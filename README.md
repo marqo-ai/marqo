@@ -16,7 +16,7 @@ A deep-learning powered, open-source search engine which seamlessly integrates w
 
 <!-- end marqo-description -->
 
-## Get started
+## Getting started
 
 1. Marqo requires docker. To install docker go to https://docs.docker.com/get-docker/
 2. Use docker to run [Opensearch](https://opensearch.org/):
