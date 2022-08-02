@@ -1,0 +1,17 @@
+# client:
+requests
+# testing:
+pytest
+tox
+# s2_inference:
+more_itertools
+nltk
+torch
+pillow
+numpy
+validators
+sentence-transformers
+clip-marqo
+onnxruntime
+onnx
+protobuf==3.20.1

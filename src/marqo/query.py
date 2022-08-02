@@ -1,0 +1,1 @@
+"""Deals with queries in S2Search's query language"""
