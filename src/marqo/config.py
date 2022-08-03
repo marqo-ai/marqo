@@ -3,6 +3,7 @@ from marqo import enums
 import torch
 import urllib3
 import warnings
+import warnings
 
 
 class Config:
@@ -32,6 +33,8 @@ class Config:
 
         self.indexing_device = indexing_device if indexing_device is not None else default_device
         self.search_device = search_device if search_device is not None else default_device
+        # suppress warnings until we figure out the dependency issues:
+        warnings.filterwarnings("ignore")
 
     def set_url(self, url):
         """Set the URL, and infers whether that url is remote"""

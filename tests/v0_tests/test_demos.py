@@ -91,7 +91,8 @@ class TestKaizanDemo(MarqoTestCase):
         r5 = mq.index("my-first-index").search('adventure', searchable_attributes=['Title'])
         assert len(r5["hits"]) == 2
 
-        r6 = mq.index("my-first-index").delete_documents(ids=["article_591"])
+        r6 = mq.index("my-first-index").delete_documents(ids=["article_591", "article_602"])
+        pprint.pprint(r6)
         assert r6['deleted'] == 1
 
         rneg1 = mq.index("my-first-index").delete()

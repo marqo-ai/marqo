@@ -117,13 +117,6 @@ Get information about an index.
 results = mq.index("my-first-index").get_stats()
 ```
 
-### Delete index
-Delete an index.
-
-```python
-results = mq.index("my-first-index").delete()
-```
-
 ### Lexical search
 Perform a keyword search.
 
@@ -181,6 +174,24 @@ Searching using an image can be achieved by providing the image link.
 ```python
 results = mq.index("my-multimodal-index").search('https://upload.wikimedia.org/wikipedia/commons/thumb/9/96/Standing_Hippopotamus_MET_DP248993.jpg/1920px-Standing_Hippopotamus_MET_DP248993.jpg')
 ```
+
+
+### Delete index
+Delete an index.
+
+```python
+results = mq.index("my-first-index").delete()
+```
+
+
+### Delete documents
+Delete documents.
+
+```python
+results = mq.index("my-first-index").delete_documents(ids=["article_591", "article_602"])
+```
+
+
 
 ## A note when using a GPU
 Depending on the class of GPU, a version of PyTorch compiled with the latest CUDA (>11.3) may be required. 
