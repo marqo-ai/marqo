@@ -3,11 +3,15 @@ from unittest import mock
 from marqo import config
 from marqo import enums
 import torch
+from marqo.client import Client
+from marqo import utils
+from tests.marqo_test import MarqoTestCase
 
-class TestConfig(unittest.TestCase):
+
+class TestConfig(MarqoTestCase):
 
     def setUp(self) -> None:
-        self.endpoint = "http://admin:admin@localhost:9200"
+        self.endpoint = self.authorized_url
 
     def test_init_custom_devices(self):
         c = config.Config(url=self.endpoint,indexing_device="cuda:3", search_device="cuda:4")
@@ -79,3 +83,11 @@ class TestConfig(unittest.TestCase):
             mock_reset_warnings.assert_called()
             return True
         assert run()
+
+    def test_url_is_s2search(self):
+        c = config.Config(url="https://s2search.io/abdcde:9200")
+        assert c.cluster_is_s2search
+
+    def test_url_is_not_s2search(self):
+        c = config.Config(url="https://som_random_cluster/abdcde:9200")
+        assert not c.cluster_is_s2search

@@ -1,25 +1,22 @@
-import json
-import pprint
-from marqo.client import Client
-import unittest
-import copy
-import unittest
 from marqo.neural_search import neural_search
 from marqo.config import Config
 from marqo.errors import MarqoError, MarqoApiError
+from tests.marqo_test import MarqoTestCase
 import requests
-from marqo.neural_search import utils
-from marqo.neural_search.enums import NeuralField
+from marqo.client import Client
 
 
-class TestDeleteDocuments(unittest.TestCase):
+class TestDeleteDocuments(MarqoTestCase):
 
     def setUp(self) -> None:
-        self.endpoint = 'https://admin:admin@localhost:9200'
+        c = Client(**self.client_settings)
+        self.endpoint = c.config.url
+        self.config = c.config
+
         self.generic_header = {"Content-type": "application/json"}
         self.index_name_1 = "my-test-index-1"
         self.index_name_2 = "my-test-index-2"
-        self.config = Config(url=self.endpoint)
+
         self._delete_testing_indices()
 
     def _delete_testing_indices(self):

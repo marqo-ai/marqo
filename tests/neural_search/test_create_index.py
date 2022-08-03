@@ -1,23 +1,25 @@
-import json
 import pprint
-import time
+
 import requests
-from marqo.neural_search.enums import NeuralField, NeuralSettingsField
+from marqo.neural_search.enums import NeuralSettingsField
 from marqo.client import Client
 from marqo.errors import MarqoApiError, MarqoError
-from marqo.neural_search import neural_search, constants, index_meta_cache
+from marqo.neural_search import neural_search
 import unittest
 import copy
+from tests.marqo_test import MarqoTestCase
 
 
-class TestCreateIndex(unittest.TestCase):
+class TestCreateIndex(MarqoTestCase):
 
     def setUp(self) -> None:
-        self.endpoint = 'https://admin:admin@localhost:9200'
+        mq = Client(**self.client_settings)
+        self.endpoint = mq.config.url
+        self.config = mq.config
+        self.client = mq
+
         self.generic_header = {"Content-type": "application/json"}
-        self.client = Client(url=self.endpoint)
         self.index_name_1 = "my-test-create-index-1"
-        self.config = copy.deepcopy(self.client.config)
         try:
             self.client.delete_index(self.index_name_1)
         except MarqoApiError as s:
@@ -42,7 +44,7 @@ class TestCreateIndex(unittest.TestCase):
             assert "no such index" in str(e)
         self.client.create_index(index_name=self.index_name_1)
         settings = requests.get(
-            url=self.endpoint + "/_mapping",
+            url=f"{self.endpoint}/{self.index_name_1}/_mapping",
             verify=False
         ).json()
         assert settings[self.index_name_1]["mappings"]["_meta"][NeuralSettingsField.neural_settings] \
@@ -65,9 +67,10 @@ class TestCreateIndex(unittest.TestCase):
         }
         self.client.create_index(index_name=self.index_name_1, **custom_settings)
         settings = requests.get(
-            url=self.endpoint + "/_mapping",
+            url=self.endpoint + "/" + self.index_name_1 + "/_mapping",
             verify=False
         ).json()
+        pprint.pprint(settings)
         retrieved_settings = settings[self.index_name_1]["mappings"]["_meta"][NeuralSettingsField.neural_settings]
         del retrieved_settings[NeuralSettingsField.index_defaults][NeuralSettingsField.model]
 

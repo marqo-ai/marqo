@@ -1,21 +1,19 @@
 import pprint
 import time
-
-import requests
 from marqo.neural_search import enums, backend
 from marqo.neural_search import neural_search
 import unittest
 import copy
 from marqo.errors import MarqoError, MarqoApiError
 from marqo.client import Client
+from tests.marqo_test import MarqoTestCase
 
 
-class TestlexicalSearch(unittest.TestCase):
+class TestlexicalSearch(MarqoTestCase):
 
     def setUp(self) -> None:
-        self.endpoint = 'https://admin:admin@localhost:9200'
         self.generic_header = {"Content-type": "application/json"}
-        self.client = Client(url=self.endpoint)
+        self.client = Client(**self.client_settings)
         self.index_name_1 = "my-test-index-1"
         self.config = copy.deepcopy(self.client.config)
         try:

@@ -3,12 +3,13 @@ from marqo.neural_search import index_meta_cache
 from marqo import errors
 import unittest
 import pprint
+from tests.marqo_test import MarqoTestCase
 
 
-class TestMultiClients(unittest.TestCase):
+class TestMultiClients(MarqoTestCase):
 
     def setUp(self) -> None:
-        self.client = Client(url='https://localhost:9200', main_user="admin", main_password="admin")
+        self.client = Client(**self.client_settings)
         self.index_name_1 = "my-test-index-1"
         try:
             self.client.delete_index(self.index_name_1)
@@ -29,6 +30,6 @@ class TestMultiClients(unittest.TestCase):
         assert len(index_meta_cache.get_cache()) == 0
         self.client = None
         # creating a client populates the cache:
-        self.client = Client(url='https://admin:admin@localhost:9200')
+        self.client = Client(**self.client_settings)
         search_res_2 = self.client.index(self.index_name_1).search("title about some doc")
         assert len(search_res_2["hits"]) > 0

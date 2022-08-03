@@ -4,13 +4,14 @@ import unittest
 import copy
 from marqo import parallel
 import torch
+from tests.marqo_test import MarqoTestCase
 
-class TestAddDocumentsPara(unittest.TestCase):
+
+class TestAddDocumentsPara(MarqoTestCase):
 
     def setUp(self) -> None:
-        self.endpoint = 'https://admin:admin@localhost:9200'
         self.generic_header = {"Content-type": "application/json"}
-        self.client = Client(url=self.endpoint)
+        self.client = Client(**self.client_settings)
         self.index_name_1 = "my-test-index-1"
         self.config = copy.deepcopy(self.client.config)
         try:

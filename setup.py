@@ -25,7 +25,7 @@ setup(
         "protobuf==3.20.1",
     ],
     name="marqo",
-    version="0.1.9",
+    version="0.1.10",
     author="marqo org",
     author_email="org@marqo.io",
     description="Neural search for humans",

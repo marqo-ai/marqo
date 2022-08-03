@@ -5,12 +5,13 @@ from marqo.client import Client
 from marqo.errors import MarqoApiError
 import unittest
 import pprint
+from tests.marqo_test import MarqoTestCase
 
 
-class TestAddDocuments(unittest.TestCase):
+class TestAddDocuments(MarqoTestCase):
 
     def setUp(self) -> None:
-        self.client = Client(url='https://localhost:9200', main_user="admin",main_password="admin")
+        self.client = Client(**self.client_settings)
         self.index_name_1 = "my-test-index-1"
         try:
             self.client.delete_index(self.index_name_1)

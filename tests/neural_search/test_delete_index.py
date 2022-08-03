@@ -1,21 +1,15 @@
-import json
-import pprint
-
-import requests
-
 from marqo.client import Client
-from marqo.errors import MarqoApiError, MarqoError
-from marqo.neural_search import neural_search, constants, index_meta_cache
-import unittest
+from marqo.errors import MarqoApiError
+from marqo.neural_search import neural_search, index_meta_cache
 import copy
+from tests.marqo_test import MarqoTestCase
 
 
-class TestDeleteIndex(unittest.TestCase):
+class TestDeleteIndex(MarqoTestCase):
 
     def setUp(self) -> None:
-        self.endpoint = 'https://admin:admin@localhost:9200'
         self.generic_header = {"Content-type": "application/json"}
-        self.client = Client(url=self.endpoint)
+        self.client = Client(**self.client_settings)
         self.index_name_1 = "my-test-index-owwoowow2"
         self.index_name_2 ="test-index-epic"
         self.config = copy.deepcopy(self.client.config)

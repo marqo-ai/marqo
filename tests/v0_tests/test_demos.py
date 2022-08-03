@@ -4,16 +4,17 @@ from marqo.client import Client
 from marqo.errors import MarqoApiError
 import unittest
 import pprint
+from tests.marqo_test import MarqoTestCase
 
 
-class TestKaizanDemo(unittest.TestCase):
+class TestKaizanDemo(MarqoTestCase):
     """Test for Kaizan demo.
 
     Assumptions:
         - Local OpenSearch (not S2Search)
     """
     def setUp(self) -> None:
-        client_0 = Client(url='https://localhost:9200', main_user="admin",main_password="admin")
+        client_0 = Client(**self.client_settings)
         for ix_name in ["cool-index-1", "my-first-index"]:
             try:
                 client_0.delete_index(ix_name)
@@ -21,7 +22,7 @@ class TestKaizanDemo(unittest.TestCase):
                 pass
 
     def test_demo(self):
-        client = Client(url='https://localhost:9200', main_user="admin",main_password="admin")
+        client = Client(**self.client_settings)
         client.index("cool-index-1").add_documents([
             {
                 "Title": "The Legend of the River",
@@ -89,6 +90,9 @@ class TestKaizanDemo(unittest.TestCase):
 
         r5 = mq.index("my-first-index").search('adventure', searchable_attributes=['Title'])
         assert len(r5["hits"]) == 2
+
+        r6 = mq.index("my-first-index").delete_documents(ids=["article_591"])
+        assert r6['deleted'] == 1
 
         rneg1 = mq.index("my-first-index").delete()
         assert rneg1["acknowledged"] is True

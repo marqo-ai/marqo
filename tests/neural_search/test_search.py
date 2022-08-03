@@ -3,20 +3,17 @@ from marqo.neural_search.enums import NeuralField, SearchMethod
 from marqo.client import Client
 from marqo.errors import MarqoApiError, MarqoError
 from marqo.neural_search import neural_search, constants, index_meta_cache
-import unittest
 import copy
+from tests.marqo_test import MarqoTestCase
 
 
-class TestVectorSearch(unittest.TestCase):
+class TestVectorSearch(MarqoTestCase):
 
     def setUp(self) -> None:
-        self.client = Client(url='https://admin:admin@localhost:9200')
+        self.client = Client(**self.client_settings)
         self.index_name_1 = "my-test-index-1"
         self.index_name_2 = "my-test-index-2"
         self.index_name_3 = "my-test-index-3"
-        self.lots_of_indices = [self.index_name_1, self.index_name_2, self.index_name_3,
-                                "my-test-index-4", "my-test-index-5", "my-test-index-6",
-                                "my-test-index-7", "my-test-index-8", "my-test-index-9"]
         self.config = copy.deepcopy(self.client.config)
         self._delete_test_indices()
 
@@ -174,15 +171,6 @@ class TestVectorSearch(unittest.TestCase):
         res = neural_search.search(
             text="In addition to NiS collection fire assay for a five element",
             config=self.config, index_name=self.index_name_1)
-
-    def test_search_concurrent_index_refresh(self):
-        self._delete_test_indices(indices=self.lots_of_indices)
-        for ix_name in self.lots_of_indices:
-            neural_search.create_vector_index(config=self.config, index_name=ix_name)
-
-        res = neural_search.search(config=self.config, index_name=self.index_name_1, text="lkekjnjn")
-        print(f"res: {res}")
-        self._delete_test_indices(indices=self.lots_of_indices)
 
     def test_search_format(self):
         """Is the result formatted correctly?"""

@@ -1,28 +1,17 @@
-import json
-import pprint
-import requests
-from marqo.client import Client
 from marqo.errors import MarqoApiError, MarqoError
-from marqo.neural_search import neural_search, constants, index_meta_cache
-import unittest
-import copy
-import unittest
-from marqo.neural_search.models.index_info import IndexInfo
-from marqo.neural_search.models import index_info
-from marqo.config import Config
-import requests
-from marqo.neural_search import utils
-from marqo.neural_search.enums import NeuralField
+from marqo.client import Client
+from marqo.neural_search import neural_search
+from tests.marqo_test import MarqoTestCase
 
 
-class TestGetDocument(unittest.TestCase):
+class TestGetDocument(MarqoTestCase):
 
     def setUp(self) -> None:
-        self.endpoint = 'https://admin:admin@localhost:9200'
         self.generic_header = {"Content-type": "application/json"}
         self.index_name_1 = "my-test-index-1"
         self.index_name_2 = "my-test-index-2"
-        self.config = Config(url=self.endpoint)
+        c = Client(**self.client_settings)
+        self.config = c.config
         self._delete_testing_indices()
 
     def _delete_testing_indices(self):

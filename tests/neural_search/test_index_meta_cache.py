@@ -8,20 +8,18 @@ from marqo.neural_search import neural_search
 from marqo.neural_search import index_meta_cache
 from marqo.config import Config
 from marqo.errors import MarqoError, MarqoApiError
-import requests
 from marqo.neural_search import utils
 from marqo.neural_search.enums import NeuralField, SearchMethod, NeuralSettingsField
 from marqo.neural_search import configs
+from tests.marqo_test import MarqoTestCase
 
-
-class TestIndexMetaCache(unittest.TestCase):
+class TestIndexMetaCache(MarqoTestCase):
 
     def setUp(self) -> None:
-        self.endpoint = 'https://admin:admin@localhost:9200'
         self.generic_header = {"Content-type": "application/json"}
         self.index_name_1 = "my-test-index-1"
         self.index_name_2 = "my-test-index-2"
-        self.config = Config(url=self.endpoint)
+        self.config = Config(self.authorized_url)
         self._delete_testing_indices()
 
     def _delete_testing_indices(self):
@@ -305,6 +303,9 @@ class TestIndexMetaCache(unittest.TestCase):
             return_doc_ids=True, search_method=SearchMethod.NEURAL)
         assert result['hits'] == []
         time.sleep(0.5)
+        if self.config.cluster_is_remote:
+            # Allow extra time if using a remote cluster
+            time.sleep(3)
         result_2 = neural_search.search(
             index_name=self.index_name_1, config=self.config, text="a line of text",
             searchable_attributes=["brand new field"],

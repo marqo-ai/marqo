@@ -23,9 +23,6 @@ class Client:
     A client instance is needed for every marqo API method to know the location of
     marqo and its permissions.
     """
-
-
-
     def __init__(
         self, url: str = "http://localhost:9200", main_user: str = None, main_password: str = None,
         indexing_device: Optional[Union[enums.Devices, str]] = None,
@@ -48,7 +45,8 @@ class Client:
         self.config = Config(self.url, indexing_device=indexing_device, search_device=search_device)
         self.http = HttpRequests(self.config)
         index_meta_cache.populate_cache(config=self.config)
-        self._turn_off_auto_create_index()
+        if not self.config.cluster_is_s2search:
+            self._turn_off_auto_create_index()
 
     def _turn_off_auto_create_index(self):
         """turns off auto creation of indices. To be run in client instantiation"""
