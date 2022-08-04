@@ -8,6 +8,7 @@ import os
 
 c = config.Config(url=f'https://admin:admin@{os.environ["OPENSEARCH_IP"]}:9200')
 
+
 class SearchQuery(BaseModel):
     q: str
     index_name: str
@@ -46,10 +47,12 @@ curl -XPOST  http://localhost:8000/add-documents -H 'Content-type:application/js
 "docs": [
     {
         "Title": "Honey is a delictable food stuff",
-        "Desc" : "some boring description"
+        "Desc" : "some boring description",
+        "_id": "honey_facts_119"
     }, {
         "Title": "Space exploration",
-        "Desc": "mooooon! Space!!!!"
+        "Desc": "mooooon! Space!!!!",
+        "_id": "moon_fact_145"
     }],
 "index_name": "my-irst-ix"
 }'
