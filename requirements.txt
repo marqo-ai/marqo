@@ -1,6 +1,7 @@
 # neural search:
 requests
 fastapi
+uvicorn[standard]
 # testing:
 pytest
 tox

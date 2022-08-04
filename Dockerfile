@@ -1,13 +1,11 @@
-# DOCKER_BUILDKIT=1 docker build .
+# DOCKER_BUILDKIT=1 docker build . -t marqo_docker_0
+# docker run -v /var/run/docker.sock:/var/run/docker.sock -p 8000:8000 marqo_docker_0
+
 
 FROM python:3.8-slim-buster
 WORKDIR /app
 RUN apt-get update
-RUN apt-get install \
-    ca-certificates \
-    curl \
-    gnupg \
-    lsb-release -y
+RUN apt-get install ca-certificates curl  gnupg lsof lsb-release -y
 RUN apt-get install apt-transport-https ca-certificates curl gnupg2 software-properties-common -y
 RUN mkdir -p /etc/apt/keyrings
 RUN curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
@@ -27,4 +25,5 @@ COPY . /app
 #COPY tests /app/tests
 #COPY setup.py /app/setup.py
 #COPY setup.py /app/setup.py
-CMD sh ./run_marqo.sh
+RUN chmod +x ./run_marqo.sh
+CMD ./run_marqo.sh
