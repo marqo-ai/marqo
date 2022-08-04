@@ -1,5 +1,6 @@
-# client:
+# neural search:
 requests
+fastapi
 # testing:
 pytest
 tox
