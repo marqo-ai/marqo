@@ -4,14 +4,12 @@
 #dockerd
 
 # Start opensearch in the background
-echo doing iffff lsof:
-lsof -i:9600
-if [[ $(lsof -i:9600) ]]; then
+if [[ $(docker ps -a | grep 9600 | grep -v Exited) ]]; then
     echo "opennsearch is running"
 else
-    docker run -id -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" opensearchproject/opensearch:2.1.0 &
+    echo "opensearch not running"
+    docker run -id -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" opensearchproject/opensearch:2.1.0
 fi
-
 
 
 # Start the neural search web app in the background
