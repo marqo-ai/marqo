@@ -12,7 +12,7 @@ setup(
         "requests",
         "urllib3",
         # s2_inference:
-        "clip-marqo==1.0.1",
+        "clip-marqo==1.0.2",
         "more_itertools",
         "nltk",
         "torch",
