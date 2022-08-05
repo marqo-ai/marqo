@@ -53,36 +53,6 @@ class TestEncoding(unittest.TestCase):
                 assert abs(model.encode_text(text) - model.encode([text])).sum() < eps
                 assert abs(model.encode(text) - model.encode_text([text])).sum() < eps
 
-    def test_compare_onnx_clip_text_models(self):
-        clear_loaded_models()
-        names = ["ViT-L/14", "RN50"]
-        sentences = ['hello', 'this is a test sentence. so is this.']
-        device = 'cpu'
-        eps = 1e-4
-        
-        for name in names:
-            for sentence in sentences:
-                model_sbert = _load_model(name, device=device)
-                model_onnx = _load_model(os.path.join('onnx', name), device=device)
-
-                assert abs(torch.FloatTensor(_convert_vectorized_output(model_onnx.encode(sentence, normalize=True))) - torch.FloatTensor(_convert_vectorized_output(model_sbert.encode(sentence, normalize=True)))).sum() < eps
-        clear_loaded_models()
-
-    def test_load_clip_onnx_text_model(self):
-        names = ['onnx/ViT-L/14', 'onnx/RN50']
-        device = 'cpu'
-        eps = 1e-9
-        texts = ['hello', 'big', 'asasasasaaaaaaaaaaaa', '', 'a word. another one!?. #$#.']
-        
-        for name in names:
-        
-            model = _load_model(name, device=device)
-            
-            for text in texts:
-                assert abs(model.encode(text) - model.encode([text])).sum() < eps
-                assert abs(model.encode_text(text) - model.encode([text])).sum() < eps
-                assert abs(model.encode(text) - model.encode_text([text])).sum() < eps
-
 
     def test_load_sbert_text_model(self):
         names = ["sentence-transformers/all-MiniLM-L6-v1", "all_datasets_v4_MiniLM-L6"]
