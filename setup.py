@@ -21,7 +21,6 @@ setup(
         "validators",
         "sentence-transformers",
         "onnxruntime",
-        "onnx",
         "protobuf==3.20.1",
     ],
     name="marqo",
