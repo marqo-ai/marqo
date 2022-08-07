@@ -38,10 +38,14 @@ class TestOutputs(unittest.TestCase):
 
         names = ['RN50', "sentence-transformers/all-MiniLM-L6-v1", "all-MiniLM-L6-v1"]
 
+        keys = []
         for name in names:
             _ = vectorise(name, 'hello', device=device)
-        print(sorted(set(available_models.keys())), sorted(set(names)))
-        assert sorted(set(available_models.keys())) == sorted(set(names))
+            key = (name, device)
+            keys.append(key)
+            print(key)
+        print(sorted(set(available_models.keys())), sorted(set(keys)))
+        assert sorted(set(available_models.keys())) == sorted(set(keys))
 
         clear_loaded_models()
 
