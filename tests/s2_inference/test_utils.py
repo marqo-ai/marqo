@@ -43,7 +43,7 @@ class TestOutputs(unittest.TestCase):
             _ = vectorise(name, 'hello', device=device)
             key = (name, device)
             keys.append(key)
-            print(key)
+            
         print(sorted(set(available_models.keys())), sorted(set(keys)))
         assert sorted(set(available_models.keys())) == sorted(set(keys))
 
