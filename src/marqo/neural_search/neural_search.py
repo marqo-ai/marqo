@@ -39,6 +39,7 @@ import typing
 import uuid
 import asyncio
 from typing import List, Optional, Union, Callable, Iterable, Sequence, Dict
+from PIL import Image
 import requests
 from marqo.neural_search.enums import MediaType, MlModel, NeuralField, SearchMethod
 from marqo.neural_search.enums import NeuralSettingsField as NsField
@@ -203,8 +204,13 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
             field_content = copied[field]
 
-            if isinstance(field_content, str):
-                text_chunks = text_processor.split_text(field_content)
+            if isinstance(field_content, (str, Image.Image)):
+                
+                if isinstance(field_content, str):
+                    text_chunks = text_processor.split_text(field_content)
+                else:
+                    text_chunks = image_processor.chunk_image(field_content)            
+                
                 vector_chunks = s2_inference.vectorise(index_info.model_name, text_chunks, 
                                                     config.indexing_device, index_info.neural_settings['index_defaults']['normalize_embeddings'],
                                                     infer=index_info.neural_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images])
