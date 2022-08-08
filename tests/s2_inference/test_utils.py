@@ -77,6 +77,25 @@ class TestOutputs(unittest.TestCase):
             
             key = _create_model_cache_key(name, device)
             assert key not in list(available_models.keys())
+            _ = vectorise(name, 'hello', device=device)
+            assert key in list(available_models.keys())
+
+        clear_loaded_models()
+
+    def test_cache_is_quicker(self):
+        # test the model is cached on subsequent calls
+        clear_loaded_models()
+        
+        device = 'cpu'
+        assert available_models == dict()
+
+        names = ['RN50', "sentence-transformers/all-MiniLM-L6-v1", "all-MiniLM-L6-v1"]
+
+        keys = []
+        for name in names:
+            
+            key = _create_model_cache_key(name, device)
+            assert key not in list(available_models.keys())
             t0 = time.time()
             _ = vectorise(name, 'hello', device=device)
             t1 = time.time()
