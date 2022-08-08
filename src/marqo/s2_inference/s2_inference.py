@@ -23,13 +23,29 @@ def vectorise(model_name: str, content: Union[str, List[str]], device: str = get
     Returns:
         List[List[float]]: _description_
     """
-    # TODO map by (model_name, device) instead of model_name
-    if model_name not in available_models:
-        available_models[(model_name, device)] = _load_model(model_name, device=device)
+    model_cache_key = _create_model_cache_key(model_name, device)
+
+    if model_cache_key not in available_models:
+        available_models[model_cache_key] = _load_model(model_name, device=device)
         logger.info(f'loaded {model_name} on device {device} with normalization={normalize_embeddings}')
-    vectorised = available_models[(model_name, device)].encode(content, normalize=normalize_embeddings, **kwargs)
+
+    vectorised = available_models[model_cache_key].encode(content, normalize=normalize_embeddings, **kwargs)
+
     return _convert_vectorized_output(vectorised)
 
+def _create_model_cache_key(model_name: str, device: str) -> str:
+    """creates a key to store the loaded model by in the cache
+
+    Args:
+        model_name (str): _description_
+        device (str): _description_
+
+    Returns:
+        str: _description_
+    """
+
+    model_cache_key = (model_name, device)
+    return model_cache_key
 
 def clear_loaded_models() -> None:
     """ clears the loaded model cache
