@@ -33,7 +33,7 @@ def vectorise(model_name: str, content: Union[str, List[str]], device: str = get
 
     return _convert_vectorized_output(vectorised)
 
-def _create_model_cache_key(model_name: str, device: str) -> str:
+def _create_model_cache_key(model_name: str, device: str) -> Tuple:
     """creates a key to store the loaded model by in the cache
 
     Args:
