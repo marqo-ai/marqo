@@ -1,8 +1,26 @@
 from PIL import Image
 import numpy as np
-from marqo.s2_inference.types import *
 
+import torch
+
+from marqo.s2_inference.types import *
 from random import randint
+from marqo.s2_inference.s2_inference import available_models
+
+def _load_yolo5(device):
+
+    key = ('yolo5', device)
+    if key in available_models:
+        model = available_models[key]
+    else:
+        model = torch.hub.load('ultralytics/yolov5', 'yolov5s', device=device)
+    return model
+
+def yolo5(image, device):
+
+    model = _load_yolo5(device)
+    
+
 
 def random_bbox(bbox):
     v = [randint(0, v) for v in bbox]
