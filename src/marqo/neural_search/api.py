@@ -23,7 +23,10 @@ async def root():
 async def search(search_query: SearchQuery, index_name: str):
     return neural_search.search(
         config=c, text=search_query.q,
-        index_name=index_name)
+        index_name=index_name, highlights=search_query.showHighlights,
+        searchable_attributes=search_query.searchableAttributes,
+        search_method=search_query.searchMethod,
+        result_count=search_query.limit)
 
 
 @app.post("/indexes/{index_name}/documents")
@@ -52,6 +55,10 @@ curl -XPOST  'http://localhost:8000/indexes/my-irst-ix/documents?refresh=true' -
 
 """
 curl -XPOST  http://localhost:8000/indexes/my-irst-ix/search -H 'Content-type:application/json' -d '{
-    "q": "what do bears eat?"
+    "q": "what do bears eat?",
+    "searchableAttributes": ["Title", "Desc", "other"],
+    "limit": 3, 
+    "searchMethod": "NEURAL",
+    "showHighlights": true
 }'
 """

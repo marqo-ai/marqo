@@ -1,17 +1,23 @@
+from enum import Enum
+
+
 class MediaType:
     text = 'text'
     image = 'image'
     default = 'text'
 
+
 class MlModel:
     bert = "hf/all_datasets_v4_MiniLM-L6"
     clip = "ViT-L/14"
 
-class SearchMethod:
+
+class SearchMethod(str, Enum):
     # BM25/ TF-IDF:
     LEXICAL = "LEXICAL"
     # chunk_embeddings
     NEURAL = "NEURAL"
+
 
 class NeuralField:
     """Neural Search fields
