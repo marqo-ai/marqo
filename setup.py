@@ -12,7 +12,7 @@ setup(
         "requests",
         "urllib3",
         # s2_inference:
-        "clip-marqo==1.0.1",
+        "clip-marqo==1.0.2",
         "more_itertools",
         "nltk",
         "torch",
@@ -21,7 +21,6 @@ setup(
         "validators",
         "sentence-transformers",
         "onnxruntime",
-        "onnx",
         "protobuf==3.20.1",
     ],
     name="marqo",

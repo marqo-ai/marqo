@@ -3,11 +3,6 @@ class MediaType:
     image = 'image'
     default = 'text'
 
-class Normalization:
-    normalize = True 
-
-
-
 class MlModel:
     bert = "hf/all_datasets_v4_MiniLM-L6"
     clip = "ViT-L/14"
