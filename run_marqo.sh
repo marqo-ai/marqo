@@ -7,9 +7,9 @@ if [[ $(docker ps -a | grep 9600 | grep -v Exited) ]]; then
 else
     echo "opensearch not running"
     # this runs docker, using the host's docker
-    docker run --name opensearch -id -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" opensearchproject/opensearch:2.1.0
+    docker run --name opensearch -id -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" opensearchproject/opensearch:2.1.0 &
     # do an if statement - here!
-    docker start opensearch &
+#    docker start opensearch &
 fi
 echo checking for docker ip:
 # probably check whether the user has set a remote cluster, first...
