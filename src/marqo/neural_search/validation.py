@@ -1,3 +1,5 @@
+import pprint
+
 from marqo.neural_search import enums
 from typing import Iterable, Container
 from marqo.errors import MarqoError
@@ -5,24 +7,24 @@ from marqo.neural_search.enums import NeuralField
 from marqo.neural_search import constants
 from typing import Any, Type
 import inspect
+from enum import Enum
 
 
-def validate_str_against_enum(value: Any, enum_class: Type, case_sensitive: bool = True):
+def validate_str_against_enum(value: Any, enum_class: Type[Enum], case_sensitive: bool = True):
     """Checks whether a value is found as the value of a str attribute of the
      given enum_class.
 
-    Assumes that member fields starting with "__" are built-ins.
-
     Returns value if an error is not raised.
     """
-    print(f"value: {value}")
-    print(f"type valuevuvn: {type(value)}")
-    available_enums = {
-        mem[1] if case_sensitive else mem[1].upper() for mem in inspect.getmembers(enum_class)
-        if not mem[0].startswith('__') and type(mem[1]) is str
-    }
-    cased_value = value if case_sensitive else value.upper()
-    if cased_value not in available_enums:
+
+    if case_sensitive:
+        enum_values = set(item.value for item in enum_class)
+        to_test_value = value
+    else:
+        enum_values = set(item.value.upper() for item in enum_class)
+        to_test_value = value.upper()
+
+    if to_test_value not in enum_values:
         raise ValueError(f"{value} is not a valid {enum_class.__name__}")
     return value
 

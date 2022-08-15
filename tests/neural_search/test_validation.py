@@ -1,4 +1,5 @@
-from marqo.neural_search import enums, validation
+from marqo.neural_search import validation
+from enum import Enum
 import unittest
 import copy
 from marqo.errors import MarqoError
@@ -7,7 +8,7 @@ from marqo.errors import MarqoError
 class TestValidation(unittest.TestCase):
 
     def setUp(self) -> None:
-        class SimpleEnum:
+        class SimpleEnum(str, Enum):
             ABC = "APPLE"
             DEF = "BANANA"
 

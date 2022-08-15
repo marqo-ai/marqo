@@ -1,5 +1,5 @@
 """The API entrypoint for Neural Search"""
-from models.api_objects import SearchQuery, AddDocuments
+from models.api_models import SearchQuery, AddDocuments
 from fastapi import FastAPI
 from typing import Union
 from fastapi import FastAPI
