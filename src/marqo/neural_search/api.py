@@ -8,7 +8,7 @@ from marqo import config
 from typing import List, Dict
 import os
 
-c = config.Config(url=f'https://admin:admin@{os.environ["OPENSEARCH_IP"]}:9200')
+c = config.Config(url=f'https://admin:admin@localhost:9200')
 
 
 app = FastAPI()
