@@ -45,6 +45,10 @@ from marqo.neural_search.enums import MediaType, MlModel, NeuralField, SearchMet
 from marqo.neural_search.enums import NeuralSettingsField as NsField
 from marqo.neural_search import utils, backend, validation, configs
 from marqo.processing import text as text_processor
+
+from marqo.processing import image as image_processor
+from marqo.s2_inference.clip_utils import _is_image
+
 from marqo.s2_inference import s2_inference
 from marqo.neural_search.index_meta_cache import get_cache,get_index_info
 from marqo.neural_search import index_meta_cache
@@ -206,15 +210,18 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
             if isinstance(field_content, (str, Image.Image)):
                 
-                if isinstance(field_content, str):
-                    text_chunks = text_processor.split_text(field_content)
+                if isinstance(field_content, str) and not _is_image(field_content):
+                    content_chunks = text_processor.split_text(field_content)
+                    text_chunks = content_chunks
                 else:
-                    text_chunks = image_processor.chunk_image(field_content)            
+                    content_chunks, text_chunks = image_processor.chunk_image(field_content, 
+                                    device=config.indexing_device)            
                 
-                vector_chunks = s2_inference.vectorise(index_info.model_name, text_chunks, 
+                vector_chunks = s2_inference.vectorise(index_info.model_name, content_chunks, 
                                                     config.indexing_device, index_info.neural_settings['index_defaults']['normalize_embeddings'],
                                                     infer=index_info.neural_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images])
-                assert len(vector_chunks) == len(text_chunks)
+
+                assert len(vector_chunks) == len(content_chunks)
                 for text_chunk, vector_chunk in zip(text_chunks, vector_chunks):
                     chunk_id = str(uuid.uuid4())
                     chunks.append({
