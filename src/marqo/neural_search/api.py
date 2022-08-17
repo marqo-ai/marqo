@@ -14,9 +14,20 @@ import logging
 
 
 def replace_host_localhosts(OPENSEARCH_IS_INTERNAL: str, OS_URL: str):
-    """If we are within the docker container
-    OPENSEARCH_IS_INTERNAL: 'False' | 'True'
-    OS_URL: the URL of OpenSearch
+    """Replaces a host's localhost URL with one that can be referenced from
+    within a container.
+
+    If we are within a docker container, we need to determine if a localhost
+    OpenSearch URL is referring to a URL within our container, or a URL on the
+    host.
+
+    Note this only works if the Docker run command is ran with this option:
+    --add-host host.docker.internal:host-gateway
+
+    Args:
+        OPENSEARCH_IS_INTERNAL: 'False' | 'True'; these are strings because they
+            come from environment vars
+        OS_URL: the URL of OpenSearch
     """
     if OPENSEARCH_IS_INTERNAL == "False":
         for local_domain in ["localhost", "0.0.0.0", "127.0.0.1"]:
