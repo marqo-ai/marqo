@@ -13,6 +13,7 @@ import torchvision
 from marqo.s2_inference.s2_inference import available_models
 from marqo.s2_inference.s2_inference import get_logger
 from marqo.s2_inference.types import Dict, List, Union, ImageType, Tuple, FloatTensor, ndarray
+from marqo.s2_inference.clip_utils import format_and_load_CLIP_image
 
 logger = get_logger('image_chunks')
 
@@ -83,10 +84,14 @@ def load_rcnn_image(image_name: str, size: Tuple = (320,320)) -> Tuple[ImageType
     Returns:
         Tuple[ImageType, FloatTensor, Tuple[int, int]]: _description_
     """
-    if not isinstance(image_name, str):
+    
+    if isinstance(image_name, ImageType):
         image = image_name 
-    else:
+    elif isinstance(image_name, str):
         image = Image.open(image_name)
+    else:
+        raise TypeError(f"received {type(image_name)} but expected a string or PIL image")
+
     original_size = image.size
 
     image = image.convert('RGB').resize(size)
@@ -94,25 +99,6 @@ def load_rcnn_image(image_name: str, size: Tuple = (320,320)) -> Tuple[ImageType
     image_pt = transforms.ToTensor()(image)
     return image, image_pt,original_size
 
-import tempfile
-import os
-def test_load_rcnn_image():
-
-    image_size = (100,100,3)
-    scaled_size = (320,320)
-
-    with tempfile.TemporaryDirectory() as d:
-        temp_file_name = os.path.join(d, 'test_image.png')
-        img = Image.fromarray(np.random.randint(0,255,size=image_size).astype(np.uint8))
-        img.save(temp_file_name)
-        gt_size = img.size
-        image, image_pt,original_size = load_rcnn_image(temp_file_name, size=scaled_size)
-
-        assert image.size == scaled_size[:2]
-        assert original_size == image_size[:2]
-        assert gt_size == image_size[:2]
-        assert image_pt.shape[0] == 3
-        assert image_pt.shape[1:] == scaled_size
 
 def calc_area(bboxes: Union[List[List], FloatTensor, ndarray], size: Union[None, Tuple[int, int]] = None) -> List[float]:
     """calculates the fractional area of a rectangle given 4 numbers (2points)
@@ -133,19 +119,7 @@ def calc_area(bboxes: Union[List[List], FloatTensor, ndarray], size: Union[None,
     areas = [(bb[2]-bb[0])*(bb[3]-bb[1])/A for bb in bboxes]
     return areas
 
-def test_area():
 
-    bboxes = [(0,0,10,10), (10,10,11,11)]
-    areas_gt = [ (bb[3] - bb[1])*(bb[2] - bb[0]) for bb in bboxes]
-
-    areas = calc_area(bboxes)
-
-    assert abs(np.array(areas_gt) - np.array(areas)).sum() < 1e-6
-
-    areas = calc_area(bboxes, size = (20,20))
-    areas_gt = [ (bb[3] - bb[1])*(bb[2] - bb[0])/(20*20) for bb in bboxes]
-
-    assert abs(np.array(areas_gt) - np.array(areas)).sum() < 1e-6
 
 
 def distance_matrix(v: Union[ndarray, FloatTensor], vectors: Union[ndarray, FloatTensor]) -> List[float]:
@@ -247,34 +221,6 @@ def filter_boxes(bboxes: Union[FloatTensor, ndarray], max_aspect_ratio: int = 4,
     
     return inds
 
-def test_filter_boxes():
-    boxes = [[0,0,100,100], [0,0,200,100], [5,3,50,700], [1,1,3,3]]
-
-    # should filter out the 3rd and 4th
-    inds = filter_boxes(boxes, max_aspect_ratio=2.1, min_area=10)
-    assert inds == [0,1]
-
-    # should filter out all boxes because of aspect ratio
-    inds = filter_boxes(boxes, max_aspect_ratio=1, min_area=10)
-    assert inds == []
-
-    # should filter out all except 1st due to aspect ratio
-    inds = filter_boxes(boxes, max_aspect_ratio=1.01, min_area=10)
-    assert inds == [0]
-
-    # should filter last only due to small area
-    inds = filter_boxes(boxes, max_aspect_ratio=100, min_area=10)
-    assert inds == [0, 1, 2]
-
-    # not filter any
-    inds = filter_boxes(boxes, max_aspect_ratio=100, min_area=1)
-    assert inds == [0, 1, 2, 3]
-
-    # filter all because of area
-    inds = filter_boxes(boxes, max_aspect_ratio=100, min_area=1e6)
-    assert inds == []
-
-
 
 def rescale_box(box: Union[List[float], ndarray, FloatTensor], from_size: Tuple, to_size: Tuple) -> Tuple:
     """rescales a bounding box between two different image sizes
@@ -300,27 +246,71 @@ def rescale_box(box: Union[List[float], ndarray, FloatTensor], from_size: Tuple,
 
     return (x1_n, y1_n, x2_n, y2_n)
 
-def test_rescale_box():
 
-    boxes = [[0,0,100,100], [0,0,200,100], [5,3,50,70]]
+# TODO generate boxes with overlap - take the bottom corners as centers
+def generate_boxes(image_size: Tuple[int, int], hn: int, wn: int) -> List[Tuple]:
+    """does a simple bounding box generation based on the desired number in the 
+    horizontal and vertical directions
 
-    boxes_gt = [(0.0, 0.0, 200.0, 200.0), (0.0, 0.0, 300.0, 200.0), (10.0, 6.0, 100.0, 140.0)]
+    Args:
+        image_size (Tuple[int, int]): _description_
+        hn (int): _description_
+        wn (int): _description_
 
-    original_sizes = [(100,100), (200,100), (50,70)]
+    Returns:
+        List[Tuple]: _description_
+    """
+    img_width, img_height = image_size
 
-    target_sizes = [(200,200), (300,200), (100,140)]
+    height = img_height // hn
 
-    for bb,orig_size,target_size in zip(boxes, original_sizes, target_sizes):
-        res_bb = rescale_box(bb, orig_size, target_size)
-        inv_bb = rescale_box(res_bb, target_size, orig_size)
-        print(res_bb)
-        assert abs(np.array(bb) - np.array(inv_bb)).sum() < 1e-6
-        assert abs(np.array(boxes_gt) - np.array(res_bb)).sum() < 1e-6
+    width = img_width // wn
+
+    bboxes = []
+    for i in range(0,img_height, height):
+        for j in range(0,img_width, width):
+            p1 = j+width
+            p2 = i+height
+            box = (j, i, p1, p2)
+            if p1 > img_width or p2 > img_height:
+                continue
+            bboxes.append(box)
+
+    return bboxes
+
+
+
+class PatchifySimple:
+    """class to do the patching
+    """
+    def __init__(self, size=(512, 512), hn=3, wn=3, **kwargs):
+
+        self.size = size
+        self.hn = hn
+        self.wn = wn
+
+
+    def infer(self, image):
+
+        self.image = format_and_load_CLIP_image(image)
+        self.original_size = self.image.size
+        self.image_resized = self.image.resize(self.size)
+        self.bboxes_simple = generate_boxes(self.size, self.hn, self.wn)
+
+    def process(self):
+        
+        # we add the original unchanged so that it is always in the index
+        # the bb of the original also provides the size which is required for later processing
+        self.bboxes = [(0,0,self.size[0],self.size[1])] + self.bboxes_simple
+        self.patches = patchify_image(self.image_resized, self.bboxes)
+
+        self.bboxes_orig = [rescale_box(bb, self.size, self.original_size) for bb in self.bboxes]
+
 
 class PatchifyPytorch:
     """class to do the patching
     """
-    def __init__(self, device='cpu', size=(240, 240), nms=True, filter=True):
+    def __init__(self, device='cpu', size=(240, 240), nms=True, filter_bb=True):
 
         self.size = size
 
@@ -336,7 +326,7 @@ class PatchifyPytorch:
         self.device = device
         self.model.to(self.device)
         self.nms = nms
-        self.filter = filter
+        self.filter_bb = filter_bb
 
     def infer(self, image):
 
@@ -349,7 +339,7 @@ class PatchifyPytorch:
         self.areas = torch.tensor(calc_area(self.results['boxes'], self.size))
         self.bboxes_pt = self.results['boxes'].detach().cpu()
         
-        if self.filter:
+        if self.filter_bb:
             inds = filter_boxes(self.bboxes_pt)
             self.bboxes_pt = self.bboxes_pt.clone().detach()[inds]
             self.areas = self.areas[inds]
@@ -359,11 +349,25 @@ class PatchifyPytorch:
         # we add the original unchanged so that it is always in the index
         # the bb of the original also provides the size which is required for later processing
         self.bboxes = [(0,0,self.size[0],self.size[1])] + self.bboxes_pt.numpy().astype(int).tolist()
-        self.patches = [self.image.crop(bbox) for bbox in self.bboxes]
+        self.patches = patchify_image(self.image, self.bboxes)
 
         self.bboxes_orig = [rescale_box(bb, self.size, self.original_size) for bb in self.bboxes]
 
-def chunk_image(image: Union[str, ImageType], device: str) -> Tuple[List[ImageType], ndarray]:
+def patchify_image(image: ImageType, bboxes: Union[List[float], FloatTensor, ndarray]) -> List[ImageType]:
+    """given a list of 4-tuple rectangles (x1, y1, x2, y2) return a list of 
+    cropped images
+    See PIL documentation for coord system
+
+    Args:
+        image (ImageType): _description_
+        bboxes (Union[List[float], FloatTensor, ndarray]): _description_
+
+    Returns:
+        List[ImageType]: _description_
+    """
+    return [image.crop(bb) for bb in bboxes]
+
+def chunk_image(image: Union[str, ImageType], device: str, method: str = 'simple') -> Tuple[List[ImageType], ndarray]:
     """wrapper function to do the chunking and return the patches and their bounding boxes
     in the original coordinates system
 
@@ -374,7 +378,20 @@ def chunk_image(image: Union[str, ImageType], device: str) -> Tuple[List[ImageTy
     Returns:
         Tuple[List[ImageType], ndarray]: _description_
     """
-    patch = PatchifyPytorch(device=device, size=get_default_size())
+
+    if method in [None, 'none', '', "None", ' ']:
+        if isinstance(image, str):
+            return [image],[image]      
+        elif isinstance(image, ImageType):
+            return [image], [(0, 0, image.size[0], image.size[1])]
+        else:
+            raise TypeError(f'only pointers to an image or a PIL image are allowed. received {type(image)}')
+    if method == 'simple':
+        patch = PatchifySimple(size=(512, 512), hn=3, wn=3)
+    elif method in ['fastercnn', 'frcnn']:
+        patch = PatchifyPytorch(device=device, size=get_default_size())
+    else:
+        raise ValueError(f"unexpected image chunking type. found {method}")
 
     patch.infer(image)
     patch.process()
