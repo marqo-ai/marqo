@@ -4,6 +4,7 @@ import marqo.enums as mq_enums
 from torch import multiprocessing as mp
 
 def get_default_neural_index_settings():
+    # if new fields are added, also update index.py to take in the new params
     return {
         NsFields.index_defaults: {
             NsFields.treat_urls_and_pointers_as_images: False, # only used for models that have text and vision encoders
@@ -13,7 +14,11 @@ def get_default_neural_index_settings():
                 NsFields.split_length: 2,
                 NsFields.split_overlap: 0,
                 NsFields.split_method: ns_enums.SplitMethod.sentence
-            }
+            },
+            # TODO move these into a processing dict with sub-dicts
+            NsFields.image_preprocessing:{
+            NsFields.patch_method: None #
+                    }
         }
     }
 
