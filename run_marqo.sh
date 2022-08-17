@@ -42,11 +42,11 @@ for process in "${processes[@]}"; do
         echo "$process is running"
     fi
 done
-
+OPENSEARCH_IS_INTERNAL=False
 # Start opensearch in the background
 if [[ ! $OPENSEARCH_URL ]]; then
   OPENSEARCH_URL="https://localhost:9200"
-
+  OPENSEARCH_IS_INTERNAL=True
   if [[ $(docker ps -a | grep opensearch) ]]; then
       if [[ $(docker ps -a | grep opensearch | grep -v Up) ]]; then
         docker start opensearch &
@@ -67,6 +67,7 @@ if [[ ! $OPENSEARCH_URL ]]; then
 fi
 
 export OPENSEARCH_URL
+export OPENSEARCH_IS_INTERNAL
 # Start the neural search web app in the background
 cd /app/src/marqo/neural_search || exit
 uvicorn api:app --host 0.0.0.0

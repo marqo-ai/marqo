@@ -3,7 +3,7 @@
 # docker run --name marqo -v /var/run/docker.sock:/var/run/docker.sock -p 8000:8000 marqo_docker_0
 # docker run --name opensearch -id -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" opensearchproject/opensearch:2.1.0
 # DIND:
-# docker rm -f marqo; DOCKER_BUILDKIT=1 docker build . -t marqo_docker_0 && docker run --name marqo --privileged -p 8000:8000 -e "OPENSEARCH_URL=https://localhost:9200" marqo_docker_0
+# docker rm -f marqo; DOCKER_BUILDKIT=1 docker build . -t marqo_docker_0 && docker run --name marqo --privileged -p 8000:8000 --add-host host.docker.internal:host-gateway -e "OPENSEARCH_URL=https://localhost:9200" marqo_docker_0
 # DEBUGGING:
 # export BUILDKIT_PROGRESS=plain; docker rm -f marqo; DOCKER_BUILDKIT=1 docker build --no-cache . -t marqo_docker_0 && docker run --name marqo --privileged -p 8000:8000 marqo_docker_0
 

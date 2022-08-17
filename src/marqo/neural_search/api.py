@@ -11,7 +11,26 @@ from typing import List, Dict
 import os
 import inspect
 import logging
-OPENSEARCH_URL = os.environ["OPENSEARCH_URL"]
+
+
+def replace_host_localhosts(OPENSEARCH_IS_INTERNAL: str, OS_URL: str):
+    """If we are within the docker container
+    OPENSEARCH_IS_INTERNAL: 'False' | 'True'
+    OS_URL: the URL of OpenSearch
+    """
+    if OPENSEARCH_IS_INTERNAL == "False":
+        for local_domain in ["localhost", "0.0.0.0", "127.0.0.1"]:
+            replaced_str = OS_URL.replace(local_domain, "host.docker.internal")
+            if replaced_str != OS_URL:
+                return replaced_str
+    return OS_URL
+
+
+OPENSEARCH_URL = replace_host_localhosts(
+    os.environ.get("OPENSEARCH_IS_INTERNAL", None),
+    os.environ["OPENSEARCH_URL"])
+
+
 security = HTTPBasic()
 app = FastAPI()
 
@@ -21,6 +40,9 @@ async def generate_config(creds: HTTPBasicCredentials = Depends(security)):
         url_base=OPENSEARCH_URL,
         username=creds.username,
         password=creds.password)
+    # TODO: DELETE THIS:
+    logging.warning("authorized_url:")
+    logging.warning(authorized_url)
     return config.Config(url=authorized_url)
 
 
