@@ -9,7 +9,8 @@ from marqo._httprequests import HttpRequests
 from marqo.config import Config
 from marqo.neural_search.enums import MediaType
 from marqo.marqo_logging import logger
-from marqo.enums import SearchMethods, Devices
+from marqo.enums import SearchMethods, Devices 
+from marqo.neural_search.enums import NeuralSettingsField as NsField
 from marqo import errors
 
 # pylint: disable=too-many-public-methods
@@ -62,7 +63,8 @@ class Index():
                model=None,
                normalize_embeddings=True,
                sentences_per_chunk=2,
-               sentence_overlap=0
+               sentence_overlap=0,
+               patch_method = None,
                ) -> Dict[str, Any]:
         """Create the index.
 
@@ -84,16 +86,21 @@ class Index():
         s2SearchApiError
             An error containing details about why marqo can't process your request. marqo error codes are described here: https://docs.marqo.com/errors/#marqo-errors
         """
+        # note the defaults in neural_search/configs.py need to be consistent with the values here
         return neural_search.create_vector_index(
             config=config, index_name=index_name, media_type=MediaType.default, neural_settings={
-                "index_defaults": {
-                    "treat_urls_and_pointers_as_images": treat_urls_and_pointers_as_images,
-                    "model": model,
-                    "normalize_embeddings": normalize_embeddings,
-                    "text_preprocessing": {
-                        "split_overlap": sentence_overlap,
-                        "split_length": sentences_per_chunk,
-                        "split_method": "sentence"
+                NsField.index_defaults: {
+                    NsField.treat_urls_and_pointers_as_images: treat_urls_and_pointers_as_images,
+                    NsField.model: model,
+                    NsField.normalize_embeddings: normalize_embeddings,
+                    NsField.text_preprocessing: {
+                        NsField.split_overlap: sentence_overlap,
+                        NsField.split_length: sentences_per_chunk,
+                        NsField.split_method: "sentence"
+                    },
+                    # TODO move these into a processing dict with sub-dicts
+                    NsField.image_preprocessing:{
+                        NsField.patch_method: patch_method #
                     }
                 }
             }
