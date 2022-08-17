@@ -208,17 +208,21 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
             field_content = copied[field]
 
+            # TODO put this into a function to determine routing
             if isinstance(field_content, (str, Image.Image)):
                 
+                # TODO: better/consistent handling of a no-op for processing
                 if isinstance(field_content, str) and not _is_image(field_content):
                     content_chunks = text_processor.split_text(field_content)
                     text_chunks = content_chunks
                 else:
+                    # the chunk_image contains the no-op logic as of now - method = None will be a no-op
                     content_chunks, text_chunks = image_processor.chunk_image(field_content, 
-                                    device=config.indexing_device)            
+                                    device=config.indexing_device, 
+                                    method=index_info.neural_settings[NsField.index_defaults][NsField.image_preprocessing][NsField.patch_method])            
                 
                 vector_chunks = s2_inference.vectorise(index_info.model_name, content_chunks, 
-                                                    config.indexing_device, index_info.neural_settings['index_defaults']['normalize_embeddings'],
+                                                    config.indexing_device, index_info.neural_settings[NsField.index_defaults][NsField.normalize_embeddings],
                                                     infer=index_info.neural_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images])
 
                 assert len(vector_chunks) == len(content_chunks)
