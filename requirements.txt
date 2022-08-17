@@ -2,6 +2,7 @@
 requests
 fastapi
 uvicorn[standard]
+fastapi_utils
 # testing:
 pytest
 tox

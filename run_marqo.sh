@@ -42,30 +42,31 @@ for process in "${processes[@]}"; do
         echo "$process is running"
     fi
 done
-# TODO: look into the Dockerfile VOLUME command
+
 # Start opensearch in the background
-if [[ $(docker ps -a | grep opensearch) ]]; then
-    if [[ $(docker ps -a | grep opensearch | grep -v Up) ]]; then
+if [[ ! $OPENSEARCH_URL ]]; then
+  OPENSEARCH_URL="https://localhost:9200"
+
+  if [[ $(docker ps -a | grep opensearch) ]]; then
+      if [[ $(docker ps -a | grep opensearch | grep -v Up) ]]; then
+        docker start opensearch &
+        until [[ $(curl -v --silent --insecure $OPENSEARCH_URL 2>&1 | grep Unauthorized) ]]; do
+          sleep 0.1;
+        done;
+        echo "Opensearch started"
+      fi
+      echo "OpenSearch is running"
+  else
+      echo "OpenSearch not found; running OpenSearch"
+      docker run --name opensearch -id -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" opensearchproject/opensearch:2.1.0 &
       docker start opensearch &
-      until [[ $(curl -v --silent --insecure https://admin:admin@localhost:9200 2>&1 | grep OpenSearch) ]]; do
+      until [[ $(curl -v --silent --insecure $OPENSEARCH_URL 2>&1 | grep Unauthorized) ]]; do
         sleep 0.1;
       done;
-      echo "Opensearch started"
-    fi
-    echo "OpenSearch is running"
-else
-    echo "OpenSearch not found; running OpenSearch"
-    docker run --name opensearch -id -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" opensearchproject/opensearch:2.1.0 &
-    docker start opensearch &
-    until [[ $(curl -v --silent --insecure https://admin:admin@localhost:9200 2>&1 | grep OpenSearch) ]]; do
-      sleep 0.1;
-    done;
+  fi
 fi
-echo checking for docker ip:
-# probably check whether the user has set a remote cluster, first...
-docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' opensearch
-OPENSEARCH_IP="$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' opensearch)"
-export OPENSEARCH_IP
+
+export OPENSEARCH_URL
 # Start the neural search web app in the background
 cd /app/src/marqo/neural_search || exit
 uvicorn api:app --host 0.0.0.0

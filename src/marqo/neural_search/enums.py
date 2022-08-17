@@ -1,4 +1,5 @@
 from enum import Enum
+from fastapi_utils.enums import StrEnum
 
 
 class MediaType:

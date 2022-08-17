@@ -13,17 +13,19 @@ from marqo.neural_search import validation
 class SearchQuery(BaseModel):
     q: str
     searchableAttributes: Union[None, List[str]] = None
-    searchMethod: Union[None, SearchMethod] = SearchMethod.NEURAL
+    searchMethod: Union[None, str] = SearchMethod.NEURAL
     limit: int = 10
     showHighlights: bool = True
 
     @pydantic.validator('searchMethod')
     def validate_search_method(cls, value):
-        print(f"valuevaluevalue: {value}")
         return validation.validate_str_against_enum(
             value=value, enum_class=SearchMethod,
             case_sensitive=False
         )
+
+    class Config:
+        arbitrary_types_allowed = True
 
 
 class AddDocuments(BaseModel):
