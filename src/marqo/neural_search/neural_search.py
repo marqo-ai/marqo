@@ -34,6 +34,7 @@ import copy
 import datetime
 import functools
 import json
+from locale import normalize
 import pprint
 import typing
 import uuid
@@ -236,11 +237,16 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                                     device=config.indexing_device, 
                                     method=image_method)            
                 
-                vector_chunks = s2_inference.vectorise(index_info.model_name, content_chunks, 
-                                                    config.indexing_device, index_info.neural_settings[NsField.index_defaults][NsField.normalize_embeddings],
-                                                    infer=index_info.neural_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images])
+                normalize_embeddings = index_info.neural_settings[NsField.index_defaults][NsField.normalize_embeddings]
+                infer_if_image = index_info.neural_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]
+                vector_chunks = s2_inference.vectorise(model_name=index_info.model_name, content=content_chunks, 
+                                                    device=config.indexing_device, normalize_embeddings=normalize_embeddings,
+                                                    infer=infer_if_image)
 
-                assert len(vector_chunks) == len(content_chunks)
+                if (len(vector_chunks) != len(text_chunks)):
+                    raise RuntimeError(f"the input content after preprocessing and its vectorized counterparts must be the same length." \
+                        f"recevied text_chunks={len(text_chunks)} and vector_chunks={len(vector_chunks)}. check the preprocessing functions and try again. ")
+
                 for text_chunk, vector_chunk in zip(text_chunks, vector_chunks):
                     chunk_id = str(uuid.uuid4())
                     chunks.append({
