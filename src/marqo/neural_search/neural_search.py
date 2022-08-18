@@ -134,16 +134,27 @@ def _autofill_neural_settings(neural_settings: dict):
             and copied_settings[NsField.index_defaults][NsField.model] is None:
         copied_settings[NsField.index_defaults][NsField.model] = MlModel.clip
 
+    # make sure the first level of keys is present, if not add all of those defaults
     for key in list(default_settings[NsField.index_defaults]):
         if key not in copied_settings[NsField.index_defaults] or \
                 copied_settings[NsField.index_defaults][key] is None:
             copied_settings[NsField.index_defaults][key] = default_settings[NsField.index_defaults][key]
 
+    # text preprocessing sub fields - fills any missing sub-dict fields if some of the first level are present
     for key in list(default_settings[NsField.index_defaults][NsField.text_preprocessing]):
         if key not in copied_settings[NsField.index_defaults][NsField.text_preprocessing] or \
                 copied_settings[NsField.index_defaults][NsField.text_preprocessing][key] is None:
             copied_settings[NsField.index_defaults][NsField.text_preprocessing][key] \
                 = default_settings[NsField.index_defaults][NsField.text_preprocessing][key]
+
+    # image preprocessing sub fields - fills any missing sub-dict fields
+    for key in list(default_settings[NsField.index_defaults][NsField.image_preprocessing]):
+        if key not in copied_settings[NsField.index_defaults][NsField.image_preprocessing] or \
+                copied_settings[NsField.index_defaults][NsField.image_preprocessing][key] is None:
+            copied_settings[NsField.index_defaults][NsField.image_preprocessing][key] \
+                = default_settings[NsField.index_defaults][NsField.image_preprocessing][key]
+
+
 
     return copied_settings
 
@@ -211,15 +222,21 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
             # TODO put this into a function to determine routing
             if isinstance(field_content, (str, Image.Image)):
                 
-                # TODO: better/consistent handling of a no-op for processing
+                # TODO: better/consistent handling of a no-op for processing (but still vectorize)
                 if isinstance(field_content, str) and not _is_image(field_content):
-                    content_chunks = text_processor.split_text(field_content)
+                    print(index_info.neural_settings)
+                    split_by = index_info.neural_settings[NsField.index_defaults][NsField.text_preprocessing][NsField.split_method]
+                    split_length = index_info.neural_settings[NsField.index_defaults][NsField.text_preprocessing][NsField.split_length]
+                    split_overlap = index_info.neural_settings[NsField.index_defaults][NsField.text_preprocessing][NsField.split_overlap]
+                    content_chunks = text_processor.split_text(field_content, split_by=split_by, split_length=split_length, split_overlap=split_overlap)
                     text_chunks = content_chunks
                 else:
+                    # TODO put the logic for getting field parameters into a function and add per field options
+                    image_method = index_info.neural_settings[NsField.index_defaults][NsField.image_preprocessing][NsField.patch_method]
                     # the chunk_image contains the no-op logic as of now - method = None will be a no-op
                     content_chunks, text_chunks = image_processor.chunk_image(field_content, 
                                     device=config.indexing_device, 
-                                    method=index_info.neural_settings[NsField.index_defaults][NsField.image_preprocessing][NsField.patch_method])            
+                                    method=image_method)            
                 
                 vector_chunks = s2_inference.vectorise(index_info.model_name, content_chunks, 
                                                     config.indexing_device, index_info.neural_settings[NsField.index_defaults][NsField.normalize_embeddings],
