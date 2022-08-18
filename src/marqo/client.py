@@ -63,7 +63,7 @@ class Client:
         normalize_embeddings=True,
         sentences_per_chunk=2,
         sentence_overlap=0,
-        patch_method=None,
+        image_preprocessing_method=None,
     ) -> Dict[str, Any]:
         """Create an index.
 
@@ -88,7 +88,7 @@ class Client:
             treat_urls_and_pointers_as_images=treat_urls_and_pointers_as_images,
             model=model, normalize_embeddings=normalize_embeddings,
             sentences_per_chunk=sentences_per_chunk, sentence_overlap=sentence_overlap,
-            patch_method=patch_method
+            image_preprocessing_method=image_preprocessing_method
         )
 
     def delete_index(self, index_name: str) -> Dict[str, Any]:
