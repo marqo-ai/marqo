@@ -222,7 +222,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                 
                 # TODO: better/consistent handling of a no-op for processing (but still vectorize)
                 if isinstance(field_content, str) and not _is_image(field_content):
-                    print(index_info.neural_settings)
+                    
                     split_by = index_info.neural_settings[NsField.index_defaults][NsField.text_preprocessing][NsField.split_method]
                     split_length = index_info.neural_settings[NsField.index_defaults][NsField.text_preprocessing][NsField.split_length]
                     split_overlap = index_info.neural_settings[NsField.index_defaults][NsField.text_preprocessing][NsField.split_overlap]
