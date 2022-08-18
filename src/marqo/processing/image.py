@@ -443,4 +443,4 @@ def load_pretrained_mobilenet320():
     return model, transform
 
 # TODO add YOLOX https://github.com/Megvii-BaseDetection/YOLOX
- 
+# TODO add onnx support https://pytorch.org/vision/0.12/generated/torchvision.models.detection.fasterrcnn_resnet50_fpn.html
