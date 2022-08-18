@@ -318,7 +318,14 @@ class PatchifyPytorch:
 
         if model_type not in available_models:
             logger.info(f"loading model {model_type}")
-            self.model, self.preprocess = load_pytorch_rcnn()
+            if model_type[0] == 'faster_rcnn':
+                func = load_pytorch_rcnn
+            elif model_type[0] == 'mobilenet':
+                func = load_pretrained_mobilenet320
+            else:
+                raise TypeError(f"wrong model for {model_type}")
+            self.model, self.preprocess = func()
+
             available_models[model_type] = (self.model, self.preprocess)
         else:
             self.model, self.preprocess = available_models[model_type]
@@ -427,7 +434,7 @@ def load_pretrained_mobilenet320():
                             box_detections_per_img=100,
                             rpn_post_nms_top_n_test=100, min_size=320)
 
-    checkpoint_file = 'awesome_mode.pth'
+    checkpoint_file = 'model_17.pth'
     checkpoint = torch.load(checkpoint_file, map_location="cpu")
     weights = FasterRCNN_MobileNet_V3_Large_FPN_Weights.DEFAULT
     transform = weights.transforms()
@@ -435,5 +442,5 @@ def load_pretrained_mobilenet320():
     model.eval()
     return model, transform
 
-
+# TODO add YOLOX https://github.com/Megvii-BaseDetection/YOLOX
  
