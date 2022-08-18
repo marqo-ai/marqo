@@ -47,7 +47,7 @@ class TestCreateIndex(MarqoTestCase):
             url=f"{self.endpoint}/{self.index_name_1}/_mapping",
             verify=False
         ).json()
-        print(settings[self.index_name_1]["mappings"]["_meta"][NeuralSettingsField.neural_settings] )
+        
         assert settings[self.index_name_1]["mappings"]["_meta"][NeuralSettingsField.neural_settings] \
             == neural_search.configs.get_default_neural_index_settings()
 
