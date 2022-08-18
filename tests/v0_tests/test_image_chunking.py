@@ -11,7 +11,7 @@ import numpy as np
 import os
 
 class TestImageChunking(MarqoTestCase):
-    """Test for Kaizan demo.
+    """Test for image chunking as a preprocessing step
 
     Assumptions:
         - Local OpenSearch (not S2Search)
@@ -40,7 +40,7 @@ class TestImageChunking(MarqoTestCase):
         settings = {
             "treat_urls_and_pointers_as_images":True,   # allows us to find an image file and index it 
             "model":"ViT-L/14", 
-            'patch_method':None,
+             "image_preprocessing_method" : None
             }
         
         client.create_index(self.index_name, **settings)
@@ -84,7 +84,7 @@ class TestImageChunking(MarqoTestCase):
         settings = {
             "treat_urls_and_pointers_as_images":True,   # allows us to find an image file and index it 
             "model":"ViT-L/14", 
-            'patch_method':'simple',
+            "image_preprocessing_method":"simple"
             }
         
         client.create_index(self.index_name, **settings)
