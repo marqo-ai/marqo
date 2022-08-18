@@ -154,8 +154,6 @@ def _autofill_neural_settings(neural_settings: dict):
             copied_settings[NsField.index_defaults][NsField.image_preprocessing][key] \
                 = default_settings[NsField.index_defaults][NsField.image_preprocessing][key]
 
-
-
     return copied_settings
 
 
