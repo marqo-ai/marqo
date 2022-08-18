@@ -50,3 +50,7 @@ class SplitMethod:
     # consider moving this enum into processing
     sentence = "sentence"
 
+
+class Device (str, Enum):
+    cpu = "cpu"
+    cuda = "cuda"

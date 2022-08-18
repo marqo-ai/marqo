@@ -1,5 +1,5 @@
 """The API entrypoint for Neural Search"""
-from models.api_models import SearchQuery, AddDocuments
+from models.api_models import SearchQuery, CreateIndex
 from fastapi import FastAPI, Request, Depends
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from marqo import utils
@@ -60,6 +60,11 @@ async def generate_config(creds: HTTPBasicCredentials = Depends(security)):
 @app.get("/")
 async def root():
     return {"message": "Hello World"}
+
+
+@app.post("/indexes")
+async def create_index(create_index: CreateIndex, marqo_config: config.Config = Depends(generate_config)):
+    pass
 
 
 @app.post("/indexes/{index_name}/search")

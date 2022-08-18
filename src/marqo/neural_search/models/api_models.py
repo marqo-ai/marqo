@@ -6,8 +6,9 @@ https://pydantic-docs.helpmanual.io/usage/types/#enums-and-choices
 import pydantic
 from pydantic import BaseModel
 from typing import Union, List
-from marqo.neural_search.enums import SearchMethod
+from marqo.neural_search.enums import SearchMethod, Device
 from marqo.neural_search import validation
+from marqo.neural_search import configs
 
 
 class SearchQuery(BaseModel):
@@ -28,6 +29,14 @@ class SearchQuery(BaseModel):
         arbitrary_types_allowed = True
 
 
-class AddDocuments(BaseModel):
-    docs: list
-    index_name: str
+class CreateIndex(BaseModel):
+    indexName: str
+    device: str = configs.get_default_neural_index_settings()
+    treatUrlsAsDownloadableImages: bool = False
+    model: str
+    @pydantic.validator('device')
+    def validate_search_method(cls, value):
+        return validation.validate_str_against_enum(
+            value=value, enum_class=Device,
+            case_sensitive=False
+        )
