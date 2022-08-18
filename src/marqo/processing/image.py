@@ -79,7 +79,7 @@ def load_rcnn_image(image_name: str, size: Tuple = (320,320)) -> Tuple[ImageType
 
     Args:
         image_name (str): _description_
-        size (Tuple, optional): _description_. Defaults to (320,320).
+        size (Tuple, optional): _description_.
 
     Returns:
         Tuple[ImageType, FloatTensor, Tuple[int, int]]: _description_
