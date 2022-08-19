@@ -194,7 +194,7 @@ def add_documents_mp(config=None, index_name=None, docs=None,
 
     # get the device ids for each process based on the process count and available devices
     device_ids = get_device_ids(n_processes, config.indexing_device)
-    print(device_ids)
+    
     start  = time.time()
 
     # we create the index if it does not exist
