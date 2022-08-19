@@ -47,6 +47,7 @@ class TestCreateIndex(MarqoTestCase):
             url=f"{self.endpoint}/{self.index_name_1}/_mapping",
             verify=False
         ).json()
+        
         assert settings[self.index_name_1]["mappings"]["_meta"][NeuralSettingsField.neural_settings] \
             == neural_search.configs.get_default_neural_index_settings()
 
@@ -76,11 +77,14 @@ class TestCreateIndex(MarqoTestCase):
 
         default_settings = neural_search.configs.get_default_neural_index_settings()
         default_text_preprocessing = default_settings[NeuralSettingsField.index_defaults][NeuralSettingsField.text_preprocessing]
+        default_image_preprocessing = default_settings[NeuralSettingsField.index_defaults][NeuralSettingsField.image_preprocessing]
+
         assert retrieved_settings == {
             NeuralSettingsField.index_defaults: {
                 NeuralSettingsField.treat_urls_and_pointers_as_images: True,
                 NeuralSettingsField.normalize_embeddings: False,
-                NeuralSettingsField.text_preprocessing: default_text_preprocessing
+                NeuralSettingsField.text_preprocessing: default_text_preprocessing,
+                NeuralSettingsField.image_preprocessing: default_image_preprocessing
         }}
 
     def test__autofill_neural_settings_fill_missing_text_preprocessing(self):

@@ -9,7 +9,7 @@ from marqo._httprequests import HttpRequests
 from marqo.config import Config
 from marqo.neural_search.enums import MediaType
 from marqo.marqo_logging import logger
-from marqo.enums import SearchMethods, Devices
+from marqo.enums import SearchMethods
 from marqo import errors
 
 # pylint: disable=too-many-public-methods
@@ -62,7 +62,8 @@ class Index():
                model=None,
                normalize_embeddings=True,
                sentences_per_chunk=2,
-               sentence_overlap=0
+               sentence_overlap=0,
+               image_preprocessing_method=None,
                ) -> Dict[str, Any]:
         """Create the index.
 
@@ -94,6 +95,9 @@ class Index():
                         "split_overlap": sentence_overlap,
                         "split_length": sentences_per_chunk,
                         "split_method": "sentence"
+                    },
+                    "image_preprocessing":{
+                        "patch_method": image_preprocessing_method
                     }
                 }
             }

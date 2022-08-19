@@ -38,6 +38,8 @@ class NeuralSettingsField:
     split_overlap = "split_overlap"
     split_method = "split_method"
 
+    image_preprocessing = "image_preprocessing"
+    patch_method = "patch_method"
 
 class SplitMethod:
     # consider moving this enum into processing

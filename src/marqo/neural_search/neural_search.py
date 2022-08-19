@@ -34,16 +34,22 @@ import copy
 import datetime
 import functools
 import json
+from locale import normalize
 import pprint
 import typing
 import uuid
 import asyncio
 from typing import List, Optional, Union, Callable, Iterable, Sequence, Dict
+from PIL import Image
 import requests
 from marqo.neural_search.enums import MediaType, MlModel, NeuralField, SearchMethod
 from marqo.neural_search.enums import NeuralSettingsField as NsField
 from marqo.neural_search import utils, backend, validation, configs
 from marqo.processing import text as text_processor
+
+from marqo.processing import image as image_processor
+from marqo.s2_inference.clip_utils import _is_image
+
 from marqo.s2_inference import s2_inference
 from marqo.neural_search.index_meta_cache import get_cache,get_index_info
 from marqo.neural_search import index_meta_cache
@@ -129,16 +135,25 @@ def _autofill_neural_settings(neural_settings: dict):
             and copied_settings[NsField.index_defaults][NsField.model] is None:
         copied_settings[NsField.index_defaults][NsField.model] = MlModel.clip
 
+    # make sure the first level of keys is present, if not add all of those defaults
     for key in list(default_settings[NsField.index_defaults]):
         if key not in copied_settings[NsField.index_defaults] or \
                 copied_settings[NsField.index_defaults][key] is None:
             copied_settings[NsField.index_defaults][key] = default_settings[NsField.index_defaults][key]
 
+    # text preprocessing sub fields - fills any missing sub-dict fields if some of the first level are present
     for key in list(default_settings[NsField.index_defaults][NsField.text_preprocessing]):
         if key not in copied_settings[NsField.index_defaults][NsField.text_preprocessing] or \
                 copied_settings[NsField.index_defaults][NsField.text_preprocessing][key] is None:
             copied_settings[NsField.index_defaults][NsField.text_preprocessing][key] \
                 = default_settings[NsField.index_defaults][NsField.text_preprocessing][key]
+
+    # image preprocessing sub fields - fills any missing sub-dict fields
+    for key in list(default_settings[NsField.index_defaults][NsField.image_preprocessing]):
+        if key not in copied_settings[NsField.index_defaults][NsField.image_preprocessing] or \
+                copied_settings[NsField.index_defaults][NsField.image_preprocessing][key] is None:
+            copied_settings[NsField.index_defaults][NsField.image_preprocessing][key] \
+                = default_settings[NsField.index_defaults][NsField.image_preprocessing][key]
 
     return copied_settings
 
@@ -203,12 +218,35 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
             field_content = copied[field]
 
-            if isinstance(field_content, str):
-                text_chunks = text_processor.split_text(field_content)
-                vector_chunks = s2_inference.vectorise(index_info.model_name, text_chunks, 
-                                                    config.indexing_device, index_info.neural_settings['index_defaults']['normalize_embeddings'],
-                                                    infer=index_info.neural_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images])
-                assert len(vector_chunks) == len(text_chunks)
+            # TODO put this into a function to determine routing
+            if isinstance(field_content, (str, Image.Image)):
+                
+                # TODO: better/consistent handling of a no-op for processing (but still vectorize)
+                if isinstance(field_content, str) and not _is_image(field_content):
+                    
+                    split_by = index_info.neural_settings[NsField.index_defaults][NsField.text_preprocessing][NsField.split_method]
+                    split_length = index_info.neural_settings[NsField.index_defaults][NsField.text_preprocessing][NsField.split_length]
+                    split_overlap = index_info.neural_settings[NsField.index_defaults][NsField.text_preprocessing][NsField.split_overlap]
+                    content_chunks = text_processor.split_text(field_content, split_by=split_by, split_length=split_length, split_overlap=split_overlap)
+                    text_chunks = content_chunks
+                else:
+                    # TODO put the logic for getting field parameters into a function and add per field options
+                    image_method = index_info.neural_settings[NsField.index_defaults][NsField.image_preprocessing][NsField.patch_method]
+                    # the chunk_image contains the no-op logic as of now - method = None will be a no-op
+                    content_chunks, text_chunks = image_processor.chunk_image(field_content, 
+                                    device=config.indexing_device, 
+                                    method=image_method)            
+                
+                normalize_embeddings = index_info.neural_settings[NsField.index_defaults][NsField.normalize_embeddings]
+                infer_if_image = index_info.neural_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]
+                vector_chunks = s2_inference.vectorise(model_name=index_info.model_name, content=content_chunks, 
+                                                    device=config.indexing_device, normalize_embeddings=normalize_embeddings,
+                                                    infer=infer_if_image)
+
+                if (len(vector_chunks) != len(text_chunks)):
+                    raise RuntimeError(f"the input content after preprocessing and its vectorized counterparts must be the same length." \
+                        f"recevied text_chunks={len(text_chunks)} and vector_chunks={len(vector_chunks)}. check the preprocessing functions and try again. ")
+
                 for text_chunk, vector_chunk in zip(text_chunks, vector_chunks):
                     chunk_id = str(uuid.uuid4())
                     chunks.append({
