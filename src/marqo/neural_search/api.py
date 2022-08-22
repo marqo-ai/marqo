@@ -63,9 +63,10 @@ async def root():
 
 
 @app.post("/indexes/{index_name}")
-async def create_index(index_name: str, settings: Dict, marqo_config: config.Config = Depends(generate_config)):
+async def create_index(index_name: str, settings: Dict = None, marqo_config: config.Config = Depends(generate_config)):
+    neural_settings = dict() if settings is None else settings
     return neural_search.create_vector_index(
-        config=marqo_config, index_name=index_name, neural_settings=settings
+        config=marqo_config, index_name=index_name, neural_settings=neural_settings
     )
 
 
