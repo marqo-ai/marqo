@@ -1,8 +1,13 @@
 """The API entrypoint for Neural Search"""
+import json
+import pprint
+
 from models.api_models import SearchQuery
-from fastapi import FastAPI, Request, Depends
+from fastapi import FastAPI, Request, Depends, HTTPException
+from fastapi.exception_handlers import http_exception_handler
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from marqo import utils
+from marqo.errors import MarqoError
 from typing import Union
 from fastapi import FastAPI
 from marqo.neural_search import neural_search
@@ -50,11 +55,17 @@ async def generate_config(creds: HTTPBasicCredentials = Depends(security)):
     authorized_url = utils.construct_authorized_url(
         url_base=OPENSEARCH_URL,
         username=creds.username,
-        password=creds.password)
-    # TODO: DELETE THIS:
-    logging.warning("authorized_url:")
-    logging.warning(authorized_url)
+        password=creds.password
+    )
     return config.Config(url=authorized_url)
+
+
+@app.exception_handler(MarqoError)
+async def marqo_exception_handler(request, exc):
+    return await http_exception_handler(request=request, exc=HTTPException(
+        status_code=400,
+        detail="some error message here..."
+    ))
 
 
 @app.get("/")
@@ -97,6 +108,7 @@ async def get_document_by_id(index_name: str, document_id: str,
     return neural_search.get_document_by_id(
         config=marqo_config, index_name=index_name, document_id=document_id
     )
+
 
 @app.get("/indexes/{index_name}/stats")
 async def get_index_stats(index_name: str, marqo_config: config.Config = Depends(generate_config)):

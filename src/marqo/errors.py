@@ -1,5 +1,4 @@
 import json
-
 from requests import Response
 
 class MarqoError(Exception):
