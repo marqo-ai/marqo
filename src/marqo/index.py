@@ -109,7 +109,7 @@ class Index():
 
     def search(self, q: str, searchable_attributes: Optional[List[str]]=None,
                limit: int=10, search_method: Union[SearchMethods.NEURAL, str] = SearchMethods.NEURAL,
-               highlights=True
+               highlights=True, reranker=None
                ) -> Dict[str, Any]:
         """Search in the index.
 
@@ -135,8 +135,8 @@ class Index():
         return neural_search.search(
             config=self.config, index_name=self.index_name, text=q, return_doc_ids=True,
             searchable_attributes=searchable_attributes, search_method=search_method, result_count=limit,
-            highlights=highlights
-        )
+            highlights=highlights, reranker=reranker)
+        
 
     def get_document(self, document_id: Union[str, int]) -> Dict[str, Any]:
         """Get one document with given document identifier.
