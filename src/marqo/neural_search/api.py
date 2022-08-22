@@ -1,5 +1,5 @@
 """The API entrypoint for Neural Search"""
-from models.api_models import SearchQuery, CreateIndex
+from models.api_models import SearchQuery
 from fastapi import FastAPI, Request, Depends
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from marqo import utils
@@ -59,12 +59,14 @@ async def generate_config(creds: HTTPBasicCredentials = Depends(security)):
 
 @app.get("/")
 async def root():
-    return {"message": "Hello World"}
+    return {"message": "Welcome to marqo"}
 
 
-@app.post("/indexes")
-async def create_index(create_index: CreateIndex, marqo_config: config.Config = Depends(generate_config)):
-    pass
+@app.post("/indexes/{index_name}")
+async def create_index(index_name: str, settings: Dict, marqo_config: config.Config = Depends(generate_config)):
+    return neural_search.create_vector_index(
+        config=marqo_config, index_name=index_name, neural_settings=settings
+    )
 
 
 @app.post("/indexes/{index_name}/search")
@@ -87,7 +89,10 @@ async def add_documents(docs: List[Dict], index_name: str,  refresh: bool = True
         index_name=index_name, auto_refresh=refresh
     )
 
+
 # try these curl commands:
+
+# ADD DOCS:
 """
 curl -XPOST  'http://admin:admin@localhost:8000/indexes/my-irst-ix/documents?refresh=true' -H 'Content-type:application/json' -d '
 [
@@ -103,6 +108,8 @@ curl -XPOST  'http://admin:admin@localhost:8000/indexes/my-irst-ix/documents?ref
 ]'
 """
 
+
+# SEARCH DOCS
 """
 curl -XPOST  http://admin:admin@localhost:8000/indexes/my-irst-ix/search -H 'Content-type:application/json' -d '{
     "q": "what do bears eat?",
@@ -112,3 +119,14 @@ curl -XPOST  http://admin:admin@localhost:8000/indexes/my-irst-ix/search -H 'Con
     "showHighlights": true
 }'
 """
+
+# CREATE CUSTOM IMAGE INDEX:
+"""
+curl -XPOST http://admin:admin@localhost:8000/indexes/my-multimodal-index -H 'Content-type:application/json' -d '{
+    "index_defaults": {
+      "treat_urls_and_pointers_as_images":true,    
+      "model":"ViT-B/32"
+    }
+}'
+"""
+
