@@ -98,6 +98,24 @@ async def get_document_by_id(index_name: str, document_id: str,
         config=marqo_config, index_name=index_name, document_id=document_id
     )
 
+@app.get("/indexes/{index_name}/stats")
+async def get_index_stats(index_name: str, marqo_config: config.Config = Depends(generate_config)):
+    return neural_search.get_stats(
+        config=marqo_config, index_name=index_name
+    )
+
+
+@app.delete("/indexes/{index_name}")
+async def delete_index(index_name: str, marqo_config: config.Config = Depends(generate_config)):
+    return neural_search.delete_index(
+        config=marqo_config, index_name=index_name
+    )
+
+
+async def delete_docs():
+    # TODO
+    pass
+
 # try these curl commands:
 
 # ADD DOCS:
@@ -141,5 +159,14 @@ curl -XPOST http://admin:admin@localhost:8000/indexes/my-multimodal-index -H 'Co
 # GET DOCUMENT BY ID:
 """
 curl -XGET http://admin:admin@localhost:8000/indexes/my-irst-ix/documents/honey_facts_119
+"""
 
+# GET index stats
+"""
+curl -XGET http://admin:admin@localhost:8000/indexes/my-irst-ix/stats
+"""
+
+# DELETE index
+"""
+curl -XDELETE http://admin:admin@localhost:8000/indexes/my-irst-ix
 """
