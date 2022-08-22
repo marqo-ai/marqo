@@ -91,6 +91,13 @@ async def add_documents(docs: List[Dict], index_name: str,  refresh: bool = True
     )
 
 
+@app.get("/indexes/{index_name}/documents/{document_id}")
+async def get_document_by_id(index_name: str, document_id: str,
+                             marqo_config: config.Config = Depends(generate_config)):
+    return neural_search.get_document_by_id(
+        config=marqo_config, index_name=index_name, document_id=document_id
+    )
+
 # try these curl commands:
 
 # ADD DOCS:
@@ -131,3 +138,8 @@ curl -XPOST http://admin:admin@localhost:8000/indexes/my-multimodal-index -H 'Co
 }'
 """
 
+# GET DOCUMENT BY ID:
+"""
+curl -XGET http://admin:admin@localhost:8000/indexes/my-irst-ix/documents/honey_facts_119
+
+"""
