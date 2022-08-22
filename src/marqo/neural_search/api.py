@@ -112,9 +112,13 @@ async def delete_index(index_name: str, marqo_config: config.Config = Depends(ge
     )
 
 
-async def delete_docs():
-    # TODO
-    pass
+@app.post("/indexes/{index_name}/documents/delete-batch")
+async def delete_docs(index_name: str, documentIds: List[str], refresh: bool = True,
+                      marqo_config: config.Config = Depends(generate_config)):
+    return neural_search.delete_documents(
+        index_name=index_name, config=marqo_config, doc_ids=documentIds,
+        auto_refresh=refresh
+    )
 
 # try these curl commands:
 
@@ -169,4 +173,11 @@ curl -XGET http://admin:admin@localhost:8000/indexes/my-irst-ix/stats
 # DELETE index
 """
 curl -XDELETE http://admin:admin@localhost:8000/indexes/my-irst-ix
+"""
+
+# DELETE docs
+"""
+curl -XPOST  http://admin:admin@localhost:8000/indexes/my-irst-ix/documents/delete-batch -H 'Content-type:application/json' -d '[
+    "honey_facts_119", "moon_fact_145"
+]'
 """
