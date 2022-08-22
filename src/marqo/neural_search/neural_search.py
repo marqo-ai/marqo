@@ -49,6 +49,7 @@ from marqo.processing import text as text_processor
 
 from marqo.processing import image as image_processor
 from marqo.s2_inference.clip_utils import _is_image
+from marqo.s2_inference.reranking import cross_encoders
 
 from marqo.s2_inference import s2_inference
 from marqo.neural_search.index_meta_cache import get_cache,get_index_info
@@ -323,7 +324,7 @@ def delete_documents(config: Config, index_name: str, doc_ids: List[str], auto_r
 
 def search(config: Config, index_name: str, text: str, result_count: int = 3, highlights=True, return_doc_ids=False,
            search_method: Union[str, SearchMethod, None] = SearchMethod.NEURAL,
-           searchable_attributes: Iterable[str] = None, verbose=0, num_highlights=3) -> Dict:
+           searchable_attributes: Iterable[str] = None, verbose=0, num_highlights=3, reranker=None) -> Dict:
     """The root search method. Calls the specific search method
 
     Validation should go here. Validations include:
@@ -382,6 +383,13 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
         )
     else:
         raise MarqoError(f"Search called with unknown search method: {search_method}")
+    
+    if reranker is not None:
+        # TODO add in the proper routing based on reranker model type
+        cross_encoders.rerank_search_results(search_result=search_result, query=text, 
+                    model_name=reranker, device=config.indexing_device, 
+                searchable_attributes=searchable_attributes, num_highlights=1)
+
     time_taken = datetime.datetime.now() - t0
     search_result["processingTimeMs"] = round(time_taken.total_seconds() * 1000)
     search_result["query"] = text
@@ -392,6 +400,18 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
             del hit["_highlights"]
 
     return search_result
+
+def _rerank_search_results(
+        config: Config, index_name: str, text: str, search_method: str, result_count: int = 3, 
+        searchable_attributes: Sequence[str] = None):
+    
+    if search_method.upper() == SearchMethod.NEURAL:
+        pass
+    elif search_method.upper() == SearchMethod.LEXICAL:
+        pass
+    else:
+        raise MarqoError(f"Search called with unknown search method: {search_method}")
+
 
 
 def _lexical_search(
