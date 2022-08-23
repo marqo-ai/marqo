@@ -49,7 +49,7 @@ from marqo.processing import text as text_processor
 
 from marqo.processing import image as image_processor
 from marqo.s2_inference.clip_utils import _is_image
-from marqo.s2_inference.reranking import cross_encoders
+from marqo.s2_inference.reranking import rerank
 
 from marqo.s2_inference import s2_inference
 from marqo.neural_search.index_meta_cache import get_cache,get_index_info
@@ -324,7 +324,7 @@ def delete_documents(config: Config, index_name: str, doc_ids: List[str], auto_r
 
 def search(config: Config, index_name: str, text: str, result_count: int = 3, highlights=True, return_doc_ids=False,
            search_method: Union[str, SearchMethod, None] = SearchMethod.NEURAL,
-           searchable_attributes: Iterable[str] = None, verbose=0, num_highlights=3, reranker=None) -> Dict:
+           searchable_attributes: Iterable[str] = None, verbose: int = 0, num_highlights: int = 3, reranker: Union[str, Dict] = None) -> Dict:
     """The root search method. Calls the specific search method
 
     Validation should go here. Validations include:
@@ -348,6 +348,7 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
     Returns:
 
     """
+    # TODO move this out into the config
     MAX_RESULT_COUNT = 500
 
     if result_count > MAX_RESULT_COUNT or result_count < 0:
@@ -385,8 +386,7 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
         raise MarqoError(f"Search called with unknown search method: {search_method}")
     
     if reranker is not None:
-        # TODO add in the proper routing based on reranker model type
-        cross_encoders.rerank_search_results(search_result=search_result, query=text, 
+        rerank.rerank_search_results(search_result=search_result, query=text, 
                     model_name=reranker, device=config.indexing_device, 
                 searchable_attributes=searchable_attributes, num_highlights=1)
 
