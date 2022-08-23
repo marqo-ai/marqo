@@ -27,3 +27,10 @@ class SearchQuery(BaseModel):
 
     class Config:
         arbitrary_types_allowed = True
+
+
+class ErrorResponse(BaseModel):
+    message: str
+    code: str
+    type: str
+    link: str

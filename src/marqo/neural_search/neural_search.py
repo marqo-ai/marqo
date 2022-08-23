@@ -283,6 +283,10 @@ def delete_documents(config: Config, index_name: str, doc_ids: List[str], auto_r
     return delete_parents_res
 
 
+def refresh_index(config: Config,  index_name: str):
+    return HttpRequests(config).post(path=F"{index_name}/_refresh")
+
+
 def search(config: Config, index_name: str, text: str, result_count: int = 3, highlights=True, return_doc_ids=False,
            search_method: Union[str, SearchMethod, None] = SearchMethod.NEURAL,
            searchable_attributes: Iterable[str] = None, verbose=0, num_highlights=3) -> Dict:

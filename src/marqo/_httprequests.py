@@ -1,13 +1,15 @@
 import copy
 import json
 import pprint
+from http import HTTPStatus
 from typing import Any, Callable, Dict, List, Optional, Union
 import requests
 from marqo.config import Config
 from marqo.errors import (
-    MarqoApiError,
+    MarqoWebError,
     MarqoCommunicationError,
     MarqoTimeoutError,
+    IndexNotFoundError
 )
 from marqo.version import qualified_version
 
@@ -122,4 +124,26 @@ class HttpRequests:
             request.raise_for_status()
             return HttpRequests.__to_json(request)
         except requests.exceptions.HTTPError as err:
-            raise MarqoApiError(str(err), request) from err
+            convert_to_marqo_web_error_and_raise(response=request, err=err)
+
+
+def convert_to_marqo_web_error_and_raise(response: requests.Response, err: requests.exceptions.HTTPError):
+    """Translates OpenSearch errors into Marqo errors"""
+    print("\nresponse, status code:")
+    print(response.status_code)
+    print("response, JSON body:")
+    pprint.pprint(response.json())
+    try:
+        response_dict = response.json()
+        open_search_error_type = response_dict["error"]["type"]
+
+        if open_search_error_type == "index_not_found_exception":
+            raise IndexNotFoundError(
+                message=f"Index `{response_dict['error']['index']}` not found."
+            ) from err
+
+    except KeyError:
+        # An error was encountered trying to read the error JSON - just pass the error message through
+        raise MarqoWebError(message=response.text, code="unhandled_backend_error", status_code=HTTPStatus(
+            response.status_code, '')) from err
+

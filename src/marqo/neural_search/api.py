@@ -1,7 +1,8 @@
 """The API entrypoint for Neural Search"""
 import json
 import pprint
-
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import JSONResponse
 from models.api_models import SearchQuery
 from fastapi import FastAPI, Request, Depends, HTTPException
 from fastapi.exception_handlers import http_exception_handler
@@ -62,10 +63,23 @@ async def generate_config(creds: HTTPBasicCredentials = Depends(security)):
 
 @app.exception_handler(MarqoWebError)
 async def marqo_exception_handler(request, exc: MarqoWebError):
-    return await http_exception_handler(request=request, exc=HTTPException(
-        status_code=exc.status_code,
-        detail=exc.message
-    ))
+    """ Catch a MarqoWebError and return an appropriate HTTP response.
+
+    We can potentially catch any type of Marqo exception. We can do isinstance() calls
+    to handle WebErrors vs Regular errors"""
+    headers = getattr(exc, "headers", None)
+    body = {
+        "message": exc.message,
+        "code": exc.code,
+        "type": exc.error_type,
+        "link": exc.link
+    }
+    if headers:
+        return JSONResponse(
+            content=body, status_code=exc.status_code, headers=headers
+        )
+    else:
+        return JSONResponse(content=body, status_code=exc.status_code)
 
 
 @app.get("/")

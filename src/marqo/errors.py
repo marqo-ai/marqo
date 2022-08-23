@@ -1,5 +1,7 @@
 import json
 from requests import Response
+from http import HTTPStatus
+
 
 class MarqoError(Exception):
     """Generic class for Marqo error handling"""
@@ -60,3 +62,85 @@ class MarqoTimeoutError(MarqoError):
 
     def __str__(self) -> str:
         return f'MarqoTimeoutError, {self.message}'
+
+
+# MARQO WEB ERROR
+
+class MarqoWebError(Exception):
+
+    status_code: HTTPStatus = None
+    error_type: str = None
+    message: str = None
+    code: str = None
+    link: str = ""
+
+    def __init__(self, message: str, status_code: HTTPStatus = None,
+                 error_type: str = None, code: str = None,
+                 link: str = None) -> None:
+        self.message = message
+
+        if self.status_code is None:
+            self.status_code = status_code
+
+        if self.error_type is None:
+            self.error_type = error_type
+
+        if self.code is None:
+            self.code = code
+
+        if self.link is None:
+            self.link = link
+        super().__init__(self.message)
+
+    def __str__(self) -> str:
+        return f'MarqoWebError: {self.__class__.__name__} Error message: {self.message}'
+
+# ---MARQO USER ERRORS---
+
+# --
+
+
+class __InvalidRequestError(MarqoWebError):
+    """abstract error"""
+
+    def __init__(self, message: str):
+        self.message = message
+
+    error_type = "invalid_request"
+
+
+class IndexAlreadyExistsError(__InvalidRequestError):
+    code = "index_already_exists"
+    status_code = HTTPStatus.CONFLICT
+
+
+class IndexNotFoundError(__InvalidRequestError):
+    code = "index_not_found"
+    status_code = HTTPStatus.NOT_FOUND
+
+
+class InvalidIndexNameError(__InvalidRequestError):
+    code = "invalid_index_name"
+    status_code = HTTPStatus.BAD_REQUEST
+
+
+class InvalidDocumentIdError(__InvalidRequestError):
+    code = "invalid_document_id"
+    status_code = HTTPStatus.BAD_REQUEST
+
+
+class BadRequestError(__InvalidRequestError):
+    code = "bad_request"
+    status_code = HTTPStatus.BAD_REQUEST
+
+
+class DocumentNotFoundError(__InvalidRequestError):
+    code = "document_not_found"
+    status_code = HTTPStatus.NOT_FOUND
+
+
+# ---MARQO INTERNAL ERROR---
+
+class InternalError(MarqoWebError):
+    error_type = "internal"
+    status_code = HTTPStatus.INTERNAL_SERVER_ERROR
