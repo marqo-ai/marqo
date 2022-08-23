@@ -21,12 +21,31 @@ from marqo.s2_inference.configs import ModelCache
 from marqo.s2_inference.logger import get_logger
 logger = get_logger(__name__)
 
+def _verify_model_inputs(list_of_lists: List[List]) -> bool:
+    """check the format of the model inputs
 
-def _verify_model_inputs(list_of_lists):
+    Args:
+        list_of_lists (List[List]): _description_
+
+    Returns:
+        bool: _description_
+    """
     return all(isinstance(x, (list, tuple)) for x in list_of_lists)
 
 def convert_device_id_to_int(device: str = 'cpu'):
+    """maps the string device, 'cpu', 'cuda', 'cuda:#'
+    to an int for HF pipelines device representation
 
+    Args:
+        device (str, optional): _description_. Defaults to 'cpu'.
+
+    Raises:
+        ValueError: _description_
+        TypeError: _description_
+
+    Returns:
+        _type_: _description_
+    """
     if device[:4] not in ['cpu', 'cuda']:
         raise ValueError(f"expected one of cpu or cuda or cuda:# but received {device}")
 
@@ -44,23 +63,37 @@ def convert_device_id_to_int(device: str = 'cpu'):
     raise TypeError(f"unexpected device {device}")
 
 class DummyModel:
-    # used for mocking the model
+    """ used for mocking the model
+
+    Returns:
+        _type_: _description_
+    """
     def __init__(self, *args, **kwargs) -> None:
         pass
 
-    def predict(self, inputs):
+    def predict(self, inputs: Iterable):
 
         return np.random.rand(len(inputs))
 
 class HFClassificationOnnx:
-    # https://huggingface.co/docs/optimum/main/en/onnxruntime/modeling_ort
+    """uses HF pipelines and optimum to load hf classification model 
+    (cross encoders) and uses it as onnx
+    https://huggingface.co/docs/optimum/main/en/onnxruntime/modeling_ort
+    
+    Raises:
+        RuntimeError: _description_
 
-    def __init__(self, model_name: str, device: str = 'cpu', load_from_cache: bool = True):
+    Returns:
+        _type_: _description_
+    """
+    
+    def __init__(self, model_name: str, device: str = 'cpu', load_from_cache: bool = True) -> None:
 
         self.model_name = model_name
         self.save_path = None
         self.device_string = device
         self.device = convert_device_id_to_int(device)
+        self.load_from_cache = load_from_cache
 
         # TODO load local version
         self.model = ORTModelForSequenceClassification.from_pretrained(self.model_name, from_transformers=True)
@@ -68,15 +101,16 @@ class HFClassificationOnnx:
         self.onnx_classifier = pipeline("text-classification", model=self.model, 
                                         tokenizer=self.tokenizer, device=self.device)
 
-
-    def _get_save_name(self):
-
+    def _get_save_name(self) -> None:
+        """generates the saeve name for local storage
+        """
         self.save_path = os.path.join(ModelCache.onnx_cache_path, self.model_name + '_onnx')
         self.model_save_name = self.save_path
         self.tokenizer_save_name = self.save_path
 
-    def save(self):
-
+    def save(self) -> None:
+        """saves the model locally
+        """
         logger.info(f"saving model to {self.model_save_name}")
         if self.save_path is None:
             self._get_save_name()
@@ -85,17 +119,45 @@ class HFClassificationOnnx:
         self.tokenizer.save_pretrained(self.tokenizer_save_name)
 
     @staticmethod
-    def _prepare_inputs(inputs: List[List[str]]):
+    def _prepare_inputs(inputs: List[List[str]]) -> List[Dict]:
+        """prepares the inputs for the onnx cross encoder
+        used named fields to allow for proper passing of two strings
+
+        Args:
+            inputs (List[List[str]]): _description_
+
+        Raises:
+            RuntimeError: _description_
+
+        Returns:
+            List[Dict]: _description_
+        """
         if not _verify_model_inputs(inputs):
             raise RuntimeError(f"expected list of lists, received {type(inputs)} of {type(inputs[0])}")
 
         return [{'text':pair[0], 'text_pair':pair[1]} for pair in inputs]
 
     @staticmethod
-    def _parepare_outputs(outputs):
+    def _parepare_outputs(outputs: Dict) -> ndarray:
+        """takes the outputs of the onnx model (dict) and extracts the score
+        assumes binary labels
+        Args:
+            outputs (Dict): _description_
+
+        Returns:
+            ndarray: _description_
+        """
         return np.array([pred['score'] for pred in outputs])
 
-    def predict(self, inputs):
+    def predict(self, inputs: List[Dict]) -> List[Dict]:
+        """onnx predict method
+
+        Args:
+            inputs (List[Dict]): _description_
+
+        Returns:
+            List[Dict]: _description_
+        """
         self.inputs = self._prepare_inputs(inputs)
         self.predictions = self.onnx_classifier(self.inputs)
         self.outputs = self._parepare_outputs(self.predictions)
@@ -103,7 +165,7 @@ class HFClassificationOnnx:
         return self.outputs
 
 
-def load_sbert_cross_encoder_model(model_name: str, device: str = 'cpu', max_length: int = 512) -> Any:
+def load_sbert_cross_encoder_model(model_name: str, device: str = 'cpu', max_length: int = 512) -> Dict:
     """    
     https://huggingface.co/cross-encoder/ms-marco-TinyBERT-L-2
     scores = model.predict([('Query', 'Paragraph1'), ('Query', 'Paragraph2') , ('Query', 'Paragraph3')])
@@ -132,7 +194,7 @@ def load_sbert_cross_encoder_model(model_name: str, device: str = 'cpu', max_len
     return {'model':model}
 
 
-def load_hf_cross_encoder_model(model_name: str, device: str = 'cpu') -> Tuple[Any, Any]:
+def load_hf_cross_encoder_model(model_name: str, device: str = 'cpu') -> Dict:
     """    
     
     features = tokenizer(['How many people live in Berlin?', 'How many people live in Berlin?'], ['Berlin has a population of 3,520,031 registered inhabitants in an area of 891.82 square kilometers.', 'New York City is famous for the Metropolitan Museum of Art.'],  padding=True, truncation=True, return_tensors="pt")
@@ -159,7 +221,7 @@ def load_hf_cross_encoder_model(model_name: str, device: str = 'cpu') -> Tuple[A
     
     return {'model':model, 'tokenizer':tokenizer}
 
-def load_owl_vit(device: str = 'cpu'):
+def load_owl_vit(device: str = 'cpu') -> Dict:
     
     if ('owl', device) in available_models:
         model, processor = available_models[('owl', device)] 
@@ -222,11 +284,4 @@ def sort_owl_boxes_scores(boxes, scores, identifier):
                 f"found {len(boxes)} boxes and {len(identifier)} identifiers")
         identifier = [identifier[i] for i in inds]
 
-    # if images is not None and len(images) != 0:
-    #     if len(images) != len(boxes):
-    #         # TODO use Marqo errors 
-    #         raise RuntimeError(f"expected each bbox to have an image. " \
-    #             f"found {len(boxes)} boxes and {len(images)} identifiers")
-    
-    #     images = [images[i] for i in inds]
     return boxes, scores, identifier
