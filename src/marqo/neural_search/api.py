@@ -178,7 +178,7 @@ curl -XPOST  'http://admin:admin@localhost:8000/indexes/my-irst-ix/documents?ref
 curl -XPOST  http://admin:admin@localhost:8000/indexes/my-irst-ix/search -H 'Content-type:application/json' -d '{
     "q": "what do bears eat?",
     "searchableAttributes": ["Title", "Desc", "other"],
-    "limit": 3, 
+    "limit": 3,  
     "searchMethod": "NEURAL",
     "showHighlights": true
 }'

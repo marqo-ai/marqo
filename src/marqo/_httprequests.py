@@ -11,7 +11,8 @@ from marqo.errors import (
     MarqoCommunicationError,
     MarqoTimeoutError,
     IndexNotFoundError,
-    DocumentNotFoundError
+    DocumentNotFoundError,
+    IndexAlreadyExistsError
 )
 from marqo.version import qualified_version
 
@@ -130,7 +131,7 @@ class HttpRequests:
 
 
 def convert_to_marqo_web_error_and_raise(response: requests.Response, err: requests.exceptions.HTTPError):
-    """Translates OpenSearch errors into Marqo errors"""
+    """Translates OpenSearch errors into Marqo errors, which are then raised"""
     try:
         response_dict = response.json()
     except requests.exceptions.JSONDecodeError:
@@ -140,9 +141,9 @@ def convert_to_marqo_web_error_and_raise(response: requests.Response, err: reque
         open_search_error_type = response_dict["error"]["type"]
 
         if open_search_error_type == "index_not_found_exception":
-            raise IndexNotFoundError(
-                message=f"Index `{response_dict['error']['index']}` not found."
-            ) from err
+            raise IndexNotFoundError(message=f"Index `{response_dict['error']['index']}` not found.") from err
+        elif open_search_error_type == "resource_already_exists_exception" and "index" in response_dict["error"]["reason"]:
+            raise IndexAlreadyExistsError(message=f"Index `{response_dict['error']['index']}` already exists") from err
         else:
             raise_catchall_http_as_marqo_error(response=response, err=err)
     except KeyError:
@@ -155,6 +156,7 @@ def convert_to_marqo_web_error_and_raise(response: requests.Response, err: reque
             ) from err
     except KeyError:
         pass
+
     raise_catchall_http_as_marqo_error(response=response, err=err)
 
 
