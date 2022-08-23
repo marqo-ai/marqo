@@ -68,13 +68,13 @@ class MarqoTimeoutError(MarqoError):
 
 class MarqoWebError(Exception):
 
-    status_code: HTTPStatus = None
+    status_code: int = None
     error_type: str = None
     message: str = None
     code: str = None
     link: str = ""
 
-    def __init__(self, message: str, status_code: HTTPStatus = None,
+    def __init__(self, message: str, status_code: int = None,
                  error_type: str = None, code: str = None,
                  link: str = None) -> None:
         self.message = message
@@ -116,7 +116,7 @@ class IndexAlreadyExistsError(__InvalidRequestError):
 
 class IndexNotFoundError(__InvalidRequestError):
     code = "index_not_found"
-    status_code = HTTPStatus.NOT_FOUND
+    status_code = HTTPStatus.NOT_FOUND.value
 
 
 class InvalidIndexNameError(__InvalidRequestError):

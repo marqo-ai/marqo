@@ -159,9 +159,9 @@ async def refresh_index(index_name: str, marqo_config: config.Config = Depends(g
 # ADD DOCS:
 """
 curl -XPOST  'http://admin:admin@localhost:8000/indexes/my-irst-ix/documents?refresh=true' -H 'Content-type:application/json' -d '
-[
+[ 
     {
-        "Title": "Honey is a delectable food stuff",
+        "Title": "Honey is a delectable food stuff", 
         "Desc" : "some boring description",
         "_id": "honey_facts_119"
     }, {

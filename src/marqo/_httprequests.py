@@ -4,6 +4,7 @@ import pprint
 from http import HTTPStatus
 from typing import Any, Callable, Dict, List, Optional, Union
 import requests
+from requests.exceptions import JSONDecodeError
 from marqo.config import Config
 from marqo.errors import (
     MarqoWebError,
@@ -144,6 +145,9 @@ def convert_to_marqo_web_error_and_raise(response: requests.Response, err: reque
 
     except KeyError:
         # An error was encountered trying to read the error JSON - just pass the error message through
-        raise MarqoWebError(message=response.text, code="unhandled_backend_error", status_code=HTTPStatus(
-            response.status_code, '')) from err
-
+        try:
+            raise MarqoWebError(message=response.json(), code="unhandled_backend_error",
+                                status_code=response.status_code) from err
+        except requests.exceptions.JSONDecodeError:
+            raise MarqoWebError(message=response.text, code="unhandled_backend_error",
+                                status_code=response.status_code) from err
