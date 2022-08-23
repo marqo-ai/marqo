@@ -10,7 +10,8 @@ from marqo.errors import (
     MarqoWebError,
     MarqoCommunicationError,
     MarqoTimeoutError,
-    IndexNotFoundError
+    IndexNotFoundError,
+    DocumentNotFoundError
 )
 from marqo.version import qualified_version
 
@@ -130,24 +131,39 @@ class HttpRequests:
 
 def convert_to_marqo_web_error_and_raise(response: requests.Response, err: requests.exceptions.HTTPError):
     """Translates OpenSearch errors into Marqo errors"""
-    print("\nresponse, status code:")
-    print(response.status_code)
-    print("response, JSON body:")
-    pprint.pprint(response.json())
     try:
         response_dict = response.json()
+    except requests.exceptions.JSONDecodeError:
+        raise_catchall_http_as_marqo_error(response=response, err=err)
+
+    try:
         open_search_error_type = response_dict["error"]["type"]
 
         if open_search_error_type == "index_not_found_exception":
             raise IndexNotFoundError(
                 message=f"Index `{response_dict['error']['index']}` not found."
             ) from err
-
+        else:
+            raise_catchall_http_as_marqo_error(response=response, err=err)
     except KeyError:
-        # An error was encountered trying to read the error JSON - just pass the error message through
-        try:
-            raise MarqoWebError(message=response.json(), code="unhandled_backend_error",
-                                status_code=response.status_code) from err
-        except requests.exceptions.JSONDecodeError:
-            raise MarqoWebError(message=response.text, code="unhandled_backend_error",
-                                status_code=response.status_code) from err
+        pass
+
+    try:
+        if response_dict["found"] is False:
+            raise DocumentNotFoundError(
+                message=f"Document `{response_dict['_id']}` not found."
+            ) from err
+    except KeyError:
+        pass
+    raise_catchall_http_as_marqo_error(response=response, err=err)
+
+
+def raise_catchall_http_as_marqo_error(response: requests.Response, err: requests.exceptions.HTTPError) -> None:
+    """Raises a generic MarqoWebError for a given HTTPError"""
+    try:
+        response_msg = response.json()
+    except requests.exceptions.JSONDecodeError:
+        response_msg = response.text
+
+    raise MarqoWebError(message=response_msg, code="unhandled_backend_error",
+                        error_type="backend_error", status_code=response.status_code) from err
