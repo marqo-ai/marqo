@@ -7,7 +7,7 @@ from fastapi import FastAPI, Request, Depends, HTTPException
 from fastapi.exception_handlers import http_exception_handler
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from marqo import utils
-from marqo.errors import MarqoError
+from marqo.errors import MarqoWebError
 from typing import Union
 from fastapi import FastAPI
 from marqo.neural_search import neural_search
@@ -60,11 +60,11 @@ async def generate_config(creds: HTTPBasicCredentials = Depends(security)):
     return config.Config(url=authorized_url)
 
 
-@app.exception_handler(MarqoError)
-async def marqo_exception_handler(request, exc):
+@app.exception_handler(MarqoWebError)
+async def marqo_exception_handler(request, exc: MarqoWebError):
     return await http_exception_handler(request=request, exc=HTTPException(
-        status_code=400,
-        detail="some error message here..."
+        status_code=exc.status_code,
+        detail=exc.message
     ))
 
 
@@ -132,6 +132,14 @@ async def delete_docs(index_name: str, documentIds: List[str], refresh: bool = T
         auto_refresh=refresh
     )
 
+
+@app.post("/indexes/{index_name}/refresh")
+async def refresh_index(index_name: str, marqo_config: config.Config = Depends(generate_config)):
+    return neural_search.refresh_index(
+        index_name=index_name, config=marqo_config,
+    )
+
+
 # try these curl commands:
 
 # ADD DOCS:
@@ -192,4 +200,9 @@ curl -XDELETE http://admin:admin@localhost:8000/indexes/my-irst-ix
 curl -XPOST  http://admin:admin@localhost:8000/indexes/my-irst-ix/documents/delete-batch -H 'Content-type:application/json' -d '[
     "honey_facts_119", "moon_fact_145"
 ]'
+"""
+
+# POST refresh index
+"""
+curl -XPOST  http://admin:admin@localhost:8000/indexes/my-irst-ix/refresh
 """
