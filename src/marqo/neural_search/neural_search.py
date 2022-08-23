@@ -401,19 +401,6 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
 
     return search_result
 
-def _rerank_search_results(
-        config: Config, index_name: str, text: str, search_method: str, result_count: int = 3, 
-        searchable_attributes: Sequence[str] = None):
-    
-    if search_method.upper() == SearchMethod.NEURAL:
-        pass
-    elif search_method.upper() == SearchMethod.LEXICAL:
-        pass
-    else:
-        raise MarqoError(f"Search called with unknown search method: {search_method}")
-
-
-
 def _lexical_search(
         config: Config, index_name: str, text: str, result_count: int = 3, return_doc_ids=False,
         searchable_attributes: Sequence[str] = None, raise_for_searchable_attributes=False):
