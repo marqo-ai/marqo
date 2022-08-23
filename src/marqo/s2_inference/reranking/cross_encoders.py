@@ -28,11 +28,6 @@ from marqo.processing import text as text_processor
 from marqo.s2_inference.logger import get_logger
 logger = get_logger(__name__)
 
-# TODO move this to an enum
-HIGHLIGHTS_FIELD = ResultsFields.highlights
-
-
-
 def _get_ids_from_results(results):
 
     return [doc[ResultsFields.id] for doc in results[ResultsFields.hits]]
