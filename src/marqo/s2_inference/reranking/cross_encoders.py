@@ -1,4 +1,4 @@
-from functools import lru_cache, partial
+from functools import partial
 import requests
 import validators
 import time
@@ -9,7 +9,7 @@ import pandas as pd
 pd.options.mode.chained_assignment = None
 from PIL import Image
 import numpy as np
-
+import torch
 
 from marqo.s2_inference.types import *
 from marqo.s2_inference.reranking.model_utils import (
@@ -37,13 +37,14 @@ def get_results_by_doc_id(results):
     ids = _get_ids_from_results(results)
 
 class FormattedResults:
+
+    """
+    helper class to format results.
+    use this as the interface between results and models and reranking.
+    output should be a dataframe with all fields required.
+    """    
     
-    # helper class to format results
-    # use this as the interface between results and models and reranking
-
-    # output should be a dataframe with all fields required 
-
-    def __init__(self, results, highlights_field=ResultsFields.highlights):
+    def __init__(self, results: Dict, highlights_field: str = ResultsFields.highlights):
 
         self.results = results
         self.highlights_field = highlights_field
@@ -55,7 +56,12 @@ class FormattedResults:
 
         self._get_searchable_columns()
 
-    def results_to_df(self):
+    def results_to_df(self) -> None:
+        """_summary_
+
+        Returns:
+            _type_: _description_
+        """
         self.results_df = pd.DataFrame(self.results[ResultsFields.hits])
 
         def _get_highlights(content):
@@ -74,10 +80,15 @@ class FormattedResults:
 
 
     @staticmethod
-    def _fill_doc_ids(results):
-        # check if an id exists, otherwise create a temporary one for easier identification
-        # during re-ranking
+    def _fill_doc_ids(results: Dict) -> None:
+        """
+        check if an id exists, otherwise create a temporary one for easier identification
+        during re-ranking
         
+        Args:
+            results (Dict): _description_
+        """
+
         for result in results[ResultsFields.hits]:
             if ResultsFields.id not in result:
                 doc_id = str(uuid.uuid4())
@@ -85,12 +96,24 @@ class FormattedResults:
             else:
                 result[ResultsFields.reranked_id] = result[ResultsFields.id]
 
-    def _get_searchable_columns(self):
+    def _get_searchable_columns(self) -> None:
+        """get the fields of the documents we can use for searching
+        """
         self.searchable_fields = [field for field in self.results_df.columns.tolist() if not field.startswith('_')]
 
     @staticmethod
-    def format_for_model(results_df, searchable_fields, query=None):
-        
+    def format_for_model(results_df: pd.DataFrame, searchable_fields: List[str], query: str = None):
+        """formats the converted results dataframe into something that goes to the models. 
+           self.results_to_df needs to be called to provide the input
+
+        Args:
+            results_df (pd.DataFrame): _description_
+            searchable_fields (List[str]): _description_
+            query (str, optional): _description_. Defaults to None.
+
+        Returns:
+            _type_: _description_
+        """
         # we want the output here to be tuples of the attribute content,query, id and attribute that was used
         # the first two will go to the model while the latter will be used to report the results
         inputs = []
@@ -107,6 +130,7 @@ class FormattedResults:
                 _inputs_df[Columns.query] = query
 
                 # we keep it in case we want to do hybrid search
+                # the number 1.0 is arbitrary to some degree (depends on how scores get combined)
                 if ResultsFields.original_score not in _inputs_df:
                     _inputs_df[ResultsFields.original_score] = 1.0
 
@@ -119,26 +143,33 @@ class FormattedResults:
         return inputs_df
 
 class ReRanker:
-
+    """base class for the rerankers
+    """
     def __init__(self, ):
         pass 
 
     def load_model(self):
         pass
 
-    def format_results(self, results, query=None):
+    def format_results(self, results: Dict, query: str = None):
+        """standardize the way the results are formatted to go to a standard cross-encoder
+
+        Args:
+            results (Dict): _description_
+            query (str, optional): _description_. Defaults to None.
+        """
         self.results = results
         self.formatted_results = FormattedResults(self.results)
 
     def rerank(self, query, results):
         pass
 
-# TODO add generic HF models
 class ReRankerText(ReRanker):
 
-    def __init__(self, model_name: str, device: str = 'cpu', max_length: int = 512, num_highlights=1, 
-                        split_params=get_default_text_processing_parameters()):
+    def __init__(self, model_name: str, device: str = 'cpu', max_length: int = 512, num_highlights: int = 1, 
+                        split_params: Dict = get_default_text_processing_parameters()):
         super().__init__()
+
         self.model_name = model_name
         self.device = device
         self.max_length = max_length
@@ -154,22 +185,47 @@ class ReRankerText(ReRanker):
         if self.split_params is not None and isinstance(self.split_params, (dict, defaultdict)):
             self._extract_text_processing_parameters()
 
-    def _extract_text_processing_parameters(self):
+    def _extract_text_processing_parameters(self) -> None:
         self.split_length = self.split_params['split_length']
         self.split_overlap = self.split_params['split_overlap']
         self.split_method = self.split_params['split_method']
 
-    def load_model(self):
+    def load_model(self) -> None:
 
         self.model = load_sbert_cross_encoder_model(model_name=self.model_name, 
                             device=self.device, max_length=self.max_length)['model']
 
     @staticmethod
-    def _prepare_inputs(inputs_df, query_column=Columns.query, content_column=Columns.field_content):
-        # TODO add in chunking option
+    def _prepare_inputs(inputs_df: pd.DataFrame, query_column: str = Columns.query, 
+                            content_column: str = Columns.field_content) -> List[List[str]]:
+        """subselects the columns from the formatted dataframe and converts to a list
+        for feeding to the cross encoder
+
+        Args:
+            inputs_df (pd.DataFrame): _description_
+            query_column (str, optional): _description_. Defaults to Columns.query.
+            content_column (str, optional): _description_. Defaults to Columns.field_content.
+
+        Returns:
+            pd.DataFrame: _description_
+        """
         return inputs_df[[query_column, content_column]].values.tolist()
 
-    def explode_nested_content_field(self, inputs_df):
+    def explode_nested_content_field(self, inputs_df: pd.DataFrame) -> pd.DataFrame:
+        """this is used to chunk the text content and then create a new entry for the model
+        based on the chunked content,
+        e.g. ['hello. this is a sentence. here is another.']
+        if we split the text by sentence then we get
+        e.g. ['hello.', 'this is a sentence.', 'here is another.']
+        so now we need 3 rows when before we had 1. this function performs the proper
+        remapping after splitting/chunking
+
+        Args:
+            inputs_df (pd.DataFrame): _description_
+
+        Returns:
+            pd.DataFrame: _description_
+        """
         # used to allow chunking on text in the same way the inexing does it
         _func = partial(text_processor.split_text, split_length=self.split_length, split_overlap=self.split_overlap, split_by=self.split_method)
         inputs_df = inputs_df.merge(inputs_df[Columns.field_content].apply(_func).explode(), left_index=True, right_index=True)
@@ -180,8 +236,18 @@ class ReRankerText(ReRanker):
         
         return inputs_df
 
-    def rerank(self, query, results, searchable_attributes=None):
+    def rerank(self, query: str, results: Dict, searchable_attributes: List[str] = None) -> None:
+        """the main reranking method
 
+        Args:
+            query (str): _description_
+            results (Dict): _description_
+            searchable_attributes (List[str], optional): _description_. Defaults to None.
+
+        Raises:
+            TypeError: _description_
+            RuntimeError: _description_
+        """
         self.results = results
         self.searchable_attributes = searchable_attributes
 
@@ -203,15 +269,17 @@ class ReRankerText(ReRanker):
         if self.searchable_attributes is None:
             self.searchable_attributes = self.formatted_results.searchable_fields
 
-        # now loop through each combination of query and searchable fields - could also just smash everything together here as well
+        # first stage of formatting converts results dict to dataframe
         self.inputs_df = self.formatted_results.format_for_model(self.formatted_results.results_df, self.searchable_attributes, query=query)
         
+        # second stage (optionally) add more rows by splitting the content into sub-chunks and
+        # performing the apprpriate filling in of other values
         if self.split_params is not None:
             _n = len(self.inputs_df)
             self.inputs_df = self.explode_nested_content_field(self.inputs_df)
             logger.info(f"chunking field content, went from length {_n} to {len(self.inputs_df)}")
         
-        # TODO chunk the text and send to model
+        # final stage creates list of lists of strings to go straight to the model
         self.model_inputs = self._prepare_inputs(self.inputs_df)
 
         if not _verify_model_inputs(self.model_inputs):
@@ -225,8 +293,12 @@ class ReRankerText(ReRanker):
 
         self.get_reranked_results()
 
-    def get_reranked_results(self, score_column=ResultsFields.reranker_score):
-        
+    def get_reranked_results(self, score_column: str = ResultsFields.reranker_score):
+        """reranks the updated results using the score in score_column
+
+        Args:
+            score_column (str, optional): _description_. Defaults to ResultsFields.reranker_score.
+        """
         reranked_top = []
         for i,group in self.inputs_df.groupby(ResultsFields.reranked_id):
             group = group.sort_values(score_column, ascending=False).head(self.num_highlights)
@@ -254,7 +326,6 @@ class ReRankerText(ReRanker):
         self.results[ResultsFields.hits] = sorted(self.results[ResultsFields.hits], key=lambda x:x[ResultsFields.reranker_score], reverse=True)
 
 
-
 class ReRankerOwl(ReRanker):
 # we might need the index config to get the processing params
 
@@ -270,7 +341,6 @@ class ReRankerOwl(ReRanker):
         loaded = load_owl_vit(self.device)
         self.model = loaded['model']
         self.processor = loaded['processor']
-
 
     @staticmethod
     def load_images(content, size):
@@ -325,10 +395,16 @@ class ReRankerOwl(ReRanker):
 
         return results
 
+def _load_image(filename: str, size: Tuple = None) -> ImageType:
+    """loads a PIL image
 
+    Args:
+        filename (str): _description_
+        size (Tuple, optional): _description_. Defaults to None.
 
-def _load_image(filename, size=None):
-    
+    Returns:
+        ImageType: _description_
+    """
     is_url = validators.url(filename)
     print(filename, is_url)
     if is_url:
@@ -341,28 +417,3 @@ def _load_image(filename, size=None):
     #im.draft('RGB', size)
     im = im.resize(size).convert('RGB')
     return im
-
-
-if __name__ == "__main__":
-    url = "http://images.cocodataset.org/val2017/000000039769.jpg"
-    image = Image.open(requests.get(url, stream=True).raw)
-    texts = [["a photo of a cat", "a photo of a dog"]]
-
-
-    # i = 0  # Retrieve predictions for the first image for the corresponding text queries
-    # text = texts[i]
-    # boxes, scores, labels = results[i]["boxes"], results[i]["scores"], results[i]["labels"]
-
-    # score_threshold = 0.1
-    # for box, score, label in zip(boxes, scores, labels):
-    #     box = [round(i, 2) for i in box.tolist()]
-    #     if score >= score_threshold:
-    #         print(f"Detected {text[label]} with confidence {round(score.item(), 3)} at location {box}")
-
-    # @lru_cache(maxsize=None)
-    # def _load_image(filenmae):
-    #     pass
-
-    # def load_images():
-    #     # https://stackoverflow.com/questions/57663734/how-to-speed-up-image-loading-in-pillow-python
-    #     pass
