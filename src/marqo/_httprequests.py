@@ -12,7 +12,8 @@ from marqo.errors import (
     MarqoTimeoutError,
     IndexNotFoundError,
     DocumentNotFoundError,
-    IndexAlreadyExistsError
+    IndexAlreadyExistsError,
+    InvalidIndexNameError
 )
 from marqo.version import qualified_version
 
@@ -144,6 +145,10 @@ def convert_to_marqo_web_error_and_raise(response: requests.Response, err: reque
             raise IndexNotFoundError(message=f"Index `{response_dict['error']['index']}` not found.") from err
         elif open_search_error_type == "resource_already_exists_exception" and "index" in response_dict["error"]["reason"]:
             raise IndexAlreadyExistsError(message=f"Index `{response_dict['error']['index']}` already exists") from err
+        elif open_search_error_type == "invalid_index_name_exception":
+            raise InvalidIndexNameError(
+                message=f"{response_dict['error']['reason'].replace('[','`').replace(']','`')}"
+            ) from err
         else:
             raise_catchall_http_as_marqo_error(response=response, err=err)
     except KeyError:
