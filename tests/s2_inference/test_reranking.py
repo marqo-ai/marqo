@@ -280,3 +280,6 @@ class TestReranking(unittest.TestCase):
 
         assert all( isinstance(doc['_score'], (int, float)) for doc in results_lexical['hits'])
 
+        # check monotinicity of scores
+        all_scores = [doc['_score'] for doc in results_lexical['hits']]
+        assert all( s1 >= s2  for s1,s2 in zip(all_scores[:-1], all_scores[1:]))
