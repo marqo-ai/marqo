@@ -60,6 +60,7 @@ from marqo.neural_search import constants
 # _httprequests.py is designed for the client
 from marqo._httprequests import HttpRequests
 from marqo.config import Config
+# TODO add an errors.py 
 from marqo import errors
 import threading
 
