@@ -15,5 +15,8 @@ numpy
 validators
 sentence-transformers
 clip-marqo
-onnxruntime
 protobuf==3.20.1
+onnxruntime-gpu
+onnx
+pandas
+optimum
