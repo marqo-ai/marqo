@@ -45,9 +45,9 @@ import requests
 from marqo.neural_search.enums import MediaType, MlModel, NeuralField, SearchMethod
 from marqo.neural_search.enums import NeuralSettingsField as NsField
 from marqo.neural_search import utils, backend, validation, configs
-from marqo.processing import text as text_processor
+from marqo.s2_inference.processing import text as text_processor
 
-from marqo.processing import image as image_processor
+from marqo.s2_inference.processing import image as image_processor
 from marqo.s2_inference.clip_utils import _is_image
 from marqo.s2_inference.reranking import rerank
 

@@ -23,7 +23,7 @@ from marqo.s2_inference.reranking.model_utils import (
 )
 from marqo.s2_inference.reranking.enums import Columns, ResultsFields
 from marqo.s2_inference.reranking.configs import get_default_text_processing_parameters
-from marqo.processing import text as text_processor
+from marqo.s2_inference.processing import text as text_processor
 
 from marqo.s2_inference.logger import get_logger
 logger = get_logger(__name__)

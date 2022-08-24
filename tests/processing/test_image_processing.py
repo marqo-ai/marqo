@@ -5,7 +5,7 @@ import os
 import numpy as np
 from PIL import Image
 
-from marqo.processing.image import (
+from marqo.s2_inference.processing.image import (
     load_rcnn_image, 
     calc_area,
     filter_boxes,

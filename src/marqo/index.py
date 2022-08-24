@@ -196,7 +196,7 @@ class Index():
             return neural_search.add_documents(
                 config=self.config, index_name=self.index_name, docs=documents, auto_refresh=auto_refresh)
         elif use_parallel:
-            from marqo import parallel
+            from marqo.neural_search import parallel
             return parallel.add_documents_mp(config=self.config, index_name=self.index_name, docs=documents, auto_refresh=auto_refresh, batch_size=batch_size)
         else:
             if batch_size <= 0:
