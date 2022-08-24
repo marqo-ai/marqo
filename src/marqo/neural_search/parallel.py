@@ -170,6 +170,8 @@ def _run_chunker(chunker: IndexChunk):
     res = chunker.process()
     return res
 
+# TODO add ray as a backend - testing using it was succesful but it was left out
+# to reduce dependencies at the early stage
 def add_documents_mp(config=None, index_name=None, docs=None, 
                      auto_refresh=None, batch_size=50):
     """add documents using parallel processing using multiporcessing
