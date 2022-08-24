@@ -1,5 +1,8 @@
-# client:
+# neural search:
 requests
+fastapi
+uvicorn[standard]
+fastapi_utils
 # testing:
 pytest
 tox
@@ -12,8 +15,8 @@ numpy
 validators
 sentence-transformers
 clip-marqo
+protobuf==3.20.1
 onnxruntime-gpu
 onnx
-protobuf==3.20.1
 pandas
 optimum

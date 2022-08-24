@@ -1,9 +1,13 @@
 import json
-
 from requests import Response
+from http import HTTPStatus
+
 
 class MarqoError(Exception):
-    """Generic class for Marqo error handling"""
+    """Generic class for Marqo error handling
+    These will be caught and returned to the user as 5xx internal errors
+
+    """
 
     def __init__(self, message: str) -> None:
         self.message = message
@@ -42,22 +46,112 @@ class MarqoApiError(MarqoError):
         return f'MarqoApiError. {self.message}'
 
 
-class MarqoNonNeuralIndexError(MarqoError):
-    """Error trying to use a non-neural index like a neural one"""
+# MARQO WEB ERROR
+
+class MarqoWebError(Exception):
+
+    status_code: int = None
+    error_type: str = None
+    message: str = None
+    code: str = None
+    link: str = ""
+
+    def __init__(self, message: str, status_code: int = None,
+                 error_type: str = None, code: str = None,
+                 link: str = None) -> None:
+        self.message = message
+
+        if self.status_code is None:
+            self.status_code = status_code
+
+        if self.error_type is None:
+            self.error_type = error_type
+
+        if self.code is None:
+            self.code = code
+
+        if self.link is None:
+            self.link = link
+        super().__init__(self.message)
 
     def __str__(self) -> str:
-        return f'MarqoCommunicationError, {self.message}'
+        return f'MarqoWebError: {self.__class__.__name__} Error message: {self.message}'
+
+# ---MARQO USER ERRORS---
+
+# --
 
 
-class MarqoCommunicationError(MarqoError):
+class __InvalidRequestError(MarqoWebError):
+    """abstract error"""
+
+    def __init__(self, message: str):
+        self.message = message
+
+    error_type = "invalid_request"
+
+
+class IndexAlreadyExistsError(__InvalidRequestError):
+    code = "index_already_exists"
+    status_code = HTTPStatus.CONFLICT
+
+
+class IndexNotFoundError(__InvalidRequestError):
+    code = "index_not_found"
+    status_code = HTTPStatus.NOT_FOUND
+
+
+class InvalidIndexNameError(__InvalidRequestError):
+    code = "invalid_index_name"
+    status_code = HTTPStatus.BAD_REQUEST
+
+
+class InvalidDocumentIdError(__InvalidRequestError):
+    code = "invalid_document_id"
+    status_code = HTTPStatus.BAD_REQUEST
+
+
+class InvalidFieldNameError(__InvalidRequestError):
+    code = "invalid_field_name"
+    status_code = HTTPStatus.BAD_REQUEST
+
+
+class InvalidArgError(__InvalidRequestError):
+    code = "invalid_argument"
+    status_code = HTTPStatus.BAD_REQUEST
+
+
+class BadRequestError(__InvalidRequestError):
+    code = "bad_request"
+    status_code = HTTPStatus.BAD_REQUEST
+
+
+class DocumentNotFoundError(__InvalidRequestError):
+    code = "document_not_found"
+    status_code = HTTPStatus.NOT_FOUND
+
+
+class NonNeuralIndexError(__InvalidRequestError):
+    """Error trying to use a non-neural OpenSearch index like a neural one"""
+    code = "document_not_found"
+    status_code = HTTPStatus.NOT_FOUND
+
+# ---MARQO INTERNAL ERROR---
+
+
+class InternalError(MarqoWebError):
+    error_type = "internal"
+    code = "internal"
+    status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+
+
+class BackendCommunicationError(InternalError):
     """Error when connecting to Marqo"""
+    code = "backend_communication_error"
+    status_code = HTTPStatus.INTERNAL_SERVER_ERROR
 
-    def __str__(self) -> str:
-        return f'MarqoCommunicationError, {self.message}'
 
-
-class MarqoTimeoutError(MarqoError):
+class BackendTimeoutError(InternalError):
     """Error when Marqo operation takes longer than expected"""
-
-    def __str__(self) -> str:
-        return f'MarqoTimeoutError, {self.message}'
+    code = "backend_timeout_error"
+    status_code = HTTPStatus.INTERNAL_SERVER_ERROR

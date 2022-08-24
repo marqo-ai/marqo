@@ -25,27 +25,27 @@ def get_index_info(config: Config, index_name: str) -> IndexInfo:
         IndexInfo of the index
 
     Raises:
-        MarqoError, if the index's mapping doesn't conform to a Neural Search index
+        NonNeuralIndexError, if the index's mapping doesn't conform to a Neural Search index
 
     """
     res = HttpRequests(config).get(path=F"{index_name}/_mapping")
 
     if not (index_name in res and "mappings" in res[index_name]
             and "_meta" in res[index_name]["mappings"]):
-        raise errors.MarqoNonNeuralIndexError(
+        raise errors.NonNeuralIndexError(
             f"Error retrieving index info for index {index_name}")
 
     if "model" in res[index_name]["mappings"]["_meta"]:
         model_name = res[index_name]["mappings"]["_meta"]["model"]
     else:
-        raise errors.MarqoNonNeuralIndexError(
+        raise errors.NonNeuralIndexError(
             "get_index_info: couldn't identify embedding model name "
             F"in index mappings! Mapping: {res}")
 
     if "neural_settings" in res[index_name]["mappings"]["_meta"]:
         neural_settings = res[index_name]["mappings"]["_meta"]["neural_settings"]
     else:
-        raise errors.MarqoNonNeuralIndexError(
+        raise errors.NonNeuralIndexError(
             "get_index_info: couldn't identify neural_settings "
             F"in index mappings! Mapping: {res}")
 

@@ -1,13 +1,19 @@
 import copy
 import json
 import pprint
+from http import HTTPStatus
 from typing import Any, Callable, Dict, List, Optional, Union
 import requests
+from requests.exceptions import JSONDecodeError
 from marqo.config import Config
 from marqo.errors import (
-    MarqoApiError,
-    MarqoCommunicationError,
-    MarqoTimeoutError,
+    MarqoWebError,
+    BackendCommunicationError,
+    BackendTimeoutError,
+    IndexNotFoundError,
+    DocumentNotFoundError,
+    IndexAlreadyExistsError,
+    InvalidIndexNameError
 )
 from marqo.version import qualified_version
 
@@ -29,7 +35,7 @@ class HttpRequests:
         body: Optional[Union[Dict[str, Any], List[Dict[str, Any]], List[str], str]] = None,
         content_type: Optional[str] = None,
     ) -> Any:
-        to_verify = self.config.cluster_is_remote
+        to_verify = False #  self.config.cluster_is_remote
 
         if http_method not in ALLOWED_OPERATIONS:
             raise ValueError("{} not an allowed operation {}".format(http_method, ALLOWED_OPERATIONS))
@@ -68,9 +74,9 @@ class HttpRequests:
             return self.__validate(response)
 
         except requests.exceptions.Timeout as err:
-            raise MarqoTimeoutError(str(err)) from err
+            raise BackendTimeoutError(str(err)) from err
         except requests.exceptions.ConnectionError as err:
-            raise MarqoCommunicationError(str(err)) from err
+            raise BackendCommunicationError(str(err)) from err
 
     def get(
         self, path: str,
@@ -122,4 +128,49 @@ class HttpRequests:
             request.raise_for_status()
             return HttpRequests.__to_json(request)
         except requests.exceptions.HTTPError as err:
-            raise MarqoApiError(str(err), request) from err
+            convert_to_marqo_web_error_and_raise(response=request, err=err)
+
+
+def convert_to_marqo_web_error_and_raise(response: requests.Response, err: requests.exceptions.HTTPError):
+    """Translates OpenSearch errors into Marqo errors, which are then raised"""
+    try:
+        response_dict = response.json()
+    except requests.exceptions.JSONDecodeError:
+        raise_catchall_http_as_marqo_error(response=response, err=err)
+
+    try:
+        open_search_error_type = response_dict["error"]["type"]
+
+        if open_search_error_type == "index_not_found_exception":
+            raise IndexNotFoundError(message=f"Index `{response_dict['error']['index']}` not found.") from err
+        elif open_search_error_type == "resource_already_exists_exception" and "index" in response_dict["error"]["reason"]:
+            raise IndexAlreadyExistsError(message=f"Index `{response_dict['error']['index']}` already exists") from err
+        elif open_search_error_type == "invalid_index_name_exception":
+            raise InvalidIndexNameError(
+                message=f"{response_dict['error']['reason'].replace('[','`').replace(']','`')}"
+            ) from err
+        else:
+            raise_catchall_http_as_marqo_error(response=response, err=err)
+    except KeyError:
+        pass
+
+    try:
+        if response_dict["found"] is False:
+            raise DocumentNotFoundError(
+                message=f"Document `{response_dict['_id']}` not found."
+            ) from err
+    except KeyError:
+        pass
+
+    raise_catchall_http_as_marqo_error(response=response, err=err)
+
+
+def raise_catchall_http_as_marqo_error(response: requests.Response, err: requests.exceptions.HTTPError) -> None:
+    """Raises a generic MarqoWebError for a given HTTPError"""
+    try:
+        response_msg = response.json()
+    except requests.exceptions.JSONDecodeError:
+        response_msg = response.text
+
+    raise MarqoWebError(message=response_msg, code="unhandled_backend_error",
+                        error_type="backend_error", status_code=response.status_code) from err

@@ -74,7 +74,7 @@ def populate_cache(config: Config):
         try:
             found_index_info = backend.get_index_info(config=config, index_name=ix_name)
             index_info_cache[ix_name] = found_index_info
-        except errors.MarqoNonNeuralIndexError as e:
+        except errors.NonNeuralIndexError as e:
             pass
 
 

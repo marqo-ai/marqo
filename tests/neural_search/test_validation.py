@@ -1,10 +1,31 @@
-from marqo.neural_search import enums, validation
+from marqo.neural_search import validation
+from enum import Enum
 import unittest
 import copy
 from marqo.errors import MarqoError
 
 
 class TestValidation(unittest.TestCase):
+
+    def setUp(self) -> None:
+        class SimpleEnum(str, Enum):
+            ABC = "APPLE"
+            DEF = "BANANA"
+
+        self.SimpleEnum = SimpleEnum
+
+    def test_validate_str_against_enum_case_senstive(self):
+        try:
+            validation.validate_str_against_enum("banana", self.SimpleEnum, case_sensitive=True)
+            raise AssertionError
+        except ValueError:
+            pass
+
+    def test_validate_str_against_enum_case_insensitive(self):
+        assert "banana" == validation.validate_str_against_enum("banana", self.SimpleEnum, case_sensitive=False)
+
+    def test_validate_str_against_enum(self):
+        assert "APPLE" == validation.validate_str_against_enum("APPLE", self.SimpleEnum)
 
     def test_validate_chunk_plus_name(self):
         try:

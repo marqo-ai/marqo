@@ -60,7 +60,7 @@ from marqo.neural_search import constants
 # _httprequests.py is designed for the client
 from marqo._httprequests import HttpRequests
 from marqo.config import Config
-from marqo.errors import MarqoError, MarqoApiError
+from marqo import errors
 import threading
 
 
@@ -179,12 +179,9 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
     try:
         index_info = backend.get_index_info(config=config, index_name=index_name)
-    except MarqoApiError as s:
-        if s.status_code == 404 and "index_not_found_exception" in str(s):
-            create_vector_index(config=config, index_name=index_name)
-            index_info = backend.get_index_info(config=config, index_name=index_name)
-        else:
-            raise s
+    except errors.IndexNotFoundError as s:
+        create_vector_index(config=config, index_name=index_name)
+        index_info = backend.get_index_info(config=config, index_name=index_name)
 
     existing_fields = set(index_info.properties.keys())
     new_fields = set()
@@ -201,8 +198,9 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
         if "_id" in doc:
             doc_id = doc["_id"]
             if not isinstance(doc_id, str):
-                raise MarqoError("Document _id must be a string type! "
-                                    f"Received _id {doc_id} of type {type(doc_id)}")
+                raise errors.InvalidDocumentIdError(
+                    "Document _id must be a string type! "
+                    f"Received _id {doc_id} of type {type(doc_id)}")
             del copied["_id"]
             doc_ids_to_update.append(doc_id)
         else:
@@ -292,9 +290,9 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 def get_document_by_id(config: Config, index_name:str, document_id: str):
     """returns document by its ID"""
     if not isinstance(document_id, str):
-        raise MarqoError("Document ID must be a str")
+        raise errors.InvalidDocumentIdError("Document ID must be a str")
     if not document_id:
-        raise MarqoError("Document ID must can't be empty")
+        raise errors.InvalidDocumentIdError("Document ID must can't be empty")
     res = HttpRequests(config).get(
         f'{index_name}/_doc/{document_id}'
     )
@@ -307,7 +305,7 @@ def get_document_by_id(config: Config, index_name:str, document_id: str):
 def delete_documents(config: Config, index_name: str, doc_ids: List[str], auto_refresh):
     """Deletes documents """
     if not doc_ids:
-        raise MarqoError("doc_ids can't be empty!")
+        raise errors.InvalidDocumentIdError("doc_ids can't be empty!")
     delete_parents_res = HttpRequests(config=config).post(
         path=f"{index_name}/_delete_by_query", body={
             "query": {
@@ -320,6 +318,10 @@ def delete_documents(config: Config, index_name: str, doc_ids: List[str], auto_r
     if auto_refresh:
         refresh_response = HttpRequests(config).post(path=F"{index_name}/_refresh")
     return delete_parents_res
+
+
+def refresh_index(config: Config,  index_name: str):
+    return HttpRequests(config).post(path=F"{index_name}/_refresh")
 
 
 def search(config: Config, index_name: str, text: str, result_count: int = 3, highlights=True, return_doc_ids=False,
@@ -352,7 +354,7 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
     MAX_RESULT_COUNT = 500
 
     if result_count > MAX_RESULT_COUNT or result_count < 0:
-        raise MarqoError("result count must be between 0 and 500!")
+        raise errors.InvalidArgError("result count must be between 0 and 500!")
 
     t0 = datetime.datetime.now()
 
@@ -383,12 +385,12 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
             return_doc_ids=return_doc_ids, searchable_attributes=searchable_attributes,
         )
     else:
-        raise MarqoError(f"Search called with unknown search method: {search_method}")
+        raise errors.InvalidArgError(f"Search called with unknown search method: {search_method}")
     
     if reranker is not None:
         rerank.rerank_search_results(search_result=search_result, query=text, 
                     model_name=reranker, device=config.indexing_device, 
-                searchable_attributes=searchable_attributes, num_highlights=1)
+                searchable_attributes=searchable_attributes, num_highlights=num_highlights)
 
     time_taken = datetime.datetime.now() - t0
     search_result["processingTimeMs"] = round(time_taken.total_seconds() * 1000)
@@ -429,15 +431,16 @@ def _lexical_search(
         - Test raise_for_searchable_attribute=False
     """
     if not isinstance(text, str):
-        raise MarqoError(f"text arg must be of type str! text arg is of type {type(text)}. "
-                            f"text arg: {text}")
+        raise errors.InvalidArgError(
+            f"Query arg must be of type str! text arg is of type {type(text)}. "
+            f"Query arg: {text}")
 
     if searchable_attributes is not None:
         cached_fields_to_search = [field for field in index_meta_cache.get_index_info(
                             config=config, index_name=index_name).get_text_properties()
                             if field in searchable_attributes]
         if raise_for_searchable_attributes and len(cached_fields_to_search) < len(searchable_attributes):
-            raise MarqoError(
+            raise errors.InvalidArgError(
                 "Detected unknown searchable_attributes:\n "
                 f"Known attributes: {index_meta_cache.get_index_info(config=config, index_name=index_name).get_text_properties().keys()},\n"
                 f"Searchable attributes: {searchable_attributes}")
@@ -514,12 +517,13 @@ def _vector_text_search(
         - searching a non existent index should return a HTTP-type error
     """
     if result_count < 0 or result_count > constants.MAX_VECTOR_SEARCH_RESULT_COUNT:
-        raise ValueError("neural_search: vector_text_search: illegal result_count: {}".format(result_count))
+        raise errors.InvalidArgError(
+            "neural_search: vector_text_search: illegal result_count: {}".format(result_count))
 
     try:
         index_info = get_index_info(config=config, index_name=index_name)
     except KeyError as e:
-        raise MarqoError(message="Tried to search a non-existent index: {}".format(index_name))
+        raise errors.IndexNotFoundError(message="Tried to search a non-existent index: {}".format(index_name))
     vectorised_text = s2_inference.vectorise(
         model_name=index_info.model_name, content=text_processor.split_text(text)[0], 
         device=config.search_device,

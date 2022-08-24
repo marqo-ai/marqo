@@ -1,17 +1,24 @@
+from enum import Enum
+from fastapi_utils.enums import StrEnum
+
+
 class MediaType:
     text = 'text'
     image = 'image'
     default = 'text'
 
+
 class MlModel:
     bert = "hf/all_datasets_v4_MiniLM-L6"
     clip = "ViT-L/14"
 
-class SearchMethod:
+
+class SearchMethod(str, Enum):
     # BM25/ TF-IDF:
     LEXICAL = "LEXICAL"
     # chunk_embeddings
     NEURAL = "NEURAL"
+
 
 class NeuralField:
     """Neural Search fields
@@ -45,3 +52,7 @@ class SplitMethod:
     # consider moving this enum into processing
     sentence = "sentence"
 
+
+class Device (str, Enum):
+    cpu = "cpu"
+    cuda = "cuda"
