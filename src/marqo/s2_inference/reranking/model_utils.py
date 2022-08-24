@@ -87,17 +87,23 @@ class HFClassificationOnnx:
         _type_: _description_
     """
     
-    def __init__(self, model_name: str, device: str = 'cpu', load_from_cache: bool = True) -> None:
+    def __init__(self, model_name: str, device: str = 'cpu', max_length: int = 512) -> None:
 
         self.model_name = model_name
         self.save_path = None
         self.device_string = device
         self.device = convert_device_id_to_int(device)
-        self.load_from_cache = load_from_cache
+        self.max_length = max_length
+        self.tokenizer_kwargs = {'padding':True, 'truncation':True,  'max_length':self.max_length}
 
         # TODO load local version
+        #self.load_from_cache = load_from_cache
+
         self.model = ORTModelForSequenceClassification.from_pretrained(self.model_name, from_transformers=True)
+        # couldn't find aaaaany documentation on passing tokenizer arguments through the pipeline
+        # https://github.com/huggingface/transformers/blob/main/src/transformers/pipelines/__init__.py#L750
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+        
         self.onnx_classifier = pipeline("text-classification", model=self.model, 
                                         tokenizer=self.tokenizer, device=self.device)
 
@@ -121,7 +127,7 @@ class HFClassificationOnnx:
     @staticmethod
     def _prepare_inputs(inputs: List[List[str]]) -> List[Dict]:
         """prepares the inputs for the onnx cross encoder
-        used named fields to allow for proper passing of two strings
+        used named fields in the output to allow for proper passing of two strings
 
         Args:
             inputs (List[List[str]]): _description_
@@ -159,7 +165,8 @@ class HFClassificationOnnx:
             List[Dict]: _description_
         """
         self.inputs = self._prepare_inputs(inputs)
-        self.predictions = self.onnx_classifier(self.inputs)
+        # https://stackoverflow.com/questions/67849833/how-to-truncate-input-in-the-huggingface-pipeline
+        self.predictions = self.onnx_classifier(self.inputs, **self.tokenizer_kwargs)
         self.outputs = self._parepare_outputs(self.predictions)
 
         return self.outputs
@@ -189,6 +196,11 @@ def load_sbert_cross_encoder_model(model_name: str, device: str = 'cpu', max_len
             model = HFClassificationOnnx(model_name.replace('onnx/', ''), device=device)
         else:
             model = CrossEncoder(model_name, max_length=max_length, device=device)
+            if hasattr(model.tokenizer, 'model_max_length'):
+                model_max_len = model.tokenizer.model_max_length
+                if max_length > model_max_len:
+                    model.max_length = model_max_len
+                    logger.warning(f"specified max_length of {max_length} is greater than model max length of {model_max_len}, setting to model max length")
         available_models[model_cache_key] = model
 
     return {'model':model}
