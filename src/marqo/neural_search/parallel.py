@@ -7,10 +7,12 @@ import numpy as np
 from torch import multiprocessing as mp
 
 from marqo.neural_search import neural_search
-from marqo.marqo_logging import logger
+from marqo.neural_search.neural_search_logging import get_logger
 from marqo.neural_search.configs import get_max_processes, get_threads_per_process
 from marqo.neural_search import backend
 from marqo.errors import MarqoApiError
+
+logger = get_logger(__name__)
 
 try:
     mp.set_start_method('spawn', force=True)
@@ -170,7 +172,7 @@ def _run_chunker(chunker: IndexChunk):
 
 def add_documents_mp(config=None, index_name=None, docs=None, 
                      auto_refresh=None, batch_size=50):
-    """add documents using parallel processing using ray
+    """add documents using parallel processing using multiporcessing
 
     Args:
         documents (_type_): _description_
