@@ -4,7 +4,7 @@ import pprint
 from http import HTTPStatus
 from typing import Any, Callable, Dict, List, Optional, Union
 import requests
-from requests.exceptions import JSONDecodeError
+from json.decoder import JSONDecodeError
 from marqo.config import Config
 from marqo.errors import (
     MarqoWebError,
@@ -135,7 +135,7 @@ def convert_to_marqo_web_error_and_raise(response: requests.Response, err: reque
     """Translates OpenSearch errors into Marqo errors, which are then raised"""
     try:
         response_dict = response.json()
-    except requests.exceptions.JSONDecodeError:
+    except JSONDecodeError:
         raise_catchall_http_as_marqo_error(response=response, err=err)
 
     try:
@@ -169,7 +169,7 @@ def raise_catchall_http_as_marqo_error(response: requests.Response, err: request
     """Raises a generic MarqoWebError for a given HTTPError"""
     try:
         response_msg = response.json()
-    except requests.exceptions.JSONDecodeError:
+    except JSONDecodeError:
         response_msg = response.text
 
     raise MarqoWebError(message=response_msg, code="unhandled_backend_error",
