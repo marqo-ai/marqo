@@ -8,7 +8,7 @@ from fastapi import FastAPI, Request, Depends, HTTPException
 from fastapi.exception_handlers import http_exception_handler
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from marqo import utils
-from marqo.errors import MarqoWebError
+from marqo.errors import MarqoWebError, MarqoError
 from typing import Union
 from fastapi import FastAPI
 from marqo.neural_search import neural_search
@@ -62,7 +62,7 @@ async def generate_config(creds: HTTPBasicCredentials = Depends(security)):
 
 
 @app.exception_handler(MarqoWebError)
-async def marqo_exception_handler(request, exc: MarqoWebError):
+async def marqo_user_exception_handler(request, exc: MarqoWebError):
     """ Catch a MarqoWebError and return an appropriate HTTP response.
 
     We can potentially catch any type of Marqo exception. We can do isinstance() calls
@@ -80,6 +80,22 @@ async def marqo_exception_handler(request, exc: MarqoWebError):
         )
     else:
         return JSONResponse(content=body, status_code=exc.status_code)
+
+
+@app.exception_handler(MarqoError)
+async def marqo_internal_exception_handler(request, exc: MarqoError):
+    """MarqoErrors are treated as internal errors"""
+    headers = getattr(exc, "headers", None)
+    body = {
+        "message": exc.message,
+        "code": "internal_errro",
+        "type": "internal_error",
+        "link": ""
+    }
+    if headers:
+        return JSONResponse(content=body, status_code=500, headers=headers)
+    else:
+        return JSONResponse(content=body, status_code=500)
 
 
 @app.get("/")

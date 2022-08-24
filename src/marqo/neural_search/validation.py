@@ -2,7 +2,7 @@ import pprint
 
 from marqo.neural_search import enums
 from typing import Iterable, Container
-from marqo.errors import MarqoError
+from marqo.errors import MarqoError, InvalidFieldNameError, BadRequestError, InternalError
 from marqo.neural_search.enums import NeuralField
 from marqo.neural_search import constants
 from typing import Any, Type
@@ -39,28 +39,28 @@ def validate_field_name(field_name) -> str:
     returns field_name, if all validations pass
 
     Raises:
-        MarqoError
+        InvalidFieldNameError
     """
     if not isinstance(field_name, str):
-        raise MarqoError(F"field name must be str! Found type {type(field_name)} for {field_name}")
+        raise InvalidFieldNameError(F"field name must be str! Found type {type(field_name)} for {field_name}")
     if not field_name:
-        raise MarqoError("field name can't be empty! ")
+        raise InvalidFieldNameError("field name can't be empty! ")
     if field_name.startswith(enums.NeuralField.vector_prefix):
-        raise MarqoError(F"can't start field name with protected prefix {enums.NeuralField.vector_prefix}."
+        raise InvalidFieldNameError(F"can't start field name with protected prefix {enums.NeuralField.vector_prefix}."
                             F" Error raised for field name: {field_name}")
     if field_name.startswith(enums.NeuralField.chunks):
-        raise MarqoError(F"can't name field with protected field name {enums.NeuralField.chunks}."
+        raise InvalidFieldNameError(F"can't name field with protected field name {enums.NeuralField.chunks}."
                             F" Error raised for field name: {field_name}")
     char_validation = [(c, c not in constants.ILLEGAL_CUSTOMER_FIELD_NAME_CHARS)
                         for c in field_name]
     char_validation_failures = [c for c in char_validation if not c[1]]
     if char_validation_failures:
-        raise MarqoError(F"Illegal character '{char_validation_failures[0][0]}' "
-                            F"detected in field name {field_name}")
+        raise InvalidFieldNameError(F"Illegal character '{char_validation_failures[0][0]}' "
+                               F"detected in field name {field_name}")
     if field_name not in enums.NeuralField.__dict__.values():
         return field_name
     else:
-        raise MarqoError(f"field name can't be a protected field. Please rename this field: {field_name}")
+        raise InvalidFieldNameError(f"field name can't be a protected field. Please rename this field: {field_name}")
 
 
 def validate_doc(doc: dict) -> dict:
@@ -68,43 +68,48 @@ def validate_doc(doc: dict) -> dict:
     Args:
         doc: a document indexed by the client
 
-    Raises an MarqoError
+    Raises:
+        errors.BadRequestError
 
     Returns
         doc if all validations pass
     """
     if len(doc) <= 0:
-        raise MarqoError("Can't index empty dict!")
+        raise BadRequestError("Can't index an empty dict.")
     return doc
 
 
 def validate_vector_name(name: str):
     """Checks that the vector name is valid.
     It should have the form __vector_{customer field name}
+
+    Raises:
+        errors.InternalError, as vector names are an internal concern and
+            should be hidden from the end user
     """
     if not isinstance(name, str):
-        raise MarqoError(F"vector name must be str! Found type {type(name)} for {name}")
+        raise InternalError(F"vector name must be str! Found type {type(name)} for {name}")
     if not name:
-        raise MarqoError("vector name can't be empty! ")
+        raise InternalError("vector name can't be empty! ")
 
     if not name.startswith(enums.NeuralField.vector_prefix):
-        raise MarqoError(
+        raise InternalError(
             f"Names of vectors must begin "
             f"with the vector prefix ({enums.NeuralField.vector_prefix})! \n"
             f"The name of the vector that raised the error: {name}")
     without_prefix = name.replace(enums.NeuralField.vector_prefix, '', 1)
     if not without_prefix:
-        raise MarqoError(
+        raise InternalError(
             f"Vector name without prefix cannot be empty. "
             f"The name of the vector that raised the error: {name}"
         )
     if without_prefix in enums.NeuralField.__dict__.values():
-        raise MarqoError(
+        raise InternalError(
             f"Vector name without vector prefix can't be a protected name."
             f"The name of the vector that raised the error: {name}"
         )
     if without_prefix == '_id':
-        raise MarqoError(
+        raise InternalError(
             f"Vector name without vector prefix can't be a protected name."
             f"The name of the vector that raised the error: {name}"
         )
@@ -112,7 +117,7 @@ def validate_vector_name(name: str):
 
 
 def validate_searchable_vector_props(existing_vector_properties: Container[str],
-                               subset_vector_properties: Iterable[str]) -> Iterable[str]:
+                                     subset_vector_properties: Iterable[str]) -> Iterable[str]:
     """Validates that the a subset of vector properties is indeed a subset.
 
     Args:
@@ -129,5 +134,5 @@ def validate_searchable_vector_props(existing_vector_properties: Container[str],
     for subset_vec in subset_vector_properties:
         if subset_vec not in existing_vector_properties:
             raise MarqoError(f"Searchable attribute '{subset_vec.replace(NeuralField.vector_prefix, '')}' "
-                                f"not found in index.")
+                             f"not found in index.")
     return subset_vector_properties

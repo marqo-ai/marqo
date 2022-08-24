@@ -8,8 +8,8 @@ from requests.exceptions import JSONDecodeError
 from marqo.config import Config
 from marqo.errors import (
     MarqoWebError,
-    MarqoCommunicationError,
-    MarqoTimeoutError,
+    BackendCommunicationError,
+    BackendTimeoutError,
     IndexNotFoundError,
     DocumentNotFoundError,
     IndexAlreadyExistsError,
@@ -74,9 +74,9 @@ class HttpRequests:
             return self.__validate(response)
 
         except requests.exceptions.Timeout as err:
-            raise MarqoTimeoutError(str(err)) from err
+            raise BackendTimeoutError(str(err)) from err
         except requests.exceptions.ConnectionError as err:
-            raise MarqoCommunicationError(str(err)) from err
+            raise BackendCommunicationError(str(err)) from err
 
     def get(
         self, path: str,
