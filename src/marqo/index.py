@@ -85,6 +85,7 @@ class Index():
         s2SearchApiError
             An error containing details about why marqo can't process your request. marqo error codes are described here: https://docs.marqo.com/errors/#marqo-errors
         """
+        # call via API
         return neural_search.create_vector_index(
             config=config, index_name=index_name, media_type=MediaType.default, neural_settings={
                 "index_defaults": {
@@ -105,6 +106,7 @@ class Index():
 
     def refresh(self):
         """refreshes the index"""
+        # might need to rename to hit Marqo or add if not it does exist
         return self.http.post(path=F"{self.index_name}/_refresh")
 
     def search(self, q: str, searchable_attributes: Optional[List[str]]=None,

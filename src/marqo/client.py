@@ -34,6 +34,8 @@ class Client:
         url:
             The url to the S2Search API (ex: http://localhost:9200)
         """
+
+        # TODO move into neural search
         self._ensure_nltk_setup()
 
         self.main_user = main_user
@@ -48,6 +50,7 @@ class Client:
         if not self.config.cluster_is_s2search:
             self._turn_off_auto_create_index()
 
+    # move into neural search
     def _turn_off_auto_create_index(self):
         """turns off auto creation of indices. To be run in client instantiation"""
         self.http.put(
@@ -134,6 +137,7 @@ class Client:
         """
         ix = Index(self.config, index_name)
         # verify it exists
+        # maybe delete - use stats end point for now
         self.http.get(path=index_name)
         return ix
 
@@ -190,7 +194,7 @@ class Client:
         data: bytes
     ) -> str:
         return base64.urlsafe_b64encode(data).decode('utf-8').replace('=','')
-
+    # move into neural script - add the model warming - consider adding warming logic in create index as well
     def _ensure_nltk_setup(self):
         try:
             nltk.data.find('tokenizers/punkt')

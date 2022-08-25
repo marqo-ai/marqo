@@ -18,6 +18,8 @@ import os
 import inspect
 import logging
 
+from marqo.neural_search.on_start_script import on_start
+
 
 def replace_host_localhosts(OPENSEARCH_IS_INTERNAL: str, OS_URL: str):
     """Replaces a host's localhost URL with one that can be referenced from
@@ -49,6 +51,7 @@ OPENSEARCH_URL = replace_host_localhosts(
 
 
 security = HTTPBasic()
+on_start()
 app = FastAPI()
 
 
