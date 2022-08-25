@@ -1,18 +1,17 @@
 import os
 import time
 from typing import List, Dict
+import copy
 
 import torch
 import numpy as np
 from torch import multiprocessing as mp
 
 from marqo.neural_search import neural_search
-from marqo.neural_search.neural_search_logging import get_logger
+from marqo.marqo_logging import logger
 from marqo.neural_search.configs import get_max_processes, get_threads_per_process
 from marqo.neural_search import backend
 from marqo.errors import MarqoApiError
-
-logger = get_logger(__name__)
 
 try:
     mp.set_start_method('spawn', force=True)
@@ -25,10 +24,8 @@ max_threads_per_process = get_threads_per_process()
 
 def get_gpu_count(device: str):
     """ returns the number of gpus. if cpu is specified defaults to 0
-
     Args:
         device (_type_): 'cpu' or 'cuda'
-
     Returns:
         _type_: _description_
     """
@@ -43,13 +40,10 @@ def get_gpu_count(device: str):
 
 def get_processes(device: str):
     """returns the processes available for either cpu or cuda
-
     Args:
         device (str): _description_
-
     Raises:
         ValueError: _description_
-
     Returns:
         _type_: _description_
     """
@@ -66,26 +60,20 @@ def get_device_ids(n_processes: int, device: str):
     """gets a list of device ids based on device
         e.g. get_device_ids(2, 'cpu')
         ['cpu', 'cpu']
-
         # single gpu machine
         e.g. get_device_ids(2, 'cuda')
         ['cuda:0', 'cuda:0']
-
         # two gpu machine
         e.g. get_device_ids(2, 'cuda')
         ['cuda:0', 'cuda:1']
-
         # two gpu machine
         e.g. get_device_ids(4, 'cuda')
         ['cuda:0', 'cuda:1', 'cuda:0', 'cuda:1']
-
     Args:
         n_processes (int): _description_
         device (str): _description_
-
     Raises:
         ValueError: _description_
-
     Returns:
         _type_: _description_
     """
@@ -99,16 +87,15 @@ def get_device_ids(n_processes: int, device: str):
 
     raise ValueError(f"expected on of 'cpu', 'cuda' or 'cuda:#' but received {device}")
 
-
 class IndexChunk:
 
-    """wrapper to pass through dopcuments to be indexed to multiprocessing
+    """wrapper to pass through documents to be indexed to multiprocessing
     """
 
     def __init__(self, config=None, index_name: str = None, docs: List[Dict] = [], 
                         auto_refresh: bool = False, batch_size: int = 50, device: str = None, process_id: int = 0):
 
-        self.config = config
+        self.config = copy.deepcopy(config)
         self.index_name = index_name
         self.docs = docs
         self.auto_refresh = auto_refresh
@@ -117,7 +104,9 @@ class IndexChunk:
         self.n_chunks = max(1, self.n_docs // self.n_batch)
         self.device = device
         self.process_id = process_id
-    
+        
+        self.config.indexing_device = device
+        
     def process(self):  
 
         # hf tokenizers setting
@@ -160,28 +149,22 @@ class IndexChunk:
         
 def _run_chunker(chunker: IndexChunk):
     """helper function to run the multiprocess by activating the chunker
-
     Args:
         chunker (IndexChunk): _description_
-
     Returns:
         _type_: _description_
     """
     res = chunker.process()
     return res
 
-# TODO add ray as a backend - testing using it was succesful but it was left out
-# to reduce dependencies at the early stage
 def add_documents_mp(config=None, index_name=None, docs=None, 
                      auto_refresh=None, batch_size=50):
-    """add documents using parallel processing using multiporcessing
-
+    """add documents using parallel processing using ray
     Args:
         documents (_type_): _description_
         config (_type_, optional): _description_. Defaults to None.
         index_name (_type_, optional): _description_. Defaults to None.
         auto_refresh (_type_, optional): _description_. Defaults to None.
-
     Returns:
         _type_: _description_
     """
@@ -219,5 +202,3 @@ def add_documents_mp(config=None, index_name=None, docs=None,
     end = time.time()
     logger.info(f"finished indexing all documents. took {end - start} seconds to index {n_documents} documents")
     return results
-
-
