@@ -121,7 +121,7 @@ async def search(search_query: SearchQuery, index_name: str, marqo_config: confi
         index_name=index_name, highlights=search_query.showHighlights,
         searchable_attributes=search_query.searchableAttributes,
         search_method=search_query.searchMethod,
-        result_count=search_query.limit)
+        result_count=search_query.limit, reranker=search_query.reRanker)
 
 
 @app.post("/indexes/{index_name}/documents")

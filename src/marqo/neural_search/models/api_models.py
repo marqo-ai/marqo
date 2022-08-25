@@ -17,6 +17,7 @@ class SearchQuery(BaseModel):
     searchMethod: Union[None, str] = SearchMethod.NEURAL
     limit: int = 10
     showHighlights: bool = True
+    reRanker: str = None
 
     @pydantic.validator('searchMethod')
     def validate_search_method(cls, value):
