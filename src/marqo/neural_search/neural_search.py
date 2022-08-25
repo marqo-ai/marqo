@@ -169,11 +169,6 @@ def get_stats(config: Config, index_name: str):
 
 def add_documents(config: Config, index_name: str, docs: List[dict], auto_refresh):
     """
-    FIXME:
-        - Atomicity issue: we index parent doc OK, but run into error indexing chunks.
-            This means we have a parent doc unsearchable via vector search!
-        - Designed for only a 1-shard index!
-        - Appropriate error handler if chunks can't be added to index
     """
 
     bulk_parent_dicts = []
