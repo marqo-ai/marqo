@@ -116,6 +116,12 @@ class FormattedResults:
         """
         # we want the output here to be tuples of the attribute content,query, id and attribute that was used
         # the first two will go to the model while the latter will be used to report the results
+        
+        # the number 1.0 is arbitrary to some degree (depends on how scores get combined)
+        if ResultsFields.original_score not in results_df:
+            results_df[ResultsFields.original_score] = 1.0
+
+        
         inputs = []
         for field in searchable_fields:
             _inputs_df = results_df[[field, ResultsFields.reranked_id, ResultsFields.original_score]]

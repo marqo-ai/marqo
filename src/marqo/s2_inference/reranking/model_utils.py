@@ -100,8 +100,6 @@ class HFClassificationOnnx:
         #self.load_from_cache = load_from_cache
 
         self.model = ORTModelForSequenceClassification.from_pretrained(self.model_name, from_transformers=True)
-        # couldn't find aaaaany documentation on passing tokenizer arguments through the pipeline
-        # https://github.com/huggingface/transformers/blob/main/src/transformers/pipelines/__init__.py#L750
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
         
         self.onnx_classifier = pipeline("text-classification", model=self.model, 
@@ -165,6 +163,8 @@ class HFClassificationOnnx:
             List[Dict]: _description_
         """
         self.inputs = self._prepare_inputs(inputs)
+        # couldn't find aaaaany documentation on passing tokenizer arguments through the pipeline
+        # https://github.com/huggingface/transformers/blob/main/src/transformers/pipelines/__init__.py#L750
         # https://stackoverflow.com/questions/67849833/how-to-truncate-input-in-the-huggingface-pipeline
         self.predictions = self.onnx_classifier(self.inputs, **self.tokenizer_kwargs)
         self.outputs = self._parepare_outputs(self.predictions)
@@ -195,7 +195,7 @@ def load_sbert_cross_encoder_model(model_name: str, device: str = 'cpu', max_len
         elif model_name.startswith('onnx/'):
             model = HFClassificationOnnx(model_name.replace('onnx/', ''), device=device)
         else:
-            model = CrossEncoder(model_name, max_length=max_length, device=device)
+            model = CrossEncoder(model_name, max_length=max_length, device=device, default_activation_function=torch.nn.Sigmoid())
             if hasattr(model.tokenizer, 'model_max_length'):
                 model_max_len = model.tokenizer.model_max_length
                 if max_length > model_max_len:
