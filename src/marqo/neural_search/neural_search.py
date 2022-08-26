@@ -69,14 +69,18 @@ logger = get_logger(__name__)
 
 def create_vector_index(
         config: Config, index_name: str, media_type: Union[str, MediaType] = MediaType.default,
-        refresh_interval: str = "1s", number_of_shards=5, neural_settings = None):
+        refresh_interval: str = "1s", neural_settings = None):
     """
     Args:
         media_type: 'text'|'image'
     """
-
-    logger.info(f"creating vector index with settings {neural_settings}")
-
+    pprint.pprint(neural_settings)
+    if neural_settings is not None:
+        the_neural_settings = _autofill_neural_settings(neural_settings=neural_settings)
+    else:
+        the_neural_settings = configs.get_default_neural_index_settings()
+    print("the_neural_settingsthe_neural_settingsthe_neural_settings")
+    pprint.pprint(the_neural_settings)
     vector_index_settings = {
         "settings": {
             "index": {
@@ -84,7 +88,7 @@ def create_vector_index(
                 "knn.algo_param.ef_search": 100,
                 "refresh_interval":  refresh_interval
             },
-            "number_of_shards": number_of_shards
+            "number_of_shards": the_neural_settings[NsField.number_of_shards]
         },
         "mappings": {
             "_meta": {
@@ -105,11 +109,6 @@ def create_vector_index(
             }
         }
     }
-
-    if neural_settings is not None:
-        the_neural_settings = _autofill_neural_settings(neural_settings=neural_settings)
-    else:
-        the_neural_settings = configs.get_default_neural_index_settings()
 
     model_name = the_neural_settings[NsField.index_defaults][NsField.model]
     vector_index_settings["mappings"]["_meta"][NsField.neural_settings] = the_neural_settings
@@ -141,7 +140,12 @@ def _autofill_neural_settings(neural_settings: dict):
             and copied_settings[NsField.index_defaults][NsField.model] is None:
         copied_settings[NsField.index_defaults][NsField.model] = MlModel.clip
 
-    # make sure the first level of keys is present, if not add all of those defaults
+    # make sure the first level of keys are present, if not add all of those defaults
+    for key in list(default_settings):
+        if key not in copied_settings or copied_settings[key] is None:
+            copied_settings[key] = default_settings[key]
+
+    # make sure the first level of keys in index defaults is present, if not add all of those defaults
     for key in list(default_settings[NsField.index_defaults]):
         if key not in copied_settings[NsField.index_defaults] or \
                 copied_settings[NsField.index_defaults][key] is None:

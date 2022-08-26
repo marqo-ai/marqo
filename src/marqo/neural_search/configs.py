@@ -16,15 +16,16 @@ def get_default_neural_index_settings():
                 NsFields.split_method: ns_enums.SplitMethod.sentence
             },
             # TODO move these into a processing dict with sub-dicts
-            NsFields.image_preprocessing:{
-                NsFields.patch_method: None #
-                    }
-        }
+            NsFields.image_preprocessing: {
+                NsFields.patch_method: None
+            }
+        },
+        NsFields.number_of_shards: 5
     }
 
 
 def get_max_processes():
-    return {'max_processes_cpu' :6, 'max_processes_gpu': 2}
+    return {'max_processes_cpu': 6, 'max_processes_gpu': 2}
 
 
 def get_threads_per_process():

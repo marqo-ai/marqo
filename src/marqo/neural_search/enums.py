@@ -48,6 +48,8 @@ class NeuralSettingsField:
     image_preprocessing = "image_preprocessing"
     patch_method = "patch_method"
 
+    number_of_shards = "number_of_shards"
+
 class SplitMethod:
     # consider moving this enum into processing
     sentence = "sentence"

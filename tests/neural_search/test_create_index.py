@@ -1,13 +1,13 @@
+import json
 import pprint
-
 import requests
 from marqo.neural_search.enums import NeuralSettingsField
 from marqo.client import Client
-from marqo.errors import MarqoApiError, MarqoError
+from marqo.errors import MarqoApiError, MarqoError, IndexNotFoundError
 from marqo.neural_search import neural_search
-import unittest
-import copy
+from marqo.neural_search import configs
 from tests.marqo_test import MarqoTestCase
+from marqo.neural_search.enums import NeuralSettingsField as NsField
 
 
 class TestCreateIndex(MarqoTestCase):
@@ -22,7 +22,7 @@ class TestCreateIndex(MarqoTestCase):
         self.index_name_1 = "my-test-create-index-1"
         try:
             self.client.delete_index(self.index_name_1)
-        except MarqoApiError as s:
+        except IndexNotFoundError as s:
             pass
 
     def tearDown(self) -> None:
@@ -95,3 +95,53 @@ class TestCreateIndex(MarqoTestCase):
                modified_settings[NeuralSettingsField.index_defaults][NeuralSettingsField.text_preprocessing]
         assert neural_search._autofill_neural_settings(modified_settings) \
             == neural_search.configs.get_default_neural_index_settings()
+
+    def test_default_number_of_shards(self):
+        """does an index get created with the default number of shards?"""
+        neural_search.create_vector_index(index_name=self.index_name_1, config=self.config)
+        default_shard_count = configs.get_default_neural_index_settings()[NsField.number_of_shards]
+        assert default_shard_count is not None
+        resp = requests.get(
+            url=self.authorized_url + f"/{self.index_name_1}",
+            verify=False
+        )
+        assert default_shard_count == int(resp.json()[self.index_name_1]['settings']['index']['number_of_shards'])
+
+    def test_autofill_number_of_shards(self):
+        """ does it work if other params are filled?"""
+        neural_search.create_vector_index(
+            index_name=self.index_name_1, config=self.config,
+            neural_settings={
+                "index_defaults": {
+                    "treat_urls_and_pointers_as_images": True,
+                    "model": "ViT-B/32",
+                }}
+        )
+        default_shard_count = configs.get_default_neural_index_settings()[NsField.number_of_shards]
+        assert default_shard_count is not None
+        resp = requests.get(
+            url=self.authorized_url + f"/{self.index_name_1}",
+            headers=self.generic_header,
+            verify=False
+        )
+        assert default_shard_count == int(resp.json()[self.index_name_1]['settings']['index']['number_of_shards'])
+
+    def test_set_number_of_shards(self):
+        """ does it work if other params are filled?"""
+        intended_shard_count = 6
+        res_0 = neural_search.create_vector_index(
+            index_name=self.index_name_1, config=self.config,
+            neural_settings={
+                "index_defaults": {
+                    "treat_urls_and_pointers_as_images": True,
+                    "model": "ViT-B/32",
+                },
+                NsField.number_of_shards: intended_shard_count
+            }
+        )
+        resp = requests.get(
+            url=self.authorized_url + f"/{self.index_name_1}",
+            headers=self.generic_header,
+            verify=False
+        )
+        assert intended_shard_count == int(resp.json()[self.index_name_1]['settings']['index']['number_of_shards'])

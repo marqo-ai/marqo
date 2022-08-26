@@ -209,7 +209,8 @@ curl -XPOST http://admin:admin@localhost:8000/indexes/my-multimodal-index -H 'Co
     "index_defaults": {
       "treat_urls_and_pointers_as_images":true,    
       "model":"ViT-B/32"
-    }
+    },
+    "number_of_shards": 3
 }'
 """
 
