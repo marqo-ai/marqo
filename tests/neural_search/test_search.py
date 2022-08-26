@@ -1,7 +1,7 @@
 import pprint
 from marqo.neural_search.enums import NeuralField, SearchMethod
 from marqo.client import Client
-from marqo.errors import MarqoApiError, MarqoError, IndexNotFoundError
+from marqo.errors import MarqoApiError, MarqoError, IndexNotFoundError, InvalidArgError
 from marqo.neural_search import neural_search, constants, index_meta_cache
 import copy
 from tests.marqo_test import MarqoTestCase
@@ -48,19 +48,18 @@ class TestVectorSearch(MarqoTestCase):
         )
         assert len(search_res['hits']) == 2
 
-
     def test_vector_text_search_validate_result_count(self):
         try:
             neural_search._vector_text_search(
                 config=self.config, index_name=self.index_name_1, result_count=-1, text="some text...")
-        except ValueError as e:
+        except InvalidArgError as e:
             assert "illegal result_count" in str(e)
 
         try:
             neural_search._vector_text_search(
                 config=self.config, index_name=self.index_name_1,
                 result_count=constants.MAX_VECTOR_SEARCH_RESULT_COUNT + 1, text="some text...")
-        except ValueError as e:
+        except InvalidArgError as e:
             assert "illegal result_count" in str(e)
 
     def test_vector_search_against_empty_index(self):
@@ -75,8 +74,8 @@ class TestVectorSearch(MarqoTestCase):
             neural_search._vector_text_search(
                 config=self.config, index_name="some-non-existent-index",
                 result_count=5, text="some text...")
-        except MarqoError as s:
-            assert "no such index" in str(s)
+        except IndexNotFoundError as s:
+            pass
 
     def test_vector_search_long_query_string(self):
         query_text = """The Guardian is a British daily newspaper. It was founded in 1821 as The Manchester Guardian, and changed its name in 1959.[5] Along with its sister papers The Observer and The Guardian Weekly, The Guardian is part of the Guardian Media Group, owned by the Scott Trust.[6] The trust was created in 1936 to "secure the financial and editorial independence of The Guardian in perpetuity and to safeguard the journalistic freedom and liberal values of The Guardian free from commercial or political interference".[7] The trust was converted into a limited company in 2008, with a constitution written so as to maintain for The Guardian the same protections as were built into the structure of the Scott Trust by its creators. Profits are reinvested in journalism rather than distributed to owners or shareholders.[7] It is considered a newspaper of record in the UK.[8][9]
@@ -228,7 +227,7 @@ class TestVectorSearch(MarqoTestCase):
                 searchable_attributes=["other field", "Cool Field 1"], return_doc_ids=True, result_count=-1
             )
             raise AssertionError
-        except MarqoError as e:
+        except InvalidArgError as e:
             assert "result count" in str(e)
         try:
             # too small
@@ -237,7 +236,7 @@ class TestVectorSearch(MarqoTestCase):
                 searchable_attributes=["other field", "Cool Field 1"], return_doc_ids=True, result_count=1000000
             )
             raise AssertionError
-        except MarqoError as e:
+        except InvalidArgError as e:
             assert "result count" in str(e)
         # should work with 0
         search_res = neural_search.search(
