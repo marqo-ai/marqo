@@ -1,4 +1,4 @@
-from marqo.processing.text import split_text
+from src.marqo.processing.text import split_text
 import unittest
 import copy
 
