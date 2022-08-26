@@ -35,9 +35,6 @@ class Client:
             The url to the S2Search API (ex: http://localhost:9200)
         """
 
-        # TODO move into neural search
-        self._ensure_nltk_setup()
-
         self.main_user = main_user
         self.main_password = main_password
         if (main_user is not None) and (main_password is not None):
