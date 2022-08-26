@@ -29,14 +29,24 @@ jobs:
         python -m pip install --upgrade pip
         pip install marqo
         #if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-    - name: Lint with flake8
-    - id: file_changes
-      uses: Ana06/get-changed-files@v1.2
-    - run: |
+    - name: Get changed files using defaults
+      id: changed-files
+      uses: tj-actions/changed-files@v29.0.1
+    - name: List all added files
+      run: |
         pip install flake8 
+        for file in ${{ steps.changed-files.outputs.added_files }}; do
+          # stop the build if there are Python syntax errors or undefined names
+          flake8 $file --count --select=E9,F63,F7,F82 --show-source --statistics
+          # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
+          flake8 $file --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+        done
+    - name: Lint with flake8
+      run: |
+        #pip install flake8 
         # stop the build if there are Python syntax errors or undefined names
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        #flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+        #flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: Test with unittest
       run: python -m unittest tests/processing/test_split_text.py
