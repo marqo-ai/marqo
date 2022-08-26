@@ -1,8 +1,6 @@
 from typing import Optional, Union
 from marqo import enums
-import torch
 import urllib3
-import warnings
 import warnings
 
 
@@ -39,7 +37,8 @@ class Config:
     def set_url(self, url):
         """Set the URL, and infers whether that url is remote"""
         lowered_url = url.lower()
-        if "localhost" in lowered_url or "0.0.0.0" in lowered_url:
+        local_host_markers = ["localhost", "0.0.0.0", "127.0.0.1"]
+        if any([marker in lowered_url for marker in local_host_markers]):
             urllib3.disable_warnings()
             self.cluster_is_remote = False
         else:

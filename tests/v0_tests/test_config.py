@@ -73,6 +73,15 @@ class TestConfig(MarqoTestCase):
             return True
         assert run()
 
+    def test_set_url_127001(self):
+        @mock.patch("urllib3.disable_warnings")
+        def run(mock_dis_warnings):
+            c = config.Config(url="https://127.0.0.1:8882")
+            assert not c.cluster_is_remote
+            mock_dis_warnings.assert_called()
+            return True
+        assert run()
+
     def test_set_url_remote(self):
         @mock.patch("urllib3.disable_warnings")
         @mock.patch("warnings.resetwarnings")
