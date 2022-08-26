@@ -64,6 +64,8 @@ from marqo.config import Config
 from marqo import errors
 import threading
 
+from marqo.neural_search.neural_search_logging import get_logger
+logger = get_logger(__name__)
 
 def create_vector_index(
         config: Config, index_name: str, media_type: Union[str, MediaType] = MediaType.default,
@@ -72,7 +74,6 @@ def create_vector_index(
     Args:
         media_type: 'text'|'image'
     """
-    print("neuralsettingjngjkgrhjbrvbjhvrjk starttttt")
     pprint.pprint(neural_settings)
     if neural_settings is not None:
         the_neural_settings = _autofill_neural_settings(neural_settings=neural_settings)
@@ -185,6 +186,8 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
     except errors.IndexNotFoundError as s:
         create_vector_index(config=config, index_name=index_name)
         index_info = backend.get_index_info(config=config, index_name=index_name)
+
+    logger.info(f"found index with settings {index_info}")
 
     existing_fields = set(index_info.properties.keys())
     new_fields = set()

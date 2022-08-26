@@ -2,11 +2,26 @@
 from marqo.neural_search.neural_search_logging import get_logger
 
 def on_start():
-
+    print('\n')
+    print("###########################################################")
+    print("###########################################################")
+    print("###### STARTING DOWNLOAD OF MARQO ARTEFACTS################")
+    print("###########################################################")
+    print("###########################################################")
+    print('\n')
+    
     to_run_on_start = (CUDAAvailable(), ModelsForCacheing(), NLTK())
 
     for thing_to_start in to_run_on_start:
         thing_to_start.run()
+
+    print('\n')
+    print("###########################################################")
+    print("###########################################################")
+    print("###### !!COMPLETED SUCCESFULLY!!!          ################")
+    print("###########################################################")
+    print("###########################################################")
+    print('\n')
 
 
 class CUDAAvailable:
@@ -71,8 +86,8 @@ class ModelsForCacheing:
 
         self.models = (
             'hf/all_datasets_v4_MiniLM-L6',
-            'onnx/all_datasets_v4_MiniLM-L6',
-            "ViT-B/16",
+            # 'onnx/all_datasets_v4_MiniLM-L6',
+            # "ViT-B/16",
         )
         # TBD to include cross-encoder/ms-marco-TinyBERT-L-2-v2
 
