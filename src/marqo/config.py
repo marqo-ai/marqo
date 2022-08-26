@@ -1,8 +1,6 @@
 from typing import Optional, Union
 from marqo import enums
-import torch
 import urllib3
-import warnings
 import warnings
 
 
