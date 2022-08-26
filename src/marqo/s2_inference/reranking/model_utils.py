@@ -15,12 +15,65 @@ import torch
 
 from marqo.s2_inference.types import *
 from marqo.s2_inference.s2_inference import available_models
-from marqo.s2_inference.s2_inference import _create_model_cache_key
+from marqo.s2_inference.s2_inference import _create_model_cache_key, _float_tensor_to_list, _nd_array_to_list
 from marqo.s2_inference.configs import ModelCache
 
 from marqo.s2_inference.logger import get_logger
 logger = get_logger(__name__)
 
+def _convert_cross_encoder_output(output: Union[FloatTensor, ndarray, List[float]]) -> List[float]:
+    """converts the model outputs to a list of floats
+
+    Args:
+        output (FloatTensor): _description_
+
+    Returns:
+        List[List[float]]: _description_
+    """
+
+    if _verify_model_outputs(output):
+        return output
+
+    if isinstance(output, (FloatTensor, Tensor)):
+        output = output.squeeze()
+        output = _float_tensor_to_list(output)
+    
+    elif isinstance(output, ndarray):
+        output = output.squeeze()
+        output = _nd_array_to_list(output)
+
+    elif isinstance(output, list):
+        if isinstance(output[0], FloatTensor):
+            output = [_float_tensor_to_list(_o) for _o in output]
+        elif isinstance(output[0], ndarray):
+            output = [_nd_array_to_list(_o) for _o in output]
+        else:
+            raise TypeError(f"unsupported nested list with elements of type {type(output[0])}")
+
+    else:
+        raise TypeError(f"unsupported output type of {type(output)}")
+
+    if _verify_model_outputs(output):
+        return output
+    
+    raise TypeError(f"unable to convert input of type {type(output)} to a list of lists of floats")
+
+
+def _verify_model_outputs(outputs):
+    if not isinstance(outputs, list):
+        return False
+
+    if len(outputs) == 0:
+        return True
+
+    if isinstance(outputs[0], (ndarray, FloatTensor ,list)):
+        return False
+
+    if isinstance(outputs[0], (float, int)):
+        return True
+
+    raise TypeError(f"unknown output type of {type(outputs)} and {type(outputs[0])} expected list")
+    
 def _verify_model_inputs(list_of_lists: List[List]) -> bool:
     """check the format of the model inputs
 
@@ -151,7 +204,7 @@ class HFClassificationOnnx:
         Returns:
             ndarray: _description_
         """
-        return np.array([pred['score'] for pred in outputs])
+        return [float(pred['score']) for pred in outputs]
 
     def predict(self, inputs: List[Dict]) -> List[Dict]:
         """onnx predict method

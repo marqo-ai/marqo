@@ -329,7 +329,8 @@ def refresh_index(config: Config,  index_name: str):
 
 def search(config: Config, index_name: str, text: str, result_count: int = 3, highlights=True, return_doc_ids=False,
            search_method: Union[str, SearchMethod, None] = SearchMethod.NEURAL,
-           searchable_attributes: Iterable[str] = None, verbose: int = 0, num_highlights: int = 3, reranker: Union[str, Dict] = None) -> Dict:
+           searchable_attributes: Iterable[str] = None, verbose: int = 0, num_highlights: int = 3, 
+           reranker: Union[str, Dict] = None, simplified_format: bool = True) -> Dict:
     """The root search method. Calls the specific search method
 
     Validation should go here. Validations include:
@@ -380,7 +381,7 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
         search_result = _vector_text_search(
             config=config, index_name=index_name, text=text, result_count=result_count,
             return_doc_ids=return_doc_ids, searchable_attributes=searchable_attributes,
-            number_of_highlights=num_highlights
+            number_of_highlights=num_highlights, simplified_format=simplified_format
         )
     elif search_method.upper() == SearchMethod.LEXICAL:
         search_result = _lexical_search(
@@ -393,7 +394,7 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
     if reranker is not None:
         rerank.rerank_search_results(search_result=search_result, query=text, 
                     model_name=reranker, device=config.indexing_device, 
-                searchable_attributes=searchable_attributes, num_highlights=num_highlights)
+                searchable_attributes=searchable_attributes, num_highlights=1 if simplified_format else num_highlights)
 
     time_taken = datetime.datetime.now() - t0
     search_result["processingTimeMs"] = round(time_taken.total_seconds() * 1000)
