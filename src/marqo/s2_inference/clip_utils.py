@@ -39,6 +39,29 @@ def format_and_load_CLIP_images(images: List[Union[str, ndarray, ImageType]]) ->
     
     return results
 
+def _load_image_from_path(image: str) -> ImageType:
+    """loads an image into PIL from a string path that is
+    either local or a url
+
+    Args:
+        image (str): _description_
+
+    Raises:
+        ValueError: _description_
+
+    Returns:
+        ImageType: _description_
+    """
+    
+    if os.path.isfile(image):
+        img = Image.open(image)
+    elif validators.url(image):
+        img = Image.open(requests.get(image, stream=True).raw)
+    else:
+        raise ValueError(f"input str of {image} is not a local file or a valid url")
+
+    return img
+
 def format_and_load_CLIP_image(image: Union[str, ndarray, ImageType]) -> ImageType:
     """standardizes the input to be a PIL image
 
@@ -54,12 +77,7 @@ def format_and_load_CLIP_image(image: Union[str, ndarray, ImageType]) -> ImageTy
     """
     # check for the input type
     if isinstance(image, str):
-        if os.path.isfile(image):
-            img = Image.open(image)
-        elif validators.url(image):
-            img = Image.open(requests.get(image, stream=True).raw)
-        else:
-            raise ValueError(f"input str of {image} is not a local file or a valid url")
+        img = _load_image_from_path(image)
     elif isinstance(image, np.ndarray):
         img = Image.fromarray(image.astype('uint8'), 'RGB')
 
