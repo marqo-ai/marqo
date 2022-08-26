@@ -19,7 +19,8 @@ from marqo.s2_inference.reranking.model_utils import (
     _predict_owl,
     process_owl_results,
     sort_owl_boxes_scores,
-    _verify_model_inputs
+    _verify_model_inputs,
+    _convert_cross_encoder_output,
 )
 from marqo.s2_inference.reranking.enums import Columns, ResultsFields
 from marqo.s2_inference.reranking.configs import get_default_text_processing_parameters
@@ -292,6 +293,7 @@ class ReRankerText(ReRanker):
             raise RuntimeError(f"incorrect model inputs, expected list of lists but recevied {type(self.model_inputs)} and {type(self.model_inputs[0])}")
 
         self.scores = self.model.predict(self.model_inputs)
+        self.scores = _convert_cross_encoder_output(self.scores)
 
         self.inputs_df[ResultsFields.reranker_score] = self.scores
         self.inputs_df[ResultsFields.hybrid_score_multiply] = np.clip(self.inputs_df[ResultsFields.original_score], 1e-3, np.inf)*np.clip(self.inputs_df[ResultsFields.reranker_score], 1e-3, np.inf)
