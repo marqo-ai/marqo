@@ -28,20 +28,20 @@ class TestCreateIndex(MarqoTestCase):
     def tearDown(self) -> None:
         try:
             self.client.delete_index(self.index_name_1)
-        except MarqoApiError as s:
+        except IndexNotFoundError as s:
             pass
 
     def test_create_vector_index_default_neural_settings(self):
         try:
             self.client.delete_index(self.index_name_1)
-        except MarqoApiError as s:
+        except IndexNotFoundError as s:
             pass
         # test that index is deleted:
         try:
             neural_search.search(config=self.config, index_name=self.index_name_1, text="some text")
             raise AssertionError
-        except MarqoError as e:
-            assert "no such index" in str(e)
+        except IndexNotFoundError as e:
+            pass
         self.client.create_index(index_name=self.index_name_1)
         settings = requests.get(
             url=f"{self.endpoint}/{self.index_name_1}/_mapping",
@@ -54,14 +54,14 @@ class TestCreateIndex(MarqoTestCase):
     def test_create_vector_index_custom_neural_settings(self):
         try:
             self.client.delete_index(self.index_name_1)
-        except MarqoApiError as s:
+        except IndexNotFoundError as s:
             pass
         # test that index is deleted:
         try:
             neural_search.search(config=self.config, index_name=self.index_name_1, text="some text")
             raise AssertionError
-        except MarqoError as e:
-            assert "no such index" in str(e)
+        except IndexNotFoundError as e:
+            pass
         custom_settings = {
             NeuralSettingsField.treat_urls_and_pointers_as_images: True,
             NeuralSettingsField.normalize_embeddings: False
@@ -85,7 +85,9 @@ class TestCreateIndex(MarqoTestCase):
                 NeuralSettingsField.normalize_embeddings: False,
                 NeuralSettingsField.text_preprocessing: default_text_preprocessing,
                 NeuralSettingsField.image_preprocessing: default_image_preprocessing
-        }}
+            },
+            NeuralSettingsField.number_of_shards: default_settings[NeuralSettingsField.number_of_shards]
+        }
 
     def test__autofill_neural_settings_fill_missing_text_preprocessing(self):
         modified_settings = neural_search.configs.get_default_neural_index_settings()

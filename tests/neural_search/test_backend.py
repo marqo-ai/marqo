@@ -1,7 +1,7 @@
 import requests
 from marqo.neural_search import enums, backend
 from marqo.neural_search import neural_search
-from marqo.errors import MarqoApiError
+from marqo.errors import MarqoApiError, IndexNotFoundError
 from marqo.client import Client
 from tests.marqo_test import MarqoTestCase
 
@@ -18,7 +18,7 @@ class TestBackend(MarqoTestCase):
         self.index_name_1 = "my-test-index-1"
         try:
             self.client.delete_index(self.index_name_1)
-        except MarqoApiError as s:
+        except IndexNotFoundError as s:
             pass
 
     def test_chunk_properties_arent_deleted(self):
