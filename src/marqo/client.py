@@ -194,9 +194,4 @@ class Client:
         data: bytes
     ) -> str:
         return base64.urlsafe_b64encode(data).decode('utf-8').replace('=','')
-    # move into neural script - add the model warming - consider adding warming logic in create index as well
-    def _ensure_nltk_setup(self):
-        try:
-            nltk.data.find('tokenizers/punkt')
-        except LookupError:
-            nltk.download('punkt')
+    
