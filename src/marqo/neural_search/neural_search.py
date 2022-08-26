@@ -67,6 +67,7 @@ import threading
 from marqo.neural_search.neural_search_logging import get_logger
 logger = get_logger(__name__)
 
+
 def create_vector_index(
         config: Config, index_name: str, media_type: Union[str, MediaType] = MediaType.default,
         refresh_interval: str = "1s", neural_settings = None):
@@ -79,8 +80,6 @@ def create_vector_index(
         the_neural_settings = _autofill_neural_settings(neural_settings=neural_settings)
     else:
         the_neural_settings = configs.get_default_neural_index_settings()
-    print("the_neural_settingsthe_neural_settingsthe_neural_settings")
-    pprint.pprint(the_neural_settings)
     vector_index_settings = {
         "settings": {
             "index": {
@@ -258,6 +257,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                         utils.generate_vector_name(field): vector_chunk,
                         NeuralField.field_content: text_chunk,
                         NeuralField.field_name: field,
+                        "my_int": "b"
                     })
         copied[NeuralField.chunks] = chunks
         bulk_parent_dicts.append(indexing_instructions)
@@ -333,7 +333,7 @@ def refresh_index(config: Config,  index_name: str):
 def search(config: Config, index_name: str, text: str, result_count: int = 3, highlights=True, return_doc_ids=False,
            search_method: Union[str, SearchMethod, None] = SearchMethod.NEURAL,
            searchable_attributes: Iterable[str] = None, verbose: int = 0, num_highlights: int = 3, 
-           reranker: Union[str, Dict] = None, simplified_format: bool = True) -> Dict:
+           reranker: Union[str, Dict] = None, simplified_format: bool = True, filter: str = None) -> Dict:
     """The root search method. Calls the specific search method
 
     Validation should go here. Validations include:
@@ -384,9 +384,12 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
         search_result = _vector_text_search(
             config=config, index_name=index_name, text=text, result_count=result_count,
             return_doc_ids=return_doc_ids, searchable_attributes=searchable_attributes,
-            number_of_highlights=num_highlights, simplified_format=simplified_format
+            number_of_highlights=num_highlights, simplified_format=simplified_format,
+            filter=filter
         )
     elif search_method.upper() == SearchMethod.LEXICAL:
+        if filter is not None:
+            raise NotImplementedError("filtering not working for lexical search")
         search_result = _lexical_search(
             config=config, index_name=index_name, text=text, result_count=result_count,
             return_doc_ids=return_doc_ids, searchable_attributes=searchable_attributes,
@@ -409,6 +412,7 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
             del hit["_highlights"]
 
     return search_result
+
 
 def _lexical_search(
         config: Config, index_name: str, text: str, result_count: int = 3, return_doc_ids=False,
@@ -486,7 +490,7 @@ def _vector_text_search(
         config: Config, index_name: str, text: str, result_count: int = 5, return_doc_ids=False,
         searchable_attributes: Iterable[str] = None, number_of_highlights=3,
         verbose=0, raise_on_searchable_attribs=False, hide_vectors=True, k=500,
-        simplified_format=True
+        simplified_format=True, filter: str = None
 ):
     """
     Args:
@@ -582,6 +586,12 @@ def _vector_text_search(
             }
             search_query["query"]["nested"]["inner_hits"]["_source"] = {
                 "exclude": ["*__vector*"]
+            }
+        if filter is not None:
+            if len(filter.split(":")) == 2 and filter.split(":")[0] != "*":
+                filter = f"{NeuralField.chunks}.{filter}"
+            search_query["query"]["nested"]["query"]["knn"][f"{NeuralField.chunks}.{vector_field}"]["filter"] = {
+                "query_string": {"query": f"{filter}"}
             }
         body += [{"index": index_name}, search_query]
 

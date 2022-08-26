@@ -1,7 +1,7 @@
 import pprint
 from marqo.neural_search.enums import NeuralField, SearchMethod
 from marqo.client import Client
-from marqo.errors import MarqoApiError, MarqoError
+from marqo.errors import MarqoApiError, MarqoError, IndexNotFoundError
 from marqo.neural_search import neural_search, constants, index_meta_cache
 import copy
 from tests.marqo_test import MarqoTestCase
@@ -25,7 +25,7 @@ class TestVectorSearch(MarqoTestCase):
         for ix_name in ix_to_delete:
             try:
                 self.client.delete_index(ix_name)
-            except MarqoApiError as s:
+            except IndexNotFoundError as s:
                 pass
 
     def test_vector_search_searchable_attributes_non_existent(self):
@@ -288,3 +288,19 @@ class TestVectorSearch(MarqoTestCase):
         for hit in lexical_no_highlights["hits"]:
             assert "_highlights" not in hit
 
+    def test_filtering(self):
+        neural_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=[
+                {"abc": "some text", "other field": "baaadd", "_id": "5678", "my_int": "b"},
+                {"abc": "some text", "other field": "Close match hehehe", "_id": "1234", "my_int": 2},
+            ], auto_refresh=True)
+
+        res = neural_search.search(
+            config=self.config, index_name=self.index_name_1, text="some text", result_count=3,
+            filter="__field_name:my_int", verbose=1
+        )
+        print("res")
+        pprint.pprint(res)
+
+    def test_filtering_lexical(self):
+        """TODO: this"""
