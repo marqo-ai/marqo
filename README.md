@@ -12,7 +12,6 @@
   <a align="center" href="https://join.slack.com/t/marqo-community/shared_invite/zt-1d737l76e-u~b3Rvey2IN2nGM4wyr44w"><img src="https://img.shields.io/badge/Slack-blueviolet?logo=slack&amp;logoColor=white&style=flat-square"></a>
 </p>
 
-![Tests](https://github.com/aryanagarwal9/marqo_CI/blob/0199c0ff2565788040fc7cdcdb776117d6ea8e9d/.github/workflows/python-app.yml/badge.svg)
 
 A deep-learning powered, open-source search engine which seamlessly integrates with your applications, websites, and workflow. 
 
