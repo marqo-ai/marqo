@@ -31,7 +31,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install git+https://github.com/S2Search/marqo.git
+        pip install "git+https://github.com/S2Search/marqo.git#egg=subdir&subdirectory=src/marqo"
         
     - name: Get changed files using defaults
       id: changed-files
