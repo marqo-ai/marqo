@@ -51,4 +51,4 @@ jobs:
         done
         
     - name: Test with unittest
-      run: python -m unittest tests/processing/test_split_text.py
+      run: python -m unittest tests/processing/test_image_processing.py
