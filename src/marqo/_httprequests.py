@@ -85,7 +85,8 @@ class HttpRequests:
         content_type = None
         if body is not None:
             content_type = 'application/json'
-        return self.send_request(requests.get, path=path, body=body, content_type=content_type)
+        res = self.send_request(requests.get, path=path, body=body, content_type=content_type)
+        return res
 
     def post(
         self,
