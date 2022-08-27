@@ -21,11 +21,13 @@ jobs:
     - uses: actions/checkout@v3
       with:
         fetch-depth: 0
+        
     - name: Set up Python 3.8
       uses: actions/setup-python@v3
       with:
         python-version: "3.8"
         cache: "pip"
+        
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
@@ -34,10 +36,10 @@ jobs:
     - name: Get changed files using defaults
       id: changed-files
       uses: tj-actions/changed-files@v29.0.1
-    - name: List all added files
+      
+    - name: List chanegd files with flake8
       run: |
         pip install flake8 
-        echo "starting.."
         for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
           echo "$file was changed"
           # stop the build if there are Python syntax errors or undefined names
@@ -45,12 +47,6 @@ jobs:
           # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
           flake8 $file --filename=*.py --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
         done
-    - name: Lint with flake8
-      run: |
-        #pip install flake8 
-        # stop the build if there are Python syntax errors or undefined names
-        #flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-        #flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+        
     - name: Test with unittest
       run: python -m unittest tests/processing/test_split_text.py
