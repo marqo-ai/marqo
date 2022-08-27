@@ -35,6 +35,7 @@ jobs:
     - name: List all added files
       run: |
         pip install flake8 
+        echo "starting.."
         for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
           echo "$file was changed"
           # stop the build if there are Python syntax errors or undefined names
