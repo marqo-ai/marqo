@@ -10,7 +10,7 @@ from marqo.neural_search import validation, constants, enums
 from marqo.neural_search import utils
 from marqo import errors
 #
-from typing import Iterable, List, Union, Optional
+from typing import Iterable, List, Union, Optional, Tuple
 from marqo.neural_search.index_meta_cache import get_cache
 
 
@@ -57,13 +57,17 @@ def get_index_info(config: Config, index_name: str) -> IndexInfo:
     return index_info
 
 
-def add_customer_field_properties(config: Config, index_name: str, customer_field_names: Iterable[str], model_properties: dict):
+def add_customer_field_properties(config: Config, index_name: str,
+                                  customer_field_names: Iterable[Tuple[str, enums.OpenSearchDataType]],
+                                  model_properties: dict):
     """Adds new customer fields to index mapping.
 
     Args:
         config:
         index_name:
-        customer_field_names: the new fieldnames the customers have made
+        customer_field_names: list of 2-tuples. The first elem in the tuple is
+            the new fieldnames the customers have made. The second elem is the
+            inferred OpenSearch data type.
         model_properties: properties of the machine learning model
 
     Returns:
@@ -75,13 +79,13 @@ def add_customer_field_properties(config: Config, index_name: str, customer_fiel
                 "type": "nested",
                 "properties": {
                     validation.validate_vector_name(
-                        utils.generate_vector_name(field_name)): {
+                        utils.generate_vector_name(field_name[0])): {
                         "type": "knn_vector",
                         "dimension": model_properties["dimensions"],
                         "method": {
                             "name": "hnsw",
-                            "space_type": "innerproduct",
-                            "engine": "nmslib",
+                            "space_type": "cosinesimil",
+                            "engine": "lucene",  # or try Lucene
                             "parameters": {
                                 "ef_construction": 128,
                                 "m": 24
@@ -97,12 +101,12 @@ def add_customer_field_properties(config: Config, index_name: str, customer_fiel
     new_index_properties = existing_info.properties.copy()
 
     for field_name in customer_field_names:
-        body["properties"][validation.validate_field_name(field_name)] = {
-            "type": "text"
-        }
-        new_index_properties[validation.validate_field_name(field_name)] = {
-            "type": "text"
-        }
+        nested_non_vector_field_type = enums.OpenSearchDataType.keyword if field_name[1] == enums.OpenSearchDataType.text else field_name[1]
+        if nested_non_vector_field_type == enums.OpenSearchDataType.text \
+                or nested_non_vector_field_type == enums.OpenSearchDataType.keyword:
+            body["properties"][enums.NeuralField.chunks]["properties"][validation.validate_field_name(field_name[0])] = {
+                "type": enums.OpenSearchDataType.keyword
+            }
 
     merged_chunk_properties = {
         **existing_info.properties[enums.NeuralField.chunks]["properties"],

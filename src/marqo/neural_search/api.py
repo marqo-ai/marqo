@@ -91,7 +91,7 @@ async def marqo_internal_exception_handler(request, exc: MarqoError):
     headers = getattr(exc, "headers", None)
     body = {
         "message": exc.message,
-        "code": "internal_errro",
+        "code": 500,
         "type": "internal_error",
         "link": ""
     }
@@ -121,7 +121,8 @@ async def search(search_query: SearchQuery, index_name: str, marqo_config: confi
         index_name=index_name, highlights=search_query.showHighlights,
         searchable_attributes=search_query.searchableAttributes,
         search_method=search_query.searchMethod,
-        result_count=search_query.limit, reranker=search_query.reRanker)
+        result_count=search_query.limit, reranker=search_query.reRanker,
+        filter=search_query.filter)
 
 
 @app.post("/indexes/{index_name}/documents")

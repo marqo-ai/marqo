@@ -33,16 +33,12 @@ Notes on search behaviour with caching and searchable attributes:
 import copy
 import datetime
 import functools
-import json
-from locale import normalize
 import pprint
 import typing
 import uuid
-import asyncio
 from typing import List, Optional, Union, Callable, Iterable, Sequence, Dict
 from PIL import Image
-import requests
-from marqo.neural_search.enums import MediaType, MlModel, NeuralField, SearchMethod
+from marqo.neural_search.enums import MediaType, MlModel, NeuralField, SearchMethod, OpenSearchDataType
 from marqo.neural_search.enums import NeuralSettingsField as NsField
 from marqo.neural_search import utils, backend, validation, configs
 from marqo.s2_inference.processing import text as text_processor
@@ -63,9 +59,11 @@ from marqo.config import Config
 # TODO add an errors.py 
 from marqo import errors
 import threading
+import re
 
 from marqo.neural_search.neural_search_logging import get_logger
 logger = get_logger(__name__)
+
 
 def create_vector_index(
         config: Config, index_name: str, media_type: Union[str, MediaType] = MediaType.default,
@@ -79,8 +77,6 @@ def create_vector_index(
         the_neural_settings = _autofill_neural_settings(neural_settings=neural_settings)
     else:
         the_neural_settings = configs.get_default_neural_index_settings()
-    print("the_neural_settingsthe_neural_settingsthe_neural_settings")
-    pprint.pprint(the_neural_settings)
     vector_index_settings = {
         "settings": {
             "index": {
@@ -175,6 +171,21 @@ def get_stats(config: Config, index_name: str):
     }
 
 
+def _infer_opensearch_data_type(
+        sample_field_content: typing.Any) -> Union[OpenSearchDataType, None]:
+    """
+    Raises:
+        Exception if sample_field_content list or dict
+    """
+    if isinstance(sample_field_content, dict):
+        raise errors.InvalidArgError("Field content can't be objects or lists!")
+    elif isinstance(sample_field_content, List):
+        raise errors.InvalidArgError("Field content can't be objects or lists!")
+    elif isinstance(sample_field_content, str):
+        return OpenSearchDataType.text
+    else:
+        return None
+
 def add_documents(config: Config, index_name: str, docs: List[dict], auto_refresh):
     """
     """
@@ -186,8 +197,6 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
     except errors.IndexNotFoundError as s:
         create_vector_index(config=config, index_name=index_name)
         index_info = backend.get_index_info(config=config, index_name=index_name)
-
-    logger.info(f"found index with settings {index_info}")
 
     existing_fields = set(index_info.properties.keys())
     new_fields = set()
@@ -219,7 +228,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
         for field in copied:
 
             if field not in existing_fields:
-                new_fields.add(field)
+                new_fields.add((field, _infer_opensearch_data_type(copied[field])))
 
             field_content = copied[field]
 
@@ -253,11 +262,18 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                         f"recevied text_chunks={len(text_chunks)} and vector_chunks={len(vector_chunks)}. check the preprocessing functions and try again. ")
 
                 for text_chunk, vector_chunk in zip(text_chunks, vector_chunks):
-                    chunk_id = str(uuid.uuid4())
+                    # only add chunk values which are string, boolean or numeric
+                    chunk_values_for_filtering = {}
+                    for key, value in doc.items():
+                        if not (isinstance(value, str) or isinstance(value, float)
+                                or isinstance(value, bool) or isinstance(value, int)):
+                            continue
+                        chunk_values_for_filtering[key] = value
                     chunks.append({
                         utils.generate_vector_name(field): vector_chunk,
                         NeuralField.field_content: text_chunk,
                         NeuralField.field_name: field,
+                        **chunk_values_for_filtering
                     })
         copied[NeuralField.chunks] = chunks
         bulk_parent_dicts.append(indexing_instructions)
@@ -283,7 +299,8 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
         item_fields_to_remove = ['_index', '_primary_term', '_seq_no', '_shards', '_version']
         for item in copied_res["items"]:
             for to_remove in item_fields_to_remove:
-                del item["index"][to_remove]
+                if to_remove in item["index"]:
+                    del item["index"][to_remove]
             new_items.append(item["index"])
         copied_res["processingTimeMs"] = took
         copied_res["index_name"] = index_name
@@ -333,7 +350,7 @@ def refresh_index(config: Config,  index_name: str):
 def search(config: Config, index_name: str, text: str, result_count: int = 3, highlights=True, return_doc_ids=False,
            search_method: Union[str, SearchMethod, None] = SearchMethod.NEURAL,
            searchable_attributes: Iterable[str] = None, verbose: int = 0, num_highlights: int = 3, 
-           reranker: Union[str, Dict] = None, simplified_format: bool = True) -> Dict:
+           reranker: Union[str, Dict] = None, simplified_format: bool = True, filter: str = None) -> Dict:
     """The root search method. Calls the specific search method
 
     Validation should go here. Validations include:
@@ -384,9 +401,12 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
         search_result = _vector_text_search(
             config=config, index_name=index_name, text=text, result_count=result_count,
             return_doc_ids=return_doc_ids, searchable_attributes=searchable_attributes,
-            number_of_highlights=num_highlights, simplified_format=simplified_format
+            number_of_highlights=num_highlights, simplified_format=simplified_format,
+            filter=filter
         )
     elif search_method.upper() == SearchMethod.LEXICAL:
+        if filter is not None:
+            raise NotImplementedError("filtering not working for lexical search")
         search_result = _lexical_search(
             config=config, index_name=index_name, text=text, result_count=result_count,
             return_doc_ids=return_doc_ids, searchable_attributes=searchable_attributes,
@@ -409,6 +429,7 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
             del hit["_highlights"]
 
     return search_result
+
 
 def _lexical_search(
         config: Config, index_name: str, text: str, result_count: int = 3, return_doc_ids=False,
@@ -486,7 +507,7 @@ def _vector_text_search(
         config: Config, index_name: str, text: str, result_count: int = 5, return_doc_ids=False,
         searchable_attributes: Iterable[str] = None, number_of_highlights=3,
         verbose=0, raise_on_searchable_attribs=False, hide_vectors=True, k=500,
-        simplified_format=True
+        simplified_format=True, filter: str = None
 ):
     """
     Args:
@@ -583,6 +604,12 @@ def _vector_text_search(
             search_query["query"]["nested"]["inner_hits"]["_source"] = {
                 "exclude": ["*__vector*"]
             }
+        if filter is not None:
+            for field in index_info.get_text_properties():
+                filter = filter.replace(field, f'{NeuralField.chunks}.{field}')
+            search_query["query"]["nested"]["query"]["knn"][f"{NeuralField.chunks}.{vector_field}"]["filter"] = {
+                "query_string": {"query": f"{filter}"}
+            }
         body += [{"index": index_name}, search_query]
 
     if verbose:
@@ -603,7 +630,6 @@ def _vector_text_search(
         # This probably means the index is emtpy
         return {"hits": []}
     response = HttpRequests(config).get(path=F"{index_name}/_msearch", body=utils.dicts_to_jsonl(body))
-
     responses = [r['hits']['hits'] for r in response["responses"]]
     gathered_docs = dict()
 

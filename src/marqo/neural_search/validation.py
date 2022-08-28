@@ -41,8 +41,6 @@ def validate_field_name(field_name) -> str:
     Raises:
         InvalidFieldNameError
     """
-    if not isinstance(field_name, str):
-        raise InvalidFieldNameError(F"field name must be str! Found type {type(field_name)} for {field_name}")
     if not field_name:
         raise InvalidFieldNameError("field name can't be empty! ")
     if field_name.startswith(enums.NeuralField.vector_prefix):

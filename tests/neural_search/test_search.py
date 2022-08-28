@@ -1,7 +1,7 @@
 import pprint
 from marqo.neural_search.enums import NeuralField, SearchMethod
 from marqo.client import Client
-from marqo.errors import MarqoApiError, MarqoError
+from marqo.errors import MarqoApiError, MarqoError, IndexNotFoundError, InvalidArgError
 from marqo.neural_search import neural_search, constants, index_meta_cache
 import copy
 from tests.marqo_test import MarqoTestCase
@@ -25,7 +25,7 @@ class TestVectorSearch(MarqoTestCase):
         for ix_name in ix_to_delete:
             try:
                 self.client.delete_index(ix_name)
-            except MarqoApiError as s:
+            except IndexNotFoundError as s:
                 pass
 
     def test_vector_search_searchable_attributes_non_existent(self):
@@ -48,19 +48,18 @@ class TestVectorSearch(MarqoTestCase):
         )
         assert len(search_res['hits']) == 2
 
-
     def test_vector_text_search_validate_result_count(self):
         try:
             neural_search._vector_text_search(
                 config=self.config, index_name=self.index_name_1, result_count=-1, text="some text...")
-        except ValueError as e:
+        except InvalidArgError as e:
             assert "illegal result_count" in str(e)
 
         try:
             neural_search._vector_text_search(
                 config=self.config, index_name=self.index_name_1,
                 result_count=constants.MAX_VECTOR_SEARCH_RESULT_COUNT + 1, text="some text...")
-        except ValueError as e:
+        except InvalidArgError as e:
             assert "illegal result_count" in str(e)
 
     def test_vector_search_against_empty_index(self):
@@ -75,8 +74,8 @@ class TestVectorSearch(MarqoTestCase):
             neural_search._vector_text_search(
                 config=self.config, index_name="some-non-existent-index",
                 result_count=5, text="some text...")
-        except MarqoError as s:
-            assert "no such index" in str(s)
+        except IndexNotFoundError as s:
+            pass
 
     def test_vector_search_long_query_string(self):
         query_text = """The Guardian is a British daily newspaper. It was founded in 1821 as The Manchester Guardian, and changed its name in 1959.[5] Along with its sister papers The Observer and The Guardian Weekly, The Guardian is part of the Guardian Media Group, owned by the Scott Trust.[6] The trust was created in 1936 to "secure the financial and editorial independence of The Guardian in perpetuity and to safeguard the journalistic freedom and liberal values of The Guardian free from commercial or political interference".[7] The trust was converted into a limited company in 2008, with a constitution written so as to maintain for The Guardian the same protections as were built into the structure of the Scott Trust by its creators. Profits are reinvested in journalism rather than distributed to owners or shareholders.[7] It is considered a newspaper of record in the UK.[8][9]
@@ -228,7 +227,7 @@ class TestVectorSearch(MarqoTestCase):
                 searchable_attributes=["other field", "Cool Field 1"], return_doc_ids=True, result_count=-1
             )
             raise AssertionError
-        except MarqoError as e:
+        except InvalidArgError as e:
             assert "result count" in str(e)
         try:
             # too small
@@ -237,7 +236,7 @@ class TestVectorSearch(MarqoTestCase):
                 searchable_attributes=["other field", "Cool Field 1"], return_doc_ids=True, result_count=1000000
             )
             raise AssertionError
-        except MarqoError as e:
+        except InvalidArgError as e:
             assert "result count" in str(e)
         # should work with 0
         search_res = neural_search.search(
@@ -288,3 +287,103 @@ class TestVectorSearch(MarqoTestCase):
         for hit in lexical_no_highlights["hits"]:
             assert "_highlights" not in hit
 
+    def test_search_lexical_int_field(self):
+        """doesn't error out if there is a random int field"""
+        neural_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=[
+                {"abc": "some text", "other field": "baaadd", "_id": "5678", "my_int": 144},
+                {"abc": "some text", "other field": "Close match hehehe", "_id": "1234", "my_int": 88},
+            ], auto_refresh=True)
+
+        s_res = neural_search.search(
+            config=self.config, index_name=self.index_name_1, text="88",
+            search_method=SearchMethod.LEXICAL)
+        pprint.pprint(s_res)
+        assert len(s_res["hits"]) > 0
+
+    def test_search_vector_int_field(self):
+        """doesn't error out if there is a random int field"""
+        neural_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=[
+                {"abc": "some text", "other field": "baaadd", "_id": "5678", "my_int": 144},
+                {"abc": "some text", "other field": "Close match hehehe", "_id": "1234", "my_int": 88},
+            ], auto_refresh=True)
+
+        s_res = neural_search.search(
+            config=self.config, index_name=self.index_name_1, text="88",
+            search_method=SearchMethod.NEURAL)
+        pprint.pprint(s_res)
+        assert len(s_res["hits"]) > 0
+
+    def test_filtering(self):
+        neural_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=[
+                {"abc": "some text", "other field": "baaadd", "_id": "5678", "my_string": "b"},
+                {"abc": "some text", "other field": "Close match hehehe", "_id": "1234", "an_int": 2},
+                {"abc": "some text", "other field": "Close match hehehe", "_id": "1233", "my_bool": True},
+            ], auto_refresh=True)
+
+        res_doesnt_exist = neural_search.search(
+            config=self.config, index_name=self.index_name_1, text="some text", result_count=3,
+            filter="my_string:c", verbose=1
+        )
+
+        res_exists_int = neural_search.search(
+            config=self.config, index_name=self.index_name_1, text="some text", result_count=3,
+            filter="an_int:2", verbose=1
+        )
+
+        res_exists_string = neural_search.search(
+            config=self.config, index_name=self.index_name_1, text="some text", result_count=3,
+            filter="my_string:b", verbose=1
+        )
+
+        res_field_doesnt_exist = neural_search.search(
+            config=self.config, index_name=self.index_name_1, text="some text", result_count=3,
+            filter="my_int_something:5", verbose=1
+        )
+
+        res_range_doesnt_exist = neural_search.search(
+            config=self.config, index_name=self.index_name_1, text="some text", result_count=3,
+            filter="an_int:[5 TO 30]", verbose=1
+        )
+
+        res_range_exists = neural_search.search(
+            config=self.config, index_name=self.index_name_1, text="some text", result_count=3,
+            filter="an_int:[0 TO 30]", verbose=1
+        )
+
+        res_bool = neural_search.search(
+            config=self.config, index_name=self.index_name_1, text="some text", result_count=3,
+            filter="my_bool:true", verbose=1
+        )
+
+        res_multi = neural_search.search(
+            config=self.config, index_name=self.index_name_1, text="some text", result_count=3,
+            filter="an_int:[0 TO 30] OR my_bool:true", verbose=1
+        )
+
+        res_complex = neural_search.search(
+            config=self.config, index_name=self.index_name_1, text="some text", result_count=3,
+            filter="(an_int:[0 TO 30] and an_int:2) AND abc:(some text)", verbose=1
+        )
+
+        assert res_exists_int["hits"][0]["_id"] == "1234"
+        assert len(res_exists_int["hits"]) == 1
+
+        assert res_exists_string["hits"][0]["_id"] == "5678"
+        assert len(res_exists_string["hits"]) == 1
+
+        assert len(res_field_doesnt_exist["hits"]) == 0
+        assert len(res_range_doesnt_exist["hits"]) == 0
+        assert len(res_doesnt_exist["hits"]) == 0
+
+        assert res_range_exists["hits"][0]["_id"] == "1234"
+        assert len(res_range_exists["hits"]) == 1
+
+        assert res_bool["hits"][0]["_id"] == "1233"
+        assert len(res_bool["hits"]) == 1
+
+        assert len(res_multi["hits"]) == 2
+
+        assert len(res_complex["hits"]) == 1
