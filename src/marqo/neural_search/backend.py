@@ -80,8 +80,8 @@ def add_customer_field_properties(config: Config, index_name: str, customer_fiel
                         "dimension": model_properties["dimensions"],
                         "method": {
                             "name": "hnsw",
-                            "space_type": "cosinesimil",
-                            "engine": "lucene",  # or try Lucene
+                            "space_type": "innerproduct",
+                            "engine": "nmslib",
                             "parameters": {
                                 "ef_construction": 128,
                                 "m": 24
