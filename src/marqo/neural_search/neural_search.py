@@ -44,18 +44,18 @@ from PIL import Image
 import requests
 from marqo.neural_search.enums import MediaType, MlModel, NeuralField, SearchMethod
 from marqo.neural_search.enums import NeuralSettingsField as NsField
-from marqo.neural_search import utils, backend, validation, configs
-from marqo.s2_inference.processing import text as text_processor
-
-from marqo.s2_inference.processing import image as image_processor
-from marqo.s2_inference.clip_utils import _is_image
-from marqo.s2_inference.reranking import rerank
-
-from marqo.s2_inference import s2_inference
+from marqo.neural_search import utils, backend, validation, configs, parallel
 from marqo.neural_search.index_meta_cache import get_cache,get_index_info
 from marqo.neural_search import index_meta_cache
 from marqo.neural_search.models.index_info import IndexInfo
 from marqo.neural_search import constants
+
+from marqo.s2_inference.processing import text as text_processor
+from marqo.s2_inference.processing import image as image_processor
+from marqo.s2_inference.clip_utils import _is_image
+from marqo.s2_inference.reranking import rerank
+from marqo.s2_inference import s2_inference
+
 # We depend on _httprequests.py for now, but this may be replaced in the future, as
 # _httprequests.py is designed for the client
 from marqo._httprequests import HttpRequests
@@ -173,28 +173,37 @@ def get_stats(config: Config, index_name: str):
         "numberOfDocuments": doc_count
     }
 
-
-def add_documents_orchestrater(config: Config, index_name: str, docs: List[dict], 
-                auto_refresh: bool, batch_size: int = None, processes: int = 1):
-
-    # create beforehand if needed - can cause issues in the mp if it does not exist
+def _check_and_create_index_if_not_exist(config: Config, index_name: str):
     try:
         index_info = backend.get_index_info(config=config, index_name=index_name)
     except errors.IndexNotFoundError as s:
         create_vector_index(config=config, index_name=index_name)
         index_info = backend.get_index_info(config=config, index_name=index_name)
 
-    if batch_size is None:
+def add_documents_orchestrater(config: Config, index_name: str, docs: List[dict], 
+                auto_refresh: bool, batch_size: int = 0, processes: int = 1):
+
+    if batch_size is None or batch_size == 0:
         logger.info(f"batch_size={batch_size} and processes={processes} - not doing any batching")
         return add_documents(
             config=config, index_name=index_name, docs=docs, auto_refresh=auto_refresh)
     elif processes is not None and processes > 1:
-        from marqo.neural_search import parallel
+
+        # create beforehand or pull from the cache so it is upto date for the multi-processing
+        _check_and_create_index_if_not_exist(config=config, index_name=index_name)
+
         logger.info(f"batch_size={batch_size} and processes={processes} - using multi-processing")
-        return parallel.add_documents_mp(config=config, index_name=index_name, docs=docs, 
+        results = parallel.add_documents_mp(config=config, index_name=index_name, docs=docs, 
                     auto_refresh=auto_refresh, batch_size=batch_size, processes=processes)
+        
+        # we need to force the cache to update as it does not propagate using mp
+        # we just clear this index's entry and it will re-populate when needed next
+        if index_name in get_cache():
+            logger.info(f'deleting cache entry for {index_name} after parallel add documents')
+            del get_cache()[index_name]
+
     else:
-        if batch_size <= 0:
+        if batch_size < 0:
             raise errors.MarqoError("Batch size can't be less than 1!")
         logger.info(f"batch_size={batch_size} and processes={processes} - batching using a single process")
         return _batch_request(config=config, index_name=index_name, dataset=docs,
@@ -318,8 +327,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                     chunks.append({
                         utils.generate_vector_name(field): vector_chunk,
                         NeuralField.field_content: text_chunk,
-                        NeuralField.field_name: field,
-                        "my_int": "b"
+                        NeuralField.field_name: field
                     })
         copied[NeuralField.chunks] = chunks
         bulk_parent_dicts.append(indexing_instructions)
@@ -538,6 +546,7 @@ def _lexical_search(
         },
         "size": result_count,
     })
+    #print(search_res)
     res_list = []
     for doc in search_res['hits']['hits']:
         just_doc = _clean_doc(doc["_source"].copy())
