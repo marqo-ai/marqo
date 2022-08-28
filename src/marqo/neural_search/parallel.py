@@ -107,7 +107,7 @@ class IndexChunk:
         # hf tokenizers setting
         os.environ['TOKENIZERS_PARALLELISM'] = 'false'
 
-        logger.info('starting add documents...')
+        logger.info(f'starting add documents using {self.n_chunks} chunks per process...')
         
         if self.device.startswith('cpu') and self.threads_per_process is not None:
             logger.info(f"restricting threads to {self.threads_per_process} for process={self.process_id}")
