@@ -11,7 +11,7 @@ from marqo.neural_search import neural_search
 from marqo.marqo_logging import logger
 from marqo.neural_search.configs import get_max_processes, get_threads_per_process
 from marqo.neural_search import backend
-from marqo.errors import MarqoApiError
+from marqo.errors import MarqoApiError, IndexNotFoundError
 
 try:
     mp.set_start_method('spawn', force=True)
@@ -186,12 +186,9 @@ def add_documents_mp(config=None, index_name=None, docs=None,
     logger.info("checking index exists and creating if not...")
     try:
         index_info = backend.get_index_info(config=config, index_name=index_name)
-    except MarqoApiError as s:
-        if s.status_code == 404 and "index_not_found_exception" in str(s):
-            neural_search.create_vector_index(config=config, index_name=index_name)
-            index_info = backend.get_index_info(config=config, index_name=index_name)
-        else:
-            raise s
+    except IndexNotFoundError as s:
+        neural_search.create_vector_index(config=config, index_name=index_name)
+        index_info = backend.get_index_info(config=config, index_name=index_name)
 
     chunkers = [IndexChunk(config=config, index_name=index_name, docs=_docs,
                                 auto_refresh=auto_refresh, batch_size=batch_size, process_id=p_id, device=device_ids[p_id]) 
