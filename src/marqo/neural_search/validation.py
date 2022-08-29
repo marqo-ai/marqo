@@ -1,8 +1,9 @@
 import pprint
-
+import typing
+from marqo.neural_search import constants
 from marqo.neural_search import enums
 from typing import Iterable, Container
-from marqo.errors import MarqoError, InvalidFieldNameError, BadRequestError, InternalError
+from marqo.errors import MarqoError, InvalidFieldNameError, InvalidArgError, InternalError
 from marqo.neural_search.enums import NeuralField
 from marqo.neural_search import constants
 from typing import Any, Type
@@ -29,6 +30,25 @@ def validate_str_against_enum(value: Any, enum_class: Type[Enum], case_sensitive
     return value
 
 
+def validate_field_content(field_content: typing.Any) -> typing.Any:
+    """
+
+    Returns
+        field_content, if it is valid
+
+    Raises:
+        InvalidArgError if field_content is not acceptable
+    """
+    if type(field_content) in constants.ALLOWED_CUSTOMER_FIELD_TYPES:
+        return field_content
+    else:
+        raise InvalidArgError(
+            f"Field content `{field_content}` \n"
+            f"of type `{type(field_content).__name__}` is not of valid content type!"
+            f"Allowed content types: {[ty.__name__ for ty in constants.ALLOWED_CUSTOMER_FIELD_TYPES]}"
+        )
+
+
 def validate_field_name(field_name) -> str:
     """TODO:
         - length (remember the vector name will have the vector_prefix added to the front of field_name)
@@ -41,10 +61,10 @@ def validate_field_name(field_name) -> str:
     Raises:
         InvalidFieldNameError
     """
-    if not isinstance(field_name, str):
-        raise InvalidFieldNameError(F"field name must be str! Found type {type(field_name)} for {field_name}")
     if not field_name:
         raise InvalidFieldNameError("field name can't be empty! ")
+    if not isinstance(field_name, str):
+        raise InvalidFieldNameError("field name must be str!")
     if field_name.startswith(enums.NeuralField.vector_prefix):
         raise InvalidFieldNameError(F"can't start field name with protected prefix {enums.NeuralField.vector_prefix}."
                             F" Error raised for field name: {field_name}")
@@ -75,7 +95,7 @@ def validate_doc(doc: dict) -> dict:
         doc if all validations pass
     """
     if len(doc) <= 0:
-        raise BadRequestError("Can't index an empty dict.")
+        raise InvalidArgError("Can't index an empty dict.")
     return doc
 
 

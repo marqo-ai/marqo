@@ -287,19 +287,104 @@ class TestVectorSearch(MarqoTestCase):
         for hit in lexical_no_highlights["hits"]:
             assert "_highlights" not in hit
 
+    def test_search_lexical_int_field(self):
+        """doesn't error out if there is a random int field"""
+        neural_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=[
+                {"abc": "some text", "other field": "baaadd", "_id": "5678", "my_int": 144},
+                {"abc": "some text", "other field": "Close match hehehe", "_id": "1234", "my_int": 88},
+            ], auto_refresh=True)
+
+        s_res = neural_search.search(
+            config=self.config, index_name=self.index_name_1, text="88",
+            search_method=SearchMethod.LEXICAL)
+        pprint.pprint(s_res)
+        assert len(s_res["hits"]) > 0
+
+    def test_search_vector_int_field(self):
+        """doesn't error out if there is a random int field"""
+        neural_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=[
+                {"abc": "some text", "other field": "baaadd", "_id": "5678", "my_int": 144},
+                {"abc": "some text", "other field": "Close match hehehe", "_id": "1234", "my_int": 88},
+            ], auto_refresh=True)
+
+        s_res = neural_search.search(
+            config=self.config, index_name=self.index_name_1, text="88",
+            search_method=SearchMethod.NEURAL)
+        pprint.pprint(s_res)
+        assert len(s_res["hits"]) > 0
+
     def test_filtering(self):
         neural_search.add_documents(
             config=self.config, index_name=self.index_name_1, docs=[
-                {"abc": "some text", "other field": "baaadd", "_id": "5678", "my_int": "b"},
-                {"abc": "some text", "other field": "Close match hehehe", "_id": "1234", "my_int": 2},
+                {"abc": "some text", "other field": "baaadd", "_id": "5678", "my_string": "b"},
+                {"abc": "some text", "other field": "Close match hehehe", "_id": "1234", "an_int": 2},
+                {"abc": "some text", "other field": "Close match hehehe", "_id": "1233", "my_bool": True},
             ], auto_refresh=True)
 
-        res = neural_search.search(
+        res_doesnt_exist = neural_search.search(
             config=self.config, index_name=self.index_name_1, text="some text", result_count=3,
-            filter="__field_name:my_int", verbose=1
+            filter="my_string:c", verbose=1
         )
-        print("res")
-        pprint.pprint(res)
 
-    def test_filtering_lexical(self):
-        """TODO: this"""
+        res_exists_int = neural_search.search(
+            config=self.config, index_name=self.index_name_1, text="some text", result_count=3,
+            filter="an_int:2", verbose=1
+        )
+
+        res_exists_string = neural_search.search(
+            config=self.config, index_name=self.index_name_1, text="some text", result_count=3,
+            filter="my_string:b", verbose=1
+        )
+
+        res_field_doesnt_exist = neural_search.search(
+            config=self.config, index_name=self.index_name_1, text="some text", result_count=3,
+            filter="my_int_something:5", verbose=1
+        )
+
+        res_range_doesnt_exist = neural_search.search(
+            config=self.config, index_name=self.index_name_1, text="some text", result_count=3,
+            filter="an_int:[5 TO 30]", verbose=1
+        )
+
+        res_range_exists = neural_search.search(
+            config=self.config, index_name=self.index_name_1, text="some text", result_count=3,
+            filter="an_int:[0 TO 30]", verbose=1
+        )
+
+        res_bool = neural_search.search(
+            config=self.config, index_name=self.index_name_1, text="some text", result_count=3,
+            filter="my_bool:true", verbose=1
+        )
+
+        res_multi = neural_search.search(
+            config=self.config, index_name=self.index_name_1, text="some text", result_count=3,
+            filter="an_int:[0 TO 30] OR my_bool:true", verbose=1
+        )
+
+        res_complex = neural_search.search(
+            config=self.config, index_name=self.index_name_1, text="some text", result_count=3,
+            filter="(an_int:[0 TO 30] and an_int:2) AND abc:(some text)", verbose=1
+        )
+
+        assert res_exists_int["hits"][0]["_id"] == "1234"
+        assert len(res_exists_int["hits"]) == 1
+
+        assert res_exists_string["hits"][0]["_id"] == "5678"
+        assert len(res_exists_string["hits"]) == 1
+
+        assert len(res_field_doesnt_exist["hits"]) == 0
+        assert len(res_range_doesnt_exist["hits"]) == 0
+        assert len(res_doesnt_exist["hits"]) == 0
+
+        assert res_range_exists["hits"][0]["_id"] == "1234"
+        assert len(res_range_exists["hits"]) == 1
+
+        assert res_bool["hits"][0]["_id"] == "1233"
+        assert len(res_bool["hits"]) == 1
+
+        assert len(res_multi["hits"]) == 2
+
+        assert len(res_complex["hits"]) == 1
+

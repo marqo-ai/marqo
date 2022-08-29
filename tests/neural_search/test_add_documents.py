@@ -3,7 +3,7 @@ import pprint
 import requests
 from marqo.neural_search.enums import NeuralField
 from marqo.client import Client
-from marqo.errors import MarqoApiError
+from marqo.errors import IndexNotFoundError, InvalidArgError
 from marqo.neural_search import neural_search, index_meta_cache
 from tests.marqo_test import MarqoTestCase
 
@@ -20,7 +20,7 @@ class TestAddDocuments(MarqoTestCase):
         self.index_name_1 = "my-test-index-1"
         try:
             self.client.delete_index(self.index_name_1)
-        except MarqoApiError as s:
+        except IndexNotFoundError as s:
             pass
 
     def _match_all(self, index_name, verbose=True):
@@ -219,3 +219,38 @@ class TestAddDocuments(MarqoTestCase):
             assert "_id" in item
             assert "result" in item
             assert "status" in item
+
+    def test_add_documents_validation(self):
+        """These bad docs should raise errors"""
+        bad_doc_args = [
+            [{
+                    "_id": "123",
+                    "id": {},
+            }],
+            [{
+                "blahblah": {1243}
+            }],
+            [{
+                "blahblah": None
+            }],
+            [{
+                "blahblah": [None], "hehehe": 123
+            },{
+                "some other obj": "finnne"
+            }],
+            [{
+                "blahblah": [None], "hehehe": 123
+            }, {
+                "some other obj": AssertionError  # wtf lad!!!
+            }],
+            [{
+                "blahblah": max  # a func!!!
+            }]
+        ]
+        for bad_doc_arg in bad_doc_args:
+            try:
+                add_res = neural_search.add_documents(config=self.config, index_name=self.index_name_1,
+                                                      docs=bad_doc_arg, auto_refresh=True)
+                raise AssertionError
+            except InvalidArgError as s:
+                pass

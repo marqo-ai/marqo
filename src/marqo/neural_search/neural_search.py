@@ -33,16 +33,13 @@ Notes on search behaviour with caching and searchable attributes:
 import copy
 import datetime
 import functools
-import json
-from locale import normalize
 import pprint
 import typing
 import uuid
 import asyncio
 from typing import List, Optional, Union, Callable, Iterable, Sequence, Dict, Any
 from PIL import Image
-import requests
-from marqo.neural_search.enums import MediaType, MlModel, NeuralField, SearchMethod
+from marqo.neural_search.enums import MediaType, MlModel, NeuralField, SearchMethod, OpenSearchDataType
 from marqo.neural_search.enums import NeuralSettingsField as NsField
 from marqo.neural_search import utils, backend, validation, configs, parallel
 from marqo.neural_search.index_meta_cache import get_cache,get_index_info
@@ -63,6 +60,7 @@ from marqo.config import Config
 # TODO add an errors.py 
 from marqo import errors
 import threading
+import re
 
 from marqo.neural_search.neural_search_logging import get_logger
 logger = get_logger(__name__)
@@ -245,6 +243,21 @@ def _batch_request(config: Config, index_name: str, dataset: List[dict],
         logger.info('completed batch ingestion.')
         return results
 
+def _infer_opensearch_data_type(
+        sample_field_content: typing.Any) -> Union[OpenSearchDataType, None]:
+    """
+    Raises:
+        Exception if sample_field_content list or dict
+    """
+    if isinstance(sample_field_content, dict):
+        raise errors.InvalidArgError("Field content can't be objects or lists!")
+    elif isinstance(sample_field_content, List):
+        raise errors.InvalidArgError("Field content can't be objects or lists!")
+    elif isinstance(sample_field_content, str):
+        return OpenSearchDataType.text
+    else:
+        return None
+
 def add_documents(config: Config, index_name: str, docs: List[dict], auto_refresh):
     """
     """
@@ -256,8 +269,6 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
     except errors.IndexNotFoundError as s:
         create_vector_index(config=config, index_name=index_name)
         index_info = backend.get_index_info(config=config, index_name=index_name)
-
-    logger.info(f"found index with settings {index_info}")
 
     existing_fields = set(index_info.properties.keys())
     new_fields = set()
@@ -276,7 +287,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
             if not isinstance(doc_id, str):
                 raise errors.InvalidDocumentIdError(
                     "Document _id must be a string type! "
-                    f"Received _id {doc_id} of type {type(doc_id)}")
+                    f"Received _id {doc_id} of type `{type(doc_id).__name__}`")
             del copied["_id"]
             doc_ids_to_update.append(doc_id)
         else:
@@ -289,9 +300,9 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
         for field in copied:
 
             if field not in existing_fields:
-                new_fields.add(field)
+                new_fields.add((field, _infer_opensearch_data_type(copied[field])))
 
-            field_content = copied[field]
+            field_content = validation.validate_field_content(copied[field])
 
             # TODO put this into a function to determine routing
             if isinstance(field_content, (str, Image.Image)):
@@ -323,11 +334,18 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                         f"recevied text_chunks={len(text_chunks)} and vector_chunks={len(vector_chunks)}. check the preprocessing functions and try again. ")
 
                 for text_chunk, vector_chunk in zip(text_chunks, vector_chunks):
-                    chunk_id = str(uuid.uuid4())
+                    # only add chunk values which are string, boolean or numeric
+                    chunk_values_for_filtering = {}
+                    for key, value in doc.items():
+                        if not (isinstance(value, str) or isinstance(value, float)
+                                or isinstance(value, bool) or isinstance(value, int)):
+                            continue
+                        chunk_values_for_filtering[key] = value
                     chunks.append({
                         utils.generate_vector_name(field): vector_chunk,
                         NeuralField.field_content: text_chunk,
-                        NeuralField.field_name: field
+                        NeuralField.field_name: field,
+                        **chunk_values_for_filtering
                     })
         copied[NeuralField.chunks] = chunks
         bulk_parent_dicts.append(indexing_instructions)
@@ -353,7 +371,8 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
         item_fields_to_remove = ['_index', '_primary_term', '_seq_no', '_shards', '_version']
         for item in copied_res["items"]:
             for to_remove in item_fields_to_remove:
-                del item["index"][to_remove]
+                if to_remove in item["index"]:
+                    del item["index"][to_remove]
             new_items.append(item["index"])
         copied_res["processingTimeMs"] = took
         copied_res["index_name"] = index_name
@@ -531,8 +550,7 @@ def _lexical_search(
         fields_to_search = index_meta_cache.get_index_info(
             config=config, index_name=index_name
         ).get_text_properties()
-
-    search_res = HttpRequests(config).get(path=f"{index_name}/_search", body={
+    body = {
         "query": {
             "bool": {
                 "should": [
@@ -545,8 +563,8 @@ def _lexical_search(
             }
         },
         "size": result_count,
-    })
-    #print(search_res)
+    }
+    search_res = HttpRequests(config).get(path=f"{index_name}/_search", body=body)
     res_list = []
     for doc in search_res['hits']['hits']:
         just_doc = _clean_doc(doc["_source"].copy())
@@ -659,8 +677,8 @@ def _vector_text_search(
                 "exclude": ["*__vector*"]
             }
         if filter is not None:
-            if len(filter.split(":")) == 2 and filter.split(":")[0] != "*":
-                filter = f"{NeuralField.chunks}.{filter}"
+            for field in index_info.get_text_properties():
+                filter = filter.replace(field, f'{NeuralField.chunks}.{field}')
             search_query["query"]["nested"]["query"]["knn"][f"{NeuralField.chunks}.{vector_field}"]["filter"] = {
                 "query_string": {"query": f"{filter}"}
             }
@@ -684,7 +702,6 @@ def _vector_text_search(
         # This probably means the index is emtpy
         return {"hits": []}
     response = HttpRequests(config).get(path=F"{index_name}/_msearch", body=utils.dicts_to_jsonl(body))
-
     responses = [r['hits']['hits'] for r in response["responses"]]
     gathered_docs = dict()
 

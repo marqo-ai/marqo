@@ -43,8 +43,8 @@ class TestBackend(MarqoTestCase):
         try:
             index_info = backend.get_index_info(
                 config=self.config, index_name=self.index_name_1)
-        except MarqoApiError as s:
-            assert "no such index" in str(s)
+        except IndexNotFoundError as s:
+            pass
 
     def test_get_cluster_indices(self):
         neural_search.create_vector_index(

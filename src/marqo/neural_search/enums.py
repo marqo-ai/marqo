@@ -50,6 +50,7 @@ class NeuralSettingsField:
 
     number_of_shards = "number_of_shards"
 
+
 class SplitMethod:
     # consider moving this enum into processing
     sentence = "sentence"
@@ -58,3 +59,12 @@ class SplitMethod:
 class Device (str, Enum):
     cpu = "cpu"
     cuda = "cuda"
+
+
+class OpenSearchDataType:
+    text = "text"
+    keyword = "keyword"
+    int = "int"
+    float = "float"
+    integer = "integer"
+    to_be_defined = "to_be_defined"  # to be defined by OpenSearch

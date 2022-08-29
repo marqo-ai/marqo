@@ -4,7 +4,7 @@ from marqo.neural_search import enums, backend
 from marqo.neural_search import neural_search
 import unittest
 import copy
-from marqo.errors import MarqoError, MarqoApiError
+from marqo.errors import InvalidArgError, IndexNotFoundError
 from marqo.client import Client
 from tests.marqo_test import MarqoTestCase
 
@@ -18,7 +18,7 @@ class TestlexicalSearch(MarqoTestCase):
         self.config = copy.deepcopy(self.client.config)
         try:
             self.client.delete_index(self.index_name_1)
-        except MarqoApiError as s:
+        except IndexNotFoundError as s:
             pass
     
     @staticmethod
@@ -55,14 +55,14 @@ class TestlexicalSearch(MarqoTestCase):
             try:
                 res = neural_search._lexical_search(config=self.config, index_name=self.index_name_1, text=a)
                 raise AssertionError
-            except MarqoError as e:
+            except InvalidArgError as e:
                 assert "type str" in str(e)
 
     def test_lexical_search_no_index(self):
         try:
             res = neural_search._lexical_search(config=self.config, index_name="non existent index", text="abcdefg")
-        except MarqoError as s:
-            assert "no such index" in str(s)
+        except IndexNotFoundError as s:
+            pass
 
     def test_lexical_search_multiple(self):
         d0 = {
@@ -177,7 +177,7 @@ class TestlexicalSearch(MarqoTestCase):
                 raise_for_searchable_attributes=True
             )
             raise AssertionError
-        except MarqoError as s:
+        except InvalidArgError as s:
             assert "unknown searchable_attributes" in str(s)
 
     def test_lexical_search_result_count(self):
