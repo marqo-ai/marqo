@@ -115,27 +115,30 @@ async def create_index(index_name: str, settings: Dict = None, marqo_config: con
 
 
 @app.post("/indexes/{index_name}/search")
-async def search(search_query: SearchQuery, index_name: str, marqo_config: config.Config = Depends(generate_config)):
+async def search(search_query: SearchQuery, index_name: str, device: str = None,
+                 marqo_config: config.Config = Depends(generate_config)):
+
     return neural_search.search(
         config=marqo_config, text=search_query.q,
         index_name=index_name, highlights=search_query.showHighlights,
         searchable_attributes=search_query.searchableAttributes,
         search_method=search_query.searchMethod,
         result_count=search_query.limit, reranker=search_query.reRanker,
-        filter=search_query.filter)
+        filter=search_query.filter, device=device)
 
 
 @app.post("/indexes/{index_name}/documents")
 async def add_documents(docs: List[Dict], index_name: str,  refresh: bool = True,
                         marqo_config: config.Config = Depends(generate_config),
-                        batch_size: int = 0, processes: int = 1):
+                        batch_size: int = 0, processes: int = 1, device: str = None):
     """add_documents endpoint"""
     return neural_search.add_documents_orchestrater(
         config=marqo_config,
         docs=docs,
         index_name=index_name, auto_refresh=refresh,
-        batch_size=batch_size, processes=processes
+        batch_size=batch_size, processes=processes, device=device
     )
+
 
 @app.get("/indexes/{index_name}/documents/{document_id}")
 async def get_document_by_id(index_name: str, document_id: str,

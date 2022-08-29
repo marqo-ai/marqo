@@ -171,6 +171,7 @@ def get_stats(config: Config, index_name: str):
         "numberOfDocuments": doc_count
     }
 
+
 def _check_and_create_index_if_not_exist(config: Config, index_name: str):
     try:
         index_info = backend.get_index_info(config=config, index_name=index_name)
@@ -178,21 +179,28 @@ def _check_and_create_index_if_not_exist(config: Config, index_name: str):
         create_vector_index(config=config, index_name=index_name)
         index_info = backend.get_index_info(config=config, index_name=index_name)
 
-def add_documents_orchestrater(config: Config, index_name: str, docs: List[dict], 
-                auto_refresh: bool, batch_size: int = 0, processes: int = 1):
+
+def add_documents_orchestrater(
+        config: Config, index_name: str, docs: List[dict],
+        auto_refresh: bool, batch_size: int = 0, processes: int = 1,
+        device=None):
 
     if batch_size is None or batch_size == 0:
         logger.info(f"batch_size={batch_size} and processes={processes} - not doing any batching")
         return add_documents(
-            config=config, index_name=index_name, docs=docs, auto_refresh=auto_refresh)
+            config=config, index_name=index_name, docs=docs, auto_refresh=auto_refresh,
+            device=device
+        )
     elif processes is not None and processes > 1:
 
         # create beforehand or pull from the cache so it is upto date for the multi-processing
         _check_and_create_index_if_not_exist(config=config, index_name=index_name)
 
         logger.info(f"batch_size={batch_size} and processes={processes} - using multi-processing")
-        results = parallel.add_documents_mp(config=config, index_name=index_name, docs=docs, 
-                    auto_refresh=auto_refresh, batch_size=batch_size, processes=processes)
+        results = parallel.add_documents_mp(
+            config=config, index_name=index_name, docs=docs,
+            auto_refresh=auto_refresh, batch_size=batch_size, processes=processes,
+        )
         
         # we need to force the cache to update as it does not propagate using mp
         # we just clear this index's entry and it will re-populate when needed next
@@ -202,14 +210,14 @@ def add_documents_orchestrater(config: Config, index_name: str, docs: List[dict]
 
     else:
         if batch_size < 0:
-            raise errors.MarqoError("Batch size can't be less than 1!")
+            raise errors.InvalidArgError("Batch size can't be less than 1!")
         logger.info(f"batch_size={batch_size} and processes={processes} - batching using a single process")
         return _batch_request(config=config, index_name=index_name, dataset=docs,
                                             batch_size=batch_size, verbose=False)
 
 
 def _batch_request(config: Config, index_name: str, dataset: List[dict], 
-                batch_size: int = 100, verbose: bool = True) -> List[Dict[str, Any]]:
+                batch_size: int = 100, verbose: bool = True, device=None) -> List[Dict[str, Any]]:
         """Batch by the number of documents"""
         logger.info(f"starting batch ingestion in sizes of {batch_size}")
 
@@ -229,7 +237,7 @@ def _batch_request(config: Config, index_name: str, dataset: List[dict],
             t0 = datetime.datetime.now()
             res = add_documents(
                 config=config, index_name=index_name,
-                docs=docs, auto_refresh=False)
+                docs=docs, auto_refresh=False, device=device)
             total_batch_time = datetime.datetime.now() - t0
             num_docs = len(docs)
 
