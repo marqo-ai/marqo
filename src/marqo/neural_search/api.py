@@ -179,7 +179,7 @@ async def refresh_index(index_name: str, marqo_config: config.Config = Depends(g
 
 # ADD DOCS:
 """
-curl -XPOST  'http://admin:admin@localhost:8000/indexes/my-irst-ix/documents?refresh=true' -H 'Content-type:application/json' -d '
+curl -XPOST  'http://admin:admin@localhost:8882/indexes/my-irst-ix/documents?refresh=true' -H 'Content-type:application/json' -d '
 [ 
     {
         "Title": "Honey is a delectable food stuff", 
@@ -196,7 +196,7 @@ curl -XPOST  'http://admin:admin@localhost:8000/indexes/my-irst-ix/documents?ref
 
 # SEARCH DOCS
 """
-curl -XPOST  http://admin:admin@localhost:8000/indexes/my-irst-ix/search -H 'Content-type:application/json' -d '{
+curl -XPOST  http://admin:admin@localhost:8882/indexes/my-irst-ix/search -H 'Content-type:application/json' -d '{
     "q": "what do bears eat?",
     "searchableAttributes": ["Title", "Desc", "other"],
     "limit": 3,    
@@ -207,7 +207,7 @@ curl -XPOST  http://admin:admin@localhost:8000/indexes/my-irst-ix/search -H 'Con
 
 # CREATE CUSTOM IMAGE INDEX:
 """
-curl -XPOST http://admin:admin@localhost:8000/indexes/my-multimodal-index -H 'Content-type:application/json' -d '{
+curl -XPOST http://admin:admin@localhost:8882/indexes/my-multimodal-index -H 'Content-type:application/json' -d '{
     "index_defaults": {
       "treat_urls_and_pointers_as_images":true,    
       "model":"ViT-B/32"
@@ -218,27 +218,27 @@ curl -XPOST http://admin:admin@localhost:8000/indexes/my-multimodal-index -H 'Co
 
 # GET DOCUMENT BY ID:
 """
-curl -XGET http://admin:admin@localhost:8000/indexes/my-irst-ix/documents/honey_facts_119
+curl -XGET http://admin:admin@localhost:8882/indexes/my-irst-ix/documents/honey_facts_119
 """
 
 # GET index stats
 """
-curl -XGET http://admin:admin@localhost:8000/indexes/my-irst-ix/stats
+curl -XGET http://admin:admin@localhost:8882/indexes/my-irst-ix/stats
 """
 
 # DELETE index
 """
-curl -XDELETE http://admin:admin@localhost:8000/indexes/my-irst-ix
+curl -XDELETE http://admin:admin@localhost:8882/indexes/my-irst-ix
 """
 
 # DELETE docs
 """
-curl -XPOST  http://admin:admin@localhost:8000/indexes/my-irst-ix/documents/delete-batch -H 'Content-type:application/json' -d '[
+curl -XPOST  http://admin:admin@localhost:8882/indexes/my-irst-ix/documents/delete-batch -H 'Content-type:application/json' -d '[
     "honey_facts_119", "moon_fact_145"
 ]'
 """
 
 # POST refresh index
 """
-curl -XPOST  http://admin:admin@localhost:8000/indexes/my-irst-ix/refresh
+curl -XPOST  http://admin:admin@localhost:8882/indexes/my-irst-ix/refresh
 """
