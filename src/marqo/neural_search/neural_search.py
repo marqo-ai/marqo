@@ -243,6 +243,7 @@ def _batch_request(config: Config, index_name: str, dataset: List[dict],
         logger.info('completed batch ingestion.')
         return results
 
+
 def _infer_opensearch_data_type(
         sample_field_content: typing.Any) -> Union[OpenSearchDataType, None]:
     """
@@ -283,11 +284,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
         [validation.validate_field_name(field) for field in copied]
 
         if "_id" in doc:
-            doc_id = doc["_id"]
-            if not isinstance(doc_id, str):
-                raise errors.InvalidDocumentIdError(
-                    "Document _id must be a string type! "
-                    f"Received _id {doc_id} of type `{type(doc_id).__name__}`")
+            doc_id = validation.validate_id(doc["_id"])
             del copied["_id"]
             doc_ids_to_update.append(doc_id)
         else:
@@ -384,10 +381,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
 def get_document_by_id(config: Config, index_name:str, document_id: str):
     """returns document by its ID"""
-    if not isinstance(document_id, str):
-        raise errors.InvalidDocumentIdError("Document ID must be a str")
-    if not document_id:
-        raise errors.InvalidDocumentIdError("Document ID must can't be empty")
+    validation.validate_id(document_id)
     res = HttpRequests(config).get(
         f'{index_name}/_doc/{document_id}'
     )
@@ -401,7 +395,12 @@ def delete_documents(config: Config, index_name: str, doc_ids: List[str], auto_r
     """Deletes documents """
     if not doc_ids:
         raise errors.InvalidDocumentIdError("doc_ids can't be empty!")
-    delete_parents_res = HttpRequests(config=config).post(
+
+    for _id in doc_ids:
+        validation.validate_id(_id)
+
+    t0 = datetime.datetime.utcnow()
+    delete_res_backend = HttpRequests(config=config).post(
         path=f"{index_name}/_delete_by_query", body={
             "query": {
                 "terms": {
@@ -412,7 +411,18 @@ def delete_documents(config: Config, index_name: str, doc_ids: List[str], auto_r
     )
     if auto_refresh:
         refresh_response = HttpRequests(config).post(path=F"{index_name}/_refresh")
-    return delete_parents_res
+    t1 = datetime.datetime.utcnow()
+    delete_res = {
+        "index_name": index_name, "status": "succeeded",
+        "type": "documentDeletion", "details": {
+            "receivedDocumentIds": len(doc_ids),
+            "deletedDocuments": delete_res_backend["deleted"],
+        },
+        "duration": utils.create_duration_string(t1 - t0),
+        "startedAt": utils.format_timestamp(t0),
+        "finishedAt": utils.format_timestamp(t1),
+    }
+    return delete_res
 
 
 def refresh_index(config: Config,  index_name: str):

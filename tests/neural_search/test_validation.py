@@ -181,7 +181,6 @@ class TestValidation(unittest.TestCase):
                 validation.validate_field_content(bad_content)
                 raise AssertionError
             except InvalidArgError as e:
-                print(e)
                 pass
 
     def test_validate_field_content_good(self):
@@ -191,3 +190,20 @@ class TestValidation(unittest.TestCase):
         for good_content in good_field_content:
             assert good_content == validation.validate_field_content(good_content)
 
+    def test_validate_id_good(self):
+        bad_ids = [
+            {123}, [], None, {"abw": "cjnk"}, 1234
+        ]
+        for bad_content in bad_ids:
+            try:
+                validation.validate_id(bad_content)
+                raise AssertionError
+            except InvalidDocumentIdError as e:
+                pass
+
+    def test_validate_id_bad(self):
+        good_ids = [
+            "123", "hehee", "12_349"
+        ]
+        for good_content in good_ids:
+            assert good_content == validation.validate_id(good_content)

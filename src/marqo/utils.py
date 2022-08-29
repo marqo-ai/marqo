@@ -1,5 +1,5 @@
 from marqo import errors
-
+import datetime
 
 def construct_authorized_url(url_base: str, username: str, password: str) -> str:
     """

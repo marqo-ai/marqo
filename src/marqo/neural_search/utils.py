@@ -4,6 +4,7 @@ import json
 from marqo.neural_search import enums
 from typing import List, Optional, Union, Callable, Iterable, Sequence, Dict
 import copy
+import datetime
 
 
 def dicts_to_jsonl(dicts: List[dict]) -> str:
@@ -38,3 +39,23 @@ def truncate_dict_vectors(doc: Union[dict, List], new_length: int = 5) -> Union[
             copied[k] = truncate_dict_vectors(v, new_length=new_length)
 
     return copied
+
+
+def create_duration_string(timedelta):
+    """Creates a duration string suitable that can be returned in the AP
+
+    Args:
+        timedelta (datetime.timedelta): time delta, or duration.
+
+    Returns:
+
+    """
+    return f"PT{timedelta.total_seconds()}S"
+
+
+def format_timestamp(timestamp: datetime.datetime):
+    """Creates a timestring string suitable for return in the API
+
+    Assumes timestamp is UTC offset 0
+    """
+    return f"{timestamp.isoformat()}Z"
