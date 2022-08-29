@@ -215,7 +215,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
             if not isinstance(doc_id, str):
                 raise errors.InvalidDocumentIdError(
                     "Document _id must be a string type! "
-                    f"Received _id {doc_id} of type {type(doc_id)}")
+                    f"Received _id {doc_id} of type `{type(doc_id).__name__}`")
             del copied["_id"]
             doc_ids_to_update.append(doc_id)
         else:
@@ -230,7 +230,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
             if field not in existing_fields:
                 new_fields.add((field, _infer_opensearch_data_type(copied[field])))
 
-            field_content = copied[field]
+            field_content = validation.validate_field_content(copied[field])
 
             # TODO put this into a function to determine routing
             if isinstance(field_content, (str, Image.Image)):

@@ -1,5 +1,6 @@
 import pprint
-
+import typing
+from marqo.neural_search import constants
 from marqo.neural_search import enums
 from typing import Iterable, Container
 from marqo.errors import MarqoError, InvalidFieldNameError, InvalidArgError, InternalError
@@ -27,6 +28,25 @@ def validate_str_against_enum(value: Any, enum_class: Type[Enum], case_sensitive
     if to_test_value not in enum_values:
         raise ValueError(f"{value} is not a valid {enum_class.__name__}")
     return value
+
+
+def validate_field_content(field_content: typing.Any) -> typing.Any:
+    """
+
+    Returns
+        field_content, if it is valid
+
+    Raises:
+        InvalidArgError if field_content is not acceptable
+    """
+    if type(field_content) in constants.ALLOWED_CUSTOMER_FIELD_TYPES:
+        return field_content
+    else:
+        raise InvalidArgError(
+            f"Field content `{field_content}` \n"
+            f"of type `{type(field_content).__name__}` is not of valid content type!"
+            f"Allowed content types: {[ty.__name__ for ty in constants.ALLOWED_CUSTOMER_FIELD_TYPES]}"
+        )
 
 
 def validate_field_name(field_name) -> str:

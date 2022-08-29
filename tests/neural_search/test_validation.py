@@ -172,3 +172,22 @@ class TestValidation(unittest.TestCase):
         except InvalidFieldNameError as s:
             assert 'protected field' in str(s)
 
+    def test_validate_field_content_bad(self):
+        bad_field_content = [
+            {123}, [], None, {"abw": "cjnk"}
+        ]
+        for bad_content in bad_field_content:
+            try:
+                validation.validate_field_content(bad_content)
+                raise AssertionError
+            except InvalidArgError as e:
+                print(e)
+                pass
+
+    def test_validate_field_content_good(self):
+        good_field_content = [
+            123, "heehee", 12.4, False
+        ]
+        for good_content in good_field_content:
+            assert good_content == validation.validate_field_content(good_content)
+
