@@ -127,14 +127,15 @@ async def search(search_query: SearchQuery, index_name: str, marqo_config: confi
 
 @app.post("/indexes/{index_name}/documents")
 async def add_documents(docs: List[Dict], index_name: str,  refresh: bool = True,
-                        marqo_config: config.Config = Depends(generate_config)):
+                        marqo_config: config.Config = Depends(generate_config),
+                        batch_size: int = 0, processes: int = 1):
     """add_documents endpoint"""
-    return neural_search.add_documents(
+    return neural_search.add_documents_orchestrater(
         config=marqo_config,
         docs=docs,
-        index_name=index_name, auto_refresh=refresh
+        index_name=index_name, auto_refresh=refresh,
+        batch_size=batch_size, processes=processes
     )
-
 
 @app.get("/indexes/{index_name}/documents/{document_id}")
 async def get_document_by_id(index_name: str, document_id: str,

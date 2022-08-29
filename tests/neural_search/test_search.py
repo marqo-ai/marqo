@@ -387,3 +387,4 @@ class TestVectorSearch(MarqoTestCase):
         assert len(res_multi["hits"]) == 2
 
         assert len(res_complex["hits"]) == 1
+

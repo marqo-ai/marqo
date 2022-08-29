@@ -36,22 +36,23 @@ import functools
 import pprint
 import typing
 import uuid
-from typing import List, Optional, Union, Callable, Iterable, Sequence, Dict
+import asyncio
+from typing import List, Optional, Union, Callable, Iterable, Sequence, Dict, Any
 from PIL import Image
 from marqo.neural_search.enums import MediaType, MlModel, NeuralField, SearchMethod, OpenSearchDataType
 from marqo.neural_search.enums import NeuralSettingsField as NsField
-from marqo.neural_search import utils, backend, validation, configs
-from marqo.s2_inference.processing import text as text_processor
-
-from marqo.s2_inference.processing import image as image_processor
-from marqo.s2_inference.clip_utils import _is_image
-from marqo.s2_inference.reranking import rerank
-
-from marqo.s2_inference import s2_inference
+from marqo.neural_search import utils, backend, validation, configs, parallel
 from marqo.neural_search.index_meta_cache import get_cache,get_index_info
 from marqo.neural_search import index_meta_cache
 from marqo.neural_search.models.index_info import IndexInfo
 from marqo.neural_search import constants
+
+from marqo.s2_inference.processing import text as text_processor
+from marqo.s2_inference.processing import image as image_processor
+from marqo.s2_inference.clip_utils import _is_image
+from marqo.s2_inference.reranking import rerank
+from marqo.s2_inference import s2_inference
+
 # We depend on _httprequests.py for now, but this may be replaced in the future, as
 # _httprequests.py is designed for the client
 from marqo._httprequests import HttpRequests
@@ -170,6 +171,77 @@ def get_stats(config: Config, index_name: str):
         "numberOfDocuments": doc_count
     }
 
+def _check_and_create_index_if_not_exist(config: Config, index_name: str):
+    try:
+        index_info = backend.get_index_info(config=config, index_name=index_name)
+    except errors.IndexNotFoundError as s:
+        create_vector_index(config=config, index_name=index_name)
+        index_info = backend.get_index_info(config=config, index_name=index_name)
+
+def add_documents_orchestrater(config: Config, index_name: str, docs: List[dict], 
+                auto_refresh: bool, batch_size: int = 0, processes: int = 1):
+
+    if batch_size is None or batch_size == 0:
+        logger.info(f"batch_size={batch_size} and processes={processes} - not doing any batching")
+        return add_documents(
+            config=config, index_name=index_name, docs=docs, auto_refresh=auto_refresh)
+    elif processes is not None and processes > 1:
+
+        # create beforehand or pull from the cache so it is upto date for the multi-processing
+        _check_and_create_index_if_not_exist(config=config, index_name=index_name)
+
+        logger.info(f"batch_size={batch_size} and processes={processes} - using multi-processing")
+        results = parallel.add_documents_mp(config=config, index_name=index_name, docs=docs, 
+                    auto_refresh=auto_refresh, batch_size=batch_size, processes=processes)
+        
+        # we need to force the cache to update as it does not propagate using mp
+        # we just clear this index's entry and it will re-populate when needed next
+        if index_name in get_cache():
+            logger.info(f'deleting cache entry for {index_name} after parallel add documents')
+            del get_cache()[index_name]
+
+    else:
+        if batch_size < 0:
+            raise errors.MarqoError("Batch size can't be less than 1!")
+        logger.info(f"batch_size={batch_size} and processes={processes} - batching using a single process")
+        return _batch_request(config=config, index_name=index_name, dataset=docs,
+                                            batch_size=batch_size, verbose=False)
+
+
+def _batch_request(config: Config, index_name: str, dataset: List[dict], 
+                batch_size: int = 100, verbose: bool = True) -> List[Dict[str, Any]]:
+        """Batch by the number of documents"""
+        logger.info(f"starting batch ingestion in sizes of {batch_size}")
+
+        deeper = ((doc, i, batch_size) for i, doc in enumerate(dataset))
+
+        def batch_requests(gathered, doc_tuple):
+            doc, i, the_batch_size = doc_tuple
+            if i % the_batch_size == 0:
+                gathered.append([doc,])
+            else:
+                gathered[-1].append(doc)
+            return gathered
+
+        batched = functools.reduce(lambda x, y: batch_requests(x, y), deeper, [])
+
+        def verbosely_add_docs(i, docs):
+            t0 = datetime.datetime.now()
+            res = add_documents(
+                config=config, index_name=index_name,
+                docs=docs, auto_refresh=False)
+            total_batch_time = datetime.datetime.now() - t0
+            num_docs = len(docs)
+
+            logger.info(f"    batch {i}: ingested {num_docs} docs. Time taken: {total_batch_time}. "
+                        f"Average timer per doc {total_batch_time/num_docs}")
+            if verbose:
+                logger.info(f"        results from indexing batch {i}: {res}")
+            return res
+
+        results = [verbosely_add_docs(i, docs) for i, docs in enumerate(batched)]
+        logger.info('completed batch ingestion.')
+        return results
 
 def _infer_opensearch_data_type(
         sample_field_content: typing.Any) -> Union[OpenSearchDataType, None]:
