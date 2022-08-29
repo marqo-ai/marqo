@@ -7,11 +7,12 @@ from marqo.neural_search.models import index_info
 from marqo.neural_search import neural_search
 from marqo.neural_search import index_meta_cache
 from marqo.config import Config
-from marqo.errors import MarqoError, MarqoApiError
+from marqo.errors import MarqoError, MarqoApiError, IndexNotFoundError
 from marqo.neural_search import utils
 from marqo.neural_search.enums import NeuralField, SearchMethod, NeuralSettingsField
 from marqo.neural_search import configs
 from tests.marqo_test import MarqoTestCase
+
 
 class TestIndexMetaCache(MarqoTestCase):
 
@@ -26,7 +27,7 @@ class TestIndexMetaCache(MarqoTestCase):
         for ix in [self.index_name_1, self.index_name_2]:
             try:
                 neural_search.delete_index(config=self.config, index_name=ix)
-            except MarqoApiError as s:
+            except IndexNotFoundError as s:
                 pass
 
     @staticmethod
@@ -51,7 +52,7 @@ class TestIndexMetaCache(MarqoTestCase):
             index_meta_cache.empty_cache()
             # there needs to be an error because the index doesn't exist yet
             neural_search.search(config=self.config, text="some text", index_name=self.index_name_1)
-        except MarqoError as s:
+        except IndexNotFoundError as s:
             pass
 
         neural_search.create_vector_index(config=self.config, index_name=self.index_name_1)
@@ -174,9 +175,9 @@ class TestIndexMetaCache(MarqoTestCase):
                     check_only_in_external_cache
                     in index_meta_cache.get_cache()[index_name].properties
             )
-        time.sleep(1)
         # set cache to t0 state:
         index_meta_cache.index_info_cache = copy.deepcopy(cache_t0)
+        time.sleep(1)
         if check_only_in_external_cache is not None:
             assert check_only_in_external_cache not in \
                    index_meta_cache.get_cache()[index_name].properties[NeuralField.chunks]["properties"]

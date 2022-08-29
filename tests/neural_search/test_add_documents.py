@@ -3,7 +3,7 @@ import pprint
 import requests
 from marqo.neural_search.enums import NeuralField
 from marqo.client import Client
-from marqo.errors import MarqoApiError
+from marqo.errors import IndexNotFoundError
 from marqo.neural_search import neural_search, index_meta_cache
 from tests.marqo_test import MarqoTestCase
 
@@ -20,7 +20,7 @@ class TestAddDocuments(MarqoTestCase):
         self.index_name_1 = "my-test-index-1"
         try:
             self.client.delete_index(self.index_name_1)
-        except MarqoApiError as s:
+        except IndexNotFoundError as s:
             pass
 
     def _match_all(self, index_name, verbose=True):

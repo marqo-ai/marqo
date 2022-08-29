@@ -1,6 +1,5 @@
 """Communication with Neural Search's persistence and search layer (OpenSearch)"""
 import json
-import pprint
 from marqo.neural_search.models.index_info import IndexInfo
 # client-specific modules - we may want to replace these:
 from marqo._httprequests import HttpRequests
@@ -62,6 +61,8 @@ def add_customer_field_properties(config: Config, index_name: str,
                                   model_properties: dict):
     """Adds new customer fields to index mapping.
 
+    Pushes the updated mapping to OpenSearch, and updates the local cache.
+
     Args:
         config:
         index_name:
@@ -100,6 +101,8 @@ def add_customer_field_properties(config: Config, index_name: str,
     existing_info = get_cache()[index_name]
     new_index_properties = existing_info.properties.copy()
 
+    # copy fields to the chunk for prefiltering. If it is text, convert it to a keyword type to save space
+    # if it's not text, ignore it, and leave it up to OpenSearch (e.g: if it's a number)
     for field_name in customer_field_names:
         nested_non_vector_field_type = enums.OpenSearchDataType.keyword if field_name[1] == enums.OpenSearchDataType.text else field_name[1]
         if nested_non_vector_field_type == enums.OpenSearchDataType.text \
@@ -108,17 +111,30 @@ def add_customer_field_properties(config: Config, index_name: str,
                 "type": enums.OpenSearchDataType.keyword
             }
 
+    mapping_res = HttpRequests(config).put(path=F"{index_name}/_mapping", body=json.dumps(body))
+
     merged_chunk_properties = {
         **existing_info.properties[enums.NeuralField.chunks]["properties"],
         **body["properties"][enums.NeuralField.chunks]["properties"]
     }
     new_index_properties[enums.NeuralField.chunks]["properties"] = merged_chunk_properties
+
+    # Save newly created fields to document-level so that it is searchable by lexical search
+    # These will be undefined, and we let OpenSearch define them, the next
+    #   time they're retrieved from the cache
+    existing_properties = set(existing_info.get_text_properties())
+    applying_properties = {field[0] for field in customer_field_names}
+    new_properties = applying_properties - existing_properties
+    for new_prop in new_properties:
+        new_index_properties[validation.validate_field_name(new_prop)] = {
+            "type": enums.OpenSearchDataType.to_be_defined
+        }
+
     get_cache()[index_name] = IndexInfo(
         model_name=existing_info.model_name,
         properties=new_index_properties,
         neural_settings=existing_info.neural_settings.copy()
     )
-    mapping_res = HttpRequests(config).put(path=F"{index_name}/_mapping", body=json.dumps(body))
     return mapping_res
 
 

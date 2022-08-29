@@ -2,7 +2,7 @@ import pprint
 
 from marqo.neural_search import enums
 from typing import Iterable, Container
-from marqo.errors import MarqoError, InvalidFieldNameError, BadRequestError, InternalError
+from marqo.errors import MarqoError, InvalidFieldNameError, InvalidArgError, InternalError
 from marqo.neural_search.enums import NeuralField
 from marqo.neural_search import constants
 from typing import Any, Type
@@ -43,6 +43,8 @@ def validate_field_name(field_name) -> str:
     """
     if not field_name:
         raise InvalidFieldNameError("field name can't be empty! ")
+    if not isinstance(field_name, str):
+        raise InvalidFieldNameError("field name must be str!")
     if field_name.startswith(enums.NeuralField.vector_prefix):
         raise InvalidFieldNameError(F"can't start field name with protected prefix {enums.NeuralField.vector_prefix}."
                             F" Error raised for field name: {field_name}")
@@ -73,7 +75,7 @@ def validate_doc(doc: dict) -> dict:
         doc if all validations pass
     """
     if len(doc) <= 0:
-        raise BadRequestError("Can't index an empty dict.")
+        raise InvalidArgError("Can't index an empty dict.")
     return doc
 
 

@@ -1,6 +1,6 @@
 from marqo.neural_search import neural_search
 from marqo.config import Config
-from marqo.errors import MarqoError, MarqoApiError
+from marqo.errors import IndexNotFoundError
 from tests.marqo_test import MarqoTestCase
 import requests
 from marqo.client import Client
@@ -23,7 +23,7 @@ class TestDeleteDocuments(MarqoTestCase):
         for ix in [self.index_name_1, self.index_name_2]:
             try:
                 neural_search.delete_index(config=self.config, index_name=ix)
-            except MarqoApiError as s:
+            except IndexNotFoundError as s:
                 pass
 
     def test_delete_documents(self):

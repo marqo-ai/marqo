@@ -1,5 +1,5 @@
 from marqo.client import Client
-from marqo.errors import MarqoApiError
+from marqo.errors import MarqoApiError, IndexNotFoundError
 from marqo.neural_search import neural_search, index_meta_cache
 import copy
 from tests.marqo_test import MarqoTestCase
@@ -23,7 +23,7 @@ class TestDeleteIndex(MarqoTestCase):
         for ix_name in [self.index_name_1, self.index_name_2]:
             try:
                 self.client.delete_index(ix_name)
-            except MarqoApiError as s:
+            except IndexNotFoundError as s:
                 pass
 
     def test_delete_clears_cache(self):

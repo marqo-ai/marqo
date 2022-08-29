@@ -3,7 +3,7 @@ import pprint
 import time
 from marqo.neural_search.enums import NeuralField
 from marqo.client import Client
-from marqo.errors import MarqoApiError, MarqoError
+from marqo.errors import IndexNotFoundError, MarqoError
 from marqo.neural_search import neural_search, constants, index_meta_cache
 import unittest
 import copy
@@ -19,13 +19,13 @@ class TestAddDocuments(MarqoTestCase):
         self.config = copy.deepcopy(self.client.config)
         try:
             self.client.delete_index(self.index_name_1)
-        except MarqoApiError as s:
+        except IndexNotFoundError as s:
             pass
 
     def test_get_stats_empty(self):
         try:
             self.client.delete_index(self.index_name_1)
-        except MarqoApiError as s:
+        except IndexNotFoundError as s:
             pass
         self.client.create_index(self.index_name_1)
         assert self.client.index(self.index_name_1).get_stats()["numberOfDocuments"] == 0
@@ -33,7 +33,7 @@ class TestAddDocuments(MarqoTestCase):
     def test_get_stats_non_empty(self):
         try:
             self.client.delete_index(self.index_name_1)
-        except MarqoApiError as s:
+        except IndexNotFoundError as s:
             pass
         self.client.index(self.index_name_1).add_documents(
             [{"1": "2"},{"134": "2"},{"14": "62"},]

@@ -478,8 +478,7 @@ def _lexical_search(
         fields_to_search = index_meta_cache.get_index_info(
             config=config, index_name=index_name
         ).get_text_properties()
-
-    search_res = HttpRequests(config).get(path=f"{index_name}/_search", body={
+    body = {
         "query": {
             "bool": {
                 "should": [
@@ -492,7 +491,8 @@ def _lexical_search(
             }
         },
         "size": result_count,
-    })
+    }
+    search_res = HttpRequests(config).get(path=f"{index_name}/_search", body=body)
     res_list = []
     for doc in search_res['hits']['hits']:
         just_doc = _clean_doc(doc["_source"].copy())

@@ -10,6 +10,10 @@ You can submit bug reports on our GitHub repo
 ### Contributing code
 We welcome contributions to the codebase. 
 
+### Error usage
+- Errors raised that concern non-user-facing functionality
+(for example, related to vectors), should raise an `InternalError` or its subclass
+
 ### Releasing changes
 - Generate a pull request to main. These will be reviewed before merging
 - To release a change, bump the correct version (major.minor.patch, see below for more details), run all the tests, build the package and push to it PyPi

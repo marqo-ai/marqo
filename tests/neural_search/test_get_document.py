@@ -1,4 +1,4 @@
-from marqo.errors import MarqoApiError, MarqoError
+from marqo.errors import IndexNotFoundError, InvalidDocumentIdError
 from marqo.client import Client
 from marqo.neural_search import neural_search
 from tests.marqo_test import MarqoTestCase
@@ -18,7 +18,7 @@ class TestGetDocument(MarqoTestCase):
         for ix in [self.index_name_1, self.index_name_2]:
             try:
                 neural_search.delete_index(config=self.config, index_name=ix)
-            except MarqoApiError as s:
+            except IndexNotFoundError as s:
                 pass
 
     def test_get_document(self):
@@ -43,8 +43,8 @@ class TestGetDocument(MarqoTestCase):
                 config=self.config, index_name=self.index_name_1,
                 document_id="123")
             raise AssertionError
-        except MarqoError as e:
-            assert 'no such index' in str(e)
+        except IndexNotFoundError as e:
+            pass
 
     def test_get_document_empty_str(self):
         try:
@@ -53,8 +53,8 @@ class TestGetDocument(MarqoTestCase):
                 document_id="")
             print(a)
             raise AssertionError
-        except MarqoError as e:
-            assert "be empty" in str(e)
+        except InvalidDocumentIdError as e:
+            pass
 
     def test_get_document_bad_types(self):
         for ar in [12.2, 1, [], {}, None]:
@@ -62,7 +62,6 @@ class TestGetDocument(MarqoTestCase):
                 a = neural_search.get_document_by_id(
                     config=self.config, index_name=self.index_name_1,
                     document_id=ar)
-                print(a)
                 raise AssertionError
-            except MarqoError as e:
-                assert "must be a str" in str(e)
+            except InvalidDocumentIdError as e:
+                pass
