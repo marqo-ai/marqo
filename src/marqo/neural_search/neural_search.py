@@ -259,7 +259,9 @@ def _infer_opensearch_data_type(
     else:
         return None
 
-def add_documents(config: Config, index_name: str, docs: List[dict], auto_refresh):
+
+def add_documents(config: Config, index_name: str, docs: List[dict], auto_refresh: bool,
+                  device=None):
     """
     """
 
@@ -322,9 +324,10 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                 
                 normalize_embeddings = index_info.neural_settings[NsField.index_defaults][NsField.normalize_embeddings]
                 infer_if_image = index_info.neural_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]
-                vector_chunks = s2_inference.vectorise(model_name=index_info.model_name, content=content_chunks, 
-                                                    device=config.indexing_device, normalize_embeddings=normalize_embeddings,
-                                                    infer=infer_if_image)
+                selected_device = config.indexing_device if device is None else device
+                vector_chunks = s2_inference.vectorise(model_name=index_info.model_name, content=content_chunks,
+                                                       device=selected_device, normalize_embeddings=normalize_embeddings,
+                                                        infer=infer_if_image)
 
                 if (len(vector_chunks) != len(text_chunks)):
                     raise RuntimeError(f"the input content after preprocessing and its vectorized counterparts must be the same length." \
@@ -432,7 +435,8 @@ def refresh_index(config: Config,  index_name: str):
 def search(config: Config, index_name: str, text: str, result_count: int = 3, highlights=True, return_doc_ids=False,
            search_method: Union[str, SearchMethod, None] = SearchMethod.NEURAL,
            searchable_attributes: Iterable[str] = None, verbose: int = 0, num_highlights: int = 3, 
-           reranker: Union[str, Dict] = None, simplified_format: bool = True, filter: str = None) -> Dict:
+           reranker: Union[str, Dict] = None, simplified_format: bool = True, filter: str = None,
+           device=None) -> Dict:
     """The root search method. Calls the specific search method
 
     Validation should go here. Validations include:
@@ -484,7 +488,7 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
             config=config, index_name=index_name, text=text, result_count=result_count,
             return_doc_ids=return_doc_ids, searchable_attributes=searchable_attributes,
             number_of_highlights=num_highlights, simplified_format=simplified_format,
-            filter=filter
+            filter=filter, device=device
         )
     elif search_method.upper() == SearchMethod.LEXICAL:
         if filter is not None:
@@ -589,7 +593,7 @@ def _vector_text_search(
         config: Config, index_name: str, text: str, result_count: int = 5, return_doc_ids=False,
         searchable_attributes: Iterable[str] = None, number_of_highlights=3,
         verbose=0, raise_on_searchable_attribs=False, hide_vectors=True, k=500,
-        simplified_format=True, filter: str = None
+        simplified_format=True, filter: str = None, device=None
 ):
     """
     Args:
@@ -634,9 +638,10 @@ def _vector_text_search(
         index_info = get_index_info(config=config, index_name=index_name)
     except KeyError as e:
         raise errors.IndexNotFoundError(message="Tried to search a non-existent index: {}".format(index_name))
+    selected_device = config.indexing_device if device is None else device
     vectorised_text = s2_inference.vectorise(
         model_name=index_info.model_name, content=text_processor.split_text(text)[0], 
-        device=config.search_device,
+        device=selected_device,
         normalize_embeddings=index_info.neural_settings['index_defaults']['normalize_embeddings'])[0]
 
     body = []
@@ -805,14 +810,6 @@ def delete_index(config: Config, index_name):
     if index_name in get_cache():
         del get_cache()[index_name]
     return res
-
-
-def _select_vectoriser(model_name: Union[str, MlModel]) -> Callable[[str], List[List[float]]]:
-    """selects the vectorisation function based on the model's name"""
-    if model_name == MlModel.bert or model_name == MlModel.clip:
-        return functools.partial(s2_inference.vectorise, model_name)
-    else:
-        raise ValueError("neural_search: Unknown model selected: {}".format(model_name))
 
 
 def _clean_doc(doc: dict, doc_id=None) -> dict:

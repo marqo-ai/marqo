@@ -8,7 +8,9 @@ Thank you for your interest in making neural search more accessible!
 You can submit bug reports on our GitHub repo
 
 ### Contributing code
-We welcome contributions to the codebase. 
+We welcome contributions to the codebase. Here are some coding guidelines to follow:
+* Where possible, we explicitly state the arg names when calling a function. 
+  This makes refactoring easier. If possible, use `func(a=1, b=2)` rather than `func(1, 2)`
 
 ### Error usage
 - Errors raised that concern non-user-facing functionality
