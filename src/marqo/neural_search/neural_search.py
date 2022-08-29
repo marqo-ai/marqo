@@ -212,8 +212,8 @@ def add_documents_orchestrater(
         if batch_size < 0:
             raise errors.InvalidArgError("Batch size can't be less than 1!")
         logger.info(f"batch_size={batch_size} and processes={processes} - batching using a single process")
-        return _batch_request(config=config, index_name=index_name, dataset=docs,
-                                            batch_size=batch_size, verbose=False)
+        return _batch_request(config=config, index_name=index_name, dataset=docs, device=device,
+                              batch_size=batch_size, verbose=False)
 
 
 def _batch_request(config: Config, index_name: str, dataset: List[dict], 

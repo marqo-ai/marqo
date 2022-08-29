@@ -185,7 +185,7 @@ async def refresh_index(index_name: str, marqo_config: config.Config = Depends(g
 
 # ADD DOCS:
 """
-curl -XPOST  'http://admin:admin@localhost:8882/indexes/my-irst-ix/documents?refresh=true' -H 'Content-type:application/json' -d '
+curl -XPOST  'http://admin:admin@localhost:8882/indexes/my-irst-ix/documents?refresh=true&device=cpu' -H 'Content-type:application/json' -d '
 [ 
     {
         "Title": "Honey is a delectable food stuff", 
@@ -202,7 +202,7 @@ curl -XPOST  'http://admin:admin@localhost:8882/indexes/my-irst-ix/documents?ref
 
 # SEARCH DOCS
 """
-curl -XPOST  http://admin:admin@localhost:8882/indexes/my-irst-ix/search -H 'Content-type:application/json' -d '{
+curl -XPOST  'http://admin:admin@localhost:8882/indexes/my-irst-ix/search?device=cuda' -H 'Content-type:application/json' -d '{
     "q": "what do bears eat?",
     "searchableAttributes": ["Title", "Desc", "other"],
     "limit": 3,    

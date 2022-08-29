@@ -15,7 +15,7 @@ export OPENSEARCH_URL="https://localhost:9200" &&
 ```bash
 docker rm -f marqo &&
      DOCKER_BUILDKIT=1 docker build . -t marqo_docker_0 && 
-     docker run --name marqo --privileged -p 8000:8000 --add-host host.docker.internal:host-gateway marqo_docker_0
+     docker run --name marqo --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqo_docker_0
 ```
 
 ### Build and run the Marqo as a Docker container, connecting to OpenSearch which is running on the host:
@@ -24,6 +24,6 @@ docker rm -f marqo &&
 ```bash
 docker rm -f marqo &&
      DOCKER_BUILDKIT=1 docker build . -t marqo_docker_0 && 
-     docker run --name marqo --privileged -p 8000:8000 --add-host host.docker.internal:host-gateway \
+     docker run --name marqo --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway \
          -e "OPENSEARCH_URL=https://localhost:9200" marqo_docker_0
 ```
