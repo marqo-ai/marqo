@@ -11,6 +11,7 @@ setup(
         # client:
         "requests",
         "urllib3",
+        "fastapi_utils",
         # s2_inference:
         "clip-marqo==1.0.2",
         "more_itertools",
