@@ -6,7 +6,7 @@
 # if you are running OpenSearch locally, or add an external URL 
 export OPENSEARCH_URL="https://localhost:9200" && 
     export PYTHONPATH="${PYTHONPATH}:<your path here>/marqo/src" &&
-    uvicorn api:app --host 0.0.0.0 --reload
+    uvicorn api:app --host 0.0.0.0 --port 8882 --reload
 ```
 
 ### Build and run the Marqo as a Docker container, that creates and manages its own internal OpenSearch 
