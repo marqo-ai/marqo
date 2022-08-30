@@ -1,6 +1,7 @@
 import pprint
 import unittest
 from marqo.neural_search import utils
+from marqo.neural_search import enums
 
 class TestUtils(unittest.TestCase):
  
@@ -27,3 +28,13 @@ class TestUtils(unittest.TestCase):
         assert "https://:@localhost:9200" == utils.construct_authorized_url(
             url_base="https://localhost:9200", username="", password=""
         )
+
+    def test_contextualise_filter(self):
+        expected_mappings = [
+            ("(an_int:[0 TO 30] and an_int:2) AND abc:(some text)",
+             f"({enums.NeuralField.chunks}.an_int:[0 TO 30] and {enums.NeuralField.chunks}.an_int:2) AND {enums.NeuralField.chunks}.abc:(some text)")
+        ]
+        for given, expected in expected_mappings:
+            assert expected == utils.contextualise_filter(
+                given, simple_properties=["an_int", "abc"]
+            )

@@ -390,6 +390,22 @@ class TestVectorSearch(MarqoTestCase):
 
         assert len(res_complex["hits"]) == 1
 
+    def test_filtering_bad_syntax(self):
+        neural_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=[
+                {"abc": "some text", "other field": "baaadd", "_id": "5678", "my_string": "b"},
+                {"abc": "some text", "other field": "Close match hehehe", "_id": "1234", "an_int": 2},
+                {"abc": "some text", "other field": "Close match hehehe", "_id": "1233", "my_bool": True},
+            ], auto_refresh=True)
+        try:
+            res_doesnt_exist = neural_search.search(
+                config=self.config, index_name=self.index_name_1, text="some text", result_count=3,
+                filter="(other field):baaadd", verbose=1
+            )
+            raise AssertionError
+        except InvalidArgError:
+            pass
+
     def test_set_device(self):
         """calling search with a specified device overrides device defined in config"""
         mock_config = copy.deepcopy(self.config)

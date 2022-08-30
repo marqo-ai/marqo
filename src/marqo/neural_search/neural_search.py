@@ -180,7 +180,7 @@ def _check_and_create_index_if_not_exist(config: Config, index_name: str):
         index_info = backend.get_index_info(config=config, index_name=index_name)
 
 
-def add_documents_orchestrater(
+def add_documents_orchestrator(
         config: Config, index_name: str, docs: List[dict],
         auto_refresh: bool, batch_size: int = 0, processes: int = 1,
         device=None):
@@ -496,7 +496,7 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
             config=config, index_name=index_name, text=text, result_count=result_count,
             return_doc_ids=return_doc_ids, searchable_attributes=searchable_attributes,
             number_of_highlights=num_highlights, simplified_format=simplified_format,
-            filter=filter, device=device
+            filter_string=filter, device=device
         )
     elif search_method.upper() == SearchMethod.LEXICAL:
         if filter is not None:
@@ -601,7 +601,7 @@ def _vector_text_search(
         config: Config, index_name: str, text: str, result_count: int = 5, return_doc_ids=False,
         searchable_attributes: Iterable[str] = None, number_of_highlights=3,
         verbose=0, raise_on_searchable_attribs=False, hide_vectors=True, k=500,
-        simplified_format=True, filter: str = None, device=None
+        simplified_format=True, filter_string: str = None, device=None
 ):
     """
     Args:
@@ -669,6 +669,13 @@ def _vector_text_search(
             vector_properties_to_search = searchable_attributes_as_vectors.intersection(
                 index_info.get_vector_properties().keys())
 
+    if filter_string is not None:
+        contextualised_filter = utils.contextualise_filter(
+            filter_string=filter_string,
+            simple_properties=index_info.get_text_properties())
+    else:
+        contextualised_filter = ''
+
     for vector_field in vector_properties_to_search:
         search_query = {
             "size": result_count,
@@ -699,11 +706,9 @@ def _vector_text_search(
             search_query["query"]["nested"]["inner_hits"]["_source"] = {
                 "exclude": ["*__vector*"]
             }
-        if filter is not None:
-            for field in index_info.get_text_properties():
-                filter = filter.replace(field, f'{NeuralField.chunks}.{field}')
+        if filter_string is not None:
             search_query["query"]["nested"]["query"]["knn"][f"{NeuralField.chunks}.{vector_field}"]["filter"] = {
-                "query_string": {"query": f"{filter}"}
+                "query_string": {"query": f"{contextualised_filter}"}
             }
         body += [{"index": index_name}, search_query]
 
@@ -725,7 +730,18 @@ def _vector_text_search(
         # This probably means the index is emtpy
         return {"hits": []}
     response = HttpRequests(config).get(path=F"{index_name}/_msearch", body=utils.dicts_to_jsonl(body))
-    responses = [r['hits']['hits'] for r in response["responses"]]
+
+    try:
+        responses = [r['hits']['hits'] for r in response["responses"]]
+    except KeyError as e:
+        # KeyError indicates we have received a non-successful result
+        try:
+            if contextualised_filter in response["responses"][0]["error"]["root_cause"][0]["reason"]:
+                raise errors.InvalidArgError("Syntax error, could not parse filter string") from e
+            raise e
+        except (KeyError, IndexError) as e2:
+            raise e
+
     gathered_docs = dict()
 
     if verbose:

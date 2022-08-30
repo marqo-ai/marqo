@@ -9,7 +9,6 @@ from models.api_models import SearchQuery
 from fastapi import FastAPI, Request, Depends, HTTPException
 from fastapi.exception_handlers import http_exception_handler
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
-from marqo import utils
 from marqo.errors import MarqoWebError, MarqoError
 from typing import Union
 from fastapi import FastAPI
@@ -128,6 +127,7 @@ async def search(search_query: SearchQuery, index_name: str, device: str = None,
         filter=search_query.filter, device=device
     )
 
+
 @app.post("/indexes/{index_name}/documents")
 async def add_documents(docs: List[Dict], index_name: str,  refresh: bool = True,
                         marqo_config: config.Config = Depends(generate_config),
@@ -136,8 +136,7 @@ async def add_documents(docs: List[Dict], index_name: str,  refresh: bool = True
     translated_device = api_utils.translate_api_device(
         api_validation.validate_api_device(device)
     )
-
-    return neural_search.add_documents_orchestrater(
+    return neural_search.add_documents_orchestrator(
         config=marqo_config,
         docs=docs,
         index_name=index_name, auto_refresh=refresh,
