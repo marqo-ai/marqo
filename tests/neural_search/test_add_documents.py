@@ -289,7 +289,7 @@ class TestAddDocuments(MarqoTestCase):
 
         @mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
         def run():
-            neural_search.add_documents_orchestrater(
+            neural_search.add_documents_orchestrator(
                 config=self.config, index_name=self.index_name_1, device="cuda:22", docs=[{"some": "doc"}, {"som other": "doc"}],
                 auto_refresh=True, batch_size=1, processes=1)
             return True
@@ -309,7 +309,7 @@ class TestAddDocuments(MarqoTestCase):
 
         @mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
         def run():
-            neural_search.add_documents_orchestrater(
+            neural_search.add_documents_orchestrator(
                 config=self.config, index_name=self.index_name_1, device="cuda:22", docs=[{"some": "doc"}, {"som other": "doc"}],
                 auto_refresh=True, batch_size=0)
             return True

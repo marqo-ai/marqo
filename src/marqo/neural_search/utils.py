@@ -1,3 +1,4 @@
+import typing
 from typing import List
 import functools
 import json
@@ -81,3 +82,23 @@ def construct_authorized_url(url_base: str, username: str, password: str) -> str
         raise errors.MarqoError(f"Could not parse url: {url_base}")
     http_part, domain_part = url_split
     return f"{http_part}{http_sep}{username}:{password}@{domain_part}"
+
+
+def contextualise_filter(filter_string: str, simple_properties: typing.Iterable) -> str:
+    """adds the chunk prefix to the start of properties found in simple string
+
+    This allows for filtering within chunks.
+
+    Args:
+        filter_string:
+        simple_properties: simple properties of an index (such as text or floats
+            and bools)
+
+    Returns:
+        a string where the properties are referenced as children of a chunk.
+    """
+    contextualised_filter = filter_string
+    for field in simple_properties:
+        contextualised_filter = contextualised_filter.replace(field, f'{enums.NeuralField.chunks}.{field}')
+    return contextualised_filter
+
