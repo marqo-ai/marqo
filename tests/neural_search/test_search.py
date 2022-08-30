@@ -1,3 +1,4 @@
+import math
 import pprint
 from unittest import mock
 
@@ -390,6 +391,11 @@ class TestVectorSearch(MarqoTestCase):
 
         assert len(res_complex["hits"]) == 1
 
+        assert 3 == len(neural_search.search(
+            config=self.config, index_name=self.index_name_1, text="some text", result_count=4,
+            filter="*:*", verbose=1
+        )["hits"])
+
     def test_filtering_bad_syntax(self):
         neural_search.add_documents(
             config=self.config, index_name=self.index_name_1, docs=[
@@ -465,3 +471,49 @@ class TestVectorSearch(MarqoTestCase):
                 text=str(to_search), config=self.config, index_name=self.index_name_1,
                 search_method=SearchMethod.LEXICAL, filter=f"{field}:{to_search}"
             )
+
+    def test_lexical_filtering(self):
+        neural_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=[
+                {
+                    "doc title": "The captain bravely lead her followers into battle."
+                                 " She directed her soldiers to and fro.",
+                    "field X": "some text",
+                    "field1": "other things", "my_bool": True,
+                    "_id": "123456", "a_float": 0.61
+                },
+                {
+                    "_id": "other doc", "a_float": 0.66, "bfield": "some text too", "my_int":5,
+                    "fake_int":"234", "fake_float":"1.23"
+                }
+            ], auto_refresh=True)
+
+        res = neural_search.search(
+            config=self.config, index_name=self.index_name_1, text="some text", result_count=3,
+            filter="(my_bool:true AND a_float:[0.1 TO 0.75]) AND field1:(other things)",
+            search_method=SearchMethod.LEXICAL
+        )
+        assert len(res["hits"]) == 1
+        assert res["hits"][0]["_id"] == "123456"
+
+        pairs = [
+            ("my_looLoo:1", None), ("", None), ("*:*", math.inf),
+             ("my_int:5", "other doc"), ("my_int:[1 TO 10]", "other doc"),
+             ("a_float:0.61", "123456"), ("field1:(other things)", "123456"),
+             ("fake_int:234", "other doc"), ("fake_float:1.23", "other doc"),
+             ("fake_float:[0 TO 2]", "other doc")
+        ]
+
+        for filter, expected in pairs:
+            check_res = neural_search.search(
+                config=self.config, index_name=self.index_name_1, text="some text", result_count=3,
+                filter=filter,
+                search_method=SearchMethod.LEXICAL
+            )
+            if expected is None:
+                assert 0 == len(check_res["hits"])
+            elif expected == math.inf:  # stand-in for "Any"
+                assert 2 == len(check_res["hits"])
+            else:
+                assert 1 == len(check_res["hits"])
+                assert expected == check_res["hits"][0]["_id"]

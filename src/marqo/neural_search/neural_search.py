@@ -440,7 +440,7 @@ def refresh_index(config: Config,  index_name: str):
     return HttpRequests(config).post(path=F"{index_name}/_refresh")
 
 
-def search(config: Config, index_name: str, text: str, result_count: int = 3, highlights=True, return_doc_ids=False,
+def search(config: Config, index_name: str, text: str, result_count: int = 3, highlights=True, return_doc_ids=True,
            search_method: Union[str, SearchMethod, None] = SearchMethod.NEURAL,
            searchable_attributes: Iterable[str] = None, verbose: int = 0, num_highlights: int = 3, 
            reranker: Union[str, Dict] = None, simplified_format: bool = True, filter: str = None,
@@ -525,7 +525,7 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
 
 
 def _lexical_search(
-        config: Config, index_name: str, text: str, result_count: int = 3, return_doc_ids=False,
+        config: Config, index_name: str, text: str, result_count: int = 3, return_doc_ids=True,
         searchable_attributes: Sequence[str] = None, raise_for_searchable_attributes=False,
         filter_string: str = None):
     """
@@ -539,10 +539,6 @@ def _lexical_search(
         searchable_attributes:
         number_of_highlights:
         verbose:
-        raise_for_searchable_attributes: if True, check searchable attributes and raises
-            and error if identified. This is appropriate only if we assume that the cache
-            remains in sync with the index. If that syncing assumption is lost, then this
-            behaviour may be unexpected.
 
     Returns:
 
@@ -583,11 +579,14 @@ def _lexical_search(
         },
         "size": result_count,
     }
-
     if filter_string is not None:
-        body["query"]["bool"]["filter"] = [{"query_string": {"query": filter_string}}]
+        body["query"]["bool"]["filter"] = [{
+            "query_string": {"query": filter_string}}]
 
+    print("BIOUUIH")
+    pprint.pprint(body)
     search_res = HttpRequests(config).get(path=f"{index_name}/_search", body=body)
+
     res_list = []
     for doc in search_res['hits']['hits']:
         just_doc = _clean_doc(doc["_source"].copy())
