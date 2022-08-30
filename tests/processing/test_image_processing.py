@@ -55,27 +55,27 @@ class TestImageChunking(unittest.TestCase):
     def test_filter_boxes(self):
         boxes = [[0,0,100,100], [0,0,200,100], [5,3,50,700], [1,1,3,3]]
 
-        # should filter_string out the 3rd and 4th
+        # should filter out the 3rd and 4th
         inds = filter_boxes(boxes, max_aspect_ratio=2.1, min_area=10)
         assert inds == [0,1]
 
-        # should filter_string out all boxes because of aspect ratio
+        # should filter out all boxes because of aspect ratio
         inds = filter_boxes(boxes, max_aspect_ratio=1, min_area=10)
         assert inds == []
 
-        # should filter_string out all except 1st due to aspect ratio
+        # should filter out all except 1st due to aspect ratio
         inds = filter_boxes(boxes, max_aspect_ratio=1.01, min_area=10)
         assert inds == [0]
 
-        # should filter_string last only due to small area
+        # should filter last only due to small area
         inds = filter_boxes(boxes, max_aspect_ratio=100, min_area=10)
         assert inds == [0, 1, 2]
 
-        # not filter_string any
+        # not filter any
         inds = filter_boxes(boxes, max_aspect_ratio=100, min_area=1)
         assert inds == [0, 1, 2, 3]
 
-        # filter_string all because of area
+        # filter all because of area
         inds = filter_boxes(boxes, max_aspect_ratio=100, min_area=1e6)
         assert inds == []
 
