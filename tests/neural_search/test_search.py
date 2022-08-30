@@ -426,3 +426,42 @@ class TestVectorSearch(MarqoTestCase):
         assert mock_config.search_device == "cpu"
         args, kwargs = mock_vectorise.call_args
         assert kwargs["device"] == "cuda:123"
+
+    def test_search_other_types_subsearch(self):
+        neural_search.add_documents(
+            config=self.config, index_name=self.index_name_1, auto_refresh=True,
+            docs=[{
+                "an_int": 1,
+                "a_float": 1.2,
+                "a_bool": True,
+                "some_str": "blah"
+            }])
+        for to_search in [1, 1.2, True, "blah"]:
+            assert "hits" in neural_search._lexical_search(
+                text=str(to_search), config=self.config, index_name=self.index_name_1,
+
+            )
+            assert "hits" in neural_search._vector_text_search(
+                text=str(to_search), config=self.config, index_name=self.index_name_1
+            )
+
+    def test_search_other_types_top_search(self):
+        docs = [{
+            "an_int": 1,
+            "a_float": 1.2,
+            "a_bool": True,
+            "some_str": "blah"
+        }]
+        neural_search.add_documents(
+            config=self.config, index_name=self.index_name_1, auto_refresh=True,
+            docs=docs)
+        for field, to_search in docs[0].items():
+            assert "hits" in neural_search.search(
+                text=str(to_search), config=self.config, index_name=self.index_name_1,
+                search_method=SearchMethod.NEURAL, filter=f"{field}:{to_search}"
+
+            )
+            assert "hits" in neural_search.search(
+                text=str(to_search), config=self.config, index_name=self.index_name_1,
+                search_method=SearchMethod.LEXICAL, filter=f"{field}:{to_search}"
+            )

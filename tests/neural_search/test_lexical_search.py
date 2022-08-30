@@ -162,24 +162,6 @@ class TestlexicalSearch(MarqoTestCase):
         assert self.strip_marqo_fields(res["hits"][1]) == d3
         assert self.strip_marqo_fields(res["hits"][2]) == d4
 
-    def test_lexical_search_non_existent_searchable_attrib(self):
-        d0 = {
-            "some doc 1": "some FIELD 2",
-            "the big field": "very unlikely theory. marqo is pretty awesom, in the field"
-        }
-        neural_search.add_documents(
-            config=self.config, index_name=self.index_name_1, auto_refresh=True,
-            docs=[d0])
-        try:
-            res = neural_search._lexical_search(
-                config=self.config, index_name=self.index_name_1, text="Marqo field",
-                return_doc_ids=False, searchable_attributes=["never existed field hehehehe"],
-                raise_for_searchable_attributes=True
-            )
-            raise AssertionError
-        except InvalidArgError as s:
-            assert "unknown searchable_attributes" in str(s)
-
     def test_lexical_search_result_count(self):
         d0 = {
             "some doc 1": "some FIELD 2",
@@ -284,3 +266,30 @@ class TestlexicalSearch(MarqoTestCase):
         assert [] == neural_search._lexical_search(
             config=self.config, index_name=self.index_name_1, text="4 grey boring walls",
             return_doc_ids=False)["hits"]
+
+    def test_lexical_search_filter(self):
+        d0 = {
+            "some doc 1": "some FIELD 2", "_id": "alpha alpha",
+            "the big field": "very unlikely theory. marqo is pretty awesom, in the field", "Lucy":"Travis"
+        }
+        d1 = {"title": "Marqo", "some doc 2": "some other thing", "_id": "abcdef"}
+        d2 = {"some doc 1": "some 2 jnkerkbj", "field abc": "robodog is not a cat", "_id": "Jupyter_12"}
+        d3 = {"TITITLE": "Tony from the way", "field lambda": "some prop field called marqo",
+              "_id": "122"}
+        d4 = {"Lucy": "Travis", "field lambda": "there is a whole bunch of text here. "
+                                                "Just a slight mention of a field", "day": 190,
+              "_id": "123"}
+        neural_search.add_documents(
+            config=self.config, index_name=self.index_name_1, auto_refresh=True,
+            docs=[d0, d4, d1 ])
+        neural_search.add_documents(
+            config=self.config, index_name=self.index_name_1, auto_refresh=True,
+            docs=[d3, d2])
+        res = neural_search._lexical_search(
+            config=self.config, index_name=self.index_name_1, text="marqo field",
+            return_doc_ids=True, filter_string="title:Marqo OR (Lucy:Travis AND day:>50)"
+            , result_count=3)
+        assert len(res["hits"]) == 2
+        assert res["hits"][0]["_id"] == "123" or res["hits"][1]["_id"] == "123"
+        assert res["hits"][0]["_id"] == "abcdef" or res["hits"][1]["_id"] == "abcdef"
+
