@@ -208,6 +208,7 @@ def add_documents_orchestrator(
             logger.info(f'deleting cache entry for {index_name} after parallel add documents')
             del get_cache()[index_name]
 
+        return results
     else:
         if batch_size < 0:
             raise errors.InvalidArgError("Batch size can't be less than 1!")
