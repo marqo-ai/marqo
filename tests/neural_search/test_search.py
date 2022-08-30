@@ -298,7 +298,7 @@ class TestVectorSearch(MarqoTestCase):
             ], auto_refresh=True)
 
         s_res = neural_search.search(
-            config=self.config, index_name=self.index_name_1, text="88",
+            config=self.config, index_name=self.index_name_1, text="cool match",
             search_method=SearchMethod.LEXICAL)
         pprint.pprint(s_res)
         assert len(s_res["hits"]) > 0
