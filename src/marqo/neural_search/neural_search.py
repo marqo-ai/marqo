@@ -171,6 +171,7 @@ def get_stats(config: Config, index_name: str):
         "numberOfDocuments": doc_count
     }
 
+
 def _check_and_create_index_if_not_exist(config: Config, index_name: str):
     try:
         index_info = backend.get_index_info(config=config, index_name=index_name)
@@ -178,21 +179,28 @@ def _check_and_create_index_if_not_exist(config: Config, index_name: str):
         create_vector_index(config=config, index_name=index_name)
         index_info = backend.get_index_info(config=config, index_name=index_name)
 
-def add_documents_orchestrater(config: Config, index_name: str, docs: List[dict], 
-                auto_refresh: bool, batch_size: int = 0, processes: int = 1):
+
+def add_documents_orchestrater(
+        config: Config, index_name: str, docs: List[dict],
+        auto_refresh: bool, batch_size: int = 0, processes: int = 1,
+        device=None):
 
     if batch_size is None or batch_size == 0:
         logger.info(f"batch_size={batch_size} and processes={processes} - not doing any batching")
         return add_documents(
-            config=config, index_name=index_name, docs=docs, auto_refresh=auto_refresh)
+            config=config, index_name=index_name, docs=docs, auto_refresh=auto_refresh,
+            device=device
+        )
     elif processes is not None and processes > 1:
 
         # create beforehand or pull from the cache so it is upto date for the multi-processing
         _check_and_create_index_if_not_exist(config=config, index_name=index_name)
 
         logger.info(f"batch_size={batch_size} and processes={processes} - using multi-processing")
-        results = parallel.add_documents_mp(config=config, index_name=index_name, docs=docs, 
-                    auto_refresh=auto_refresh, batch_size=batch_size, processes=processes)
+        results = parallel.add_documents_mp(
+            config=config, index_name=index_name, docs=docs,
+            auto_refresh=auto_refresh, batch_size=batch_size, processes=processes,
+        )
         
         # we need to force the cache to update as it does not propagate using mp
         # we just clear this index's entry and it will re-populate when needed next
@@ -202,14 +210,14 @@ def add_documents_orchestrater(config: Config, index_name: str, docs: List[dict]
 
     else:
         if batch_size < 0:
-            raise errors.MarqoError("Batch size can't be less than 1!")
+            raise errors.InvalidArgError("Batch size can't be less than 1!")
         logger.info(f"batch_size={batch_size} and processes={processes} - batching using a single process")
-        return _batch_request(config=config, index_name=index_name, dataset=docs,
-                                            batch_size=batch_size, verbose=False)
+        return _batch_request(config=config, index_name=index_name, dataset=docs, device=device,
+                              batch_size=batch_size, verbose=False)
 
 
 def _batch_request(config: Config, index_name: str, dataset: List[dict], 
-                batch_size: int = 100, verbose: bool = True) -> List[Dict[str, Any]]:
+                batch_size: int = 100, verbose: bool = True, device=None) -> List[Dict[str, Any]]:
         """Batch by the number of documents"""
         logger.info(f"starting batch ingestion in sizes of {batch_size}")
 
@@ -229,7 +237,7 @@ def _batch_request(config: Config, index_name: str, dataset: List[dict],
             t0 = datetime.datetime.now()
             res = add_documents(
                 config=config, index_name=index_name,
-                docs=docs, auto_refresh=False)
+                docs=docs, auto_refresh=False, device=device)
             total_batch_time = datetime.datetime.now() - t0
             num_docs = len(docs)
 
@@ -242,6 +250,7 @@ def _batch_request(config: Config, index_name: str, dataset: List[dict],
         results = [verbosely_add_docs(i, docs) for i, docs in enumerate(batched)]
         logger.info('completed batch ingestion.')
         return results
+
 
 def _infer_opensearch_data_type(
         sample_field_content: typing.Any) -> Union[OpenSearchDataType, None]:
@@ -258,7 +267,9 @@ def _infer_opensearch_data_type(
     else:
         return None
 
-def add_documents(config: Config, index_name: str, docs: List[dict], auto_refresh):
+
+def add_documents(config: Config, index_name: str, docs: List[dict], auto_refresh: bool,
+                  device=None):
     """
     """
 
@@ -283,11 +294,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
         [validation.validate_field_name(field) for field in copied]
 
         if "_id" in doc:
-            doc_id = doc["_id"]
-            if not isinstance(doc_id, str):
-                raise errors.InvalidDocumentIdError(
-                    "Document _id must be a string type! "
-                    f"Received _id {doc_id} of type `{type(doc_id).__name__}`")
+            doc_id = validation.validate_id(doc["_id"])
             del copied["_id"]
             doc_ids_to_update.append(doc_id)
         else:
@@ -325,9 +332,10 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                 
                 normalize_embeddings = index_info.neural_settings[NsField.index_defaults][NsField.normalize_embeddings]
                 infer_if_image = index_info.neural_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]
-                vector_chunks = s2_inference.vectorise(model_name=index_info.model_name, content=content_chunks, 
-                                                    device=config.indexing_device, normalize_embeddings=normalize_embeddings,
-                                                    infer=infer_if_image)
+                selected_device = config.indexing_device if device is None else device
+                vector_chunks = s2_inference.vectorise(model_name=index_info.model_name, content=content_chunks,
+                                                       device=selected_device, normalize_embeddings=normalize_embeddings,
+                                                        infer=infer_if_image)
 
                 if (len(vector_chunks) != len(text_chunks)):
                     raise RuntimeError(f"the input content after preprocessing and its vectorized counterparts must be the same length." \
@@ -384,10 +392,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
 def get_document_by_id(config: Config, index_name:str, document_id: str):
     """returns document by its ID"""
-    if not isinstance(document_id, str):
-        raise errors.InvalidDocumentIdError("Document ID must be a str")
-    if not document_id:
-        raise errors.InvalidDocumentIdError("Document ID must can't be empty")
+    validation.validate_id(document_id)
     res = HttpRequests(config).get(
         f'{index_name}/_doc/{document_id}'
     )
@@ -401,7 +406,12 @@ def delete_documents(config: Config, index_name: str, doc_ids: List[str], auto_r
     """Deletes documents """
     if not doc_ids:
         raise errors.InvalidDocumentIdError("doc_ids can't be empty!")
-    delete_parents_res = HttpRequests(config=config).post(
+
+    for _id in doc_ids:
+        validation.validate_id(_id)
+
+    t0 = datetime.datetime.utcnow()
+    delete_res_backend = HttpRequests(config=config).post(
         path=f"{index_name}/_delete_by_query", body={
             "query": {
                 "terms": {
@@ -412,7 +422,18 @@ def delete_documents(config: Config, index_name: str, doc_ids: List[str], auto_r
     )
     if auto_refresh:
         refresh_response = HttpRequests(config).post(path=F"{index_name}/_refresh")
-    return delete_parents_res
+    t1 = datetime.datetime.utcnow()
+    delete_res = {
+        "index_name": index_name, "status": "succeeded",
+        "type": "documentDeletion", "details": {
+            "receivedDocumentIds": len(doc_ids),
+            "deletedDocuments": delete_res_backend["deleted"],
+        },
+        "duration": utils.create_duration_string(t1 - t0),
+        "startedAt": utils.format_timestamp(t0),
+        "finishedAt": utils.format_timestamp(t1),
+    }
+    return delete_res
 
 
 def refresh_index(config: Config,  index_name: str):
@@ -422,7 +443,8 @@ def refresh_index(config: Config,  index_name: str):
 def search(config: Config, index_name: str, text: str, result_count: int = 3, highlights=True, return_doc_ids=False,
            search_method: Union[str, SearchMethod, None] = SearchMethod.NEURAL,
            searchable_attributes: Iterable[str] = None, verbose: int = 0, num_highlights: int = 3, 
-           reranker: Union[str, Dict] = None, simplified_format: bool = True, filter: str = None) -> Dict:
+           reranker: Union[str, Dict] = None, simplified_format: bool = True, filter: str = None,
+           device=None) -> Dict:
     """The root search method. Calls the specific search method
 
     Validation should go here. Validations include:
@@ -474,7 +496,7 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
             config=config, index_name=index_name, text=text, result_count=result_count,
             return_doc_ids=return_doc_ids, searchable_attributes=searchable_attributes,
             number_of_highlights=num_highlights, simplified_format=simplified_format,
-            filter=filter
+            filter=filter, device=device
         )
     elif search_method.upper() == SearchMethod.LEXICAL:
         if filter is not None:
@@ -579,7 +601,7 @@ def _vector_text_search(
         config: Config, index_name: str, text: str, result_count: int = 5, return_doc_ids=False,
         searchable_attributes: Iterable[str] = None, number_of_highlights=3,
         verbose=0, raise_on_searchable_attribs=False, hide_vectors=True, k=500,
-        simplified_format=True, filter: str = None
+        simplified_format=True, filter: str = None, device=None
 ):
     """
     Args:
@@ -624,9 +646,10 @@ def _vector_text_search(
         index_info = get_index_info(config=config, index_name=index_name)
     except KeyError as e:
         raise errors.IndexNotFoundError(message="Tried to search a non-existent index: {}".format(index_name))
+    selected_device = config.indexing_device if device is None else device
     vectorised_text = s2_inference.vectorise(
         model_name=index_info.model_name, content=text_processor.split_text(text)[0], 
-        device=config.search_device,
+        device=selected_device,
         normalize_embeddings=index_info.neural_settings['index_defaults']['normalize_embeddings'])[0]
 
     body = []
@@ -795,14 +818,6 @@ def delete_index(config: Config, index_name):
     if index_name in get_cache():
         del get_cache()[index_name]
     return res
-
-
-def _select_vectoriser(model_name: Union[str, MlModel]) -> Callable[[str], List[List[float]]]:
-    """selects the vectorisation function based on the model's name"""
-    if model_name == MlModel.bert or model_name == MlModel.clip:
-        return functools.partial(s2_inference.vectorise, model_name)
-    else:
-        raise ValueError("neural_search: Unknown model selected: {}".format(model_name))
 
 
 def _clean_doc(doc: dict, doc_id=None) -> dict:

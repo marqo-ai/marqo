@@ -1,4 +1,6 @@
 import pprint
+from unittest import mock
+
 from marqo.neural_search.enums import NeuralField, SearchMethod
 from marqo.client import Client
 from marqo.errors import MarqoApiError, MarqoError, IndexNotFoundError, InvalidArgError
@@ -388,3 +390,23 @@ class TestVectorSearch(MarqoTestCase):
 
         assert len(res_complex["hits"]) == 1
 
+    def test_set_device(self):
+        """calling search with a specified device overrides device defined in config"""
+        mock_config = copy.deepcopy(self.config)
+        mock_config.search_device = "cpu"
+        neural_search.create_vector_index(config=self.config, index_name=self.index_name_1)
+
+        mock_vectorise = mock.MagicMock()
+        mock_vectorise.return_value = [[0, 0, 0, 0]]
+
+        @mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
+        def run():
+            neural_search.search(
+                config=self.config, index_name=self.index_name_1, text="some text",
+                search_method=SearchMethod.NEURAL, highlights=True, device="cuda:123")
+            return True
+
+        assert run()
+        assert mock_config.search_device == "cpu"
+        args, kwargs = mock_vectorise.call_args
+        assert kwargs["device"] == "cuda:123"

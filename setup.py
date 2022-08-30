@@ -8,7 +8,7 @@ setup(
     install_requires=[
         # difficult packages:
         "click==8.0.4",
-        # client:
+        # neural_search:
         "requests",
         "urllib3",
         "fastapi_utils",
@@ -30,7 +30,7 @@ setup(
         "uvicorn[standard]",
         "fastapi_utils",
     ],
-    name="marqo",
+    name="marqo-engine",
     version="0.1.10",
     author="marqo org",
     author_email="org@marqo.io",

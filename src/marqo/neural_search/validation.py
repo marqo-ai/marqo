@@ -3,7 +3,7 @@ import typing
 from marqo.neural_search import constants
 from marqo.neural_search import enums
 from typing import Iterable, Container
-from marqo.errors import MarqoError, InvalidFieldNameError, InvalidArgError, InternalError
+from marqo.errors import MarqoError, InvalidFieldNameError, InvalidArgError, InternalError, InvalidDocumentIdError
 from marqo.neural_search.enums import NeuralField
 from marqo.neural_search import constants
 from typing import Any, Type
@@ -156,3 +156,21 @@ def validate_searchable_vector_props(existing_vector_properties: Container[str],
             raise MarqoError(f"Searchable attribute '{subset_vec.replace(NeuralField.vector_prefix, '')}' "
                              f"not found in index.")
     return subset_vector_properties
+
+
+def validate_id(_id: str):
+    """Validates that an _id is ok
+
+    Args:
+        _id: to be validated
+
+    Returns:
+        _id, if it is acceptable
+    """
+    if not isinstance(_id, str):
+        raise InvalidDocumentIdError(
+            "Document _id must be a string type! "
+            f"Received _id {_id} of type `{type(_id).__name__}`")
+    if not _id:
+        raise InvalidDocumentIdError("Document ID must can't be empty")
+    return _id

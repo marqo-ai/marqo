@@ -1,5 +1,5 @@
 import unittest
-from marqo.utils import construct_authorized_url
+from marqo.neural_search.utils import construct_authorized_url
 
 
 class MarqoTestCase(unittest.TestCase):

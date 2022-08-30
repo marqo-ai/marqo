@@ -3,9 +3,6 @@
 
 export PYTHONPATH="${PYTHONPATH}:/app/src/"
 
-# Wait for it to run:
-# https://stackoverflow.com/questions/43978837/how-to-check-if-docker-daemon-is-running
-# https://github.com/cruizba/ubuntu-dind/blob/master/startup.sh
 
 function wait_for_process () {
     local max_time_wait=30
@@ -71,7 +68,7 @@ export OPENSEARCH_URL
 export OPENSEARCH_IS_INTERNAL
 # Start the neural search web app in the background
 cd /app/src/marqo/neural_search || exit
-uvicorn api:app --host 0.0.0.0
+uvicorn api:app --host 0.0.0.0 --port 8882
 
 # Wait for any process to exit
 wait -n

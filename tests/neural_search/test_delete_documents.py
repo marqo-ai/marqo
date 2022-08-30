@@ -1,3 +1,5 @@
+import pprint
+
 from marqo.neural_search import neural_search
 from marqo.config import Config
 from marqo.errors import IndexNotFoundError
@@ -58,4 +60,23 @@ class TestDeleteDocuments(MarqoTestCase):
             verify=False
         ).json()["count"]
         assert count_post_delete == count0_res
+
+    def test_delete_docs_format(self):
+        neural_search.add_documents(
+            config=self.config, index_name=self.index_name_1,
+            docs=[
+                {"f1": "cat dog sat mat", "Sydney": "Australia contains Sydney", "_id": "1234"},
+                {"Lime": "Tree tee", "Magnificent": "Waterfall out yonder", "_id": "5678"},
+            ], auto_refresh=True)
+        res = neural_search.delete_documents(config=self.config, doc_ids=["5678", "491"], index_name=self.index_name_1
+                                             , auto_refresh=False)
+        pprint.pprint(res)
+        assert res["index_name"] == self.index_name_1
+        assert res["type"] == "documentDeletion"
+        assert res["status"] == "succeeded"
+        assert res["details"]["receivedDocumentIds"] == 2
+        assert res["details"]["deletedDocuments"] == 1
+        assert "PT" in res["duration"]
+        assert "Z" in res["startedAt"]
+        assert "T" in res["finishedAt"]
 

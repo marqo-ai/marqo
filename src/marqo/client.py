@@ -6,6 +6,8 @@ import datetime
 import nltk
 import ssl
 from typing import Any, Dict, List, Optional, Union
+
+import marqo.neural_search.utils
 from marqo.index import Index
 from marqo.enums import Devices
 from marqo.config import Config
@@ -13,7 +15,7 @@ from marqo._httprequests import HttpRequests
 from marqo.errors import MarqoError
 from marqo.neural_search import neural_search, index_meta_cache
 import urllib3
-from marqo import utils, enums
+from marqo import enums
 
 
 class Client:
@@ -38,7 +40,7 @@ class Client:
         self.main_user = main_user
         self.main_password = main_password
         if (main_user is not None) and (main_password is not None):
-            self.url = utils.construct_authorized_url(url_base=url, username=main_user, password=main_password)
+            self.url = marqo.neural_search.utils.construct_authorized_url(url_base=url, username=main_user, password=main_password)
         else:
             self.url = url
         self.config = Config(self.url, indexing_device=indexing_device, search_device=search_device)

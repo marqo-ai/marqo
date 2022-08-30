@@ -3,6 +3,8 @@ import json
 import pprint
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
+
+import marqo.neural_search.utils
 from models.api_models import SearchQuery
 from fastapi import FastAPI, Request, Depends, HTTPException
 from fastapi.exception_handlers import http_exception_handler
@@ -15,8 +17,7 @@ from marqo.neural_search import neural_search
 from marqo import config
 from typing import List, Dict
 import os
-import inspect
-import logging
+from marqo.neural_search.web import api_validation, api_utils
 
 from marqo.neural_search.on_start_script import on_start
 
@@ -56,7 +57,7 @@ app = FastAPI()
 
 
 async def generate_config(creds: HTTPBasicCredentials = Depends(security)):
-    authorized_url = utils.construct_authorized_url(
+    authorized_url = marqo.neural_search.utils.construct_authorized_url(
         url_base=OPENSEARCH_URL,
         username=creds.username,
         password=creds.password
@@ -115,27 +116,34 @@ async def create_index(index_name: str, settings: Dict = None, marqo_config: con
 
 
 @app.post("/indexes/{index_name}/search")
-async def search(search_query: SearchQuery, index_name: str, marqo_config: config.Config = Depends(generate_config)):
+async def search(search_query: SearchQuery, index_name: str, device: str = None,
+                 marqo_config: config.Config = Depends(generate_config)):
+    device = api_utils.translate_api_device(api_validation.validate_api_device(device))
     return neural_search.search(
         config=marqo_config, text=search_query.q,
         index_name=index_name, highlights=search_query.showHighlights,
         searchable_attributes=search_query.searchableAttributes,
         search_method=search_query.searchMethod,
         result_count=search_query.limit, reranker=search_query.reRanker,
-        filter=search_query.filter)
-
+        filter=search_query.filter, device=device
+    )
 
 @app.post("/indexes/{index_name}/documents")
 async def add_documents(docs: List[Dict], index_name: str,  refresh: bool = True,
                         marqo_config: config.Config = Depends(generate_config),
-                        batch_size: int = 0, processes: int = 1):
+                        batch_size: int = 0, processes: int = 1, device: str = None):
     """add_documents endpoint"""
+    translated_device = api_utils.translate_api_device(
+        api_validation.validate_api_device(device)
+    )
+
     return neural_search.add_documents_orchestrater(
         config=marqo_config,
         docs=docs,
         index_name=index_name, auto_refresh=refresh,
-        batch_size=batch_size, processes=processes
+        batch_size=batch_size, processes=processes, device=translated_device
     )
+
 
 @app.get("/indexes/{index_name}/documents/{document_id}")
 async def get_document_by_id(index_name: str, document_id: str,
@@ -179,7 +187,7 @@ async def refresh_index(index_name: str, marqo_config: config.Config = Depends(g
 
 # ADD DOCS:
 """
-curl -XPOST  'http://admin:admin@localhost:8000/indexes/my-irst-ix/documents?refresh=true' -H 'Content-type:application/json' -d '
+curl -XPOST  'http://admin:admin@localhost:8882/indexes/my-irst-ix/documents?refresh=true&device=cpu' -H 'Content-type:application/json' -d '
 [ 
     {
         "Title": "Honey is a delectable food stuff", 
@@ -196,7 +204,7 @@ curl -XPOST  'http://admin:admin@localhost:8000/indexes/my-irst-ix/documents?ref
 
 # SEARCH DOCS
 """
-curl -XPOST  http://admin:admin@localhost:8000/indexes/my-irst-ix/search -H 'Content-type:application/json' -d '{
+curl -XPOST  'http://admin:admin@localhost:8882/indexes/my-irst-ix/search?device=cuda' -H 'Content-type:application/json' -d '{
     "q": "what do bears eat?",
     "searchableAttributes": ["Title", "Desc", "other"],
     "limit": 3,    
@@ -207,7 +215,7 @@ curl -XPOST  http://admin:admin@localhost:8000/indexes/my-irst-ix/search -H 'Con
 
 # CREATE CUSTOM IMAGE INDEX:
 """
-curl -XPOST http://admin:admin@localhost:8000/indexes/my-multimodal-index -H 'Content-type:application/json' -d '{
+curl -XPOST http://admin:admin@localhost:8882/indexes/my-multimodal-index?device=cpu -H 'Content-type:application/json' -d '{
     "index_defaults": {
       "treat_urls_and_pointers_as_images":true,    
       "model":"ViT-B/32"
@@ -218,27 +226,27 @@ curl -XPOST http://admin:admin@localhost:8000/indexes/my-multimodal-index -H 'Co
 
 # GET DOCUMENT BY ID:
 """
-curl -XGET http://admin:admin@localhost:8000/indexes/my-irst-ix/documents/honey_facts_119
+curl -XGET http://admin:admin@localhost:8882/indexes/my-irst-ix/documents/honey_facts_119
 """
 
 # GET index stats
 """
-curl -XGET http://admin:admin@localhost:8000/indexes/my-irst-ix/stats
+curl -XGET http://admin:admin@localhost:8882/indexes/my-irst-ix/stats
 """
 
 # DELETE index
 """
-curl -XDELETE http://admin:admin@localhost:8000/indexes/my-irst-ix
+curl -XDELETE http://admin:admin@localhost:8882/indexes/my-irst-ix
 """
 
 # DELETE docs
 """
-curl -XPOST  http://admin:admin@localhost:8000/indexes/my-irst-ix/documents/delete-batch -H 'Content-type:application/json' -d '[
+curl -XPOST  http://admin:admin@localhost:8882/indexes/my-irst-ix/documents/delete-batch -H 'Content-type:application/json' -d '[
     "honey_facts_119", "moon_fact_145"
 ]'
 """
 
 # POST refresh index
 """
-curl -XPOST  http://admin:admin@localhost:8000/indexes/my-irst-ix/refresh
+curl -XPOST  http://admin:admin@localhost:8882/indexes/my-irst-ix/refresh
 """

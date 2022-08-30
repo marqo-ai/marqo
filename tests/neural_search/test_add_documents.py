@@ -1,5 +1,8 @@
+import copy
 import json
 import pprint
+from unittest import mock
+
 import requests
 from marqo.neural_search.enums import NeuralField
 from marqo.client import Client
@@ -254,3 +257,64 @@ class TestAddDocuments(MarqoTestCase):
                 raise AssertionError
             except InvalidArgError as s:
                 pass
+
+    def test_add_documents_set_device(self):
+        """calling search with a specified device overrides device defined in config"""
+        mock_config = copy.deepcopy(self.config)
+        mock_config.search_device = "cpu"
+        neural_search.create_vector_index(config=self.config, index_name=self.index_name_1)
+
+        mock_vectorise = mock.MagicMock()
+        mock_vectorise.return_value = [[0, 0, 0, 0]]
+
+        @mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
+        def run():
+            neural_search.add_documents(
+                config=self.config, index_name=self.index_name_1, device="cuda:411", docs=[{"some": "doc"}],
+                auto_refresh=True)
+            return True
+
+        assert run()
+        assert mock_config.search_device == "cpu"
+        args, kwargs = mock_vectorise.call_args
+        assert kwargs["device"] == "cuda:411"
+
+    def test_add_documents_orchestrator_set_device_single_process(self):
+        mock_config = copy.deepcopy(self.config)
+        mock_config.search_device = "cpu"
+        neural_search.create_vector_index(config=self.config, index_name=self.index_name_1)
+
+        mock_vectorise = mock.MagicMock()
+        mock_vectorise.return_value = [[0, 0, 0, 0]]
+
+        @mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
+        def run():
+            neural_search.add_documents_orchestrater(
+                config=self.config, index_name=self.index_name_1, device="cuda:22", docs=[{"some": "doc"}, {"som other": "doc"}],
+                auto_refresh=True, batch_size=1, processes=1)
+            return True
+
+        assert run()
+        assert mock_config.search_device == "cpu"
+        args, kwargs = mock_vectorise.call_args
+        assert kwargs["device"] == "cuda:22"
+
+    def test_add_documents_orchestrator_set_device_empty_batch(self):
+        mock_config = copy.deepcopy(self.config)
+        mock_config.search_device = "cpu"
+        neural_search.create_vector_index(config=self.config, index_name=self.index_name_1)
+
+        mock_vectorise = mock.MagicMock()
+        mock_vectorise.return_value = [[0, 0, 0, 0]]
+
+        @mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
+        def run():
+            neural_search.add_documents_orchestrater(
+                config=self.config, index_name=self.index_name_1, device="cuda:22", docs=[{"some": "doc"}, {"som other": "doc"}],
+                auto_refresh=True, batch_size=0)
+            return True
+
+        assert run()
+        assert mock_config.search_device == "cpu"
+        args, kwargs = mock_vectorise.call_args
+        assert kwargs["device"] == "cuda:22"
