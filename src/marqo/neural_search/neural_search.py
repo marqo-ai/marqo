@@ -584,8 +584,6 @@ def _lexical_search(
         body["query"]["bool"]["filter"] = [{
             "query_string": {"query": filter_string}}]
 
-    print("BIOUUIH")
-    pprint.pprint(body)
     search_res = HttpRequests(config).get(path=f"{index_name}/_search", body=body)
 
     res_list = []
