@@ -3,6 +3,8 @@ import json
 import pprint
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
+
+import marqo.neural_search.utils
 from models.api_models import SearchQuery
 from fastapi import FastAPI, Request, Depends, HTTPException
 from fastapi.exception_handlers import http_exception_handler
@@ -55,7 +57,7 @@ app = FastAPI()
 
 
 async def generate_config(creds: HTTPBasicCredentials = Depends(security)):
-    authorized_url = utils.construct_authorized_url(
+    authorized_url = marqo.neural_search.utils.construct_authorized_url(
         url_base=OPENSEARCH_URL,
         username=creds.username,
         password=creds.password

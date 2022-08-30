@@ -8,13 +8,14 @@ from tests.marqo_test import MarqoTestCase
 
 class TestApiUtils(MarqoTestCase):
 
-    def test_validate_api_device_good(self):
+    def test_translate_api_device_good(self):
         for given, expected in [("cpu", "cpu"), ("cuda", "cuda"),
                                 ("CPU", "cpu"), ("CUDA2", "cuda:2"),
-                                ("cuda1234", "cuda:1234"), ("cpu1", "cpu:1")]:
+                                ("cuda1234", "cuda:1234"), ("cpu1", "cpu:1"),
+                                (None, None)]:
             assert expected == api_utils.translate_api_device(given)
 
-    def test_validate_api_device_bad(self):
+    def test_translate_api_device_bad(self):
         for bad in ["avr", "123"]:
             try:
                 api_utils.translate_api_device(bad)

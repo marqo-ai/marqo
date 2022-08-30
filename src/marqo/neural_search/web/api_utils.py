@@ -1,7 +1,9 @@
 from marqo.errors import InvalidArgError
 from marqo.neural_search import enums
+from typing import Optional
 
-def translate_api_device(device: str) -> str:
+
+def translate_api_device(device: Optional[str]) -> Optional[str]:
     """Translates an API device as given through the API into an internal enum.
 
     Args:
@@ -14,6 +16,9 @@ def translate_api_device(device: str) -> str:
     Raises:
         InvalidArgError if device is invalid
     """
+    if device is None:
+        return device
+
     lowered_device = device.lower()
     acceptable_devices = [d.value.lower() for d in enums.Device]
 

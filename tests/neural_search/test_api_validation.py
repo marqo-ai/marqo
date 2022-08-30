@@ -9,7 +9,7 @@ from tests.marqo_test import MarqoTestCase
 class TestApiValidation(MarqoTestCase):
 
     def test_validate_api_device_good(self):
-        for good in ["cpu", "cuda", "CPU", "CUDA2", "cuda1234", "cpu1"]:
+        for good in ["cpu", "cuda", "CPU", "CUDA2", "cuda1234", "cpu1", None]:
             assert good == api_validation.validate_api_device(good)
 
     def test_validate_api_device_bad(self):

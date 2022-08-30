@@ -1,9 +1,10 @@
 from marqo.neural_search.validation import validate_str_against_enum
 from marqo.errors import InvalidArgError
 from marqo.neural_search import enums
+import typing
 
 
-def validate_api_device(device: str) -> str:
+def validate_api_device(device: typing.Optional[str]) -> typing.Optional[str]:
     """Validates a device which is an API parameter
 
     Args:
@@ -16,6 +17,9 @@ def validate_api_device(device: str) -> str:
     Raises:
         InvalidArgError if device is invalid
     """
+    if device is None:
+        return device
+
     if not isinstance(device, str):
         raise InvalidArgError(f"Device must be a str! Given "
                               f"device `{device}` of type {type(device).__name__} ")
