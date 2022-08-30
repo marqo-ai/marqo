@@ -215,7 +215,7 @@ curl -XPOST  'http://admin:admin@localhost:8882/indexes/my-irst-ix/search?device
 
 # CREATE CUSTOM IMAGE INDEX:
 """
-curl -XPOST http://admin:admin@localhost:8882/indexes/my-multimodal-index?device=cpu -H 'Content-type:application/json' -d '{
+curl -XPOST http://admin:admin@localhost:8882/indexes/my-multimodal-index -H 'Content-type:application/json' -d '{
     "index_defaults": {
       "treat_urls_and_pointers_as_images":true,    
       "model":"ViT-B/32"
