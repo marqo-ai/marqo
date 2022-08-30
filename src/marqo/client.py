@@ -15,7 +15,7 @@ from marqo._httprequests import HttpRequests
 from marqo.errors import MarqoError
 from marqo.neural_search import neural_search, index_meta_cache
 import urllib3
-from marqo import utils, enums
+from marqo import enums
 
 
 class Client:

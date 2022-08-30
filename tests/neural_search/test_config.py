@@ -4,7 +4,6 @@ from marqo import config
 from marqo import enums
 import torch
 from marqo.client import Client
-from marqo import utils
 from tests.marqo_test import MarqoTestCase
 
 
