@@ -15,7 +15,7 @@ export OPENSEARCH_URL="https://localhost:9200" &&
 ```bash
 docker rm -f marqo &&
      DOCKER_BUILDKIT=1 docker build . -t marqo_docker_0 && 
-     docker run --name marqo --gpus all --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqo_docker_0
+     docker run --name marqo --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqo_docker_0
 ```
 
 ### C. Build and run the Marqo as a Docker container, connecting to OpenSearch which is running on the host:
@@ -24,7 +24,7 @@ docker rm -f marqo &&
 ```bash
 docker rm -f marqo &&
      DOCKER_BUILDKIT=1 docker build . -t marqo_docker_0 && 
-     docker run --name marqo --gpus all --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway \
+     docker run --name marqo --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway \
          -e "OPENSEARCH_URL=https://localhost:9200" marqo_docker_0
 ```
 
@@ -42,7 +42,10 @@ Marqo outside Docker will rely on the system setup to use the GPU. If you can us
 
 #### Using Marqo within Docker
 Currently, only CUDA based (Nvidia) GPU's are supported. If you have a GPU on the host machine and want to use it with Marqo, there are two things to do first; 
-1. Ensure the `--gpus all` is in the `docker run` command. This command is *included above as a default* and should allow the GPU's to be used within Marqo. 
+1. Add the `--gpus all` flag to the `docker run` command. This command excluded from the above but will allow the GPU's to be used within Marqo. For example, in the steps B., C., and D., above `--gpus all` should be added after the 
+`docker run --name marqo` part of the command, e.g. 
+`docker run --name marqo` -> `docker run --name marqo --gpus all`.
+
 2. Install [nvidia-docker2](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html) which is required for the GPU to work with Docker. The [link]((https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html) provided has instructions for installing it but it should consist of only a couple of steps (refer to the link for full details). The three steps below should install it for a Ubuntu based machine;  
 ```
 $ distribution=$(. /etc/os-release;echo $ID$VERSION_ID) \
