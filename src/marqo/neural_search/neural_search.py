@@ -73,7 +73,6 @@ def create_vector_index(
     Args:
         media_type: 'text'|'image'
     """
-    pprint.pprint(neural_settings)
     if neural_settings is not None:
         the_neural_settings = _autofill_neural_settings(neural_settings=neural_settings)
     else:
