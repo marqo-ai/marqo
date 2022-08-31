@@ -19,9 +19,9 @@ A deep-learning powered, open-source search engine which seamlessly integrates w
 ## Getting started
 
 1. Marqo requires docker. To install docker go to https://docs.docker.com/get-docker/
-2. Use docker to run [Opensearch](https://opensearch.org/):
+2. Use docker to run Marqo:
 ```bash
-docker run -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" opensearchproject/opensearch:2.1.0
+docker run --name marqo --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:0.0.1
 ```
 3. Install the Marqo client:
 ```bash
@@ -32,7 +32,7 @@ pip install marqo
 ```python
 import marqo
 
-mq = marqo.Client(url='https://localhost:9200', main_user="admin", main_password="admin")
+mq = marqo.Client(url='http://localhost:8882', main_user="admin", main_password="admin")
 
 mq.index("my-first-index").add_documents([
     {
@@ -77,14 +77,14 @@ pprint.pprint(results)
                                'mobility, life support, and communications for astronauts'
             },
             '_id': 'article_591',
-            '_score': 1.2387788
+            '_score': 0.61938936
         }, 
         {   
             'Title': 'The Travels of Marco Polo',
             'Description': "A 13th-century travelogue describing Polo's travels",
             '_highlights': {'Title': 'The Travels of Marco Polo'},
             '_id': 'e00d1a8d-894c-41a1-8e3b-d8b2a8fce12a',
-            '_score': 1.2047464
+            '_score': 0.60237324
         }
     ],
     'limit': 10,
@@ -148,7 +148,7 @@ Images can then be added within documents as follows. You can use urls from the 
 ```python
 
 response = mq.index("my-multimodal-index").add_documents([{
-    "My Image": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b3/Hipop%C3%B3tamo_%28Hippopotamus_amphibius%29%2C_parque_nacional_de_Chobe%2C_Botsuana%2C_2018-07-28%2C_DD_82.jpg/640px-Hipop%C3%B3tamo_%28Hippopotamus_amphibius%29%2C_parque_nacional_de_Chobe%2C_Botsuana%2C_2018-07-28%2C_DD_82.jpg",
+    "My Image": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f2/Portrait_Hippopotamus_in_the_water.jpg/440px-Portrait_Hippopotamus_in_the_water.jpg",
     "Description": "The hippopotamus, also called the common hippopotamus or river hippopotamus, is a large semiaquatic mammal native to sub-Saharan Africa",
     "_id": "hippo-facts"
 }])
@@ -172,7 +172,7 @@ results = mq.index("my-multimodal-index").search('animal',  searchable_attribute
 ### Searching using an image
 Searching using an image can be achieved by providing the image link. 
 ```python
-results = mq.index("my-multimodal-index").search('https://upload.wikimedia.org/wikipedia/commons/thumb/9/96/Standing_Hippopotamus_MET_DP248993.jpg/1920px-Standing_Hippopotamus_MET_DP248993.jpg')
+results = mq.index("my-multimodal-index").search('https://upload.wikimedia.org/wikipedia/commons/thumb/9/96/Standing_Hippopotamus_MET_DP248993.jpg/440px-Standing_Hippopotamus_MET_DP248993.jpg')
 ```
 
 
