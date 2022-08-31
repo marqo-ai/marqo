@@ -526,8 +526,7 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
 
 def _lexical_search(
         config: Config, index_name: str, text: str, result_count: int = 3, return_doc_ids=True,
-        searchable_attributes: Sequence[str] = None, raise_for_searchable_attributes=False,
-        filter_string: str = None):
+        searchable_attributes: Sequence[str] = None, filter_string: str = None):
     """
 
     Args:
@@ -554,12 +553,7 @@ def _lexical_search(
             f"Query arg: {text}")
 
     if searchable_attributes is not None:
-        fields_to_search = {
-            field_name: field_props for field_name, field_props in
-            index_meta_cache.get_index_info(
-                config=config, index_name=index_name).get_true_text_properties().items()
-            if field_name in searchable_attributes
-        }
+        fields_to_search = searchable_attributes
     else:
         fields_to_search = index_meta_cache.get_index_info(
             config=config, index_name=index_name
