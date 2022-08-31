@@ -73,7 +73,6 @@ def create_vector_index(
     Args:
         media_type: 'text'|'image'
     """
-    pprint.pprint(neural_settings)
     if neural_settings is not None:
         the_neural_settings = _autofill_neural_settings(neural_settings=neural_settings)
     else:
@@ -441,7 +440,7 @@ def refresh_index(config: Config,  index_name: str):
     return HttpRequests(config).post(path=F"{index_name}/_refresh")
 
 
-def search(config: Config, index_name: str, text: str, result_count: int = 3, highlights=True, return_doc_ids=False,
+def search(config: Config, index_name: str, text: str, result_count: int = 3, highlights=True, return_doc_ids=True,
            search_method: Union[str, SearchMethod, None] = SearchMethod.NEURAL,
            searchable_attributes: Iterable[str] = None, verbose: int = 0, num_highlights: int = 3, 
            reranker: Union[str, Dict] = None, simplified_format: bool = True, filter: str = None,
@@ -500,11 +499,10 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
             filter_string=filter, device=device
         )
     elif search_method.upper() == SearchMethod.LEXICAL:
-        if filter is not None:
-            raise NotImplementedError("filtering not working for lexical search")
         search_result = _lexical_search(
             config=config, index_name=index_name, text=text, result_count=result_count,
             return_doc_ids=return_doc_ids, searchable_attributes=searchable_attributes,
+            filter_string=filter
         )
     else:
         raise errors.InvalidArgError(f"Search called with unknown search method: {search_method}")
@@ -527,8 +525,9 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
 
 
 def _lexical_search(
-        config: Config, index_name: str, text: str, result_count: int = 3, return_doc_ids=False,
-        searchable_attributes: Sequence[str] = None, raise_for_searchable_attributes=False):
+        config: Config, index_name: str, text: str, result_count: int = 3, return_doc_ids=True,
+        searchable_attributes: Sequence[str] = None, raise_for_searchable_attributes=False,
+        filter_string: str = None):
     """
 
     Args:
@@ -540,10 +539,6 @@ def _lexical_search(
         searchable_attributes:
         number_of_highlights:
         verbose:
-        raise_for_searchable_attributes: if True, check searchable attributes and raises
-            and error if identified. This is appropriate only if we assume that the cache
-            remains in sync with the index. If that syncing assumption is lost, then this
-            behaviour may be unexpected.
 
     Returns:
 
@@ -559,20 +554,17 @@ def _lexical_search(
             f"Query arg: {text}")
 
     if searchable_attributes is not None:
-        cached_fields_to_search = [field for field in index_meta_cache.get_index_info(
-                            config=config, index_name=index_name).get_text_properties()
-                            if field in searchable_attributes]
-        if raise_for_searchable_attributes and len(cached_fields_to_search) < len(searchable_attributes):
-            raise errors.InvalidArgError(
-                "Detected unknown searchable_attributes:\n "
-                f"Known attributes: {index_meta_cache.get_index_info(config=config, index_name=index_name).get_text_properties().keys()},\n"
-                f"Searchable attributes: {searchable_attributes}")
-        else:
-            fields_to_search = searchable_attributes
+        fields_to_search = {
+            field_name: field_props for field_name, field_props in
+            index_meta_cache.get_index_info(
+                config=config, index_name=index_name).get_true_text_properties().items()
+            if field_name in searchable_attributes
+        }
     else:
         fields_to_search = index_meta_cache.get_index_info(
             config=config, index_name=index_name
-        ).get_text_properties()
+        ).get_true_text_properties()
+
     body = {
         "query": {
             "bool": {
@@ -582,12 +574,17 @@ def _lexical_search(
                 ],
                 "must_not": [
                     {"exists": {"field": NeuralField.field_name}}
-                ]
+                ],
             }
         },
         "size": result_count,
     }
+    if filter_string is not None:
+        body["query"]["bool"]["filter"] = [{
+            "query_string": {"query": filter_string}}]
+
     search_res = HttpRequests(config).get(path=f"{index_name}/_search", body=body)
+
     res_list = []
     for doc in search_res['hits']['hits']:
         just_doc = _clean_doc(doc["_source"].copy())

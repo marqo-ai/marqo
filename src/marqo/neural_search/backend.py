@@ -124,10 +124,13 @@ def add_customer_field_properties(config: Config, index_name: str,
     #   time they're retrieved from the cache
     existing_properties = set(existing_info.get_text_properties())
     applying_properties = {field[0] for field in customer_field_names}
+    app_type_mapping = {field: field_type for field, field_type in customer_field_names}
     new_properties = applying_properties - existing_properties
     for new_prop in new_properties:
+        type_to_set = app_type_mapping[new_prop] if app_type_mapping[new_prop] == enums.OpenSearchDataType.text \
+                        else enums.OpenSearchDataType.to_be_defined
         new_index_properties[validation.validate_field_name(new_prop)] = {
-            "type": enums.OpenSearchDataType.to_be_defined
+            "type": type_to_set
         }
 
     get_cache()[index_name] = IndexInfo(

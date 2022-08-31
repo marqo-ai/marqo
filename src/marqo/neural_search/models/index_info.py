@@ -27,13 +27,32 @@ class IndexInfo(NamedTuple):
             if vector_name.startswith(enums.NeuralField.vector_prefix)
         }
 
-    def get_text_properties(self):
-        """returns a dict containing only names and properties of text fields
-        Perhaps a better approach is to check if the text's props is actually a text type,
-        plus checks over fieldnames"""
+    def get_text_properties(self) -> dict:
+        """returns a dict containing only names and properties of non
+        vector fields.
+
+        This returns more than just pure text fields. For example: ints
+        bool fields.
+
+        """
         return {
             text_field: text_props
             for text_field, text_props in self.properties.items()
             if not text_field.startswith(enums.NeuralField.vector_prefix)
                 and not text_field in enums.NeuralField.__dict__.values()
         }
+
+    def get_true_text_properties(self) -> dict:
+        """returns a dict containing only names and properties of fields that
+        are true text fields
+        """
+        simple_props = self.get_text_properties()
+
+        true_text_props = dict()
+        for text_field, text_props in simple_props.items():
+            try:
+                if text_props["type"] == enums.OpenSearchDataType.text:
+                    true_text_props[text_field] = text_props
+            except KeyError:
+                continue
+        return true_text_props

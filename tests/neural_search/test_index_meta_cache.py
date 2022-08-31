@@ -242,6 +242,7 @@ class TestIndexMetaCache(MarqoTestCase):
 
     def test_search_lexical_externally_created_field_attributes(self):
         """lexical search doesn't need an up-to-date cache to work"""
+        index_meta_cache.empty_cache()
         neural_search.create_vector_index(
             config=self.config, index_name=self.index_name_1)
         neural_search.add_documents(
