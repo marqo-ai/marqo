@@ -27,3 +27,9 @@ docker rm -f marqo &&
      docker run --name marqo --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway \
          -e "OPENSEARCH_URL=https://localhost:9200" marqo_docker_0
 ```
+
+
+### Pull marqo from `hub.docker.com` and run it
+```
+docker run --name marqo --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:0.0.1
+```
