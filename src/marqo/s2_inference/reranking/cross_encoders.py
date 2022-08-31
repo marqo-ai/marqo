@@ -35,13 +35,6 @@ from marqo.s2_inference.processing import image as image_processor
 from marqo.s2_inference.logger import get_logger
 logger = get_logger(__name__)
 
-def _get_ids_from_results(results):
-
-    return [doc[ResultsFields.id] for doc in results[ResultsFields.hits]]
-
-def get_results_by_doc_id(results):
-
-    ids = _get_ids_from_results(results)
 
 class FormattedResults:
 
@@ -390,7 +383,7 @@ class ReRankerOwl(ReRanker):
         self.processor = loaded['processor']
 
     @staticmethod
-    def load_images(content, size):
+    def load_images(content: List[str], size: Tuple[int]) -> Tuple[ImageType, List[Tuple]]:
 
         # TODO do web urls as well - fast laoding could be hard -
         images, original_size = zip(*[_load_image(f, size=size) for f in content])
@@ -400,7 +393,7 @@ class ReRankerOwl(ReRanker):
         # only allow rerank if single attribute
         return images, original_size
 
-    def rerank(self, query, results, image_attributes: List, num_highlights: int = 1):
+    def rerank(self, query: str, results: Dict, image_attributes: List, num_highlights: int = 1):
         
         self.results = results
         self.image_attributes = image_attributes

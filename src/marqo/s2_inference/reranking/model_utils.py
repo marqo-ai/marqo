@@ -59,7 +59,18 @@ def _convert_cross_encoder_output(output: Union[FloatTensor, ndarray, List[float
     raise TypeError(f"unable to convert input of type {type(output)} to a list of lists of floats")
 
 
-def _verify_model_outputs(outputs):
+def _verify_model_outputs(outputs: Union[List, ndarray,FloatTensor]) -> bool:
+    """checks the outpus conforms to the standard of a list of floats or ints
+
+    Args:
+        outputs (Union[List, ndarray,FloatTensor]): _description_
+
+    Raises:
+        TypeError: _description_
+
+    Returns:
+        bool: _description_
+    """
     if not isinstance(outputs, list):
         return False
 
@@ -287,7 +298,15 @@ def load_hf_cross_encoder_model(model_name: str, device: str = 'cpu') -> Dict:
     return {'model':model, 'tokenizer':tokenizer}
 
 def load_owl_vit(model_name: str, device: str = 'cpu') -> Dict:
-    
+    """loader for owl vit for image reranking
+
+    Args:
+        model_name (str): _description_
+        device (str, optional): _description_. Defaults to 'cpu'.
+
+    Returns:
+        Dict: _description_
+    """
     if ('owl', device) in available_models:
         model, processor = available_models[('owl', device)] 
     else:
@@ -301,10 +320,30 @@ def load_owl_vit(model_name: str, device: str = 'cpu') -> Dict:
     return {'model':model, 'processor':processor}
 
 def _process_owl_inputs(processor, texts, images):
+    """wrapper for processing the owl inputs
+
+    Args:
+        processor (_type_): _description_
+        texts (_type_): _description_
+        images (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
     return processor(text=texts, images=images, return_tensors="pt")
 
 def _predict_owl(model, processed_inputs, post_process_function, size):
-    
+    """helper to predict with owl
+
+    Args:
+        model (_type_): _description_
+        processed_inputs (_type_): _description_
+        post_process_function (_type_): _description_
+        size (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
     with torch.no_grad():
         outputs = model(**processed_inputs)
 
@@ -315,14 +354,22 @@ def _predict_owl(model, processed_inputs, post_process_function, size):
 
         return results
 
-def process_owl_results(results):
+def process_owl_results(results: Dict) -> List:
+    """_summary_
+
+    Args:
+        results (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
     rezs = []
     for result in results:
         rez = _process_owl_result(result)
         rezs.append(rez)
     return rezs
 
-def _process_owl_result(result, identifier):
+def _process_owl_result(result: List[Dict], identifier: str) -> Tuple[List, List, List]:
     # process indiviudal result
     boxes, scores, _ = result[0]["boxes"], result[0]["scores"], result[0]["labels"]
  
@@ -332,8 +379,21 @@ def _process_owl_result(result, identifier):
 
     return boxes, scores, [identifier]*len(scores)
 
-def sort_owl_boxes_scores(boxes, scores, identifier):
+def sort_owl_boxes_scores(boxes: List, scores: List, identifier: List) -> Tuple[List, List, List]:
+    """sorts the lists based on  the scores
 
+    Args:
+        boxes (List): _description_
+        scores (List): _description_
+        identifier (List): _description_
+
+    Raises:
+        RuntimeError: _description_
+        RuntimeError: _description_
+
+    Returns:
+        Tuple[List, List, List]: _description_
+    """
     if len(scores) != len(boxes):
         # TODO use Marqo errors 
         raise RuntimeError(f"expected each bbox to have a score. found {len(boxes)} boxes and {len(scores)} scores")
@@ -352,4 +412,13 @@ def sort_owl_boxes_scores(boxes, scores, identifier):
     return boxes, scores, identifier
 
 def _keep_top_k(input_list: List, k: int = 1):
+    """return top-k of a list
+
+    Args:
+        input_list (List): _description_
+        k (int, optional): _description_. Defaults to 1.
+
+    Returns:
+        _type_: _description_
+    """
     return input_list[:k]
