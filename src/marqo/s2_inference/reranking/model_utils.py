@@ -286,13 +286,13 @@ def load_hf_cross_encoder_model(model_name: str, device: str = 'cpu') -> Dict:
     
     return {'model':model, 'tokenizer':tokenizer}
 
-def load_owl_vit(device: str = 'cpu') -> Dict:
+def load_owl_vit(model_name: str, device: str = 'cpu') -> Dict:
     
     if ('owl', device) in available_models:
         model, processor = available_models[('owl', device)] 
     else:
-        processor = OwlViTProcessor.from_pretrained("google/owlvit-base-patch32") #pathc16, patch
-        model = OwlViTForObjectDetection.from_pretrained("google/owlvit-base-patch32")
+        processor = OwlViTProcessor.from_pretrained(model_name)
+        model = OwlViTForObjectDetection.from_pretrained(model_name)
         available_models[('owl', device)] = model, processor
 
     model.eval()
@@ -350,3 +350,6 @@ def sort_owl_boxes_scores(boxes, scores, identifier):
         identifier = [identifier[i] for i in inds]
 
     return boxes, scores, identifier
+
+def _keep_top_k(input_list: List, k: int = 1):
+    return input_list[:k]
