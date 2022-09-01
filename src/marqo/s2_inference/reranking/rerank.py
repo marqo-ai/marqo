@@ -1,6 +1,6 @@
 # use this as the entry point for reranking
 from marqo.s2_inference.reranking.enums import ResultsFields
-from marqo.s2_inference.reranking.cross_encoders import ReRankerText
+from marqo.s2_inference.reranking.cross_encoders import ReRankerText, ReRankerOwl
 from marqo.s2_inference.types import Dict, List
 
 def rerank_search_results(search_result: Dict, query: str, model_name: str, device: str, 
@@ -19,8 +19,12 @@ def rerank_search_results(search_result: Dict, query: str, model_name: str, devi
     """
 
     # TODO add in routing based on model type
-    reranker = ReRankerText(model_name, device=device, num_highlights=num_highlights)
-    reranker.rerank(query=query, results=search_result, searchable_attributes=searchable_attributes)
+    if 'owl' in model_name.lower():
+        reranker = ReRankerOwl(model_name=model_name, device=device, image_size=(240,240))
+        reranker.rerank(query=query, results=search_result, image_attributes=searchable_attributes)
+    else:
+        reranker = ReRankerText(model_name=model_name, device=device, num_highlights=num_highlights)
+        reranker.rerank(query=query, results=search_result, searchable_attributes=searchable_attributes)
 
     if overwrite_original_scores_highlights:
         cleanup_final_reranked_results(search_result)
@@ -33,6 +37,7 @@ def cleanup_final_reranked_results(reranked_results: Dict) -> None:
     """
     for result in reranked_results['hits']:
         # replace original with reranked score
+        # could also do a hybrid score
         if ResultsFields.reranker_score in result:
             result[ResultsFields.original_score] = result[ResultsFields.reranker_score]
             del result[ResultsFields.reranker_score]

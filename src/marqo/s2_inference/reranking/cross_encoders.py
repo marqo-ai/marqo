@@ -1,4 +1,5 @@
 from functools import partial
+import functools
 import requests
 import validators
 import time
@@ -21,21 +22,19 @@ from marqo.s2_inference.reranking.model_utils import (
     sort_owl_boxes_scores,
     _verify_model_inputs,
     _convert_cross_encoder_output,
-)
+    _process_owl_result,
+    _keep_top_k
+    )
+
+from marqo.s2_inference.clip_utils import _load_image_from_path
 from marqo.s2_inference.reranking.enums import Columns, ResultsFields
 from marqo.s2_inference.reranking.configs import get_default_text_processing_parameters
 from marqo.s2_inference.processing import text as text_processor
+from marqo.s2_inference.processing import image as image_processor
 
 from marqo.s2_inference.logger import get_logger
 logger = get_logger(__name__)
 
-def _get_ids_from_results(results):
-
-    return [doc[ResultsFields.id] for doc in results[ResultsFields.hits]]
-
-def get_results_by_doc_id(results):
-
-    ids = _get_ids_from_results(results)
 
 class FormattedResults:
 
@@ -168,6 +167,56 @@ class ReRanker:
         self.results = results
         self.formatted_results = FormattedResults(self.results)
 
+    @staticmethod
+    def _prepare_inputs(inputs_df: pd.DataFrame, query_column: str = Columns.query, 
+                            content_column: str = Columns.field_content) -> List[List[str]]:
+        """subselects the columns from the formatted dataframe and converts to a list
+        for feeding to the cross encoder
+
+        Args:
+            inputs_df (pd.DataFrame): _description_
+            query_column (str, optional): _description_. Defaults to Columns.query.
+            content_column (str, optional): _description_. Defaults to Columns.field_content.
+
+        Returns:
+            pd.DataFrame: _description_
+        """
+        return inputs_df[[query_column, content_column]].values.tolist()
+
+    def get_reranked_results(self, score_column: str = ResultsFields.reranker_score, 
+                            highlight_content_column: str = Columns.field_content):
+        """reranks the updated results using the score in score_column
+
+        Args:
+            score_column (str, optional): _description_. Defaults to ResultsFields.reranker_score.
+        """
+        reranked_top = []
+        for i,group in self.inputs_df.groupby(ResultsFields.reranked_id):
+            group = group.sort_values(score_column, ascending=False).head(self.num_highlights)
+            reranked_top.append(group)
+        reranked_top = pd.concat(reranked_top).set_index(ResultsFields.reranked_id)
+        
+        # find out which document is the highest, then do the field as a highlight
+        for result in self.results[ResultsFields.hits]:
+            rerank_id = result[ResultsFields.reranked_id]
+            if self.num_highlights == 1:
+                _score = reranked_top.loc[rerank_id][score_column]
+            else:
+                _score = reranked_top.loc[rerank_id][score_column].values.tolist()
+                
+            result[ResultsFields.reranker_score] = _score
+            _df = reranked_top.loc[rerank_id]
+             
+            if self.num_highlights == 1:
+                _content = {_df[Columns.original_field_name]:_df[highlight_content_column]}
+            else:
+                _content = [{row[Columns.original_field_name]:row[highlight_content_column]} for _,row in _df.iterrows()]
+
+            result[ResultsFields.highlights_reranked] = _content
+
+        self.results[ResultsFields.hits] = sorted(self.results[ResultsFields.hits], key=lambda x:x[ResultsFields.reranker_score], reverse=True)
+
+
     def rerank(self, query, results):
         pass
 
@@ -201,22 +250,6 @@ class ReRankerText(ReRanker):
 
         self.model = load_sbert_cross_encoder_model(model_name=self.model_name, 
                             device=self.device, max_length=self.max_length)['model']
-
-    @staticmethod
-    def _prepare_inputs(inputs_df: pd.DataFrame, query_column: str = Columns.query, 
-                            content_column: str = Columns.field_content) -> List[List[str]]:
-        """subselects the columns from the formatted dataframe and converts to a list
-        for feeding to the cross encoder
-
-        Args:
-            inputs_df (pd.DataFrame): _description_
-            query_column (str, optional): _description_. Defaults to Columns.query.
-            content_column (str, optional): _description_. Defaults to Columns.field_content.
-
-        Returns:
-            pd.DataFrame: _description_
-        """
-        return inputs_df[[query_column, content_column]].values.tolist()
 
     def explode_nested_content_field(self, inputs_df: pd.DataFrame) -> pd.DataFrame:
         """this is used to chunk the text content and then create a new entry for the model
@@ -301,41 +334,13 @@ class ReRankerText(ReRanker):
 
         self.get_reranked_results()
 
-    def get_reranked_results(self, score_column: str = ResultsFields.reranker_score):
-        """reranks the updated results using the score in score_column
-
-        Args:
-            score_column (str, optional): _description_. Defaults to ResultsFields.reranker_score.
-        """
-        reranked_top = []
-        for i,group in self.inputs_df.groupby(ResultsFields.reranked_id):
-            group = group.sort_values(score_column, ascending=False).head(self.num_highlights)
-            reranked_top.append(group)
-        reranked_top = pd.concat(reranked_top).set_index(ResultsFields.reranked_id)
-        
-        # find out which document is the highest, then do the field as a highlight
-        for result in self.results[ResultsFields.hits]:
-            rerank_id = result[ResultsFields.reranked_id]
-            if self.num_highlights == 1:
-                _score = reranked_top.loc[rerank_id][score_column]
-            else:
-                _score = reranked_top.loc[rerank_id][score_column].values.tolist()
-                
-            result[ResultsFields.reranker_score] = _score
-            _df = reranked_top.loc[rerank_id]
-             
-            if self.num_highlights == 1:
-                _content = {_df[Columns.original_field_name]:_df[Columns.field_content]}
-            else:
-                _content = [{row[Columns.original_field_name]:row[Columns.field_content]} for _,row in _df.iterrows()]
-
-            result[ResultsFields.highlights_reranked] = _content
-
-        self.results[ResultsFields.hits] = sorted(self.results[ResultsFields.hits], key=lambda x:x[ResultsFields.reranker_score], reverse=True)
 
 
 class ReRankerOwl(ReRanker):
-# we might need the index config to get the processing params
+    # we might need the index config to get the processing params
+    # "google/owlvit-base-patch32"
+    # "google/owlvit-base-patch16"
+    # "google/owlvit-large-patch14"
 
     def __init__(self, model_name: str, device: str, image_size: Tuple):
         super().__init__()
@@ -344,65 +349,117 @@ class ReRankerOwl(ReRanker):
         self.image_size = image_size
         self.results = []
     
+        self.model = None
+        self.processed_inputs = None
+
+        self.results = None
+        self.image_attributes = None
+        self.num_highlights = None
+
+        self._model_map = None
+        self._get_model_mapping()
+
+        if self.model_name not in self._model_map:
+            raise ValueError(f"could not find model_name={self.model_name} in mappings {self._model_map}")
+
+    def _get_model_mapping(self):
+
+        self._model_map = {
+            "google/owlvit-base-patch32":"google/owlvit-base-patch32",
+            "google/owlvit-base-patch16":"google/owlvit-base-patch16",
+            "google/owlvit-large-patch14":"google/owlvit-large-patch14",
+            "owl/ViT-B/32":"google/owlvit-base-patch32",
+            "owl/ViT-B/16":"google/owlvit-base-patch16",
+            "owl/ViT-L/14":"google/owlvit-large-patch14",
+
+        }
+
     def load_model(self):
         
-        loaded = load_owl_vit(self.device)
+        self._remapped_name = self._model_map[self.model_name]
+        logger.info(f"loading model={self._remapped_name} from input name={self.model_name}")
+        loaded = load_owl_vit(self._remapped_name, self.device)
         self.model = loaded['model']
         self.processor = loaded['processor']
 
     @staticmethod
-    def load_images(content, size):
+    def load_images(content: List[str], size: Tuple[int]) -> Tuple[ImageType, List[Tuple]]:
 
         # TODO do web urls as well - fast laoding could be hard -
-        images = [_load_image(f, size=size) for f in content]
+        images, original_size = zip(*[_load_image(f, size=size) for f in content])
 
         # use highlights
         # get parent value to load from highlight key name
         # only allow rerank if single attribute
-        return images
+        return images, original_size
 
-    def rerank(self, query, results):
-        t_start = time.time()
-        self.content, self.ids = self.get_data(results, highlights_field=ResultsFields.highlights)
-        t_content = time.time()
-        self.images = self.load_images(self.content, self.image_size)
-        t_image_loaded = time.time()
-        # TODO check query type before making a list
-        _b, _s, _i, _im = [], [], [], []
+    def rerank(self, query: str, results: Dict, image_attributes: List, num_highlights: int = 1):
+        
+        self.results = results
+        self.image_attributes = image_attributes
+        self.num_highlights = num_highlights
 
-        # TODO find out why batching images does not work 
-        for image, content in zip(self.images, self.content):
-            self.processed_inputs = _process_owl_inputs(self.processor, [[query]], image)
+        if not isinstance(results, (dict, defaultdict)):
+            raise TypeError(f"expected a dict or defaultdict, received {type(results)}")
+
+        if len(results[ResultsFields.hits]) == 0:
+            logger.warning("empty results for re-ranking. returning doing nothing...")
+            return 
+
+        if self.model is None:
+            self.load_model()
+
+        self.format_results(results)
+
+        # first stage of formatting converts results dict to dataframe
+        self.inputs_df = self.formatted_results.format_for_model(self.formatted_results.results_df, self.image_attributes, query=query)
+        
+        # final stage creates list of lists of strings to go straight to the model
+        self.model_inputs = self._prepare_inputs(self.inputs_df)
+
+        # todo unzip and get image location
+        queries, image_names = zip(*self.model_inputs)
+
+        self.images, self.original_sizes = self.load_images(image_names, self.image_size)
+
+        # # TODO check query type before making a list
+        _b, _s, _i, _bo = [], [], [], []
+
+        # # TODO find out why batching images does not work 
+        for image, content, _query, orig_size in zip(self.images, image_names, queries, self.original_sizes):
+            self.processed_inputs = _process_owl_inputs(self.processor, _query, image)
             owl_results = _predict_owl(self.model, self.processed_inputs, 
                                 post_process_function=self.processor.post_process,
                         size=self.image_size)
 
             boxes, scores, identifier = _process_owl_result(owl_results, content)
+            boxes, scores, identifier = sort_owl_boxes_scores(boxes, scores, identifier)
+            boxes, scores, identifier = _keep_top_k(boxes, k=num_highlights), _keep_top_k(scores, k=num_highlights), _keep_top_k(identifier, k=num_highlights)
+
+            # just keep top from each image
+            _bo += [list(image_processor.rescale_box(b.detach().cpu().tolist(), self.image_size, orig_size)) for b in boxes]
+            # _os.append()
             _b.append(boxes)
             _s.append(scores)
             _i += identifier
-            _im.append(image)
-        t_predict = time.time()
-        boxes = torch.cat(_b)
-        scores = torch.cat(_s)
+
+        self.boxes_original = _bo           
+        self.boxes = torch.cat(_b)
+        self.scores = torch.cat(_s)
         self.identifier = _i
-        images = _im
-         
-        self.boxes, self.scores, self.identifier = sort_owl_boxes_scores(boxes, scores, self.identifier)
-        t_sort = time.time()
+        
+        self.boxes_scores_df = pd.DataFrame(zip(self.boxes.detach().cpu().tolist(), self.scores.detach().cpu().tolist(), 
+                                            self.identifier, self.boxes_original), 
+                                        columns=[Columns.bbox, ResultsFields.reranker_score, Columns.field_content, Columns.bbox_original])
 
-        timings = {"time_to_prepare_data":t_image_loaded - t_start, 'time_to_predict':t_predict-t_image_loaded, 'time_to_sort':t_sort - t_predict}
+        # now merge back with original - filed_content is the image pointer and can be used as the identifier
+        self.inputs_df = self.boxes_scores_df.merge(self.inputs_df, left_on=Columns.field_content, right_on=Columns.field_content)
 
-        # do you take 1 or n from each image?
-        # TODO prepatch if we want 
-        # TODO take top n from each one
-        results['reranked'] = {}
-        results['reranked'][ResultsFields.hits] = []
-        results['reranked'][ResultsFields.hits] = [{'boxes':self.boxes, 'scores':self.scores, 'identifier':self.identifier}]
-        results['reranked']['processTime'] = timings
 
-        return results
+        self.get_reranked_results(highlight_content_column=Columns.bbox_original)
+        
 
+@functools.lru_cache
 def _load_image(filename: str, size: Tuple = None) -> ImageType:
     """loads a PIL image
 
@@ -413,15 +470,8 @@ def _load_image(filename: str, size: Tuple = None) -> ImageType:
     Returns:
         ImageType: _description_
     """
-    is_url = validators.url(filename)
-    print(filename, is_url)
-    if is_url:
-        im = Image.open(requests.get(filename, stream=True).raw)
-    else:
-        im = Image.open(filename)    
-     
-    if size is None:
-        size = im.size
-    #im.draft('RGB', size)
-    im = im.resize(size).convert('RGB')
-    return im
+    im = _load_image_from_path(filename)
+    original_size = im.size
+    if size is not None:
+        im = im.resize(size).convert('RGB')
+    return im,original_size

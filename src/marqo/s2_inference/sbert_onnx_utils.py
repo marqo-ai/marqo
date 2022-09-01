@@ -117,6 +117,8 @@ class SBERT_ONNX(object):
         self.session = onnxruntime.InferenceSession(
             self.export_model_name, sess_options, providers=[self.fast_onnxprovider])
 
+        logger.info(f"loaded session {self.session.get_providers()}")
+
     def _convert_to_onnx(self) -> None:
         """converts from pytorch to onnx
         """

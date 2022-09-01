@@ -87,7 +87,8 @@ class IndexChunk:
 
     def __init__(self, config=None, index_name: str = None, docs: List[Dict] = [], 
                         auto_refresh: bool = False, batch_size: int = 50, 
-                        device: str = None, process_id: int = 0, threads_per_process: int = None):
+                        device: str = None, process_id: int = 0, 
+                        threads_per_process: int = None):
 
         self.config = copy.deepcopy(config)
         self.index_name = index_name
@@ -99,7 +100,7 @@ class IndexChunk:
         self.device = device
         self.process_id = process_id
         
-        self.config.indexing_device = device
+        self.config.indexing_device = device if device is not None else self.config.indexing_device
         self.threads_per_process = threads_per_process
 
     def process(self):  
@@ -158,7 +159,7 @@ def get_threads_per_process(processes: int):
     return max(1, total_cpu//processes)
 
 def add_documents_mp(config=None, index_name=None, docs=None, 
-                     auto_refresh=None, batch_size=50, processes=1):
+                     auto_refresh=None, batch_size=50, processes=1, device=None):
     """add documents using parallel processing using ray
     Args:
         documents (_type_): _description_
@@ -172,11 +173,14 @@ def add_documents_mp(config=None, index_name=None, docs=None,
     Returns:
         _type_: _description_
     """
+
+    selected_device = device if device is not None else config.indexing_device
+
     n_documents = len(docs)
 
     logger.info(f"found {n_documents} documents")
 
-    n_processes = get_processes(config.indexing_device, processes)
+    n_processes = get_processes(selected_device, processes)
     if n_documents < n_processes:
         n_processes = max(1, n_documents)
     
@@ -185,7 +189,7 @@ def add_documents_mp(config=None, index_name=None, docs=None,
     logger.info(f"using {n_processes} processes")
 
     # get the device ids for each process based on the process count and available devices
-    device_ids = get_device_ids(n_processes, config.indexing_device)
+    device_ids = get_device_ids(n_processes, selected_device)
 
     start  = time.time()
 
@@ -193,7 +197,7 @@ def add_documents_mp(config=None, index_name=None, docs=None,
                                 auto_refresh=auto_refresh, batch_size=batch_size, 
                                 process_id=p_id, device=device_ids[p_id], threads_per_process=threads_per_process) 
                                 for p_id,_docs in enumerate(np.array_split(docs, n_processes))]
-    logger.info('Performing parallel now...')
+    logger.info(f'Performing parallel now across devices {device_ids}...')
     with mp.Pool(n_processes) as pool:
         results = pool.map(_run_chunker, chunkers)
     end = time.time()

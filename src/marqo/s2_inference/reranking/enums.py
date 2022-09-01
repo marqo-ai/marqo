@@ -4,6 +4,9 @@ class Columns:
     original_field_name = 'original_field_name'
     field_name = 'field_name'
     field_content_original = 'field_content_original'
+    bbox = 'bbox'
+    bbox_original = 'bbox_original'
+    original_size = 'original_size'
 
 class ResultsFields:
     id = '_id'

@@ -185,7 +185,7 @@ def add_documents_orchestrator(
         device=None):
 
     if batch_size is None or batch_size == 0:
-        logger.info(f"batch_size={batch_size} and processes={processes} - not doing any batching")
+        logger.info(f"batch_size={batch_size} and processes={processes} - not doing any marqo side batching")
         return add_documents(
             config=config, index_name=index_name, docs=docs, auto_refresh=auto_refresh,
             device=device
@@ -199,6 +199,7 @@ def add_documents_orchestrator(
         results = parallel.add_documents_mp(
             config=config, index_name=index_name, docs=docs,
             auto_refresh=auto_refresh, batch_size=batch_size, processes=processes,
+            device=device
         )
         
         # we need to force the cache to update as it does not propagate using mp
@@ -285,6 +286,8 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
     new_fields = set()
     doc_ids_to_update = []
 
+    selected_device = config.indexing_device if device is None else device
+
     for doc in docs:
 
         indexing_instructions = {"index": {"_index": index_name}}
@@ -327,12 +330,12 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                     image_method = index_info.neural_settings[NsField.index_defaults][NsField.image_preprocessing][NsField.patch_method]
                     # the chunk_image contains the no-op logic as of now - method = None will be a no-op
                     content_chunks, text_chunks = image_processor.chunk_image(field_content, 
-                                    device=config.indexing_device, 
+                                    device=selected_device,
                                     method=image_method)            
                 
                 normalize_embeddings = index_info.neural_settings[NsField.index_defaults][NsField.normalize_embeddings]
                 infer_if_image = index_info.neural_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]
-                selected_device = config.indexing_device if device is None else device
+                
                 vector_chunks = s2_inference.vectorise(model_name=index_info.model_name, content=content_chunks,
                                                        device=selected_device, normalize_embeddings=normalize_embeddings,
                                                         infer=infer_if_image)
@@ -639,8 +642,10 @@ def _vector_text_search(
     except KeyError as e:
         raise errors.IndexNotFoundError(message="Tried to search a non-existent index: {}".format(index_name))
     selected_device = config.indexing_device if device is None else device
+
+    # TODO average over vectorized inputs with weights
     vectorised_text = s2_inference.vectorise(
-        model_name=index_info.model_name, content=text_processor.split_text(text)[0], 
+        model_name=index_info.model_name, content=text, 
         device=selected_device,
         normalize_embeddings=index_info.neural_settings['index_defaults']['normalize_embeddings'])[0]
 
