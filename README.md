@@ -21,7 +21,7 @@ A deep-learning powered, open-source search engine which seamlessly integrates w
 1. Marqo requires docker. To install docker go to https://docs.docker.com/get-docker/
 2. Use docker to run Marqo:
 ```bash
-docker run --name marqo --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:latest
+docker run --name marqo --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:0.0.2
 ```
 3. Install the Marqo client:
 ```bash
