@@ -99,6 +99,6 @@ def contextualise_filter(filter_string: str, simple_properties: typing.Iterable)
     """
     contextualised_filter = filter_string
     for field in simple_properties:
-        contextualised_filter = contextualised_filter.replace(field, f'{enums.NeuralField.chunks}.{field}')
+        contextualised_filter = contextualised_filter.replace(f'{field}:', f'{enums.NeuralField.chunks}.{field}:')
     return contextualised_filter
 
