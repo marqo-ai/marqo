@@ -41,12 +41,18 @@ Depending if you are running Marqo within Docker (steps B., C. and D.) or not (s
 Marqo outside Docker will rely on the system setup to use the GPU. If you can use a GPU normally with pytorch then it should be good to go. The usual caveats apply though, the CUDA version of pytorch will need to match that of the GPU drivers (see below on how to check).
 
 #### Using Marqo within Docker
-Currently, only CUDA based (Nvidia) GPU's are supported. If you have a GPU on the host machine and want to use it with Marqo, there are two things to do first; 
+Currently, only CUDA based (Nvidia) GPU's are supported. If you have a GPU on the host machine and want to use it with Marqo, there are two things to do; 
 1. Add the `--gpus all` flag to the `docker run` command. This command excluded from the above but will allow the GPU's to be used within Marqo. For example, in the steps B., C., and D., above `--gpus all` should be added after the 
-`docker run --name marqo` part of the command, e.g. 
-`docker run --name marqo` -> `docker run --name marqo --gpus all`.
+`docker run --name marqo` part of the command, e.g. B. from above would become,
+```bash
+docker rm -f marqo &&
+     DOCKER_BUILDKIT=1 docker build . -t marqo_docker_0 && 
+     docker run --name marqo --gpus all --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway \
+         -e "OPENSEARCH_URL=https://localhost:9200" marqo_docker_0
+```
+note the `--gpus all` has been added.
 
-2. Install [nvidia-docker2](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html) which is required for the GPU to work with Docker. The [link]((https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html) provided has instructions for installing it but it should consist of only a couple of steps (refer to the link for full details). The three steps below should install it for a Ubuntu based machine;  
+2. Install [nvidia-docker2](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html) which is required for the GPU to work with Docker. The [link](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html) provided has instructions for installing it but it should consist of only a couple of steps (refer to the link for full details). The three steps below should install it for a Ubuntu based machine;  
 ```
 $ distribution=$(. /etc/os-release;echo $ID$VERSION_ID) \
       && curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg \
@@ -57,7 +63,7 @@ $ distribution=$(. /etc/os-release;echo $ID$VERSION_ID) \
 $ sudo apt-get update
 $ sudo apt-get install -y nvidia-docker2
 ```
-Once this is installed, one of the previous Docker commands acan be run (either step B., C., or D.).
+Once this is installed, one of the previous Docker commands can be run (either step B., C., or D.).
 
 #### Troubleshooting
 ##### Drivers
@@ -84,4 +90,4 @@ To check your driver and maximum CUDA version supported, type the following into
 ```
 nvidia-smi
 ```
-Pytorch comes with its own bundled CUDA which allows many different CUDA versions to be used. Follow the (getting started)[https://pytorch.org/get-started/locally/] to see how to install different versions of pytorch and CUDA.
+Pytorch comes with its own bundled CUDA which allows many different CUDA versions to be used. Follow the [getting started](https://pytorch.org/get-started/locally/) to see how to install different versions of pytorch and CUDA.
