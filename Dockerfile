@@ -4,12 +4,10 @@
 # export BUILDKIT_PROGRESS=plain; docker rm -f marqo; DOCKER_BUILDKIT=1 docker build --no-cache . -t marqo_docker_0 && docker run --name marqo --privileged -p 8882:8882 marqo_docker_0
 ARG CUDA_VERSION=11.4.2
 FROM nvidia/cuda:${CUDA_VERSION}-cudnn8-runtime-ubuntu20.04 as cuda_image
-CMD nvidia-smi
 
 FROM cruizba/ubuntu-dind
 # this is required for onnx to find cuda
 COPY --from=cuda_image /usr/local/cuda/ /usr/local/cuda/
-FROM cruizba/ubuntu-dind
 WORKDIR /app
 RUN apt-get update
 RUN apt-get install ca-certificates curl  gnupg lsof lsb-release jq -y
