@@ -4,7 +4,6 @@ from fastapi.responses import JSONResponse
 import marqo.neural_search.utils
 from models.api_models import SearchQuery
 from fastapi import FastAPI, Request, Depends, HTTPException
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from marqo.errors import MarqoWebError, MarqoError
 from fastapi import FastAPI
 from marqo.neural_search import neural_search
@@ -49,7 +48,7 @@ on_start()
 app = FastAPI()
 
 
-async def generate_config(creds: HTTPBasicCredentials = Depends(security)):
+async def generate_config():
     authorized_url = marqo.neural_search.utils.construct_authorized_url(
         url_base=OPENSEARCH_URL,
         username="admin",
