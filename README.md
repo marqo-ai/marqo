@@ -32,7 +32,7 @@ pip install marqo
 ```python
 import marqo
 
-mq = marqo.Client(url='http://localhost:8882', main_user="admin", main_password="admin")
+mq = marqo.Client(url='http://localhost:8882')
 
 mq.index("my-first-index").add_documents([
     {
