@@ -1,16 +1,11 @@
 """The API entrypoint for Neural Search"""
-import json
-import pprint
-from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 
 import marqo.neural_search.utils
 from models.api_models import SearchQuery
 from fastapi import FastAPI, Request, Depends, HTTPException
-from fastapi.exception_handlers import http_exception_handler
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from marqo.errors import MarqoWebError, MarqoError
-from typing import Union
 from fastapi import FastAPI
 from marqo.neural_search import neural_search
 from marqo import config
@@ -50,7 +45,6 @@ OPENSEARCH_URL = replace_host_localhosts(
     os.environ["OPENSEARCH_URL"])
 
 
-security = HTTPBasic()
 on_start()
 app = FastAPI()
 
@@ -58,8 +52,8 @@ app = FastAPI()
 async def generate_config(creds: HTTPBasicCredentials = Depends(security)):
     authorized_url = marqo.neural_search.utils.construct_authorized_url(
         url_base=OPENSEARCH_URL,
-        username=creds.username,
-        password=creds.password
+        username="admin",
+        password="admin"
     )
     return config.Config(url=authorized_url)
 
@@ -180,7 +174,6 @@ async def refresh_index(index_name: str, marqo_config: config.Config = Depends(g
     return neural_search.refresh_index(
         index_name=index_name, config=marqo_config,
     )
-
 
 # try these curl commands:
 
