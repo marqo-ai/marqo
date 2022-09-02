@@ -4,10 +4,10 @@ import logging
 from urllib import parse
 from datetime import datetime
 from typing import Any, Dict, Generator, List, Optional, Union
-from marqo.neural_search import neural_search
+from marqo.tensor_search import tensor_search
 from marqo._httprequests import HttpRequests
 from marqo.config import Config
-from marqo.neural_search.enums import MediaType
+from marqo.tensor_search.enums import MediaType
 from marqo.marqo_logging import logger
 from marqo.enums import SearchMethods
 from marqo import errors
@@ -54,7 +54,7 @@ class Index():
         s2SearchApiError
             An error containing details about why marqo can't process your request. marqo error codes are described here: https://docs.marqo.com/errors/#marqo-errors
         """
-        return neural_search.delete_index(config=self.config, index_name=self.index_name)
+        return tensor_search.delete_index(config=self.config, index_name=self.index_name)
 
     @staticmethod
     def create(config: Config, index_name: str,
@@ -86,8 +86,8 @@ class Index():
             An error containing details about why marqo can't process your request. marqo error codes are described here: https://docs.marqo.com/errors/#marqo-errors
         """
         # call via API
-        return neural_search.create_vector_index(
-            config=config, index_name=index_name, media_type=MediaType.default, neural_settings={
+        return tensor_search.create_vector_index(
+            config=config, index_name=index_name, media_type=MediaType.default, index_settings={
                 "index_defaults": {
                     "treat_urls_and_pointers_as_images": treat_urls_and_pointers_as_images,
                     "model": model,
@@ -110,7 +110,7 @@ class Index():
         return self.http.post(path=F"{self.index_name}/_refresh")
 
     def search(self, q: str, searchable_attributes: Optional[List[str]]=None,
-               limit: int=10, search_method: Union[SearchMethods.NEURAL, str] = SearchMethods.NEURAL,
+               limit: int=10, search_method: Union[SearchMethods.TENSOR, str] = SearchMethods.TENSOR,
                highlights=True, reranker=None
                ) -> Dict[str, Any]:
         """Search in the index.
@@ -134,7 +134,7 @@ class Index():
         s2SearchApiError
             An error containing details about why marqo can't process your request. marqo error codes are described here: https://docs.marqo.com/errors/#marqo-errors
         """
-        return neural_search.search(
+        return tensor_search.search(
             config=self.config, index_name=self.index_name, text=q, return_doc_ids=True,
             searchable_attributes=searchable_attributes, search_method=search_method, result_count=limit,
             highlights=highlights, reranker=reranker)
@@ -158,7 +158,7 @@ class Index():
         s2SearchApiError
             An error containing details about why marqo can't process your request. marqo error codes are described here: https://docs.marqo.com/errors/#marqo-errors
         """
-        return neural_search.get_document_by_id(
+        return tensor_search.get_document_by_id(
             config=self.config, index_name=self.index_name, document_id=document_id)
 
     def add_documents(
@@ -187,7 +187,6 @@ class Index():
         -------
         We need to translate into this endpoint: https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html
 
-        See Jesse's code for JSONL: https://github.com/S2Search/NeuralSearchPOC/blob/main/data/csv_to_json.py#L152
         Raises
         ------
         s2SearchApiError
@@ -195,10 +194,10 @@ class Index():
         """
 
         if batch_size is None:
-            return neural_search.add_documents(
+            return tensor_search.add_documents(
                 config=self.config, index_name=self.index_name, docs=documents, auto_refresh=auto_refresh)
         elif use_parallel:
-            from marqo.neural_search import parallel
+            from marqo.tensor_search import parallel
             return parallel.add_documents_mp(config=self.config, index_name=self.index_name, docs=documents, auto_refresh=auto_refresh, batch_size=batch_size)
         else:
             if batch_size <= 0:
@@ -225,13 +224,13 @@ class Index():
         s2SearchApiError
             An error containing details about why marqo can't process your request. marqo error codes are described here: https://docs.marqo.com/errors/#marqo-errors
         """
-        return neural_search.delete_documents(
+        return tensor_search.delete_documents(
             config=self.config, index_name=self.index_name, doc_ids=ids,
             auto_refresh=auto_refresh)
 
     def get_stats(self) -> Dict[str, Any]:
         """Get stats of the index"""
-        return neural_search.get_stats(config=self.config, index_name=self.index_name)
+        return tensor_search.get_stats(config=self.config, index_name=self.index_name)
 
     @staticmethod
     def _maybe_datetime(the_date: Optional[Union[datetime, str]]) -> Optional[datetime]:
@@ -264,7 +263,7 @@ class Index():
 
         def verbosely_add_docs(i, docs):
             t0 = datetime.now()
-            res = neural_search.add_documents(
+            res = tensor_search.add_documents(
                 config=self.config, index_name=self.index_name,
                 docs=docs, auto_refresh=False)
             total_batch_time = datetime.now() - t0

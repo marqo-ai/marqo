@@ -1,4 +1,4 @@
-# neural search:
+# tensor search:
 requests
 fastapi
 uvicorn[standard]

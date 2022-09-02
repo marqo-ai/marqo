@@ -1,13 +1,20 @@
+
 ### A. Run the Marqo application locally (outside of docker):
 
-1. `cd` into `src/marqo/neuralsearch`
+1. `cd` into `src/marqo/tensor_search`
 2. Run the following command:
 ```bash
-# if you are running OpenSearch locally, or add an external URL 
+# if you are running OpenSearch locally. 
 export OPENSEARCH_URL="https://localhost:9200" && 
     export PYTHONPATH="${PYTHONPATH}:<your path here>/marqo/src" &&
     uvicorn api:app --host 0.0.0.0 --port 8882 --reload
 ```
+__Notes__:
+
+- This is for marqo-os (Marqo OpenSearch) running locally. You can alternatively set
+`OPENSEARCH_URL` to  a remote Marqo OpenSearch cluster 
+- 
+
 
 ### B. Build and run the Marqo as a Docker container, that creates and manages its own internal OpenSearch 
 1. `cd` into the marqo root directory

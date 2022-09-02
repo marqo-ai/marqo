@@ -7,13 +7,13 @@ import nltk
 import ssl
 from typing import Any, Dict, List, Optional, Union
 
-import marqo.neural_search.utils
+import marqo.tensor_search.utils
 from marqo.index import Index
 from marqo.enums import Devices
 from marqo.config import Config
 from marqo._httprequests import HttpRequests
 from marqo.errors import MarqoError
-from marqo.neural_search import neural_search, index_meta_cache
+from marqo.tensor_search import tensor_search, index_meta_cache
 import urllib3
 from marqo import enums
 
@@ -40,7 +40,7 @@ class Client:
         self.main_user = main_user
         self.main_password = main_password
         if (main_user is not None) and (main_password is not None):
-            self.url = marqo.neural_search.utils.construct_authorized_url(url_base=url, username=main_user, password=main_password)
+            self.url = marqo.tensor_search.utils.construct_authorized_url(url_base=url, username=main_user, password=main_password)
         else:
             self.url = url
         self.config = Config(self.url, indexing_device=indexing_device, search_device=search_device)
@@ -49,7 +49,7 @@ class Client:
         if not self.config.cluster_is_s2search:
             self._turn_off_auto_create_index()
 
-    # move into neural search
+    # move into tensor_search
     def _turn_off_auto_create_index(self):
         """turns off auto creation of indices. To be run in client instantiation"""
         self.http.put(
@@ -113,7 +113,7 @@ class Client:
             An error containing details about why marqo can't process your request. marqo error codes are described here: https://docs.marqo.com/errors/#marqo-errors
         """
 
-        return neural_search.delete_index(config=self.config, index_name=index_name)
+        return tensor_search.delete_index(config=self.config, index_name=index_name)
 
     def get_index(self, index_name: str) -> Index:
         """Get the index.
