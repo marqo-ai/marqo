@@ -21,7 +21,7 @@ A tensor search framework which seamlessly integrates with your applications, we
 1. Marqo requires docker. To install docker go to https://docs.docker.com/get-docker/
 2. Use docker to run Marqo:
 ```bash
-docker run --name marqo --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:0.0.1
+docker run --name marqo --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:0.0.2
 ```
 3. Install the Marqo client:
 ```bash
