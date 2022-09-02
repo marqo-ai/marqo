@@ -12,7 +12,7 @@
   <a align="center" href="https://join.slack.com/t/marqo-community/shared_invite/zt-1d737l76e-u~b3Rvey2IN2nGM4wyr44w"><img src="https://img.shields.io/badge/Slack-blueviolet?logo=slack&amp;logoColor=white&style=flat-square"></a>
 </p>
 
-An open-source tensor search framework which seamlessly integrates with your applications, websites, and workflow. 
+An open-source tensor search framework that seamlessly integrates with your applications, websites, and workflow. 
 
 <!-- end marqo-description -->
 
