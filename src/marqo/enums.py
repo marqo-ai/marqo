@@ -3,7 +3,7 @@
 
 class SearchMethods:
     LEXICAL = "LEXICAL"
-    NEURAL = "NEURAL"
+    TENSOR = "TENSOR"
 
 
 class Devices:

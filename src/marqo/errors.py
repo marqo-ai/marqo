@@ -131,8 +131,8 @@ class DocumentNotFoundError(__InvalidRequestError):
     status_code = HTTPStatus.NOT_FOUND
 
 
-class NonNeuralIndexError(__InvalidRequestError):
-    """Error trying to use a non-neural OpenSearch index like a neural one"""
+class NonTensorIndexError(__InvalidRequestError):
+    """Error trying to use a non-tensor OpenSearch index like a tensor one"""
     code = "document_not_found"
     status_code = HTTPStatus.NOT_FOUND
 

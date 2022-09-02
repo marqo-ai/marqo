@@ -69,8 +69,8 @@ fi
 
 export OPENSEARCH_URL
 export OPENSEARCH_IS_INTERNAL
-# Start the neural search web app in the background
-cd /app/src/marqo/neural_search || exit
+# Start the tensor search web app in the background
+cd /app/src/marqo/tensor_search || exit
 uvicorn api:app --host 0.0.0.0 --port 8882
 
 # Wait for any process to exit

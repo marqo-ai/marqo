@@ -56,7 +56,7 @@ def clear_loaded_models() -> None:
 def get_model_properties(model_name: str) -> dict:
     """ Returns a dict describing properties of a model.
 
-    These properties will be used by the Neural_Search application to set up
+    These properties will be used by the tensor_search application to set up
     index parameters.
 
     see https://huggingface.co/sentence-transformers for available models
@@ -175,7 +175,7 @@ def _convert_vectorized_output(output: Union[FloatTensor, ndarray, List[List[flo
 def _get_model_loader(model_name: str) -> Any:
     """ Returns a dict describing properties of a model.
 
-    These properties will be used by the Neural_Search application to set up
+    These properties will be used by the tensor_search application to set up
     index parameters.
 
     see https://huggingface.co/sentence-transformers for available models

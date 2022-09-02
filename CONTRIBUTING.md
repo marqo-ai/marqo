@@ -1,4 +1,4 @@
-Thank you for your interest in making neural search more accessible!
+Thank you for your interest in making tensor search more accessible!
 
 ---
 
