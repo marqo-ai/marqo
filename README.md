@@ -5,7 +5,7 @@
 <h1 align="center">Marqo</h1>
 
 <p align="center">
-  <b>Neural search for humans.</b>
+  <b>Tensor search for humans.</b>
 </p>
 
 <p align="center">
@@ -125,7 +125,7 @@ result =  mq.index("my-first-index").search('marco polo', search_method=marqo.Se
 ```
 
 ### Search specific fields
-Using the default neural search method
+Using the default tensor search method
 ```python
 result = mq.index("my-first-index").search('adventure', searchable_attributes=['Title'])
 ```
@@ -218,7 +218,7 @@ found here https://pytorch.org/get-started/locally/ and previous versions with o
 Note that you should not run other applications on Marqo's Opensearch cluster as Marqo automatically changes and adapts the settings on the cluster.
 
 ## Contributors
-Marqo is a community project with the goal of making neural search accessible to the wider developer community. We are glad that you are interested in helping out! Please read [this](./CONTRIBUTING.md) to get started
+Marqo is a community project with the goal of making tensor search accessible to the wider developer community. We are glad that you are interested in helping out! Please read [this](./CONTRIBUTING.md) to get started
 
 ## Dev set up
 1. Create a virtual env ```python -m venv ./venv```
@@ -230,10 +230,6 @@ Marqo is a community project with the goal of making neural search accessible to
 ## Merge instructions:
 1. Run the full test suite (by using the command `tox` in this dir).
 2. Create a pull request with an attached github issue.
-
-The large data test will 
-build Marqo from the main branch and fill indices with data. Go through and test queries 
-against this data. https://github.com/S2Search/NeuralSearchLargeDataTest
 
 <!-- start support-pitch -->
 
