@@ -130,6 +130,20 @@ Using the default tensor search method
 result = mq.index("my-first-index").search('adventure', searchable_attributes=['Title'])
 ```
 
+### Delete documents
+Delete documents.
+
+```python
+results = mq.index("my-first-index").delete_documents(ids=["article_591", "article_602"])
+```
+
+### Delete index
+Delete an index.
+
+```python
+results = mq.index("my-first-index").delete()
+```
+
 ## Multi modal and cross modal search
 
 To power image and text search, Marqo allows users to plug and play with CLIP models from HuggingFace. **Note that if you do not configure multi modal search, image urls will be treated as strings.** To start indexing and searching with images, first create an index with a CLIP configuration, as below:
@@ -176,42 +190,6 @@ results = mq.index("my-multimodal-index").search('https://upload.wikimedia.org/w
 ```
 
 
-### Delete index
-Delete an index.
-
-```python
-results = mq.index("my-first-index").delete()
-```
-
-
-### Delete documents
-Delete documents.
-
-```python
-results = mq.index("my-first-index").delete_documents(ids=["article_591", "article_602"])
-```
-
-
-
-## A note when using a GPU
-Depending on the class of GPU, a version of PyTorch compiled with the latest CUDA (>11.3) may be required. 
-If for example, an error appears similar to the following;
-
-```
-NVIDIA #### with CUDA capability sm_86 is not compatible with the current PyTorch installation.
-The current PyTorch install supports CUDA capabilities sm_37 sm_50 sm_60 sm_70.
-If you want to use the NVIDIA #### GPU with PyTorch, please check the instructions at https://pytorch.org/get-started/locally/
-```
-then PyTorch with the appropriate CUDA should be installed. For example, to install PyTorch 1.12 with CUDA 11.6 do the following;
-```
-pip3 install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu116 --upgrade
-```
-It should be noted that the CUDA version the current driver supports can be obtained by using the following command in the terminal;
-```
-$nvidia-smi
-```
-The respective PyTorch installation should have a CUDA version that does not exceed this. PyTorch installation instrucitons can be
-found here https://pytorch.org/get-started/locally/ and previous versions with other CUDA options can be found at https://pytorch.org/get-started/previous-versions/.
 
 ## Warning
 
