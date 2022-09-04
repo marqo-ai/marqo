@@ -47,9 +47,9 @@ OPENSEARCH_IS_INTERNAL=False
 if [[ ! $OPENSEARCH_URL ]]; then
   OPENSEARCH_URL="https://localhost:9200"
   OPENSEARCH_IS_INTERNAL=True
-  if [[ $(docker ps -a | grep opensearch) ]]; then
-      if [[ $(docker ps -a | grep opensearch | grep -v Up) ]]; then
-        docker start opensearch &
+  if [[ $(docker ps -a | grep marqo-os) ]]; then
+      if [[ $(docker ps -a | grep marqo-os | grep -v Up) ]]; then
+        docker start marqo-os &
         until [[ $(curl -v --silent --insecure $OPENSEARCH_URL 2>&1 | grep Unauthorized) ]]; do
           sleep 0.1;
         done;
@@ -58,7 +58,6 @@ if [[ ! $OPENSEARCH_URL ]]; then
       echo "OpenSearch is running"
   else
       echo "OpenSearch not found; running OpenSearch"
-#      docker run --name opensearch -id -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" opensearchproject/opensearch:2.1.0 &
       docker run --name marqo-os -id -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" marqoai/marqo-os:0.0.2 &
       docker start marqo-os &
       until [[ $(curl -v --silent --insecure $OPENSEARCH_URL 2>&1 | grep Unauthorized) ]]; do
