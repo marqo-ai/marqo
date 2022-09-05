@@ -5,7 +5,9 @@ from marqo.tensor_search.utils import construct_authorized_url
 from marqo import config
 
 
-def generate_config(opensearch_url) -> config.Config:
+def upconstruct_authorized_url(opensearch_url: str) -> str:
+    """Generates an authorized URL, if it is not already authorized
+    """
     http_sep = "://"
     if http_sep not in opensearch_url:
         raise InternalError(f"Could not parse backend url: {opensearch_url}")
@@ -17,7 +19,7 @@ def generate_config(opensearch_url) -> config.Config:
         )
     else:
         authorized_url = opensearch_url
-    return config.Config(url=authorized_url)
+    return authorized_url
 
 
 def translate_api_device(device: Optional[str]) -> Optional[str]:

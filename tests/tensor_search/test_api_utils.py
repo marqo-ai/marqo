@@ -34,13 +34,13 @@ class TestApiUtils(MarqoTestCase):
                 ("http://www.unusual.com/happy@@@@#chappy:9200", "http://admin:admin@www.unusual.com/happy@@@@#chappy:9200"),
                 ("://", "://admin:admin@")
                 ]:
-            c = api_utils.generate_config(opensearch_url=opensearch_url)
+            c = api_utils.upconstruct_authorized_url(opensearch_url=opensearch_url)
             assert authorized_url == c.url
 
     def test_generate_config_bad_url(self):
         for opensearch_url in ["www.google.com", "http:/mywebsite", "yahoo"]:
             try:
-                c = api_utils.generate_config(opensearch_url=opensearch_url)
+                c = api_utils.upconstruct_authorized_url(opensearch_url=opensearch_url)
                 raise AssertionError
             except InternalError:
                 pass
