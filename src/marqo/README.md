@@ -38,7 +38,8 @@ docker rm -f marqo &&
 
 ### D. Pull marqo from `hub.docker.com` and run it
 ```
-docker run --name marqo --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:0.0.1
+docker rm -f marqo &&
+    docker run --name marqo --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:0.0.3
 ```
 
 ### Using Marqo with a GPU
