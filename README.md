@@ -11,6 +11,11 @@
 <p align="center">
   <a align="center" href="https://join.slack.com/t/marqo-community/shared_invite/zt-1d737l76e-u~b3Rvey2IN2nGM4wyr44w"><img src="https://img.shields.io/badge/Slack-blueviolet?logo=slack&amp;logoColor=white&style=flat-square"></a>
 </p>
+<p align="center">
+<a href="https://hub.docker.com/r/marqoai/marqo/tags"><img alt="Docker Hub" src="https://img.shields.io/docker/v/marqoai/marqo?&label=Version&sort=date&style=flat-square"></a> 
+<a href="https://hub.docker.com/r/marqoai/marqo"><img alt="Docker pull stats" src="https://img.shields.io/docker/pulls/marqoai/marqo?label=Docker%20Pulls&style=flat-square"></a>
+<a href="https://pypistats.org/packages/marqo"><img alt="PyPI - Downloads from official pypistats" src="https://img.shields.io/pypi/dm/marqo?label=Downloads&style=flat-square"></a>
+</p>
 
 An open-source tensor search framework that seamlessly integrates with your applications, websites, and workflow. 
 
