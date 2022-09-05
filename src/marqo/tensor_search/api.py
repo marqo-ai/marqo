@@ -1,7 +1,5 @@
 """The API entrypoint for Tensor Search"""
 from fastapi.responses import JSONResponse
-
-import marqo.tensor_search.utils
 from models.api_models import SearchQuery
 from fastapi import FastAPI, Request, Depends, HTTPException
 from marqo.errors import MarqoWebError, MarqoError
@@ -11,7 +9,6 @@ from marqo import config
 from typing import List, Dict
 import os
 from marqo.tensor_search.web import api_validation, api_utils
-
 from marqo.tensor_search.on_start_script import on_start
 
 
@@ -48,13 +45,10 @@ on_start()
 app = FastAPI()
 
 
-async def generate_config():
-    authorized_url = marqo.tensor_search.utils.construct_authorized_url(
-        url_base=OPENSEARCH_URL,
-        username="admin",
-        password="admin"
-    )
-    return config.Config(url=authorized_url)
+async def generate_config() -> config.Config:
+    return config.Config(api_utils.upconstruct_authorized_url(
+        opensearch_url=OPENSEARCH_URL
+    ))
 
 
 @app.exception_handler(MarqoWebError)
@@ -109,7 +103,7 @@ async def create_index(index_name: str, settings: Dict = None, marqo_config: con
 
 @app.post("/indexes/{index_name}/search")
 async def search(search_query: SearchQuery, index_name: str, device: str = None,
-                 marqo_config: config.Config = Depends(generate_config)):
+                  marqo_config: config.Config = Depends(generate_config)):
     device = api_utils.translate_api_device(api_validation.validate_api_device(device))
     return tensor_search.search(
         config=marqo_config, text=search_query.q,
@@ -122,7 +116,7 @@ async def search(search_query: SearchQuery, index_name: str, device: str = None,
 
 
 @app.post("/indexes/{index_name}/documents")
-async def add_documents(docs: List[Dict], index_name: str,  refresh: bool = True,
+async def add_documents(docs: List[Dict], index_name: str, refresh: bool = True,
                         marqo_config: config.Config = Depends(generate_config),
                         batch_size: int = 0, processes: int = 1, device: str = None):
     """add_documents endpoint"""

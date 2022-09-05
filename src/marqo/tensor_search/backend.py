@@ -74,6 +74,11 @@ def add_customer_field_properties(config: Config, index_name: str,
     Returns:
         HTTP Response
     """
+    if config.cluster_is_s2search:
+        engine = "nmslib"
+    else:
+        engine = "lucene"
+
     body = {
         "properties": {
             enums.TensorField.chunks: {
@@ -86,7 +91,7 @@ def add_customer_field_properties(config: Config, index_name: str,
                         "method": {
                             "name": "hnsw",
                             "space_type": "cosinesimil",
-                            "engine": "lucene",  # or try Lucene
+                            "engine": engine,
                             "parameters": {
                                 "ef_construction": 128,
                                 "m": 24
