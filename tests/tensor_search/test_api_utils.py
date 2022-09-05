@@ -35,7 +35,7 @@ class TestApiUtils(MarqoTestCase):
                 ("://", "://admin:admin@")
                 ]:
             c = api_utils.upconstruct_authorized_url(opensearch_url=opensearch_url)
-            assert authorized_url == c.url
+            assert authorized_url == c
 
     def test_generate_config_bad_url(self):
         for opensearch_url in ["www.google.com", "http:/mywebsite", "yahoo"]:

@@ -637,6 +637,11 @@ def _vector_text_search(
         raise errors.InvalidArgError(
             "tensor_search: vector_text_search: illegal result_count: {}".format(result_count))
 
+    if config.cluster_is_s2search and filter_string is not None:
+        raise errors.InvalidArgError(
+            "filtering not yet implemented for S2Search cloud!"
+        )
+
     try:
         index_info = get_index_info(config=config, index_name=index_name)
     except KeyError as e:
