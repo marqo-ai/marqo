@@ -1,6 +1,23 @@
-from marqo.errors import InvalidArgError
+from marqo.errors import InvalidArgError, InternalError
 from marqo.tensor_search import enums
 from typing import Optional
+from marqo.tensor_search.utils import construct_authorized_url
+from marqo import config
+
+
+def generate_config(opensearch_url) -> config.Config:
+    http_sep = "://"
+    if http_sep not in opensearch_url:
+        raise InternalError(f"Could not parse backend url: {opensearch_url}")
+    if "@" not in opensearch_url.split("/")[2]:
+        authorized_url = construct_authorized_url(
+            url_base=opensearch_url,
+            username="admin",
+            password="admin"
+        )
+    else:
+        authorized_url = opensearch_url
+    return config.Config(url=authorized_url)
 
 
 def translate_api_device(device: Optional[str]) -> Optional[str]:

@@ -1,7 +1,5 @@
 """The API entrypoint for Tensor Search"""
 from fastapi.responses import JSONResponse
-
-import marqo.tensor_search.utils
 from models.api_models import SearchQuery
 from fastapi import FastAPI, Request, Depends, HTTPException
 from marqo.errors import MarqoWebError, MarqoError
@@ -11,7 +9,7 @@ from marqo import config
 from typing import List, Dict
 import os
 from marqo.tensor_search.web import api_validation, api_utils
-
+from marqo.tensor_search.web.api_utils import generate_config
 from marqo.tensor_search.on_start_script import on_start
 
 
@@ -46,15 +44,6 @@ OPENSEARCH_URL = replace_host_localhosts(
 
 on_start()
 app = FastAPI()
-
-
-async def generate_config():
-    authorized_url = marqo.tensor_search.utils.construct_authorized_url(
-        url_base=OPENSEARCH_URL,
-        username="admin",
-        password="admin"
-    )
-    return config.Config(url=authorized_url)
 
 
 @app.exception_handler(MarqoWebError)
