@@ -501,7 +501,7 @@ class TestVectorSearch(MarqoTestCase):
              ("my_int:5", "other doc"), ("my_int:[1 TO 10]", "other doc"),
              ("a_float:0.61", "123456"), ("field1:(other things)", "123456"),
              ("fake_int:234", "other doc"), ("fake_float:1.23", "other doc"),
-             ("fake_float:[0 TO 2]", "other doc"), ("gapped\ field_name:gap")
+             ("fake_float:[0 TO 2]", "other doc"), ("gapped\ field_name:gap", "other doc")
         ]
 
         for filter, expected in pairs:
