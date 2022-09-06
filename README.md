@@ -16,6 +16,20 @@
 
 An open-source tensor search framework that seamlessly integrates with your applications, websites, and workflow. 
 
+## What is tensor search?
+
+Tensor search allows documents, images and other data to be searched directly by using deep-learning to transform them into a collection of vectors called a "tensor". Representing data as tensors allows us to match documents against queries through human-like understanding of the document's content. Tensor search can power search for a variety of use cases such as:
+- end user search and recommendations
+- multi-modal search (image-to-image, text-to-image, image-to-text)
+- chat bots and question and answer systems
+- text and image classification
+
+Marqo is rich in functionality and supports features such as:
+- end to end support for image and text data types
+- a query DSL language for pre-filtering based on metadata
+- result highlighting
+- configurability of models - plug and play from a selection of models from Huggingface
+
 <!-- end marqo-description -->
 
 ## Getting started
