@@ -18,7 +18,7 @@ An open-source tensor search framework that seamlessly integrates with your appl
 
 ## What is tensor search?
 
-Tensor search uses deep-learning to transform documents, images and other data into a collections of vectors called "tensors". Representing data as tensors allows us to match queries against documents through human-like understanding of the query and document's content. Tensor search can power a variety of use cases such as:
+Tensor search uses deep-learning to transform documents, images and other data into collections of vectors called "tensors". Representing data as tensors allows us to match queries against documents with human-like understanding of the query and document's content. Tensor search can power a variety of use cases such as:
 - end user search and recommendations
 - multi-modal search (image-to-image, text-to-image, image-to-text)
 - chat bots and question and answer systems
