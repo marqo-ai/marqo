@@ -24,12 +24,6 @@ Tensor search allows documents, images and other data to be searched directly by
 - chat bots and question and answer systems
 - text and image classification
 
-Marqo is rich in functionality and supports features such as:
-- end to end support for image and text data types
-- a query DSL language for pre-filtering based on metadata
-- result highlighting
-- configurability of models - plug and play from a selection of models from Huggingface
-
 <!-- end marqo-description -->
 
 ## Getting started
