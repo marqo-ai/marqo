@@ -23,3 +23,22 @@ We welcome contributions to the codebase. Here are some coding guidelines to fol
 - In-between minor releases, we can release bug-fixes by bumping the patch number: 0.34.6 -> 0.34.7
 - If there are any breaking changes, there will be a major release: 5.39.55 -> 6.39.55
 - Not that pre-version 1.x.x, because this is the pre-release stage, breaking functionality may be introduced in minor versions.
+
+### Testing
+Notes: 
+
+- if you don't have the exact python version specified in the `tox.ini` file, you can run tox like `tox -e py` which tells `tox` to use whatever python version it finds on your machine. 
+- Be very careful if your environment has access to a Marqo production instance. These tests will arbitrarily modify, create and delete indices on the Marqo instances it uses for testing. 
+
+#### Unit tests
+To run unit tests, simple run `tox` in the Marqo home directory
+
+#### Integration  tests
+To run integration tests, pull the [api testing repo](https://github.com/marqo-ai/marqo-api-tests). 
+Then, follow the instructions in the [README](https://github.com/marqo-ai/marqo-api-tests#readme)
+
+
+#### Testing Marqo python client
+The Python Marqo client has its own test suite. Clone [the repo](https://github.com/marqo-ai/py-marqo), `cd` into the client home directory and then run `tox`.
+
+
