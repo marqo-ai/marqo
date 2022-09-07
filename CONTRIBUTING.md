@@ -27,7 +27,7 @@ We welcome contributions to the codebase. Here are some coding guidelines to fol
 ### Testing
 Notes: 
 
-- if you don't have the exact python version specified in the `tox.ini` file, you can run tox like `tox -e py` which tells `tox` to use whatever python version it finds on your machine. 
+- If you don't have the exact python version specified in the `tox.ini` file, you can run tox like this: `tox -e py`. This tells `tox` to use whatever python version it finds on your machine. 
 - Be very careful if your environment has access to a Marqo production instance. These tests will arbitrarily modify, create and delete indices on the Marqo instances it uses for testing. 
 
 #### Unit tests
@@ -35,7 +35,7 @@ To run unit tests, simple run `tox` in the Marqo home directory
 
 #### Integration  tests
 To run integration tests, pull the [api testing repo](https://github.com/marqo-ai/marqo-api-tests). 
-Then, follow the instructions in the [README](https://github.com/marqo-ai/marqo-api-tests#readme)
+Then, follow the instructions in the [README](https://github.com/marqo-ai/marqo-api-tests#readme).
 
 
 #### Testing Marqo python client
