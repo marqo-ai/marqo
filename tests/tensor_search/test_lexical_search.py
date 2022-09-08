@@ -293,3 +293,21 @@ class TestlexicalSearch(MarqoTestCase):
         assert res["hits"][0]["_id"] == "123" or res["hits"][1]["_id"] == "123"
         assert res["hits"][0]["_id"] == "abcdef" or res["hits"][1]["_id"] == "abcdef"
 
+    def test_lexical_search_empty_searchable_attribs(self):
+        """Empty searchable attribs searches all fields"""
+        d0 = {
+            "some doc 1": "some FIELD 2", "_id": "alpha alpha",
+            "the big field": "extravagant very unlikely theory. marqo is pretty awesom, in the field"
+        }
+        d1 = {"title": "Marqo", "some doc 2": "some other thing", "_id": "abcdef"}
+        d2 = {"some doc 1": "some 2 jnkerkbj", "field abc": "extravagant robodog is not a cat", "_id": "Jupyter_12"}
+
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1, auto_refresh=True,
+            docs=[d0, d1, d2 ])
+        res = tensor_search._lexical_search(
+            config=self.config, index_name=self.index_name_1, text="extravagant",
+            return_doc_ids=True, searchable_attributes=[], result_count=3)
+        assert len(res["hits"]) == 2
+        assert (res["hits"][0]["_id"] == "alpha alpha") or (res["hits"][0]["_id"] == "Jupyter_12")
+        assert (res["hits"][0]["_id"] != "abcdef") and (res["hits"][0]["_id"] != "abcdef")
