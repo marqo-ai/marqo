@@ -33,7 +33,7 @@ Tensor search uses deep-learning to transform documents, images and other data i
 ## Getting started
 
 1. Marqo requires docker. To install docker go to https://docs.docker.com/get-docker/
-2. Use docker to run Marqo (M1 users will need to [go here](#M1-Mac-users)):
+2. Use docker to run Marqo (Mac users with M1 chips will need to [go here](#M1-Mac-users)):
 ```bash
 docker rm -f marqo;docker run --name marqo -it --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:0.0.3
 ```
@@ -217,7 +217,7 @@ The current docker based solution for running Marqo leads to [sub-optimal perfor
  ```
  git clone https://github.com/marqo-ai/marqo.git
  ```
- 3. change into the Marqo directory;
+ 3. change into the Marqo directory,
  ```
  cd marqo
  ```
@@ -239,7 +239,7 @@ pip install -e .
 CWD=$(pwd)
 cd src/marqo/tensor_search/
 ```
-8. Run Marqo;
+8. Run Marqo,
 ```
 export OPENSEARCH_URL="https://localhost:9200" && 
     export PYTHONPATH="${PYTHONPATH}:${CWD}/src" &&
