@@ -24,6 +24,10 @@ Tensor search uses deep-learning to transform documents, images and other data i
 - chat bots and question and answer systems
 - text and image classification
 
+<p align="center">
+  <img src="assets/output.gif"/>
+</p>
+
 <!-- end marqo-description -->
 
 ## Getting started
