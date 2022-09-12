@@ -246,7 +246,7 @@ export OPENSEARCH_URL="https://localhost:9200" &&
     uvicorn api:app --host 0.0.0.0 --port 8882 --reload
 ```
 
-Improving this experience for users is a current priority. We welcome any contributions on impimprovingroiving the experience for M1 useers.
+Improving this experience for users is a priority. We welcome any contributions on this topic.
 
 ## Contributors
 Marqo is a community project with the goal of making tensor search accessible to the wider developer community. We are glad that you are interested in helping out! Please read [this](./CONTRIBUTING.md) to get started
