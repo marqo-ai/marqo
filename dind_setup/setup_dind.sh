@@ -42,7 +42,7 @@ set -eux; \
 
 cp /app/dind_setup/deps/modprobe /usr/local/bin/
 cp -r /app/dind_setup/deps/supervisor/ /etc/supervisor/conf.d/
-cp /app/dind_setup/deps/logger.sh /opt/bash-utils/logger.sh
+cp -r /app/dind_setup/deps/logger.sh /opt/bash-utils/logger.sh
 
 chmod +x /usr/local/bin/modprobe
 
