@@ -5,7 +5,8 @@
 ARG CUDA_VERSION=11.4.2
 FROM nvidia/cuda:${CUDA_VERSION}-cudnn8-runtime-ubuntu20.04 as cuda_image
 
-FROM cruizba/ubuntu-dind
+FROM ubuntu:20.04
+VOLUME /var/lib/docker
 # this is required for onnx to find cuda
 COPY --from=cuda_image /usr/local/cuda/ /usr/local/cuda/
 WORKDIR /app
