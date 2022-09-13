@@ -34,7 +34,7 @@ echo dockerd command complete
 OPENSEARCH_IS_INTERNAL=False
 # Start opensearch in the background
 if [[ ! $OPENSEARCH_URL ]]; then
-  bash /app/dind_setup.sh
+  bash /app/dind_setup/setup_dind.sh
   echo "Waiting for processes to be running"
   processes=(dockerd)
   for process in "${processes[@]}"; do
