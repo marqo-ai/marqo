@@ -24,17 +24,18 @@ function wait_for_process () {
     return 0
 }
 
-echo "Starting supervisor"
-/usr/bin/supervisord -n >> /dev/null 2>&1 &
-
-echo starting dockerd command
-dockerd &
-echo dockerd command complete
-
 OPENSEARCH_IS_INTERNAL=False
 # Start opensearch in the background
 if [[ ! $OPENSEARCH_URL ]]; then
   bash /app/dind_setup/setup_dind.sh
+
+  echo "Starting supervisor"
+  /usr/bin/supervisord -n >> /dev/null 2>&1 &
+
+  echo starting dockerd command
+  dockerd &
+  echo dockerd command complete
+
   echo "Waiting for processes to be running"
   processes=(dockerd)
   for process in "${processes[@]}"; do
