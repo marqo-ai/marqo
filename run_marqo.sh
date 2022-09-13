@@ -28,8 +28,11 @@ OPENSEARCH_IS_INTERNAL=False
 # Start opensearch in the background
 if [[ ! $OPENSEARCH_URL ]]; then
 
-  if [[ $(dockerd | grep "command not found") ]]; then
-    bash /app/dind_setup/setup_dind.sh
+  which docker > /dev/null 2>&1
+  rc=$?
+  if [ $rc != 0 ]; then
+      echo "Docker not found. Installing it..."
+      bash /app/dind_setup/setup_dind.sh
   fi
 
   echo "Starting supervisor"
