@@ -208,45 +208,26 @@ results = mq.index("my-multimodal-index").search('https://upload.wikimedia.org/w
 Note that you should not run other applications on Marqo's Opensearch cluster as Marqo automatically changes and adapts the settings on the cluster.
 
 ## M1 Mac users
-The current docker based solution for running Marqo leads to [sub-optimal performance on the M1 based Mac's](https://github.com/marqo-ai/marqo/issues/50#issuecomment-1244428785).  The following steps should be performed instead to use Marqo:
-1. Run marqo-os,
-```
- docker run --name marqo-os --platform linux/amd64 -id -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" marqoai/marqo-os:0.0.2 
- ```
- 2. Clone the Marqo github repo,
- ```
- git clone https://github.com/marqo-ai/marqo.git
- ```
- 3. change into the Marqo directory,
- ```
- cd marqo
- ```
- 4. Install some dependencies (requires [Homebrew](https://brew.sh/)),
-```
-brew install cmake;
-brew install protobuf;
-```
-5. [Install rust](https://www.rust-lang.org/tools/install),
-```
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs/ | sh;
-```
-6. Install marqo dependencies,
-```
-pip install -e .
-```
-7. Change into the tensor search directory,
-```
-CWD=$(pwd)
-cd src/marqo/tensor_search/
-```
-8. Run Marqo,
-```
-export OPENSEARCH_URL="https://localhost:9200" && 
-    export PYTHONPATH="${PYTHONPATH}:${CWD}/src" &&
-    uvicorn api:app --host 0.0.0.0 --port 8882 --reload
+The backend, marqo-os (Marqo-OpenSearch) isn't yet supported for the arm64 architecture. This means that if you have an M1
+Mac, you will need to run OpenSearch locally. This unfortunately means that you won't be 
+able to use the filtering feature for tensor search queries. We are working on an arm64 Marqo-OpenSearch build as a top 
+priority. 
+
+To run Marqo on an M1 Mac, follow the next steps.
+
+1. In one terminal run the following command to start opensearch:
+
+```shell
+docker rm -f marqo-os; docker run -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" opensearchproject/opensearch:2.2.1
 ```
 
-Improving this experience for users is a priority. We welcome any contributions on this topic.
+2. In another terminal run the following command to launch Marqo:
+```shell
+docker rm -f marqo; docker run --name marqo --privileged \
+    -p 8882:8882 --add-host host.docker.internal:host-gateway \
+    -e "OPENSEARCH_URL=https://localhost:9200" \
+    marqoai/marqo:0.0.3
+```
 
 ## Contributors
 Marqo is a community project with the goal of making tensor search accessible to the wider developer community. We are glad that you are interested in helping out! Please read [this](./CONTRIBUTING.md) to get started
