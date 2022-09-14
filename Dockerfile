@@ -21,7 +21,7 @@ RUN apt-get install python3.8-distutils -y # python3-distutils
 RUN apt-get  install python3.8 python3-pip -y # pip is 276 MB!
 # TODO: up the RAM
 RUN pip3 --no-cache-dir install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu113 --upgrade
-RUN if [[ "$TARGETPLATFORM" == "amd64" ]] ; then pip3 --no-cache-dir install onnxruntime-gpu ; fi
+RUN if [[ "$TARGETPLATFORM" == "linux/amd64" ]] ; then pip3 --no-cache-dir install onnxruntime-gpu ; fi
 
 COPY requirements.txt requirements.txt
 RUN pip3 install --no-cache-dir -r requirements.txt
