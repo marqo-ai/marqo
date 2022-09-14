@@ -555,7 +555,7 @@ def _lexical_search(
             f"Query arg must be of type str! text arg is of type {type(text)}. "
             f"Query arg: {text}")
 
-    if searchable_attributes is not None:
+    if searchable_attributes is not None and searchable_attributes:
         fields_to_search = searchable_attributes
     else:
         fields_to_search = index_meta_cache.get_index_info(

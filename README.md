@@ -24,12 +24,16 @@ Tensor search uses deep-learning to transform documents, images and other data i
 - chat bots and question and answer systems
 - text and image classification
 
+<p align="center">
+  <img src="assets/output.gif"/>
+</p>
+
 <!-- end marqo-description -->
 
 ## Getting started
 
 1. Marqo requires docker. To install docker go to https://docs.docker.com/get-docker/
-2. Use docker to run Marqo:
+2. Use docker to run Marqo (Mac users with M1 chips will need to [go here](#M1-Mac-users)):
 ```bash
 docker rm -f marqo;docker run --name marqo -it --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:0.0.3
 ```
@@ -199,11 +203,50 @@ Searching using an image can be achieved by providing the image link.
 results = mq.index("my-multimodal-index").search('https://upload.wikimedia.org/wikipedia/commons/thumb/9/96/Standing_Hippopotamus_MET_DP248993.jpg/440px-Standing_Hippopotamus_MET_DP248993.jpg')
 ```
 
-
-
 ## Warning
 
 Note that you should not run other applications on Marqo's Opensearch cluster as Marqo automatically changes and adapts the settings on the cluster.
+
+## M1 Mac users
+The current docker based solution for running Marqo leads to [sub-optimal performance on the M1 based Mac's](https://github.com/marqo-ai/marqo/issues/50#issuecomment-1244428785).  The following steps should be performed instead to use Marqo:
+1. Run marqo-os,
+```
+ docker run --name marqo-os --platform linux/amd64 -id -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" marqoai/marqo-os:0.0.2 
+ ```
+ 2. Clone the Marqo github repo,
+ ```
+ git clone https://github.com/marqo-ai/marqo.git
+ ```
+ 3. change into the Marqo directory,
+ ```
+ cd marqo
+ ```
+ 4. Install some dependencies (requires [Homebrew](https://brew.sh/)),
+```
+brew install cmake;
+brew install protobuf;
+```
+5. [Install rust](https://www.rust-lang.org/tools/install),
+```
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs/ | sh;
+```
+6. Install marqo dependencies,
+```
+pip install -e .
+```
+7. Change into the tensor search directory,
+```
+CWD=$(pwd)
+cd src/marqo/tensor_search/
+```
+8. Run Marqo,
+```
+export OPENSEARCH_URL="https://localhost:9200" && 
+    export PYTHONPATH="${PYTHONPATH}:${CWD}/src" &&
+    uvicorn api:app --host 0.0.0.0 --port 8882 --reload
+```
+
+Improving this experience for users is a priority. We welcome any contributions on this topic.
 
 ## Contributors
 Marqo is a community project with the goal of making tensor search accessible to the wider developer community. We are glad that you are interested in helping out! Please read [this](./CONTRIBUTING.md) to get started
