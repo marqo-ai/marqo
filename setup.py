@@ -21,7 +21,7 @@ setup(
         "numpy",
         "validators",
         "sentence-transformers",
-        "onnxruntime",
+        "onnxruntime-gpu",
         "onnx",
         "protobuf==3.20.1",
         "pandas",
