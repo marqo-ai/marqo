@@ -7,6 +7,9 @@ export CUDA_HOME=/usr/local/cuda/
 export LD_LIBRARY_PATH=${CUDA_HOME}/lib64
 export PATH=${CUDA_HOME}/bin:${PATH}
 
+echo Python packages:
+pip freeze
+
 function wait_for_process () {
     local max_time_wait=30
     local process_name="$1"

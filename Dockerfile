@@ -25,7 +25,7 @@ RUN echo Target platform is "$TARGETPLATFORM"
 
 COPY requirements.txt requirements.txt
 RUN pip3 install --no-cache-dir -r requirements.txt
-RUN if [[ "$TARGETPLATFORM" != "linux/arm64" ]] ; then pip3 --no-cache-dir install --upgrade onnxruntime-gpu ; else pip3 --no-cache-dir install onnxruntime; fi
+RUN if [[ "$TARGETPLATFORM" != "linux/arm64" ]] ; then pip3 --no-cache-dir install --upgrade onnxruntime-gpu ; else pip3 --no-cache-dir install --upgrade onnxruntime ; fi
 COPY . /app
 ENV PYTHONPATH "${PYTHONPATH}:/app"
 
