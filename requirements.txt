@@ -17,5 +17,6 @@ sentence-transformers
 clip-marqo
 protobuf==3.20.1
 onnx
+onnxruntime
 pandas
 optimum
