@@ -66,4 +66,4 @@ async def validate_device(device: typing.Optional[str]) -> typing.Optional[str]:
         return translated
     else:
         raise HardwareCompatabilityError(message="Requested device is not available on this machine."
-                                                 f" Requested device: {translated}")
+                                                 f" Requested device: `{translated}`")
