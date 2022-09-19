@@ -5,6 +5,7 @@ from http import HTTPStatus
 
 class MarqoError(Exception):
     """Generic class for Marqo error handling
+    Can be used for value errors etc.
     These will be caught and returned to the user as 5xx internal errors
 
     """

@@ -162,7 +162,7 @@ def convert_to_marqo_web_error_and_raise(response: requests.Response, err: reque
             reason = response_dict["error"]["reason"].lower()
             if "knn" in reason and "filter" in reason:
                 raise HardwareCompatabilityError(
-                    message=f"Filtering is not yet supported for arm-based architectures."
+                    message=f"Filtering is not yet supported for arm-based architectures"
                 ) from err
     except KeyError:
         pass

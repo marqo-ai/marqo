@@ -10,12 +10,12 @@ class TestApiValidation(MarqoTestCase):
 
     def test_validate_api_device_good(self):
         for good in ["cpu", "cuda", "CPU", "CUDA2", "cuda1234", "cpu1", None]:
-            assert good == api_validation.validate_api_device(good)
+            assert good == api_validation.validate_api_device_string(good)
 
     def test_validate_api_device_bad(self):
         for bad in [dict(), set(), 123, "CUDA:1", "JKJKNN","cpu:3", "cuda:3"]:
             try:
-                api_validation.validate_api_device(bad)
+                api_validation.validate_api_device_string(bad)
                 print(bad)
                 raise AssertionError
             except InvalidArgError:

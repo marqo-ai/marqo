@@ -1,4 +1,5 @@
 """The API entrypoint for Tensor Search"""
+import typing
 from fastapi.responses import JSONResponse
 from models.api_models import SearchQuery
 from fastapi import FastAPI, Request, Depends, HTTPException
@@ -9,6 +10,7 @@ from marqo import config
 from typing import List, Dict
 import os
 from marqo.tensor_search.web import api_validation, api_utils
+from marqo.tensor_search import utils
 from marqo.tensor_search.on_start_script import on_start
 
 
@@ -102,9 +104,9 @@ async def create_index(index_name: str, settings: Dict = None, marqo_config: con
 
 
 @app.post("/indexes/{index_name}/search")
-async def search(search_query: SearchQuery, index_name: str, device: str = None,
-                  marqo_config: config.Config = Depends(generate_config)):
-    device = api_utils.translate_api_device(api_validation.validate_api_device(device))
+async def search(search_query: SearchQuery, index_name: str, device: str = Depends(api_validation.validate_device),
+                 marqo_config: config.Config = Depends(generate_config)):
+    device = api_utils.translate_api_device(api_validation.validate_api_device_string(device))
     return tensor_search.search(
         config=marqo_config, text=search_query.q,
         index_name=index_name, highlights=search_query.showHighlights,
@@ -118,10 +120,10 @@ async def search(search_query: SearchQuery, index_name: str, device: str = None,
 @app.post("/indexes/{index_name}/documents")
 async def add_documents(docs: List[Dict], index_name: str, refresh: bool = True,
                         marqo_config: config.Config = Depends(generate_config),
-                        batch_size: int = 0, processes: int = 1, device: str = None):
+                        batch_size: int = 0, processes: int = 1, device: str = Depends(api_validation.validate_device)):
     """add_documents endpoint"""
     translated_device = api_utils.translate_api_device(
-        api_validation.validate_api_device(device)
+        api_validation.validate_api_device_string(device)
     )
     return tensor_search.add_documents_orchestrator(
         config=marqo_config,
@@ -194,7 +196,8 @@ curl -XPOST  'http://localhost:8882/indexes/my-irst-ix/search?device=cuda' -H 'C
     "searchableAttributes": ["Title", "Desc", "other"],
     "limit": 3,    
     "searchMethod": "TENSOR",
-    "showHighlights": true
+    "showHighlights": true,
+    "filter": "Desc:some boring description"
 }'
 """
 
