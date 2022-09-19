@@ -2,6 +2,8 @@ import pprint
 import unittest
 from marqo.tensor_search import utils
 from marqo.tensor_search import enums
+from unittest import mock
+
 
 class TestUtils(unittest.TestCase):
  
@@ -38,3 +40,25 @@ class TestUtils(unittest.TestCase):
             assert expected == utils.contextualise_filter(
                 given, simple_properties=["an_int", "abc"]
             )
+
+    def test_check_device_is_available(self):
+        mock_cuda_is_available = mock.MagicMock()
+        mock_cuda_device_count = mock.MagicMock()
+        for device_str, num_cuda_devices, expected in [
+                    ("cpu", 0, True),
+                    ("cpu", 3, True),
+                    ("cuda", 1, True),
+                    ("cuda", 0, False),
+                    ("cuda:0", 1, True),
+                    ("cuda:1", 2, True),
+                    ("cuda:2", 2, False),
+                ]:
+            mock_cuda_is_available.return_value = True if num_cuda_devices > 0 else False
+            mock_cuda_device_count.return_value = num_cuda_devices
+
+            @mock.patch("torch.cuda.is_available", mock_cuda_is_available)
+            @mock.patch("torch.cuda.device_count", mock_cuda_device_count)
+            def run_test():
+                assert expected == utils.check_device_is_available(device_str)
+                return True
+            assert run_test()
