@@ -39,7 +39,7 @@ class TestEncoding(unittest.TestCase):
 
 
     def test_load_clip_text_model(self):
-        names = ['RN50', 'ViT-L/14']
+        names = ['RN50', "ViT-B/16"]
         device = 'cpu'
         eps = 1e-9
         texts = ['hello', 'big', 'asasasasaaaaaaaaaaaa', '', 'a word. another one!?. #$#.']
@@ -111,7 +111,7 @@ class TestEncoding(unittest.TestCase):
                 assert _check_output_type(_convert_vectorized_output(output))
 
     def test_model_normalization(self):
-        names = ['RN50', 'ViT-L/14', "all-MiniLM-L6-v1", "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6", "onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]
+        names = ['RN50', "ViT-B/16", "all-MiniLM-L6-v1", "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6", "onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]
         sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
         device = 'cpu'
         eps = 1e-6
@@ -132,7 +132,7 @@ class TestEncoding(unittest.TestCase):
     def test_model_un_normalization(self):
         # note: sbert native seems to provide normalized embeddings even with = False, needs more investigation
         # , 
-        names = ['RN50', 'ViT-L/14', "hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6", "onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]
+        names = ['RN50', "ViT-B/16", "hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6", "onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]
         sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
         device = 'cpu'
         eps = 1e-3
