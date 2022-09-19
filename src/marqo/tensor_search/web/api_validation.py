@@ -40,10 +40,9 @@ def validate_api_device_string(device: typing.Optional[str]) -> typing.Optional[
         return device
     try:
         int(prefix_match)
-
     except ValueError:
         raise InvalidArgError(f"Given device `{device}` not recognised. "
-                        f"Acceptable devices: {acceptable_devices}")
+                              f"Acceptable devices: {acceptable_devices}")
     return device
 
 

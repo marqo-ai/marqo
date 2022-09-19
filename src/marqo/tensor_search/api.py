@@ -106,7 +106,6 @@ async def create_index(index_name: str, settings: Dict = None, marqo_config: con
 @app.post("/indexes/{index_name}/search")
 async def search(search_query: SearchQuery, index_name: str, device: str = Depends(api_validation.validate_device),
                  marqo_config: config.Config = Depends(generate_config)):
-    device = api_utils.translate_api_device(api_validation.validate_api_device_string(device))
     return tensor_search.search(
         config=marqo_config, text=search_query.q,
         index_name=index_name, highlights=search_query.showHighlights,
@@ -122,14 +121,11 @@ async def add_documents(docs: List[Dict], index_name: str, refresh: bool = True,
                         marqo_config: config.Config = Depends(generate_config),
                         batch_size: int = 0, processes: int = 1, device: str = Depends(api_validation.validate_device)):
     """add_documents endpoint"""
-    translated_device = api_utils.translate_api_device(
-        api_validation.validate_api_device_string(device)
-    )
     return tensor_search.add_documents_orchestrator(
         config=marqo_config,
         docs=docs,
         index_name=index_name, auto_refresh=refresh,
-        batch_size=batch_size, processes=processes, device=translated_device
+        batch_size=batch_size, processes=processes, device=device
     )
 
 
@@ -191,13 +187,13 @@ curl -XPOST  'http://localhost:8882/indexes/my-irst-ix/documents?refresh=true&de
 
 # SEARCH DOCS
 """
-curl -XPOST  'http://localhost:8882/indexes/my-irst-ix/search?device=cuda' -H 'Content-type:application/json' -d '{
+curl -XPOST  'http://localhost:8882/indexes/my-irst-ix/search?device=cuda:0' -H 'Content-type:application/json' -d '{
     "q": "what do bears eat?",
     "searchableAttributes": ["Title", "Desc", "other"],
     "limit": 3,    
     "searchMethod": "TENSOR",
     "showHighlights": true,
-    "filter": "Desc:some boring description"
+    "filter": "Desc:(some boring description)"
 }'
 """
 
