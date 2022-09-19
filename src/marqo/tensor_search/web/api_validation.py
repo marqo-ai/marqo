@@ -46,7 +46,7 @@ def validate_api_device_string(device: typing.Optional[str]) -> typing.Optional[
     return device
 
 
-async def validate_device(device: typing.Optional[str]) -> typing.Optional[str]:
+async def validate_device(device: typing.Optional[str] = None) -> typing.Optional[str]:
     """Translates and validates the device string. Checks if the requested
     device is available.
 

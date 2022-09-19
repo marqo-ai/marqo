@@ -119,7 +119,8 @@ async def search(search_query: SearchQuery, index_name: str, device: str = Depen
 @app.post("/indexes/{index_name}/documents")
 async def add_documents(docs: List[Dict], index_name: str, refresh: bool = True,
                         marqo_config: config.Config = Depends(generate_config),
-                        batch_size: int = 0, processes: int = 1, device: str = Depends(api_validation.validate_device)):
+                        batch_size: int = 0, processes: int = 1,
+                        device: str = Depends(api_validation.validate_device)):
     """add_documents endpoint"""
     return tensor_search.add_documents_orchestrator(
         config=marqo_config,
