@@ -65,5 +65,5 @@ async def validate_device(device: typing.Optional[str]) -> typing.Optional[str]:
     if utils.check_device_is_available(translated):
         return translated
     else:
-        raise HardwareCompatabilityError(message="Requested device is not available on this machine."
+        raise HardwareCompatabilityError(message="Requested device is not available to this Marqo instance."
                                                  f" Requested device: `{translated}`")
