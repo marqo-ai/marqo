@@ -134,7 +134,14 @@ class DocumentNotFoundError(__InvalidRequestError):
 class NonTensorIndexError(__InvalidRequestError):
     """Error trying to use a non-tensor OpenSearch index like a tensor one"""
     code = "document_not_found"
-    status_code = HTTPStatus.NOT_FOUND
+    status_code = HTTPStatus.BAD_REQUEST
+
+
+class HardwareCompatabilityError(__InvalidRequestError):
+    """Error when a request incorrectly assumes that the server has a certain
+    hardware configuration"""
+    code = "hardware_compatability_error"
+    status_code = HTTPStatus.BAD_REQUEST
 
 # ---MARQO INTERNAL ERROR---
 
