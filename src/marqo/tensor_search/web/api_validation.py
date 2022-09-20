@@ -1,10 +1,10 @@
-from marqo.tensor_search.validation import validate_str_against_enum
-from marqo.errors import InvalidArgError
-from marqo.tensor_search import enums
+from marqo.errors import InvalidArgError, HardwareCompatabilityError
+from marqo.tensor_search import enums, utils
+from marqo.tensor_search.web import api_utils
 import typing
 
 
-def validate_api_device(device: typing.Optional[str]) -> typing.Optional[str]:
+def validate_api_device_string(device: typing.Optional[str]) -> typing.Optional[str]:
     """Validates a device which is an API parameter
 
     Args:
@@ -40,8 +40,29 @@ def validate_api_device(device: typing.Optional[str]) -> typing.Optional[str]:
         return device
     try:
         int(prefix_match)
-
     except ValueError:
         raise InvalidArgError(f"Given device `{device}` not recognised. "
-                        f"Acceptable devices: {acceptable_devices}")
+                              f"Acceptable devices: {acceptable_devices}")
     return device
+
+
+async def validate_device(device: typing.Optional[str] = None) -> typing.Optional[str]:
+    """Translates and validates the device string. Checks if the requested
+    device is available.
+
+    "cuda1" -> "cuda:1"
+
+    Args:
+        device:
+
+    Returns:
+        The device translated for internal use. If it has passed validation.
+    """
+    if device is None:
+        return None
+    translated = api_utils.translate_api_device(validate_api_device_string(device))
+    if utils.check_device_is_available(translated):
+        return translated
+    else:
+        raise HardwareCompatabilityError(message="Requested device is not available to this Marqo instance."
+                                                 f" Requested device: `{translated}`")

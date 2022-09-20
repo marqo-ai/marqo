@@ -13,7 +13,8 @@ from marqo.errors import (
     IndexNotFoundError,
     DocumentNotFoundError,
     IndexAlreadyExistsError,
-    InvalidIndexNameError
+    InvalidIndexNameError,
+    HardwareCompatabilityError
 )
 from marqo.version import qualified_version
 
@@ -133,7 +134,14 @@ class HttpRequests:
 
 
 def convert_to_marqo_web_error_and_raise(response: requests.Response, err: requests.exceptions.HTTPError):
-    """Translates OpenSearch errors into Marqo errors, which are then raised"""
+    """Translates OpenSearch errors into Marqo errors, which are then raised
+
+    If the incoming OpenSearch error can't be matched, a default catch all
+    MarqoWebError is reaised
+
+    Raises:
+        MarqoWebError - some type of Marqo Web error
+    """
     try:
         response_dict = response.json()
     except JSONDecodeError:
@@ -150,8 +158,12 @@ def convert_to_marqo_web_error_and_raise(response: requests.Response, err: reque
             raise InvalidIndexNameError(
                 message=f"{response_dict['error']['reason'].replace('[','`').replace(']','`')}"
             ) from err
-        else:
-            raise_catchall_http_as_marqo_error(response=response, err=err)
+        elif open_search_error_type == "parsing_exception":
+            reason = response_dict["error"]["reason"].lower()
+            if "knn" in reason and "filter" in reason:
+                raise HardwareCompatabilityError(
+                    message=f"Filtering is not yet supported for arm-based architectures"
+                ) from err
     except KeyError:
         pass
 

@@ -2,7 +2,7 @@ import typing
 from typing import List
 import functools
 import json
-
+import torch
 from marqo import errors
 from marqo.tensor_search import enums
 from typing import List, Optional, Union, Callable, Iterable, Sequence, Dict
@@ -102,3 +102,38 @@ def contextualise_filter(filter_string: str, simple_properties: typing.Iterable)
         contextualised_filter = contextualised_filter.replace(f'{field}:', f'{enums.TensorField.chunks}.{field}:')
     return contextualised_filter
 
+
+def check_device_is_available(device: str) -> bool:
+    """Checks if a device is available on the machine
+
+    Args:
+        device: assumes device is a valid device strings (e.g: 'cpu' or
+            'cuda:1')
+
+    Returns:
+        True, IFF it is available
+
+    Raises:
+        MarqoError if device is determined to be invalid
+    """
+    lowered = device.lower()
+    if lowered == "cpu":
+        return True
+
+    split = lowered.split(":")
+    if split[0] != "cuda":
+        raise errors.MarqoError(f"Invalid device prefix! {device}. Valid prefixes: 'cpu' and 'cuda'")
+
+    if not torch.cuda.is_available():
+        return False
+
+    if len(split) < 2:
+        return True
+
+    if int(split[1]) < 0:
+        raise errors.MarqoError(f"Invalid cuda device number! {device}. It must not be negative")
+
+    if int(split[1]) < torch.cuda.device_count():
+        return True
+    else:
+        return False
