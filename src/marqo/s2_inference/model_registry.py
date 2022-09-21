@@ -199,6 +199,12 @@ def _get_hf_properties() -> Dict:
                 "tokens":128,
                 "type":"hf",
                 "notes": ""},
+            'sentence-transformers/stsb-xlm-r-multilingual':
+                {"name": 'sentence-transformers/stsb-xlm-r-multilingual',
+                 "dimensions": 768,
+                 "tokens": 128,
+                 "type": "sbert",
+                 "notes": ""}
     }
     return HF_MODEL_PROPERTIES
 
