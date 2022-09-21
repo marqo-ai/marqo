@@ -5,6 +5,8 @@ on:
   push:
     branches:
       mainline
+    paths-ignore:
+      - '**.md'
 
 permissions:
   contents: read
