@@ -208,17 +208,14 @@ results = mq.index("my-multimodal-index").search('https://upload.wikimedia.org/w
 Note that you should not run other applications on Marqo's Opensearch cluster as Marqo automatically changes and adapts the settings on the cluster.
 
 ## M series Mac users
-The backend, marqo-os (Marqo-OpenSearch) isn't yet supported for the arm64 architecture. This means that if you have an M series
-Mac, you will need to run OpenSearch locally. This unfortunately means that you won't be 
-able to use the filtering feature for tensor search queries. We are working on an arm64 Marqo-OpenSearch build as a top 
-priority. 
+Marqo does not yet support the docker-in-docker backend configuration for the arm64 architecture. This means that if you have an M series Mac, you will also need to run marqo's backend, marqo-os, locally.
 
 To run Marqo on an M series Mac, follow the next steps.
 
 1. In one terminal run the following command to start opensearch:
 
 ```shell
-docker rm -f marqo-os; docker run -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" opensearchproject/opensearch:2.2.1
+docker rm -f marqo-os; docker run -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" marqoai/marqo-os:0.0.2-arm
 ```
 
 2. In another terminal run the following command to launch Marqo:
