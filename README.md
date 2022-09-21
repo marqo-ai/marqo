@@ -14,7 +14,7 @@
 </p>
 
 
-An open-source tensor search framework that seamlessly integrates with your applications, websites, and workflow. 
+An open-source tensor search engine that seamlessly integrates with your applications, websites, and workflow. 
 
 ## What is tensor search?
 
