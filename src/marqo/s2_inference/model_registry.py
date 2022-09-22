@@ -1,6 +1,6 @@
 from marqo.s2_inference.hf_utils import HF_MODEL
 from marqo.s2_inference.sbert_onnx_utils import SBERT_ONNX
-from marqo.s2_inference.sbert_utils import SBERT, TEST
+from marqo.s2_inference.sbert_utils import SBERT, TEST, SBERT_TRITON
 from marqo.s2_inference.random_utils import Random
 from marqo.s2_inference.clip_utils import CLIP
 from marqo.s2_inference.types import Any, Dict, List, Optional, Union, FloatTensor
@@ -77,7 +77,8 @@ def _get_sbert_properties() -> Dict:
                 "type":"sbert",
                 "notes": ""},
             "sentence-transformers/all-MiniLM-L6-v2": 
-                {"name": "sentence-transformers/all-MiniLM-L6-v2",
+                # {"name": "sentence-transformers/all-MiniLM-L6-v2",
+                {"name": "all-MiniLM-L6-v2",
                 "dimensions": 384,
                 "tokens":256,
                 "type":"sbert",
@@ -318,7 +319,8 @@ def _get_random_properties() -> Dict:
 
 def _get_model_load_mappings() -> Dict:
     return {'clip':CLIP, 
-            'sbert':SBERT, 
+            # 'sbert':SBERT,
+            'sbert':SBERT_TRITON, 
             'test':TEST, 
             'sbert_onnx':SBERT_ONNX,
             'random':Random, 
