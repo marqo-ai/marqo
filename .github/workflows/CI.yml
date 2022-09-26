@@ -16,6 +16,11 @@ jobs:
   Test-Marqo:
     name: Run Marqo Test Suite
     runs-on: ubuntu-latest
+    services:
+      registry:
+        image: registry:2
+        ports:
+          - 5000:5000
                 
     environment: marqo-test-suite 
     
@@ -23,56 +28,48 @@ jobs:
        
       - name: Checkout marqo repo
         uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
           
       - name: Set up Python 3.8
         uses: actions/setup-python@v3
         with:
           python-version: "3.8"
           cache: "pip"
-          
-      - name: Install Dependencies
-        run: |
-          #pip install -r requirements.txt
-          pip install tox
-          pip install flake8
         
-      - name: Get Changed Directories
-        id: changed-dir
-        uses: tj-actions/changed-files@v29.0.1
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v2
         with:
-          dir_names: true
-      
-      - name: Lint Changed Directories with flake8
-        run: |
-          for dir in ${{ steps.changed-dir.outputs.all_changed_files }}; do
-            echo "$dir was changed"
-            # stop the build if there are Python syntax errors or undefined names
-            flake8 $dir --count --select=E9,F63,F7,F82 --show-source --statistics --filename *.py
-            # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-            flake8 $dir --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics --filename *.py
-          done
+          install: true
+          driver-opts: network=host
+          
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
         
+      - name: Build Marqo Docker
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: localhost:5000/marqo/multiarch:latest
+          
       - name: Checkout marqo-api-tests repo
         uses: actions/checkout@v3
         with:
           repository: marqo-ai/marqo-api-tests
           
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-          
       - name: Set up Environment
         run: |
+          pip install tox
           # Set up conf file
-          echo 'export MARQO_API_TESTS_ROOT="/home/runner/work/marqo/marqo"' >> conf
+          echo 'export MARQO_API_TESTS_ROOT="${{ github.workspace }}"' >> conf
           echo 'export S2SEARCH_URL="${{ secrets.S2SEARCH_URL }}"' >> conf
           
       - name: Run Unit Tests
         run: tox -e py3-local_os_unit_tests_w_requirements
         
       - name: Run Integration Tests - local_os
-        run: tox -e py3-local_os
+        run: tox -e py3-local_os 
         
       - name: Run Integration Tests - dind_os
         run: tox -e py3-dind_os
