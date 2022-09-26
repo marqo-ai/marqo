@@ -38,7 +38,9 @@ Tensor search involves transforming documents, images and other data into collec
 1. Marqo requires docker. To install docker go to https://docs.docker.com/get-docker/
 2. Use docker to run Marqo (Mac users with M-series chips will need to [go here](#m-series-mac-users)):
 ```bash
-docker rm -f marqo;docker run --name marqo -it --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:0.0.3
+docker pull marqoai/marqo:0.0.3;
+docker rm -f marqo;
+docker run --name marqo -it --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:0.0.3
 ```
 3. Install the Marqo client:
 ```bash
