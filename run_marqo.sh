@@ -45,7 +45,7 @@ if [[ ! $OPENSEARCH_URL ]]; then
   /usr/bin/supervisord -n >> /dev/null 2>&1 &
 
   echo restarting dockerd command
-  ps axf | grep docker | grep -v grep | awk '{print "kill " $1}' | sh; rm /var/run/docker.pid; dockerd &
+  ps axf | grep docker | grep -v grep | awk '{print "kill -9" $1}' | sh; rm /var/run/docker.pid; dockerd &
   echo dockerd command complete
 
   echo "Waiting for processes to be running"
