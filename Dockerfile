@@ -31,5 +31,5 @@ COPY . /app
 ENV PYTHONPATH "${PYTHONPATH}:/app"
 
 RUN chmod +x ./run_marqo.sh
-CMD ./run_marqo.sh
+CMD ["bash", "run_marqo.sh"]
 ENTRYPOINT ["bash", "run_marqo.sh"]
