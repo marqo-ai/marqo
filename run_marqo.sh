@@ -41,7 +41,9 @@ if [[ ! $OPENSEARCH_URL ]]; then
   rc=$?
   if [ $rc != 0 ]; then
       echo "Docker not found. Installing it..."
-      bash /app/dind_setup/setup_dind.sh
+      bash /app/dind_setup/setup_dind.sh &
+      setup_dind_pid=$!
+      wait "$setup_dind_pid"
   fi
 
   echo "Starting supervisor"
@@ -86,7 +88,7 @@ export OPENSEARCH_URL
 export OPENSEARCH_IS_INTERNAL
 # Start the tensor search web app in the background
 cd /app/src/marqo/tensor_search || exit
-uvicorn api:app --host 0.0.0.0 --port 8882
+uvicorn api:app --host 0.0.0.0 --port 8882 &
 
 # Wait for any process to exit
 wait -n
