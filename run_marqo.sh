@@ -1,13 +1,13 @@
 #!/bin/bash
 #source /opt/bash-utils/logger.sh
-
-export PYTHONPATH="${PYTHONPATH}:/app/src/"
 export PYTHONPATH="${PYTHONPATH}:/app/src/"
 export CUDA_HOME=/usr/local/cuda/
 export LD_LIBRARY_PATH=${CUDA_HOME}/lib64
 export PATH=${CUDA_HOME}/bin:${PATH}
 
-echo Python packages:
+trap "bash /app/scripts/shutdown.sh" SIGTERM SIGINT
+
+echo "Python packages:"
 pip freeze
 
 function wait_for_process () {
