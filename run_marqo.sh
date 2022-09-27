@@ -89,11 +89,9 @@ export OPENSEARCH_IS_INTERNAL
 # Start the tensor search web app in the background
 cd /app/src/marqo/tensor_search || exit
 uvicorn api:app --host 0.0.0.0 --port 8882 &
+api_pid=$!
+wait "$api_pid"
 
-echo "herhehrehre"
-
-# Wait for any process to exit
-wait -n
 
 # Exit with status of process that exited first
 exit $?

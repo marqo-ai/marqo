@@ -27,6 +27,8 @@ COPY requirements.txt requirements.txt
 RUN pip3 install --no-cache-dir -r requirements.txt
 COPY scripts scripts
 RUN bash scripts/install_onnx_gpu_for_amd.sh
+COPY dind_setup dind_setup
+RUN bash dind_setup/setup_dind.sh
 COPY . /app
 ENV PYTHONPATH "${PYTHONPATH}:/app"
 
