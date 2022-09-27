@@ -90,6 +90,8 @@ export OPENSEARCH_IS_INTERNAL
 cd /app/src/marqo/tensor_search || exit
 uvicorn api:app --host 0.0.0.0 --port 8882 &
 
+echo "herhehrehre"
+
 # Wait for any process to exit
 wait -n
 
