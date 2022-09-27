@@ -17,9 +17,10 @@ function wait_for_process () {
     while ! [[ $(docker ps -a | grep CONTAINER) ]] >/dev/null && ((waited_sec < max_time_wait)); do
         echo "Output of ps -a"
         docker ps -a
+        ps axf | grep docker | grep -v grep | awk '{print "kill -9" $1}' | sh; rm /var/run/docker.pid; dockerd &
         echo "Process $process_name is not running yet. Retrying in 1 seconds"
         echo "Waited $waited_sec seconds of $max_time_wait seconds"
-        sleep 1
+        sleep 3
         echo "Output of ps -a (after wait)"
         docker ps -a
         ((waited_sec=waited_sec+1))
