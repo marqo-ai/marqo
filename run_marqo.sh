@@ -15,6 +15,8 @@ function wait_for_process () {
     local process_name="$1"
     local waited_sec=0
     while ! [[ $(docker ps -a | grep CONTAINER) ]] >/dev/null && ((waited_sec < max_time_wait)); do
+        echo "Output of ps -a"
+        docker ps -a
         echo "Process $process_name is not running yet. Retrying in 1 seconds"
         echo "Waited $waited_sec seconds of $max_time_wait seconds"
         dockerd &
