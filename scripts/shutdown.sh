@@ -1,4 +1,5 @@
 #!/bin/bash
 echo "stopping marqo..."
 docker stop marqo-os
-ps axf | grep docker | grep -v grep | awk '{print "kill " $1}' | sh
+kill "$(cat /var/run/docker.pid)"
+rm /var/run/docker.pid
