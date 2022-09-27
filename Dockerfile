@@ -25,10 +25,11 @@ RUN echo Target platform is "$TARGETPLATFORM"
 
 COPY requirements.txt requirements.txt
 RUN pip3 install --no-cache-dir -r requirements.txt
-COPY scripts scripts
-RUN bash scripts/install_onnx_gpu_for_amd.sh
 COPY dind_setup dind_setup
 RUN bash dind_setup/setup_dind.sh
+COPY scripts scripts
+RUN bash scripts/install_onnx_gpu_for_amd.sh
+RUN bash scripts/install_marqo_os.sh
 COPY . /app
 ENV PYTHONPATH "${PYTHONPATH}:/app"
 
