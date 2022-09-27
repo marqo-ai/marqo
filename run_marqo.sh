@@ -17,7 +17,7 @@ function wait_for_process () {
     while ! [[ $(docker ps -a | grep CONTAINER) ]] >/dev/null && ((waited_sec < max_time_wait)); do
         echo "Output of ps -a"
         docker ps -a
-        ps axf | grep docker | grep -v grep | awk '{print "kill -9" $1}' | sh; rm /var/run/docker.pid; dockerd &
+        ps axf | grep docker | grep -v grep | awk '{print "kill -9 " $1}' | sh; rm /var/run/docker.pid; dockerd &
         echo "Process $process_name is not running yet. Retrying in 1 seconds"
         echo "Waited $waited_sec seconds of $max_time_wait seconds"
         sleep 3
@@ -46,7 +46,7 @@ if [[ ! $OPENSEARCH_URL ]]; then
   /usr/bin/supervisord -n >> /dev/null 2>&1 &
 
   echo restarting dockerd command
-  ps axf | grep docker | grep -v grep | awk '{print "kill -9" $1}' | sh; rm /var/run/docker.pid; dockerd &
+  ps axf | grep docker | grep -v grep | awk '{print "kill -9 " $1}' | sh; rm /var/run/docker.pid; dockerd &
   echo dockerd command complete
 
   echo "Waiting for processes to be running"
