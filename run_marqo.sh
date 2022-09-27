@@ -11,20 +11,20 @@ echo Python packages:
 pip freeze
 
 function wait_for_process () {
-    local max_time_wait=30
+    local max_retries=30
+    local n_restarts_before_sigkill=3
     local process_name="$1"
-    local waited_sec=0
-    while ! [[ $(docker ps -a | grep CONTAINER) ]] >/dev/null && ((waited_sec < max_time_wait)); do
-        echo "Output of ps -a"
-        docker ps -a
-        ps axf | grep docker | grep -v grep | awk '{print "kill -9 " $1}' | sh; rm /var/run/docker.pid; dockerd &
+    local retries=0
+    while ! [[ $(docker ps -a | grep CONTAINER) ]] >/dev/null && ((retries < max_retries)); do
         echo "Process $process_name is not running yet. Retrying in 1 seconds"
-        echo "Waited $waited_sec seconds of $max_time_wait seconds"
+        echo "Retry $retries of a maximum of $max_retries retries"
+        ((retries=retries+1))
+        if ((retries >= n_restarts_before_sigkill)); then
+            echo "sending SIGKILL to dockerd and restarting "
+            ps axf | grep docker | grep -v grep | awk '{print "kill -9 " $1}' | sh; rm /var/run/docker.pid; dockerd &
+        fi
         sleep 3
-        echo "Output of ps -a (after wait)"
-        docker ps -a
-        ((waited_sec=waited_sec+1))
-        if ((waited_sec >= max_time_wait)); then
+        if ((retries >= max_retries)); then
             return 1
         fi
     done
@@ -45,9 +45,8 @@ if [[ ! $OPENSEARCH_URL ]]; then
   echo "Starting supervisor"
   /usr/bin/supervisord -n >> /dev/null 2>&1 &
 
-  echo restarting dockerd command
-  ps axf | grep docker | grep -v grep | awk '{print "kill -9 " $1}' | sh; rm /var/run/docker.pid; dockerd &
-  echo dockerd command complete
+  dockerd &
+  echo "called dockerd command"
 
   echo "Waiting for processes to be running"
   processes=(dockerd)
