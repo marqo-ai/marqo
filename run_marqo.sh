@@ -22,6 +22,8 @@ function wait_for_process () {
         if ((retries >= n_restarts_before_sigkill)); then
             echo "sending SIGKILL to dockerd and restarting "
             ps axf | grep docker | grep -v grep | awk '{print "kill -9 " $1}' | sh; rm /var/run/docker.pid; dockerd &
+        else
+            dockerd &
         fi
         sleep 3
         if ((retries >= max_retries)); then
