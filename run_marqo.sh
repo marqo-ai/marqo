@@ -5,7 +5,7 @@ export CUDA_HOME=/usr/local/cuda/
 export LD_LIBRARY_PATH=${CUDA_HOME}/lib64
 export PATH=${CUDA_HOME}/bin:${PATH}
 
-trap "bash /app/scripts/shutdown.sh" SIGTERM SIGINT
+trap "bash /app/scripts/shutdown.sh; exit" SIGTERM SIGINT
 
 echo "Python packages:"
 pip freeze
