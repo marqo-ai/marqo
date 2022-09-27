@@ -21,6 +21,8 @@ function wait_for_process () {
         echo "Waited $waited_sec seconds of $max_time_wait seconds"
         dockerd &
         sleep 1
+        echo "Output of ps -a (after wait)"
+        docker ps -a
         ((waited_sec=waited_sec+1))
         if ((waited_sec >= max_time_wait)); then
             return 1
