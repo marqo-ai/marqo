@@ -89,11 +89,13 @@ def validate_doc(doc: dict) -> dict:
         doc: a document indexed by the client
 
     Raises:
-        errors.BadRequestError
+        errors.InvalidArgError
 
     Returns
         doc if all validations pass
     """
+    if not isinstance(doc, dict):
+        raise InvalidArgError("Docs must be dicts")
     if len(doc) <= 0:
         raise InvalidArgError("Can't index an empty dict.")
     return doc

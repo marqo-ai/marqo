@@ -295,23 +295,26 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
     for i, doc in enumerate(docs):
 
         indexing_instructions = {"index": {"_index": index_name}}
-        copied = doc.copy()
+        copied = copy.deepcopy(doc)
 
         document_is_valid = True
         new_fields_from_doc = set()
 
-        if "_id" in doc:
-            doc_id = validation.validate_id(doc["_id"])
-            del copied["_id"]
-        else:
-            doc_id = str(uuid.uuid4())
-
+        doc_id = None
         try:
             validation.validate_doc(doc)
+
+            if "_id" in doc:
+                doc_id = validation.validate_id(doc["_id"])
+                del copied["_id"]
+            else:
+                doc_id = str(uuid.uuid4())
+
             [validation.validate_field_name(field) for field in copied]
-        except errors.InvalidArgError as err:
+        except errors.__InvalidRequestError as err:
             unsuccessful_docs.append(
-                (i, {'_id': doc_id, 'error': err.message, 'status': err.status_code, 'code': err.code})
+                (i, {'_id': doc_id if doc_id is not None else '',
+                     'error': err.message, 'status': int(err.status_code), 'code': err.code})
             )
             continue
 
@@ -326,7 +329,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
             except errors.InvalidArgError as err:
                 document_is_valid = False
                 unsuccessful_docs.append(
-                    (i, {'_id': doc_id, 'error': err.message, 'status': err.status_code,
+                    (i, {'_id': doc_id, 'error': err.message, 'status': int(err.status_code),
                          'code': err.code})
                 )
                 break
@@ -362,7 +365,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                     document_is_valid = False
                     image_err = errors.InvalidArgError(message=f'Could not process given image: {field_content}')
                     unsuccessful_docs.append(
-                        (i, {'_id': doc_id, 'error': image_err.message, 'status': image_err.status_code,
+                        (i, {'_id': doc_id, 'error': image_err.message, 'status': int(image_err.status_code),
                              'code': image_err.code})
                     )
                     break
