@@ -19,7 +19,7 @@
 
 An open-source tensor search engine that seamlessly integrates with your applications, websites, and workflow. 
 
-Marqo cloud is currently in beta, apply here: https://q78175g1wwa.typeform.com/to/d0PEuRPC
+Marqo cloud ☁️  is currently in beta. If you're interested, apply here: https://q78175g1wwa.typeform.com/to/d0PEuRPC
 
 ## What is tensor search?
 
