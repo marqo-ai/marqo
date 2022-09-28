@@ -1,3 +1,10 @@
+#!/bin/bash
+# This script is meant to be run at buildtime
+# DIND is not yet support for arm64
+if [[ "$TARGETPLATFORM" != "linux/amd64" ]]; then
+  exit
+fi
+
 set -e
 
 apt update \
