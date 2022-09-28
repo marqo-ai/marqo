@@ -4,9 +4,9 @@ import pprint
 from unittest import mock
 
 import requests
-from marqo.tensor_search.enums import TensorField
+from marqo.tensor_search.enums import TensorField, IndexSettingsField
 from marqo.client import Client
-from marqo.errors import IndexNotFoundError, InvalidArgError
+from marqo.errors import IndexNotFoundError, InvalidArgError, BadRequestError
 from marqo.tensor_search import tensor_search, index_meta_cache
 from tests.marqo_test import MarqoTestCase
 
@@ -206,6 +206,10 @@ class TestAddDocuments(MarqoTestCase):
                 "id": "abcdefgh",
                 "title 1": "content 1",
                 "desc 2": "content 2. blah blah blah"
+            },
+            {
+                "_id": "789",
+                "subtitle": [1, 2, 3]
             }
         ], auto_refresh=True)
 
@@ -220,7 +224,7 @@ class TestAddDocuments(MarqoTestCase):
 
         for item in add_res["items"]:
             assert "_id" in item
-            assert "result" in item
+            assert ("result" in item) ^ ("error" in item and "code" in item)
             assert "status" in item
 
     def test_add_documents_validation(self):
@@ -251,12 +255,10 @@ class TestAddDocuments(MarqoTestCase):
             }]
         ]
         for bad_doc_arg in bad_doc_args:
-            try:
-                add_res = tensor_search.add_documents(config=self.config, index_name=self.index_name_1,
-                                                      docs=bad_doc_arg, auto_refresh=True)
-                raise AssertionError
-            except InvalidArgError as s:
-                pass
+            add_res = tensor_search.add_documents(config=self.config, index_name=self.index_name_1,
+                                                  docs=bad_doc_arg, auto_refresh=True)
+            assert any(['error' in item for item in add_res['items']])
+
 
     def test_add_documents_set_device(self):
         """calling search with a specified device overrides device defined in config"""
@@ -318,3 +320,102 @@ class TestAddDocuments(MarqoTestCase):
         assert mock_config.search_device == "cpu"
         args, kwargs = mock_vectorise.call_args
         assert kwargs["device"] == "cuda:22"
+
+    def test_add_documents_empty(self):
+        try:
+            tensor_search.add_documents(
+                config=self.config, index_name=self.index_name_1, docs=[],
+                auto_refresh=True)
+            raise AssertionError
+        except BadRequestError:
+            pass
+
+    def test_resilient_add_images(self):
+        tensor_search.create_vector_index(
+            config=self.config, index_name=self.index_name_1,
+            index_settings={
+                IndexSettingsField.index_defaults: {
+                    IndexSettingsField.model: "ViT-B/16",
+                    IndexSettingsField.treat_urls_and_pointers_as_images: True
+                }
+        })
+        docs_results = [
+            ([{"_id": "123","image_field": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png"},
+             {"_id": "789", "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png"},
+             {"_id": "456", "image_field": "https://www.marqo.ai/this/image/doesnt/exist.png"}],
+             [("123", "result"), ("789", "result"), ("456", "error")]
+             ),
+            ([{"_id": "123",
+               "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png"},
+              {"_id": "789",
+               "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png"},
+              {"_id": "456", "image_field": "https://www.marqo.ai/this/image/doesnt/exist.png"},
+              {"_id": "111", "image_field": "https://www.marqo.ai/this/image/doesnt/exist2.png"}],
+             [("123", "result"), ("789", "result"), ("456", "error"), ("111", "error")]
+             ),
+            ([{"_id": "505", "image_field": "https://www.marqo.ai/this/image/doesnt/exist3.png"},
+              {"_id": "456", "image_field": "https://www.marqo.ai/this/image/doesnt/exist.png"},
+              {"_id": "111", "image_field": "https://www.marqo.ai/this/image/doesnt/exist2.png"}],
+             [("505", "error"), ("456", "error"), ("111", "error")]
+             ),
+            ([{"_id": "505", "image_field": "https://www.marqo.ai/this/image/doesnt/exist2.png"}],
+             [("505", "error")]
+             ),
+        ]
+        for docs, expected_results in docs_results:
+            add_res = tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs, auto_refresh=True)
+            for i, res_dict in enumerate(add_res['items']):
+                assert res_dict["_id"] == expected_results[i][0]
+                assert expected_results[i][1] in res_dict
+
+    def test_add_documents_resilient_doc_validation(self):
+        tensor_search.create_vector_index(
+            config=self.config, index_name=self.index_name_1)
+        docs_results = [
+            # problems with
+            ([{"_id": "123", "my_field": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png"},
+             {"_id": "789", "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png"},
+             {"_id": "456", "image_field": "https://www.marqo.ai/this/image/doesnt/exist.png"}],
+             [("123", "result"), ("789", "result"), ("456", "error")]
+             ),
+        ]
+        for docs, expected_results in docs_results:
+            add_res = tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs, auto_refresh=True)
+            for i, res_dict in enumerate(add_res['items']):
+                assert res_dict["_id"] == expected_results[i][0]
+                assert expected_results[i][1] in res_dict
+
+    def test_add_documents_empty_dicts(self):
+        """handle such list of empty dicts well"""
+
+    def test_mappings_arent_updated_bad_image(self):
+        """if an image isn't added properly, we need to ensure that
+        it's mappings don't get added to index mappings"""
+
+    def test_resilient_invalid_dict(self):
+        """handle invalid dicts"""
+
+    def test_mappings_arent_updated_invalid_dict(self):
+        """if an dict isn't added properly, we need to ensure that
+        it's mappings don't get added to index mappings"""
+
+    def test_resilient_invalid_field(self):
+        """handle invalid dicts"""
+
+    def test_mappings_arent_updated_invalid_field(self):
+        """if an dict isn't added properly, we need to ensure that
+        it's mappings don't get added to index mappings"""
+
+    def test_resilient_invalid_content(self):
+        """handle invalid dicts"""
+
+    def test_mappings_arent_updated_invalid_content(self):
+        """if an dict isn't added properly, we need to ensure that
+        it's mappings don't get added to index mappings"""
+
+    def test_resilient_invalid_ids(self):
+        """handle invalid dicts"""
+
+    def test_mappings_arent_updated_invalid_ids(self):
+        """if an dict isn't added properly, we need to ensure that
+        it's mappings don't get added to index mappings"""
