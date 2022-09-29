@@ -7,7 +7,7 @@ import requests
 from marqo.tensor_search.enums import TensorField, IndexSettingsField
 from marqo.client import Client
 from marqo.errors import IndexNotFoundError, InvalidArgError, BadRequestError
-from marqo.tensor_search import tensor_search, index_meta_cache
+from marqo.tensor_search import tensor_search, index_meta_cache, backend
 from tests.marqo_test import MarqoTestCase
 
 
@@ -387,6 +387,9 @@ class TestAddDocuments(MarqoTestCase):
             ([1234], [(None, 'error')]), ([None], [(None, 'error')]),
             # handle invalid field names
             ([{123: "bad"}, {"_id": "cool"}], [(None, 'error'), ("cool", 'result')]),
+            ([{"__chunks": "bad"}, {"_id": "1511", "__vector_a": "some content"}, {"_id": "cool"},
+              {"_id": "144451", "__field_content": "some content"}],
+             [(None, 'error'), ("1511", 'error'), ("cool", 'result'), ("144451", "error")]),
             ([{123: "bad", "_id": "12345"}, {"_id": "cool"}], [("12345", 'error'), ("cool", 'result')]),
             ([{None: "bad", "_id": "12345"}, {"_id": "cool"}], [("12345", 'error'), ("cool", 'result')]),
             # handle bad content
@@ -427,4 +430,60 @@ class TestAddDocuments(MarqoTestCase):
             - invalid content
             - invalid _ids
         """
+        tensor_search.create_vector_index(
+            config=self.config, index_name=self.index_name_1,
+            index_settings={
+                IndexSettingsField.index_defaults: {
+                    IndexSettingsField.model: "ViT-B/16",
+                    IndexSettingsField.treat_urls_and_pointers_as_images: True
+                }
+            })
+        docs_results = [
+            # invalid images
+            ([{"_id": "123",
+              "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png"},
+             {"_id": "789",
+              "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png"},
+             {"_id": "456", "image_field_3": "https://www.marqo.ai/this/image/doesnt/exist.png"}],
+             ({"image_field_1", "image_field_2"}, {"image_field_3"})
+             ),
+            # invalid dict
+            ([{"_id": "24frg", "my_field": "legitimate text"}, {},
+              {"_id": "srgb4", "my_field": "awesome stuff!"}],
+             ({"my_field"}, {})
+             ),
+            # invalid fields
+            ([{"_id": "14g", (12, 14): "some content"}, {"_id": "1511", None: "some content"},
+              {"_id": "1511", "__vector_a": "some content"}, {"_id": "1234f", "__chunks": "some content"},
+              {"_id": "144451", "__field_content": "some content"},
+              {"_id": "sv4124", "good_field_3": "some content 2 " , "good_field_4": 3.65}],
+             ({"good_field_3", "good_field_4"}, {(12, 14), None, "__vector_a", "__chunks", "__field_content"})
+             ),
+            # invalid content
+            ([{"_id": "f24f4", "bad_field_1": []}, {"_id": "4t6g5g5", "bad_field_1": {}},
+              {"_id": "df3f3", "bad_field_1": (1, 23, 4)},
+              {"_id": "fr2452", "good_field_1": 000, "good_field_2": 3.65}],
+             ({"good_field_1", "good_field_2"}, {"bad_field_1" })
+             ),
+            # invalid -ids
+            ([{"_id": 12445, "bad_field_1": "actually decent text"}, {"_id": [], "bad_field_1": "actually decent text"},
+              {"_id": {}, "bad_field_1": "actually decent text"},
+              {"_id": "fr2452", "good_field_1": 000, "good_field_2": 3.65}],
+             ({"good_field_1", "good_field_2"}, { "bad_field_1"})
+             ),
+        ]
+        for docs, (good_fields, bad_fields) in docs_results:
+            # good_fields should appear in the mapping.
+            # bad_fields should not
+            tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs, auto_refresh=True)
+            ii = backend.get_index_info(config=self.config, index_name=self.index_name_1)
+            customer_props = {field_name for field_name in ii.get_text_properties()}
+            reduced_vector_props = {field_name.replace(TensorField.vector_prefix, '')
+                                    for field_name in ii.get_text_properties()}
+            for field in good_fields:
+                assert field in customer_props
+                assert field in reduced_vector_props
 
+            for field in bad_fields:
+                assert field not in customer_props
+                assert field not in reduced_vector_props

@@ -282,7 +282,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
         create_vector_index(config=config, index_name=index_name)
         index_info = backend.get_index_info(config=config, index_name=index_name)
 
-    if not docs:
+    if len(docs) == 0:
         raise errors.BadRequestError(message="Received empty add documents request")
 
     existing_fields = set(index_info.properties.keys())
