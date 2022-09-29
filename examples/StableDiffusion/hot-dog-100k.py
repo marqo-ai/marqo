@@ -17,6 +17,7 @@ import subprocess
 #####################################################
 
 # this should be where the images are unzipped
+# get the dataset from here https://drive.google.com/file/d/16_1MlX9GH-6v060jYA23eTJwH74fSU4L/view?usp=sharing
 images_directory = 'hot-dog-100k/'
 
 # the images are accessed via docker from here - you will be able
@@ -35,7 +36,7 @@ files_map = {os.path.basename(f):f for f in files}
 # update them to use the correct path
 files_docker = [f.replace(images_directory, docker_path) for f in files]
 
-# now we create our documents for indexing -  a list of python dicts
+# now we create our documents for indexing - a list of python dicts with keys as field names
 documents = [{"image_docker":file_docker, '_id':os.path.basename(file_docker)} for file_docker,file_local in zip(files_docker, files)]
 
 #####################################################
@@ -43,8 +44,7 @@ documents = [{"image_docker":file_docker, '_id':os.path.basename(file_docker)} f
 #####################################################
 
 # we create the index and can set the model we want to use
-# the onnx models are typically faster on both CPU and GPU
-# to use non-onnx just use the name 'all_datasets_v4_MiniLM-L6'
+
 
 # get the marqo client
 client = Client()
@@ -58,13 +58,13 @@ settings = {
         }
 client.create_index(index_name, **settings)
 
-# here we use parallel indexing to speed up the task - a gpu is recomended
+# here we use parallel indexing to speed up the task - a gpu is recomended (device='cuda')
 responses = client.index(index_name).add_documents(documents, device='cpu'
                                                     , processes=4, batch_size=50)
 
 
 #####################################################
-############### Step 3. Add some labels via zero-shot learning
+### Step 3. Add some labels via zero-shot learning
 #####################################################
 
 
@@ -72,6 +72,7 @@ index_name = 'one_dog_two'
 
 # the documents here are actually serving as labels. the document (i.e. label)
 # that most closely matches is returned first and can be used as a label
+# each one gets scored and those scores can also be kept
 labels = [{"label":"one hot dog"}, {"label":"two hot dogs"},
                 {"label":"a hamburger"}, {"label": "a face"}]
 
@@ -104,7 +105,7 @@ responses = client.index("hot-dogs-100k").add_documents(documents, device='cpu',
                                                             processes=3, batch_size=50)
 
 #####################################################
-############### Step 4. Remove the black images
+### Step 4. Remove the black images
 #####################################################
 
 query = 'a black image'
@@ -121,7 +122,7 @@ client.index(index_name).delete_documents(documents_delete)
 
 
 #####################################################
-############### phase 5. order them
+### Step 5. order the images based on their similarity with each other
 #####################################################
 
 # pick one to start
@@ -157,7 +158,7 @@ ordered_images = [files_map[f] for f in ordered_documents]
 deleted_documents = [d for d in documents if d['_id'] in ordered_documents]
 
 #####################################################
-############### Step 6. Animate them
+### Step 6. Animate them
 #####################################################
 import sys
 import subprocess
