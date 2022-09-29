@@ -550,27 +550,84 @@ class TestVectorSearch(MarqoTestCase):
             pass
 
     def test_attributes_to_retrieve_vector(self):
+        docs = {
+            "5678": {"abc": "Exact match hehehe", "other field": "baaadd",
+                     "Cool Field 1": "res res res", "_id": "5678"},
+            "rgjknrgnj": {"Cool Field 1": "somewhat match", "_id": "rgjknrgnj",
+                          "abc": "random text", "other field": "Close match hehehe"},
+            "9000": {"Cool Field 1": "somewhat match", "_id": "9000", "other field": "weewowow"}
+        }
         tensor_search.add_documents(
-            config=self.config, index_name=self.index_name_1, docs=[
-                {"abc": "Exact match hehehe", "other field": "baaadd",
-                 "Cool Field 1": "res res res", "_id": "5678"},
-                {"Cool Field 1": "somewhat match",
-                 "abc": "random text", "other field": "Close match hehehe"},
-                {"Cool Field 1": "somewhat match", "_id": "9000", "other field": "weewowow"}
-            ], auto_refresh=True)
+            config=self.config, index_name=self.index_name_1, docs=list(docs.values()), auto_refresh=True)
         search_res = tensor_search.search(
             config=self.config, index_name=self.index_name_1, text="Exact match hehehe",
-            attributes_to_retrieve=["other field", "Cool Field 1"], return_doc_ids=True
+            attributes_to_retrieve=["other field", "Cool Field 1"], return_doc_ids=True,
+            search_method="TENSOR"
         )
+        assert len(search_res["hits"]) == 3
         for res in search_res["hits"]:
+            assert docs[res["_id"]]["other field"] == res["other field"]
+            assert docs[res["_id"]]["Cool Field 1"] == res["Cool Field 1"]
             assert set(k for k in res.keys() if k not in TensorField.__dict__.values()) == \
                    {"other field", "Cool Field 1", "_id"}
 
     def test_attributes_to_retrieve_lexical(self):
-        """FIXME"""
-
-    def test_attributes_to_retrieve_ids(self):
-        """FIXME - both lexical and vector"""
+        docs = {
+            "5678": {"abc": "Exact match hehehe", "other field": "baaadd",
+                     "Cool Field 1": "res res res", "_id": "5678"},
+            "rgjknrgnj": {"Cool Field 1": "somewhat match", "_id": "rgjknrgnj",
+                          "abc": "random text", "other field": "Close match hehehe"},
+            "9000": {"Cool Field 1": "somewhat match", "_id": "9000", "other field": "weewowow"}
+        }
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=list(docs.values()), auto_refresh=True)
+        search_res = tensor_search.search(
+            config=self.config, index_name=self.index_name_1, text="Exact match hehehe",
+            attributes_to_retrieve=["other field", "Cool Field 1"], return_doc_ids=True, search_method="LEXICAL"
+        )
+        assert len(search_res["hits"]) == 3
+        for res in search_res["hits"]:
+            assert docs[res["_id"]]["other field"] == res["other field"]
+            assert docs[res["_id"]]["Cool Field 1"] == res["Cool Field 1"]
+            assert set(k for k in res.keys() if k not in TensorField.__dict__.values()) == \
+                   {"other field", "Cool Field 1", "_id"}
 
     def test_attributes_to_retrieve_empty(self):
+        docs = {
+            "5678": {"abc": "Exact match hehehe", "other field": "baaadd",
+                     "Cool Field 1": "res res res", "_id": "5678"},
+            "rgjknrgnj": {"Cool Field 1": "somewhat match", "_id": "rgjknrgnj",
+                          "abc": "random text", "other field": "Close match hehehe"},
+            "9000": {"Cool Field 1": "somewhat match", "_id": "9000", "other field": "weewowow"}
+        }
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=list(docs.values()), auto_refresh=True)
+        for method in ("LEXICAL", "TENSOR"):
+            search_res = tensor_search.search(
+                config=self.config, index_name=self.index_name_1, text="Exact match hehehe",
+                attributes_to_retrieve=[], return_doc_ids=True, search_method=method
+            )
+            assert len(search_res["hits"]) == 3
+            for res in search_res["hits"]:
+                assert set(k for k in res.keys() if k not in TensorField.__dict__.values()) == {"_id"}
+
+    def test_attributes_to_retrieve_empty_index(self):
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
+        assert 0 == tensor_search.get_stats(config=self.config, index_name=self.index_name_1)['numberOfDocuments']
+        for to_retrieve in [[], ["some field name"]]:
+            for method in ("LEXICAL", "TENSOR"):
+                search_res = tensor_search.search(
+                    config=self.config, index_name=self.index_name_1, text="Exact match hehehe",
+                    attributes_to_retrieve=to_retrieve, return_doc_ids=True, search_method=method
+                )
+                assert len(search_res["hits"]) == 0
+                assert search_res['query'] == "Exact match hehehe"
+
+    def test_attributes_to_retrieve_non_existent(self):
+        """FIXME - both lexical and vector"""
+
+    def test_attributes_to_retrieve_and_searchable_attribs(self):
+        """FIXME - both lexical and vector"""
+
+    def test_attributes_to_retrieve_non_list(self):
         """FIXME - both lexical and vector"""

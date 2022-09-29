@@ -583,12 +583,12 @@ def _lexical_search(
         body["query"]["bool"]["filter"] = [{
             "query_string": {"query": filter_string}}]
     if attributes_to_retrieve is not None:
-        body["_source"] = attributes_to_retrieve
+        body["_source"] = {"include": attributes_to_retrieve} if len(attributes_to_retrieve) > 0 else False
     search_res = HttpRequests(config).get(path=f"{index_name}/_search", body=body)
 
     res_list = []
     for doc in search_res['hits']['hits']:
-        just_doc = _clean_doc(doc["_source"].copy())
+        just_doc = _clean_doc(doc["_source"].copy()) if "_source" in doc else dict()
         if return_doc_ids:
             just_doc["_id"] = doc["_id"]
             just_doc["_score"] = doc["_score"]
@@ -714,9 +714,7 @@ def _vector_text_search(
                 "exclude": ["*__vector*"]
             }
         if attributes_to_retrieve is not None:
-            search_query["_source"] = {
-                "include": attributes_to_retrieve
-            }
+            search_query["_source"] = {"include": attributes_to_retrieve} if len(attributes_to_retrieve) > 0 else False
         if filter_string is not None:
             search_query["query"]["nested"]["query"]["knn"][f"{TensorField.chunks}.{vector_field}"]["filter"] = {
                 "query_string": {"query": f"{contextualised_filter}"}
@@ -826,7 +824,11 @@ def _vector_text_search(
         simple_results = []
 
         for d in ordered_docs_w_chunks:
-            cleaned = _clean_doc(d['doc']["_source"], doc_id=d['_id'])
+            if "_source" in d['doc']:
+                cleaned = _clean_doc(d['doc']["_source"], doc_id=d['_id'])
+            else:
+                cleaned = _clean_doc(dict(), doc_id=d['_id'])
+
             cleaned["_highlights"] = {
                 d["chunks"][0]["_source"][TensorField.field_name]: d["chunks"][0]["_source"][TensorField.field_content]
             }
