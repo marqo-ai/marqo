@@ -549,3 +549,28 @@ class TestVectorSearch(MarqoTestCase):
         except InvalidArgError:
             pass
 
+    def test_attributes_to_retrieve_vector(self):
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=[
+                {"abc": "Exact match hehehe", "other field": "baaadd",
+                 "Cool Field 1": "res res res", "_id": "5678"},
+                {"Cool Field 1": "somewhat match",
+                 "abc": "random text", "other field": "Close match hehehe"},
+                {"Cool Field 1": "somewhat match", "_id": "9000", "other field": "weewowow"}
+            ], auto_refresh=True)
+        search_res = tensor_search.search(
+            config=self.config, index_name=self.index_name_1, text="Exact match hehehe",
+            attributes_to_retrieve=["other field", "Cool Field 1"], return_doc_ids=True
+        )
+        for res in search_res["hits"]:
+            assert set(k for k in res.keys() if k not in TensorField.__dict__.values()) == \
+                   {"other field", "Cool Field 1", "_id"}
+
+    def test_attributes_to_retrieve_lexical(self):
+        """FIXME"""
+
+    def test_attributes_to_retrieve_ids(self):
+        """FIXME - both lexical and vector"""
+
+    def test_attributes_to_retrieve_empty(self):
+        """FIXME - both lexical and vector"""
