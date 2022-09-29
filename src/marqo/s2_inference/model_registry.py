@@ -94,7 +94,12 @@ def _get_sbert_properties() -> Dict:
                 "tokens":128,
                 "type":"sbert",
                 "notes": ""},
-
+            'sentence-transformers/stsb-xlm-r-multilingual':
+                {"name": 'sentence-transformers/stsb-xlm-r-multilingual',
+                 "dimensions": 768,
+                 "tokens": 128,
+                 "type": "sbert",
+                 "notes": ""},
             "flax-sentence-embeddings/all_datasets_v3_MiniLM-L12": 
                 {"name": "flax-sentence-embeddings/all_datasets_v3_MiniLM-L12",
                 "dimensions": 384,
@@ -198,13 +203,7 @@ def _get_hf_properties() -> Dict:
                 "dimensions": 768,
                 "tokens":128,
                 "type":"hf",
-                "notes": ""},
-            'sentence-transformers/stsb-xlm-r-multilingual':
-                {"name": 'sentence-transformers/stsb-xlm-r-multilingual',
-                 "dimensions": 768,
-                 "tokens": 128,
-                 "type": "sbert",
-                 "notes": ""}
+                "notes": ""}
     }
     return HF_MODEL_PROPERTIES
 

@@ -19,6 +19,8 @@
 
 An open-source tensor search engine that seamlessly integrates with your applications, websites, and workflow. 
 
+Marqo cloud ☁️  is currently in beta. If you're interested, apply here: https://q78175g1wwa.typeform.com/to/d0PEuRPC
+
 ## What is tensor search?
 
 Tensor search involves transforming documents, images and other data into collections of vectors called "tensors". Representing data as tensors allows us to match queries against documents with human-like understanding of the query and document's content. Tensor search can power a variety of use cases such as:

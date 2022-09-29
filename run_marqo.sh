@@ -1,26 +1,32 @@
 #!/bin/bash
 #source /opt/bash-utils/logger.sh
-
-export PYTHONPATH="${PYTHONPATH}:/app/src/"
 export PYTHONPATH="${PYTHONPATH}:/app/src/"
 export CUDA_HOME=/usr/local/cuda/
 export LD_LIBRARY_PATH=${CUDA_HOME}/lib64
 export PATH=${CUDA_HOME}/bin:${PATH}
 
-echo Python packages:
+trap "bash /app/scripts/shutdown.sh; exit" SIGTERM SIGINT
+
+echo "Python packages:"
 pip freeze
 
 function wait_for_process () {
-    local max_time_wait=30
+    local max_retries=30
+    local n_restarts_before_sigkill=3
     local process_name="$1"
-    local waited_sec=0
-    while ! [[ $(docker ps -a | grep CONTAINER) ]] >/dev/null && ((waited_sec < max_time_wait)); do
+    local retries=0
+    while ! [[ $(docker ps -a | grep CONTAINER) ]] >/dev/null && ((retries < max_retries)); do
         echo "Process $process_name is not running yet. Retrying in 1 seconds"
-        echo "Waited $waited_sec seconds of $max_time_wait seconds"
-        dockerd &
-        sleep 1
-        ((waited_sec=waited_sec+1))
-        if ((waited_sec >= max_time_wait)); then
+        echo "Retry $retries of a maximum of $max_retries retries"
+        ((retries=retries+1))
+        if ((retries >= n_restarts_before_sigkill)); then
+            echo "sending SIGKILL to dockerd and restarting "
+            ps axf | grep docker | grep -v grep | awk '{print "kill -9 " $1}' | sh; rm /var/run/docker.pid; dockerd &
+        else
+            dockerd &
+        fi
+        sleep 3
+        if ((retries >= max_retries)); then
             return 1
         fi
     done
@@ -35,15 +41,16 @@ if [[ ! $OPENSEARCH_URL ]]; then
   rc=$?
   if [ $rc != 0 ]; then
       echo "Docker not found. Installing it..."
-      bash /app/dind_setup/setup_dind.sh
+      bash /app/dind_setup/setup_dind.sh &
+      setup_dind_pid=$!
+      wait "$setup_dind_pid"
   fi
 
   echo "Starting supervisor"
   /usr/bin/supervisord -n >> /dev/null 2>&1 &
 
-  echo starting dockerd command
   dockerd &
-  echo dockerd command complete
+  echo "called dockerd command"
 
   echo "Waiting for processes to be running"
   processes=(dockerd)
@@ -81,10 +88,10 @@ export OPENSEARCH_URL
 export OPENSEARCH_IS_INTERNAL
 # Start the tensor search web app in the background
 cd /app/src/marqo/tensor_search || exit
-uvicorn api:app --host 0.0.0.0 --port 8882
+uvicorn api:app --host 0.0.0.0 --port 8882 &
+api_pid=$!
+wait "$api_pid"
 
-# Wait for any process to exit
-wait -n
 
 # Exit with status of process that exited first
 exit $?
