@@ -1,9 +1,6 @@
 import copy
-
 import PIL
-
-from marqo.errors import ChunkerError
-from PIL import Image
+from marqo.s2_inference.errors import ChunkerError
 import numpy as np
 import torch
 from torchvision.models.detection import FasterRCNN_MobileNet_V3_Large_FPN_Weights, fasterrcnn_mobilenet_v3_large_fpn

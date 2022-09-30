@@ -2,7 +2,7 @@
 The functions defined here would have endpoints, later on.
 """
 import numpy as np
-from marqo.errors import VectoriseError
+from marqo.s2_inference.errors import VectoriseError
 from PIL import UnidentifiedImageError
 from marqo.s2_inference.model_registry import load_model_properties
 from marqo.s2_inference.configs import get_default_device,get_default_normalization,get_default_seq_length

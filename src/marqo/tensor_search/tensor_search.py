@@ -56,8 +56,8 @@ from marqo.s2_inference import s2_inference
 # _httprequests.py is designed for the client
 from marqo._httprequests import HttpRequests
 from marqo.config import Config
-# TODO add an errors.py 
 from marqo import errors
+from marqo.s2_inference import errors as s2_inference_errors
 import threading
 import re
 
@@ -356,7 +356,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                         # errors of different types generated here, too.
                         content_chunks, text_chunks = image_processor.chunk_image(
                             field_content, device=selected_device, method=image_method)
-                    except errors.S2InferenceError:
+                    except s2_inference_errors.S2InferenceError:
                         document_is_valid = False
                         image_err = errors.InvalidArgError(message=f'Could not process given image: {field_content}')
                         unsuccessful_docs.append(
@@ -373,7 +373,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                     vector_chunks = s2_inference.vectorise(model_name=index_info.model_name, content=content_chunks,
                                                            device=selected_device, normalize_embeddings=normalize_embeddings,
                                                            infer=infer_if_image)
-                except errors.S2InferenceError:
+                except s2_inference_errors.S2InferenceError:
                     document_is_valid = False
                     image_err = errors.InvalidArgError(message=f'Could not process given image: {field_content}')
                     unsuccessful_docs.append(
