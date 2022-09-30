@@ -1,8 +1,10 @@
 import copy
 
+import PIL
+
+from marqo.errors import ChunkerError
 from PIL import Image
 import numpy as np
-
 import torch
 from torchvision.models.detection import FasterRCNN_MobileNet_V3_Large_FPN_Weights, fasterrcnn_mobilenet_v3_large_fpn
 from torchvision.models.detection import fasterrcnn_resnet50_fpn_v2, FasterRCNN_ResNet50_FPN_V2_Weights
@@ -384,6 +386,8 @@ def chunk_image(image: Union[str, ImageType], device: str, method: str = 'simple
 
     Returns:
         Tuple[List[ImageType], ndarray]: _description_
+
+    Raises ChunkerError, if the chunker can't work for some reason
     """
 
     if method in [None, 'none', '', "None", ' ']:
@@ -399,10 +403,11 @@ def chunk_image(image: Union[str, ImageType], device: str, method: str = 'simple
         patch = PatchifyPytorch(device=device, size=get_default_size())
     else:
         raise ValueError(f"unexpected image chunking type. found {method}")
-
-    patch.infer(image)
-    patch.process()
-
+    try:
+        patch.infer(image)
+        patch.process()
+    except PIL.UnidentifiedImageError as e:
+        raise ChunkerError from e
     return patch.patches,patch.bboxes_orig
 
 

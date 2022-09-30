@@ -38,7 +38,7 @@ import typing
 import uuid
 import asyncio
 from typing import List, Optional, Union, Callable, Iterable, Sequence, Dict, Any
-from PIL import Image, UnidentifiedImageError
+from PIL import Image
 from marqo.tensor_search.enums import MediaType, MlModel, TensorField, SearchMethod, OpenSearchDataType
 from marqo.tensor_search.enums import IndexSettingsField as NsField
 from marqo.tensor_search import utils, backend, validation, configs, parallel
@@ -46,7 +46,6 @@ from marqo.tensor_search.index_meta_cache import get_cache,get_index_info
 from marqo.tensor_search import index_meta_cache
 from marqo.tensor_search.models.index_info import IndexInfo
 from marqo.tensor_search import constants
-
 from marqo.s2_inference.processing import text as text_processor
 from marqo.s2_inference.processing import image as image_processor
 from marqo.s2_inference.clip_utils import _is_image
@@ -352,16 +351,29 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                     # TODO put the logic for getting field parameters into a function and add per field options
                     image_method = index_info.index_settings[NsField.index_defaults][NsField.image_preprocessing][NsField.patch_method]
                     # the chunk_image contains the no-op logic as of now - method = None will be a no-op
-                    content_chunks, text_chunks = image_processor.chunk_image(
-                        field_content, device=selected_device, method=image_method)
+                    try:
+                        # in the future, if we have different chunking methods, make sure we catch possible
+                        # errors of different types generated here, too.
+                        content_chunks, text_chunks = image_processor.chunk_image(
+                            field_content, device=selected_device, method=image_method)
+                    except errors.S2InferenceError:
+                        document_is_valid = False
+                        image_err = errors.InvalidArgError(message=f'Could not process given image: {field_content}')
+                        unsuccessful_docs.append(
+                            (i, {'_id': doc_id, 'error': image_err.message, 'status': int(image_err.status_code),
+                                 'code': image_err.code})
+                        )
+                        break
                 
                 normalize_embeddings = index_info.index_settings[NsField.index_defaults][NsField.normalize_embeddings]
                 infer_if_image = index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]
                 try:
+                    # in the future, if we have different underlying vectorising methods, make sure we catch possible
+                    # errors of different types generated here, too.
                     vector_chunks = s2_inference.vectorise(model_name=index_info.model_name, content=content_chunks,
                                                            device=selected_device, normalize_embeddings=normalize_embeddings,
                                                            infer=infer_if_image)
-                except UnidentifiedImageError:
+                except errors.S2InferenceError:
                     document_is_valid = False
                     image_err = errors.InvalidArgError(message=f'Could not process given image: {field_content}')
                     unsuccessful_docs.append(

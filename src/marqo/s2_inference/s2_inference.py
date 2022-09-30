@@ -2,7 +2,8 @@
 The functions defined here would have endpoints, later on.
 """
 import numpy as np
-
+from marqo.errors import VectoriseError
+from PIL import UnidentifiedImageError
 from marqo.s2_inference.model_registry import load_model_properties
 from marqo.s2_inference.configs import get_default_device,get_default_normalization,get_default_seq_length
 from marqo.s2_inference.types import *
@@ -22,14 +23,19 @@ def vectorise(model_name: str, content: Union[str, List[str]], device: str = get
 
     Returns:
         List[List[float]]: _description_
+
+    Raises:
+        VectoriseError: if the content can't be vectorised, for some reason.
     """
     model_cache_key = _create_model_cache_key(model_name, device)
 
     if model_cache_key not in available_models:
         available_models[model_cache_key] = _load_model(model_name, device=device)
         logger.info(f'loaded {model_name} on device {device} with normalization={normalize_embeddings}')
-
-    vectorised = available_models[model_cache_key].encode(content, normalize=normalize_embeddings, **kwargs)
+    try:
+        vectorised = available_models[model_cache_key].encode(content, normalize=normalize_embeddings, **kwargs)
+    except UnidentifiedImageError as e:
+        raise VectoriseError from e
 
     return _convert_vectorized_output(vectorised)
 

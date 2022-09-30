@@ -331,43 +331,57 @@ class TestAddDocuments(MarqoTestCase):
             pass
 
     def test_resilient_add_images(self):
-        tensor_search.create_vector_index(
-            config=self.config, index_name=self.index_name_1,
-            index_settings={
+        image_index_configs = [
+            # NO CHUNKING
+            {
                 IndexSettingsField.index_defaults: {
                     IndexSettingsField.model: "ViT-B/16",
                     IndexSettingsField.treat_urls_and_pointers_as_images: True
                 }
-        })
-        docs_results = [
-            ([{"_id": "123","image_field": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png"},
-             {"_id": "789", "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png"},
-             {"_id": "456", "image_field": "https://www.marqo.ai/this/image/doesnt/exist.png"}],
-             [("123", "result"), ("789", "result"), ("456", "error")]
-             ),
-            ([{"_id": "123",
-               "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png"},
-              {"_id": "789",
-               "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png"},
-              {"_id": "456", "image_field": "https://www.marqo.ai/this/image/doesnt/exist.png"},
-              {"_id": "111", "image_field": "https://www.marqo.ai/this/image/doesnt/exist2.png"}],
-             [("123", "result"), ("789", "result"), ("456", "error"), ("111", "error")]
-             ),
-            ([{"_id": "505", "image_field": "https://www.marqo.ai/this/image/doesnt/exist3.png"},
-              {"_id": "456", "image_field": "https://www.marqo.ai/this/image/doesnt/exist.png"},
-              {"_id": "111", "image_field": "https://www.marqo.ai/this/image/doesnt/exist2.png"}],
-             [("505", "error"), ("456", "error"), ("111", "error")]
-             ),
-            ([{"_id": "505", "image_field": "https://www.marqo.ai/this/image/doesnt/exist2.png"}],
-             [("505", "error")]
-             ),
+            },
+            # WITH CHUNKING
+            {
+                IndexSettingsField.index_defaults: {
+                    IndexSettingsField.model: "ViT-B/16",
+                    IndexSettingsField.treat_urls_and_pointers_as_images: True,
+                    IndexSettingsField.normalize_embeddings: True,
+                    IndexSettingsField.image_preprocessing: {IndexSettingsField.patch_method: "frcnn"},
+                },
+            }
         ]
-        for docs, expected_results in docs_results:
-            add_res = tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs, auto_refresh=True)
-            assert len(add_res['items']) == len(expected_results)
-            for i, res_dict in enumerate(add_res['items']):
-                assert res_dict["_id"] == expected_results[i][0]
-                assert expected_results[i][1] in res_dict
+        for image_index_config in image_index_configs:
+            tensor_search.create_vector_index(
+                config=self.config, index_name=self.index_name_1, index_settings=image_index_config)
+            docs_results = [
+                ([{"_id": "123","image_field": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png"},
+                 {"_id": "789", "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png"},
+                 {"_id": "456", "image_field": "https://www.marqo.ai/this/image/doesnt/exist.png"}],
+                 [("123", "result"), ("789", "result"), ("456", "error")]
+                 ),
+                ([{"_id": "123",
+                   "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png"},
+                  {"_id": "789",
+                   "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png"},
+                  {"_id": "456", "image_field": "https://www.marqo.ai/this/image/doesnt/exist.png"},
+                  {"_id": "111", "image_field": "https://www.marqo.ai/this/image/doesnt/exist2.png"}],
+                 [("123", "result"), ("789", "result"), ("456", "error"), ("111", "error")]
+                 ),
+                ([{"_id": "505", "image_field": "https://www.marqo.ai/this/image/doesnt/exist3.png"},
+                  {"_id": "456", "image_field": "https://www.marqo.ai/this/image/doesnt/exist.png"},
+                  {"_id": "111", "image_field": "https://www.marqo.ai/this/image/doesnt/exist2.png"}],
+                 [("505", "error"), ("456", "error"), ("111", "error")]
+                 ),
+                ([{"_id": "505", "image_field": "https://www.marqo.ai/this/image/doesnt/exist2.png"}],
+                 [("505", "error")]
+                 ),
+            ]
+            for docs, expected_results in docs_results:
+                add_res = tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs, auto_refresh=True)
+                assert len(add_res['items']) == len(expected_results)
+                for i, res_dict in enumerate(add_res['items']):
+                    assert res_dict["_id"] == expected_results[i][0]
+                    assert expected_results[i][1] in res_dict
+            tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
 
     def test_add_documents_resilient_doc_validation(self):
         tensor_search.create_vector_index(
@@ -431,22 +445,8 @@ class TestAddDocuments(MarqoTestCase):
             - invalid _ids
         """
         tensor_search.create_vector_index(
-            config=self.config, index_name=self.index_name_1,
-            index_settings={
-                IndexSettingsField.index_defaults: {
-                    IndexSettingsField.model: "ViT-B/16",
-                    IndexSettingsField.treat_urls_and_pointers_as_images: True
-                }
-            })
+            config=self.config, index_name=self.index_name_1)
         docs_results = [
-            # invalid images
-            ([{"_id": "123",
-              "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png"},
-             {"_id": "789",
-              "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png"},
-             {"_id": "456", "image_field_3": "https://www.marqo.ai/this/image/doesnt/exist.png"}],
-             ({"image_field_1", "image_field_2"}, {"image_field_3"})
-             ),
             # invalid dict
             ([{"_id": "24frg", "my_field": "legitimate text"}, {},
               {"_id": "srgb4", "my_field": "awesome stuff!"}],
@@ -487,3 +487,60 @@ class TestAddDocuments(MarqoTestCase):
             for field in bad_fields:
                 assert field not in customer_props
                 assert field not in reduced_vector_props
+
+    def test_mappings_arent_updated_images(self):
+        """if an image isn't added properly, we need to ensure that
+        it's mappings don't get added to index mappings
+
+        Test for:
+            - images with chunking
+            - images without chunking
+        """
+        image_index_configs = [
+            # NO CHUNKING
+            {
+                IndexSettingsField.index_defaults: {
+                    IndexSettingsField.model: "ViT-B/16",
+                    IndexSettingsField.treat_urls_and_pointers_as_images: True
+                }
+            },
+            # WITH CHUNKING
+            {
+                IndexSettingsField.index_defaults: {
+                    IndexSettingsField.model: "ViT-B/16",
+                    IndexSettingsField.treat_urls_and_pointers_as_images: True,
+                    IndexSettingsField.normalize_embeddings: True,
+                    IndexSettingsField.image_preprocessing: {IndexSettingsField.patch_method: "frcnn"},
+                },
+            }
+        ]
+        for image_index_config in image_index_configs:
+            tensor_search.create_vector_index(
+                config=self.config, index_name=self.index_name_1,
+                index_settings=image_index_config)
+            docs_results = [
+                # invalid images
+                ([{"_id": "123",
+                  "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png"},
+                 {"_id": "789",
+                  "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png"},
+                 {"_id": "456", "image_field_3": "https://www.marqo.ai/this/image/doesnt/exist.png"}],
+                 ({"image_field_1", "image_field_2"}, {"image_field_3"})
+                 ),
+            ]
+            for docs, (good_fields, bad_fields) in docs_results:
+                # good_fields should appear in the mapping.
+                # bad_fields should not
+                tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs, auto_refresh=True)
+                ii = backend.get_index_info(config=self.config, index_name=self.index_name_1)
+                customer_props = {field_name for field_name in ii.get_text_properties()}
+                reduced_vector_props = {field_name.replace(TensorField.vector_prefix, '')
+                                        for field_name in ii.get_text_properties()}
+                for field in good_fields:
+                    assert field in customer_props
+                    assert field in reduced_vector_props
+
+                for field in bad_fields:
+                    assert field not in customer_props
+                    assert field not in reduced_vector_props
+            tensor_search.delete_index(config=self.config, index_name=self.index_name_1)

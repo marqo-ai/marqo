@@ -1,6 +1,22 @@
 import json
 from requests import Response
 from http import HTTPStatus
+from typing import Optional
+
+
+class S2InferenceError(Exception):
+    def __init__(self, message: Optional[str] = None) -> None:
+        if Optional is not None:
+            self.message = message
+            super().__init__(self.message)
+
+
+class ChunkerError(S2InferenceError):
+    pass
+
+
+class VectoriseError(S2InferenceError):
+    pass
 
 
 class MarqoError(Exception):
@@ -79,8 +95,6 @@ class MarqoWebError(Exception):
         return f'MarqoWebError: {self.__class__.__name__} Error message: {self.message}'
 
 # ---MARQO USER ERRORS---
-
-# --
 
 
 class __InvalidRequestError(MarqoWebError):
