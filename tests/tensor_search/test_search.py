@@ -4,7 +4,10 @@ from unittest import mock
 
 from marqo.tensor_search.enums import TensorField, SearchMethod
 from marqo.client import Client
-from marqo.errors import MarqoApiError, MarqoError, IndexNotFoundError, InvalidArgError
+from marqo.errors import (
+    MarqoApiError, MarqoError, IndexNotFoundError, InvalidArgError,
+    InvalidFieldNameError
+)
 from marqo.tensor_search import tensor_search, constants, index_meta_cache
 import copy
 from tests.marqo_test import MarqoTestCase
@@ -614,7 +617,7 @@ class TestVectorSearch(MarqoTestCase):
     def test_attributes_to_retrieve_empty_index(self):
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
         assert 0 == tensor_search.get_stats(config=self.config, index_name=self.index_name_1)['numberOfDocuments']
-        for to_retrieve in [[], ["some field name"]]:
+        for to_retrieve in [[], ["some field name"], ["some field name", "wowowow field"]]:
             for method in ("LEXICAL", "TENSOR"):
                 search_res = tensor_search.search(
                     config=self.config, index_name=self.index_name_1, text="Exact match hehehe",
@@ -624,10 +627,72 @@ class TestVectorSearch(MarqoTestCase):
                 assert search_res['query'] == "Exact match hehehe"
 
     def test_attributes_to_retrieve_non_existent(self):
-        """FIXME - both lexical and vector"""
+        docs = {
+            "5678": {"abc": "Exact a match hehehe", "other field": "baaadd",
+                     "Cool Field 1": "res res res", "_id": "5678"},
+            "rgjknrgnj": {"Cool Field 1": "somewhata  match", "_id": "rgjknrgnj",
+                          "abc": "random a text", "other field": "Close match hehehe"},
+            "9000": {"Cool Field 1": "somewhat a match", "_id": "9000", "other field": "weewowow"}
+        }
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=list(docs.values()), auto_refresh=True)
+        for to_retrieve in [[], ["non existing field name"], ["other field", "non existing field name"]]:
+            for method in ("TENSOR", "LEXICAL"):
+                search_res = tensor_search.search(
+                    config=self.config, index_name=self.index_name_1, text=" a ",
+                    attributes_to_retrieve=to_retrieve, return_doc_ids=True, search_method=method
+                )
+                assert len(search_res["hits"]) == 3
+                for res in search_res["hits"]:
+                    assert "non existing field name" not in res
+                    assert set(k for k in res.keys()
+                               if k not in TensorField.__dict__.values() and k != "_id"
+                               ).issubset(to_retrieve)
 
     def test_attributes_to_retrieve_and_searchable_attribs(self):
-        """FIXME - both lexical and vector"""
+        docs = {
+            "i_1": {"field_1": "a", "other field": "baaadd",
+                    "Cool Field 1": "res res res", "_id": "i_1"},
+            "i_2": {"field_1": "a", "_id": "i_2",
+                    "field_2": "a", "other field": "Close match hehehe"},
+            "i_3": {"field_1": " a ", "_id": "i_3", "field_2": "a",
+                    "field_3": "a "}
+        }
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=list(docs.values()), auto_refresh=True)
+        for to_retrieve, to_search, expected_ids, expected_fields in [
+            (["field_1"], ["field_3"], ["i_3"], ["field_1"]),
+            (["field_3"], ["field_1"], ["i_1", "i_2", "i_3"], ["field_3"]),
+            (["field_1", "field_2"], ["field_2", "field_3"], ["i_2", "i_3"], ["field_1", "field_2"]),
+        ]:
+            for method in ("TENSOR", "LEXICAL"):
+                search_res = tensor_search.search(
+                    config=self.config, index_name=self.index_name_1, text="a",
+                    attributes_to_retrieve=to_retrieve, return_doc_ids=True, search_method=method,
+                    searchable_attributes=to_search
+                )
+                assert len(search_res["hits"]) == len(expected_ids)
+                assert set(expected_ids) == {h['_id'] for h in search_res["hits"]}
+                for res in search_res["hits"]:
+                    relevant_fields = set(expected_fields).intersection(set(docs[res["_id"]].keys()))
+                    assert set(k for k in res.keys()
+                               if k not in TensorField.__dict__.values() and k != "_id"
+                               ) == relevant_fields
 
     def test_attributes_to_retrieve_non_list(self):
-        """FIXME - both lexical and vector"""
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1,
+                                    docs=[{"cool field 111": "this is some content"}],
+                                    auto_refresh=True)
+        for method in ("TENSOR", "LEXICAL"):
+            for bad_attr in ["jknjhc", "", dict(), 1234, 1.245]:
+                try:
+                    print("bad_attrbad_attrbad_attr",bad_attr)
+                    tensor_search.search(
+                        config=self.config, index_name=self.index_name_1, text="a",
+                        attributes_to_retrieve=bad_attr, return_doc_ids=True, search_method=method,
+                    )
+                    raise AssertionError
+                except (InvalidArgError, InvalidFieldNameError):
+                    pass
+
+
