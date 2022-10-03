@@ -509,6 +509,7 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
            search_method: Union[str, SearchMethod, None] = SearchMethod.TENSOR,
            searchable_attributes: Iterable[str] = None, verbose: int = 0, num_highlights: int = 3,
            reranker: Union[str, Dict] = None, simplified_format: bool = True, filter: str = None,
+           attributes_to_retrieve: Optional[List[str]] = None,
            device=None) -> Dict:
     """The root search method. Calls the specific search method
 
@@ -543,7 +544,10 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
 
     if searchable_attributes is not None:
         [validation.validate_field_name(attribute) for attribute in searchable_attributes]
-
+    if attributes_to_retrieve is not None:
+        if not isinstance(attributes_to_retrieve, (List, typing.Tuple)):
+            raise errors.InvalidArgError("attributes_to_retrieve must be a sequence!")
+        [validation.validate_field_name(attribute) for attribute in attributes_to_retrieve]
     if verbose:
         print(f"determined_search_method: {search_method}, text query: {text}")
     # if we can't see the index name in cache, we request it and wait for the info
@@ -561,13 +565,13 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
             config=config, index_name=index_name, text=text, result_count=result_count,
             return_doc_ids=return_doc_ids, searchable_attributes=searchable_attributes,
             number_of_highlights=num_highlights, simplified_format=simplified_format,
-            filter_string=filter, device=device
+            filter_string=filter, device=device, attributes_to_retrieve=attributes_to_retrieve
         )
     elif search_method.upper() == SearchMethod.LEXICAL:
         search_result = _lexical_search(
             config=config, index_name=index_name, text=text, result_count=result_count,
             return_doc_ids=return_doc_ids, searchable_attributes=searchable_attributes,
-            filter_string=filter
+            filter_string=filter, attributes_to_retrieve=attributes_to_retrieve
         )
     else:
         raise errors.InvalidArgError(f"Search called with unknown search method: {search_method}")
@@ -591,7 +595,8 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
 
 def _lexical_search(
         config: Config, index_name: str, text: str, result_count: int = 3, return_doc_ids=True,
-        searchable_attributes: Sequence[str] = None, filter_string: str = None):
+        searchable_attributes: Sequence[str] = None, filter_string: str = None,
+        attributes_to_retrieve: Optional[List[str]] = None):
     """
 
     Args:
@@ -641,12 +646,13 @@ def _lexical_search(
     if filter_string is not None:
         body["query"]["bool"]["filter"] = [{
             "query_string": {"query": filter_string}}]
-
+    if attributes_to_retrieve is not None:
+        body["_source"] = {"include": attributes_to_retrieve} if len(attributes_to_retrieve) > 0 else False
     search_res = HttpRequests(config).get(path=f"{index_name}/_search", body=body)
 
     res_list = []
     for doc in search_res['hits']['hits']:
-        just_doc = _clean_doc(doc["_source"].copy())
+        just_doc = _clean_doc(doc["_source"].copy()) if "_source" in doc else dict()
         if return_doc_ids:
             just_doc["_id"] = doc["_id"]
             just_doc["_score"] = doc["_score"]
@@ -658,8 +664,8 @@ def _vector_text_search(
         config: Config, index_name: str, text: str, result_count: int = 5, return_doc_ids=False,
         searchable_attributes: Iterable[str] = None, number_of_highlights=3,
         verbose=0, raise_on_searchable_attribs=False, hide_vectors=True, k=500,
-        simplified_format=True, filter_string: str = None, device=None
-):
+        simplified_format=True, filter_string: str = None, device=None,
+        attributes_to_retrieve: Optional[List[str]] = None):
     """
     Args:
         config:
@@ -675,6 +681,7 @@ def _vector_text_search(
             objects are printed out
         hide_vectors: if True, vectors won't be returned from OpenSearch. This reduces the size
             of data transfers
+        attributes_to_retrieve: if set, only returns these fields
     Returns:
 
     Note:
@@ -770,6 +777,8 @@ def _vector_text_search(
             search_query["query"]["nested"]["inner_hits"]["_source"] = {
                 "exclude": ["*__vector*"]
             }
+        if attributes_to_retrieve is not None:
+            search_query["_source"] = {"include": attributes_to_retrieve} if len(attributes_to_retrieve) > 0 else False
         if filter_string is not None:
             search_query["query"]["nested"]["query"]["knn"][f"{TensorField.chunks}.{vector_field}"]["filter"] = {
                 "query_string": {"query": f"{contextualised_filter}"}
@@ -879,7 +888,11 @@ def _vector_text_search(
         simple_results = []
 
         for d in ordered_docs_w_chunks:
-            cleaned = _clean_doc(d['doc']["_source"], doc_id=d['_id'])
+            if "_source" in d['doc']:
+                cleaned = _clean_doc(d['doc']["_source"], doc_id=d['_id'])
+            else:
+                cleaned = _clean_doc(dict(), doc_id=d['_id'])
+
             cleaned["_highlights"] = {
                 d["chunks"][0]["_source"][TensorField.field_name]: d["chunks"][0]["_source"][TensorField.field_content]
             }
