@@ -10,7 +10,7 @@ import pprint
 
 def read_json(filename: str) -> dict:
     # reads a json file
-    with open(filename, 'r') as f:
+    with open(filename, 'r', encoding='utf-8') as f:
         data = json.load(f)
     return data
 
