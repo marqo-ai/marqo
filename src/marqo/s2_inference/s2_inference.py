@@ -12,28 +12,40 @@ logger = get_logger(__name__)
 available_models = dict()
 MODEL_PROPERTIES = load_model_properties()
 
-def vectorise(model_name: str, content: Union[str, List[str]], device: str = get_default_device(), 
+def vectorise(model: Union[str, dict], content: Union[str, List[str]], device: str = get_default_device(),
                                     normalize_embeddings: bool = get_default_normalization(), **kwargs) -> List[List[float]]:
     """vectorizes the content by model name
 
     Args:
-        model_name (str): _description_
+        model (str | dict): _description_
         content (_type_): _description_
 
     Returns:
         List[List[float]]: _description_
     """
+
+    model_name = _get_model_name(model)
+
     model_cache_key = _create_model_cache_key(model_name, device)
 
-    if model_cache_key not in available_models:
-        available_models[model_cache_key] = _load_model(model_name, device=device)
-        logger.info(f'loaded {model_name} on device {device} with normalization={normalize_embeddings}')
+    _update_model_properties(model, model_name)
+
+    _update_available_models(model_cache_key, model_name, device, normalize_embeddings)
 
     vectorised = available_models[model_cache_key].encode(content, normalize=normalize_embeddings, **kwargs)
 
     return _convert_vectorized_output(vectorised)
 
-def _create_model_cache_key(model_name: str, device: str) -> Tuple:
+def _get_model_name(model: Union[str, dict]) -> str:
+    """returns the name of the model
+    """
+    if isinstance(model, str):
+        return model
+    elif isinstance(model, dict):
+        return model['name']
+
+
+def _create_model_cache_key(model_name: str, device: str) -> Tuple[str, str]:
     """creates a key to store the loaded model by in the cache
 
     Args:
@@ -46,6 +58,23 @@ def _create_model_cache_key(model_name: str, device: str) -> Tuple:
 
     model_cache_key = (model_name, device)
     return model_cache_key
+
+
+def _update_model_properties(model: Union[str, dict], model_name: str) -> None:
+    """updates MODEL_PROPERTIES if model details are specified by user
+    """
+    if isinstance(model, dict):
+        model_properties = {model_name: model}
+        MODEL_PROPERTIES['models'].update(model_properties)
+
+
+def _update_available_models(model_cache_key: str, model_name: str, device: str, normalize_embeddings: bool) -> None:
+    """loads the model if it is not already loaded
+    """
+    if model_cache_key not in available_models:
+        available_models[model_cache_key] = _load_model(model_name, device=device)
+        logger.info(f'loaded {model_name} on device {device} with normalization={normalize_embeddings}')
+
 
 def clear_loaded_models() -> None:
     """ clears the loaded model cache
@@ -92,7 +121,7 @@ def _check_output_type(output: List[List[float]]) -> bool:
         return False
     elif len(output[0]) == 0:
         raise ValueError("received empty input")
-    
+
     # this is a soft check for speed reasons
     if not isinstance(output[0][0], (float, int)):
         return False
@@ -143,9 +172,9 @@ def _convert_vectorized_output(output: Union[FloatTensor, ndarray, List[List[flo
 
     if isinstance(output, (FloatTensor, Tensor)):
         if output.ndim == 1:
-            output = output.unsqueeze(0)        
+            output = output.unsqueeze(0)
         output = _float_tensor_to_list(output)
-    
+
     elif isinstance(output, ndarray):
         if output.ndim == 1:
             output = output[np.newaxis, :]
@@ -168,7 +197,7 @@ def _convert_vectorized_output(output: Union[FloatTensor, ndarray, List[List[flo
 
     if _check_output_type(output):
         return output
-    
+
     raise TypeError(f"unable to convert input of type {type(output)} to a list of lists of floats")
 
 
@@ -209,14 +238,14 @@ def _load_model(model_name: str, device: str = get_default_device()) -> Any:
     """
 
     model_properties = get_model_properties(model_name)
-    
+
     loader = _get_model_loader(model_name)
-    
+
     max_sequence_length = model_properties.get('tokens', get_default_seq_length())
 
-    model = loader(model_properties['name'], device=device, embedding_dim=model_properties['dimensions'], 
+    model = loader(model_properties['name'], device=device, embedding_dim=model_properties['dimensions'],
                     max_seq_length=max_sequence_length)
-    
+
     model.load()
 
     return model
@@ -242,5 +271,4 @@ def _load_model(model_name: str, device: str = get_default_device()) -> Any:
 #     if is_valid:
 #         return inputs / row_sums
 
-#     raise TypeError(f"expected 2D matrix for normalization but received {n_dims}")  
-    
+#     raise TypeError(f"expected 2D matrix for normalization but received {n_dims}")
