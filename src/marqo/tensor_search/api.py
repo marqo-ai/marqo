@@ -112,7 +112,8 @@ async def search(search_query: SearchQuery, index_name: str, device: str = Depen
         searchable_attributes=search_query.searchableAttributes,
         search_method=search_query.searchMethod,
         result_count=search_query.limit, reranker=search_query.reRanker,
-        filter=search_query.filter, device=device
+        filter=search_query.filter, device=device,
+        attributes_to_retrieve=search_query.attributesToRetrieve
     )
 
 
@@ -188,13 +189,14 @@ curl -XPOST  'http://localhost:8882/indexes/my-irst-ix/documents?refresh=true&de
 
 # SEARCH DOCS
 """
-curl -XPOST  'http://localhost:8882/indexes/my-irst-ix/search?device=cuda:0' -H 'Content-type:application/json' -d '{
+curl -XPOST  'http://localhost:8882/indexes/my-irst-ix/search?device=cuda0' -H 'Content-type:application/json' -d '{
     "q": "what do bears eat?",
     "searchableAttributes": ["Title", "Desc", "other"],
     "limit": 3,    
     "searchMethod": "TENSOR",
     "showHighlights": true,
-    "filter": "Desc:(some boring description)"
+    "filter": "Desc:(some boring description)",
+    "attributesToRetrieve": ["Title"]
 }'
 """
 
