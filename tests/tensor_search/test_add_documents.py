@@ -556,10 +556,11 @@ class TestAddDocuments(MarqoTestCase):
             {"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}
         ]
         tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs_, auto_refresh=True)
-        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[{
+        update_res = tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[{
             "_id": "789", "Title": "Story of Alex Appleseed"
         }], auto_refresh=True, update_mode='update')
         updated_doc = tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="789")
+        pprint.pprint(update_res)
         assert updated_doc["Description"] == "Alice grew up in Houston, Texas."
         assert updated_doc["Title"] == "Story of Alex Appleseed"
 

@@ -478,16 +478,15 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
         if response is not None:
             copied_res = copy.deepcopy(response)
-            print("copied_rescopied_rescopied_res")
-            pprint.pprint(copied_res)
+
             result_dict['errors'] = copied_res['errors']
+            actioned = "index" if update_mode == 'replace' else 'update'
 
             for item in copied_res["items"]:
                 for to_remove in item_fields_to_remove:
-                    actioned = "index" if update_mode == 'replace' else 'update'
                     if to_remove in item[actioned]:
                         del item[actioned][to_remove]
-                new_items.append(item["index"])
+                new_items.append(item[actioned])
 
         if unsuccessful_docs:
             result_dict['errors'] = True
