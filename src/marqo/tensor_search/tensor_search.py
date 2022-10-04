@@ -269,8 +269,19 @@ def _infer_opensearch_data_type(
 
 
 def add_documents(config: Config, index_name: str, docs: List[dict], auto_refresh: bool,
-                  device=None):
+                  device=None, update_mode: str = "replace"):
     """
+
+    Args:
+        config: Config object
+        index_name: name of the index
+        docs: List of documents
+        auto_refresh: Set to False if indexing lots of docs
+        device: Device used to carry out the document update.
+        update_mode: {'replace' | 'update'}. If set to replace (default) just
+
+    Returns:
+
     """
     t0 = datetime.datetime.now()
     bulk_parent_dicts = []
@@ -284,6 +295,11 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
     if len(docs) == 0:
         raise errors.BadRequestError(message="Received empty add documents request")
 
+    valid_update_modes = ('update', 'replace')
+    if update_mode not in valid_update_modes:
+        raise errors.InvalidArgError(message=f"Unknown update_mode `{update_mode}` "
+                                             f"received! Valid update modes: {valid_update_modes}")
+
     existing_fields = set(index_info.properties.keys())
     new_fields = set()
 
@@ -293,7 +309,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
     for i, doc in enumerate(docs):
 
-        indexing_instructions = {"index": {"_index": index_name}}
+        indexing_instructions = {'index' if update_mode == 'replace' else 'update': {"_index": index_name}}
         copied = copy.deepcopy(doc)
 
         document_is_valid = True
@@ -317,7 +333,10 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
             )
             continue
 
-        indexing_instructions["index"]["_id"] = doc_id
+        if update_mode == "replace":
+            indexing_instructions["index"]["_id"] = doc_id
+        else:
+            indexing_instructions["update"]["_id"] = doc_id
 
         chunks = []
 
@@ -403,11 +422,37 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                         **chunk_values_for_filtering
                     })
         if document_is_valid:
-            copied[TensorField.chunks] = chunks
-            bulk_parent_dicts.append(indexing_instructions)
-            bulk_parent_dicts.append(copied)
-
             new_fields = new_fields.union(new_fields_from_doc)
+            if update_mode =='replace':
+                copied[TensorField.chunks] = chunks
+                bulk_parent_dicts.append(indexing_instructions)
+                bulk_parent_dicts.append(copied)
+            else:
+                bulk_parent_dicts.append(indexing_instructions)
+                bulk_parent_dicts.append({
+                    "script": {
+                        "lang": "painless",
+                        "source": f"""
+                        
+            for (int i=ctx._source.{TensorField.chunks}.length-1; i>=0; i--) {{
+                if (params.doc_fields.contains(ctx._source.{TensorField.chunks}[i].{TensorField.field_name})) {{
+                   ctx._source.{TensorField.chunks}.remove(i);
+                }}
+            }}
+            
+            ctx._source.{TensorField.chunks}.addAll(params.new_chunks);
+            
+            for (key in params.customer_dict.keySet()) {{
+                ctx._source[key] = params.customer_dict[key];
+            }}
+                        """,
+                        "params": {
+                            "doc_fields": list(new_fields_from_doc),
+                            "new_chunks": chunks,
+                            "customer_dict": copied,
+                        }
+                    }
+                })
 
     if bulk_parent_dicts:
         # the HttpRequest wrapper handles error logic
@@ -433,12 +478,15 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
         if response is not None:
             copied_res = copy.deepcopy(response)
+            print("copied_rescopied_rescopied_res")
+            pprint.pprint(copied_res)
             result_dict['errors'] = copied_res['errors']
 
             for item in copied_res["items"]:
                 for to_remove in item_fields_to_remove:
-                    if to_remove in item["index"]:
-                        del item["index"][to_remove]
+                    actioned = "index" if update_mode == 'replace' else 'update'
+                    if to_remove in item[actioned]:
+                        del item[actioned][to_remove]
                 new_items.append(item["index"])
 
         if unsuccessful_docs:

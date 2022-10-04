@@ -434,7 +434,7 @@ class TestAddDocuments(MarqoTestCase):
                 assert expected_results[i][1] in res_dict
 
     def test_mappings_arent_updated(self):
-        """if an image isn't added properly, we need to ensure that
+        """if a doc isn't added properly, we need to ensure that
         it's mappings don't get added to index mappings
 
         Test for:
@@ -544,3 +544,56 @@ class TestAddDocuments(MarqoTestCase):
                     assert field not in customer_props
                     assert field not in reduced_vector_props
             tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+
+    def test_patch_documents(self):
+        """
+        TODO: test
+            - Text
+            - ints, floats, bools
+        """
+        docs_ = [
+            {"_id": "123", "Title": "Story of Joe Blogs", "Description": "Joe was a great farmer."},
+            {"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}
+        ]
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs_, auto_refresh=True)
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[{
+            "_id": "789", "Title": "Story of Alex Appleseed"
+        }], auto_refresh=True, update_mode='update')
+        updated_doc = tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="789")
+        assert updated_doc["Description"] == "Alice grew up in Houston, Texas."
+        assert updated_doc["Title"] == "Story of Alex Appleseed"
+
+    def test_patch_documents_no_outdated_chunks(self):
+        """Ensure there are no chunks left over
+        TODO: test
+            - Text
+            - ints, floats, bools
+        """
+
+    def test_patch_documents_filtering(self):
+        """Ensure there are no chunks left over
+        TODO: test
+            - Text
+            - ints, floats, bools
+        """
+
+    def test_patch_documents_mp(self):
+        """
+        TODO: test
+            - Text
+            - ints, floats, bools
+        """
+
+    def test_patch_empty(self):
+        """
+        TODO: test
+            - Text
+            - ints, floats, bools
+        """
+
+    def test_patch_documents_orchestrator(self):
+        """
+        TODO: test
+            - Text
+            - ints, floats, bools
+        """
