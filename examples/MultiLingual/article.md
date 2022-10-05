@@ -1,8 +1,8 @@
 # How I used Marqo to create a multilingual legal database in 5 key lines of code
 ![](assets/robot_lawyer.png)
-*A [machine learning transformer](https://openai.com/dall-e-2/) 
+*A [machine learning transformer model](https://openai.com/dall-e-2/) 
 from [OpenAI](https://openai.com/) 
-generated this image, and will power the multilingual search used in this solution.*
+generated this image. A transformer model will also power the following multilingual search solution.*
 
 
 The European Union has to deal with a peculiar problem - it has 24 official languages across 27 countries and these countries must abide by EU law. Experts in EU law have the complex task of navigating legal material in multiple languages.
@@ -89,6 +89,7 @@ with an AWS _ml.g4dn.2xlarge_ machine.
 
 ### Searching the index
 ![GIF of a legal search interface, with results in multiple languages](assets/fishing_search.gif)
+
 We'll define the following search function that sets some parameters for the call to Marqo:
 ```python
 # pprint is an inbuilt python formatter package that prints data in a readable way
