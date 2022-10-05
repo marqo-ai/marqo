@@ -68,7 +68,7 @@ If you don't have the exact python version specified in the `tox.ini` file, you 
 1. Ensure you have marqo-os running:
 ```bash
 docker rm -f marqo-os
-docker run -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" --name marqo-os marqoai/marqo-os:0.0.2-arm
+docker run -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" --name marqo-os marqoai/marqo-os:0.0.2
 ```
 2. run `tox` in the Marqo home directory
 
