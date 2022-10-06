@@ -428,8 +428,11 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                 bulk_parent_dicts.append(indexing_instructions)
                 bulk_parent_dicts.append(copied)
             else:
+                to_upsert = copied.copy()
+                to_upsert[TensorField.chunks] = chunks
                 bulk_parent_dicts.append(indexing_instructions)
                 bulk_parent_dicts.append({
+                    "upsert": to_upsert,
                     "script": {
                         "lang": "painless",
                         "source": f"""
@@ -450,7 +453,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                             "doc_fields": list(new_fields_from_doc),
                             "new_chunks": chunks,
                             "customer_dict": copied,
-                        }
+                        },
                     }
                 })
 

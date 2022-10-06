@@ -545,24 +545,73 @@ class TestAddDocuments(MarqoTestCase):
                     assert field not in reduced_vector_props
             tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
 
+    def patch_documents_tests(self, docs_, update_docs, get_docs):
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs_, auto_refresh=True)
+        update_res = tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=update_docs,
+            auto_refresh=True, update_mode='update')
+
+        for doc_id, check_dict in get_docs.items():
+            updated_doc = tensor_search.get_document_by_id(
+                config=self.config, index_name=self.index_name_1, document_id=doc_id
+            )
+            for field, expected_value in check_dict.items():
+                assert updated_doc[field] == expected_value
+        return True
+
     def test_patch_documents(self):
-        """
-        TODO: test
-            - Text
-            - ints, floats, bools
-        """
         docs_ = [
             {"_id": "123", "Title": "Story of Joe Blogs", "Description": "Joe was a great farmer."},
             {"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}
         ]
-        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs_, auto_refresh=True)
-        update_res = tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[{
-            "_id": "789", "Title": "Story of Alex Appleseed"
-        }], auto_refresh=True, update_mode='update')
-        updated_doc = tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="789")
-        pprint.pprint(update_res)
-        assert updated_doc["Description"] == "Alice grew up in Houston, Texas."
-        assert updated_doc["Title"] == "Story of Alex Appleseed"
+        assert self.patch_documents_tests(
+            docs_=docs_, update_docs=[{"_id": "789", "Title": "Story of Alex Appleseed"}], get_docs=
+            {"789": {"Description": "Alice grew up in Houston, Texas.",
+                     "Title": "Story of Alex Appleseed"}}
+        )
+
+    def test_patch_documents_int(self):
+        docs_ = [
+            {"_id": "123", "int_field": 9814, "Description": "Joe was a great farmer."},
+            {"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}
+        ]
+        assert self.patch_documents_tests(
+            docs_=docs_, update_docs=[{"_id": "123", "int_field": 88489}], get_docs=
+            {"123": {"Description": "Joe was a great farmer.", "int_field": 88489}}
+        )
+
+    def test_patch_documents_floats(self):
+        docs_ = [
+            {"_id": "123", "fl_field": 12.5, "Description": "Joe was a great farmer."},
+            {"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}
+        ]
+        assert self.patch_documents_tests(
+            docs_=docs_, update_docs=[{"_id": "123", "fl_field": 12.5}], get_docs=
+            {"123": {"Description": "Joe was a great farmer.", "int_field": 88489}}
+        )
+
+    def test_patch_documents_bools(self):
+        docs_ = [
+            {"_id": "123", "bl": True, "Description": "Joe was a great farmer."},
+            {"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}
+        ]
+        assert self.patch_documents_tests(
+            docs_=docs_, update_docs=[{"_id": "123", "bl": False}], get_docs=
+            {"123": {"Description": "Joe was a great farmer.", "bl": False}}
+        )
+
+    def test_patch_documents_upsert(self):
+        docs_ = [
+            {"_id": "123", "bl": True, "Description": "Joe was a great farmer."},
+            {"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}
+        ]
+        assert self.patch_documents_tests(
+            docs_=docs_, update_docs=[{"_id": "123", "bl": False}, {"_id": "new_doc", "blah": "hehehe"}], get_docs=
+            {
+                "123": {"Description": "Joe was a great farmer.", "bl": False},
+                "new_doc": {"blah": "hehehe"}
+            }
+        )
 
     def test_patch_documents_no_outdated_chunks(self):
         """Ensure there are no chunks left over
