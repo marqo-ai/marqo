@@ -88,12 +88,12 @@ def _get_sbert_properties() -> Dict:
                 "tokens":128,
                 "type":"sbert",
                 "notes": ""},
-            # "sentence-transformers/all-mpnet-base-v2":
-            #     {"name": "sentence-transformers/all-mpnet-base-v2",
-            #     "dimensions": 768,
-            #     "tokens":128,
-            #     "type":"sbert",
-            #     "notes": ""},
+            "sentence-transformers/all-mpnet-base-v2":
+                {"name": "sentence-transformers/all-mpnet-base-v2",
+                "dimensions": 768,
+                "tokens":128,
+                "type":"sbert",
+                "notes": ""},
             'sentence-transformers/stsb-xlm-r-multilingual':
                 {"name": 'sentence-transformers/stsb-xlm-r-multilingual',
                  "dimensions": 768,
