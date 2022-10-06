@@ -556,7 +556,19 @@ class TestAddDocuments(MarqoTestCase):
                 config=self.config, index_name=self.index_name_1, document_id=doc_id
             )
             for field, expected_value in check_dict.items():
+                print("jnjnknjk")
+                pprint.pprint(updated_doc)
                 assert updated_doc[field] == expected_value
+
+            updated_raw_doc = requests.get(
+                url=F"{self.endpoint}/{self.index_name_1}/_doc/{doc_id}",
+                verify=False
+            )
+            for ch in updated_raw_doc.json()['_source']['__chunks']:
+                print("jnkvvjnk")
+                pprint.pprint(ch)
+                for field, expected_value in check_dict.items():
+                    assert ch[field] == expected_value
         return True
 
     def test_patch_documents(self):
@@ -645,8 +657,11 @@ class TestAddDocuments(MarqoTestCase):
         import marqo.tensor_search.utils as marqo_utils
         import numpy as np
         descript_vector_name = marqo_utils.generate_vector_name('Description')
+        # check the vectors aren't the same:
         assert not np.allclose(description_chunk[descript_vector_name], new_description_chunk[descript_vector_name])
+        # check the field content has been updated
         assert new_description_chunk[TensorField.field_content] == "Alice grew up in Rooster, Texas."
+        # check fields used for filtering are updated
         for chunk in updated_doc.json()['_source']['__chunks']:
             assert chunk['Description'] == "Alice grew up in Rooster, Texas."
 
@@ -656,6 +671,7 @@ class TestAddDocuments(MarqoTestCase):
             - Text
             - ints, floats, bools
         """
+
 
     def test_patch_documents_search_new_fields(self):
         """Can we search with the new vectors
@@ -685,9 +701,17 @@ class TestAddDocuments(MarqoTestCase):
             - ints, floats, bools
         """
 
+    def test_no_chunks(self):
+        """
+        TODO: test
+            - Text
+            - ints, floats, bools
+        """
+
     def test_patch_documents_orchestrator(self):
         """
         TODO: test
             - Text
             - ints, floats, bools
         """
+

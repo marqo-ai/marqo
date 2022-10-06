@@ -431,29 +431,48 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                 to_upsert = copied.copy()
                 to_upsert[TensorField.chunks] = chunks
                 bulk_parent_dicts.append(indexing_instructions)
+                print("ikbjbhjnjnkbh")
+                pprint.pprint(copied)
                 bulk_parent_dicts.append({
                     "upsert": to_upsert,
                     "script": {
                         "lang": "painless",
                         "source": f"""
+            
+            // updates the doc's fields with the new content
+            for (key in params.customer_dict.keySet()) {{
+                ctx._source[key] = params.customer_dict[key];
+            }}            
                         
+            // keep track of the merged doc
+            def merged_doc = [:];
+            merged_doc.putAll(ctx._source);
+            merged_doc.remove("{TensorField.chunks}");
+            
+            // remove chunks if the __field_name matches an updated field            
             for (int i=ctx._source.{TensorField.chunks}.length-1; i>=0; i--) {{
                 if (params.doc_fields.contains(ctx._source.{TensorField.chunks}[i].{TensorField.field_name})) {{
                    ctx._source.{TensorField.chunks}.remove(i);
                 }}
             }}
             
+            // update the chunks, setting fields to the new data
             for (int i=ctx._source.{TensorField.chunks}.length-1; i>=0; i--) {{
                 for (key in params.customer_dict.keySet()) {{
                     ctx._source.{TensorField.chunks}[i][key] = params.customer_dict[key];
                 }}
             }}
             
+            // update the new chunks, adding the existing data 
+            for (int i=params.new_chunks.length-1; i>=0; i--) {{
+                for (key in merged_doc.keySet()) {{
+                    params.new_chunks[i][key] = merged_doc[key];
+                }}
+            }}
+            
+            // appends the new chunks to the existing chunks  
             ctx._source.{TensorField.chunks}.addAll(params.new_chunks);
             
-            for (key in params.customer_dict.keySet()) {{
-                ctx._source[key] = params.customer_dict[key];
-            }}
                         """,
                         "params": {
                             "doc_fields": list(new_fields_from_doc) + list(existing_fields),
@@ -471,6 +490,8 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
         index_parent_response = HttpRequests(config).post(
             path="_bulk", body=utils.dicts_to_jsonl(bulk_parent_dicts))
+        print("kjnjknrjnkrvjnkjnkrv")
+        pprint.pprint(index_parent_response)
     else:
         index_parent_response = None
 
