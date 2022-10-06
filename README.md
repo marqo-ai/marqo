@@ -77,7 +77,7 @@ results = mq.index("my-first-index").search(
 - `mq` is the client that wraps the`marqo` API
 - `add_documents()` takes a list of documents, represented as python dicts, for indexing
 - `add_documents()` creates an index with default settings, if one does not already exist
-- You can optionally set a document's ID with the special `_id` field. Otherwise, marqo will generate one.
+- You can optionally set a document's ID with the special `_id` field. Otherwise, Marqo will generate one.
 - If the index doesn't exist, Marqo will create it. If it exists then Marqo will add the documents to the index.
 
 Let's have a look at the results:
