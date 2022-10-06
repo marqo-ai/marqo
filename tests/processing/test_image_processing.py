@@ -12,7 +12,11 @@ from marqo.s2_inference.processing.image import (
     rescale_box,
     generate_boxes,
     PatchifySimple,
+    PatchifyPytorch,
     patchify_image,
+    _process_patch_method,
+    chunk_image,
+    str2bool
 )
 
 
@@ -101,8 +105,8 @@ class TestImageChunking(unittest.TestCase):
         image_size = (100,100)
         hn = 4
         wn = 4
-        width = image_size[1]//wn
-        height = image_size[0]//hn
+        width = image_size[0]//wn
+        height = image_size[1]//hn
 
         bboxes = generate_boxes(image_size, hn, wn)
 
@@ -134,6 +138,45 @@ class TestImageChunking(unittest.TestCase):
         assert bboxes[0] == (0, 0, image_size[0]//wn, image_size[1]//hn)
         assert bboxes[-1] == ( width*(wn-1), height*(hn-1), image_size[0], image_size[1]) 
 
+    def test_generate_boxes_overlap(self):
+        
+        def within_a_pixel(arr1, arr2, tolerance=2):
+            return np.abs(np.array(arr1) - np.array(arr2)).sum() <= tolerance
+
+        test_sizes = [((100,100), 2 , 2), ((150,100), 2 , 2), ((150,100), 3 , 2),
+                    ((240,240), 3 , 3), ((240,240), 4 , 3), ((240,240), 3 , 4)]
+
+        for image_size, hn, wn, in test_sizes:
+
+            width = image_size[0]//wn
+            height = image_size[1]//hn
+
+            bboxes = generate_boxes(image_size, hn, wn, overlap=True)
+
+            assert len(set(bboxes)) == (hn*wn) + (hn-1)*(wn-1)
+            assert bboxes[0] == (0, 0, image_size[0]//wn, image_size[1]//hn)
+            assert within_a_pixel(bboxes[-1], ( width*(wn-1), height*(hn-1), image_size[0], image_size[1]))
+
+    def test_process_patch_method(self):
+
+        urls = (
+            ('simple', 'simple', dict()),
+            ('overlap', 'overlap', dict()),
+            ('simple?hn=3', 'simple', {'hn':'3'}),
+            ('overlap?hn=3', 'overlap', {'hn':'3'}),
+            ('simple?wn=3', 'simple', {'wn':'3'}),
+            ('overlap?wn=3', 'overlap', {'wn':'3'}),
+            ('simple?hn=3&wn=4', 'simple', {'hn':'3', 'wn':'4'}),
+            ('overlap?hn=3&wn=4', 'overlap', {'hn':'3', 'wn':'4'}),
+            ('simple?wn=3&wn=4', 'simple', {'wn':'3', 'wn':'4'}),
+            ('overlap?wn=3&wn=4','overlap', {'wn':'3', 'wn':'4'}),
+        )
+
+        for url,path,params in urls:
+            path_out, params_out = _process_patch_method(url)
+            assert path_out == path
+            assert params_out == params
+
     def test_PatchifySimple(self):
 
         image_size = (400,500)
@@ -158,6 +201,85 @@ class TestImageChunking(unittest.TestCase):
             assert len(patcher.patches) == len(patcher.bboxes_orig)
             assert abs(np.array(patcher.patches[0]) - np.array(patcher.image_resized)).sum() < 1e-6
 
+    def test_PatchifyPytorch(self):
+
+        image_size = (400,500)
+        with tempfile.TemporaryDirectory() as d:
+            temp_file_name = os.path.join(d, 'test_image.png')
+            img = Image.fromarray(np.random.randint(0,255,size=image_size).astype(np.uint8))
+            img.save(temp_file_name)
+
+            patcher = PatchifyPytorch(size=image_size)
+            patcher.infer(img)
+            patcher.process()
+
+            assert len(patcher.patches) == len(patcher.bboxes)
+            assert len(patcher.patches) == len(patcher.bboxes_orig)
+            assert abs(np.array(patcher.patches[0]) - np.array(patcher.image)).sum() < 1e-6
+
+            patcher = PatchifyPytorch(size=image_size)
+            patcher.infer(temp_file_name)
+            patcher.process()
+
+            assert len(patcher.patches) == len(patcher.bboxes)
+            assert len(patcher.patches) == len(patcher.bboxes_orig)
+            assert abs(np.array(patcher.patches[0]) - np.array(patcher.image)).sum() < 1e-6
+
+    def test_PatchifyPytorchPrior(self):
+
+        image_size = (400,500)
+        with tempfile.TemporaryDirectory() as d:
+            temp_file_name = os.path.join(d, 'test_image.png')
+            img = Image.fromarray(np.random.randint(0,255,size=image_size).astype(np.uint8))
+            img.save(temp_file_name)
+
+            patcher = PatchifyPytorch(size=image_size, hn=3, wn=3, prior=True)
+            patcher.infer(img)
+            patcher.process()
+
+            assert len(patcher.patches) == len(patcher.bboxes)
+            assert len(patcher.patches) == len(patcher.bboxes_orig)
+            assert abs(np.array(patcher.patches[0]) - np.array(patcher.image)).sum() < 1e-6
+            assert len(patcher.bboxes_simple) == (3*3) + (3-1)*(3-1)
+ 
+            patcher = PatchifyPytorch(size=image_size, hn=3, wn=3, prior=True)
+            patcher.infer(temp_file_name)
+            patcher.process()
+
+            assert len(patcher.patches) == len(patcher.bboxes)
+            assert len(patcher.patches) == len(patcher.bboxes_orig)
+            assert len(patcher.bboxes_simple) == (3*3) + (3-1)*(3-1)
+            assert abs(np.array(patcher.patches[0]) - np.array(patcher.image)).sum() < 1e-6
+
+
+    def test_PatchifyOverlap(self):
+
+        image_size = (400,500)
+        with tempfile.TemporaryDirectory() as d:
+            temp_file_name = os.path.join(d, 'test_image.png')
+            img = Image.fromarray(np.random.randint(0,255,size=image_size).astype(np.uint8))
+            img.save(temp_file_name)
+
+            patcher = PatchifySimple(size=image_size, hn=3, wn=3, overlap=True)
+            patcher.infer(img)
+            patcher.process()
+
+            assert len(patcher.patches) == len(patcher.bboxes)
+            assert len(patcher.patches) == len(patcher.bboxes_orig)
+            # the first term is non-overlapping, second term is overlapping, third term is original box
+            assert len(set(patcher.bboxes)) == (3*3) + (3-1)*(3-1) + 1 
+            assert abs(np.array(patcher.patches[0]) - np.array(patcher.image_resized)).sum() < 1e-6
+
+            patcher = PatchifySimple(size=image_size, hn=3, wn=3, overlap=True)
+            patcher.infer(temp_file_name)
+            patcher.process()
+
+            assert len(patcher.patches) == len(patcher.bboxes)
+            assert len(patcher.patches) == len(patcher.bboxes_orig)
+            assert len(set(patcher.bboxes)) == (3*3) + (3-1)*(3-1) + 1
+            assert abs(np.array(patcher.patches[0]) - np.array(patcher.image_resized)).sum() < 1e-6
+
+
     def test_patchify(self):
 
         image_size = (250, 200)
@@ -174,3 +296,100 @@ class TestImageChunking(unittest.TestCase):
                 a = bb[2] - bb[0]
                 b = bb[3] - bb[1]
                 assert patch.size == (a, b)
+
+    def test_chunk_image_simple(self):
+
+        SIZE = (256, 384)
+        with tempfile.TemporaryDirectory() as d:
+            temp_file_name = os.path.join(d, 'test_image.png')
+            img = Image.fromarray(np.random.randint(0,255, 
+                            size=SIZE).astype(np.uint8))
+            img.save(temp_file_name)
+
+            patches, bboxes = chunk_image(img, device='cpu', 
+                                method = 'simple', size=SIZE)
+            
+            assert len(patches) == (3*3) + 1
+            assert patches[0].size == SIZE
+
+            patches, bboxes = chunk_image(img, device='cpu', 
+                                method = 'simple?hn=2&wn=3', size=SIZE)
+            
+            assert len(patches) == (2*3) + 1, len(patches)
+            assert patches[0].size == SIZE
+
+
+    def test_chunk_image_overlap(self):
+
+        SIZE = (256, 384)
+        with tempfile.TemporaryDirectory() as d:
+            temp_file_name = os.path.join(d, 'test_image.png')
+            img = Image.fromarray(np.random.randint(0,255, 
+                            size=SIZE).astype(np.uint8))
+            img.save(temp_file_name)
+
+            patches, bboxes = chunk_image(img, device='cpu', 
+                                method = 'overlap', size=SIZE)
+            
+            assert len(patches) == (3*3) + (3-1)*(3-1) +  1
+            assert patches[0].size == SIZE
+
+            patches, bboxes = chunk_image(img, device='cpu', 
+                                method = 'overlap?wn=4&hn=2', size=SIZE)
+            
+            assert len(patches) == (4*2) + (4-1)*(2-1) +  1
+            assert patches[0].size == SIZE
+
+    def test_chunk_image_pytorch(self):
+
+        SIZE = (256, 384)
+        with tempfile.TemporaryDirectory() as d:
+            temp_file_name = os.path.join(d, 'test_image.png')
+            img = Image.fromarray(np.random.randint(0,255, 
+                            size=SIZE).astype(np.uint8))
+            img.save(temp_file_name)
+
+            patches, bboxes = chunk_image(img, device='cpu', 
+                                method = 'frcnn', size=SIZE)
+            
+            assert len(patches) >= 1
+            assert patches[0].size == SIZE
+
+            patches, bboxes = chunk_image(img, device='cpu', 
+                                method = 'overlap/frcnn?wn=4&hn=2', size=SIZE)
+            
+            assert len(patches) >= (4*2) + (4-1)*(2-1) +  1
+            assert patches[0].size == SIZE
+
+            patches, bboxes = chunk_image(img, device='cpu', 
+                                method = 'overlap/frcnn?nms=false', size=SIZE)
+            
+            assert len(patches) >= (4*2) + (4-1)*(2-1) +  1
+            assert patches[0].size == SIZE
+
+            patches, bboxes = chunk_image(img, device='cpu', 
+                                method = 'overlap/frcnn?filter_bb=false', size=SIZE)
+            
+            assert len(patches) >= (4*2) + (4-1)*(2-1) +  1
+            assert patches[0].size == SIZE
+
+
+    def test_str2bool(self):
+
+        assert str2bool('true')
+        assert str2bool('True')
+        assert str2bool('T')
+        assert str2bool('t')        
+        assert str2bool('1')
+
+        assert not str2bool('false')
+        assert not str2bool('False')
+        assert not str2bool('F')
+        assert not str2bool('f')        
+        assert not str2bool('0')
+
+        assert not str2bool('foo')
+        assert not str2bool('hello')
+        assert not str2bool('something')
+        assert not str2bool(' ')        
+        assert not str2bool('sd;lkmsnd')
