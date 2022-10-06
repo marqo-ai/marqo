@@ -606,8 +606,8 @@ class TestAddDocuments(MarqoTestCase):
             {"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}
         ]
         assert self.patch_documents_tests(
-            docs_=docs_, update_docs=[{"_id": "123", "bl": False}, {"_id": "new_doc", "blah": "hehehe"}], get_docs=
-            {
+            docs_=docs_, update_docs=[{"_id": "123", "bl": False}, {"_id": "new_doc", "blah": "hehehe"}],
+            get_docs={
                 "123": {"Description": "Joe was a great farmer.", "bl": False},
                 "new_doc": {"blah": "hehehe"}
             }
@@ -615,6 +615,50 @@ class TestAddDocuments(MarqoTestCase):
 
     def test_patch_documents_no_outdated_chunks(self):
         """Ensure there are no chunks left over
+
+        We have to ensure that
+            1) each chunk's copy of the document is updated (the fields used for filtering)
+            2) the vectors are updated
+            3) there are no dangling chunks
+        """
+        docs_ = [{"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}]
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs_, auto_refresh=True)
+        original_doc = requests.get(
+            url=F"{self.endpoint}/{self.index_name_1}/_doc/789",
+            verify=False
+        )
+        original_number_of_chunks = len(original_doc.json()['_source']['__chunks'])
+        description_chunk = [chunk for chunk in original_doc.json()['_source']['__chunks']
+                             if chunk['__field_name'] == 'Description'][0]
+        update_res = tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=[
+                {"_id": "789", "Title": "Story of Alice Appleseed",
+                 "Description": "Alice grew up in Rooster, Texas."}],
+            auto_refresh=True, update_mode='update')
+        updated_doc = requests.get(
+            url=F"{self.endpoint}/{self.index_name_1}/_doc/789",
+            verify=False
+        )
+        new_description_chunk = [chunk for chunk in updated_doc.json()['_source']['__chunks']
+                                 if chunk['__field_name'] == 'Description'][0]
+        assert len(updated_doc.json()['_source']['__chunks']) == original_number_of_chunks
+        import marqo.tensor_search.utils as marqo_utils
+        import numpy as np
+        descript_vector_name = marqo_utils.generate_vector_name('Description')
+        assert not np.allclose(description_chunk[descript_vector_name], new_description_chunk[descript_vector_name])
+        assert new_description_chunk[TensorField.field_content] == "Alice grew up in Rooster, Texas."
+        for chunk in updated_doc.json()['_source']['__chunks']:
+            assert chunk['Description'] == "Alice grew up in Rooster, Texas."
+
+    def test_patch_documents_search(self):
+        """Can we search with the new vectors
+        TODO: test
+            - Text
+            - ints, floats, bools
+        """
+
+    def test_patch_documents_search_new_fields(self):
+        """Can we search with the new vectors
         TODO: test
             - Text
             - ints, floats, bools

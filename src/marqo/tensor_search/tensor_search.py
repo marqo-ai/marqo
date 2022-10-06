@@ -443,6 +443,12 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                 }}
             }}
             
+            for (int i=ctx._source.{TensorField.chunks}.length-1; i>=0; i--) {{
+                for (key in params.customer_dict.keySet()) {{
+                    ctx._source.{TensorField.chunks}[i][key] = params.customer_dict[key];
+                }}
+            }}
+            
             ctx._source.{TensorField.chunks}.addAll(params.new_chunks);
             
             for (key in params.customer_dict.keySet()) {{
@@ -450,7 +456,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
             }}
                         """,
                         "params": {
-                            "doc_fields": list(new_fields_from_doc),
+                            "doc_fields": list(new_fields_from_doc) + list(existing_fields),
                             "new_chunks": chunks,
                             "customer_dict": copied,
                         },
