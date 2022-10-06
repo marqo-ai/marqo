@@ -11,6 +11,8 @@ class S2InferenceError(Exception):
 class ChunkerError(S2InferenceError):
     pass
 
+class ChunkerMethodProcessError(S2InferenceError):
+    pass
 
 class VectoriseError(S2InferenceError):
     pass
