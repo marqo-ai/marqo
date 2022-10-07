@@ -1,10 +1,12 @@
 import copy
+import fileinput
 import json
 import pprint
 from unittest import mock
-
+import marqo.tensor_search.utils as marqo_utils
+import numpy as np
 import requests
-from marqo.tensor_search.enums import TensorField, IndexSettingsField
+from marqo.tensor_search.enums import TensorField, IndexSettingsField, SearchMethod
 from marqo.client import Client
 from marqo.errors import IndexNotFoundError, InvalidArgError, BadRequestError
 from marqo.tensor_search import tensor_search, index_meta_cache, backend
@@ -556,8 +558,6 @@ class TestAddDocuments(MarqoTestCase):
                 config=self.config, index_name=self.index_name_1, document_id=doc_id
             )
             for field, expected_value in check_dict.items():
-                print("jnjnknjk")
-                pprint.pprint(updated_doc)
                 assert updated_doc[field] == expected_value
 
             updated_raw_doc = requests.get(
@@ -565,8 +565,6 @@ class TestAddDocuments(MarqoTestCase):
                 verify=False
             )
             for ch in updated_raw_doc.json()['_source']['__chunks']:
-                print("jnkvvjnk")
-                pprint.pprint(ch)
                 for field, expected_value in check_dict.items():
                     assert ch[field] == expected_value
         return True
@@ -580,6 +578,20 @@ class TestAddDocuments(MarqoTestCase):
             docs_=docs_, update_docs=[{"_id": "789", "Title": "Story of Alex Appleseed"}], get_docs=
             {"789": {"Description": "Alice grew up in Houston, Texas.",
                      "Title": "Story of Alex Appleseed"}}
+        )
+
+    def test_patch_documents_new_field(self):
+        docs_ = [
+            {"_id": "123", "Title": "Story of Joe Blogs", "Description": "Joe was a great farmer."},
+            {"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}
+        ]
+        assert self.patch_documents_tests(
+            docs_=docs_,
+            update_docs=[{"_id": "789", "Backstory": "The thing about Alice, was that she was created, "
+                                                                  "not born."}],
+            get_docs=
+            {"789": {"Backstory": "The thing about Alice, was that she was created, not born.",
+                     "Title": "Story of Alice Appleseed"}}
         )
 
     def test_patch_documents_int(self):
@@ -598,8 +610,8 @@ class TestAddDocuments(MarqoTestCase):
             {"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}
         ]
         assert self.patch_documents_tests(
-            docs_=docs_, update_docs=[{"_id": "123", "fl_field": 12.5}], get_docs=
-            {"123": {"Description": "Joe was a great farmer.", "int_field": 88489}}
+            docs_=docs_, update_docs=[{"_id": "123", "fl_field": 4122.2221}], get_docs=
+            {"123": {"Description": "Joe was a great farmer.", "fl_field": 4122.2221}}
         )
 
     def test_patch_documents_bools(self):
@@ -654,8 +666,7 @@ class TestAddDocuments(MarqoTestCase):
         new_description_chunk = [chunk for chunk in updated_doc.json()['_source']['__chunks']
                                  if chunk['__field_name'] == 'Description'][0]
         assert len(updated_doc.json()['_source']['__chunks']) == original_number_of_chunks
-        import marqo.tensor_search.utils as marqo_utils
-        import numpy as np
+
         descript_vector_name = marqo_utils.generate_vector_name('Description')
         # check the vectors aren't the same:
         assert not np.allclose(description_chunk[descript_vector_name], new_description_chunk[descript_vector_name])
@@ -667,25 +678,104 @@ class TestAddDocuments(MarqoTestCase):
 
     def test_patch_documents_search(self):
         """Can we search with the new vectors
-        TODO: test
-            - Text
-            - ints, floats, bools
         """
-
+        docs_ = [{"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}]
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs_, auto_refresh=True)
+        search_str = "Who is an alien?"
+        first_search = tensor_search.search(config=self.config, index_name=self.index_name_1, text=search_str)
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
+            {"_id": "789", "Title": "Story of Alice Appleseed",
+             "Description": "Unbeknownst to most, Alice is actually an alien in disguise. She uses a UFO to commute to work."}
+        ], auto_refresh=True, update_mode='update')
+        second_search = tensor_search.search(config=self.config, index_name=self.index_name_1, text=search_str)
+        assert not np.isclose(first_search["hits"][0]["_score"], second_search["hits"][0]["_score"])
+        assert second_search["hits"][0]["_score"] > first_search["hits"][0]["_score"]
 
     def test_patch_documents_search_new_fields(self):
-        """Can we search with the new vectors
-        TODO: test
-            - Text
-            - ints, floats, bools
+        """Can we search with the new field?
         """
+        docs_ = [{"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}]
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs_, auto_refresh=True)
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
+            {"_id": "789", "Title": "Story of Alice Appleseed", "Favourite Wavelength": "2 microns"}
+        ], auto_refresh=True, update_mode='update')
+        searched = tensor_search.search(
+            config=self.config, index_name=self.index_name_1, text="A very small length",
+            searchable_attributes=['Favourite Wavelength']
+        )
+        assert len(searched['hits']) == 1
+        assert searched["hits"][0]['_id'] == '789'
 
-    def test_patch_documents_filtering(self):
-        """Ensure there are no chunks left over
-        TODO: test
-            - Text
-            - ints, floats, bools
-        """
+    def patch_documents_filtering_test(self, original_add_docs, update_add_docs, filter_string, expected_ids: set):
+        """Helper for filtering tests"""
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=original_add_docs, auto_refresh=True)
+
+        res = tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=update_add_docs, auto_refresh=True, update_mode='update')
+
+        print("resresres")
+        pprint.pprint(res)
+        abc = requests.get(
+            url=F"{self.endpoint}/{self.index_name_1}/_doc/789",
+            verify=False
+        )
+        print("abccv")
+        pprint.pprint(abc.json())
+
+        for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
+            searched = tensor_search.search(
+                config=self.config, index_name=self.index_name_1, filter=filter_string, text='',
+                search_method=search_method
+            )
+            assert {h['_id'] for h in searched['hits']} == expected_ids
+        return True
+
+    def test_patch_documents_filtering_text(self):
+        assert self.patch_documents_filtering_test(
+            original_add_docs=[
+                {"_id": "101", "Red": "Herring"},
+                {"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}],
+            update_add_docs=[
+                {"_id": "789", "Mother_tongue": "Elvish"}],
+            filter_string="Mother_tongue:Elvish",
+            expected_ids={'789'}
+        )
+
+    def test_patch_documents_filtering_float(self):
+        """  - ints, bools """
+        assert self.patch_documents_filtering_test(
+            original_add_docs=[
+                {"_id": "101", "Red": "Herring"},
+                {"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}],
+            update_add_docs=[
+                {"_id": "789", "Accuracy": -19.34}],
+            filter_string="Accuracy:[-100 TO -1.8]",
+            expected_ids={'789'}
+        )
+
+    def test_patch_documents_filtering_bool(self):
+        """  - ints, bools """
+        assert self.patch_documents_filtering_test(
+            original_add_docs=[
+                {"_id": "101", "Red": "Herring"},
+                {"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}],
+            update_add_docs=[
+                {"_id": "789", "am": True}],
+            filter_string="am:true",
+            expected_ids={'789'}
+        )
+
+    def test_patch_documents_filtering_int(self):
+        """  - ints, bools """
+        assert self.patch_documents_filtering_test(
+            original_add_docs=[
+                {"_id": "101", "Red": "Herring"},
+                {"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}],
+            update_add_docs=[
+                {"_id": "789", "my_int": 1234}],
+            filter_string="my_int:[0 TO 10000]",
+            expected_ids={'789'}
+        )
+
 
     def test_patch_documents_mp(self):
         """

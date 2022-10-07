@@ -428,11 +428,11 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                 bulk_parent_dicts.append(indexing_instructions)
                 bulk_parent_dicts.append(copied)
             else:
+                print('jihhjkjkhjk')
+                pprint.pprint(copied)
                 to_upsert = copied.copy()
                 to_upsert[TensorField.chunks] = chunks
                 bulk_parent_dicts.append(indexing_instructions)
-                print("ikbjbhjnjnkbh")
-                pprint.pprint(copied)
                 bulk_parent_dicts.append({
                     "upsert": to_upsert,
                     "script": {
@@ -449,7 +449,8 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
             merged_doc.putAll(ctx._source);
             merged_doc.remove("{TensorField.chunks}");
             
-            // remove chunks if the __field_name matches an updated field            
+            // remove chunks if the __field_name matches an updated field
+            // All update fields should be recomputed             
             for (int i=ctx._source.{TensorField.chunks}.length-1; i>=0; i--) {{
                 if (params.doc_fields.contains(ctx._source.{TensorField.chunks}[i].{TensorField.field_name})) {{
                    ctx._source.{TensorField.chunks}.remove(i);
@@ -475,7 +476,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
             
                         """,
                         "params": {
-                            "doc_fields": list(new_fields_from_doc) + list(existing_fields),
+                            "doc_fields": list(copied.keys()),
                             "new_chunks": chunks,
                             "customer_dict": copied,
                         },
@@ -490,8 +491,6 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
         index_parent_response = HttpRequests(config).post(
             path="_bulk", body=utils.dicts_to_jsonl(bulk_parent_dicts))
-        print("kjnjknrjnkrvjnkjnkrv")
-        pprint.pprint(index_parent_response)
     else:
         index_parent_response = None
 
