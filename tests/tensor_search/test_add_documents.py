@@ -570,7 +570,7 @@ class TestAddDocuments(MarqoTestCase):
                     assert ch[field] == expected_value
         return True
 
-    def test_patch_documents(self):
+    def test_put_documents(self):
         docs_ = [
             {"_id": "123", "Title": "Story of Joe Blogs", "Description": "Joe was a great farmer."},
             {"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}
@@ -581,7 +581,7 @@ class TestAddDocuments(MarqoTestCase):
                      "Title": "Story of Alex Appleseed"}}
         )
 
-    def test_patch_documents_multiple(self):
+    def test_put_documents_multiple(self):
         docs_ = [
             {"_id": "123", "Title": "Story of Joe Blogs", "Description": "Joe was a great farmer."},
             {"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}
@@ -596,7 +596,25 @@ class TestAddDocuments(MarqoTestCase):
                      "Title": "Woohoo", "Mega": "Coool", "Luminosity": "Extreme", "Temp": 12.5}}
         )
 
-    def test_patch_documents_new_field(self):
+    def test_put_documents_multiple_docs(self):
+        """mutliple docs updated at once"""
+        docs_ = [
+            {"_id": "123", "Title": "Story of Joe Blogs", "Description": "Joe was a great farmer."},
+            {"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}
+        ]
+        assert self.patch_documents_tests(
+            docs_=docs_, update_docs=[{"_id": "789", "Title": "Story of Alex Appleseed"},
+                                      {"_id": "789", "Title": "Woohoo", "Mega": "Coool"},
+                                      {"_id": "789", "Luminosity": "Extreme"},
+                                      {'_id': '123', 'Title': "Never know", "thing1": 9844},
+                                      {"_id": "789", "Temp": 12.5},
+                                      ], get_docs=
+            {"789": {"Description": "Alice grew up in Houston, Texas.",
+                     "Title": "Woohoo", "Mega": "Coool", "Luminosity": "Extreme", "Temp": 12.5},
+             '123': {'_id': '123', 'Title': "Never know", "thing1": 9844, "Description": "Joe was a great farmer."}}
+        )
+
+    def test_put_documents_new_field(self):
         docs_ = [
             {"_id": "123", "Title": "Story of Joe Blogs", "Description": "Joe was a great farmer."},
             {"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}
@@ -610,7 +628,7 @@ class TestAddDocuments(MarqoTestCase):
                      "Title": "Story of Alice Appleseed"}}
         )
 
-    def test_patch_documents_int(self):
+    def test_put_documents_int(self):
         docs_ = [
             {"_id": "123", "int_field": 9814, "Description": "Joe was a great farmer."},
             {"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}
@@ -620,7 +638,7 @@ class TestAddDocuments(MarqoTestCase):
             {"123": {"Description": "Joe was a great farmer.", "int_field": 88489}}
         )
 
-    def test_patch_documents_floats(self):
+    def test_put_documents_floats(self):
         docs_ = [
             {"_id": "123", "fl_field": 12.5, "Description": "Joe was a great farmer."},
             {"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}
@@ -630,7 +648,7 @@ class TestAddDocuments(MarqoTestCase):
             {"123": {"Description": "Joe was a great farmer.", "fl_field": 4122.2221}}
         )
 
-    def test_patch_documents_bools(self):
+    def test_put_documents_bools(self):
         docs_ = [
             {"_id": "123", "bl": True, "Description": "Joe was a great farmer."},
             {"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}
@@ -640,7 +658,7 @@ class TestAddDocuments(MarqoTestCase):
             {"123": {"Description": "Joe was a great farmer.", "bl": False}}
         )
 
-    def test_patch_documents_upsert(self):
+    def test_put_documents_upsert(self):
         docs_ = [
             {"_id": "123", "bl": True, "Description": "Joe was a great farmer."},
             {"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}
@@ -653,7 +671,7 @@ class TestAddDocuments(MarqoTestCase):
             }
         )
 
-    def test_patch_documents_no_outdated_chunks(self):
+    def test_put_documents_no_outdated_chunks(self):
         """Ensure there are no chunks left over
 
         We have to ensure that
@@ -692,7 +710,7 @@ class TestAddDocuments(MarqoTestCase):
         for chunk in updated_doc.json()['_source']['__chunks']:
             assert chunk['Description'] == "Alice grew up in Rooster, Texas."
 
-    def test_patch_documents_search(self):
+    def test_put_documents_search(self):
         """Can we search with the new vectors
         """
         docs_ = [{"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}]
@@ -707,7 +725,7 @@ class TestAddDocuments(MarqoTestCase):
         assert not np.isclose(first_search["hits"][0]["_score"], second_search["hits"][0]["_score"])
         assert second_search["hits"][0]["_score"] > first_search["hits"][0]["_score"]
 
-    def test_patch_documents_search_new_fields(self):
+    def test_put_documents_search_new_fields(self):
         """Can we search with the new field?
         """
         docs_ = [{"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}]
@@ -739,7 +757,7 @@ class TestAddDocuments(MarqoTestCase):
             assert {h['_id'] for h in searched['hits']} == expected_ids
         return True
 
-    def test_patch_documents_filtering_text(self):
+    def test_put_documents_filtering_text(self):
         assert self.patch_documents_filtering_test(
             original_add_docs=[
                 {"_id": "101", "Red": "Herring"},
@@ -750,7 +768,7 @@ class TestAddDocuments(MarqoTestCase):
             expected_ids={'789'}
         )
 
-    def test_patch_documents_filtering_float(self):
+    def test_put_documents_filtering_float(self):
         """  - ints, bools """
         assert self.patch_documents_filtering_test(
             original_add_docs=[
@@ -762,7 +780,7 @@ class TestAddDocuments(MarqoTestCase):
             expected_ids={'789'}
         )
 
-    def test_patch_documents_filtering_bool(self):
+    def test_put_documents_filtering_bool(self):
         """  - ints, bools """
         assert self.patch_documents_filtering_test(
             original_add_docs=[
@@ -774,7 +792,7 @@ class TestAddDocuments(MarqoTestCase):
             expected_ids={'789'}
         )
 
-    def test_patch_documents_filtering_int(self):
+    def test_put_documents_filtering_int(self):
         """  - ints, bools """
         assert self.patch_documents_filtering_test(
             original_add_docs=[
@@ -786,7 +804,7 @@ class TestAddDocuments(MarqoTestCase):
             expected_ids={'789'}
         )
 
-    def test_patch_no_update(self):
+    def test_put_no_update(self):
         tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[{'_id':'123'}],
                                     auto_refresh=True, update_mode='replace')
         res = tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[{'_id':'123'}],
@@ -795,7 +813,7 @@ class TestAddDocuments(MarqoTestCase):
             config=self.config, index_name=self.index_name_1, document_id='123')
 
 
-    def test_patch_no_update_existing_field(self):
+    def test_put_no_update_existing_field(self):
         assert self.patch_documents_tests(
             docs_=[{'_id': '123', "abc": "567"}], update_docs=[{'_id': '123'}], get_docs=
             {"123": {'_id': '123', "abc": "567"}}
@@ -804,7 +822,7 @@ class TestAddDocuments(MarqoTestCase):
             config=self.config, index_name=self.index_name_1, document_id='123')
         assert {'_id': '123', "abc": "567"} == get_res
 
-    def test_patch_no_update_existing_field_float(self):
+    def test_put_no_update_existing_field_float(self):
         assert self.patch_documents_tests(
             docs_=[{'_id': '123', "the_float": 20.22}], update_docs=[{'_id': '123'}], get_docs=
             {"123": {'_id': '123', "the_float": 20.22}}
@@ -813,7 +831,7 @@ class TestAddDocuments(MarqoTestCase):
             config=self.config, index_name=self.index_name_1, document_id='123')
         assert {'_id': '123', "the_float": 20.22} == get_res
 
-    def test_patch_documents_orchestrator(self):
+    def test_put_documents_orchestrator(self):
         """
         """
         docs_ = [
