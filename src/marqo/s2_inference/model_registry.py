@@ -2,7 +2,7 @@ from marqo.s2_inference.hf_utils import HF_MODEL
 from marqo.s2_inference.sbert_onnx_utils import SBERT_ONNX
 from marqo.s2_inference.sbert_utils import SBERT, TEST
 from marqo.s2_inference.random_utils import Random
-from marqo.s2_inference.clip_utils import CLIP
+from marqo.s2_inference.clip_utils import CLIP, OPEN_CLIP
 from marqo.s2_inference.types import Any, Dict, List, Optional, Union, FloatTensor
 
 # we need to keep track of the embed dim and model load functions/classes
@@ -66,6 +66,190 @@ def _get_clip_properties() -> Dict:
 
         }
     return CLIP_MODEL_PROPERTIES
+def _get_open_clip_properties() -> Dict:
+    OPEN_CLIP_MODEL_PROPERTIES = {
+        'open_clip/RN50/openai':
+           {'name': 'open_clip/RN50/openai',
+            'dimensions': 512,
+            'note': 'clip model from open_clip implementation',
+            'type': 'open_clip',
+            'pretrained': 'openai'},
+        'open_clip/RN50/yfcc15m':
+            {'name': 'open_clip/RN50/yfcc15m',
+             'dimensions': 512, 'note': 'clip model from open_clip implementation',
+             'type': 'open_clip', 'pretrained': 'yfcc15m'},
+        'open_clip/RN50/cc12m':
+            {'name': 'open_clip/RN50/cc12m',
+             'dimensions': 512,
+             'note': 'clip model from open_clip implementation',
+             'type': 'open_clip', 'pretrained': 'cc12m'},
+        'open_clip/RN50-quickgelu/openai':
+            {'name': 'open_clip/RN50-quickgelu/openai',
+             'dimensions': 512,
+             'note': 'clip model from open_clip implementation',
+             'type': 'open_clip', 'pretrained': 'openai'},
+        'open_clip/RN50-quickgelu/yfcc15m':
+            {'name': 'open_clip/RN50-quickgelu/yfcc15m',
+             'dimensions': 512,
+             'note': 'clip model from open_clip implementation',
+             'type': 'open_clip', 'pretrained': 'yfcc15m'},
+        'open_clip/RN50-quickgelu/cc12m':
+            {'name': 'open_clip/RN50-quickgelu/cc12m',
+             'dimensions': 512,
+             'note': 'clip model from open_clip implementation',
+             'type': 'open_clip', 'pretrained': 'cc12m'},
+        'open_clip/RN101/openai':
+            {'name': 'open_clip/RN101/openai',
+             'dimensions': 512,
+             'note': 'clip model from open_clip implementation',
+             'type': 'open_clip', 'pretrained': 'openai'},
+        'open_clip/RN101/yfcc15m':
+            {'name': 'open_clip/RN101/yfcc15m',
+             'dimensions': 512,
+             'note': 'clip model from open_clip implementation',
+             'type': 'open_clip',
+             'pretrained': 'yfcc15m'},
+        'open_clip/RN101-quickgelu/openai':
+            {'name': 'open_clip/RN101-quickgelu/openai',
+             'dimensions': 512,
+             'note': 'clip model from open_clip implementation',
+             'type': 'open_clip',
+             'pretrained': 'openai'},
+        'open_clip/RN101-quickgelu/yfcc15m':
+            {'name': 'open_clip/RN101-quickgelu/yfcc15m',
+             'dimensions': 512,
+             'note': 'clip model from open_clip implementation',
+             'type': 'open_clip',
+             'pretrained': 'yfcc15m'},
+        'open_clip/RN50x4/openai':
+            {'name': 'open_clip/RN50x4/openai',
+             'dimensions': 512,
+             'note': 'clip model from open_clip implementation',
+             'type': 'open_clip',
+             'pretrained': 'openai'},
+        'open_clip/RN50x16/openai':
+            {'name': 'open_clip/RN50x16/openai',
+             'dimensions': 512,
+             'note': 'clip model from open_clip implementation',
+             'type': 'open_clip',
+             'pretrained': 'openai'},
+        'open_clip/RN50x64/openai':
+            {'name': 'open_clip/RN50x64/openai',
+             'dimensions': 512,
+             'note': 'clip model from open_clip implementation',
+             'type': 'open_clip', 'pretrained': 'openai'},
+        'open_clip/ViT-B-32/openai':
+            {'name': 'open_clip/ViT-B-32/openai',
+             'dimensions': 512,
+             'note': 'clip model from open_clip implementation',
+             'type': 'open_clip',
+             'pretrained': 'openai'},
+        'open_clip/ViT-B-32/laion400m_e31':
+            {'name': 'open_clip/ViT-B-32/laion400m_e31',
+             'dimensions': 512,
+             'note': 'clip model from open_clip implementation',
+             'type': 'open_clip', 'pretrained': 'laion400m_e31'},
+        'open_clip/ViT-B-32/laion400m_e32':
+            {'name': 'open_clip/ViT-B-32/laion400m_e32',
+             'dimensions': 512,
+             'note': 'clip model from open_clip implementation',
+             'type': 'open_clip', 'pretrained': 'laion400m_e32'},
+        'open_clip/ViT-B-32/laion2b_e16':
+            {'name': 'open_clip/ViT-B-32/laion2b_e16',
+             'dimensions': 512,
+             'note': 'clip model from open_clip implementation',
+             'type': 'open_clip',
+             'pretrained': 'laion2b_e16'},
+        'open_clip/ViT-B-32/laion2b_s34b_b79k':
+            {'name': 'open_clip/ViT-B-32/laion2b_s34b_b79k',
+             'dimensions': 512,
+             'note': 'clip model from open_clip implementation',
+             'type': 'open_clip',
+             'pretrained': 'laion2b_s34b_b79k'},
+        'open_clip/ViT-B-32-quickgelu/openai':
+            {'name': 'open_clip/ViT-B-32-quickgelu/openai',
+             'dimensions': 512,
+             'note': 'clip model from open_clip implementation',
+             'type': 'open_clip',
+             'pretrained': 'openai'},
+        'open_clip/ViT-B-32-quickgelu/laion400m_e31':
+            {'name': 'open_clip/ViT-B-32-quickgelu/laion400m_e31',
+             'dimensions': 512,
+             'note': 'clip model from open_clip implementation',
+             'type': 'open_clip',
+             'pretrained': 'laion400m_e31'},
+        'open_clip/ViT-B-32-quickgelu/laion400m_e32':
+            {'name': 'open_clip/ViT-B-32-quickgelu/laion400m_e32',
+             'dimensions': 512,
+             'note': 'clip model from open_clip implementation',
+             'type': 'open_clip', 'pretrained': 'laion400m_e32'},
+        'open_clip/ViT-B-16/openai':
+            {'name': 'open_clip/ViT-B-16/openai',
+             'dimensions': 512,
+             'note': 'clip model from open_clip implementation',
+             'type': 'open_clip', 'pretrained': 'openai'},
+        'open_clip/ViT-B-16/laion400m_e31':
+            {'name': 'open_clip/ViT-B-16/laion400m_e31',
+             'dimensions': 512,
+             'note': 'clip model from open_clip implementation',
+             'type': 'open_clip', 'pretrained': 'laion400m_e31'},
+        'open_clip/ViT-B-16/laion400m_e32':
+            {'name': 'open_clip/ViT-B-16/laion400m_e32',
+             'dimensions': 512, 'note': 'clip model from open_clip implementation',
+             'type': 'open_clip', 'pretrained': 'laion400m_e32'},
+        'open_clip/ViT-B-16-plus-240/laion400m_e31':
+            {'name': 'open_clip/ViT-B-16-plus-240/laion400m_e31',
+             'dimensions': 512,
+             'note': 'clip model from open_clip implementation',
+             'type': 'open_clip', 'pretrained': 'laion400m_e31'},
+        'open_clip/ViT-B-16-plus-240/laion400m_e32':
+            {'name': 'open_clip/ViT-B-16-plus-240/laion400m_e32',
+             'dimensions': 512,
+             'note': 'clip model from open_clip implementation',
+             'type': 'open_clip', 'pretrained': 'laion400m_e32'},
+        'open_clip/ViT-L-14/openai':
+            {'name': 'open_clip/ViT-L-14/openai',
+             'dimensions': 512,
+             'note': 'clip model from open_clip implementation',
+             'type': 'open_clip',
+             'pretrained': 'openai'},
+        'open_clip/ViT-L-14/laion400m_e31':
+            {'name': 'open_clip/ViT-L-14/laion400m_e31',
+             'dimensions': 512,
+             'note': 'clip model from open_clip implementation',
+             'type': 'open_clip', 'pretrained': 'laion400m_e31'},
+        'open_clip/ViT-L-14/laion400m_e32':
+            {'name': 'open_clip/ViT-L-14/laion400m_e32',
+             'dimensions': 512,
+             'note': 'clip model from open_clip implementation',
+             'type': 'open_clip',
+             'pretrained': 'laion400m_e32'},
+        'open_clip/ViT-L-14/laion2b_s32b_b82k':
+            {'name': 'open_clip/ViT-L-14/laion2b_s32b_b82k',
+             'dimensions': 512,
+             'note': 'clip model from open_clip implementation',
+             'type': 'open_clip',
+             'pretrained': 'laion2b_s32b_b82k'},
+        'open_clip/ViT-L-14-336/openai':
+            {'name': 'open_clip/ViT-L-14-336/openai',
+             'dimensions': 512,
+             'note': 'clip model from open_clip implementation',
+             'type': 'open_clip',
+             'pretrained': 'openai'},
+        'open_clip/ViT-H-14/laion2b_s32b_b79k':
+            {'name': 'open_clip/ViT-H-14/laion2b_s32b_b79k',
+             'dimensions': 512,
+             'note': 'clip model from open_clip implementation',
+             'type': 'open_clip',
+             'pretrained': 'laion2b_s32b_b79k'},
+        'open_clip/ViT-g-14/laion2b_s12b_b42k':
+            {'name': 'open_clip/ViT-g-14/laion2b_s12b_b42k',
+             'dimensions': 512,
+             'note': 'clip model from open_clip implementation',
+             'type': 'open_clip',
+             'pretrained': 'laion2b_s12b_b42k'}}
+
+    return OPEN_CLIP_MODEL_PROPERTIES
 
 
 def _get_sbert_properties() -> Dict:
@@ -322,7 +506,8 @@ def _get_random_properties() -> Dict:
     return RANDOM_MODEL_PROPERTIES
 
 def _get_model_load_mappings() -> Dict:
-    return {'clip':CLIP, 
+    return {'clip':CLIP,
+            'open_clip': OPEN_CLIP,
             'sbert':SBERT, 
             'test':TEST, 
             'sbert_onnx':SBERT_ONNX,
@@ -340,6 +525,7 @@ def load_model_properties() -> Dict:
     test_model_properties = _get_sbert_test_properties()
     random_model_properties = _get_random_properties()
     hf_model_properties = _get_hf_properties()
+    open_clip_model_properties = _get_open_clip_properties()
 
     # combine the above dicts
     model_properties = dict(clip_model_properties.items())
@@ -348,6 +534,7 @@ def load_model_properties() -> Dict:
     model_properties.update(sbert_onnx_model_properties)
     model_properties.update(random_model_properties)
     model_properties.update(hf_model_properties)
+    model_properties.update(open_clip_model_properties)
 
     all_properties = dict()
     all_properties['models'] = model_properties
