@@ -815,14 +815,33 @@ class TestAddDocuments(MarqoTestCase):
 
     def test_patch_documents_orchestrator(self):
         """
-        TODO: test
-            - Text
-            - ints, floats, bools
         """
+        docs_ = [
+            {"_id": "123", "Title": "Story of Joe Blogs", "Description": "Joe was a great farmer."},
+            {"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}
+        ]
 
-    def test_patch_documents_mp(self):
-        """
-        TODO: test
-            - Text
-            - ints, floats, bools
-        """
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs_, auto_refresh=True)
+        update_res = tensor_search.add_documents_orchestrator(
+            config=self.config, index_name=self.index_name_1, docs=[
+                  {"_id": "789", "Title": "Woohoo", "Mega": "Coool"},
+                  {"_id": "789", "Luminosity": "Extreme"},
+                  {"_id": "789", "Temp": 12.5},
+                  ],
+            auto_refresh=True, update_mode='update', processes=4, batch_size=1)
+
+        updated_doc = tensor_search.get_document_by_id(
+            config=self.config, index_name=self.index_name_1, document_id='789'
+        )
+        check_dict = {"_id": '789', "Temp": 12.5, "Luminosity": "Extreme", "Title": "Woohoo", "Mega": "Coool"}
+        for field, expected_value in check_dict.items():
+            assert updated_doc[field] == expected_value
+
+        updated_raw_doc = requests.get(
+            url=F"{self.endpoint}/{self.index_name_1}/_doc/789",
+            verify=False
+        )
+        # make sure that the chunks have been updated
+        for ch in updated_raw_doc.json()['_source']['__chunks']:
+            for field, expected_value in check_dict.items():
+                assert ch[field] == expected_value
