@@ -564,6 +564,7 @@ class TestAddDocuments(MarqoTestCase):
                 url=F"{self.endpoint}/{self.index_name_1}/_doc/{doc_id}",
                 verify=False
             )
+            # make sure that the chunks have been updated
             for ch in updated_raw_doc.json()['_source']['__chunks']:
                 for field, expected_value in check_dict.items():
                     assert ch[field] == expected_value
@@ -578,6 +579,21 @@ class TestAddDocuments(MarqoTestCase):
             docs_=docs_, update_docs=[{"_id": "789", "Title": "Story of Alex Appleseed"}], get_docs=
             {"789": {"Description": "Alice grew up in Houston, Texas.",
                      "Title": "Story of Alex Appleseed"}}
+        )
+
+    def test_patch_documents_multiple(self):
+        docs_ = [
+            {"_id": "123", "Title": "Story of Joe Blogs", "Description": "Joe was a great farmer."},
+            {"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}
+        ]
+        assert self.patch_documents_tests(
+            docs_=docs_, update_docs=[{"_id": "789", "Title": "Story of Alex Appleseed"},
+                                      {"_id": "789", "Title": "Woohoo", "Mega": "Coool"},
+                                      {"_id": "789", "Luminosity": "Extreme"},
+                                      {"_id": "789", "Temp": 12.5},
+                                      ], get_docs=
+            {"789": {"Description": "Alice grew up in Houston, Texas.",
+                     "Title": "Woohoo", "Mega": "Coool", "Luminosity": "Extreme", "Temp": 12.5}}
         )
 
     def test_patch_documents_new_field(self):
@@ -709,18 +725,12 @@ class TestAddDocuments(MarqoTestCase):
     def patch_documents_filtering_test(self, original_add_docs, update_add_docs, filter_string, expected_ids: set):
         """Helper for filtering tests"""
         tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=original_add_docs, auto_refresh=True)
-
         res = tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=update_add_docs, auto_refresh=True, update_mode='update')
 
-        print("resresres")
-        pprint.pprint(res)
         abc = requests.get(
             url=F"{self.endpoint}/{self.index_name_1}/_doc/789",
             verify=False
         )
-        print("abccv")
-        pprint.pprint(abc.json())
-
         for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
             searched = tensor_search.search(
                 config=self.config, index_name=self.index_name_1, filter=filter_string, text='',
@@ -776,27 +786,32 @@ class TestAddDocuments(MarqoTestCase):
             expected_ids={'789'}
         )
 
+    def test_patch_no_update(self):
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[{'_id':'123'}],
+                                    auto_refresh=True, update_mode='replace')
+        res = tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[{'_id':'123'}],
+                                          auto_refresh=True, update_mode='replace')
+        assert {'_id':'123'} == tensor_search.get_document_by_id(
+            config=self.config, index_name=self.index_name_1, document_id='123')
 
-    def test_patch_documents_mp(self):
-        """
-        TODO: test
-            - Text
-            - ints, floats, bools
-        """
 
-    def test_patch_empty(self):
-        """
-        TODO: test
-            - Text
-            - ints, floats, bools
-        """
+    def test_patch_no_update_existing_field(self):
+        assert self.patch_documents_tests(
+            docs_=[{'_id': '123', "abc": "567"}], update_docs=[{'_id': '123'}], get_docs=
+            {"123": {'_id': '123', "abc": "567"}}
+        )
+        get_res = tensor_search.get_document_by_id(
+            config=self.config, index_name=self.index_name_1, document_id='123')
+        assert {'_id': '123', "abc": "567"} == get_res
 
-    def test_no_chunks(self):
-        """
-        TODO: test
-            - Text
-            - ints, floats, bools
-        """
+    def test_patch_no_update_existing_field_float(self):
+        assert self.patch_documents_tests(
+            docs_=[{'_id': '123', "the_float": 20.22}], update_docs=[{'_id': '123'}], get_docs=
+            {"123": {'_id': '123', "the_float": 20.22}}
+        )
+        get_res = tensor_search.get_document_by_id(
+            config=self.config, index_name=self.index_name_1, document_id='123')
+        assert {'_id': '123', "the_float": 20.22} == get_res
 
     def test_patch_documents_orchestrator(self):
         """
@@ -805,3 +820,9 @@ class TestAddDocuments(MarqoTestCase):
             - ints, floats, bools
         """
 
+    def test_patch_documents_mp(self):
+        """
+        TODO: test
+            - Text
+            - ints, floats, bools
+        """

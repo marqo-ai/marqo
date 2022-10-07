@@ -181,13 +181,13 @@ def _check_and_create_index_if_not_exist(config: Config, index_name: str):
 def add_documents_orchestrator(
         config: Config, index_name: str, docs: List[dict],
         auto_refresh: bool, batch_size: int = 0, processes: int = 1,
-        device=None):
+        device=None, update_mode: str = 'replace'):
 
     if batch_size is None or batch_size == 0:
         logger.info(f"batch_size={batch_size} and processes={processes} - not doing any marqo side batching")
         return add_documents(
             config=config, index_name=index_name, docs=docs, auto_refresh=auto_refresh,
-            device=device
+            device=device, update_mode=update_mode
         )
     elif processes is not None and processes > 1:
 
@@ -198,7 +198,7 @@ def add_documents_orchestrator(
         results = parallel.add_documents_mp(
             config=config, index_name=index_name, docs=docs,
             auto_refresh=auto_refresh, batch_size=batch_size, processes=processes,
-            device=device
+            device=device, update_mode=update_mode
         )
         
         # we need to force the cache to update as it does not propagate using mp
@@ -217,7 +217,8 @@ def add_documents_orchestrator(
 
 
 def _batch_request(config: Config, index_name: str, dataset: List[dict], 
-                batch_size: int = 100, verbose: bool = True, device=None) -> List[Dict[str, Any]]:
+                   batch_size: int = 100, verbose: bool = True, device=None,
+                   update_mode: str = 'replace') -> List[Dict[str, Any]]:
         """Batch by the number of documents"""
         logger.info(f"starting batch ingestion in sizes of {batch_size}")
 
@@ -237,7 +238,9 @@ def _batch_request(config: Config, index_name: str, dataset: List[dict],
             t0 = datetime.datetime.now()
             res = add_documents(
                 config=config, index_name=index_name,
-                docs=docs, auto_refresh=False, device=device)
+                docs=docs, auto_refresh=False, device=device,
+                update_mode=update_mode
+            )
             total_batch_time = datetime.datetime.now() - t0
             num_docs = len(docs)
 
@@ -428,8 +431,6 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                 bulk_parent_dicts.append(indexing_instructions)
                 bulk_parent_dicts.append(copied)
             else:
-                print('jihhjkjkhjk')
-                pprint.pprint(copied)
                 to_upsert = copied.copy()
                 to_upsert[TensorField.chunks] = chunks
                 bulk_parent_dicts.append(indexing_instructions)
@@ -450,7 +451,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
             merged_doc.remove("{TensorField.chunks}");
             
             // remove chunks if the __field_name matches an updated field
-            // All update fields should be recomputed             
+            // All update fields should be recomputed, and it should be safe to delete these chunks             
             for (int i=ctx._source.{TensorField.chunks}.length-1; i>=0; i--) {{
                 if (params.doc_fields.contains(ctx._source.{TensorField.chunks}[i].{TensorField.field_name})) {{
                    ctx._source.{TensorField.chunks}.remove(i);
