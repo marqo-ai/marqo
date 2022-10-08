@@ -1,7 +1,3 @@
-# DIND:
-# docker rm -f marqo; DOCKER_BUILDKIT=1 docker build . -t marqo_docker_0 && docker run --name marqo --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqo_docker_0
-# DEBUGGING:
-# export BUILDKIT_PROGRESS=plain; docker rm -f marqo; DOCKER_BUILDKIT=1 docker build --no-cache . -t marqo_docker_0 && docker run --name marqo --privileged -p 8882:8882 marqo_docker_0
 ARG CUDA_VERSION=11.4.2
 FROM nvidia/cuda:${CUDA_VERSION}-cudnn8-runtime-ubuntu20.04 as cuda_image
 
@@ -25,11 +21,13 @@ RUN echo Target platform is "$TARGETPLATFORM"
 
 COPY requirements.txt requirements.txt
 RUN pip3 install --no-cache-dir -r requirements.txt
+COPY dind_setup dind_setup
+RUN bash dind_setup/setup_dind.sh
 COPY scripts scripts
 RUN bash scripts/install_onnx_gpu_for_amd.sh
 COPY . /app
 ENV PYTHONPATH "${PYTHONPATH}:/app"
 
 RUN chmod +x ./run_marqo.sh
-CMD ./run_marqo.sh
-ENTRYPOINT ["bash", "run_marqo.sh"]
+CMD ["./run_marqo.sh"]
+ENTRYPOINT ["./run_marqo.sh"]

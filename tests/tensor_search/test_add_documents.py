@@ -4,10 +4,10 @@ import pprint
 from unittest import mock
 
 import requests
-from marqo.tensor_search.enums import TensorField
+from marqo.tensor_search.enums import TensorField, IndexSettingsField
 from marqo.client import Client
-from marqo.errors import IndexNotFoundError, InvalidArgError
-from marqo.tensor_search import tensor_search, index_meta_cache
+from marqo.errors import IndexNotFoundError, InvalidArgError, BadRequestError
+from marqo.tensor_search import tensor_search, index_meta_cache, backend
 from tests.marqo_test import MarqoTestCase
 
 
@@ -206,6 +206,10 @@ class TestAddDocuments(MarqoTestCase):
                 "id": "abcdefgh",
                 "title 1": "content 1",
                 "desc 2": "content 2. blah blah blah"
+            },
+            {
+                "_id": "789",
+                "subtitle": [1, 2, 3]
             }
         ], auto_refresh=True)
 
@@ -220,7 +224,7 @@ class TestAddDocuments(MarqoTestCase):
 
         for item in add_res["items"]:
             assert "_id" in item
-            assert "result" in item
+            assert ("result" in item) ^ ("error" in item and "code" in item)
             assert "status" in item
 
     def test_add_documents_validation(self):
@@ -251,12 +255,10 @@ class TestAddDocuments(MarqoTestCase):
             }]
         ]
         for bad_doc_arg in bad_doc_args:
-            try:
-                add_res = tensor_search.add_documents(config=self.config, index_name=self.index_name_1,
-                                                      docs=bad_doc_arg, auto_refresh=True)
-                raise AssertionError
-            except InvalidArgError as s:
-                pass
+            add_res = tensor_search.add_documents(config=self.config, index_name=self.index_name_1,
+                                                  docs=bad_doc_arg, auto_refresh=True)
+            assert any(['error' in item for item in add_res['items']])
+
 
     def test_add_documents_set_device(self):
         """calling search with a specified device overrides device defined in config"""
@@ -318,3 +320,227 @@ class TestAddDocuments(MarqoTestCase):
         assert mock_config.search_device == "cpu"
         args, kwargs = mock_vectorise.call_args
         assert kwargs["device"] == "cuda:22"
+
+    def test_add_documents_empty(self):
+        try:
+            tensor_search.add_documents(
+                config=self.config, index_name=self.index_name_1, docs=[],
+                auto_refresh=True)
+            raise AssertionError
+        except BadRequestError:
+            pass
+
+    def test_resilient_add_images(self):
+        image_index_configs = [
+            # NO CHUNKING
+            {
+                IndexSettingsField.index_defaults: {
+                    IndexSettingsField.model: "ViT-B/16",
+                    IndexSettingsField.treat_urls_and_pointers_as_images: True
+                }
+            },
+            # WITH CHUNKING
+            {
+                IndexSettingsField.index_defaults: {
+                    IndexSettingsField.model: "ViT-B/16",
+                    IndexSettingsField.treat_urls_and_pointers_as_images: True,
+                    IndexSettingsField.normalize_embeddings: True,
+                    IndexSettingsField.image_preprocessing: {IndexSettingsField.patch_method: "frcnn"},
+                },
+            }
+        ]
+        for image_index_config in image_index_configs:
+            tensor_search.create_vector_index(
+                config=self.config, index_name=self.index_name_1, index_settings=image_index_config)
+            docs_results = [
+                ([{"_id": "123","image_field": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png"},
+                 {"_id": "789", "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png"},
+                 {"_id": "456", "image_field": "https://www.marqo.ai/this/image/doesnt/exist.png"}],
+                 [("123", "result"), ("789", "result"), ("456", "error")]
+                 ),
+                ([{"_id": "123",
+                   "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png"},
+                  {"_id": "789",
+                   "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png"},
+                  {"_id": "456", "image_field": "https://www.marqo.ai/this/image/doesnt/exist.png"},
+                  {"_id": "111", "image_field": "https://www.marqo.ai/this/image/doesnt/exist2.png"}],
+                 [("123", "result"), ("789", "result"), ("456", "error"), ("111", "error")]
+                 ),
+                ([{"_id": "505", "image_field": "https://www.marqo.ai/this/image/doesnt/exist3.png"},
+                  {"_id": "456", "image_field": "https://www.marqo.ai/this/image/doesnt/exist.png"},
+                  {"_id": "111", "image_field": "https://www.marqo.ai/this/image/doesnt/exist2.png"}],
+                 [("505", "error"), ("456", "error"), ("111", "error")]
+                 ),
+                ([{"_id": "505", "image_field": "https://www.marqo.ai/this/image/doesnt/exist2.png"}],
+                 [("505", "error")]
+                 ),
+            ]
+            for docs, expected_results in docs_results:
+                add_res = tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs, auto_refresh=True)
+                assert len(add_res['items']) == len(expected_results)
+                for i, res_dict in enumerate(add_res['items']):
+                    assert res_dict["_id"] == expected_results[i][0]
+                    assert expected_results[i][1] in res_dict
+            tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+
+    def test_add_documents_resilient_doc_validation(self):
+        tensor_search.create_vector_index(
+            config=self.config, index_name=self.index_name_1)
+        docs_results = [
+            # handle empty dicts
+            ([{"_id": "123", "my_field": "legitimate text"},
+             {},
+             {"_id": "456", "my_field": "awesome stuff!"}],
+             [("123", "result"), (None, 'error'), ('456', 'result')]
+             ),
+            ([{}], [(None, 'error')]),
+            ([{}, {}], [(None, 'error'), (None, 'error')]),
+            ([{}, {}, {"some_dict": "yep"}], [(None, 'error'), (None, 'error'), (None, 'result')]),
+            # handle invalid dicts
+            ([{"this is a set, lmao"}, "this is a string", {"some_dict": "yep"}], [(None, 'error'), (None, 'error'), (None, 'result')]),
+            ([1234], [(None, 'error')]), ([None], [(None, 'error')]),
+            # handle invalid field names
+            ([{123: "bad"}, {"_id": "cool"}], [(None, 'error'), ("cool", 'result')]),
+            ([{"__chunks": "bad"}, {"_id": "1511", "__vector_a": "some content"}, {"_id": "cool"},
+              {"_id": "144451", "__field_content": "some content"}],
+             [(None, 'error'), ("1511", 'error'), ("cool", 'result'), ("144451", "error")]),
+            ([{123: "bad", "_id": "12345"}, {"_id": "cool"}], [("12345", 'error'), ("cool", 'result')]),
+            ([{None: "bad", "_id": "12345"}, {"_id": "cool"}], [("12345", 'error'), ("cool", 'result')]),
+            # handle bad content
+            ([{"bad": None, "_id": "12345"}, {"_id": "cool"}], [("12345", 'error'), ("cool", 'result')]),
+            ([{"bad": [1, 2, 3, 4], "_id": "12345"}, {"_id": "cool"}], [("12345", 'error'), ("cool", 'result')]),
+            ([{"bad": ("cat", "dog"), "_id": "12345"}, {"_id": "cool"}], [("12345", 'error'), ("cool", 'result')]),
+            ([{"bad": set(), "_id": "12345"}, {"_id": "cool"}], [("12345", 'error'), ("cool", 'result')]),
+            ([{"bad": dict(), "_id": "12345"}, {"_id": "cool"}], [("12345", 'error'), ("cool", 'result')]),
+            # handle bad _ids
+            ([{"bad": "hehehe", "_id": 12345}, {"_id": "cool"}], [(None, 'error'), ("cool", 'result')]),
+            ([{"bad": "hehehe", "_id": 12345}, {"_id": "cool"}, {"bad": "hehehe", "_id": None}, {"field": "yep"},
+              {"_id": (1, 2), "efgh": "abc"}, {"_id": 1.234, "cool": "wowowow"}],
+             [(None, 'error'), ("cool", 'result'), (None, 'error'), (None, 'result'), (None, 'error'), (None, 'error')]),
+            # mixed
+            ([{(1, 2, 3): set(), "_id": "12345"}, {"_id": "cool"}, {"bad": [1, 2, 3], "_id": None}, {"field": "yep"},
+              {}, "abcdefgh"],
+             [(None, 'error'), ("cool", 'result'), (None, 'error'), (None, 'result'), (None, 'error'),
+              (None, 'error')]),
+        ]
+        for docs, expected_results in docs_results:
+            add_res = tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs, auto_refresh=True)
+            assert len(add_res['items']) == len(expected_results)
+            for i, res_dict in enumerate(add_res['items']):
+                # if the expected id is None, then it assumed the id is
+                # generated and can't be asserted against
+                if expected_results[i][0] is not None:
+                    assert res_dict["_id"] == expected_results[i][0]
+                assert expected_results[i][1] in res_dict
+
+    def test_mappings_arent_updated(self):
+        """if an image isn't added properly, we need to ensure that
+        it's mappings don't get added to index mappings
+
+        Test for:
+            - invalid images
+            - invalid dict
+            - invalid fields
+            - invalid content
+            - invalid _ids
+        """
+        tensor_search.create_vector_index(
+            config=self.config, index_name=self.index_name_1)
+        docs_results = [
+            # invalid dict
+            ([{"_id": "24frg", "my_field": "legitimate text"}, {},
+              {"_id": "srgb4", "my_field": "awesome stuff!"}],
+             ({"my_field"}, {})
+             ),
+            # invalid fields
+            ([{"_id": "14g", (12, 14): "some content"}, {"_id": "1511", None: "some content"},
+              {"_id": "1511", "__vector_a": "some content"}, {"_id": "1234f", "__chunks": "some content"},
+              {"_id": "144451", "__field_content": "some content"},
+              {"_id": "sv4124", "good_field_3": "some content 2 " , "good_field_4": 3.65}],
+             ({"good_field_3", "good_field_4"}, {(12, 14), None, "__vector_a", "__chunks", "__field_content"})
+             ),
+            # invalid content
+            ([{"_id": "f24f4", "bad_field_1": []}, {"_id": "4t6g5g5", "bad_field_1": {}},
+              {"_id": "df3f3", "bad_field_1": (1, 23, 4)},
+              {"_id": "fr2452", "good_field_1": 000, "good_field_2": 3.65}],
+             ({"good_field_1", "good_field_2"}, {"bad_field_1" })
+             ),
+            # invalid -ids
+            ([{"_id": 12445, "bad_field_1": "actually decent text"}, {"_id": [], "bad_field_1": "actually decent text"},
+              {"_id": {}, "bad_field_1": "actually decent text"},
+              {"_id": "fr2452", "good_field_1": 000, "good_field_2": 3.65}],
+             ({"good_field_1", "good_field_2"}, { "bad_field_1"})
+             ),
+        ]
+        for docs, (good_fields, bad_fields) in docs_results:
+            # good_fields should appear in the mapping.
+            # bad_fields should not
+            tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs, auto_refresh=True)
+            ii = backend.get_index_info(config=self.config, index_name=self.index_name_1)
+            customer_props = {field_name for field_name in ii.get_text_properties()}
+            reduced_vector_props = {field_name.replace(TensorField.vector_prefix, '')
+                                    for field_name in ii.get_text_properties()}
+            for field in good_fields:
+                assert field in customer_props
+                assert field in reduced_vector_props
+
+            for field in bad_fields:
+                assert field not in customer_props
+                assert field not in reduced_vector_props
+
+    def test_mappings_arent_updated_images(self):
+        """if an image isn't added properly, we need to ensure that
+        it's mappings don't get added to index mappings
+
+        Test for:
+            - images with chunking
+            - images without chunking
+        """
+        image_index_configs = [
+            # NO CHUNKING
+            {
+                IndexSettingsField.index_defaults: {
+                    IndexSettingsField.model: "ViT-B/16",
+                    IndexSettingsField.treat_urls_and_pointers_as_images: True
+                }
+            },
+            # WITH CHUNKING
+            {
+                IndexSettingsField.index_defaults: {
+                    IndexSettingsField.model: "ViT-B/16",
+                    IndexSettingsField.treat_urls_and_pointers_as_images: True,
+                    IndexSettingsField.normalize_embeddings: True,
+                    IndexSettingsField.image_preprocessing: {IndexSettingsField.patch_method: "frcnn"},
+                },
+            }
+        ]
+        for image_index_config in image_index_configs:
+            tensor_search.create_vector_index(
+                config=self.config, index_name=self.index_name_1,
+                index_settings=image_index_config)
+            docs_results = [
+                # invalid images
+                ([{"_id": "123",
+                  "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png"},
+                 {"_id": "789",
+                  "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png"},
+                 {"_id": "456", "image_field_3": "https://www.marqo.ai/this/image/doesnt/exist.png"}],
+                 ({"image_field_1", "image_field_2"}, {"image_field_3"})
+                 ),
+            ]
+            for docs, (good_fields, bad_fields) in docs_results:
+                # good_fields should appear in the mapping.
+                # bad_fields should not
+                tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs, auto_refresh=True)
+                ii = backend.get_index_info(config=self.config, index_name=self.index_name_1)
+                customer_props = {field_name for field_name in ii.get_text_properties()}
+                reduced_vector_props = {field_name.replace(TensorField.vector_prefix, '')
+                                        for field_name in ii.get_text_properties()}
+                for field in good_fields:
+                    assert field in customer_props
+                    assert field in reduced_vector_props
+
+                for field in bad_fields:
+                    assert field not in customer_props
+                    assert field not in reduced_vector_props
+            tensor_search.delete_index(config=self.config, index_name=self.index_name_1)

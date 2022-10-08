@@ -46,7 +46,6 @@ from marqo.tensor_search.index_meta_cache import get_cache,get_index_info
 from marqo.tensor_search import index_meta_cache
 from marqo.tensor_search.models.index_info import IndexInfo
 from marqo.tensor_search import constants
-
 from marqo.s2_inference.processing import text as text_processor
 from marqo.s2_inference.processing import image as image_processor
 from marqo.s2_inference.clip_utils import _is_image
@@ -57,8 +56,8 @@ from marqo.s2_inference import s2_inference
 # _httprequests.py is designed for the client
 from marqo._httprequests import HttpRequests
 from marqo.config import Config
-# TODO add an errors.py 
 from marqo import errors
+from marqo.s2_inference import errors as s2_inference_errors
 import threading
 import re
 
@@ -273,7 +272,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                   device=None):
     """
     """
-
+    t0 = datetime.datetime.now()
     bulk_parent_dicts = []
 
     try:
@@ -282,26 +281,41 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
         create_vector_index(config=config, index_name=index_name)
         index_info = backend.get_index_info(config=config, index_name=index_name)
 
+    if len(docs) == 0:
+        raise errors.BadRequestError(message="Received empty add documents request")
+
     existing_fields = set(index_info.properties.keys())
     new_fields = set()
-    doc_ids_to_update = []
 
     selected_device = config.indexing_device if device is None else device
 
-    for doc in docs:
+    unsuccessful_docs = []
+
+    for i, doc in enumerate(docs):
 
         indexing_instructions = {"index": {"_index": index_name}}
-        copied = doc.copy()
+        copied = copy.deepcopy(doc)
 
-        validation.validate_doc(doc)
-        [validation.validate_field_name(field) for field in copied]
+        document_is_valid = True
+        new_fields_from_doc = set()
 
-        if "_id" in doc:
-            doc_id = validation.validate_id(doc["_id"])
-            del copied["_id"]
-            doc_ids_to_update.append(doc_id)
-        else:
-            doc_id = str(uuid.uuid4())
+        doc_id = None
+        try:
+            validation.validate_doc(doc)
+
+            if "_id" in doc:
+                doc_id = validation.validate_id(doc["_id"])
+                del copied["_id"]
+            else:
+                doc_id = str(uuid.uuid4())
+
+            [validation.validate_field_name(field) for field in copied]
+        except errors.__InvalidRequestError as err:
+            unsuccessful_docs.append(
+                (i, {'_id': doc_id if doc_id is not None else '',
+                     'error': err.message, 'status': int(err.status_code), 'code': err.code})
+            )
+            continue
 
         indexing_instructions["index"]["_id"] = doc_id
 
@@ -309,10 +323,18 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
         for field in copied:
 
-            if field not in existing_fields:
-                new_fields.add((field, _infer_opensearch_data_type(copied[field])))
+            try:
+                field_content = validation.validate_field_content(copied[field])
+            except errors.InvalidArgError as err:
+                document_is_valid = False
+                unsuccessful_docs.append(
+                    (i, {'_id': doc_id, 'error': err.message, 'status': int(err.status_code),
+                         'code': err.code})
+                )
+                break
 
-            field_content = validation.validate_field_content(copied[field])
+            if field not in existing_fields:
+                new_fields_from_doc.add((field, _infer_opensearch_data_type(copied[field])))
 
             # TODO put this into a function to determine routing
             if isinstance(field_content, (str, Image.Image)):
@@ -329,20 +351,42 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                     # TODO put the logic for getting field parameters into a function and add per field options
                     image_method = index_info.index_settings[NsField.index_defaults][NsField.image_preprocessing][NsField.patch_method]
                     # the chunk_image contains the no-op logic as of now - method = None will be a no-op
-                    content_chunks, text_chunks = image_processor.chunk_image(field_content, 
-                                    device=selected_device,
-                                    method=image_method)            
+                    try:
+                        # in the future, if we have different chunking methods, make sure we catch possible
+                        # errors of different types generated here, too.
+                        content_chunks, text_chunks = image_processor.chunk_image(
+                            field_content, device=selected_device, method=image_method)
+                    except s2_inference_errors.S2InferenceError:
+                        document_is_valid = False
+                        image_err = errors.InvalidArgError(message=f'Could not process given image: {field_content}')
+                        unsuccessful_docs.append(
+                            (i, {'_id': doc_id, 'error': image_err.message, 'status': int(image_err.status_code),
+                                 'code': image_err.code})
+                        )
+                        break
                 
                 normalize_embeddings = index_info.index_settings[NsField.index_defaults][NsField.normalize_embeddings]
                 infer_if_image = index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]
-                
-                vector_chunks = s2_inference.vectorise(model_name=index_info.model_name, content=content_chunks,
-                                                       device=selected_device, normalize_embeddings=normalize_embeddings,
-                                                        infer=infer_if_image)
+                try:
+                    # in the future, if we have different underlying vectorising methods, make sure we catch possible
+                    # errors of different types generated here, too.
+                    vector_chunks = s2_inference.vectorise(model_name=index_info.model_name, content=content_chunks,
+                                                           device=selected_device, normalize_embeddings=normalize_embeddings,
+                                                           infer=infer_if_image)
+                except s2_inference_errors.S2InferenceError:
+                    document_is_valid = False
+                    image_err = errors.InvalidArgError(message=f'Could not process given image: {field_content}')
+                    unsuccessful_docs.append(
+                        (i, {'_id': doc_id, 'error': image_err.message, 'status': int(image_err.status_code),
+                             'code': image_err.code})
+                    )
+                    break
 
                 if (len(vector_chunks) != len(text_chunks)):
-                    raise RuntimeError(f"the input content after preprocessing and its vectorized counterparts must be the same length." \
-                        f"recevied text_chunks={len(text_chunks)} and vector_chunks={len(vector_chunks)}. check the preprocessing functions and try again. ")
+                    raise RuntimeError(
+                        f"the input content after preprocessing and its vectorized counterparts must be the same length."
+                        f"recevied text_chunks={len(text_chunks)} and vector_chunks={len(vector_chunks)}. "
+                        f"check the preprocessing functions and try again. ")
 
                 for text_chunk, vector_chunk in zip(text_chunks, vector_chunks):
                     # only add chunk values which are string, boolean or numeric
@@ -358,39 +402,57 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                         TensorField.field_name: field,
                         **chunk_values_for_filtering
                     })
-        copied[TensorField.chunks] = chunks
-        bulk_parent_dicts.append(indexing_instructions)
-        bulk_parent_dicts.append(copied)
+        if document_is_valid:
+            copied[TensorField.chunks] = chunks
+            bulk_parent_dicts.append(indexing_instructions)
+            bulk_parent_dicts.append(copied)
 
-    # the HttpRequest wrapper handles error logic
-    update_mapping_response = backend.add_customer_field_properties(
-        config=config, index_name=index_name, customer_field_names=new_fields,
-        model_properties=s2_inference.get_model_properties(model_name=index_info.model_name))
+            new_fields = new_fields.union(new_fields_from_doc)
 
-    index_parent_response = HttpRequests(config).post(
-        path="_bulk", body=utils.dicts_to_jsonl(bulk_parent_dicts))
+    if bulk_parent_dicts:
+        # the HttpRequest wrapper handles error logic
+        update_mapping_response = backend.add_customer_field_properties(
+            config=config, index_name=index_name, customer_field_names=new_fields,
+            model_properties=s2_inference.get_model_properties(model_name=index_info.model_name))
+
+        index_parent_response = HttpRequests(config).post(
+            path="_bulk", body=utils.dicts_to_jsonl(bulk_parent_dicts))
+    else:
+        index_parent_response = None
 
     if auto_refresh:
         refresh_response = HttpRequests(config).post(path=F"{index_name}/_refresh")
 
-    def translate_add_doc_response(response: dict) -> dict:
-        """translates OpenSearch response dict into Marqo dict"""
-        copied_res = copy.deepcopy(response)
-        took = copied_res["took"]
-        del copied_res["took"]
-        new_items = []
-        item_fields_to_remove = ['_index', '_primary_term', '_seq_no', '_shards', '_version']
-        for item in copied_res["items"]:
-            for to_remove in item_fields_to_remove:
-                if to_remove in item["index"]:
-                    del item["index"][to_remove]
-            new_items.append(item["index"])
-        copied_res["processingTimeMs"] = took
-        copied_res["index_name"] = index_name
-        copied_res["items"] = new_items
-        return copied_res
+    t1 = datetime.datetime.now()
 
-    return translate_add_doc_response(index_parent_response)
+    def translate_add_doc_response(response: Optional[dict], time_diff: datetime.timedelta) -> dict:
+        """translates OpenSearch response dict into Marqo dict"""
+        item_fields_to_remove = ['_index', '_primary_term', '_seq_no', '_shards', '_version']
+        result_dict = {}
+        new_items = []
+
+        if response is not None:
+            copied_res = copy.deepcopy(response)
+            result_dict['errors'] = copied_res['errors']
+
+            for item in copied_res["items"]:
+                for to_remove in item_fields_to_remove:
+                    if to_remove in item["index"]:
+                        del item["index"][to_remove]
+                new_items.append(item["index"])
+
+        if unsuccessful_docs:
+            result_dict['errors'] = True
+
+        for loc, error_info in unsuccessful_docs:
+            new_items.insert(loc, error_info)
+
+        result_dict["processingTimeMs"] = time_diff.total_seconds() * 1000
+        result_dict["index_name"] = index_name
+        result_dict["items"] = new_items
+        return result_dict
+
+    return translate_add_doc_response(response=index_parent_response, time_diff= t1 - t0)
 
 
 def get_document_by_id(config: Config, index_name:str, document_id: str):
@@ -447,6 +509,7 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
            search_method: Union[str, SearchMethod, None] = SearchMethod.TENSOR,
            searchable_attributes: Iterable[str] = None, verbose: int = 0, num_highlights: int = 3,
            reranker: Union[str, Dict] = None, simplified_format: bool = True, filter: str = None,
+           attributes_to_retrieve: Optional[List[str]] = None,
            device=None) -> Dict:
     """The root search method. Calls the specific search method
 
@@ -481,7 +544,10 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
 
     if searchable_attributes is not None:
         [validation.validate_field_name(attribute) for attribute in searchable_attributes]
-
+    if attributes_to_retrieve is not None:
+        if not isinstance(attributes_to_retrieve, (List, typing.Tuple)):
+            raise errors.InvalidArgError("attributes_to_retrieve must be a sequence!")
+        [validation.validate_field_name(attribute) for attribute in attributes_to_retrieve]
     if verbose:
         print(f"determined_search_method: {search_method}, text query: {text}")
     # if we can't see the index name in cache, we request it and wait for the info
@@ -499,13 +565,13 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
             config=config, index_name=index_name, text=text, result_count=result_count,
             return_doc_ids=return_doc_ids, searchable_attributes=searchable_attributes,
             number_of_highlights=num_highlights, simplified_format=simplified_format,
-            filter_string=filter, device=device
+            filter_string=filter, device=device, attributes_to_retrieve=attributes_to_retrieve
         )
     elif search_method.upper() == SearchMethod.LEXICAL:
         search_result = _lexical_search(
             config=config, index_name=index_name, text=text, result_count=result_count,
             return_doc_ids=return_doc_ids, searchable_attributes=searchable_attributes,
-            filter_string=filter
+            filter_string=filter, attributes_to_retrieve=attributes_to_retrieve
         )
     else:
         raise errors.InvalidArgError(f"Search called with unknown search method: {search_method}")
@@ -529,7 +595,8 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
 
 def _lexical_search(
         config: Config, index_name: str, text: str, result_count: int = 3, return_doc_ids=True,
-        searchable_attributes: Sequence[str] = None, filter_string: str = None):
+        searchable_attributes: Sequence[str] = None, filter_string: str = None,
+        attributes_to_retrieve: Optional[List[str]] = None):
     """
 
     Args:
@@ -579,12 +646,13 @@ def _lexical_search(
     if filter_string is not None:
         body["query"]["bool"]["filter"] = [{
             "query_string": {"query": filter_string}}]
-
+    if attributes_to_retrieve is not None:
+        body["_source"] = {"include": attributes_to_retrieve} if len(attributes_to_retrieve) > 0 else False
     search_res = HttpRequests(config).get(path=f"{index_name}/_search", body=body)
 
     res_list = []
     for doc in search_res['hits']['hits']:
-        just_doc = _clean_doc(doc["_source"].copy())
+        just_doc = _clean_doc(doc["_source"].copy()) if "_source" in doc else dict()
         if return_doc_ids:
             just_doc["_id"] = doc["_id"]
             just_doc["_score"] = doc["_score"]
@@ -596,8 +664,8 @@ def _vector_text_search(
         config: Config, index_name: str, text: str, result_count: int = 5, return_doc_ids=False,
         searchable_attributes: Iterable[str] = None, number_of_highlights=3,
         verbose=0, raise_on_searchable_attribs=False, hide_vectors=True, k=500,
-        simplified_format=True, filter_string: str = None, device=None
-):
+        simplified_format=True, filter_string: str = None, device=None,
+        attributes_to_retrieve: Optional[List[str]] = None):
     """
     Args:
         config:
@@ -613,6 +681,7 @@ def _vector_text_search(
             objects are printed out
         hide_vectors: if True, vectors won't be returned from OpenSearch. This reduces the size
             of data transfers
+        attributes_to_retrieve: if set, only returns these fields
     Returns:
 
     Note:
@@ -708,6 +777,8 @@ def _vector_text_search(
             search_query["query"]["nested"]["inner_hits"]["_source"] = {
                 "exclude": ["*__vector*"]
             }
+        if attributes_to_retrieve is not None:
+            search_query["_source"] = {"include": attributes_to_retrieve} if len(attributes_to_retrieve) > 0 else False
         if filter_string is not None:
             search_query["query"]["nested"]["query"]["knn"][f"{TensorField.chunks}.{vector_field}"]["filter"] = {
                 "query_string": {"query": f"{contextualised_filter}"}
@@ -817,7 +888,11 @@ def _vector_text_search(
         simple_results = []
 
         for d in ordered_docs_w_chunks:
-            cleaned = _clean_doc(d['doc']["_source"], doc_id=d['_id'])
+            if "_source" in d['doc']:
+                cleaned = _clean_doc(d['doc']["_source"], doc_id=d['_id'])
+            else:
+                cleaned = _clean_doc(dict(), doc_id=d['_id'])
+
             cleaned["_highlights"] = {
                 d["chunks"][0]["_source"][TensorField.field_name]: d["chunks"][0]["_source"][TensorField.field_content]
             }

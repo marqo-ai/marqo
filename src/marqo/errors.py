@@ -80,8 +80,6 @@ class MarqoWebError(Exception):
 
 # ---MARQO USER ERRORS---
 
-# --
-
 
 class __InvalidRequestError(MarqoWebError):
     """abstract error"""
