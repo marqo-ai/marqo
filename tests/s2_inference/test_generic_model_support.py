@@ -13,19 +13,10 @@ from marqo.s2_inference.s2_inference import (
 from tests.marqo_test import MarqoTestCase
 
 
-'''
-Temporary test file, will refactor it for unit testing purposes later on
-'''
-
 class TestGenericModelSupport(unittest.TestCase):
 
     def setUp(self):
-        #giving an error??
-        # mq = Client(**self.client_settings)
-        # self.config = mq.config
-        # self.client = mq
-
-        self.index_name_1 = "my-test-hf-index-1"
+        pass
 
 
     def test_get_model_name_with_str_input(self):
@@ -92,27 +83,9 @@ class TestGenericModelSupport(unittest.TestCase):
 
 
     def test_vectorise_accepts_dict(self):
-        model = {"name": "random-model-name",
+        model = {"name": "sentence-transformers/multi-qa-MiniLM-L6-cos-v1",
                 "dimensions": 768,
                 "tokens": 128,
                 "type":"sbert"}
 
         result = vectorise(model, "some string")
-
-
-    # def _delete_index(self, index_name: str):
-    #     try:
-    #         tensor_search.delete_index(config=self.config, index_name=index_name)
-    #         print("Index successfully deleted.")
-    #     except Exception as e:
-    #         print(e)
-    #         print("Index does not exist.")
-    #
-    #
-    # def _create_index(self, index_name: str, settings):
-    #     try:
-    #         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, **settings)
-    #         print("index created")
-    #     except Exception as e:
-    #         print(e)
-    #         print("index already exists")

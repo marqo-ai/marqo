@@ -15,8 +15,10 @@ class ChunkerError(S2InferenceError):
 class VectoriseError(S2InferenceError):
     pass
 
+
 class InvalidModelSettingsError(S2InferenceError):
     pass
+
 
 class ModelLoadError(S2InferenceError):
     pass
