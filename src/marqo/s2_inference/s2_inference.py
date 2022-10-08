@@ -2,7 +2,7 @@
 The functions defined here would have endpoints, later on.
 """
 import numpy as np
-from marqo.s2_inference.errors import VectoriseError
+from marqo.s2_inference.errors import VectoriseError, InvalidModelSettingsError, ModelLoadError
 from PIL import UnidentifiedImageError
 from marqo.s2_inference.model_registry import load_model_properties
 from marqo.s2_inference.configs import get_default_device,get_default_normalization,get_default_seq_length
@@ -35,7 +35,7 @@ def vectorise(model: Union[str, dict], content: Union[str, List[str]], device: s
     _update_model_properties(model, model_name)
 
     _update_available_models(model_cache_key, model_name, device, normalize_embeddings)
-    
+
     try:
         vectorised = available_models[model_cache_key].encode(content, normalize=normalize_embeddings, **kwargs)
     except UnidentifiedImageError as e:
@@ -68,20 +68,46 @@ def _create_model_cache_key(model_name: str, device: str) -> Tuple[str, str]:
     return model_cache_key
 
 
-def _update_model_properties(model: Union[str, dict], model_name: str) -> None:
+def _check_model_dict(model: dict) ->  bool:
+    """checks model dict to see if all required keys are present
+    """
+    required_keys = ["name", "dimensions"]
+    for key in required_keys:
+        if key not in model:
+            raise InvalidModelSettingsError(f'model {key} not in settings')
+    else:
+        return True
+
+
+def _update_model_dict(model: dict) -> dict:
+    """updates model dict with default values if optional keys are missing
+    """
+    optional_keys_values = [("type", "sbert"), ("tokens", 128)]
+    for key, value in optional_keys_values:
+        if key not in model:
+            model[key] = value
+
+    return model
+
+def _update_model_properties(model: Union[str, dict], model_name: str, all_model_properties = MODEL_PROPERTIES) -> None:
     """updates MODEL_PROPERTIES if model details are specified by user
     """
     if isinstance(model, dict):
-        model_properties = {model_name: model}
-        MODEL_PROPERTIES['models'].update(model_properties)
+        _check_model_dict(model)
+        _model = _update_model_dict(model)
+        model_properties = {model_name: _model}
+        all_model_properties['models'].update(model_properties)
 
 
 def _update_available_models(model_cache_key: str, model_name: str, device: str, normalize_embeddings: bool) -> None:
     """loads the model if it is not already loaded
     """
     if model_cache_key not in available_models:
-        available_models[model_cache_key] = _load_model(model_name, device=device)
-        logger.info(f'loaded {model_name} on device {device} with normalization={normalize_embeddings}')
+        try:
+            available_models[model_cache_key] = _load_model(model_name, device=device)
+            logger.info(f'loaded {model_name} on device {device} with normalization={normalize_embeddings}')
+        except Exception as e:
+            raise ModelLoadError
 
 
 def clear_loaded_models() -> None:
