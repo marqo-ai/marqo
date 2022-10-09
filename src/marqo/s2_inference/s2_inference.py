@@ -13,7 +13,7 @@ logger = get_logger(__name__)
 available_models = dict()
 MODEL_PROPERTIES = load_model_properties()
 
-def vectorise(model: Union[str, dict], content: Union[str, List[str]], device: str = get_default_device(),
+def vectorise(model_name: Union[str, dict], content: Union[str, List[str]], device: str = get_default_device(),
                                     normalize_embeddings: bool = get_default_normalization(), **kwargs) -> List[List[float]]:
     """vectorizes the content by model name
 
@@ -28,11 +28,12 @@ def vectorise(model: Union[str, dict], content: Union[str, List[str]], device: s
         VectoriseError: if the content can't be vectorised, for some reason.
     """
 
+    model = model_name
     model_name = _get_model_name(model)
 
     model_cache_key = _create_model_cache_key(model_name, device)
 
-    _update_model_properties(model, model_name)
+    _update_model_properties(model_name, model)
 
     _update_available_models(model_cache_key, model_name, device, normalize_embeddings)
 
@@ -50,6 +51,7 @@ def _get_model_name(model: Union[str, dict]) -> str:
     if isinstance(model, str):
         return model
     elif isinstance(model, dict):
+        _check_model_dict(model)
         return model['name']
 
 
@@ -89,11 +91,10 @@ def _update_model_dict(model: dict) -> dict:
 
     return model
 
-def _update_model_properties(model: Union[str, dict], model_name: str, all_model_properties = MODEL_PROPERTIES) -> None:
+def _update_model_properties(model_name: str, model: Union[str, dict], all_model_properties = MODEL_PROPERTIES) -> None:
     """updates MODEL_PROPERTIES if model details are specified by user
     """
     if isinstance(model, dict):
-        _check_model_dict(model)
         _model = _update_model_dict(model)
         model_properties = {model_name: _model}
         all_model_properties['models'].update(model_properties)
