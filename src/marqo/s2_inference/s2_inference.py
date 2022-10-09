@@ -106,8 +106,8 @@ def _update_available_models(model_cache_key: str, model_name: str, device: str,
         try:
             available_models[model_cache_key] = _load_model(model_name, device=device)
             logger.info(f'loaded {model_name} on device {device} with normalization={normalize_embeddings}')
-        except Exception as e:
-            raise ModelLoadError
+        except:
+            raise ModelLoadError(f"Unable to load model={model_name} on device={device} with normalization={normalize_embeddings}")
 
 
 def clear_loaded_models() -> None:
