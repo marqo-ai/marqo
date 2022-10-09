@@ -122,14 +122,28 @@ async def add_documents(docs: List[Dict], index_name: str, refresh: bool = True,
                         marqo_config: config.Config = Depends(generate_config),
                         batch_size: int = 0, processes: int = 1,
                         device: str = Depends(api_validation.validate_device)):
-    """add_documents endpoint"""
+    """add_documents endpoint (replace existing docs with the same id)"""
     return tensor_search.add_documents_orchestrator(
         config=marqo_config,
         docs=docs,
         index_name=index_name, auto_refresh=refresh,
-        batch_size=batch_size, processes=processes, device=device
+        batch_size=batch_size, processes=processes, device=device,
+        update_mode='replace'
     )
 
+
+@app.put("/indexes/{index_name}/documents")
+async def add_documents(docs: List[Dict], index_name: str, refresh: bool = True,
+                        marqo_config: config.Config = Depends(generate_config),
+                        batch_size: int = 0, processes: int = 1,
+                        device: str = Depends(api_validation.validate_device)):
+    """update add_documents endpoint"""
+    return tensor_search.add_documents_orchestrator(
+        config=marqo_config,
+        docs=docs,
+        index_name=index_name, auto_refresh=refresh,
+        batch_size=batch_size, processes=processes, device=device, update_mode='update'
+    )
 
 @app.get("/indexes/{index_name}/documents/{document_id}")
 async def get_document_by_id(index_name: str, document_id: str,

@@ -181,13 +181,13 @@ def _check_and_create_index_if_not_exist(config: Config, index_name: str):
 def add_documents_orchestrator(
         config: Config, index_name: str, docs: List[dict],
         auto_refresh: bool, batch_size: int = 0, processes: int = 1,
-        device=None):
+        device=None, update_mode: str = 'replace'):
 
     if batch_size is None or batch_size == 0:
         logger.info(f"batch_size={batch_size} and processes={processes} - not doing any marqo side batching")
         return add_documents(
             config=config, index_name=index_name, docs=docs, auto_refresh=auto_refresh,
-            device=device
+            device=device, update_mode=update_mode
         )
     elif processes is not None and processes > 1:
 
@@ -198,7 +198,7 @@ def add_documents_orchestrator(
         results = parallel.add_documents_mp(
             config=config, index_name=index_name, docs=docs,
             auto_refresh=auto_refresh, batch_size=batch_size, processes=processes,
-            device=device
+            device=device, update_mode=update_mode
         )
         
         # we need to force the cache to update as it does not propagate using mp
@@ -217,7 +217,8 @@ def add_documents_orchestrator(
 
 
 def _batch_request(config: Config, index_name: str, dataset: List[dict], 
-                batch_size: int = 100, verbose: bool = True, device=None) -> List[Dict[str, Any]]:
+                   batch_size: int = 100, verbose: bool = True, device=None,
+                   update_mode: str = 'replace') -> List[Dict[str, Any]]:
         """Batch by the number of documents"""
         logger.info(f"starting batch ingestion in sizes of {batch_size}")
 
@@ -237,7 +238,9 @@ def _batch_request(config: Config, index_name: str, dataset: List[dict],
             t0 = datetime.datetime.now()
             res = add_documents(
                 config=config, index_name=index_name,
-                docs=docs, auto_refresh=False, device=device)
+                docs=docs, auto_refresh=False, device=device,
+                update_mode=update_mode
+            )
             total_batch_time = datetime.datetime.now() - t0
             num_docs = len(docs)
 
@@ -269,8 +272,19 @@ def _infer_opensearch_data_type(
 
 
 def add_documents(config: Config, index_name: str, docs: List[dict], auto_refresh: bool,
-                  device=None):
+                  device=None, update_mode: str = "replace"):
     """
+
+    Args:
+        config: Config object
+        index_name: name of the index
+        docs: List of documents
+        auto_refresh: Set to False if indexing lots of docs
+        device: Device used to carry out the document update.
+        update_mode: {'replace' | 'update'}. If set to replace (default) just
+
+    Returns:
+
     """
     t0 = datetime.datetime.now()
     bulk_parent_dicts = []
@@ -284,6 +298,11 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
     if len(docs) == 0:
         raise errors.BadRequestError(message="Received empty add documents request")
 
+    valid_update_modes = ('update', 'replace')
+    if update_mode not in valid_update_modes:
+        raise errors.InvalidArgError(message=f"Unknown update_mode `{update_mode}` "
+                                             f"received! Valid update modes: {valid_update_modes}")
+
     existing_fields = set(index_info.properties.keys())
     new_fields = set()
 
@@ -293,7 +312,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
     for i, doc in enumerate(docs):
 
-        indexing_instructions = {"index": {"_index": index_name}}
+        indexing_instructions = {'index' if update_mode == 'replace' else 'update': {"_index": index_name}}
         copied = copy.deepcopy(doc)
 
         document_is_valid = True
@@ -317,7 +336,10 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
             )
             continue
 
-        indexing_instructions["index"]["_id"] = doc_id
+        if update_mode == "replace":
+            indexing_instructions["index"]["_id"] = doc_id
+        else:
+            indexing_instructions["update"]["_id"] = doc_id
 
         chunks = []
 
@@ -403,11 +425,64 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                         **chunk_values_for_filtering
                     })
         if document_is_valid:
-            copied[TensorField.chunks] = chunks
-            bulk_parent_dicts.append(indexing_instructions)
-            bulk_parent_dicts.append(copied)
-
             new_fields = new_fields.union(new_fields_from_doc)
+            if update_mode =='replace':
+                copied[TensorField.chunks] = chunks
+                bulk_parent_dicts.append(indexing_instructions)
+                bulk_parent_dicts.append(copied)
+            else:
+                to_upsert = copied.copy()
+                to_upsert[TensorField.chunks] = chunks
+                bulk_parent_dicts.append(indexing_instructions)
+                bulk_parent_dicts.append({
+                    "upsert": to_upsert,
+                    "script": {
+                        "lang": "painless",
+                        "source": f"""
+            
+            // updates the doc's fields with the new content
+            for (key in params.customer_dict.keySet()) {{
+                ctx._source[key] = params.customer_dict[key];
+            }}            
+                        
+            // keep track of the merged doc
+            def merged_doc = [:];
+            merged_doc.putAll(ctx._source);
+            merged_doc.remove("{TensorField.chunks}");
+            
+            // remove chunks if the __field_name matches an updated field
+            // All update fields should be recomputed, and it should be safe to delete these chunks             
+            for (int i=ctx._source.{TensorField.chunks}.length-1; i>=0; i--) {{
+                if (params.doc_fields.contains(ctx._source.{TensorField.chunks}[i].{TensorField.field_name})) {{
+                   ctx._source.{TensorField.chunks}.remove(i);
+                }}
+            }}
+            
+            // update the chunks, setting fields to the new data
+            for (int i=ctx._source.{TensorField.chunks}.length-1; i>=0; i--) {{
+                for (key in params.customer_dict.keySet()) {{
+                    ctx._source.{TensorField.chunks}[i][key] = params.customer_dict[key];
+                }}
+            }}
+            
+            // update the new chunks, adding the existing data 
+            for (int i=params.new_chunks.length-1; i>=0; i--) {{
+                for (key in merged_doc.keySet()) {{
+                    params.new_chunks[i][key] = merged_doc[key];
+                }}
+            }}
+            
+            // appends the new chunks to the existing chunks  
+            ctx._source.{TensorField.chunks}.addAll(params.new_chunks);
+            
+                        """,
+                        "params": {
+                            "doc_fields": list(copied.keys()),
+                            "new_chunks": chunks,
+                            "customer_dict": copied,
+                        },
+                    }
+                })
 
     if bulk_parent_dicts:
         # the HttpRequest wrapper handles error logic
@@ -433,13 +508,15 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
         if response is not None:
             copied_res = copy.deepcopy(response)
+
             result_dict['errors'] = copied_res['errors']
+            actioned = "index" if update_mode == 'replace' else 'update'
 
             for item in copied_res["items"]:
                 for to_remove in item_fields_to_remove:
-                    if to_remove in item["index"]:
-                        del item["index"][to_remove]
-                new_items.append(item["index"])
+                    if to_remove in item[actioned]:
+                        del item[actioned][to_remove]
+                new_items.append(item[actioned])
 
         if unsuccessful_docs:
             result_dict['errors'] = True
