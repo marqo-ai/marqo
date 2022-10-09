@@ -38,14 +38,18 @@ class TestGenericModelSupport(unittest.TestCase):
 
 
     def test_check_model_dict(self):
+        """_check_model_dict should throw an exception if required keys are not given.
+        """
         model = {# "name": "sentence-transformers/all-mpnet-base-v2",
                 # "dimensions": 768,
                 "tokens":128,
                 "type":"sbert"}
 
-
         self.assertRaises(InvalidModelSettingsError, _check_model_dict, model)
 
+
+        """_check_model_dict should not throw an exception if required keys are given.
+        """
         model['dimensions'] = 768
         model['name'] = "sentence-transformers/all-mpnet-base-v2"
 
@@ -53,6 +57,8 @@ class TestGenericModelSupport(unittest.TestCase):
 
 
     def test_update_model_dict(self):
+        """If optional keys are not given, _update_model_dict should add the keys with default values.
+        """
         model = {"name": "sentence-transformers/all-mpnet-base-v2",
                 "dimensions": 768
                 # "tokens": 128,
@@ -68,6 +74,8 @@ class TestGenericModelSupport(unittest.TestCase):
 
 
     def test_update_model_properties(self):
+        """If model info is not in MODEL_PROPERTIES, _update_model_properties should add it
+        """
         model = {"name": "random-model-name",
                 "dimensions": 768,
                 "tokens": 128,
