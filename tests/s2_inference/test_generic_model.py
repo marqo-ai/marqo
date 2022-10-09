@@ -1,6 +1,8 @@
 import unittest
+from marqo.errors import MarqoApiError, MarqoError, IndexNotFoundError
 from marqo.s2_inference.errors import InvalidModelSettingsError
 from marqo.s2_inference.model_registry import load_model_properties
+from marqo.client import Client
 
 from marqo.s2_inference.s2_inference import (
     vectorise,
@@ -13,10 +15,27 @@ from marqo.s2_inference.s2_inference import (
 from tests.marqo_test import MarqoTestCase
 
 
-class TestGenericModelSupport(unittest.TestCase):
+class TestGenericModelSupport(MarqoTestCase):
 
     def setUp(self):
-        pass
+        mq = Client(**self.client_settings)
+        self.endpoint = mq.config.url
+        self.config = mq.config
+        self.client = mq
+
+        self.generic_header = {"Content-type": "application/json"}
+        self.index_name_1 = "my-test-create-index-1"
+        try:
+            self.client.delete_index(self.index_name_1)
+        except IndexNotFoundError as s:
+            pass
+
+
+    def tearDown(self) -> None:
+        try:
+            self.client.delete_index(self.index_name_1)
+        except IndexNotFoundError as s:
+            pass
 
 
     def test_get_model_name_with_str_input(self):
@@ -85,7 +104,7 @@ class TestGenericModelSupport(unittest.TestCase):
 
         TEST_MODEL_PROPERTIES = load_model_properties()
 
-        _update_model_properties(model, model_name, TEST_MODEL_PROPERTIES)
+        _update_model_properties(model_name, model, TEST_MODEL_PROPERTIES)
 
         self.assertEqual(TEST_MODEL_PROPERTIES['models'][model_name], model)
 
