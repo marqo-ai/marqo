@@ -230,7 +230,7 @@ docker rm -f marqo-os; docker run -p 9200:9200 -p 9600:9600 -e "discovery.type=s
 docker rm -f marqo; docker run --name marqo --privileged \
     -p 8882:8882 --add-host host.docker.internal:host-gateway \
     -e "OPENSEARCH_URL=https://localhost:9200" \
-    marqoai/marqo:0.0.3
+    marqoai/marqo:0.0.4
 ```
 
 ## Contributors
