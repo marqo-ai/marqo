@@ -210,6 +210,9 @@ Searching using an image can be achieved by providing the image link.
 results = mq.index("my-multimodal-index").search('https://upload.wikimedia.org/wikipedia/commons/thumb/9/96/Standing_Hippopotamus_MET_DP248993.jpg/440px-Standing_Hippopotamus_MET_DP248993.jpg')
 ```
 
+## Documentation
+The full documentation for Marqo can be found here [https://marqo.pages.dev/](https://marqo.pages.dev/).
+
 ## Warning
 
 Note that you should not run other applications on Marqo's Opensearch cluster as Marqo automatically changes and adapts the settings on the cluster.
