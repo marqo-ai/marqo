@@ -41,8 +41,8 @@ Tensor search involves transforming documents, images and other data into collec
 2. Use docker to run Marqo (Mac users with M-series chips will need to [go here](#m-series-mac-users)):
 ```bash
 docker rm -f marqo;
-docker pull marqoai/marqo:0.0.3;
-docker run --name marqo -it --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:0.0.3
+docker pull marqoai/marqo:0.0.4;
+docker run --name marqo -it --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:0.0.4
 ```
 3. Install the Marqo client:
 ```bash
