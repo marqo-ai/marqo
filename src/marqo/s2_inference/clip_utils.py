@@ -7,6 +7,7 @@ import numpy as np
 import clip
 import torch
 from PIL import Image
+import open_clip
 
 from marqo.s2_inference.types import *
 from marqo.s2_inference.logger import get_logger
@@ -231,4 +232,37 @@ class CLIP:
         else:
             logger.debug('text')
             return self.encode_text(inputs, normalize=normalize)
+
+class OPEN_CLIP(CLIP):
+    def __init__(self, model_type: str = "open_clip/ViT-B-32-quickgelu/laion400m_e32", device: str = 'cpu',  embedding_dim: int = None,
+                            truncate: bool = True, **kwargs) -> None:
+        super().__init__(model_type, device,  embedding_dim, truncate , **kwargs)
+        self.model_name = model_type.split("/", 3)[1]
+        self.pretrained = model_type.split("/", 3)[2]
+
+
+    def load(self) -> None:
+        # https://github.com/mlfoundations/open_clip
+        self.model, _, self.preprocess = open_clip.create_model_and_transforms(self.model_name, pretrained = self.pretrained, device=self.device, jit=False)
+        self.tokenizer = open_clip.tokenize
+        self.model.eval()
+
+    def encode_text(self, sentence: Union[str, List[str]], normalize=True) -> FloatTensor:
+
+        if self.model is None:
+            self.load()
+
+        text = self.tokenizer(sentence).to(self.device)
+
+        with torch.no_grad():
+            outputs = self.model.encode_text(text)
+
+        if normalize:
+            _shape_before = outputs.shape
+            outputs /= self.normalize(outputs)
+            assert outputs.shape == _shape_before
+
+        return self._convert_output(outputs)
+
+
         
