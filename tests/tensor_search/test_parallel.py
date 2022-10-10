@@ -5,7 +5,7 @@ import copy
 from marqo.tensor_search import parallel
 import torch
 from tests.marqo_test import MarqoTestCase
-
+from marqo.tensor_search import tensor_search
 
 class TestAddDocumentsPara(MarqoTestCase):
     """
@@ -46,6 +46,6 @@ class TestAddDocumentsPara(MarqoTestCase):
 
         data = [{'text':f'something {str(i)}', '_id': str(i)} for i in range(100)]
 
-        res = self.client.index(self.index_name_1).add_documents(data, batch_size=10, use_parallel=True)
-
-        res = self.client.index(self.index_name_1).search('something')
+        res = tensor_search.add_documents_orchestrator(config=self.config, index_name=self.index_name_1, docs=data,
+                                                       batch_size=10, processes=1, auto_refresh=True)
+        res = tensor_search.search(config=self.config, text='something', index_name=self.index_name_1)

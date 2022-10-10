@@ -41,8 +41,8 @@ Tensor search involves transforming documents, images and other data into collec
 2. Use docker to run Marqo (Mac users with M-series chips will need to [go here](#m-series-mac-users)):
 ```bash
 docker rm -f marqo;
-docker pull marqoai/marqo:0.0.3;
-docker run --name marqo -it --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:0.0.3
+docker pull marqoai/marqo:0.0.4;
+docker run --name marqo -it --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:0.0.4
 ```
 3. Install the Marqo client:
 ```bash
@@ -77,7 +77,7 @@ results = mq.index("my-first-index").search(
 - `mq` is the client that wraps the`marqo` API
 - `add_documents()` takes a list of documents, represented as python dicts, for indexing
 - `add_documents()` creates an index with default settings, if one does not already exist
-- You can optionally set a document's ID with the special `_id` field. Otherwise, marqo will generate one.
+- You can optionally set a document's ID with the special `_id` field. Otherwise, Marqo will generate one.
 - If the index doesn't exist, Marqo will create it. If it exists then Marqo will add the documents to the index.
 
 Let's have a look at the results:
@@ -230,7 +230,7 @@ docker rm -f marqo-os; docker run -p 9200:9200 -p 9600:9600 -e "discovery.type=s
 docker rm -f marqo; docker run --name marqo --privileged \
     -p 8882:8882 --add-host host.docker.internal:host-gateway \
     -e "OPENSEARCH_URL=https://localhost:9200" \
-    marqoai/marqo:0.0.3
+    marqoai/marqo:0.0.4
 ```
 
 ## Contributors
