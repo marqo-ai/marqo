@@ -243,7 +243,7 @@ class OPEN_CLIP(CLIP):
 
     def load(self) -> None:
         # https://github.com/mlfoundations/open_clip
-        self.model, _, self.preprocess = open_clip.create_model_and_transforms(self.model_name, pretrained =self.pretrained, device=self.device, jit=False)
+        self.model, _, self.preprocess = open_clip.create_model_and_transforms(self.model_name, pretrained = self.pretrained, device=self.device, jit=False)
         self.tokenizer = open_clip.tokenize
         self.model.eval()
 
