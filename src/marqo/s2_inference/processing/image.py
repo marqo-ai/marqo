@@ -77,6 +77,55 @@ def load_pytorch_fcos():
     
     return model, preprocess
 
+def _PIL_to_opencv(pil_image: ImageType):
+
+    if isinstance(pil_image, ImageType):
+        return cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
+    raise TypeError(f"expected a PIL image but received {type(pil_image)}")
+
+def preprocess_yolox(img, input_size, swap=(2, 0, 1)):
+    
+    if len(img.shape) == 3:
+        padded_img = np.ones((input_size[0], input_size[1], 3), dtype=np.uint8) * 114
+    else:
+        padded_img = np.ones(input_size, dtype=np.uint8) * 114
+
+    r = min(input_size[0] / img.shape[0], input_size[1] / img.shape[1])
+    resized_img = cv2.resize(
+        img,
+        (int(img.shape[1] * r), int(img.shape[0] * r)),
+        interpolation=cv2.INTER_LINEAR,
+    ).astype(np.uint8)
+    padded_img[: int(img.shape[0] * r), : int(img.shape[1] * r)] = resized_img
+
+    padded_img = padded_img.transpose(swap)
+    padded_img = np.ascontiguousarray(padded_img, dtype=np.float32)
+    return padded_img, r
+
+def _get_onnx_provider(device: str) -> str:
+    """determine where the model should run based on specified device
+    """
+    onnxproviders = onnxruntime.get_available_providers()
+    logger.info(f"device:{device} and available providers {onnxproviders}")
+    if device == 'cpu':
+        fast_onnxprovider = 'CPUExecutionProvider'
+    else:
+        if 'CUDAExecutionProvider' not in onnxproviders:
+            fast_onnxprovider = 'CPUExecutionProvider'
+        else:
+            fast_onnxprovider = 'CUDAExecutionProvider'
+
+    logger.info(f"onnx_provider:{fast_onnxprovider}")
+    return fast_onnxprovider
+
+def load_yolox_onnx(model_name: str, device: str) -> Tuple[onnxruntime.InferenceSession, preprocess_yolox]:
+
+    fast_onnxprovider = _get_onnx_provider(device)
+
+    session = onnxruntime.InferenceSession(model_name, providers=[fast_onnxprovider])
+    preprocess = preprocess_yolox
+
+    return session, preprocess
 
 def load_rcnn_image(image_name: str, size: Tuple = (320,320)) -> Tuple[ImageType, FloatTensor, Tuple[int, int]]:
     """this is the loading and processing for the input
