@@ -156,8 +156,7 @@ class TestEncoding(unittest.TestCase):
 
     def test_open_clip_vectorize(self):
 
-        names = ['open_clip/RN50/openai', 'open_clip/RN101/yfcc15m', 'open_clip/RN101-quickgelu/openai',
-                 'open_clip/ViT-g-14/laion2b_s12b_b42k']
+        names = ['open_clip/ViT-B-32/laion400m_e32', 'open_clip/RN50/openai']
 
         sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
         device = 'cpu'
@@ -180,12 +179,7 @@ class TestEncoding(unittest.TestCase):
 
         # This is a full test as the list includes all the models. Note that the training dataset does not affect the
         # embedding size.
-        names = ['open_clip/RN50/openai', 'open_clip/RN101/openai', 'open_clip/RN101-quickgelu/openai',
-                 'open_clip/RN50x4/openai',
-                 'open_clip/RN50x16/openai', 'open_clip/RN50x64/openai', 'open_clip/ViT-B-32/openai',
-                 'open_clip/ViT-B-16/openai',
-                 'open_clip/ViT-B-16-plus-240/laion400m_e31', 'open_clip/ViT-L-14/openai',
-                 'open_clip/ViT-H-14/laion2b_s32b_b79k', 'open_clip/ViT-g-14/laion2b_s12b_b42k']
+        names = ['open_clip/ViT-B-32/laion400m_e32', 'open_clip/RN50/openai']
 
         device = "cpu"
 
