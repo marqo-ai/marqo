@@ -1,2 +1,0 @@
-import open_clip
-
