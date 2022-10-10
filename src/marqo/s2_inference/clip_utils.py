@@ -237,14 +237,13 @@ class OPEN_CLIP(CLIP):
     def __init__(self, model_type: str = "open_clip/ViT-B-32-quickgelu/laion400m_e32", device: str = 'cpu',  embedding_dim: int = None,
                             truncate: bool = True, **kwargs) -> None:
         super().__init__(model_type, device,  embedding_dim, truncate , **kwargs)
-        self.model_type = model_type.split("/", 3)[1]
+        self.model_name = model_type.split("/", 3)[1]
         self.pretrained = model_type.split("/", 3)[2]
 
 
     def load(self) -> None:
-        # https://github.com/openai/CLIP/issues/30
-        self.model, _, self.preprocess = open_clip.create_model_and_transforms(self.model_type, pretrained =self.pretrained, device=self.device, jit=False)
-        #self.model = self.model.to(self.device)
+        # https://github.com/mlfoundations/open_clip
+        self.model, _, self.preprocess = open_clip.create_model_and_transforms(self.model_name, pretrained =self.pretrained, device=self.device, jit=False)
         self.tokenizer = open_clip.tokenize
         self.model.eval()
 
