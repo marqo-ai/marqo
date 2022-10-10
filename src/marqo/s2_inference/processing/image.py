@@ -16,6 +16,9 @@ from marqo.s2_inference.types import Dict, List, Union, ImageType, Tuple, FloatT
 from marqo.s2_inference.clip_utils import format_and_load_CLIP_image, _load_image_from_path
 from marqo.s2_inference.errors import ChunkerError, ChunkerMethodProcessError
 
+import onnxruntime
+import cv2
+
 logger = get_logger('image_chunks')
 
 def get_default_rcnn_params() -> Dict:
@@ -358,7 +361,7 @@ class PatchifyPytorch:
         self.batch = [self.preprocess(self.image_pt.to(self.device))]
         with torch.no_grad():
             self.results = self.model(self.batch)[0]
-
+        
         if self.prior:
             self.bboxes_simple = generate_boxes(self.size, self.hn, self.wn, overlap=True)
               
@@ -432,7 +435,7 @@ def str2bool(string: str) -> bool:
         bool: _description_
     """
     return string.lower() in ("true", "1", "t")
-
+    
 def chunk_image(image: Union[str, ImageType], device: str, 
                         method: str = 'simple', size=get_default_size()) -> Tuple[List[ImageType], ndarray]:
     """_summary_
@@ -498,6 +501,60 @@ def chunk_image(image: Union[str, ImageType], device: str,
     except PIL.UnidentifiedImageError as e:
         raise ChunkerError from e
     return patch.patches,patch.bboxes_orig
+
+class PatchifyYolox:
+    """class to do the patching
+    """
+    def __init__(self, device='cpu', size=(240, 240), nms=True, filter_bb=True):
+
+        self.size = size
+        self.device = device
+
+        model_type = ('yolox', device)
+
+        if model_type not in available_models:
+            logger.info(f"loading model {model_type}")
+            if model_type[0] == 'yolox':
+                func = load_yolox_onnx
+            else:
+                raise TypeError(f"wrong model for {model_type}")
+
+            self.model, self.preprocess = func("yolox_s.onnx", self.device)
+
+            available_models[model_type] = (self.model, self.preprocess)
+        else:
+            self.model, self.preprocess = available_models[model_type]
+
+        self.nms = nms
+        self.filter_bb = filter_bb
+
+    def infer(self, image):
+
+        self.image_pil, self.image_pt, self.original_size = load_rcnn_image(image, size=self.size)
+        # make cv2 format
+        self.image = _PIL_to_opencv(self.image_pil)
+        self.batch = [self.preprocess(self.image)]
+       
+        self.results = self.model(self.batch)[0]
+        
+    def process(self):
+        self.areas = torch.tensor(calc_area(self.results['boxes'], self.size))
+        self.bboxes_pt = self.results['boxes'].detach().cpu()
+        
+        if self.filter_bb:
+            inds = filter_boxes(self.bboxes_pt)
+            self.bboxes_pt = self.bboxes_pt.clone().detach()[inds]
+            self.areas = self.areas[inds]
+        if self.nms:
+            self.inds = torchvision.ops.nms(self.bboxes_pt, 1 - self.areas, 0.6)
+            self.bboxes_pt = self.bboxes_pt.clone().detach()[self.inds]
+        # we add the original unchanged so that it is always in the index
+        # the bb of the original also provides the size which is required for later processing
+        self.bboxes = [(0,0,self.size[0],self.size[1])] + self.bboxes_pt.numpy().astype(int).tolist()
+        self.patches = patchify_image(self.image, self.bboxes)
+
+        self.bboxes_orig = [rescale_box(bb, self.size, self.original_size) for bb in self.bboxes]
+
 
 # def load_pretrained_yolox():
 #     input_shape = tuple(map(int, "384,384".split(',')))
