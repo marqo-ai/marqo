@@ -17,7 +17,7 @@ setup(
         "more_itertools",
         "nltk",
         "torch",
-        "open_clip_torch"
+        "open_clip_torch",
         "pillow",
         "numpy",
         "validators",
