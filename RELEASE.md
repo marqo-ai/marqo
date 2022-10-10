@@ -1,7 +1,7 @@
 # Release 0.0.4
 
 <!--SMALL BLURB ABOUT RELEASE-->
-Adding the attributesToRetrieve option to the search endpoint
+Adding the attributesToRetrieve to the search endpoint and added the update documents endpoints
 
 ## New features
 <!--NON BREAKING CHANGES GO HERE-->
