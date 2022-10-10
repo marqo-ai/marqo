@@ -4,12 +4,14 @@ import torch
 
 from marqo.s2_inference.types import FloatTensor
 from marqo.s2_inference.s2_inference import clear_loaded_models
+from marqo.s2_inference.model_registry import load_model_properties, _get_open_clip_properties
 
 from marqo.s2_inference.s2_inference import (
     _load_model,
-    _check_output_type, vectorise, 
-    _convert_vectorized_output, 
-    )
+    _check_output_type, vectorise,
+    _convert_vectorized_output,
+)
+
 
 class TestEncoding(unittest.TestCase):
 
@@ -18,8 +20,9 @@ class TestEncoding(unittest.TestCase):
         pass
 
     def test_vectorize(self):
-        
-        names = ["all-MiniLM-L6-v1", "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6", "onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]
+
+        names = ["all-MiniLM-L6-v1", "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6",
+                 "onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]
         sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
         device = 'cpu'
         eps = 1e-9
@@ -37,28 +40,26 @@ class TestEncoding(unittest.TestCase):
 
                 assert abs(torch.FloatTensor(output_m) - torch.FloatTensor(output_v)).sum() < eps
 
-
     def test_load_clip_text_model(self):
         names = ['RN50', "ViT-B/16"]
         device = 'cpu'
         eps = 1e-9
         texts = ['hello', 'big', 'asasasasaaaaaaaaaaaa', '', 'a word. another one!?. #$#.']
-        
+
         for name in names:
-        
+
             model = _load_model(name, device=device)
-            
+
             for text in texts:
                 assert abs(model.encode(text) - model.encode([text])).sum() < eps
                 assert abs(model.encode_text(text) - model.encode([text])).sum() < eps
                 assert abs(model.encode(text) - model.encode_text([text])).sum() < eps
 
-
     def test_load_sbert_text_model(self):
         names = ["sentence-transformers/all-MiniLM-L6-v1", "all_datasets_v4_MiniLM-L6"]
         device = 'cpu'
         eps = 1e-9
-        
+
         for name in names:
             model = _load_model(name, device=device)
             assert abs(model.encode('hello') - model.encode(['hello'])).sum() < eps
@@ -67,38 +68,38 @@ class TestEncoding(unittest.TestCase):
         names = ["hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6"]
         device = 'cpu'
         eps = 1e-9
-        
+
         for name in names:
             model = _load_model(name, device=device)
             assert abs(model.encode('hello') - model.encode(['hello'])).sum() < eps
-
 
     def test_load_onnx_sbert_text_model(self):
         names = ["onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]
         device = 'cpu'
         eps = 1e-9
-        
+
         for name in names:
             model = _load_model(name, device=device)
             assert abs(model.encode('hello') - model.encode(['hello'])).sum() < eps
 
-    
     def test_compare_onnx_sbert_text_models(self):
         names = ["all-MiniLM-L6-v1", "all_datasets_v4_MiniLM-L6"]
         sentences = ['hello', 'this is a test sentence. so is this.']
         device = 'cpu'
         eps = 1e-4
-        
+
         for name in names:
             for sentence in sentences:
-                model_onnx = _load_model(os.path.join('onnx',name), device=device)
+                model_onnx = _load_model(os.path.join('onnx', name), device=device)
 
                 model_sbert = _load_model(name, device=device)
 
                 assert abs(model_onnx.encode(sentence) - model_sbert.encode(sentence)).sum() < eps
 
     def test_model_outputs(self):
-        names = ['open_clip/ViT-B-32/laion400m_e32', "all-MiniLM-L6-v1", "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6", "onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]
+        names = ['open_clip/ViT-B-32/laion400m_e32', "all-MiniLM-L6-v1", "all_datasets_v4_MiniLM-L6",
+                 "hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6", "onnx/all-MiniLM-L6-v1",
+                 "onnx/all_datasets_v4_MiniLM-L6"]
         sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
         device = 'cpu'
 
@@ -111,7 +112,9 @@ class TestEncoding(unittest.TestCase):
                 assert _check_output_type(_convert_vectorized_output(output))
 
     def test_model_normalization(self):
-        names = ['open_clip/ViT-B-32/laion400m_e32', 'RN50', "ViT-B/16", "all-MiniLM-L6-v1", "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6", "onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]
+        names = ['open_clip/ViT-B-32/laion400m_e32', 'RN50', "ViT-B/16", "all-MiniLM-L6-v1",
+                 "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6",
+                 "onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]
         sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
         device = 'cpu'
         eps = 1e-6
@@ -132,7 +135,8 @@ class TestEncoding(unittest.TestCase):
     def test_model_un_normalization(self):
         # note: sbert native seems to provide normalized embeddings even with = False, needs more investigation
         # , 
-        names = ['open_clip/ViT-B-32/laion400m_e32','RN50', "ViT-B/16", "hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6", "onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]
+        names = ['open_clip/ViT-B-32/laion400m_e32', 'RN50', "ViT-B/16", "hf/all-MiniLM-L6-v1",
+                 "hf/all_datasets_v4_MiniLM-L6", "onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]
         sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
         device = 'cpu'
         eps = 1e-3
@@ -152,7 +156,7 @@ class TestEncoding(unittest.TestCase):
 
     def test_open_clip_vectorize(self):
 
-        names = ['open_clip/RN50/openai',  'open_clip/RN101/yfcc15m', 'open_clip/RN101-quickgelu/openai',
+        names = ['open_clip/RN50/openai', 'open_clip/RN101/yfcc15m', 'open_clip/RN101-quickgelu/openai',
                  'open_clip/ViT-g-14/laion2b_s12b_b42k']
 
         sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
@@ -172,3 +176,27 @@ class TestEncoding(unittest.TestCase):
 
                 assert abs(torch.FloatTensor(output_m) - torch.FloatTensor(output_v)).sum() < eps
 
+    def test_open_clip_embedding_size(self):
+
+        # This is a full test as the list includes all the models. Note that the training dataset does not affect the
+        # embedding size.
+        names = ['open_clip/RN50/openai', 'open_clip/RN101/openai', 'open_clip/RN101-quickgelu/openai',
+                 'open_clip/RN50x4/openai',
+                 'open_clip/RN50x16/openai', 'open_clip/RN50x64/openai', 'open_clip/ViT-B-32/openai',
+                 'open_clip/ViT-B-16/openai',
+                 'open_clip/ViT-B-16-plus-240/laion400m_e31', 'open_clip/ViT-L-14/openai',
+                 'open_clip/ViT-H-14/laion2b_s32b_b79k', 'open_clip/ViT-g-14/laion2b_s12b_b42k']
+
+        device = "cpu"
+
+        sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
+
+        for name in names:
+            open_clip_properties = _get_open_clip_properties()
+
+            for sentence in sentences:
+                output_v = vectorise(name, sentence, device, normalize_embeddings=True)
+                registered_dimension = open_clip_properties[name]["dimensions"]
+                output_dimension = len(output_v[0])
+
+                assert registered_dimension == output_dimension
