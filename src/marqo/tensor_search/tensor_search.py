@@ -549,8 +549,12 @@ def get_documents_by_ids(
         show_vectors: bool = False,
     ):
     """returns documents by their IDs"""
+    if not isinstance(document_ids, typing.Collection):
+        raise errors.InvalidArgError("Get documents must be passed a collection of IDs!")
+    if len(document_ids) <= 0:
+        raise errors.InvalidArgError("Can't get empty collection of IDs!")
     res = HttpRequests(config).get(
-        f'/_mget/',
+        f'_mget/',
         body={
             "docs": [
                 {"_index": index_name, "_id": validation.validate_id(doc_id)}
@@ -563,8 +567,14 @@ def get_documents_by_ids(
             "results": []
         }
         for doc in res['docs']:
-            to_return['results'].append(
-                _clean_doc(doc["_source"], doc_id=doc["_id"], include_vectors=show_vectors))
+            if not doc['found']:
+                to_return['results'].append({
+                    '_id': doc['_id'],
+                    TensorField.found: False})
+            else:
+                to_return['results'].append(
+                    {TensorField.found: True,
+                     ** _clean_doc(doc["_source"], doc_id=doc["_id"], include_vectors=show_vectors)})
         return to_return
     else:
         return res

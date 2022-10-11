@@ -76,7 +76,7 @@ class TestGetDocument(MarqoTestCase):
         keys = ("title 1", "desc 2")
         vals = ("content 1", "content 2. blah blah blah")
         tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
-            {"_id": "123", **dict(zip(keys,vals))}], auto_refresh=True)
+            {"_id": "123", **dict(zip(keys, vals))}], auto_refresh=True)
         res = tensor_search.get_document_by_id(
             config=self.config, index_name=self.index_name_1,
             document_id="123", show_vectors=True)
@@ -93,3 +93,5 @@ class TestGetDocument(MarqoTestCase):
             if keys[1] in facet:
                 assert facet[keys[1]] == vals[1]
             assert enums.TensorField.embedding in facet
+
+

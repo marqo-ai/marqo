@@ -1,7 +1,9 @@
 import functools
 import pprint
 from marqo.tensor_search import enums
-from marqo.errors import IndexNotFoundError, InvalidDocumentIdError
+from marqo.errors import (
+    IndexNotFoundError, InvalidDocumentIdError, InvalidArgError
+)
 from marqo.client import Client
 from marqo.tensor_search import tensor_search
 from tests.marqo_test import MarqoTestCase
@@ -59,5 +61,53 @@ class TestGetDocuments(MarqoTestCase):
                     assert facet[keys[1]] == vals[1]
                 assert enums.TensorField.embedding in facet
 
-    def test_get_documents_by_ids_resilience(self):
-        """TODO"""
+    def test_get_document_vectors_non_existent(self):
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
+        id_reqs = [
+            ['123', '456'], ['124']
+        ]
+        for is_vector_shown in (True, False):
+            for i, ids in enumerate(id_reqs):
+                res = tensor_search.get_documents_by_ids(
+                    config=self.config, index_name=self.index_name_1, document_ids=ids,
+                    show_vectors=is_vector_shown
+                )
+                assert {ii['_id'] for ii in res['results']} == set(id_reqs[i])
+                for doc_res in res['results']:
+                    assert not doc_res['_found']
+
+    def test_get_document_vectors_resilient(self):
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
+            {"_id": '456', "title": "alexandra"}, {'_id': '221', 'message': 'hello'}], auto_refresh=True)
+        id_reqs = [
+            (['123', '456'], [False, True]), ([['456', '789'], [True, False]]),
+            ([['456', '789', '221'], [True, False, True]]), ([['vkj', '456', '4891'], [False, True, False]])
+        ]
+        for is_vector_shown in (True, False):
+            for i, (ids, presence) in enumerate(id_reqs):
+                res = tensor_search.get_documents_by_ids(
+                    config=self.config, index_name=self.index_name_1, document_ids=ids,
+                    show_vectors=is_vector_shown
+                )
+                assert [ii['_id'] for ii in res['results']] == id_reqs[i][0]
+                for j, doc_res in enumerate(res['results']):
+                    assert doc_res['_id'] == ids[j]
+                    assert doc_res['_found'] == presence[j]
+                    if doc_res['_found'] and is_vector_shown:
+                        assert enums.TensorField.tensor_facets in doc_res
+                        assert 'title' in doc_res or 'message' in doc_res
+
+    def test_get_document_vectors_failures(self):
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
+        for show_vectors_option in (True, False):
+            for bad_get in [[123], [None], [set()], list(), 1.3, dict(),
+                            None, 123, ['123', 456], ['123', 45, '445'], [14, '58']]:
+                try:
+                    res = tensor_search.get_documents_by_ids(
+                        config=self.config, index_name=self.index_name_1, document_ids=bad_get,
+                        show_vectors=show_vectors_option
+                    )
+                    raise AssertionError
+                except (InvalidDocumentIdError, InvalidArgError):
+                    pass

@@ -35,6 +35,7 @@ class TensorField:
     # output fields:
     tensor_facets = "_tensor_facets"
     embedding = "_embedding"
+    found = "_found"
 
 class IndexSettingsField:
     index_settings = "index_settings"
