@@ -147,18 +147,22 @@ async def add_documents(docs: List[Dict], index_name: str, refresh: bool = True,
 
 @app.get("/indexes/{index_name}/documents/{document_id}")
 async def get_document_by_id(index_name: str, document_id: str,
-                             marqo_config: config.Config = Depends(generate_config)):
+                             marqo_config: config.Config = Depends(generate_config),
+                             expose_facets: bool = False):
     return tensor_search.get_document_by_id(
-        config=marqo_config, index_name=index_name, document_id=document_id
+        config=marqo_config, index_name=index_name, document_id=document_id,
+        show_vectors=expose_facets
     )
 
 
 @app.get("/indexes/{index_name}/documents")
-async def get_document_by_id(
+async def get_documents_by_ids(
         index_name: str, document_ids: List[str],
-        marqo_config: config.Config = Depends(generate_config)):
+        marqo_config: config.Config = Depends(generate_config),
+        expose_facets: bool = False):
     return tensor_search.get_documents_by_ids(
-        config=marqo_config, index_name=index_name, document_ids=document_ids
+        config=marqo_config, index_name=index_name, document_ids=document_ids,
+        show_vectors=expose_facets
     )
 
 
