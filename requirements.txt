@@ -20,3 +20,4 @@ onnx
 onnxruntime
 pandas
 optimum
+opencv-python
