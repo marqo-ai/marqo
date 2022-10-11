@@ -21,9 +21,9 @@ def _clean_doc(doc: dict, doc_id=None, include_vectors: bool = False) -> dict:
     if TensorField.chunk_ids in copied:
         del copied[TensorField.chunk_ids]
     if include_vectors:
-        copied["_tensor_components"] = [
+        copied[TensorField.tensor_facets] = [
             {ch[TensorField.field_name]: ch[TensorField.field_content],
-             "_vector": ch[utils.generate_vector_name(ch[TensorField.field_name])]
+             TensorField.embedding: ch[utils.generate_vector_name(ch[TensorField.field_name])]
             } for ch in copied[TensorField.chunks]
         ]
     if TensorField.chunks in copied:

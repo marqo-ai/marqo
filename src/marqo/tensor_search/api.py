@@ -155,10 +155,10 @@ async def get_document_by_id(index_name: str, document_id: str,
 
 @app.get("/indexes/{index_name}/documents")
 async def get_document_by_id(
-        index_name: str, document_id: str,
+        index_name: str, document_ids: List[str],
         marqo_config: config.Config = Depends(generate_config)):
     return tensor_search.get_documents_by_ids(
-        config=marqo_config, index_name=index_name, document_id=document_id
+        config=marqo_config, index_name=index_name, document_ids=document_ids
     )
 
 
