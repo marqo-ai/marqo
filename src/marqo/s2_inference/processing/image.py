@@ -83,6 +83,72 @@ def _PIL_to_opencv(pil_image: ImageType):
         return cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
     raise TypeError(f"expected a PIL image but received {type(pil_image)}")
 
+def demo_postprocess(outputs, img_size, p6=False):
+
+    grids = []
+    expanded_strides = []
+
+    if not p6:
+        strides = [8, 16, 32]
+    else:
+        strides = [8, 16, 32, 64]
+
+    hsizes = [img_size[0] // stride for stride in strides]
+    wsizes = [img_size[1] // stride for stride in strides]
+
+    for hsize, wsize, stride in zip(hsizes, wsizes, strides):
+        xv, yv = np.meshgrid(np.arange(wsize), np.arange(hsize))
+        grid = np.stack((xv, yv), 2).reshape(1, -1, 2)
+        grids.append(grid)
+        shape = grid.shape[:2]
+        expanded_strides.append(np.full((*shape, 1), stride))
+
+    grids = np.concatenate(grids, 1)
+    expanded_strides = np.concatenate(expanded_strides, 1)
+    outputs[..., :2] = (outputs[..., :2] + grids) * expanded_strides
+    outputs[..., 2:4] = np.exp(outputs[..., 2:4]) * expanded_strides
+
+    return outputs
+
+def _infer_yolox(session, preprocess, opencv_image, input_shape):
+
+    img, ratio = preprocess(opencv_image, input_shape)
+
+    ort_inputs = {session.get_inputs()[0].name: img[None, :, :, :]}
+    output = session.run(None, ort_inputs)
+
+    return output, ratio
+
+def _process_yolox(output, ratio, size=(384, 384)):
+
+    predictions = demo_postprocess(output[0], size)[0]
+    boxes = predictions[:, :4]
+    scores = predictions[:, 4:5] 
+
+    boxes_xyxy = np.ones_like(boxes)
+    boxes_xyxy[:, 0] = boxes[:, 0] - boxes[:, 2]/2.
+    boxes_xyxy[:, 1] = boxes[:, 1] - boxes[:, 3]/2.
+    boxes_xyxy[:, 2] = boxes[:, 0] + boxes[:, 2]/2.
+    boxes_xyxy[:, 3] = boxes[:, 1] + boxes[:, 3]/2.
+    boxes_xyxy /= ratio
+
+    return boxes_xyxy, scores
+
+def _filter_yolox(boxes_xyxy, scores):
+
+    # filter
+    inds_f = filter_yolox_boxes(boxes_xyxy)
+    ss = scores.max(-1)
+    boxes_xyxy_filtered = np.array([boxes_xyxy[_i] for _i in inds_f])
+    _s = np.array([ss[_i] for _i in inds_f])
+
+    inds = torchvision.ops.nms(torch.FloatTensor(boxes_xyxy_filtered), torch.FloatTensor(_s), 0.4)
+
+    return boxes_xyxy_filtered[inds]
+
+def _keep_topk(boxes_xyxy, k=10):
+    return boxes_xyxy[:k]
+
 def preprocess_yolox(img, input_size, swap=(2, 0, 1)):
     
     if len(img.shape) == 3:
@@ -541,7 +607,8 @@ def chunk_image(image: Union[str, ImageType], device: str,
                         'fastercnn/overlap', 'frcnn/overlap']:
         patch = PatchifyPytorch(device=device, size=size, 
                     prior=True, hn=hn, wn=wn, nms=nms, filter_bb=filter_bb)
-        
+    elif method in ['marqo-yolo', 'yolox']:
+        patch = PatchifyYolox(device=device)
     else:
         raise ValueError(f"unexpected image chunking type. found {method}")
     try:
@@ -554,11 +621,13 @@ def chunk_image(image: Union[str, ImageType], device: str,
 class PatchifyYolox:
     """class to do the patching
     """
-    def __init__(self, device='cpu', size=(240, 240), nms=True, filter_bb=True):
+    def __init__(self, device='cpu', size=(384, 384), filter_bb=True):
 
         self.size = size
         self.device = device
-
+        self.input_shape = (384, 384)
+        self.top_k = 10
+        self.model_name = "yolox_s.onnx"
         model_type = ('yolox', device)
 
         if model_type not in available_models:
@@ -568,13 +637,12 @@ class PatchifyYolox:
             else:
                 raise TypeError(f"wrong model for {model_type}")
 
-            self.model, self.preprocess = func("yolox_s.onnx", self.device)
+            self.model, self.preprocess = func(self.model_name, self.device)
 
             available_models[model_type] = (self.model, self.preprocess)
         else:
             self.model, self.preprocess = available_models[model_type]
 
-        self.nms = nms
         self.filter_bb = filter_bb
 
     def infer(self, image):
@@ -582,52 +650,27 @@ class PatchifyYolox:
         self.image_pil, self.image_pt, self.original_size = load_rcnn_image(image, size=self.size)
         # make cv2 format
         self.image = _PIL_to_opencv(self.image_pil)
-        self.batch = [self.preprocess(self.image)]
-       
-        self.results = self.model(self.batch)[0]
+        
+        self.results, self.ratio = _infer_yolox(session=self.model, 
+                            preprocess=self.preprocess, opencv_image=self.image, 
+                            input_shape=self.input_shape)
+
         
     def process(self):
-        self.areas = torch.tensor(calc_area(self.results['boxes'], self.size))
-        self.bboxes_pt = self.results['boxes'].detach().cpu()
-        
+
+        self.boxes_xyxy, self.scores =  _process_yolox(output=self.results, ratio=self.ratio, size=self.input_shape)
+
         if self.filter_bb:
-            inds = filter_boxes(self.bboxes_pt)
-            self.bboxes_pt = self.bboxes_pt.clone().detach()[inds]
-            self.areas = self.areas[inds]
-        if self.nms:
-            self.inds = torchvision.ops.nms(self.bboxes_pt, 1 - self.areas, 0.6)
-            self.bboxes_pt = self.bboxes_pt.clone().detach()[self.inds]
+            self.boxes_xyxy = _filter_yolox(self.boxes_xyxy, self.scores)
+
+        self.boxes_xyxy = _keep_topk(self.boxes_xyxy, k=self.top_k)
         # we add the original unchanged so that it is always in the index
         # the bb of the original also provides the size which is required for later processing
-        self.bboxes = [(0,0,self.size[0],self.size[1])] + self.bboxes_pt.numpy().astype(int).tolist()
-        self.patches = patchify_image(self.image, self.bboxes)
+        self.bboxes = [(0,0,self.size[0],self.size[1])] + self.boxes_xyxy.astype(int).tolist()
+        self.patches = patchify_image(self.image_pil, self.bboxes)
 
         self.bboxes_orig = [rescale_box(bb, self.size, self.original_size) for bb in self.bboxes]
 
-
-# def load_pretrained_yolox():
-#     input_shape = tuple(map(int, "384,384".split(',')))
-#     origin_img = cv2.imread(args.image_path)
-#     img, ratio = preprocess(origin_img, input_shape)
-
-#     session = onnxruntime.InferenceSession(args.model)
-
-#     ort_inputs = {session.get_inputs()[0].name: img[None, :, :, :]}
-#     output = session.run(None, ort_inputs)
-#     predictions = demo_postprocess(output[0], input_shape, p6=args.with_p6)[0]
-
-#     boxes = predictions[:, :4]
-#     scores = predictions[:, 4:5] * predictions[:, 5:]
-
-#     boxes_xyxy = np.ones_like(boxes)
-#     boxes_xyxy[:, 0] = boxes[:, 0] - boxes[:, 2]/2.
-#     boxes_xyxy[:, 1] = boxes[:, 1] - boxes[:, 3]/2.
-#     boxes_xyxy[:, 2] = boxes[:, 0] + boxes[:, 2]/2.
-#     boxes_xyxy[:, 3] = boxes[:, 1] + boxes[:, 3]/2.
-#     boxes_xyxy /= ratio
-#     dets = multiclass_nms(boxes_xyxy, scores, nms_thr=0.45, score_thr=0.1)
-#     if dets is not None:
-#         final_boxes, final_scores, final_cls_inds = dets[:, :4], dets[:, 4], dets[:, 5]
 
 def load_pretrained_mobilenet():
     """"
@@ -667,3 +710,15 @@ def load_pretrained_mobilenet320():
 
 # TODO add YOLOX https://github.com/Megvii-BaseDetection/YOLOX
 # TODO add onnx support https://pytorch.org/vision/0.12/generated/torchvision.models.detection.fasterrcnn_resnet50_fpn.html
+
+def filter_yolox_boxes(boxes, max_aspect_ratio: int = 4, min_area: int = 40*40):
+
+    inds = []
+    for ind,box in enumerate(boxes):
+        box = box.tolist()
+        area = (box[2]-box[0])*(box[3] - box[1])
+        if area > min_area:
+            inds.append(ind)
+    
+    return inds
+
