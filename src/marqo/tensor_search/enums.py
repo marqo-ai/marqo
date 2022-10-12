@@ -32,6 +32,10 @@ class TensorField:
     chunks = "__chunks"
     output_highlights = "_highlights"
     output_score = "_score"
+    # output fields:
+    tensor_facets = "_tensor_facets"
+    embedding = "_embedding"
+    found = "_found"
 
 class IndexSettingsField:
     index_settings = "index_settings"

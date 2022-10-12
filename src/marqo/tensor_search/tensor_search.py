@@ -36,12 +36,12 @@ import functools
 import pprint
 import typing
 import uuid
-import asyncio
-from typing import List, Optional, Union, Callable, Iterable, Sequence, Dict, Any
+from typing import List, Optional, Union, Iterable, Sequence, Dict, Any
 from PIL import Image
 from marqo.tensor_search.enums import MediaType, MlModel, TensorField, SearchMethod, OpenSearchDataType
 from marqo.tensor_search.enums import IndexSettingsField as NsField
 from marqo.tensor_search import utils, backend, validation, configs, parallel
+from marqo.tensor_search.formatting import _clean_doc
 from marqo.tensor_search.index_meta_cache import get_cache,get_index_info
 from marqo.tensor_search import index_meta_cache
 from marqo.tensor_search.models.index_info import IndexInfo
@@ -59,7 +59,6 @@ from marqo.config import Config
 from marqo import errors
 from marqo.s2_inference import errors as s2_inference_errors
 import threading
-import re
 
 from marqo.tensor_search.tensor_search_logging import get_logger
 logger = get_logger(__name__)
@@ -532,14 +531,51 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
     return translate_add_doc_response(response=index_parent_response, time_diff= t1 - t0)
 
 
-def get_document_by_id(config: Config, index_name:str, document_id: str):
+def get_document_by_id(
+        config: Config, index_name: str, document_id: str, show_vectors: bool = False):
     """returns document by its ID"""
     validation.validate_id(document_id)
     res = HttpRequests(config).get(
         f'{index_name}/_doc/{document_id}'
     )
     if "_source" in res:
-        return _clean_doc(res["_source"], doc_id=document_id)
+        return _clean_doc(res["_source"], doc_id=document_id, include_vectors=show_vectors)
+    else:
+        return res
+
+
+def get_documents_by_ids(
+        config: Config, index_name: str, document_ids: List[str],
+        show_vectors: bool = False,
+    ):
+    """returns documents by their IDs"""
+    if not isinstance(document_ids, typing.Collection):
+        raise errors.InvalidArgError("Get documents must be passed a collection of IDs!")
+    if len(document_ids) <= 0:
+        raise errors.InvalidArgError("Can't get empty collection of IDs!")
+    res = HttpRequests(config).get(
+        f'_mget/',
+        body={
+            "docs": [
+                {"_index": index_name, "_id": validation.validate_id(doc_id)}
+                for doc_id in document_ids
+            ]
+        }
+    )
+    if "docs" in res:
+        to_return = {
+            "results": []
+        }
+        for doc in res['docs']:
+            if not doc['found']:
+                to_return['results'].append({
+                    '_id': doc['_id'],
+                    TensorField.found: False})
+            else:
+                to_return['results'].append(
+                    {TensorField.found: True,
+                     ** _clean_doc(doc["_source"], doc_id=doc["_id"], include_vectors=show_vectors)})
+        return to_return
     else:
         return res
 
@@ -988,28 +1024,6 @@ def delete_index(config: Config, index_name):
     if index_name in get_cache():
         del get_cache()[index_name]
     return res
-
-
-def _clean_doc(doc: dict, doc_id=None) -> dict:
-    """clears tensor search specific fields from the doc
-
-    Args:
-        doc: the doc to clean
-        doc_id: if left as None, then the doc will be returned without the _id field
-
-    Returns:
-
-    """
-    copied = doc.copy()
-    if TensorField.doc_chunk_relation in copied:
-        del copied[TensorField.doc_chunk_relation]
-    if TensorField.chunk_ids in copied:
-        del copied[TensorField.chunk_ids]
-    if TensorField.chunks in copied:
-        del copied[TensorField.chunks]
-    if doc_id is not None:
-        copied['_id'] = doc_id
-    return copied
 
 
 def _select_model_from_media_type(media_type: Union[MediaType, str]) -> Union[MlModel, str]:
