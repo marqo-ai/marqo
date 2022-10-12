@@ -652,8 +652,11 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
         )
     else:
         raise errors.InvalidArgError(f"Search called with unknown search method: {search_method}")
+
+    logger.info("reranking using {}".format(reranker))
     
     if reranker is not None:
+        logger.info("reranking using {}".format(reranker))
         rerank.rerank_search_results(search_result=search_result, query=text, 
                     model_name=reranker, device=config.indexing_device, 
                 searchable_attributes=searchable_attributes, num_highlights=1 if simplified_format else num_highlights)
