@@ -11,7 +11,7 @@ Read about usage [here](https://marqo.pages.dev/Models-Reference/dense_retrieval
 Read about usage [here](https://marqo.pages.dev/API-Reference/documents/#get-multiple-documents)
 - Added the ability to get document tensor facets through the get document endpoint 
 ([#122](https://github.com/marqo-ai/marqo/pull/122)). 
-Read about usage [here](https://marqo.pages.dev/API-Reference/documents/#get-multiple-documents)
+Read about usage [here](https://marqo.pages.dev/API-Reference/documents/#example_2)
 
 # Release 0.0.4
 
