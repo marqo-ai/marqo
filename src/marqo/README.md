@@ -56,7 +56,7 @@ __Notes__:
 ### D. Pull marqo from `hub.docker.com` and run it
 ```
 docker rm -f marqo &&
-    docker run --name marqo --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:0.0.3
+    docker run --name marqo --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:0.0.5
 ```
 
 ### E. Run marqo on arm64 (including M-series Macs) for development
