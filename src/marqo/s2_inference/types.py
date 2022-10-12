@@ -12,3 +12,4 @@ from typing import (
     Iterable, 
     Type, 
     )
+VideoType = List[ImageType]

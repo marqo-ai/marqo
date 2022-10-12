@@ -21,3 +21,6 @@ onnx
 onnxruntime
 pandas
 optimum
+moviepy
+youtube-dl
+pafy
