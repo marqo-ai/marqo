@@ -230,37 +230,36 @@ class TestAddDocuments(MarqoTestCase):
             assert "status" in item
 
     def test_add_documents_validation(self):
-        """These bad docs should raise errors"""
+        """These bad docs should return errors"""
         bad_doc_args = [
-            [{
-                    "_id": "123",
-                    "id": {},
-            }],
-            [{
-                "blahblah": {1243}
-            }],
-            [{
-                "blahblah": None
-            }],
-            [{
-                "blahblah": [None], "hehehe": 123
-            },{
-                "some other obj": "finnne"
-            }],
-            [{
-                "blahblah": [None], "hehehe": 123
-            }, {
-                "some other obj": AssertionError  # wtf lad!!!
-            }],
-            [{
-                "blahblah": max  # a func!!!
-            }]
+            [{"_id": "to_fail_123", "id": {}}],
+            # strict checking: only allowed fields:
+            [{"_id": "to_fail_123", "my_field": dict()}],
+            [{"_id": "to_fail_123", "my_field": ["wow", "this", "is"]}],
+            [{"_id": "to_fail_123", "my_field": ["wow", "this", "is"]},
+             {"_id": "to_pass_123", "my_field": 'some_content'}],
+            [{"_id": "to_fail_123", "my_field": [{"abc": "678"}]}],
+            [{"_id": "to_fail_123", "my_field": {"abc": "234"}}],
+            [{"_id": "to_fail_123", "my_field": {"abc": "234"}},
+             {"_id": "to_pass_123", "my_field": 'some_content'}],
+            # other checking:
+            [{"blahblah": {1243}, "_id": "to_fail_123"}],
+            [{"blahblah": None, "_id": "to_fail_123"}],
+            [{"_id": "to_fail_123", "blahblah": [None], "hehehe": 123},
+             {"_id": "to_fail_567", "some other obj": "finnne", 123: "heehee"}],
+            [{"_id": "to_fail_123", "blahblah": [None], "hehehe": 123},
+             {"_id": "to_fail_567", "some other obj": AssertionError}],
+            [{"_id": "to_fail_567", "blahblah": max}]
         ]
-        for bad_doc_arg in bad_doc_args:
-            add_res = tensor_search.add_documents(config=self.config, index_name=self.index_name_1,
-                                                  docs=bad_doc_arg, auto_refresh=True)
-            assert any(['error' in item for item in add_res['items']])
-
+        for update_mode in ('replace', 'update'):
+            for bad_doc_arg in bad_doc_args:
+                add_res = tensor_search.add_documents(
+                    config=self.config, index_name=self.index_name_1,
+                    docs=bad_doc_arg, auto_refresh=True, update_mode=update_mode)
+                assert add_res['errors'] is True
+                assert all(['error' in item for item in add_res['items'] if item['_id'].startswith('to_fail')])
+                assert all(['result' in item
+                            for item in add_res['items'] if item['_id'].startswith('to_pass')])
 
     def test_add_documents_set_device(self):
         """calling search with a specified device overrides device defined in config"""
