@@ -312,10 +312,10 @@ def load_owl_vit(model_name: str, device: str = 'cpu') -> Dict:
 
     if model_cache_key in available_models:
         logger.info(f"loading {model_cache_key} from cache...")
-        model, processor = available_models[('owl', device)] 
+        model, processor = available_models[model_cache_key] 
     else:
         processor = OwlViTProcessor.from_pretrained(model_name)
-        model = OwlViTForObjectDetection.from_pretrained(model_name)
+        model = OwlViTForObjectDetection.from_pretrained(model_name).to(device)
         available_models[model_cache_key] = model, processor
 
     model.eval()

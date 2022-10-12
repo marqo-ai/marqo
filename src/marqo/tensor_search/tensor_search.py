@@ -658,7 +658,7 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
     if reranker is not None:
         logger.info("reranking using {}".format(reranker))
         rerank.rerank_search_results(search_result=search_result, query=text, 
-                    model_name=reranker, device=config.indexing_device, 
+                    model_name=reranker, device=config.indexing_device if device is None else device, 
                 searchable_attributes=searchable_attributes, num_highlights=1 if simplified_format else num_highlights)
 
     time_taken = datetime.datetime.now() - t0

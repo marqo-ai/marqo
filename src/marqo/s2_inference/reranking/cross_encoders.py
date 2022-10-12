@@ -377,8 +377,8 @@ class ReRankerOwl(ReRanker):
     def load_model(self):
         
         self._remapped_name = self._model_map[self.model_name]
-        logger.info(f"loading model={self._remapped_name} from input name={self.model_name}")
-        loaded = load_owl_vit(self._remapped_name, self.device)
+        logger.info(f"loading model={self._remapped_name} from input name={self.model_name} to device {self.device}")
+        loaded = load_owl_vit(self._remapped_name, device=self.device)
         self.model = loaded['model']
         self.processor = loaded['processor']
 
@@ -427,7 +427,7 @@ class ReRankerOwl(ReRanker):
 
         # # TODO find out why batching images does not work 
         for image, content, _query, orig_size in zip(self.images, image_names, queries, self.original_sizes):
-            self.processed_inputs = _process_owl_inputs(self.processor, _query, image)
+            self.processed_inputs = _process_owl_inputs(self.processor, _query, image).to(self.device)
             owl_results = _predict_owl(self.model, self.processed_inputs, 
                                 post_process_function=self.processor.post_process,
                         size=self.image_size)
