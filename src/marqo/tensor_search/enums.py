@@ -5,7 +5,20 @@ from fastapi_utils.enums import StrEnum
 class MediaType:
     text = 'text'
     image = 'image'
+    video = 'video'
     default = 'text'
+
+class FileType:
+    youtube = "youtube"
+    tiktok = "tiktok"
+    url = "url"
+    local = "local_path"
+    straight_text = "straight_text"
+    ndarray = "ndarray"
+    PILImage = "PILImage"
+    ListOfPILImage = "ListOfPILImage"
+    default = "url"
+
 
 
 class MlModel:
