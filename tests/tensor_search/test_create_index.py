@@ -2,7 +2,6 @@ import json
 import pprint
 import requests
 from marqo.tensor_search.enums import IndexSettingsField
-from marqo.client import Client
 from marqo.errors import MarqoApiError, MarqoError, IndexNotFoundError
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search import configs
@@ -13,15 +12,11 @@ from marqo.tensor_search.enums import IndexSettingsField as NsField
 class TestCreateIndex(MarqoTestCase):
 
     def setUp(self) -> None:
-        mq = Client(**self.client_settings)
-        self.endpoint = mq.config.url
-        self.config = mq.config
-        self.client = mq
-
+        self.endpoint = self.authorized_url
         self.generic_header = {"Content-type": "application/json"}
         self.index_name_1 = "my-test-create-index-1"
         try:
-            self.client.delete_index(self.index_name_1)
+            tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         except IndexNotFoundError as s:
             pass
 

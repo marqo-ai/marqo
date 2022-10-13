@@ -1,4 +1,3 @@
-from marqo.client import Client
 from marqo.errors import MarqoApiError, IndexNotFoundError
 from marqo.tensor_search import tensor_search, index_meta_cache
 import copy
@@ -9,10 +8,8 @@ class TestDeleteIndex(MarqoTestCase):
 
     def setUp(self) -> None:
         self.generic_header = {"Content-type": "application/json"}
-        self.client = Client(**self.client_settings)
         self.index_name_1 = "my-test-index-owwoowow2"
         self.index_name_2 ="test-index-epic"
-        self.config = copy.deepcopy(self.client.config)
         self._delete_indices()
 
     def tearDown(self) -> None:
@@ -22,7 +19,7 @@ class TestDeleteIndex(MarqoTestCase):
         """Helper to just delete testing indices"""
         for ix_name in [self.index_name_1, self.index_name_2]:
             try:
-                self.client.delete_index(ix_name)
+                tensor_search.delete_index(config=self.config, index_name=ix_name)
             except IndexNotFoundError as s:
                 pass
 

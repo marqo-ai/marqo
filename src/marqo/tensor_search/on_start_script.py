@@ -1,9 +1,16 @@
 from marqo.tensor_search.tensor_search_logging import get_logger
 import time
+from marqo.tensor_search import index_meta_cache
+from marqo import config
+from marqo.tensor_search.web import api_utils
+from marqo._httprequests import HttpRequests
 
-def on_start():
+
+def on_start(marqo_os_url: str):
         
-    to_run_on_start = (DownloadStartText(), 
+    to_run_on_start = (
+                        PopulateCache(marqo_os_url),
+                        DownloadStartText(),
                         CUDAAvailable(), 
                         ModelsForCacheing(), 
                         NLTK(), 
@@ -14,6 +21,24 @@ def on_start():
 
     for thing_to_start in to_run_on_start:
         thing_to_start.run()
+
+
+class PopulateCache:
+
+    def __init__(self, marqo_os_url: str):
+        """Populates the cache"""
+        c = config.Config(api_utils.upconstruct_authorized_url(
+            opensearch_url=marqo_os_url
+        ))
+        index_meta_cache.populate_cache(c)
+        connection = HttpRequests(c)
+        # the following lines turns off auto create index
+        # connection.put(
+        #     path="_cluster/settings",
+        #     body={
+        #         "persistent": {"action.auto_create_index": "false"}
+        #     })
+
 
 class CUDAAvailable:
 

@@ -6,7 +6,6 @@ import requests
 from marqo.tensor_search import enums, backend, utils
 from marqo.tensor_search import tensor_search
 from marqo.errors import MarqoApiError, IndexNotFoundError
-from marqo.client import Client
 from tests.marqo_test import MarqoTestCase
 from unittest import mock
 
@@ -14,15 +13,10 @@ from unittest import mock
 class TestBackend(MarqoTestCase):
 
     def setUp(self) -> None:
-        mq = Client(**self.client_settings)
-        self.endpoint = mq.config.url
-        self.config = mq.config
-        self.client = mq
-
         self.generic_header = {"Content-type": "application/json"}
         self.index_name_1 = "my-test-index-1"
         try:
-            self.client.delete_index(self.index_name_1)
+            tensor_search.delete_index(self.config, self.index_name_1)
         except IndexNotFoundError as s:
             pass
 

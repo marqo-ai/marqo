@@ -3,7 +3,6 @@ from unittest import mock
 from marqo import config
 from marqo import enums
 import torch
-from marqo.client import Client
 from tests.marqo_test import MarqoTestCase
 
 

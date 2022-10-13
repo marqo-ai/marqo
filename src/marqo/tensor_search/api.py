@@ -43,7 +43,7 @@ OPENSEARCH_URL = replace_host_localhosts(
     os.environ["OPENSEARCH_URL"])
 
 
-on_start()
+on_start(OPENSEARCH_URL)
 app = FastAPI()
 
 
@@ -194,6 +194,15 @@ async def refresh_index(index_name: str, marqo_config: config.Config = Depends(g
     return tensor_search.refresh_index(
         index_name=index_name, config=marqo_config,
     )
+
+
+@app.get("/health")
+async def check_health(marqo_config: config.Config = Depends(generate_config)):
+    return tensor_search.refresh_index(
+        config=marqo_config,
+    )
+
+
 
 # try these curl commands:
 

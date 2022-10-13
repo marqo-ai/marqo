@@ -5,15 +5,12 @@ from marqo.config import Config
 from marqo.errors import IndexNotFoundError
 from tests.marqo_test import MarqoTestCase
 import requests
-from marqo.client import Client
 
 
 class TestDeleteDocuments(MarqoTestCase):
 
     def setUp(self) -> None:
-        c = Client(**self.client_settings)
-        self.endpoint = c.config.url
-        self.config = c.config
+        self.endpoint = self.authorized_url
 
         self.generic_header = {"Content-type": "application/json"}
         self.index_name_1 = "my-test-index-1"

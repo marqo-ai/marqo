@@ -1019,6 +1019,36 @@ def _vector_text_search(
         return format_ordered_docs_preserving(ordered_docs_w_chunks=completely_sorted, num_highlights=number_of_highlights)
 
 
+def check_health(config: Config):
+
+    marqo_status = "green"
+
+    statuses = {
+        "green": 0,
+        "yellow": 1,
+        "red": 2
+    }
+
+    marqo_os_health_check = None
+    # catch some sort of error here:
+    marqo_os_health_check = HttpRequests(config).get(path="_cluster/health")
+
+    if marqo_os_health_check is not None:
+        if "status" in marqo_os_health_check:
+            marqo_os_status = marqo_os_health_check['status']
+        else:
+            marqo_os_status = "red"
+    else:
+        marqo_os_status = "red"
+
+    marqo_status = marqo_status if statuses[marqo_status] >= statuses[marqo_os_status] else marqo_os_status
+
+    return {
+        "status": marqo_status,
+        "marqo-os-status": marqo_os_status
+    }
+
+
 def delete_index(config: Config, index_name):
     res = HttpRequests(config).delete(path=index_name)
     if index_name in get_cache():
