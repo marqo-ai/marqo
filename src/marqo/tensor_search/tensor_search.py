@@ -38,8 +38,10 @@ import typing
 import uuid
 import asyncio
 from typing import List, Optional, Union, Callable, Iterable, Sequence, Dict, Any
+
+import PIL.Image
 from PIL import Image
-from marqo.tensor_search.enums import MediaType, MlModel, TensorField, SearchMethod, OpenSearchDataType
+from marqo.tensor_search.enums import MediaType, MlModel, TensorField, SearchMethod, OpenSearchDataType, FileType
 from marqo.tensor_search.enums import IndexSettingsField as NsField
 from marqo.tensor_search import utils, backend, validation, configs, parallel
 from marqo.tensor_search.index_meta_cache import get_cache,get_index_info
@@ -48,9 +50,12 @@ from marqo.tensor_search.models.index_info import IndexInfo
 from marqo.tensor_search import constants
 from marqo.s2_inference.processing import text as text_processor
 from marqo.s2_inference.processing import image as image_processor
+from marqo.s2_inference.processing import video as video_processor
 from marqo.s2_inference.clip_utils import _is_image
 from marqo.s2_inference.reranking import rerank
 from marqo.s2_inference import s2_inference
+from moviepy.editor import VideoFileClip
+import cv2
 
 # We depend on _httprequests.py for now, but this may be replaced in the future, as
 # _httprequests.py is designed for the client
@@ -60,6 +65,7 @@ from marqo import errors
 from marqo.s2_inference import errors as s2_inference_errors
 import threading
 import re
+from marqo.tensor_search.utils import content_routering
 
 from marqo.tensor_search.tensor_search_logging import get_logger
 logger = get_logger(__name__)
@@ -361,24 +367,39 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
             # TODO put this into a function to determine routing
             if isinstance(field_content, (str, Image.Image)):
                 #whether its a valid input
-                
-                # TODO: better/consistent handling of a no-op for processing (but still vectorize)
-                if isinstance(field_content, str) and not _is_image(field_content):
-                    #preprocessing the text
-                    
-                    split_by = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][NsField.split_method]
-                    split_length = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][NsField.split_length]
-                    split_overlap = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][NsField.split_overlap]
-                    content_chunks = text_processor.split_text(field_content, split_by=split_by, split_length=split_length, split_overlap=split_overlap)
-                    text_chunks = content_chunks
-                else:
-                    #preprocessing the image
-                    # TODO put the logic for getting field parameters into a function and add per field options
-                    image_method = index_info.index_settings[NsField.index_defaults][NsField.image_preprocessing][NsField.patch_method]
-                    # the chunk_image contains the no-op logic as of now - method = None will be a no-op
+
+                infer_if_media = index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]
+
+                field_content, mediatype, filetype = content_routering(field_content, infer_if_media)
+
+                if mediatype == MediaType.text:
+                    #We can add more combinations of MediaType and FieldType combinations later.
+
+                    if filetype == FileType.straight_text:
+                        pass
+                    else:
+                        TypeError(f"We do not support the file type {filetype} for media {mediatype}")
+
+                    if filetype == FileType.straight_text:
+                        split_by = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][
+                            NsField.split_method]
+                        split_length = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][NsField.split_length]
+                        split_overlap = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][NsField.split_overlap]
+                        content_chunks = text_processor.split_text(field_content, split_by=split_by, split_length=split_length, split_overlap=split_overlap)
+                        text_chunks = content_chunks
+
+                elif mediatype == MediaType.image:
+                    if filetype == FileType.url or filetype == FileType.local:
+                        field_content = PIL.Image.OPEN(field_content)
+                    elif filetype == FileType.PILImage:
+                        pass
+                    else:
+                        TypeError(f"We do not support the file type {filetype} for media {mediatype}")
                     try:
                         # in the future, if we have different chunking methods, make sure we catch possible
                         # errors of different types generated here, too.
+                        image_method = index_info.index_settings[NsField.index_defaults][NsField.image_preprocessing][
+                            NsField.patch_method]
                         content_chunks, text_chunks = image_processor.chunk_image(
                             field_content, device=selected_device, method=image_method)
                     except s2_inference_errors.S2InferenceError:
@@ -389,6 +410,44 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                                  'code': image_err.code})
                         )
                         break
+
+                elif mediatype == MediaType.video:
+                    if filetype == FileType.url or filetype.local:
+                        field_content = VideoFileClip(field_content)
+                    elif filetype == filetype.ListOfPILImage:
+                        pass
+                    else:
+                        TypeError(f"We do not support the file type {filetype} for media {mediatype}")
+                    content_chunks, text_chunks = video_processor.chunk_video(field_content, device=selected_device)
+
+
+                # TODO: better/consistent handling of a no-op for processing (but still vectorize)
+                # if isinstance(field_content, str) and not _is_image(field_content):
+                #     #preprocessing the text
+                #
+                #     split_by = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][NsField.split_method]
+                #     split_length = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][NsField.split_length]
+                #     split_overlap = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][NsField.split_overlap]
+                #     content_chunks = text_processor.split_text(field_content, split_by=split_by, split_length=split_length, split_overlap=split_overlap)
+                #     text_chunks = content_chunks
+                # else:
+                #     #preprocessing the image
+                #     # TODO put the logic for getting field parameters into a function and add per field options
+                #     image_method = index_info.index_settings[NsField.index_defaults][NsField.image_preprocessing][NsField.patch_method]
+                #     # the chunk_image contains the no-op logic as of now - method = None will be a no-op
+                #     try:
+                #         # in the future, if we have different chunking methods, make sure we catch possible
+                #         # errors of different types generated here, too.
+                #         content_chunks, text_chunks = image_processor.chunk_image(
+                #             field_content, device=selected_device, method=image_method)
+                #     except s2_inference_errors.S2InferenceError:
+                #         document_is_valid = False
+                #         image_err = errors.InvalidArgError(message=f'Could not process given image: {field_content}')
+                #         unsuccessful_docs.append(
+                #             (i, {'_id': doc_id, 'error': image_err.message, 'status': int(image_err.status_code),
+                #                  'code': image_err.code})
+                #         )
+                #         break
                 
                 normalize_embeddings = index_info.index_settings[NsField.index_defaults][NsField.normalize_embeddings]
                 infer_if_image = index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]

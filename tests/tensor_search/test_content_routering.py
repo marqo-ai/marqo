@@ -3,12 +3,11 @@ from tests.marqo_test import MarqoTestCase
 import unittest
 import numpy as np
 
+
 class TestContentRoutering(unittest.TestCase):
 
     def setUp(self) -> None:
-
         pass
-
 
     def validation_test(self):
         validation_test_example = {
@@ -35,8 +34,8 @@ class TestContentRoutering(unittest.TestCase):
 
             # A video from ndarray
             "video": np.random.randn(8, 200, 500, 3),
-        }
 
+        }
 
         for types, inputs in validation_test_example.items():
             predicted_type = content_routering(inputs)
@@ -55,7 +54,3 @@ class TestContentRoutering(unittest.TestCase):
                 predicted_type = content_routering(inputs)
             except TypeError:
                 pass
-
-
-
-

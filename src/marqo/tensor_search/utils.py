@@ -13,8 +13,12 @@ import mimetypes
 from PIL.Image import Image as ImageType
 from numpy import ndarray
 from urllib.parse import urlparse
-from enums import MediaType, FileType
+from marqo.tensor_search.enums import MediaType, FileType
 import os
+from marqo.tensor_search.enums import MediaType, FileType
+from typing import Tuple
+import requests, re
+import wget
 
 
 def dicts_to_jsonl(dicts: List[dict]) -> str:
@@ -184,35 +188,47 @@ def convert_to_FileType(type_str = "default") -> FileType:
         raise TypeError(f"Unsupported filetype for {type_str}")
 
 
-def content_routering(field_content) -> str:
+
+def get_filename_from_cd(cd):
+    """
+    Get filename from content-disposition
+    """
+    if not cd:
+        return None
+    fname = re.findall('filename=(.+)', cd)
+    if len(fname) == 0:
+        return None
+    return fname[0]
+
+def content_routering(field_content, infer_if_media = True):
     if isinstance(field_content, str):
-        if validators.url(field_content):
-            try:
+        if infer_if_media:
+            if validators.url(field_content):
+                try:
+                    downloaded_file = wget.download(field_content)
+                    file_type, encoding = mimetypes.guess_type(downloaded_file)
+                except:
+                    r = requests.get(field_content, stream= True, allow_redirects=True)
+                    downloaded_file = get_filename_from_cd(r.headers.get('content-disposition'))
+                    open(downloaded_file, 'wb').write(r.content)
+                    file_type, encoding = mimetypes.guess_type(downloaded_file)
+
+                if file_type:
+                    main_type = file_type.split("/")[0]
+                    return downloaded_file, convert_to_MediaType(main_type), convert_to_FileType()
+                else:
+                    raise TypeError(f"We can't recognize the Type of input url {field_content}")
+            elif os.path.isfile(field_content):
                 file_type, encoding = mimetypes.guess_type(field_content)
                 main_type = file_type.split("/")[0]
-                return [convert_to_MediaType(main_type), convert_to_FileType()]
-            except AttributeError:
-                netloc = urlparse(field_content).netloc
-                return [MediaType.video, convert_to_FileType(netloc)]
+                return field_content, convert_to_MediaType(main_type), FileType.local,
+            else:
+                return field_content, MediaType.text, FileType.straight_text
 
-        elif os.path.isfile(field_content):
-            file_type, encoding = mimetypes.guess_type(field_content)
-            main_type = file_type.split("/")[0]
-            return [convert_to_MediaType(main_type), FileType.local]
         else:
-            return [MediaType.text, FileType.straight_text]
+            return field_content, MediaType.text, FileType.straight_text
 
     elif isinstance(field_content, ImageType):
-        return [MediaType.image,FileType.PILImage]
-
-    elif isinstance(field_content, list) and all(isinstance(i, ImageType) for i in field_content):
-        return [MediaType.video, FileType.ListOfPILImage]
-
-    elif isinstance(field_content, ndarray):
-        if len(field_content.shape) == 4:
-            return [MediaType.video, FileType.ndarray]
-        elif len(field_content.shape) == 3:
-            return [MediaType.video, FileType.ndarray]
-
+        return field_content, MediaType.image,FileType.PILImage
     else:
         raise TypeError(f"The input type {type(field_content)} is supported.")
