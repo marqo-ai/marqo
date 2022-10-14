@@ -418,7 +418,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                     elif filetype == filetype.ListOfPILImage:
                         pass
                     else:
-                        TypeError(f"We do not support the file type {filetype} for media {mediatype}")
+                        raise TypeError(f"We do not support the file type {filetype} for media {mediatype}")
                     content_chunks, text_chunks = video_processor.chunk_video(field_content, device=selected_device)
 
 
