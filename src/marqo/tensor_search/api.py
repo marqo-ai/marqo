@@ -104,7 +104,7 @@ async def create_index(index_name: str, settings: Dict = None, marqo_config: con
 
 
 @app.post("/indexes/{index_name}/search")
-async def search(search_query: SearchQuery, index_name: str, device: str = Depends(api_validation.validate_device),
+def search(search_query: SearchQuery, index_name: str, device: str = Depends(api_validation.validate_device),
                  marqo_config: config.Config = Depends(generate_config)):
     return tensor_search.search(
         config=marqo_config, text=search_query.q,
@@ -118,7 +118,7 @@ async def search(search_query: SearchQuery, index_name: str, device: str = Depen
 
 
 @app.post("/indexes/{index_name}/documents")
-async def add_documents(docs: List[Dict], index_name: str, refresh: bool = True,
+def add_or_replace_documents(docs: List[Dict], index_name: str, refresh: bool = True,
                         marqo_config: config.Config = Depends(generate_config),
                         batch_size: int = 0, processes: int = 1,
                         device: str = Depends(api_validation.validate_device)):
@@ -133,7 +133,7 @@ async def add_documents(docs: List[Dict], index_name: str, refresh: bool = True,
 
 
 @app.put("/indexes/{index_name}/documents")
-async def add_documents(docs: List[Dict], index_name: str, refresh: bool = True,
+def add_or_update_documents(docs: List[Dict], index_name: str, refresh: bool = True,
                         marqo_config: config.Config = Depends(generate_config),
                         batch_size: int = 0, processes: int = 1,
                         device: str = Depends(api_validation.validate_device)):
@@ -190,7 +190,7 @@ async def delete_docs(index_name: str, documentIds: List[str], refresh: bool = T
 
 
 @app.post("/indexes/{index_name}/refresh")
-async def refresh_index(index_name: str, marqo_config: config.Config = Depends(generate_config)):
+def refresh_index(index_name: str, marqo_config: config.Config = Depends(generate_config)):
     return tensor_search.refresh_index(
         index_name=index_name, config=marqo_config,
     )

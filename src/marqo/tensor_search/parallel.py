@@ -196,12 +196,13 @@ def add_documents_mp(config=None, index_name=None, docs=None,
     # get the device ids for each process based on the process count and available devices
     device_ids = get_device_ids(n_processes, selected_device)
 
-    start  = time.time()
+    start = time.time()
 
-    chunkers = [IndexChunk(config=config, index_name=index_name, docs=_docs,
-                            auto_refresh=auto_refresh, batch_size=batch_size, update_mode=update_mode,
-                            process_id=p_id, device=device_ids[p_id], threads_per_process=threads_per_process)
-                            for p_id,_docs in enumerate(np.array_split(docs, n_processes))]
+    chunkers = [IndexChunk(
+            config=config, index_name=index_name, docs=_docs,
+            auto_refresh=auto_refresh, batch_size=batch_size, update_mode=update_mode,
+            process_id=p_id, device=device_ids[p_id], threads_per_process=threads_per_process)
+        for p_id,_docs in enumerate(np.array_split(docs, n_processes))]
     logger.info(f'Performing parallel now across devices {device_ids}...')
     with mp.Pool(n_processes) as pool:
         results = pool.map(_run_chunker, chunkers)

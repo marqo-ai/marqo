@@ -16,7 +16,6 @@ from marqo.errors import (
     InvalidIndexNameError,
     HardwareCompatabilityError
 )
-from marqo.version import qualified_version
 
 ALLOWED_OPERATIONS = {requests.delete, requests.get, requests.post, requests.put}
 

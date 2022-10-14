@@ -24,11 +24,15 @@ def on_start(marqo_os_url: str):
 
 
 class PopulateCache:
+    """Populates the cache on start"""
 
     def __init__(self, marqo_os_url: str):
-        """Populates the cache"""
+        self.marqo_os_url = marqo_os_url
+        pass
+
+    def run(self):
         c = config.Config(api_utils.upconstruct_authorized_url(
-            opensearch_url=marqo_os_url
+            opensearch_url=self.marqo_os_url
         ))
         index_meta_cache.populate_cache(c)
         connection = HttpRequests(c)

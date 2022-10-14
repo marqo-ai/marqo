@@ -163,6 +163,7 @@ def _autofill_index_settings(index_settings: dict):
 
 
 def get_stats(config: Config, index_name: str):
+    print(f"STATS ENDPOINT CALLEDJKKHJBJHBBJH. Index name is {index_name}. ")
     doc_count = HttpRequests(config).post(path=F"{index_name}/_count")["count"]
     return {
         "numberOfDocuments": doc_count
@@ -285,6 +286,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
     Returns:
 
     """
+    print("STARTING ADD DOCS JKNJKNBHJJBHBHJ")
     t0 = datetime.datetime.now()
     bulk_parent_dicts = []
 
@@ -361,6 +363,14 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
             if isinstance(field_content, (str, Image.Image)):
                 
                 # TODO: better/consistent handling of a no-op for processing (but still vectorize)
+
+                # 1. check if urls should be downloaded -> "treat_pointers_and_urls_as_images":True
+                # 2. check if it is a url or pointer
+                # 3. If yes in 1 and 2, download blindly (without type)
+                # 4. Determine media type of downloaded
+                # 5. load correct media type into memory -> PIL (images), videos (), audio (torchaudio)
+                # 6. if chunking -> then add the extra chunker
+
                 if isinstance(field_content, str) and not _is_image(field_content):
                     
                     split_by = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][NsField.split_method]
@@ -494,7 +504,8 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
     else:
         index_parent_response = None
 
-    if auto_refresh:
+    print("UNDO THE FOLLOWING:")
+    if True:
         refresh_response = HttpRequests(config).post(path=F"{index_name}/_refresh")
 
     t1 = datetime.datetime.now()
@@ -528,6 +539,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
         result_dict["items"] = new_items
         return result_dict
 
+    print(f"END OF ADD DOCS jknvvjknkjnvr. Index name: {index_name}. Added {len(docs)} new docs.")
     return translate_add_doc_response(response=index_parent_response, time_diff= t1 - t0)
 
 
@@ -615,6 +627,7 @@ def delete_documents(config: Config, index_name: str, doc_ids: List[str], auto_r
 
 
 def refresh_index(config: Config,  index_name: str):
+    print(f"REFRESH INDEX CALLED... index name={index_name}")
     return HttpRequests(config).post(path=F"{index_name}/_refresh")
 
 
