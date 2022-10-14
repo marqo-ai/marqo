@@ -378,7 +378,8 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                     if filetype == FileType.straight_text:
                         pass
                     else:
-                        TypeError(f"We do not support the file type {filetype} for media {mediatype}")
+                        raise TypeError(f"We do not support the file type {filetype} for media {mediatype}")
+
 
                     if filetype == FileType.straight_text:
                         split_by = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][
