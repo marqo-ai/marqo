@@ -208,12 +208,12 @@ def content_routering(field_content, infer_if_media = True):
                     downloaded_file = wget.download(field_content)
                     file_type, encoding = mimetypes.guess_type(downloaded_file)
                 except:
-                    r = requests.get(field_content, stream= True, allow_redirects=True).raw
-                    downloaded_file = get_filename_from_cd(r.headers.get('content-disposition'))
-                    open(downloaded_file, 'wb').write(r.content)
-                    if downloaded_file and r:
+                    try:
+                        r = requests.get(field_content, stream= True, allow_redirects=True).raw
+                        downloaded_file = get_filename_from_cd(r.headers.get('content-disposition'))
+                        open(downloaded_file, 'wb').write(r.content)
                         file_type, encoding = mimetypes.guess_type(downloaded_file)
-                    else:
+                    except:
                         raise TypeError(f"The url {field_content} is not downloadable.")
 
 
