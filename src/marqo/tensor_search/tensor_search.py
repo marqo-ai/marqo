@@ -395,7 +395,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                     elif filetype == FileType.PILImage:
                         pass
                     else:
-                        TypeError(f"We do not support the file type {filetype} for media {mediatype}")
+                        raise TypeError(f"We do not support the file type {filetype} for media {mediatype}")
                     try:
                         # in the future, if we have different chunking methods, make sure we catch possible
                         # errors of different types generated here, too.
