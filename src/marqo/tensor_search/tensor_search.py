@@ -370,7 +370,16 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
                 infer_if_media = index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]
 
-                field_content, mediatype, filetype = content_routering(field_content, infer_if_media)
+                try:
+                    field_content, mediatype, filetype = content_routering(field_content, infer_if_media)
+                except:
+                    routering_error = errors.InvalidArgError(message=f'Could not process given image: {field_content}')
+                    unsuccessful_docs.append(
+                        (i, {'_id': doc_id, 'error': routering_error.message, 'status': int(routering_error.status_code),
+                             'code': image_err.code})
+                    )
+                    break
+
 
                 if mediatype == MediaType.text:
                     #We can add more combinations of MediaType and FieldType combinations later.
