@@ -209,7 +209,7 @@ def content_routering(field_content, infer_if_media = True):
                     file_type, encoding = mimetypes.guess_type(downloaded_file)
                 except:
                     try:
-                        r = requests.get(field_content, stream= True, allow_redirects=True).raw
+                        r = requests.get(field_content, stream = True, allow_redirects=True).raw
                         downloaded_file = get_filename_from_cd(r.headers.get('content-disposition'))
                         open(downloaded_file, 'wb').write(r.content)
                         file_type, encoding = mimetypes.guess_type(downloaded_file)
