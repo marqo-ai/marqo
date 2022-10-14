@@ -376,7 +376,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                     routering_error = errors.InvalidArgError(message=f'Could not process given image: {field_content}')
                     unsuccessful_docs.append(
                         (i, {'_id': doc_id, 'error': routering_error.message, 'status': int(routering_error.status_code),
-                             'code': image_err.code})
+                             'code': routering_error.code})
                     )
                     break
 
