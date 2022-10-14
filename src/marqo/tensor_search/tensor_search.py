@@ -373,6 +373,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                 try:
                     field_content, mediatype, filetype = content_routering(field_content, infer_if_media)
                 except:
+                    document_is_valid = False
                     routering_error = errors.InvalidArgError(message=f'Could not process given image: {field_content}')
                     unsuccessful_docs.append(
                         (i, {'_id': doc_id, 'error': routering_error.message, 'status': int(routering_error.status_code),
