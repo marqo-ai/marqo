@@ -22,13 +22,13 @@ class TestCreateIndex(MarqoTestCase):
 
     def tearDown(self) -> None:
         try:
-            self.client.delete_index(self.index_name_1)
+            tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         except IndexNotFoundError as s:
             pass
 
     def test_create_vector_index_default_index_settings(self):
         try:
-            self.client.delete_index(self.index_name_1)
+            tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         except IndexNotFoundError as s:
             pass
         # test that index is deleted:
@@ -37,7 +37,7 @@ class TestCreateIndex(MarqoTestCase):
             raise AssertionError
         except IndexNotFoundError as e:
             pass
-        self.client.create_index(index_name=self.index_name_1)
+        tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         settings = requests.get(
             url=f"{self.endpoint}/{self.index_name_1}/_mapping",
             verify=False
@@ -48,7 +48,7 @@ class TestCreateIndex(MarqoTestCase):
 
     def test_create_vector_index_custom_index_settings(self):
         try:
-            self.client.delete_index(self.index_name_1)
+            tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         except IndexNotFoundError as s:
             pass
         # test that index is deleted:
@@ -61,7 +61,7 @@ class TestCreateIndex(MarqoTestCase):
             IndexSettingsField.treat_urls_and_pointers_as_images: True,
             IndexSettingsField.normalize_embeddings: False
         }
-        self.client.create_index(index_name=self.index_name_1, **custom_settings)
+        tensor_search.create_vector_index(index_name=self.index_name_1, **custom_settings)
         settings = requests.get(
             url=self.endpoint + "/" + self.index_name_1 + "/_mapping",
             verify=False

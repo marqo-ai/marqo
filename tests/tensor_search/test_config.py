@@ -1,9 +1,9 @@
 import unittest
 from unittest import mock
 from marqo import config
-from marqo import enums
 import torch
 from tests.marqo_test import MarqoTestCase
+from marqo.tensor_search import enums
 
 
 class TestConfig(MarqoTestCase):
@@ -24,8 +24,8 @@ class TestConfig(MarqoTestCase):
         def run():
             c = config.Config(url=self.endpoint, indexing_device='cuda' if torch.cuda.is_available() else 'cpu', 
                                     search_device='cuda' if torch.cuda.is_available() else 'cpu')
-            assert c.indexing_device == enums.Devices.cuda, f"{enums.Devices.cuda} {c.indexing_device}"
-            assert c.search_device == enums.Devices.cuda
+            assert c.indexing_device == enums.Device.cuda, f"{enums.Device.cuda} {c.indexing_device}"
+            assert c.search_device == enums.Device.cuda
             return True
         assert run()
 

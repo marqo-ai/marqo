@@ -163,7 +163,6 @@ def _autofill_index_settings(index_settings: dict):
 
 
 def get_stats(config: Config, index_name: str):
-    print(f"STATS ENDPOINT CALLEDJKKHJBJHBBJH. Index name is {index_name}. ")
     doc_count = HttpRequests(config).post(path=F"{index_name}/_count")["count"]
     return {
         "numberOfDocuments": doc_count
@@ -286,7 +285,6 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
     Returns:
 
     """
-    print("STARTING ADD DOCS JKNJKNBHJJBHBHJ")
     t0 = datetime.datetime.now()
     bulk_parent_dicts = []
 
@@ -504,8 +502,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
     else:
         index_parent_response = None
 
-    print("UNDO THE FOLLOWING:")
-    if True:
+    if auto_refresh:
         refresh_response = HttpRequests(config).post(path=F"{index_name}/_refresh")
 
     t1 = datetime.datetime.now()
@@ -539,7 +536,6 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
         result_dict["items"] = new_items
         return result_dict
 
-    print(f"END OF ADD DOCS jknvvjknkjnvr. Index name: {index_name}. Added {len(docs)} new docs.")
     return translate_add_doc_response(response=index_parent_response, time_diff= t1 - t0)
 
 
@@ -627,7 +623,6 @@ def delete_documents(config: Config, index_name: str, doc_ids: List[str], auto_r
 
 
 def refresh_index(config: Config,  index_name: str):
-    print(f"REFRESH INDEX CALLED... index name={index_name}")
     return HttpRequests(config).post(path=F"{index_name}/_refresh")
 
 

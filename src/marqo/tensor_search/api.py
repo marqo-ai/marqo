@@ -47,14 +47,14 @@ on_start(OPENSEARCH_URL)
 app = FastAPI()
 
 
-async def generate_config() -> config.Config:
+def generate_config() -> config.Config:
     return config.Config(api_utils.upconstruct_authorized_url(
         opensearch_url=OPENSEARCH_URL
     ))
 
 
 @app.exception_handler(MarqoWebError)
-async def marqo_user_exception_handler(request, exc: MarqoWebError):
+def marqo_user_exception_handler(request, exc: MarqoWebError):
     """ Catch a MarqoWebError and return an appropriate HTTP response.
 
     We can potentially catch any type of Marqo exception. We can do isinstance() calls
@@ -75,7 +75,7 @@ async def marqo_user_exception_handler(request, exc: MarqoWebError):
 
 
 @app.exception_handler(MarqoError)
-async def marqo_internal_exception_handler(request, exc: MarqoError):
+def marqo_internal_exception_handler(request, exc: MarqoError):
     """MarqoErrors are treated as internal errors"""
     headers = getattr(exc, "headers", None)
     body = {
@@ -91,12 +91,12 @@ async def marqo_internal_exception_handler(request, exc: MarqoError):
 
 
 @app.get("/")
-async def root():
+def root():
     return {"message": "Welcome to marqo"}
 
 
 @app.post("/indexes/{index_name}")
-async def create_index(index_name: str, settings: Dict = None, marqo_config: config.Config = Depends(generate_config)):
+def create_index(index_name: str, settings: Dict = None, marqo_config: config.Config = Depends(generate_config)):
     index_settings = dict() if settings is None else settings
     return tensor_search.create_vector_index(
         config=marqo_config, index_name=index_name, index_settings=index_settings
@@ -146,7 +146,7 @@ def add_or_update_documents(docs: List[Dict], index_name: str, refresh: bool = T
     )
 
 @app.get("/indexes/{index_name}/documents/{document_id}")
-async def get_document_by_id(index_name: str, document_id: str,
+def get_document_by_id(index_name: str, document_id: str,
                              marqo_config: config.Config = Depends(generate_config),
                              expose_facets: bool = False):
     return tensor_search.get_document_by_id(
@@ -156,7 +156,7 @@ async def get_document_by_id(index_name: str, document_id: str,
 
 
 @app.get("/indexes/{index_name}/documents")
-async def get_documents_by_ids(
+def get_documents_by_ids(
         index_name: str, document_ids: List[str],
         marqo_config: config.Config = Depends(generate_config),
         expose_facets: bool = False):
@@ -167,21 +167,21 @@ async def get_documents_by_ids(
 
 
 @app.get("/indexes/{index_name}/stats")
-async def get_index_stats(index_name: str, marqo_config: config.Config = Depends(generate_config)):
+def get_index_stats(index_name: str, marqo_config: config.Config = Depends(generate_config)):
     return tensor_search.get_stats(
         config=marqo_config, index_name=index_name
     )
 
 
 @app.delete("/indexes/{index_name}")
-async def delete_index(index_name: str, marqo_config: config.Config = Depends(generate_config)):
+def delete_index(index_name: str, marqo_config: config.Config = Depends(generate_config)):
     return tensor_search.delete_index(
         config=marqo_config, index_name=index_name
     )
 
 
 @app.post("/indexes/{index_name}/documents/delete-batch")
-async def delete_docs(index_name: str, documentIds: List[str], refresh: bool = True,
+def delete_docs(index_name: str, documentIds: List[str], refresh: bool = True,
                       marqo_config: config.Config = Depends(generate_config)):
     return tensor_search.delete_documents(
         index_name=index_name, config=marqo_config, doc_ids=documentIds,
@@ -197,7 +197,7 @@ def refresh_index(index_name: str, marqo_config: config.Config = Depends(generat
 
 
 @app.get("/health")
-async def check_health(marqo_config: config.Config = Depends(generate_config)):
+def check_health(marqo_config: config.Config = Depends(generate_config)):
     return tensor_search.refresh_index(
         config=marqo_config,
     )
