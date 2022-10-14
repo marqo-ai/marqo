@@ -432,34 +432,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                     content_chunks, text_chunks = video_processor.chunk_video(field_content, device=selected_device)
 
 
-                # TODO: better/consistent handling of a no-op for processing (but still vectorize)
-                # if isinstance(field_content, str) and not _is_image(field_content):
-                #     #preprocessing the text
-                #
-                #     split_by = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][NsField.split_method]
-                #     split_length = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][NsField.split_length]
-                #     split_overlap = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][NsField.split_overlap]
-                #     content_chunks = text_processor.split_text(field_content, split_by=split_by, split_length=split_length, split_overlap=split_overlap)
-                #     text_chunks = content_chunks
-                # else:
-                #     #preprocessing the image
-                #     # TODO put the logic for getting field parameters into a function and add per field options
-                #     image_method = index_info.index_settings[NsField.index_defaults][NsField.image_preprocessing][NsField.patch_method]
-                #     # the chunk_image contains the no-op logic as of now - method = None will be a no-op
-                #     try:
-                #         # in the future, if we have different chunking methods, make sure we catch possible
-                #         # errors of different types generated here, too.
-                #         content_chunks, text_chunks = image_processor.chunk_image(
-                #             field_content, device=selected_device, method=image_method)
-                #     except s2_inference_errors.S2InferenceError:
-                #         document_is_valid = False
-                #         image_err = errors.InvalidArgError(message=f'Could not process given image: {field_content}')
-                #         unsuccessful_docs.append(
-                #             (i, {'_id': doc_id, 'error': image_err.message, 'status': int(image_err.status_code),
-                #                  'code': image_err.code})
-                #         )
-                #         break
-                
+
                 normalize_embeddings = index_info.index_settings[NsField.index_defaults][NsField.normalize_embeddings]
                 infer_if_image = index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]
                 try:
