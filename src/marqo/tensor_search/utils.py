@@ -214,7 +214,7 @@ def content_routering(field_content, infer_if_media = True):
                         open(downloaded_file, 'wb').write(r.content)
                         file_type, encoding = mimetypes.guess_type(downloaded_file)
                     except:
-                        raise errors.MarqoError(f"The url {field_content} is not downloadable.")
+                        raise errors.MarqoWebError(f"The url {field_content} is not downloadable.")
 
 
                 if file_type:
