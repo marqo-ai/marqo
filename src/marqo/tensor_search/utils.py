@@ -162,7 +162,7 @@ def convert_to_MediaType(type_str: str) -> MediaType:
     elif type_str == "video":
         return MediaType.video
     else:
-        raise TypeError(f"Unspported type for {type_str}")
+        raise errors.MarqoError(f"Unspported type for {type_str}")
 
 def convert_to_FileType(type_str = "default") -> FileType:
     #This can actually be a dictionary :(
@@ -185,7 +185,7 @@ def convert_to_FileType(type_str = "default") -> FileType:
     elif type_str == "ListOfPILImage":
         return FileType.ListOfPILImage
     else:
-        raise TypeError(f"Unsupported filetype for {type_str}")
+        raise errors.MarqoError(f"Unsupported filetype for {type_str}")
 
 
 
@@ -214,14 +214,14 @@ def content_routering(field_content, infer_if_media = True):
                         open(downloaded_file, 'wb').write(r.content)
                         file_type, encoding = mimetypes.guess_type(downloaded_file)
                     except:
-                        raise errors(f"The url {field_content} is not downloadable.")
+                        raise errors.MarqoError(f"The url {field_content} is not downloadable.")
 
 
                 if file_type:
                     main_type = file_type.split("/")[0]
                     return downloaded_file, convert_to_MediaType(main_type), convert_to_FileType()
                 else:
-                    raise TypeError(f"We can't recognize the Type of input url {field_content}")
+                    raise errors.MarqoError(f"We can't recognize the Type of input url {field_content}")
             elif os.path.isfile(field_content):
                 file_type, encoding = mimetypes.guess_type(field_content)
                 main_type = file_type.split("/")[0]
@@ -235,4 +235,4 @@ def content_routering(field_content, infer_if_media = True):
     elif isinstance(field_content, ImageType):
         return field_content, MediaType.image,FileType.PILImage
     else:
-        raise TypeError(f"The input type {type(field_content)} is supported.")
+        raise errors.MarqoError(f"The input type {type(field_content)} is supported.")
