@@ -38,6 +38,7 @@ class IndexSettingsField:
     index_defaults = "index_defaults"
     treat_urls_and_pointers_as_images = "treat_urls_and_pointers_as_images"
     model = "model"
+    model_properties = "model_properties"
     normalize_embeddings = "normalize_embeddings"
 
     text_preprocessing = "text_preprocessing"
