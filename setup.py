@@ -24,6 +24,7 @@ setup(
         "sentence-transformers",
         "onnxruntime-gpu",
         "onnx",
+        "wget",
         "protobuf==3.20.1",
         "moviepy",
         "pafy",
