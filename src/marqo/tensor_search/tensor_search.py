@@ -390,7 +390,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
                 elif mediatype == MediaType.image:
                     if filetype == FileType.url or filetype == FileType.local:
-                        field_content = PIL.Image.OPEN(field_content)
+                        field_content = PIL.Image.open(field_content)
                     elif filetype == FileType.PILImage:
                         pass
                     else:
