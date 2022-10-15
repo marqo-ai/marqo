@@ -230,37 +230,36 @@ class TestAddDocuments(MarqoTestCase):
             assert "status" in item
 
     def test_add_documents_validation(self):
-        """These bad docs should raise errors"""
+        """These bad docs should return errors"""
         bad_doc_args = [
-            [{
-                    "_id": "123",
-                    "id": {},
-            }],
-            [{
-                "blahblah": {1243}
-            }],
-            [{
-                "blahblah": None
-            }],
-            [{
-                "blahblah": [None], "hehehe": 123
-            },{
-                "some other obj": "finnne"
-            }],
-            [{
-                "blahblah": [None], "hehehe": 123
-            }, {
-                "some other obj": AssertionError  # wtf lad!!!
-            }],
-            [{
-                "blahblah": max  # a func!!!
-            }]
+            [{"_id": "to_fail_123", "id": {}}],
+            # strict checking: only allowed fields:
+            [{"_id": "to_fail_123", "my_field": dict()}],
+            [{"_id": "to_fail_123", "my_field": ["wow", "this", "is"]}],
+            [{"_id": "to_fail_123", "my_field": ["wow", "this", "is"]},
+             {"_id": "to_pass_123", "my_field": 'some_content'}],
+            [{"_id": "to_fail_123", "my_field": [{"abc": "678"}]}],
+            [{"_id": "to_fail_123", "my_field": {"abc": "234"}}],
+            [{"_id": "to_fail_123", "my_field": {"abc": "234"}},
+             {"_id": "to_pass_123", "my_field": 'some_content'}],
+            # other checking:
+            [{"blahblah": {1243}, "_id": "to_fail_123"}],
+            [{"blahblah": None, "_id": "to_fail_123"}],
+            [{"_id": "to_fail_123", "blahblah": [None], "hehehe": 123},
+             {"_id": "to_fail_567", "some other obj": "finnne", 123: "heehee"}],
+            [{"_id": "to_fail_123", "blahblah": [None], "hehehe": 123},
+             {"_id": "to_fail_567", "some other obj": AssertionError}],
+            [{"_id": "to_fail_567", "blahblah": max}]
         ]
-        for bad_doc_arg in bad_doc_args:
-            add_res = tensor_search.add_documents(config=self.config, index_name=self.index_name_1,
-                                                  docs=bad_doc_arg, auto_refresh=True)
-            assert any(['error' in item for item in add_res['items']])
-
+        for update_mode in ('replace', 'update'):
+            for bad_doc_arg in bad_doc_args:
+                add_res = tensor_search.add_documents(
+                    config=self.config, index_name=self.index_name_1,
+                    docs=bad_doc_arg, auto_refresh=True, update_mode=update_mode)
+                assert add_res['errors'] is True
+                assert all(['error' in item for item in add_res['items'] if item['_id'].startswith('to_fail')])
+                assert all(['result' in item
+                            for item in add_res['items'] if item['_id'].startswith('to_pass')])
 
     def test_add_documents_set_device(self):
         """calling search with a specified device overrides device defined in config"""
@@ -355,7 +354,7 @@ class TestAddDocuments(MarqoTestCase):
             tensor_search.create_vector_index(
                 config=self.config, index_name=self.index_name_1, index_settings=image_index_config)
             docs_results = [
-                ([{"_id": "123","image_field": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png"},
+                ([{"_id": "123", "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png"},
                  {"_id": "789", "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png"},
                  {"_id": "456", "image_field": "https://www.marqo.ai/this/image/doesnt/exist.png"}],
                  [("123", "result"), ("789", "result"), ("456", "error")]
@@ -425,15 +424,19 @@ class TestAddDocuments(MarqoTestCase):
              [(None, 'error'), ("cool", 'result'), (None, 'error'), (None, 'result'), (None, 'error'),
               (None, 'error')]),
         ]
-        for docs, expected_results in docs_results:
-            add_res = tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs, auto_refresh=True)
-            assert len(add_res['items']) == len(expected_results)
-            for i, res_dict in enumerate(add_res['items']):
-                # if the expected id is None, then it assumed the id is
-                # generated and can't be asserted against
-                if expected_results[i][0] is not None:
-                    assert res_dict["_id"] == expected_results[i][0]
-                assert expected_results[i][1] in res_dict
+        for update_mode in ('update', 'replace'):
+            for docs, expected_results in docs_results:
+                add_res = tensor_search.add_documents(
+                    config=self.config, index_name=self.index_name_1, docs=docs, auto_refresh=True,
+                    update_mode=update_mode
+                )
+                assert len(add_res['items']) == len(expected_results)
+                for i, res_dict in enumerate(add_res['items']):
+                    # if the expected id is None, then it assumed the id is
+                    # generated and can't be asserted against
+                    if expected_results[i][0] is not None:
+                        assert res_dict["_id"] == expected_results[i][0]
+                    assert expected_results[i][1] in res_dict
 
     def test_mappings_arent_updated(self):
         """if a doc isn't added properly, we need to ensure that
@@ -474,21 +477,23 @@ class TestAddDocuments(MarqoTestCase):
              ({"good_field_1", "good_field_2"}, { "bad_field_1"})
              ),
         ]
-        for docs, (good_fields, bad_fields) in docs_results:
-            # good_fields should appear in the mapping.
-            # bad_fields should not
-            tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs, auto_refresh=True)
-            ii = backend.get_index_info(config=self.config, index_name=self.index_name_1)
-            customer_props = {field_name for field_name in ii.get_text_properties()}
-            reduced_vector_props = {field_name.replace(TensorField.vector_prefix, '')
-                                    for field_name in ii.get_text_properties()}
-            for field in good_fields:
-                assert field in customer_props
-                assert field in reduced_vector_props
+        for update_mode in ('update', 'replace'):
+            for docs, (good_fields, bad_fields) in docs_results:
+                # good_fields should appear in the mapping.
+                # bad_fields should not
+                tensor_search.add_documents(config=self.config, index_name=self.index_name_1,
+                                            docs=docs, auto_refresh=True, update_mode=update_mode)
+                ii = backend.get_index_info(config=self.config, index_name=self.index_name_1)
+                customer_props = {field_name for field_name in ii.get_text_properties()}
+                reduced_vector_props = {field_name.replace(TensorField.vector_prefix, '')
+                                        for field_name in ii.get_text_properties()}
+                for field in good_fields:
+                    assert field in customer_props
+                    assert field in reduced_vector_props
 
-            for field in bad_fields:
-                assert field not in customer_props
-                assert field not in reduced_vector_props
+                for field in bad_fields:
+                    assert field not in customer_props
+                    assert field not in reduced_vector_props
 
     def test_mappings_arent_updated_images(self):
         """if an image isn't added properly, we need to ensure that
@@ -811,7 +816,6 @@ class TestAddDocuments(MarqoTestCase):
                                           auto_refresh=True, update_mode='replace')
         assert {'_id':'123'} == tensor_search.get_document_by_id(
             config=self.config, index_name=self.index_name_1, document_id='123')
-
 
     def test_put_no_update_existing_field(self):
         assert self.patch_documents_tests(

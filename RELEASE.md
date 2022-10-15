@@ -1,3 +1,18 @@
+# Release 0.0.5
+<!--SMALL BLURB ABOUT RELEASE-->
+Added Open CLIP models and added features to the get document endpoint.
+
+## New features
+<!--NON BREAKING CHANGES GO HERE-->
+- Added Open CLIP models ([#116](https://github.com/marqo-ai/marqo/pull/116)). 
+Read about usage [here](https://marqo.pages.dev/Models-Reference/dense_retrieval/#open-clip)
+- Added the ability to get multiple documents by ID 
+([#122](https://github.com/marqo-ai/marqo/pull/122)). 
+Read about usage [here](https://marqo.pages.dev/API-Reference/documents/#get-multiple-documents)
+- Added the ability to get document tensor facets through the get document endpoint 
+([#122](https://github.com/marqo-ai/marqo/pull/122)). 
+Read about usage [here](https://marqo.pages.dev/API-Reference/documents/#example_2)
+
 # Release 0.0.4
 
 <!--SMALL BLURB ABOUT RELEASE-->
