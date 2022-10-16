@@ -349,13 +349,15 @@ def _predict_owl(model, processed_inputs, post_process_function, size):
         _type_: _description_
     """
     with torch.no_grad():
-        outputs = model(**processed_inputs)
-
+        #print(processed_inputs.device, model.device)
+        print(model.device)
+        outputs = model(**processed_inputs)#.to('cpu')
+        print("####################################################")
         # Target image sizes (height, width) to rescale box predictions [batch_size, 2]
         target_sizes = torch.Tensor([size[::-1]])
         # Convert outputs (bounding boxes and class logits) to COCO API
         results = post_process_function(outputs=outputs, target_sizes=target_sizes)
-
+        print(results)
         return results
 
 def process_owl_results(results: Dict) -> List:
