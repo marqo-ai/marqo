@@ -37,7 +37,7 @@ class TestCreateIndex(MarqoTestCase):
             raise AssertionError
         except IndexNotFoundError as e:
             pass
-        tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
         settings = requests.get(
             url=f"{self.endpoint}/{self.index_name_1}/_mapping",
             verify=False
@@ -61,7 +61,9 @@ class TestCreateIndex(MarqoTestCase):
             IndexSettingsField.treat_urls_and_pointers_as_images: True,
             IndexSettingsField.normalize_embeddings: False
         }
-        tensor_search.create_vector_index(index_name=self.index_name_1, **custom_settings)
+        tensor_search.create_vector_index(
+            config=self.config, index_name=self.index_name_1, index_settings={
+                NsField.index_defaults:custom_settings})
         settings = requests.get(
             url=self.endpoint + "/" + self.index_name_1 + "/_mapping",
             verify=False
