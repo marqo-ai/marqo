@@ -1,3 +1,4 @@
+import json
 import pprint
 import unittest
 from marqo.tensor_search import utils
@@ -62,3 +63,47 @@ class TestUtils(unittest.TestCase):
                 assert expected == utils.check_device_is_available(device_str)
                 return True
             assert run_test()
+
+    def test_merge_dicts(self):
+        base = {
+            'lvl_0_a': {
+                'lvl_1_a': 'efgh',
+                'lvl_1_b': True
+            },
+            'lvl_0_b': 'abcd',
+            'lvl_0_c': 1234,
+            'lvl_0_d': ['abcdefgh']
+        }
+        base_hash = hash(json.dumps(base))
+        preferences = {
+            'lvl_0_a': {
+                'lvl_1_b': False,
+                'lvl_1_c': "abcabc"
+            },
+            'lvl_0_d': [{'lvl_0_d_1': 'cat dog'}],
+            'lvl_0_e': {'lvl1_0_d_1': {'jump': {"skip": 'track'}}}
+        }
+        preferences_hash = hash(json.dumps(preferences))
+        assert utils.merge_dicts(base, preferences) == {
+            'lvl_0_a': {
+                'lvl_1_a': 'efgh',
+                'lvl_1_b': False,
+                'lvl_1_c': "abcabc"
+            },
+            'lvl_0_b': 'abcd',
+            'lvl_0_c': 1234,
+            'lvl_0_d': [{'lvl_0_d_1': 'cat dog'}],
+            'lvl_0_e': {'lvl1_0_d_1': {'jump': {"skip": 'track'}}}
+        }
+        # assert that they didn't mutate
+        assert preferences_hash == hash(json.dumps(preferences))
+        assert base_hash == hash(json.dumps(base))
+
+    def test_merge_dicts_edge_cases(self):
+        assert {} == utils.merge_dicts({}, {})
+        assert {'abc': '123', "zzz": {"wow": "cool"}} \
+               == utils.merge_dicts({'abc': '123', "zzz": {"wow": "cool"}}, {})
+        assert {'abc': '123', "zzz": {"wow": "cool"}} \
+               == utils.merge_dicts({}, {'abc': '123', "zzz": {"wow": "cool"}})
+        assert {'abc': '123', "zzz": {"wow": "cool"}} \
+               == utils.merge_dicts({'zzz': {"wow": "rough"}}, {'abc': '123', "zzz": {"wow": "cool"}})

@@ -35,7 +35,7 @@ class TestBackend(MarqoTestCase):
 
     def test_get_index_info_no_index(self):
         r1 = requests.get(
-            url=f"{self.endpoint}/{self.index_name_1}",
+            url=f"{self.authorized_url}/{self.index_name_1}",
             verify=False
         )
         assert r1.status_code == 404

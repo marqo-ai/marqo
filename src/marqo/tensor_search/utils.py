@@ -137,3 +137,23 @@ def check_device_is_available(device: str) -> bool:
         return True
     else:
         return False
+
+
+def merge_dicts(base: dict, preferences: dict) -> dict:
+    """Merges two dicts together. Fields in the base dict are overwritten by
+    the preferences dict
+    """
+    merged_dicts = copy.deepcopy(base)
+
+    def merge(merged: dict, prefs: dict) -> dict:
+        for key in prefs:
+            if not isinstance(prefs[key], dict):
+                merged[key] = prefs[key]
+            else:
+                if key in merged:
+                    merged[key] = merge(merged[key], prefs[key])
+                else:
+                    merged[key] = prefs[key]
+        return merged
+
+    return merge(merged=merged_dicts, prefs=preferences)

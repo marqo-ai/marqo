@@ -63,7 +63,7 @@ class TestCreateIndex(MarqoTestCase):
         }
         tensor_search.create_vector_index(
             config=self.config, index_name=self.index_name_1, index_settings={
-                NsField.index_defaults:custom_settings})
+                NsField.index_defaults: custom_settings})
         settings = requests.get(
             url=self.endpoint + "/" + self.index_name_1 + "/_mapping",
             verify=False

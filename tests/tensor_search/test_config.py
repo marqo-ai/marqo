@@ -36,8 +36,8 @@ class TestConfig(MarqoTestCase):
         @mock.patch("torch.cuda", mock_torch_cuda)
         def run():
             c = config.Config(url=self.endpoint)
-            assert c.indexing_device == enums.Devices.cpu
-            assert c.search_device == enums.Devices.cpu
+            assert c.indexing_device == enums.Device.cpu
+            assert c.search_device == enums.Device.cpu
             return True
         assert run()
 
