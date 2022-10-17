@@ -1,16 +1,12 @@
-import unittest
-from marqo.errors import MarqoApiError, MarqoError, IndexNotFoundError
+from marqo.errors import MarqoApiError, MarqoError, IndexNotFoundError, UnknownModelError
 from marqo.s2_inference.errors import InvalidModelSettingsError
-from marqo.s2_inference.model_registry import load_model_properties
+from marqo.tensor_search import tensor_search
 from marqo.client import Client
 
 from marqo.s2_inference.s2_inference import (
     vectorise,
-    _get_model_name,
-    _check_model_dict,
-    _update_model_dict,
-    _update_model_properties
-    )
+    _validate_model_properties,
+)
 
 from tests.marqo_test import MarqoTestCase
 
@@ -19,100 +15,121 @@ class TestGenericModelSupport(MarqoTestCase):
 
     def setUp(self):
         mq = Client(**self.client_settings)
-        self.endpoint = mq.config.url
         self.config = mq.config
-        self.client = mq
-
-        self.generic_header = {"Content-type": "application/json"}
         self.index_name_1 = "my-test-create-index-1"
         try:
-            self.client.delete_index(self.index_name_1)
-        except IndexNotFoundError as s:
+            tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+        except IndexNotFoundError as e:
             pass
-
 
     def tearDown(self) -> None:
-        try:
-            self.client.delete_index(self.index_name_1)
-        except IndexNotFoundError as s:
-            pass
+        pass
 
-
-    def test_get_model_name_with_str_input(self):
-        model = "sentence-transformers/all-mpnet-base-v2"
-        model_name = _get_model_name(model)
-
-        assert model_name == "sentence-transformers/all-mpnet-base-v2"
-
-
-    def test_get_model_name_with_dict_input(self):
-        model = {"name": "sentence-transformers/all-mpnet-base-v2",
-                "dimensions": 768,
-                "tokens":128,
-                "type":"sbert"}
-
-        model_name = _get_model_name(model)
-
-        assert model_name == "sentence-transformers/all-mpnet-base-v2"
-
-
-    def test_check_model_dict(self):
-        """_check_model_dict should throw an exception if required keys are not given.
+    def test_create_index_with_custom_model_properties(self):
+        """index should get created with custom model_properties
         """
-        model = {# "name": "sentence-transformers/all-mpnet-base-v2",
-                # "dimensions": 768,
-                "tokens":128,
-                "type":"sbert"}
-
-        self.assertRaises(InvalidModelSettingsError, _check_model_dict, model)
-
-
-        """_check_model_dict should not throw an exception if required keys are given.
-        """
-        model['dimensions'] = 768
-        model['name'] = "sentence-transformers/all-mpnet-base-v2"
-
-        self.assertEqual(_check_model_dict(model), True)
-
-
-    def test_update_model_dict(self):
-        """If optional keys are not given, _update_model_dict should add the keys with default values.
-        """
-        model = {"name": "sentence-transformers/all-mpnet-base-v2",
-                "dimensions": 768
-                # "tokens": 128,
-                # "type":"sbert"
+        tensor_search.create_vector_index(
+            index_name=self.index_name_1, config=self.config,
+            index_settings={
+                "index_defaults": {
+                    'model': "test-model",
+                    'model_properties': {"name": "sentence-transformers/all-mpnet-base-v2",
+                                         "dimensions": 768,
+                                         "tokens": 128,
+                                         "type": "sbert"}
                 }
+            }
+        )
 
-        updated_model_dict = _update_model_dict(model)
-        default_tokens_value = updated_model_dict.get('tokens')
-        default_type_value = updated_model_dict.get('type')
+    def test_add_documents_with_custom_model_properties(self):
+        """add_documents should throw error if model is not in registry,
+        and model_properties have not been given in index
+        """
+        model_name = "test-model"
+        tensor_search.create_vector_index(
+            index_name=self.index_name_1, config=self.config,
+            index_settings={
+                "index_defaults": {
+                    'model': model_name
+                }
+            }
+        )
+
+        config = self.config
+        index_name = self.index_name_1
+        docs = [
+            {
+                "_id": "123",
+                "title 1": "content 1",
+                "desc 2": "content 2. blah blah blah"
+            }]
+        auto_refresh = True
+
+        self.assertRaises(UnknownModelError, tensor_search.add_documents, config, index_name, docs, auto_refresh)
+
+    def test_create_index_with_model_properties_without_model_name(self):
+        """
+        bert becomes default name but what if settings are different
+        """
+
+    def test_validate_model_properties_missing_required_keys(self):
+        """_validate_model_properties should throw an exception if required keys are not given.
+        """
+        model_name = "test-model"
+        model_properties = {  # "name": "sentence-transformers/all-mpnet-base-v2",
+            # "dimensions": 768,
+            "tokens": 128,
+            "type": "sbert"}
+
+        self.assertRaises(InvalidModelSettingsError, _validate_model_properties, model_name, model_properties)
+
+        """_validate_model_properties should not throw an exception if required keys are given.
+        """
+        model_properties['dimensions'] = 768
+        model_properties['name'] = "sentence-transformers/all-mpnet-base-v2"
+
+        validated_model_properties = _validate_model_properties(model_name, model_properties)
+
+        self.assertEqual(validated_model_properties, model_properties)
+
+    def test_validate_model_properties_missing_optional_keys(self):
+        """If optional keys are not given, _validate_model_properties should add the keys with default values.
+        """
+        model_name = 'test-model'
+        model_properties = {"name": "sentence-transformers/all-mpnet-base-v2",
+                            "dimensions": 768
+                            # "tokens": 128,
+                            # "type":"sbert"
+                            }
+
+        validated_model_properties = _validate_model_properties(model_name, model_properties)
+        default_tokens_value = validated_model_properties.get('tokens')
+        default_type_value = validated_model_properties.get('type')
 
         self.assertEqual(default_tokens_value, 128)
         self.assertEqual(default_type_value, "sbert")
 
-
-    def test_update_model_properties(self):
-        """If model info is not in MODEL_PROPERTIES, _update_model_properties should add it
+    def test_validate_model_properties_missing_properties(self):
+        """If model_properties is None _validate_model_properties should use model_registry properties
         """
-        model = {"name": "random-model-name",
-                "dimensions": 768,
-                "tokens": 128,
-                "type":"sbert"
-                }
-        model_name = _get_model_name(model)
+        model_name = 'test'
+        registry_test_model_properties = {"name": "sentence-transformers/all-MiniLM-L6-v1",
+                                          "dimensions": 16,
+                                          "tokens": 128,
+                                          "type": "test",
+                                          "notes": ""}
 
-        TEST_MODEL_PROPERTIES = load_model_properties()
+        validated_model_properties = _validate_model_properties(model_name=model_name, model_properties=None)
 
-        _update_model_properties(model_name, model, TEST_MODEL_PROPERTIES)
-
-        self.assertEqual(TEST_MODEL_PROPERTIES['models'][model_name], model)
-
+        self.assertEqual(registry_test_model_properties, validated_model_properties)
 
     def test_vectorise_accepts_dict(self):
-        model = {"name": "sentence-transformers/multi-qa-MiniLM-L6-cos-v1",
-                "dimensions": 768,
-                "tokens": 128,
-                "type":"sbert"}
+        model_name = "test-model"
 
-        result = vectorise(model, "some string")
+        # this model is not in model_registry
+        model_properties = {"name": "sentence-transformers/multi-qa-MiniLM-L6-cos-v1",
+                            "dimensions": 768,
+                            "tokens": 128,
+                            "type": "sbert"}
+
+        result = vectorise(model_name=model_name, model_properties=model_properties, content="some string")
