@@ -1055,7 +1055,9 @@ def check_health(config: Config):
 
     return {
         "status": marqo_status,
-        "marqo-os-status": marqo_os_status
+        "backend": {
+            "status": marqo_os_status
+        }
     }
 
 

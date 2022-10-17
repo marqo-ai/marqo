@@ -60,6 +60,7 @@ class TestBackend(MarqoTestCase):
 
         tensor_search.create_vector_index(
             config=mock_config, index_name=self.index_name_1)
+
         @mock.patch("marqo._httprequests.HttpRequests.put", mock__put)
         def run():
             tensor_search.add_documents(config=mock_config, docs=[{"f1": "doc"}, {"f2":"C"}],
