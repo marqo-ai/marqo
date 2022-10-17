@@ -198,11 +198,7 @@ def refresh_index(index_name: str, marqo_config: config.Config = Depends(generat
 
 @app.get("/health")
 def check_health(marqo_config: config.Config = Depends(generate_config)):
-    return tensor_search.refresh_index(
-        config=marqo_config,
-    )
-
-
+    return tensor_search.check_health(config=marqo_config)
 
 # try these curl commands:
 
