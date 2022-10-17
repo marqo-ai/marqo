@@ -375,7 +375,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                     try:
                         model_properties = index_defaults[NsField.model_properties]
                     except KeyError:
-                        raise errors.UnknownModelError(f"Could not find model properties for model={index_info.model_name}")
+                        raise errors.UnknownModelError(f"Could not find model properties for model={index_info.model_name}") from None
 
                 try:
                     # in the future, if we have different underlying vectorising methods, make sure we catch possible
