@@ -107,3 +107,40 @@ class TestUtils(unittest.TestCase):
                == utils.merge_dicts({}, {'abc': '123', "zzz": {"wow": "cool"}})
         assert {'abc': '123', "zzz": {"wow": "cool"}} \
                == utils.merge_dicts({'zzz': {"wow": "rough"}}, {'abc': '123', "zzz": {"wow": "cool"}})
+
+    def test_merge_nones(self):
+        base = {
+            'lvl_0_a': {
+                'lvl_1_a': 'efgh',
+                'lvl_1_b': True
+            },
+            'lvl_0_b': 'abcd',
+            'lvl_0_c': 1234,
+            'lvl_0_d': ['abcdefgh'],
+            'lvl_0_e': {'lvl1_0_d_1': {'jump': {"skip": 'track'}}}
+        }
+        base_hash = hash(json.dumps(base))
+        preferences = {
+            'lvl_0_a': {
+                'lvl_1_b': None,
+                'lvl_1_c': "abcabc"
+            },
+            'lvl_0_d': [{'lvl_0_d_1': 'cat dog'}],
+            'lvl_0_e': None
+        }
+        preferences_hash = hash(json.dumps(preferences))
+        assert utils.merge_dicts(base, preferences) == {
+            'lvl_0_a': {
+                'lvl_1_a': 'efgh',
+                'lvl_1_b': True,
+                'lvl_1_c': "abcabc"
+            },
+            'lvl_0_b': 'abcd',
+            'lvl_0_c': 1234,
+            'lvl_0_d': [{'lvl_0_d_1': 'cat dog'}],
+            'lvl_0_e': {'lvl1_0_d_1': {'jump': {"skip": 'track'}}}
+        }
+        # assert that they didn't mutate
+        assert preferences_hash == hash(json.dumps(preferences))
+        assert base_hash == hash(json.dumps(base))
+

@@ -147,6 +147,8 @@ def merge_dicts(base: dict, preferences: dict) -> dict:
 
     def merge(merged: dict, prefs: dict) -> dict:
         for key in prefs:
+            if prefs[key] is None:
+                continue
             if not isinstance(prefs[key], dict):
                 merged[key] = prefs[key]
             else:
