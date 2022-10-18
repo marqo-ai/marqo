@@ -4,6 +4,7 @@ from marqo.tensor_search import index_meta_cache
 from marqo import config
 from marqo.tensor_search.web import api_utils
 from marqo._httprequests import HttpRequests
+from marqo import errors
 
 
 def on_start(marqo_os_url: str):
@@ -34,9 +35,15 @@ class PopulateCache:
         c = config.Config(api_utils.upconstruct_authorized_url(
             opensearch_url=self.marqo_os_url
         ))
-        index_meta_cache.populate_cache(c)
-        connection = HttpRequests(c)
+        try:
+            index_meta_cache.populate_cache(c)
+        except errors.BackendCommunicationError as e:
+            raise errors.BackendCommunicationError(
+                message="Can't connect to Marqo-os backend!\n"
+                        f"        OPENSEARCH_URL: {self.marqo_os_url}"
+            ) from e
         # the following lines turns off auto create index
+        # connection = HttpRequests(c)
         # connection.put(
         #     path="_cluster/settings",
         #     body={

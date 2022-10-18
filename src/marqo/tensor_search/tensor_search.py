@@ -1030,18 +1030,23 @@ def _vector_text_search(
 
 
 def check_health(config: Config):
-
-    marqo_status = "green"
-
+    TIMEOUT = 3
     statuses = {
         "green": 0,
         "yellow": 1,
         "red": 2
     }
 
+    marqo_status = "green"
     marqo_os_health_check = None
-    # catch some sort of error here:
-    marqo_os_health_check = HttpRequests(config).get(path="_cluster/health")
+    try:
+        timeout_config = copy.deepcopy(config)
+        timeout_config.timeout = TIMEOUT
+        marqo_os_health_check = HttpRequests(timeout_config).get(
+            path="_cluster/health"
+        )
+    except errors.BackendCommunicationError:
+        marqo_os_status = "red"
 
     if marqo_os_health_check is not None:
         if "status" in marqo_os_health_check:

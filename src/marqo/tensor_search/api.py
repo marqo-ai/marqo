@@ -12,7 +12,7 @@ import os
 from marqo.tensor_search.web import api_validation, api_utils
 from marqo.tensor_search import utils
 from marqo.tensor_search.on_start_script import on_start
-
+from marqo import version
 
 def replace_host_localhosts(OPENSEARCH_IS_INTERNAL: str, OS_URL: str):
     """Replaces a host's localhost URL with one that can be referenced from
@@ -44,7 +44,10 @@ OPENSEARCH_URL = replace_host_localhosts(
 
 
 on_start(OPENSEARCH_URL)
-app = FastAPI()
+app = FastAPI(
+    title="Marqo",
+    version=version.get_version()
+)
 
 
 def generate_config() -> config.Config:
@@ -92,7 +95,8 @@ def marqo_internal_exception_handler(request, exc: MarqoError):
 
 @app.get("/")
 def root():
-    return {"message": "Welcome to marqo"}
+    return {"message": "Welcome to Marqo",
+            "version": version.get_version()}
 
 
 @app.post("/indexes/{index_name}")
