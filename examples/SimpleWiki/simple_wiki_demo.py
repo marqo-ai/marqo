@@ -53,10 +53,10 @@ client = Client()
 
 # we create the index. Note if it already exists an error will occur 
 # as you cannot overwrite an existing index
-# try:
-#     client.delete_index(index_name)
-# except:
-#     pass
+try:
+     client.delete_index(index_name)
+except:
+     pass
 
 # we create the index and can set the model we want to use
 # the onnx models are typically faster on both CPU and GPU
@@ -66,7 +66,7 @@ client.create_index(index_name, model='onnx/all_datasets_v4_MiniLM-L6')
 device = 'cpu'
 
 # here we use parallel indexing to speed up the task
-responses = client.index(index_name).add_documents(data, device=device, processes=4, batch_size=50)
+responses = client.index(index_name).add_documents(data, device=device, processes=1, batch_size=50)
 
 # optionally take a look at the responses
 #pprint.print(responses)
