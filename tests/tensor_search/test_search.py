@@ -3,7 +3,6 @@ import pprint
 from unittest import mock
 
 from marqo.tensor_search.enums import TensorField, SearchMethod
-from marqo.client import Client
 from marqo.errors import (
     MarqoApiError, MarqoError, IndexNotFoundError, InvalidArgError,
     InvalidFieldNameError
@@ -16,11 +15,9 @@ from tests.marqo_test import MarqoTestCase
 class TestVectorSearch(MarqoTestCase):
 
     def setUp(self) -> None:
-        self.client = Client(**self.client_settings)
         self.index_name_1 = "my-test-index-1"
         self.index_name_2 = "my-test-index-2"
         self.index_name_3 = "my-test-index-3"
-        self.config = copy.deepcopy(self.client.config)
         self._delete_test_indices()
 
     def _delete_test_indices(self, indices=None):
@@ -30,7 +27,7 @@ class TestVectorSearch(MarqoTestCase):
             ix_to_delete = indices
         for ix_name in ix_to_delete:
             try:
-                self.client.delete_index(ix_name)
+                tensor_search.delete_index(config=self.config, index_name=ix_name)
             except IndexNotFoundError as s:
                 pass
 

@@ -14,7 +14,7 @@ from marqo.tensor_search import configs
 class SearchQuery(BaseModel):
     q: str
     searchableAttributes: Union[None, List[str]] = None
-    searchMethod: Union[None, str] = SearchMethod.TENSOR
+    searchMethod: Union[None, str] = "TENSOR"
     limit: int = 10
     showHighlights: bool = True
     reRanker: str = None
@@ -27,9 +27,6 @@ class SearchQuery(BaseModel):
             value=value, enum_class=SearchMethod,
             case_sensitive=False
         )
-
-    class Config:
-        arbitrary_types_allowed = True
 
 
 class ErrorResponse(BaseModel):

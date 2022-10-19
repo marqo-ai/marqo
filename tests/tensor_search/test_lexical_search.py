@@ -5,7 +5,6 @@ from marqo.tensor_search import tensor_search
 import unittest
 import copy
 from marqo.errors import InvalidArgError, IndexNotFoundError
-from marqo.client import Client
 from tests.marqo_test import MarqoTestCase
 
 
@@ -13,11 +12,11 @@ class TestlexicalSearch(MarqoTestCase):
 
     def setUp(self) -> None:
         self.generic_header = {"Content-type": "application/json"}
-        self.client = Client(**self.client_settings)
+
         self.index_name_1 = "my-test-index-1"
-        self.config = copy.deepcopy(self.client.config)
+        self.config = copy.deepcopy(self.config)
         try:
-            self.client.delete_index(self.index_name_1)
+            tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         except IndexNotFoundError as s:
             pass
     

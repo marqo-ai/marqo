@@ -126,8 +126,10 @@ def _autofill_index_settings(index_settings: dict):
     copied_settings = index_settings.copy()
     default_settings = configs.get_default_index_settings()
 
-    if NsField.index_defaults not in copied_settings:
-        copied_settings[NsField.index_defaults] = default_settings[NsField.index_defaults]
+    copied_settings = utils.merge_dicts(default_settings, copied_settings)
+
+    # if NsField.index_defaults not in copied_settings:
+    #     copied_settings[NsField.index_defaults] = default_settings[NsField.index_defaults]
 
     if NsField.treat_urls_and_pointers_as_images in copied_settings[NsField.index_defaults] and \
             copied_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images] is True\
@@ -135,15 +137,15 @@ def _autofill_index_settings(index_settings: dict):
         copied_settings[NsField.index_defaults][NsField.model] = MlModel.clip
 
     # make sure the first level of keys are present, if not add all of those defaults
-    for key in list(default_settings):
-        if key not in copied_settings or copied_settings[key] is None:
-            copied_settings[key] = default_settings[key]
+    # for key in list(default_settings):
+    #     if key not in copied_settings or copied_settings[key] is None:
+    #         copied_settings[key] = default_settings[key]
 
-    # make sure the first level of keys in index defaults is present, if not add all of those defaults
-    for key in list(default_settings[NsField.index_defaults]):
-        if key not in copied_settings[NsField.index_defaults] or \
-                copied_settings[NsField.index_defaults][key] is None:
-            copied_settings[NsField.index_defaults][key] = default_settings[NsField.index_defaults][key]
+    # # make sure the first level of keys in index defaults is present, if not add all of those defaults
+    # for key in list(default_settings[NsField.index_defaults]):
+    #     if key not in copied_settings[NsField.index_defaults] or \
+    #             copied_settings[NsField.index_defaults][key] is None:
+    #         copied_settings[NsField.index_defaults][key] = default_settings[NsField.index_defaults][key]
 
     # text preprocessing sub fields - fills any missing sub-dict fields if some of the first level are present
     for key in list(default_settings[NsField.index_defaults][NsField.text_preprocessing]):
@@ -361,6 +363,14 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
             if isinstance(field_content, (str, Image.Image)):
                 
                 # TODO: better/consistent handling of a no-op for processing (but still vectorize)
+
+                # 1. check if urls should be downloaded -> "treat_pointers_and_urls_as_images":True
+                # 2. check if it is a url or pointer
+                # 3. If yes in 1 and 2, download blindly (without type)
+                # 4. Determine media type of downloaded
+                # 5. load correct media type into memory -> PIL (images), videos (), audio (torchaudio)
+                # 6. if chunking -> then add the extra chunker
+
                 if isinstance(field_content, str) and not _is_image(field_content):
                     
                     split_by = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][NsField.split_method]
@@ -1017,6 +1027,43 @@ def _vector_text_search(
         return format_ordered_docs_simple(ordered_docs_w_chunks=completely_sorted)
     else:
         return format_ordered_docs_preserving(ordered_docs_w_chunks=completely_sorted, num_highlights=number_of_highlights)
+
+
+def check_health(config: Config):
+    TIMEOUT = 3
+    statuses = {
+        "green": 0,
+        "yellow": 1,
+        "red": 2
+    }
+
+    marqo_status = "green"
+    marqo_os_health_check = None
+    try:
+        timeout_config = copy.deepcopy(config)
+        timeout_config.timeout = TIMEOUT
+        marqo_os_health_check = HttpRequests(timeout_config).get(
+            path="_cluster/health"
+        )
+    except errors.BackendCommunicationError:
+        marqo_os_status = "red"
+
+    if marqo_os_health_check is not None:
+        if "status" in marqo_os_health_check:
+            marqo_os_status = marqo_os_health_check['status']
+        else:
+            marqo_os_status = "red"
+    else:
+        marqo_os_status = "red"
+
+    marqo_status = marqo_status if statuses[marqo_status] >= statuses[marqo_os_status] else marqo_os_status
+
+    return {
+        "status": marqo_status,
+        "backend": {
+            "status": marqo_os_status
+        }
+    }
 
 
 def delete_index(config: Config, index_name):

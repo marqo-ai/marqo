@@ -1,7 +1,7 @@
 from marqo.tensor_search import enums as ns_enums
 from marqo.tensor_search.enums import IndexSettingsField as NsFields
-import marqo.enums as mq_enums
 from torch import multiprocessing as mp
+
 
 def get_default_index_settings():
     # if new fields are added, also update index.py to take in the new params
