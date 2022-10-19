@@ -454,7 +454,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                     # errors of different types generated here, too.
                     vector_chunks = s2_inference.vectorise(model_name=index_info.model_name, content=content_chunks,
                                                            device=selected_device, normalize_embeddings=normalize_embeddings,
-                                                           infer=infer_if_image, mediatype = mediatype)
+                                                           infer=infer_if_image)
                 except s2_inference_errors.S2InferenceError:
                     document_is_valid = False
                     image_err = errors.InvalidArgError(message=f'Could not process given image: {field_content}')
@@ -855,6 +855,8 @@ def _vector_text_search(
     selected_device = config.indexing_device if device is None else device
 
     # TODO average over vectorized inputs with weights
+
+    # TODO content_routering to pass the """text""" to the correct model to vectorise it
     vectorised_text = s2_inference.vectorise(
         model_name=index_info.model_name, content=text, 
         device=selected_device,
