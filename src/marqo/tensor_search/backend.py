@@ -109,12 +109,11 @@ def add_customer_field_properties(config: Config, index_name: str,
     # copy fields to the chunk for prefiltering. If it is text, convert it to a keyword type to save space
     # if it's not text, ignore it, and leave it up to OpenSearch (e.g: if it's a number)
     for field_name in customer_field_names:
-        nested_non_vector_field_type = enums.OpenSearchDataType.keyword if field_name[1] == enums.OpenSearchDataType.text else field_name[1]
-        if nested_non_vector_field_type == enums.OpenSearchDataType.text \
-                or nested_non_vector_field_type == enums.OpenSearchDataType.keyword:
+        if field_name[1] == enums.OpenSearchDataType.text \
+                or field_name[1] == enums.OpenSearchDataType.keyword:
             body["properties"][enums.TensorField.chunks]["properties"][validation.validate_field_name(field_name[0])] = {
                 "type": enums.OpenSearchDataType.keyword
-            }
+        }
 
     mapping_res = HttpRequests(config).put(path=F"{index_name}/_mapping", body=json.dumps(body))
 
@@ -137,7 +136,8 @@ def add_customer_field_properties(config: Config, index_name: str,
         new_index_properties[validation.validate_field_name(new_prop)] = {
             "type": type_to_set
         }
-
+    print('jnkjnkjnk')
+    pprint.pprint(new_index_properties)
     get_cache()[index_name] = IndexInfo(
         model_name=existing_info.model_name,
         properties=new_index_properties,

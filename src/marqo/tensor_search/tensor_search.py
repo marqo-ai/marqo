@@ -38,7 +38,10 @@ import typing
 import uuid
 from typing import List, Optional, Union, Iterable, Sequence, Dict, Any
 from PIL import Image
-from marqo.tensor_search.enums import MediaType, MlModel, TensorField, SearchMethod, OpenSearchDataType
+from marqo.tensor_search.enums import (
+    MediaType, MlModel, TensorField, SearchMethod, OpenSearchDataType,
+    EnvVars
+)
 from marqo.tensor_search.enums import IndexSettingsField as NsField
 from marqo.tensor_search import utils, backend, validation, configs, parallel
 from marqo.tensor_search.formatting import _clean_doc
@@ -82,12 +85,23 @@ def create_vector_index(
                 "knn.algo_param.ef_search": 100,
                 "refresh_interval":  refresh_interval
             },
-            "number_of_shards": the_index_settings[NsField.number_of_shards]
+            "number_of_shards": the_index_settings[NsField.number_of_shards],
+
         },
         "mappings": {
             "_meta": {
                 "media_type": media_type,
             },
+            "dynamic_templates": [
+                {
+                    "strings": {
+                        "match_mapping_type": "string",
+                        "mapping": {
+                            "type": "text"
+                        }
+                    }
+                }
+            ],
             "properties": {
                 TensorField.chunks: {
                     "type": "nested",
@@ -103,7 +117,12 @@ def create_vector_index(
             }
         }
     }
+    max_fields = _marqo_field_limit_to_os_limit(
+        int(utils.read_env_vars_and_defaults(EnvVars.MARQO_MAX_INDEX_FIELDS))
+    )
 
+    if max_fields is not None:
+        vector_index_settings["settings"]["mapping"] = {"total_fields": {"limit": int(max_fields)}}
     model_name = the_index_settings[NsField.index_defaults][NsField.model]
     vector_index_settings["mappings"]["_meta"][NsField.index_settings] = the_index_settings
     vector_index_settings["mappings"]["_meta"]["model"] = model_name
@@ -115,6 +134,27 @@ def create_vector_index(
         index_settings=the_index_settings
     )
     return response
+
+
+def _marqo_field_limit_to_os_limit(marqo_index_field_limit: int) -> int:
+    """Translates a Marqo Index Field limit (that a Marqo user will set)
+    into the equivalent limit for Marqo-OS
+
+    Each Marqo field generates 3 Marqo-OS fields:
+        - One for its content
+        - One for its vector
+        - One for filtering
+
+    There are also 3 fields that will be generated on a Marqo index, in most
+    cases:
+        - one for the chunks field
+        - one for chunk's __field_content
+        - one for chunk's __field_name
+
+    Returns:
+        The corresponding Marqo-OS limit
+    """
+    return (marqo_index_field_limit * 3) + 3
 
 
 def _autofill_index_settings(index_settings: dict):

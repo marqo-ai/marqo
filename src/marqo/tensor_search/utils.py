@@ -1,10 +1,10 @@
+import os
 import typing
-from typing import List
 import functools
 import json
 import torch
 from marqo import errors
-from marqo.tensor_search import enums
+from marqo.tensor_search import enums, configs
 from typing import List, Optional, Union, Callable, Iterable, Sequence, Dict
 import copy
 import datetime
@@ -159,3 +159,20 @@ def merge_dicts(base: dict, preferences: dict) -> dict:
         return merged
 
     return merge(merged=merged_dicts, prefs=preferences)
+
+
+def read_env_vars_and_defaults(var: str) -> Optional[str]:
+    """Attempts to read an environment variable.
+    If none is found, it will attempt to retrieve it from
+    configs.default_env_vars(). If still unsuccessful, None is returned.
+    """
+    try:
+        return os.environ[var]
+    except KeyError:
+        try:
+            return configs.get_default_index_settings()[var]
+        except KeyError:
+            return None
+
+
+

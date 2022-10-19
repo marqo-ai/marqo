@@ -14,7 +14,8 @@ from marqo.errors import (
     DocumentNotFoundError,
     IndexAlreadyExistsError,
     InvalidIndexNameError,
-    HardwareCompatabilityError
+    HardwareCompatabilityError,
+    IndexMaxFieldsError
 )
 
 ALLOWED_OPERATIONS = {requests.delete, requests.get, requests.post, requests.put}
@@ -163,6 +164,11 @@ def convert_to_marqo_web_error_and_raise(response: requests.Response, err: reque
                 raise HardwareCompatabilityError(
                     message=f"Filtering is not yet supported for arm-based architectures"
                 ) from err
+        elif open_search_error_type == "illegal_argument_exception":
+            reason = response_dict["error"]["reason"].lower()
+            if "limit of total fields" in reason and "exceeded" in reason:
+                raise IndexMaxFieldsError(message="Exceeded maximum number of "
+                                                  "allowed fields for this index.")
     except KeyError:
         pass
 
