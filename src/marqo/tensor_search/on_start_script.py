@@ -40,7 +40,6 @@ class PopulateCache:
         except errors.BackendCommunicationError as e:
             raise errors.BackendCommunicationError(
                 message="Can't connect to Marqo-os backend!\n"
-                        f"        OPENSEARCH_URL: {self.marqo_os_url}"
             ) from e
         # the following lines turns off auto create index
         # connection = HttpRequests(c)
