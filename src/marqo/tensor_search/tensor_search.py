@@ -117,12 +117,11 @@ def create_vector_index(
             }
         }
     }
-    max_fields = _marqo_field_limit_to_os_limit(
-        int(utils.read_env_vars_and_defaults(EnvVars.MARQO_MAX_INDEX_FIELDS))
-    )
+    max_marqo_fields = utils.read_env_vars_and_defaults(EnvVars.MARQO_MAX_INDEX_FIELDS)
 
-    if max_fields is not None:
-        vector_index_settings["settings"]["mapping"] = {"total_fields": {"limit": int(max_fields)}}
+    if max_marqo_fields is not None:
+        max_os_fields = _marqo_field_limit_to_os_limit(int(max_marqo_fields))
+        vector_index_settings["settings"]["mapping"] = {"total_fields": {"limit": int(max_os_fields)}}
     model_name = the_index_settings[NsField.index_defaults][NsField.model]
     vector_index_settings["mappings"]["_meta"][NsField.index_settings] = the_index_settings
     vector_index_settings["mappings"]["_meta"]["model"] = model_name
