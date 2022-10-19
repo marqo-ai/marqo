@@ -145,37 +145,72 @@ class TestCreateIndex(MarqoTestCase):
         )
         assert intended_shard_count == int(resp.json()[self.index_name_1]['settings']['index']['number_of_shards'])
 
-    def test_field_limit(self):
+    def test_field_limits(self):
+
+        index_limits = [1, 5, 10, 100, 1000]
+        for lim in index_limits:
+            try:
+                tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+            except IndexNotFoundError as s:
+                pass
+            mock_read_env_vars = mock.MagicMock()
+            mock_read_env_vars.return_value = lim
+
+            @mock.patch("marqo.tensor_search.utils.read_env_vars_and_defaults", mock_read_env_vars)
+            def run():
+                res_1 = tensor_search.add_documents(
+                    index_name=self.index_name_1, docs=[{f"f{i}": "some content" for i in range(lim)}],
+                    auto_refresh=True, config=self.config
+                )
+                assert not res_1['errors']
+                res_1_2 = tensor_search.add_documents(
+                    index_name=self.index_name_1, docs=[{f"f{i}": "some content" for i in range(lim // 2 + 1)}],
+                    auto_refresh=True, config=self.config
+                )
+                assert not res_1_2['errors']
+                try:
+                    res_2 = tensor_search.add_documents(
+                        index_name=self.index_name_1, docs=[
+                            {'fx': "blah"}
+                        ], auto_refresh=True, config=self.config
+                    )
+                    raise AssertionError
+                except errors.IndexMaxFieldsError:
+                    pass
+                return True
+            assert run()
+
+
+    def test_field_Limit_non_text_types(self):
         mock_read_env_vars = mock.MagicMock()
         mock_read_env_vars.return_value = 5
 
         @mock.patch("marqo.tensor_search.utils.read_env_vars_and_defaults", mock_read_env_vars)
         def run():
-            res_0 = tensor_search.create_vector_index(
-                index_name=self.index_name_1, config=self.config
-            )
+            docs = [
+                {"f1": "fgrrvb", "f2": 1234, "f3": 1.4, "f4": "hello hello", "f5": False},
+                {"f1": "erf1f", "f2": 934, "f3": 4.0, "f4": "my name", "f5": True},
+                {"f1": "water is healthy", "f5": True},
+                {"f2": 49, "f3": 400.4, "f4": "alien message"}
+            ]
             res_1 = tensor_search.add_documents(
-                index_name=self.index_name_1, docs=[
-                    {"f1": "fgrrvb", "f2": 1234, "f3": 1.4, "f4": "hello hello", "f5": False},
-                    {"f1": "erf1f", "f2": 934, "f3": 4.0, "f4": "my name", "f5": True},
-                    {"f1": "water is healthy",  "f5": True},
-                    {"f2": 49, "f3": 400.4, "f4": "alien message"}
-                ], auto_refresh=True, config=self.config
+                index_name=self.index_name_1, docs=docs, auto_refresh=True, config=self.config
             )
             mapping_info = requests.get(
-                self.authorized_url+f"/{self.index_name_1}/_mapping",
+                self.authorized_url + f"/{self.index_name_1}/_mapping",
                 verify=False
             )
             assert not res_1['errors']
             try:
                 res_2 = tensor_search.add_documents(
                     index_name=self.index_name_1, docs=[
-                        {'fx3': "blah"}
+                        {'fx': "blah"}
                     ], auto_refresh=True, config=self.config
                 )
                 raise AssertionError
             except errors.IndexMaxFieldsError:
                 pass
             return True
+
         assert run()
 

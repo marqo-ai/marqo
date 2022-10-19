@@ -136,8 +136,6 @@ def add_customer_field_properties(config: Config, index_name: str,
         new_index_properties[validation.validate_field_name(new_prop)] = {
             "type": type_to_set
         }
-    print('jnkjnkjnk')
-    pprint.pprint(new_index_properties)
     get_cache()[index_name] = IndexInfo(
         model_name=existing_info.model_name,
         properties=new_index_properties,
