@@ -233,6 +233,6 @@ def content_routering(field_content, infer_if_media = True):
             return field_content, MediaType.text, FileType.straight_text
 
     elif isinstance(field_content, ImageType):
-        return field_content, MediaType.image,FileType.PILImage
+        return field_content, MediaType.image, FileType.PILImage
     else:
         raise errors.MarqoError(f"The input type {type(field_content)} is supported.")

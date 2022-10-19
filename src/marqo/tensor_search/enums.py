@@ -24,6 +24,7 @@ class FileType:
 class MlModel:
     bert = "hf/all_datasets_v4_MiniLM-L6"
     clip = "ViT-L/14"
+    x_clip = "microsoft/xclip-base-patch16-kinetics-600"
 
 
 class SearchMethod(str, Enum):

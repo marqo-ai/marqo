@@ -544,12 +544,18 @@ def _get_random_properties() -> Dict:
 
 def _get_XCLIP_properties() -> Dict:
     XCLIP_MODEL_PROPERTIES = {
-            "microsoft/xclip-base-patch16-ucf-4-shot":
+            "microsoft/xclip-base-patch16-zero-shot":
                 {"name": "microsoft/xclip-base-patch16-ucf-4-shot",
-                "dimensions": 384,
+                "dimensions": 512,
                 "tokens":128,
-                "type":"random",
+                "type":"xclip",
                 "notes": ""},
+            "microsoft/xclip-base-patch16-kinetics-600":
+                {"name": "microsoft/xclip-base-patch16-ucf-4-shot",
+                 "dimensions": 512,
+                 "tokens": 128,
+                 "type": "xclip",
+                 "notes": ""},
     }
     return XCLIP_MODEL_PROPERTIES
 

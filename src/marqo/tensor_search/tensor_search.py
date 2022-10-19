@@ -33,6 +33,7 @@ Notes on search behaviour with caching and searchable attributes:
 import copy
 import datetime
 import functools
+import os
 import pprint
 import typing
 import uuid
@@ -55,6 +56,7 @@ from marqo.s2_inference.clip_utils import _is_image
 from marqo.s2_inference.reranking import rerank
 from marqo.s2_inference import s2_inference
 from moviepy.editor import VideoFileClip
+import tempfile
 import cv2
 
 # We depend on _httprequests.py for now, but this may be replaced in the future, as
@@ -76,7 +78,7 @@ def create_vector_index(
         refresh_interval: str = "1s", index_settings = None):
     """
     Args:
-        media_type: 'text'|'image'
+        media_type: 'text'|'image'|'video'
     """
     if index_settings is not None:
         the_index_settings = _autofill_index_settings(index_settings=index_settings)
@@ -370,9 +372,13 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
                 infer_if_media = index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]
 
+                #download the file in a tmpdirname
+
                 try:
+                    # Pass the field_content into the router and get the MediaType and FileType
                     field_content, mediatype, filetype = content_routering(field_content, infer_if_media)
                 except:
+                    # Add the error messsage to the doc
                     document_is_valid = False
                     routering_error = errors.InvalidArgError(message=f'Could not process given image: {field_content}')
                     unsuccessful_docs.append(
@@ -380,17 +386,16 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                              'code': routering_error.code})
                     )
                     break
+                # Load and process the field content based on the MediaType and FileType.
+                # We may wrap these into a function later
 
-
+                # mediatype is text
                 if mediatype == MediaType.text:
-                    #We can add more combinations of MediaType and FieldType combinations later.
-
+                    # We can support more combinations of MediaType and FieldType combinations later.
                     if filetype == FileType.straight_text:
                         pass
                     else:
                         raise TypeError(f"We do not support the file type {filetype} for media {mediatype}")
-
-
                     if filetype == FileType.straight_text:
                         split_by = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][
                             NsField.split_method]
@@ -398,9 +403,14 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                         split_overlap = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][NsField.split_overlap]
                         content_chunks = text_processor.split_text(field_content, split_by=split_by, split_length=split_length, split_overlap=split_overlap)
                         text_chunks = content_chunks
-
+                # mediatype is image
                 elif mediatype == MediaType.image:
-                    if filetype == FileType.url or filetype == FileType.local:
+                    if filetype == FileType.url:
+                        # Remove the downloaded file after loading the file into the memory
+                        temp_file = field_content
+                        field_content = PIL.Image.open(field_content)
+                        os.remove(temp_file)
+                    elif filetype == FileType.local:
                         field_content = PIL.Image.open(field_content)
                     elif filetype == FileType.PILImage:
                         pass
@@ -421,16 +431,20 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                                  'code': image_err.code})
                         )
                         break
-
+                # mediatype is video
                 elif mediatype == MediaType.video:
-                    if filetype == FileType.url or filetype.local:
+                    if filetype == FileType.url:
+                        #Remove the downloaded file after loading the file into the memory
+                        temp_file = field_content
+                        field_content = VideoFileClip(field_content)
+                        os.remove(temp_file)
+                    elif filetype == FileType.local:
                         field_content = VideoFileClip(field_content)
                     elif filetype == filetype.ListOfPILImage:
                         pass
                     else:
                         raise TypeError(f"We do not support the file type {filetype} for media {mediatype}")
                     content_chunks, text_chunks = video_processor.chunk_video(field_content, device=selected_device)
-
 
 
                 normalize_embeddings = index_info.index_settings[NsField.index_defaults][NsField.normalize_embeddings]
@@ -440,7 +454,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                     # errors of different types generated here, too.
                     vector_chunks = s2_inference.vectorise(model_name=index_info.model_name, content=content_chunks,
                                                            device=selected_device, normalize_embeddings=normalize_embeddings,
-                                                           infer=infer_if_image)
+                                                           infer=infer_if_image, mediatype = mediatype)
                 except s2_inference_errors.S2InferenceError:
                     document_is_valid = False
                     image_err = errors.InvalidArgError(message=f'Could not process given image: {field_content}')
@@ -1063,6 +1077,8 @@ def _select_model_from_media_type(media_type: Union[MediaType, str]) -> Union[Ml
         return MlModel.bert
     elif media_type == MediaType.image:
         return MlModel.clip
+    elif media_type == MediaType.video:
+        return MlModel.x_clip
     else:
         raise ValueError("_select_model_from_media_type(): "
                          "Received unknown media type: {}".format(media_type))

@@ -21,32 +21,10 @@ def get_allowed_video_types():
     return set(('.mp4', '.avi', '.wmv'))
 
 
-# def format_and_load_CLIP_images(images: List[Union[str, ndarray, ImageType]]) -> VideoType:
-#     """takes in a list of strings, arrays or urls and either loads and/or converts to PIL
-#         for the clip model
-#
-#     Args:
-#         images (List[Union[str, np.ndarray, ImageType]]): list of file locations or arrays (can be mixed)
-#
-#     Raises:
-#         TypeError: _description_
-#
-#     Returns:
-#         List[ImageType]: list of PIL images
-#     """
-#     if not isinstance(images, list):
-#         raise TypeError(f"expected list but received {type(images)}")
-#
-#     results = []
-#     for image in images:
-#         results.append(format_and_load_CLIP_image(image))
-#
-#     return results
-
-def format_and_load_XCLIP_videos(videos: List[Union[str, ndarray, List[ImageType]]]) -> VideoType:
+def format_and_load_XCLIP_videos(videos: List[Union[str, ndarray, List[ImageType]]]) -> List[VideoType]:
     """takes in a list of strings, arrays or urls and either loads and/or converts to
     #         VideoType: List[PILImage]
-    #         for the clip model
+    #         for the x_clip model
     #
     #     Args:
     #         videos (List[Union[str, np.ndarray, List[ImageType]]]): list of file locations, arrays,
@@ -71,7 +49,7 @@ def format_and_load_XCLIP_videos(videos: List[Union[str, ndarray, List[ImageType
 
 
 def _load_video_from_path(video: str) -> VideoType:
-    """loads an image into PIL from a string path that is
+    """loads an video into List[PILImage] from a string path that is
     either local or a url
 
     Args:
@@ -81,7 +59,7 @@ def _load_video_from_path(video: str) -> VideoType:
         ValueError: _description_
 
     Returns:
-        ImageType: _description_
+        Video Type: _description_
     """
 
     if os.path.isfile(video):
@@ -111,17 +89,17 @@ def convert_to_listofPIL(video):
 
 
 def format_and_load_XCLIP_video(video: Union[str, ndarray, List[ImageType]]) -> VideoType:
-    """standardizes the input to be a PIL image
+    """standardizes the input to be a List[PILImage]
 
     Args:
-        image (Union[str, np.ndarray, ImageType]): can be a local file, url or array
+        video (Union[str, np.ndarray, List[ImageType]]): can be a local file, url or array
 
     Raises:
         ValueError: _description_
         TypeError: _description_
 
     Returns:
-        ImageType: PIL image
+        Videotype: List[PILImage]
     """
     # check for the input type
     if isinstance(video, str):
@@ -129,10 +107,10 @@ def format_and_load_XCLIP_video(video: Union[str, ndarray, List[ImageType]]) -> 
     elif isinstance(video, np.ndarray):
         video = list([Image.fromarray(video[i].astype('uint8'), 'RGB') for i in range(len(video))])
 
-    elif isinstance(video, VideoType):
+    elif isinstance(video, list) and isinstance(video[0], ImageType):
         video = video
     else:
-        raise TypeError(f"input of type {type(video)} did not match allowed types of str, np.ndarray, ImageType")
+        raise TypeError(f"input of type {type(video)} did not match allowed types of str, np.ndarray, VideoType")
 
     return video
 
@@ -175,21 +153,23 @@ def _is_video(inputs: Union[str, List[Union[str, VideoType, ndarray]]]) -> bool:
                 return True
             else:
                 False
-                # raise ValueError(f"{thing} cannot be identified as a local file, url or image")
+                # raise ValueError(f"{thing} cannot be identified as a local file, url or video")
 
-    # if it is an array, then it is an image
-    elif isinstance(thing, (VideoType, ndarray)):
+    # if it is an array, then it is an video
+    elif isinstance(thing, list) and isinstance(thing[0], ImageType):
+        return True
+    elif isinstance(thing, ImageType):
         return True
     else:
-        raise TypeError(f"expected type Image or str for inputs but received type {type(thing)}")
+        raise TypeError(f"expected type Video or str for inputs but received type {type(thing)}")
 
 
 class XCLIP:
     """
-    conveniance class wrapper to make clip work easily for both text and image encoding
+    conveniance class wrapper to make clip work easily for both text and video encoding
     """
 
-    def __init__(self, model_type: str = "microsoft/xclip-base-patch16-ucf-4-shot", device: str = 'cpu', embedding_dim: int = None,
+    def __init__(self, model_type: str = "microsoft/xclip-base-patch16-kinetics-600", device: str = 'cpu', embedding_dim: int = None,
                  truncate: bool = True, **kwargs) -> None:
 
         self.model_type = model_type
@@ -202,7 +182,7 @@ class XCLIP:
 
     def load(self) -> None:
 
-        # https://github.com/openai/CLIP/issues/30
+        # https://huggingface.co/models?other=xclip
         self.processor = XCLIPProcessor.from_pretrained(self.model_type)
         self.model = XCLIPModel.from_pretrained(self.model_type)
         self.tokenizer = CLIPTokenizer.from_pretrained(self.model_type)
@@ -226,10 +206,10 @@ class XCLIP:
         if self.model is None:
             self.load()
 
-        text = self.tokenizer(sentence, truncate=self.truncate).to(self.device)
+        text = self.tokenizer(sentence, padding = True, return_tensors = "pt").to(self.device)
 
         with torch.no_grad():
-            outputs = self.model.encode_text(text)
+            outputs = self.model.get_text_features(**text)
 
         if normalize:
             _shape_before = outputs.shape
@@ -240,20 +220,25 @@ class XCLIP:
 
     def encode_video(self, videos: Union[str, VideoType, ndarray, List[Union[str, ImageType]]],
                      normalize=True) -> FloatTensor:
-
         if self.model is None:
             self.load()
-
         # default to batch encoding
-        if isinstance(videos, list):
+        # Note that a single video also is a list
+        if isinstance(videos, list) and isinstance(videos[0], list):
             video_input = format_and_load_XCLIP_videos(videos)
-        else:
+        elif isinstance(videos, list) and isinstance(videos[0], ImageType):
             video_input = [format_and_load_XCLIP_video(videos)]
 
-        self.video_input_processed = torch.stack([self.processor(_video).to(self.device) for _video in video_input])
+        #print("processing video")
+
+        self.video_input_processed = [self.processor(videos = list(_video), return_tensors = "pt") for _video in video_input]
+
+        #print(self.video_input_processed)
 
         with torch.no_grad():
-            outputs = self.model.get_video_features(self.video_input_processed)
+
+            outputs = torch.cat([self.model.get_video_features(**video) for video in self.video_input_processed])
+            print(outputs.shape)
 
         if normalize:
             _shape_before = outputs.shape
@@ -283,14 +268,14 @@ class XCLIP:
             is_video = False
             if default == 'text':
                 is_video = False
-            elif default == 'image':
+            elif default == 'video':
                 is_video = True
             else:
-                raise ValueError(f"expected default='image' or default='text' but received {default}")
+                raise ValueError(f"expected default='video' or default='text' but received {default}")
 
         if is_video:
             logger.debug('video')
-            return self.encode_image(inputs, normalize=normalize)
+            return self.encode_video(inputs, normalize=normalize)
         else:
             logger.debug('text')
             return self.encode_text(inputs, normalize=normalize)
