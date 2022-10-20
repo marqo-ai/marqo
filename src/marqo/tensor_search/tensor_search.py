@@ -73,6 +73,7 @@ def create_vector_index(
         media_type: 'text'|'image'
     """
     if index_settings is not None:
+        _check_model_name(index_settings)
         the_index_settings = _autofill_index_settings(index_settings=index_settings)
     else:
         the_index_settings = configs.get_default_index_settings()
@@ -116,6 +117,13 @@ def create_vector_index(
         index_settings=the_index_settings
     )
     return response
+
+
+def _check_model_name(index_settings):
+    model_name = index_settings[NsField.index_defaults].get(NsField.model)
+    model_properties = index_settings[NsField.index_defaults].get(NsField.model_properties)
+    if model_properties is not None and model_name is None:
+        raise s2_inference_errors.UnknownModelError(f"No model name found for model_properties={model_properties}")
 
 
 def _autofill_index_settings(index_settings: dict):
@@ -368,14 +376,9 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                 normalize_embeddings = index_info.index_settings[NsField.index_defaults][NsField.normalize_embeddings]
                 infer_if_image = index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]
 
-                try:
-                    model_properties = s2_inference.get_model_properties_from_registry(model_name=index_info.model_name)
-                except KeyError:
-                    index_defaults = index_info.get_index_settings()["index_defaults"]
-                    try:
-                        model_properties = index_defaults[NsField.model_properties]
-                    except KeyError:
-                        raise errors.UnknownModelError(f"Could not find model properties for model={index_info.model_name}") from None
+
+                index_defaults = index_info.get_index_settings()["index_defaults"]
+                model_properties = index_defaults.get(NsField.model_properties)
 
                 try:
                     # in the future, if we have different underlying vectorising methods, make sure we catch possible
@@ -727,14 +730,8 @@ def _vector_text_search(
         raise errors.IndexNotFoundError(message="Tried to search a non-existent index: {}".format(index_name))
     selected_device = config.indexing_device if device is None else device
 
-    try:
-        model_properties = s2_inference.get_model_properties_from_registry(model_name=index_info.model_name)
-    except KeyError:
-        index_defaults = index_info.get_index_settings()["index_defaults"]
-        try:
-            model_properties = index_defaults[NsField.model_properties]
-        except KeyError:
-            raise errors.UnknownModelError(f"Could not find model properties for model={index_info.model_name}")
+    index_defaults = index_info.get_index_settings()["index_defaults"]
+    model_properties = index_defaults.get(NsField.model_properties)
 
     # TODO average over vectorized inputs with weights
     vectorised_text = s2_inference.vectorise(

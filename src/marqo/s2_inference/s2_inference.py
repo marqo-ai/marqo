@@ -2,7 +2,7 @@
 The functions defined here would have endpoints, later on.
 """
 import numpy as np
-from marqo.s2_inference.errors import VectoriseError, InvalidModelSettingsError, ModelLoadError
+from marqo.s2_inference.errors import VectoriseError, InvalidModelSettingsError, ModelLoadError, UnknownModelError
 from PIL import UnidentifiedImageError
 from marqo.s2_inference.model_registry import load_model_properties
 from marqo.s2_inference.configs import get_default_device,get_default_normalization,get_default_seq_length
@@ -50,6 +50,10 @@ def _create_model_cache_key(model_name: str, device: str) -> Tuple[str, str]:
 
     Returns:
         str: _description_
+
+    Future_Change:
+        make the cache key more unique for scenarios such as the user
+        changing the properties but keeping the same model name
     """
 
     model_cache_key = (model_name, device)
@@ -87,13 +91,16 @@ def _validate_model_properties(model_name: str, model_properties: dict) -> dict:
                 model_properties[key] = value
 
     else:
-        model_properties = MODEL_PROPERTIES['models'][model_name]
+        model_properties = get_model_properties_from_registry(model_name)
 
     return model_properties
 
 
 def clear_loaded_models() -> None:
     """ clears the loaded model cache
+
+        Future_Change:
+            expose cache related functions to the client
     """
     available_models.clear()
 
@@ -113,7 +120,7 @@ def get_model_properties_from_registry(model_name: str) -> dict:
     """
 
     if model_name not in MODEL_PROPERTIES['models']:
-        raise KeyError(f"model_name={model_name} not in allowed model names")
+        raise UnknownModelError(f"Could not find model properties for model={model_name}")
 
     return MODEL_PROPERTIES['models'][model_name]
 
