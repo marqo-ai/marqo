@@ -170,7 +170,7 @@ def read_env_vars_and_defaults(var: str) -> Optional[str]:
         return os.environ[var]
     except KeyError:
         try:
-            return configs.get_default_index_settings()[var]
+            return configs.default_env_vars()[var]
         except KeyError:
             return None
 

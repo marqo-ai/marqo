@@ -146,7 +146,7 @@ class TestCreateIndex(MarqoTestCase):
         assert intended_shard_count == int(resp.json()[self.index_name_1]['settings']['index']['number_of_shards'])
 
     def test_field_limits(self):
-        index_limits = [1, 5, 10, 100, None, 1000]
+        index_limits = [1, 5, 10, 100, 1000]
         for lim in index_limits:
             try:
                 tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
