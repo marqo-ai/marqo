@@ -60,7 +60,9 @@ class MarqoWebError(Exception):
     def __init__(self, message: str, status_code: int = None,
                  error_type: str = None, code: str = None,
                  link: str = None) -> None:
-        base_message = "Please raise an issue on Marqo's GitHub repo (https://github.com/marqo-ai/marqo) if this problem persists."
+        base_message = ("Please create an issue on Marqo's GitHub repo"
+                        " (https://github.com/marqo-ai/marqo/issues) "
+                        "if this problem persists.")
         self.message = f"{message}\n{base_message}"
 
         if self.status_code is None:
