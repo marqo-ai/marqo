@@ -174,10 +174,3 @@ class TestGenericModelSupport(MarqoTestCase):
 
         assert np.array(result).shape[-1] == model_properties['dimensions']
 
-    def test_vectorize_search(self):
-        pass
-        # put in api tests
-        # create index
-        # add docs
-        # vectorize
-        # search
