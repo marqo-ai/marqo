@@ -409,7 +409,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
 
                 index_defaults = index_info.get_index_settings()["index_defaults"]
-                model_properties = index_defaults.get(NsField.model_properties)
+                model_properties = index_defaults.get(NsField.model_properties, None)
 
                 try:
                     # in the future, if we have different underlying vectorising methods, make sure we catch possible
@@ -854,7 +854,7 @@ def _vector_text_search(
     selected_device = config.indexing_device if device is None else device
 
     index_defaults = index_info.get_index_settings()["index_defaults"]
-    model_properties = index_defaults.get(NsField.model_properties)
+    model_properties = index_defaults.get(NsField.model_properties, None)
 
     # TODO average over vectorized inputs with weights
     vectorised_text = s2_inference.vectorise(
