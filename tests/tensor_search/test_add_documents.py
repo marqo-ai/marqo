@@ -1,11 +1,12 @@
 import copy
+import fileinput
 import json
 import pprint
 from unittest import mock
-
+import marqo.tensor_search.utils as marqo_utils
+import numpy as np
 import requests
-from marqo.tensor_search.enums import TensorField, IndexSettingsField
-from marqo.client import Client
+from marqo.tensor_search.enums import TensorField, IndexSettingsField, SearchMethod
 from marqo.errors import IndexNotFoundError, InvalidArgError, BadRequestError
 from marqo.tensor_search import tensor_search, index_meta_cache, backend
 from tests.marqo_test import MarqoTestCase
@@ -14,15 +15,11 @@ from tests.marqo_test import MarqoTestCase
 class TestAddDocuments(MarqoTestCase):
 
     def setUp(self) -> None:
-        mq = Client(**self.client_settings)
-        self.endpoint = mq.config.url
-        self.config = mq.config
-        self.client = mq
-
+        self.endpoint = self.authorized_url
         self.generic_header = {"Content-type": "application/json"}
         self.index_name_1 = "my-test-index-1"
         try:
-            self.client.delete_index(self.index_name_1)
+            tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         except IndexNotFoundError as s:
             pass
 
@@ -228,37 +225,36 @@ class TestAddDocuments(MarqoTestCase):
             assert "status" in item
 
     def test_add_documents_validation(self):
-        """These bad docs should raise errors"""
+        """These bad docs should return errors"""
         bad_doc_args = [
-            [{
-                    "_id": "123",
-                    "id": {},
-            }],
-            [{
-                "blahblah": {1243}
-            }],
-            [{
-                "blahblah": None
-            }],
-            [{
-                "blahblah": [None], "hehehe": 123
-            },{
-                "some other obj": "finnne"
-            }],
-            [{
-                "blahblah": [None], "hehehe": 123
-            }, {
-                "some other obj": AssertionError  # wtf lad!!!
-            }],
-            [{
-                "blahblah": max  # a func!!!
-            }]
+            [{"_id": "to_fail_123", "id": {}}],
+            # strict checking: only allowed fields:
+            [{"_id": "to_fail_123", "my_field": dict()}],
+            [{"_id": "to_fail_123", "my_field": ["wow", "this", "is"]}],
+            [{"_id": "to_fail_123", "my_field": ["wow", "this", "is"]},
+             {"_id": "to_pass_123", "my_field": 'some_content'}],
+            [{"_id": "to_fail_123", "my_field": [{"abc": "678"}]}],
+            [{"_id": "to_fail_123", "my_field": {"abc": "234"}}],
+            [{"_id": "to_fail_123", "my_field": {"abc": "234"}},
+             {"_id": "to_pass_123", "my_field": 'some_content'}],
+            # other checking:
+            [{"blahblah": {1243}, "_id": "to_fail_123"}],
+            [{"blahblah": None, "_id": "to_fail_123"}],
+            [{"_id": "to_fail_123", "blahblah": [None], "hehehe": 123},
+             {"_id": "to_fail_567", "some other obj": "finnne", 123: "heehee"}],
+            [{"_id": "to_fail_123", "blahblah": [None], "hehehe": 123},
+             {"_id": "to_fail_567", "some other obj": AssertionError}],
+            [{"_id": "to_fail_567", "blahblah": max}]
         ]
-        for bad_doc_arg in bad_doc_args:
-            add_res = tensor_search.add_documents(config=self.config, index_name=self.index_name_1,
-                                                  docs=bad_doc_arg, auto_refresh=True)
-            assert any(['error' in item for item in add_res['items']])
-
+        for update_mode in ('replace', 'update'):
+            for bad_doc_arg in bad_doc_args:
+                add_res = tensor_search.add_documents(
+                    config=self.config, index_name=self.index_name_1,
+                    docs=bad_doc_arg, auto_refresh=True, update_mode=update_mode)
+                assert add_res['errors'] is True
+                assert all(['error' in item for item in add_res['items'] if item['_id'].startswith('to_fail')])
+                assert all(['result' in item
+                            for item in add_res['items'] if item['_id'].startswith('to_pass')])
 
     def test_add_documents_set_device(self):
         """calling search with a specified device overrides device defined in config"""
@@ -353,7 +349,7 @@ class TestAddDocuments(MarqoTestCase):
             tensor_search.create_vector_index(
                 config=self.config, index_name=self.index_name_1, index_settings=image_index_config)
             docs_results = [
-                ([{"_id": "123","image_field": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png"},
+                ([{"_id": "123", "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png"},
                  {"_id": "789", "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png"},
                  {"_id": "456", "image_field": "https://www.marqo.ai/this/image/doesnt/exist.png"}],
                  [("123", "result"), ("789", "result"), ("456", "error")]
@@ -423,18 +419,22 @@ class TestAddDocuments(MarqoTestCase):
              [(None, 'error'), ("cool", 'result'), (None, 'error'), (None, 'result'), (None, 'error'),
               (None, 'error')]),
         ]
-        for docs, expected_results in docs_results:
-            add_res = tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs, auto_refresh=True)
-            assert len(add_res['items']) == len(expected_results)
-            for i, res_dict in enumerate(add_res['items']):
-                # if the expected id is None, then it assumed the id is
-                # generated and can't be asserted against
-                if expected_results[i][0] is not None:
-                    assert res_dict["_id"] == expected_results[i][0]
-                assert expected_results[i][1] in res_dict
+        for update_mode in ('update', 'replace'):
+            for docs, expected_results in docs_results:
+                add_res = tensor_search.add_documents(
+                    config=self.config, index_name=self.index_name_1, docs=docs, auto_refresh=True,
+                    update_mode=update_mode
+                )
+                assert len(add_res['items']) == len(expected_results)
+                for i, res_dict in enumerate(add_res['items']):
+                    # if the expected id is None, then it assumed the id is
+                    # generated and can't be asserted against
+                    if expected_results[i][0] is not None:
+                        assert res_dict["_id"] == expected_results[i][0]
+                    assert expected_results[i][1] in res_dict
 
     def test_mappings_arent_updated(self):
-        """if an image isn't added properly, we need to ensure that
+        """if a doc isn't added properly, we need to ensure that
         it's mappings don't get added to index mappings
 
         Test for:
@@ -472,21 +472,23 @@ class TestAddDocuments(MarqoTestCase):
              ({"good_field_1", "good_field_2"}, { "bad_field_1"})
              ),
         ]
-        for docs, (good_fields, bad_fields) in docs_results:
-            # good_fields should appear in the mapping.
-            # bad_fields should not
-            tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs, auto_refresh=True)
-            ii = backend.get_index_info(config=self.config, index_name=self.index_name_1)
-            customer_props = {field_name for field_name in ii.get_text_properties()}
-            reduced_vector_props = {field_name.replace(TensorField.vector_prefix, '')
-                                    for field_name in ii.get_text_properties()}
-            for field in good_fields:
-                assert field in customer_props
-                assert field in reduced_vector_props
+        for update_mode in ('update', 'replace'):
+            for docs, (good_fields, bad_fields) in docs_results:
+                # good_fields should appear in the mapping.
+                # bad_fields should not
+                tensor_search.add_documents(config=self.config, index_name=self.index_name_1,
+                                            docs=docs, auto_refresh=True, update_mode=update_mode)
+                ii = backend.get_index_info(config=self.config, index_name=self.index_name_1)
+                customer_props = {field_name for field_name in ii.get_text_properties()}
+                reduced_vector_props = {field_name.replace(TensorField.vector_prefix, '')
+                                        for field_name in ii.get_text_properties()}
+                for field in good_fields:
+                    assert field in customer_props
+                    assert field in reduced_vector_props
 
-            for field in bad_fields:
-                assert field not in customer_props
-                assert field not in reduced_vector_props
+                for field in bad_fields:
+                    assert field not in customer_props
+                    assert field not in reduced_vector_props
 
     def test_mappings_arent_updated_images(self):
         """if an image isn't added properly, we need to ensure that
@@ -544,3 +546,319 @@ class TestAddDocuments(MarqoTestCase):
                     assert field not in customer_props
                     assert field not in reduced_vector_props
             tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+
+    def patch_documents_tests(self, docs_, update_docs, get_docs):
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs_, auto_refresh=True)
+        update_res = tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=update_docs,
+            auto_refresh=True, update_mode='update')
+
+        for doc_id, check_dict in get_docs.items():
+            updated_doc = tensor_search.get_document_by_id(
+                config=self.config, index_name=self.index_name_1, document_id=doc_id
+            )
+            for field, expected_value in check_dict.items():
+                assert updated_doc[field] == expected_value
+
+            updated_raw_doc = requests.get(
+                url=F"{self.endpoint}/{self.index_name_1}/_doc/{doc_id}",
+                verify=False
+            )
+            # make sure that the chunks have been updated
+            for ch in updated_raw_doc.json()['_source']['__chunks']:
+                for field, expected_value in check_dict.items():
+                    assert ch[field] == expected_value
+        return True
+
+    def test_put_documents(self):
+        docs_ = [
+            {"_id": "123", "Title": "Story of Joe Blogs", "Description": "Joe was a great farmer."},
+            {"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}
+        ]
+        assert self.patch_documents_tests(
+            docs_=docs_, update_docs=[{"_id": "789", "Title": "Story of Alex Appleseed"}], get_docs=
+            {"789": {"Description": "Alice grew up in Houston, Texas.",
+                     "Title": "Story of Alex Appleseed"}}
+        )
+
+    def test_put_documents_multiple(self):
+        docs_ = [
+            {"_id": "123", "Title": "Story of Joe Blogs", "Description": "Joe was a great farmer."},
+            {"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}
+        ]
+        assert self.patch_documents_tests(
+            docs_=docs_, update_docs=[{"_id": "789", "Title": "Story of Alex Appleseed"},
+                                      {"_id": "789", "Title": "Woohoo", "Mega": "Coool"},
+                                      {"_id": "789", "Luminosity": "Extreme"},
+                                      {"_id": "789", "Temp": 12.5},
+                                      ], get_docs=
+            {"789": {"Description": "Alice grew up in Houston, Texas.",
+                     "Title": "Woohoo", "Mega": "Coool", "Luminosity": "Extreme", "Temp": 12.5}}
+        )
+
+    def test_put_documents_multiple_docs(self):
+        """mutliple docs updated at once"""
+        docs_ = [
+            {"_id": "123", "Title": "Story of Joe Blogs", "Description": "Joe was a great farmer."},
+            {"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}
+        ]
+        assert self.patch_documents_tests(
+            docs_=docs_, update_docs=[{"_id": "789", "Title": "Story of Alex Appleseed"},
+                                      {"_id": "789", "Title": "Woohoo", "Mega": "Coool"},
+                                      {"_id": "789", "Luminosity": "Extreme"},
+                                      {'_id': '123', 'Title': "Never know", "thing1": 9844},
+                                      {"_id": "789", "Temp": 12.5},
+                                      ], get_docs=
+            {"789": {"Description": "Alice grew up in Houston, Texas.",
+                     "Title": "Woohoo", "Mega": "Coool", "Luminosity": "Extreme", "Temp": 12.5},
+             '123': {'_id': '123', 'Title': "Never know", "thing1": 9844, "Description": "Joe was a great farmer."}}
+        )
+
+    def test_put_documents_new_field(self):
+        docs_ = [
+            {"_id": "123", "Title": "Story of Joe Blogs", "Description": "Joe was a great farmer."},
+            {"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}
+        ]
+        assert self.patch_documents_tests(
+            docs_=docs_,
+            update_docs=[{"_id": "789", "Backstory": "The thing about Alice, was that she was created, "
+                                                                  "not born."}],
+            get_docs=
+            {"789": {"Backstory": "The thing about Alice, was that she was created, not born.",
+                     "Title": "Story of Alice Appleseed"}}
+        )
+
+    def test_put_documents_int(self):
+        docs_ = [
+            {"_id": "123", "int_field": 9814, "Description": "Joe was a great farmer."},
+            {"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}
+        ]
+        assert self.patch_documents_tests(
+            docs_=docs_, update_docs=[{"_id": "123", "int_field": 88489}], get_docs=
+            {"123": {"Description": "Joe was a great farmer.", "int_field": 88489}}
+        )
+
+    def test_put_documents_floats(self):
+        docs_ = [
+            {"_id": "123", "fl_field": 12.5, "Description": "Joe was a great farmer."},
+            {"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}
+        ]
+        assert self.patch_documents_tests(
+            docs_=docs_, update_docs=[{"_id": "123", "fl_field": 4122.2221}], get_docs=
+            {"123": {"Description": "Joe was a great farmer.", "fl_field": 4122.2221}}
+        )
+
+    def test_put_documents_bools(self):
+        docs_ = [
+            {"_id": "123", "bl": True, "Description": "Joe was a great farmer."},
+            {"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}
+        ]
+        assert self.patch_documents_tests(
+            docs_=docs_, update_docs=[{"_id": "123", "bl": False}], get_docs=
+            {"123": {"Description": "Joe was a great farmer.", "bl": False}}
+        )
+
+    def test_put_documents_upsert(self):
+        docs_ = [
+            {"_id": "123", "bl": True, "Description": "Joe was a great farmer."},
+            {"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}
+        ]
+        assert self.patch_documents_tests(
+            docs_=docs_, update_docs=[{"_id": "123", "bl": False}, {"_id": "new_doc", "blah": "hehehe"}],
+            get_docs={
+                "123": {"Description": "Joe was a great farmer.", "bl": False},
+                "new_doc": {"blah": "hehehe"}
+            }
+        )
+
+    def test_put_documents_no_outdated_chunks(self):
+        """Ensure there are no chunks left over
+
+        We have to ensure that
+            1) each chunk's copy of the document is updated (the fields used for filtering)
+            2) the vectors are updated
+            3) there are no dangling chunks
+        """
+        docs_ = [{"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}]
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs_, auto_refresh=True)
+        original_doc = requests.get(
+            url=F"{self.endpoint}/{self.index_name_1}/_doc/789",
+            verify=False
+        )
+        original_number_of_chunks = len(original_doc.json()['_source']['__chunks'])
+        description_chunk = [chunk for chunk in original_doc.json()['_source']['__chunks']
+                             if chunk['__field_name'] == 'Description'][0]
+        update_res = tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=[
+                {"_id": "789", "Title": "Story of Alice Appleseed",
+                 "Description": "Alice grew up in Rooster, Texas."}],
+            auto_refresh=True, update_mode='update')
+        updated_doc = requests.get(
+            url=F"{self.endpoint}/{self.index_name_1}/_doc/789",
+            verify=False
+        )
+        new_description_chunk = [chunk for chunk in updated_doc.json()['_source']['__chunks']
+                                 if chunk['__field_name'] == 'Description'][0]
+        assert len(updated_doc.json()['_source']['__chunks']) == original_number_of_chunks
+
+        descript_vector_name = marqo_utils.generate_vector_name('Description')
+        # check the vectors aren't the same:
+        assert not np.allclose(description_chunk[descript_vector_name], new_description_chunk[descript_vector_name])
+        # check the field content has been updated
+        assert new_description_chunk[TensorField.field_content] == "Alice grew up in Rooster, Texas."
+        # check fields used for filtering are updated
+        for chunk in updated_doc.json()['_source']['__chunks']:
+            assert chunk['Description'] == "Alice grew up in Rooster, Texas."
+
+    def test_put_documents_search(self):
+        """Can we search with the new vectors
+        """
+        docs_ = [{"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}]
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs_, auto_refresh=True)
+        search_str = "Who is an alien?"
+        first_search = tensor_search.search(config=self.config, index_name=self.index_name_1, text=search_str)
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
+            {"_id": "789", "Title": "Story of Alice Appleseed",
+             "Description": "Unbeknownst to most, Alice is actually an alien in disguise. She uses a UFO to commute to work."}
+        ], auto_refresh=True, update_mode='update')
+        second_search = tensor_search.search(config=self.config, index_name=self.index_name_1, text=search_str)
+        assert not np.isclose(first_search["hits"][0]["_score"], second_search["hits"][0]["_score"])
+        assert second_search["hits"][0]["_score"] > first_search["hits"][0]["_score"]
+
+    def test_put_documents_search_new_fields(self):
+        """Can we search with the new field?
+        """
+        docs_ = [{"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}]
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs_, auto_refresh=True)
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
+            {"_id": "789", "Title": "Story of Alice Appleseed", "Favourite Wavelength": "2 microns"}
+        ], auto_refresh=True, update_mode='update')
+        searched = tensor_search.search(
+            config=self.config, index_name=self.index_name_1, text="A very small length",
+            searchable_attributes=['Favourite Wavelength']
+        )
+        assert len(searched['hits']) == 1
+        assert searched["hits"][0]['_id'] == '789'
+
+    def patch_documents_filtering_test(self, original_add_docs, update_add_docs, filter_string, expected_ids: set):
+        """Helper for filtering tests"""
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=original_add_docs, auto_refresh=True)
+        res = tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=update_add_docs, auto_refresh=True, update_mode='update')
+
+        abc = requests.get(
+            url=F"{self.endpoint}/{self.index_name_1}/_doc/789",
+            verify=False
+        )
+        for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
+            searched = tensor_search.search(
+                config=self.config, index_name=self.index_name_1, filter=filter_string, text='',
+                search_method=search_method
+            )
+            assert {h['_id'] for h in searched['hits']} == expected_ids
+        return True
+
+    def test_put_documents_filtering_text(self):
+        assert self.patch_documents_filtering_test(
+            original_add_docs=[
+                {"_id": "101", "Red": "Herring"},
+                {"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}],
+            update_add_docs=[
+                {"_id": "789", "Mother_tongue": "Elvish"}],
+            filter_string="Mother_tongue:Elvish",
+            expected_ids={'789'}
+        )
+
+    def test_put_documents_filtering_float(self):
+        """  - ints, bools """
+        assert self.patch_documents_filtering_test(
+            original_add_docs=[
+                {"_id": "101", "Red": "Herring"},
+                {"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}],
+            update_add_docs=[
+                {"_id": "789", "Accuracy": -19.34}],
+            filter_string="Accuracy:[-100 TO -1.8]",
+            expected_ids={'789'}
+        )
+
+    def test_put_documents_filtering_bool(self):
+        """  - ints, bools """
+        assert self.patch_documents_filtering_test(
+            original_add_docs=[
+                {"_id": "101", "Red": "Herring"},
+                {"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}],
+            update_add_docs=[
+                {"_id": "789", "am": True}],
+            filter_string="am:true",
+            expected_ids={'789'}
+        )
+
+    def test_put_documents_filtering_int(self):
+        """  - ints, bools """
+        assert self.patch_documents_filtering_test(
+            original_add_docs=[
+                {"_id": "101", "Red": "Herring"},
+                {"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}],
+            update_add_docs=[
+                {"_id": "789", "my_int": 1234}],
+            filter_string="my_int:[0 TO 10000]",
+            expected_ids={'789'}
+        )
+
+    def test_put_no_update(self):
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[{'_id':'123'}],
+                                    auto_refresh=True, update_mode='replace')
+        res = tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[{'_id':'123'}],
+                                          auto_refresh=True, update_mode='replace')
+        assert {'_id':'123'} == tensor_search.get_document_by_id(
+            config=self.config, index_name=self.index_name_1, document_id='123')
+
+    def test_put_no_update_existing_field(self):
+        assert self.patch_documents_tests(
+            docs_=[{'_id': '123', "abc": "567"}], update_docs=[{'_id': '123'}], get_docs=
+            {"123": {'_id': '123', "abc": "567"}}
+        )
+        get_res = tensor_search.get_document_by_id(
+            config=self.config, index_name=self.index_name_1, document_id='123')
+        assert {'_id': '123', "abc": "567"} == get_res
+
+    def test_put_no_update_existing_field_float(self):
+        assert self.patch_documents_tests(
+            docs_=[{'_id': '123', "the_float": 20.22}], update_docs=[{'_id': '123'}], get_docs=
+            {"123": {'_id': '123', "the_float": 20.22}}
+        )
+        get_res = tensor_search.get_document_by_id(
+            config=self.config, index_name=self.index_name_1, document_id='123')
+        assert {'_id': '123', "the_float": 20.22} == get_res
+
+    def test_put_documents_orchestrator(self):
+        """
+        """
+        docs_ = [
+            {"_id": "123", "Title": "Story of Joe Blogs", "Description": "Joe was a great farmer."},
+            {"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}
+        ]
+
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs_, auto_refresh=True)
+        update_res = tensor_search.add_documents_orchestrator(
+            config=self.config, index_name=self.index_name_1, docs=[
+                  {"_id": "789", "Title": "Woohoo", "Mega": "Coool"},
+                  {"_id": "789", "Luminosity": "Extreme"},
+                  {"_id": "789", "Temp": 12.5},
+                  ],
+            auto_refresh=True, update_mode='update', processes=4, batch_size=1)
+
+        updated_doc = tensor_search.get_document_by_id(
+            config=self.config, index_name=self.index_name_1, document_id='789'
+        )
+        check_dict = {"_id": '789', "Temp": 12.5, "Luminosity": "Extreme", "Title": "Woohoo", "Mega": "Coool"}
+        for field, expected_value in check_dict.items():
+            assert updated_doc[field] == expected_value
+
+        updated_raw_doc = requests.get(
+            url=F"{self.endpoint}/{self.index_name_1}/_doc/789",
+            verify=False
+        )
+        # make sure that the chunks have been updated
+        for ch in updated_raw_doc.json()['_source']['__chunks']:
+            for field, expected_value in check_dict.items():
+                assert ch[field] == expected_value

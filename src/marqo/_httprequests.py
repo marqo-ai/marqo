@@ -16,7 +16,6 @@ from marqo.errors import (
     InvalidIndexNameError,
     HardwareCompatabilityError
 )
-from marqo.version import qualified_version
 
 ALLOWED_OPERATIONS = {requests.delete, requests.get, requests.post, requests.put}
 
@@ -137,7 +136,7 @@ def convert_to_marqo_web_error_and_raise(response: requests.Response, err: reque
     """Translates OpenSearch errors into Marqo errors, which are then raised
 
     If the incoming OpenSearch error can't be matched, a default catch all
-    MarqoWebError is reaised
+    MarqoWebError is raised
 
     Raises:
         MarqoWebError - some type of Marqo Web error

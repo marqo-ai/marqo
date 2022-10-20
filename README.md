@@ -37,12 +37,12 @@ Tensor search involves transforming documents, images and other data into collec
 
 ## Getting started
 
-1. Marqo requires docker. To install docker go to https://docs.docker.com/get-docker/
+1. Marqo requires docker. To install Docker go to the [Docker Official website.](https://docs.docker.com/get-docker/)
 2. Use docker to run Marqo (Mac users with M-series chips will need to [go here](#m-series-mac-users)):
 ```bash
 docker rm -f marqo;
-docker pull marqoai/marqo:0.0.3;
-docker run --name marqo -it --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:0.0.3
+docker pull marqoai/marqo:0.0.5;
+docker run --name marqo -it --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:0.0.5
 ```
 3. Install the Marqo client:
 ```bash
@@ -173,7 +173,7 @@ To power image and text search, Marqo allows users to plug and play with CLIP mo
 
 settings = {
   "treat_urls_and_pointers_as_images":True,   # allows us to find an image file and index it 
-  "model":"ViT-B/32"
+  "model":"ViT-L/14"
 }
 response = mq.create_index("my-multimodal-index", **settings)
 ```
@@ -210,6 +210,9 @@ Searching using an image can be achieved by providing the image link.
 results = mq.index("my-multimodal-index").search('https://upload.wikimedia.org/wikipedia/commons/thumb/9/96/Standing_Hippopotamus_MET_DP248993.jpg/440px-Standing_Hippopotamus_MET_DP248993.jpg')
 ```
 
+## Documentation
+The full documentation for Marqo can be found here [https://marqo.pages.dev/](https://marqo.pages.dev/).
+
 ## Warning
 
 Note that you should not run other applications on Marqo's Opensearch cluster as Marqo automatically changes and adapts the settings on the cluster.
@@ -230,7 +233,7 @@ docker rm -f marqo-os; docker run -p 9200:9200 -p 9600:9600 -e "discovery.type=s
 docker rm -f marqo; docker run --name marqo --privileged \
     -p 8882:8882 --add-host host.docker.internal:host-gateway \
     -e "OPENSEARCH_URL=https://localhost:9200" \
-    marqoai/marqo:0.0.3
+    marqoai/marqo:0.0.5
 ```
 
 ## Contributors

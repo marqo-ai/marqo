@@ -1,20 +1,16 @@
 from typing import Optional, Union
-from marqo import enums
 import urllib3
 import warnings
+from marqo.tensor_search import enums
 
 
 class Config:
-    """
-    Client's credentials and configuration parameters
-    """
-
     def __init__(
         self,
         url: str,
         timeout: Optional[int] = None,
-        indexing_device: Optional[Union[enums.Devices, str]] = None,
-        search_device: Optional[Union[enums.Devices, str]] = None
+        indexing_device: Optional[Union[enums.Device, str]] = None,
+        search_device: Optional[Union[enums.Device, str]] = None
     ) -> None:
         """
         Parameters
@@ -27,7 +23,7 @@ class Config:
         self.url = self.set_url(url)
         self.timeout = timeout
 
-        default_device = enums.Devices.cpu
+        default_device = enums.Device.cpu
 
         self.indexing_device = indexing_device if indexing_device is not None else default_device
         self.search_device = search_device if search_device is not None else default_device

@@ -1,10 +1,10 @@
-from marqo.client import Client
 from marqo.errors import IndexNotFoundError
 import unittest
 import copy
 from marqo.tensor_search import parallel
 import torch
 from tests.marqo_test import MarqoTestCase
+from marqo.tensor_search import tensor_search
 
 
 class TestAddDocumentsPara(MarqoTestCase):
@@ -15,11 +15,9 @@ class TestAddDocumentsPara(MarqoTestCase):
 
     def setUp(self) -> None:
         self.generic_header = {"Content-type": "application/json"}
-        self.client = Client(**self.client_settings)
         self.index_name_1 = "my-test-index-1"
-        self.config = copy.deepcopy(self.client.config)
         try:
-            self.client.delete_index(self.index_name_1)
+            tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         except IndexNotFoundError as s:
             pass
     
@@ -46,6 +44,6 @@ class TestAddDocumentsPara(MarqoTestCase):
 
         data = [{'text':f'something {str(i)}', '_id': str(i)} for i in range(100)]
 
-        res = self.client.index(self.index_name_1).add_documents(data, batch_size=10, use_parallel=True)
-
-        res = self.client.index(self.index_name_1).search('something')
+        res = tensor_search.add_documents_orchestrator(config=self.config, index_name=self.index_name_1, docs=data,
+                                                       batch_size=10, processes=1, auto_refresh=True)
+        res = tensor_search.search(config=self.config, text='something', index_name=self.index_name_1)

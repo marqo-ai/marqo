@@ -36,12 +36,12 @@ import functools
 import pprint
 import typing
 import uuid
-import asyncio
-from typing import List, Optional, Union, Callable, Iterable, Sequence, Dict, Any
+from typing import List, Optional, Union, Iterable, Sequence, Dict, Any
 from PIL import Image
 from marqo.tensor_search.enums import MediaType, MlModel, TensorField, SearchMethod, OpenSearchDataType
 from marqo.tensor_search.enums import IndexSettingsField as NsField
 from marqo.tensor_search import utils, backend, validation, configs, parallel
+from marqo.tensor_search.formatting import _clean_doc
 from marqo.tensor_search.index_meta_cache import get_cache,get_index_info
 from marqo.tensor_search import index_meta_cache
 from marqo.tensor_search.models.index_info import IndexInfo
@@ -59,7 +59,6 @@ from marqo.config import Config
 from marqo import errors
 from marqo.s2_inference import errors as s2_inference_errors
 import threading
-import re
 
 from marqo.tensor_search.tensor_search_logging import get_logger
 logger = get_logger(__name__)
@@ -135,8 +134,10 @@ def _autofill_index_settings(index_settings: dict):
     copied_settings = index_settings.copy()
     default_settings = configs.get_default_index_settings()
 
-    if NsField.index_defaults not in copied_settings:
-        copied_settings[NsField.index_defaults] = default_settings[NsField.index_defaults]
+    copied_settings = utils.merge_dicts(default_settings, copied_settings)
+
+    # if NsField.index_defaults not in copied_settings:
+    #     copied_settings[NsField.index_defaults] = default_settings[NsField.index_defaults]
 
     if NsField.treat_urls_and_pointers_as_images in copied_settings[NsField.index_defaults] and \
             copied_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images] is True\
@@ -144,15 +145,15 @@ def _autofill_index_settings(index_settings: dict):
         copied_settings[NsField.index_defaults][NsField.model] = MlModel.clip
 
     # make sure the first level of keys are present, if not add all of those defaults
-    for key in list(default_settings):
-        if key not in copied_settings or copied_settings[key] is None:
-            copied_settings[key] = default_settings[key]
+    # for key in list(default_settings):
+    #     if key not in copied_settings or copied_settings[key] is None:
+    #         copied_settings[key] = default_settings[key]
 
-    # make sure the first level of keys in index defaults is present, if not add all of those defaults
-    for key in list(default_settings[NsField.index_defaults]):
-        if key not in copied_settings[NsField.index_defaults] or \
-                copied_settings[NsField.index_defaults][key] is None:
-            copied_settings[NsField.index_defaults][key] = default_settings[NsField.index_defaults][key]
+    # # make sure the first level of keys in index defaults is present, if not add all of those defaults
+    # for key in list(default_settings[NsField.index_defaults]):
+    #     if key not in copied_settings[NsField.index_defaults] or \
+    #             copied_settings[NsField.index_defaults][key] is None:
+    #         copied_settings[NsField.index_defaults][key] = default_settings[NsField.index_defaults][key]
 
     # text preprocessing sub fields - fills any missing sub-dict fields if some of the first level are present
     for key in list(default_settings[NsField.index_defaults][NsField.text_preprocessing]):
@@ -189,13 +190,13 @@ def _check_and_create_index_if_not_exist(config: Config, index_name: str):
 def add_documents_orchestrator(
         config: Config, index_name: str, docs: List[dict],
         auto_refresh: bool, batch_size: int = 0, processes: int = 1,
-        device=None):
+        device=None, update_mode: str = 'replace'):
 
     if batch_size is None or batch_size == 0:
         logger.info(f"batch_size={batch_size} and processes={processes} - not doing any marqo side batching")
         return add_documents(
             config=config, index_name=index_name, docs=docs, auto_refresh=auto_refresh,
-            device=device
+            device=device, update_mode=update_mode
         )
     elif processes is not None and processes > 1:
 
@@ -206,7 +207,7 @@ def add_documents_orchestrator(
         results = parallel.add_documents_mp(
             config=config, index_name=index_name, docs=docs,
             auto_refresh=auto_refresh, batch_size=batch_size, processes=processes,
-            device=device
+            device=device, update_mode=update_mode
         )
 
         # we need to force the cache to update as it does not propagate using mp
@@ -225,7 +226,8 @@ def add_documents_orchestrator(
 
 
 def _batch_request(config: Config, index_name: str, dataset: List[dict], 
-                batch_size: int = 100, verbose: bool = True, device=None) -> List[Dict[str, Any]]:
+                   batch_size: int = 100, verbose: bool = True, device=None,
+                   update_mode: str = 'replace') -> List[Dict[str, Any]]:
         """Batch by the number of documents"""
         logger.info(f"starting batch ingestion in sizes of {batch_size}")
 
@@ -245,7 +247,9 @@ def _batch_request(config: Config, index_name: str, dataset: List[dict],
             t0 = datetime.datetime.now()
             res = add_documents(
                 config=config, index_name=index_name,
-                docs=docs, auto_refresh=False, device=device)
+                docs=docs, auto_refresh=False, device=device,
+                update_mode=update_mode
+            )
             total_batch_time = datetime.datetime.now() - t0
             num_docs = len(docs)
 
@@ -277,8 +281,19 @@ def _infer_opensearch_data_type(
 
 
 def add_documents(config: Config, index_name: str, docs: List[dict], auto_refresh: bool,
-                  device=None):
+                  device=None, update_mode: str = "replace"):
     """
+
+    Args:
+        config: Config object
+        index_name: name of the index
+        docs: List of documents
+        auto_refresh: Set to False if indexing lots of docs
+        device: Device used to carry out the document update.
+        update_mode: {'replace' | 'update'}. If set to replace (default) just
+
+    Returns:
+
     """
     t0 = datetime.datetime.now()
     bulk_parent_dicts = []
@@ -292,6 +307,11 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
     if len(docs) == 0:
         raise errors.BadRequestError(message="Received empty add documents request")
 
+    valid_update_modes = ('update', 'replace')
+    if update_mode not in valid_update_modes:
+        raise errors.InvalidArgError(message=f"Unknown update_mode `{update_mode}` "
+                                             f"received! Valid update modes: {valid_update_modes}")
+
     existing_fields = set(index_info.properties.keys())
     new_fields = set()
 
@@ -301,7 +321,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
     for i, doc in enumerate(docs):
 
-        indexing_instructions = {"index": {"_index": index_name}}
+        indexing_instructions = {'index' if update_mode == 'replace' else 'update': {"_index": index_name}}
         copied = copy.deepcopy(doc)
 
         document_is_valid = True
@@ -325,7 +345,10 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
             )
             continue
 
-        indexing_instructions["index"]["_id"] = doc_id
+        if update_mode == "replace":
+            indexing_instructions["index"]["_id"] = doc_id
+        else:
+            indexing_instructions["update"]["_id"] = doc_id
 
         chunks = []
 
@@ -348,6 +371,14 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
             if isinstance(field_content, (str, Image.Image)):
 
                 # TODO: better/consistent handling of a no-op for processing (but still vectorize)
+
+                # 1. check if urls should be downloaded -> "treat_pointers_and_urls_as_images":True
+                # 2. check if it is a url or pointer
+                # 3. If yes in 1 and 2, download blindly (without type)
+                # 4. Determine media type of downloaded
+                # 5. load correct media type into memory -> PIL (images), videos (), audio (torchaudio)
+                # 6. if chunking -> then add the extra chunker
+
                 if isinstance(field_content, str) and not _is_image(field_content):
 
                     split_by = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][NsField.split_method]
@@ -416,11 +447,64 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                         **chunk_values_for_filtering
                     })
         if document_is_valid:
-            copied[TensorField.chunks] = chunks
-            bulk_parent_dicts.append(indexing_instructions)
-            bulk_parent_dicts.append(copied)
-
             new_fields = new_fields.union(new_fields_from_doc)
+            if update_mode =='replace':
+                copied[TensorField.chunks] = chunks
+                bulk_parent_dicts.append(indexing_instructions)
+                bulk_parent_dicts.append(copied)
+            else:
+                to_upsert = copied.copy()
+                to_upsert[TensorField.chunks] = chunks
+                bulk_parent_dicts.append(indexing_instructions)
+                bulk_parent_dicts.append({
+                    "upsert": to_upsert,
+                    "script": {
+                        "lang": "painless",
+                        "source": f"""
+            
+            // updates the doc's fields with the new content
+            for (key in params.customer_dict.keySet()) {{
+                ctx._source[key] = params.customer_dict[key];
+            }}            
+                        
+            // keep track of the merged doc
+            def merged_doc = [:];
+            merged_doc.putAll(ctx._source);
+            merged_doc.remove("{TensorField.chunks}");
+            
+            // remove chunks if the __field_name matches an updated field
+            // All update fields should be recomputed, and it should be safe to delete these chunks             
+            for (int i=ctx._source.{TensorField.chunks}.length-1; i>=0; i--) {{
+                if (params.doc_fields.contains(ctx._source.{TensorField.chunks}[i].{TensorField.field_name})) {{
+                   ctx._source.{TensorField.chunks}.remove(i);
+                }}
+            }}
+            
+            // update the chunks, setting fields to the new data
+            for (int i=ctx._source.{TensorField.chunks}.length-1; i>=0; i--) {{
+                for (key in params.customer_dict.keySet()) {{
+                    ctx._source.{TensorField.chunks}[i][key] = params.customer_dict[key];
+                }}
+            }}
+            
+            // update the new chunks, adding the existing data 
+            for (int i=params.new_chunks.length-1; i>=0; i--) {{
+                for (key in merged_doc.keySet()) {{
+                    params.new_chunks[i][key] = merged_doc[key];
+                }}
+            }}
+            
+            // appends the new chunks to the existing chunks  
+            ctx._source.{TensorField.chunks}.addAll(params.new_chunks);
+            
+                        """,
+                        "params": {
+                            "doc_fields": list(copied.keys()),
+                            "new_chunks": chunks,
+                            "customer_dict": copied,
+                        },
+                    }
+                })
 
     if bulk_parent_dicts:
         # the HttpRequest wrapper handles error logic
@@ -446,13 +530,15 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
         if response is not None:
             copied_res = copy.deepcopy(response)
+
             result_dict['errors'] = copied_res['errors']
+            actioned = "index" if update_mode == 'replace' else 'update'
 
             for item in copied_res["items"]:
                 for to_remove in item_fields_to_remove:
-                    if to_remove in item["index"]:
-                        del item["index"][to_remove]
-                new_items.append(item["index"])
+                    if to_remove in item[actioned]:
+                        del item[actioned][to_remove]
+                new_items.append(item[actioned])
 
         if unsuccessful_docs:
             result_dict['errors'] = True
@@ -468,14 +554,51 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
     return translate_add_doc_response(response=index_parent_response, time_diff= t1 - t0)
 
 
-def get_document_by_id(config: Config, index_name:str, document_id: str):
+def get_document_by_id(
+        config: Config, index_name: str, document_id: str, show_vectors: bool = False):
     """returns document by its ID"""
     validation.validate_id(document_id)
     res = HttpRequests(config).get(
         f'{index_name}/_doc/{document_id}'
     )
     if "_source" in res:
-        return _clean_doc(res["_source"], doc_id=document_id)
+        return _clean_doc(res["_source"], doc_id=document_id, include_vectors=show_vectors)
+    else:
+        return res
+
+
+def get_documents_by_ids(
+        config: Config, index_name: str, document_ids: List[str],
+        show_vectors: bool = False,
+    ):
+    """returns documents by their IDs"""
+    if not isinstance(document_ids, typing.Collection):
+        raise errors.InvalidArgError("Get documents must be passed a collection of IDs!")
+    if len(document_ids) <= 0:
+        raise errors.InvalidArgError("Can't get empty collection of IDs!")
+    res = HttpRequests(config).get(
+        f'_mget/',
+        body={
+            "docs": [
+                {"_index": index_name, "_id": validation.validate_id(doc_id)}
+                for doc_id in document_ids
+            ]
+        }
+    )
+    if "docs" in res:
+        to_return = {
+            "results": []
+        }
+        for doc in res['docs']:
+            if not doc['found']:
+                to_return['results'].append({
+                    '_id': doc['_id'],
+                    TensorField.found: False})
+            else:
+                to_return['results'].append(
+                    {TensorField.found: True,
+                     ** _clean_doc(doc["_source"], doc_id=doc["_id"], include_vectors=show_vectors)})
+        return to_return
     else:
         return res
 
@@ -922,33 +1045,48 @@ def _vector_text_search(
         return format_ordered_docs_preserving(ordered_docs_w_chunks=completely_sorted, num_highlights=number_of_highlights)
 
 
+def check_health(config: Config):
+    TIMEOUT = 3
+    statuses = {
+        "green": 0,
+        "yellow": 1,
+        "red": 2
+    }
+
+    marqo_status = "green"
+    marqo_os_health_check = None
+    try:
+        timeout_config = copy.deepcopy(config)
+        timeout_config.timeout = TIMEOUT
+        marqo_os_health_check = HttpRequests(timeout_config).get(
+            path="_cluster/health"
+        )
+    except errors.BackendCommunicationError:
+        marqo_os_status = "red"
+
+    if marqo_os_health_check is not None:
+        if "status" in marqo_os_health_check:
+            marqo_os_status = marqo_os_health_check['status']
+        else:
+            marqo_os_status = "red"
+    else:
+        marqo_os_status = "red"
+
+    marqo_status = marqo_status if statuses[marqo_status] >= statuses[marqo_os_status] else marqo_os_status
+
+    return {
+        "status": marqo_status,
+        "backend": {
+            "status": marqo_os_status
+        }
+    }
+
+
 def delete_index(config: Config, index_name):
     res = HttpRequests(config).delete(path=index_name)
     if index_name in get_cache():
         del get_cache()[index_name]
     return res
-
-
-def _clean_doc(doc: dict, doc_id=None) -> dict:
-    """clears tensor search specific fields from the doc
-
-    Args:
-        doc: the doc to clean
-        doc_id: if left as None, then the doc will be returned without the _id field
-
-    Returns:
-
-    """
-    copied = doc.copy()
-    if TensorField.doc_chunk_relation in copied:
-        del copied[TensorField.doc_chunk_relation]
-    if TensorField.chunk_ids in copied:
-        del copied[TensorField.chunk_ids]
-    if TensorField.chunks in copied:
-        del copied[TensorField.chunks]
-    if doc_id is not None:
-        copied['_id'] = doc_id
-    return copied
 
 
 def _select_model_from_media_type(media_type: Union[MediaType, str]) -> Union[MlModel, str]:

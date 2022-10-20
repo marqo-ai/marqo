@@ -12,7 +12,7 @@ import os
 from marqo.tensor_search.web import api_validation, api_utils
 from marqo.tensor_search import utils
 from marqo.tensor_search.on_start_script import on_start
-
+from marqo import version
 
 def replace_host_localhosts(OPENSEARCH_IS_INTERNAL: str, OS_URL: str):
     """Replaces a host's localhost URL with one that can be referenced from
@@ -43,18 +43,21 @@ OPENSEARCH_URL = replace_host_localhosts(
     os.environ["OPENSEARCH_URL"])
 
 
-on_start()
-app = FastAPI()
+on_start(OPENSEARCH_URL)
+app = FastAPI(
+    title="Marqo",
+    version=version.get_version()
+)
 
 
-async def generate_config() -> config.Config:
+def generate_config() -> config.Config:
     return config.Config(api_utils.upconstruct_authorized_url(
         opensearch_url=OPENSEARCH_URL
     ))
 
 
 @app.exception_handler(MarqoWebError)
-async def marqo_user_exception_handler(request, exc: MarqoWebError):
+def marqo_user_exception_handler(request, exc: MarqoWebError):
     """ Catch a MarqoWebError and return an appropriate HTTP response.
 
     We can potentially catch any type of Marqo exception. We can do isinstance() calls
@@ -75,7 +78,7 @@ async def marqo_user_exception_handler(request, exc: MarqoWebError):
 
 
 @app.exception_handler(MarqoError)
-async def marqo_internal_exception_handler(request, exc: MarqoError):
+def marqo_internal_exception_handler(request, exc: MarqoError):
     """MarqoErrors are treated as internal errors"""
     headers = getattr(exc, "headers", None)
     body = {
@@ -91,12 +94,13 @@ async def marqo_internal_exception_handler(request, exc: MarqoError):
 
 
 @app.get("/")
-async def root():
-    return {"message": "Welcome to marqo"}
+def root():
+    return {"message": "Welcome to Marqo",
+            "version": version.get_version()}
 
 
 @app.post("/indexes/{index_name}")
-async def create_index(index_name: str, settings: Dict = None, marqo_config: config.Config = Depends(generate_config)):
+def create_index(index_name: str, settings: Dict = None, marqo_config: config.Config = Depends(generate_config)):
     index_settings = dict() if settings is None else settings
     return tensor_search.create_vector_index(
         config=marqo_config, index_name=index_name, index_settings=index_settings
@@ -104,7 +108,7 @@ async def create_index(index_name: str, settings: Dict = None, marqo_config: con
 
 
 @app.post("/indexes/{index_name}/search")
-async def search(search_query: SearchQuery, index_name: str, device: str = Depends(api_validation.validate_device),
+def search(search_query: SearchQuery, index_name: str, device: str = Depends(api_validation.validate_device),
                  marqo_config: config.Config = Depends(generate_config)):
     return tensor_search.search(
         config=marqo_config, text=search_query.q,
@@ -118,43 +122,70 @@ async def search(search_query: SearchQuery, index_name: str, device: str = Depen
 
 
 @app.post("/indexes/{index_name}/documents")
-async def add_documents(docs: List[Dict], index_name: str, refresh: bool = True,
+def add_or_replace_documents(docs: List[Dict], index_name: str, refresh: bool = True,
                         marqo_config: config.Config = Depends(generate_config),
                         batch_size: int = 0, processes: int = 1,
                         device: str = Depends(api_validation.validate_device)):
-    """add_documents endpoint"""
+    """add_documents endpoint (replace existing docs with the same id)"""
     return tensor_search.add_documents_orchestrator(
         config=marqo_config,
         docs=docs,
         index_name=index_name, auto_refresh=refresh,
-        batch_size=batch_size, processes=processes, device=device
+        batch_size=batch_size, processes=processes, device=device,
+        update_mode='replace'
     )
 
 
+@app.put("/indexes/{index_name}/documents")
+def add_or_update_documents(docs: List[Dict], index_name: str, refresh: bool = True,
+                        marqo_config: config.Config = Depends(generate_config),
+                        batch_size: int = 0, processes: int = 1,
+                        device: str = Depends(api_validation.validate_device)):
+    """update add_documents endpoint"""
+    return tensor_search.add_documents_orchestrator(
+        config=marqo_config,
+        docs=docs,
+        index_name=index_name, auto_refresh=refresh,
+        batch_size=batch_size, processes=processes, device=device, update_mode='update'
+    )
+
 @app.get("/indexes/{index_name}/documents/{document_id}")
-async def get_document_by_id(index_name: str, document_id: str,
-                             marqo_config: config.Config = Depends(generate_config)):
+def get_document_by_id(index_name: str, document_id: str,
+                             marqo_config: config.Config = Depends(generate_config),
+                             expose_facets: bool = False):
     return tensor_search.get_document_by_id(
-        config=marqo_config, index_name=index_name, document_id=document_id
+        config=marqo_config, index_name=index_name, document_id=document_id,
+        show_vectors=expose_facets
+    )
+
+
+@app.get("/indexes/{index_name}/documents")
+def get_documents_by_ids(
+        index_name: str, document_ids: List[str],
+        marqo_config: config.Config = Depends(generate_config),
+        expose_facets: bool = False):
+    return tensor_search.get_documents_by_ids(
+        config=marqo_config, index_name=index_name, document_ids=document_ids,
+        show_vectors=expose_facets
     )
 
 
 @app.get("/indexes/{index_name}/stats")
-async def get_index_stats(index_name: str, marqo_config: config.Config = Depends(generate_config)):
+def get_index_stats(index_name: str, marqo_config: config.Config = Depends(generate_config)):
     return tensor_search.get_stats(
         config=marqo_config, index_name=index_name
     )
 
 
 @app.delete("/indexes/{index_name}")
-async def delete_index(index_name: str, marqo_config: config.Config = Depends(generate_config)):
+def delete_index(index_name: str, marqo_config: config.Config = Depends(generate_config)):
     return tensor_search.delete_index(
         config=marqo_config, index_name=index_name
     )
 
 
 @app.post("/indexes/{index_name}/documents/delete-batch")
-async def delete_docs(index_name: str, documentIds: List[str], refresh: bool = True,
+def delete_docs(index_name: str, documentIds: List[str], refresh: bool = True,
                       marqo_config: config.Config = Depends(generate_config)):
     return tensor_search.delete_documents(
         index_name=index_name, config=marqo_config, doc_ids=documentIds,
@@ -163,10 +194,15 @@ async def delete_docs(index_name: str, documentIds: List[str], refresh: bool = T
 
 
 @app.post("/indexes/{index_name}/refresh")
-async def refresh_index(index_name: str, marqo_config: config.Config = Depends(generate_config)):
+def refresh_index(index_name: str, marqo_config: config.Config = Depends(generate_config)):
     return tensor_search.refresh_index(
         index_name=index_name, config=marqo_config,
     )
+
+
+@app.get("/health")
+def check_health(marqo_config: config.Config = Depends(generate_config)):
+    return tensor_search.check_health(config=marqo_config)
 
 # try these curl commands:
 

@@ -153,7 +153,7 @@ class InternalError(MarqoWebError):
 
 
 class BackendCommunicationError(InternalError):
-    """Error when connecting to Marqo"""
+    """Error when connecting to Marqo-os"""
     code = "backend_communication_error"
     status_code = HTTPStatus.INTERNAL_SERVER_ERROR
 
