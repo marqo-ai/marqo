@@ -29,7 +29,7 @@ setup(
         "moviepy",
         "pafy",
         "youtube_dl",
-        "opencv-python"
+        "opencv-python",
         "pandas",
         "optimum",
         "fastapi",
