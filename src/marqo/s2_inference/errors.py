@@ -22,3 +22,7 @@ class InvalidModelSettingsError(S2InferenceError):
 
 class ModelLoadError(S2InferenceError):
     pass
+
+
+class UnknownModelError(S2InferenceError):
+    pass

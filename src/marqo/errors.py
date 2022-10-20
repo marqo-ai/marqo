@@ -143,11 +143,6 @@ class HardwareCompatabilityError(__InvalidRequestError):
     status_code = HTTPStatus.BAD_REQUEST
 
 
-class UnknownModelError(__InvalidRequestError):
-    code = "unknown_model_error"
-    status_code = HTTPStatus.BAD_REQUEST
-
-
 # ---MARQO INTERNAL ERROR---
 
 
