@@ -39,7 +39,13 @@ class PopulateCache:
             index_meta_cache.populate_cache(c)
         except errors.BackendCommunicationError as e:
             raise errors.BackendCommunicationError(
-                message="Can't connect to Marqo-os backend!\n"
+                message="Can't connect to Marqo-os backend. \n"  
+                        "    Possible causes: \n"
+                        "        - If this is an arm64 machine, ensure you are using an external Marqo-os instance \n"
+                        "        - If you are using an external Marqo-os instance, ensure it is running. \n"
+                        "        - Ensure that the OPENSEARCH_URL environment variable points to Marqo-os. \n"
+                        "    Please check the possible causes then re-launch Marqo. \n",
+                link="https://github.com/marqo-ai/marqo/tree/mainline/src/marqo#c-build-and-run-the-marqo-as-a-docker-container-connecting-to-marqo-os-which-is-running-on-the-host"
             ) from e
         # the following lines turns off auto create index
         # connection = HttpRequests(c)
