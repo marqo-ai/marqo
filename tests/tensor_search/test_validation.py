@@ -1,10 +1,12 @@
 from marqo.tensor_search import validation
 from enum import Enum
+from marqo.tensor_search import enums
 import unittest
 import copy
+from unittest import mock
 from marqo.errors import (
     MarqoError, InvalidFieldNameError, InternalError,
-    InvalidDocumentIdError, InvalidArgError
+    InvalidDocumentIdError, InvalidArgError, DocTooLargeError
 )
 
 
@@ -207,3 +209,27 @@ class TestValidation(unittest.TestCase):
         ]
         for good_content in good_ids:
             assert good_content == validation.validate_id(good_content)
+
+    def test_validate_doc_max_size(self):
+        max_size = 1234567
+        mock_environ = {enums.EnvVars.MARQO_MAX_DOC_BYTES: max_size}
+
+        @mock.patch("os.environ", mock_environ)
+        def run():
+            good_doc = {"abcd": "a" * (max_size - 500)}
+            good_back = validation.validate_doc(doc=good_doc)
+            assert good_back == good_doc
+
+            bad_doc = {"abcd": "a" * max_size}
+            try:
+                validation.validate_doc(doc=bad_doc)
+                raise AssertionError
+            except DocTooLargeError:
+                pass
+            return True
+
+        assert run()
+
+
+
+

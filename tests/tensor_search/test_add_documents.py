@@ -7,6 +7,7 @@ import marqo.tensor_search.utils as marqo_utils
 import numpy as np
 import requests
 from marqo.tensor_search.enums import TensorField, IndexSettingsField, SearchMethod
+from marqo.tensor_search import enums
 from marqo.errors import IndexNotFoundError, InvalidArgError, BadRequestError
 from marqo.tensor_search import tensor_search, index_meta_cache, backend
 from tests.marqo_test import MarqoTestCase
@@ -862,3 +863,26 @@ class TestAddDocuments(MarqoTestCase):
         for ch in updated_raw_doc.json()['_source']['__chunks']:
             for field, expected_value in check_dict.items():
                 assert ch[field] == expected_value
+
+    def test_doc_too_large(self):
+        max_size = 400000
+        mock_environ = {enums.EnvVars.MARQO_MAX_DOC_BYTES: max_size}
+
+        @mock.patch("os.environ", mock_environ)
+        def run():
+            update_res = tensor_search.add_documents(
+                config=self.config, index_name=self.index_name_1, docs=[
+                        {"_id": "123", 'Surviving field': "edf " * (max_size // 4)},
+                        {"_id": "789", "Breaker": "abc " * ((max_size // 4) - 500)},
+                        {"_id": "456", "Luminosity": "exc " * (max_size // 4)},
+                      ],
+                auto_refresh=True, update_mode='update')
+            pprint.pprint(update_res)
+            items = update_res['items']
+            assert update_res['errors']
+            assert 'error' in items[0] and 'error' in items[2]
+            assert 'doc_too_large' == items[0]['code'] and ('doc_too_large' == items[0]['code'])
+            assert items[1]['result'] == 'created'
+            assert 'error' not in items[1]
+            return True
+        assert run()

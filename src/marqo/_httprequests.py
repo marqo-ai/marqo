@@ -17,6 +17,8 @@ from marqo.errors import (
     HardwareCompatabilityError,
     IndexMaxFieldsError
 )
+from urllib3.exceptions import InsecureRequestWarning
+import warnings
 
 ALLOWED_OPERATIONS = {requests.delete, requests.get, requests.post, requests.put}
 
@@ -46,38 +48,40 @@ class HttpRequests:
         if content_type is not None and content_type:
             req_headers['Content-Type'] = content_type
 
-        try:
-            request_path = self.config.url + '/' + path
-            if isinstance(body, bytes):
-                response = http_method(
-                    request_path,
-                    timeout=self.config.timeout,
-                    headers=req_headers,
-                    data=body,
-                    verify=to_verify
-                )
-            elif isinstance(body, str):
-                response = http_method(
-                    request_path,
-                    timeout=self.config.timeout,
-                    headers=req_headers,
-                    data=body,
-                    verify=to_verify
-                )
-            else:
-                response = http_method(
-                    request_path,
-                    timeout=self.config.timeout,
-                    headers=req_headers,
-                    data=json.dumps(body) if body else None,
-                    verify=to_verify
-                )
-            return self.__validate(response)
-
-        except requests.exceptions.Timeout as err:
-            raise BackendTimeoutError(str(err)) from err
-        except requests.exceptions.ConnectionError as err:
-            raise BackendCommunicationError(str(err)) from err
+        with warnings.catch_warnings():
+            if not self.config.cluster_is_remote:
+                warnings.simplefilter('ignore', InsecureRequestWarning)
+            try:
+                request_path = self.config.url + '/' + path
+                if isinstance(body, bytes):
+                    response = http_method(
+                        request_path,
+                        timeout=self.config.timeout,
+                        headers=req_headers,
+                        data=body,
+                        verify=to_verify
+                    )
+                elif isinstance(body, str):
+                    response = http_method(
+                        request_path,
+                        timeout=self.config.timeout,
+                        headers=req_headers,
+                        data=body,
+                        verify=to_verify
+                    )
+                else:
+                    response = http_method(
+                        request_path,
+                        timeout=self.config.timeout,
+                        headers=req_headers,
+                        data=json.dumps(body) if body else None,
+                        verify=to_verify
+                    )
+                return self.__validate(response)
+            except requests.exceptions.Timeout as err:
+                raise BackendTimeoutError(str(err)) from err
+            except requests.exceptions.ConnectionError as err:
+                raise BackendCommunicationError(str(err)) from err
 
     def get(
         self, path: str,

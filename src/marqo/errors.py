@@ -120,6 +120,11 @@ class InvalidArgError(__InvalidRequestError):
     status_code = HTTPStatus.BAD_REQUEST
 
 
+class DocTooLargeError(__InvalidRequestError):
+    code = "doc_too_large"
+    status_code = HTTPStatus.BAD_REQUEST
+
+
 class BadRequestError(__InvalidRequestError):
     code = "bad_request"
     status_code = HTTPStatus.BAD_REQUEST

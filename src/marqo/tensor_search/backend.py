@@ -112,7 +112,8 @@ def add_customer_field_properties(config: Config, index_name: str,
         if field_name[1] == enums.OpenSearchDataType.text \
                 or field_name[1] == enums.OpenSearchDataType.keyword:
             body["properties"][enums.TensorField.chunks]["properties"][validation.validate_field_name(field_name[0])] = {
-                "type": enums.OpenSearchDataType.keyword
+                "type": enums.OpenSearchDataType.keyword,
+                "ignore_above": 32766  # this is the Marqo-OS bytes limit
         }
 
     mapping_res = HttpRequests(config).put(path=F"{index_name}/_mapping", body=json.dumps(body))
