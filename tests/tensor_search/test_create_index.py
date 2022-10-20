@@ -213,4 +213,27 @@ class TestCreateIndex(MarqoTestCase):
         assert run()
 
     def test_field_Limit_none_env_var(self):
-        """TODO"""
+        """When the limit env var is undefined: we need to manually test it,
+        as the testing environment may have this env var defined."""
+        mock_read_env_vars = mock.MagicMock()
+        mock_read_env_vars.return_value = None
+
+        @mock.patch("marqo.tensor_search.utils.read_env_vars_and_defaults", mock_read_env_vars)
+        def run():
+            docs = [
+                {"f1": "fgrrvb", "f2": 1234, "f3": 1.4, "f4": "hello hello", "f5": False},
+                {"f1": "erf1f", "f2": 934, "f3": 4.0, "f4": "my name", "f5": True},
+                {"f1": "water is healthy", "f5": True},
+                {"f2": 49, "f3": 400.4, "f4": "alien message"}
+            ]
+            res_1 = tensor_search.add_documents(
+                index_name=self.index_name_1, docs=docs, auto_refresh=True, config=self.config
+            )
+            mapping_info = requests.get(
+                self.authorized_url + f"/{self.index_name_1}/_mapping",
+                verify=False
+            )
+            assert not res_1['errors']
+            return True
+        assert run()
+
