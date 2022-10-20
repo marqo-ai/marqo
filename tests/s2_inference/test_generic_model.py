@@ -1,5 +1,7 @@
-from marqo.errors import MarqoApiError, MarqoError, IndexNotFoundError, UnknownModelError
-from marqo.s2_inference.errors import InvalidModelSettingsError
+import numpy as np
+
+from marqo.errors import MarqoApiError, MarqoError, IndexNotFoundError
+from marqo.s2_inference.errors import InvalidModelSettingsError, UnknownModelError
 from marqo.tensor_search import tensor_search
 from marqo.client import Client
 
@@ -28,29 +30,52 @@ class TestGenericModelSupport(MarqoTestCase):
     def test_create_index_with_custom_model_properties(self):
         """index should get created with custom model_properties
         """
+        model_name = 'test-model'
+        model_properties = {"name": "sentence-transformers/all-mpnet-base-v2",
+                            "dimensions": 768,
+                            "tokens": 128,
+                            "type": "sbert"}
         tensor_search.create_vector_index(
             index_name=self.index_name_1, config=self.config,
             index_settings={
                 "index_defaults": {
-                    'model': "test-model",
-                    'model_properties': {"name": "sentence-transformers/all-mpnet-base-v2",
-                                         "dimensions": 768,
-                                         "tokens": 128,
-                                         "type": "sbert"}
+                    'model': model_name,
+                    'model_properties': model_properties
                 }
             }
         )
 
-    def test_add_documents_with_custom_model_properties(self):
-        """add_documents should throw error if model is not in registry,
-        and model_properties have not been given in index
+    def test_create_index_with_model_properties_without_model_name(self):
+        """create_vector_index should throw an error
+            if model_properties are given without a model name
         """
-        model_name = "test-model"
+        model_properties = {"name": "sentence-transformers/all-mpnet-base-v2",
+                            "dimensions": 768,
+                            "tokens": 128,
+                            "type": "sbert"}
         tensor_search.create_vector_index(
             index_name=self.index_name_1, config=self.config,
             index_settings={
                 "index_defaults": {
-                    'model': model_name
+                    'model_properties': model_properties
+                }
+            }
+        )
+
+    def test_add_documents(self):
+        """if given the right input, add_documents should work without any throwing any errors
+        """
+        model_name = "test-model"
+        model_properties = {"name": "sentence-transformers/multi-qa-MiniLM-L6-cos-v1",
+                            "dimensions": 384,
+                            "tokens": 128,
+                            "type": "sbert"}
+        tensor_search.create_vector_index(
+            index_name=self.index_name_1, config=self.config,
+            index_settings={
+                "index_defaults": {
+                    'model': model_name,
+                    'model_properties': model_properties
                 }
             }
         )
@@ -65,12 +90,7 @@ class TestGenericModelSupport(MarqoTestCase):
             }]
         auto_refresh = True
 
-        self.assertRaises(UnknownModelError, tensor_search.add_documents, config, index_name, docs, auto_refresh)
-
-    def test_create_index_with_model_properties_without_model_name(self):
-        """
-        bert becomes default name but what if settings are different
-        """
+        tensor_search.add_documents(config=config, index_name=index_name, docs=docs, auto_refresh=auto_refresh)
 
     def test_validate_model_properties_missing_required_keys(self):
         """_validate_model_properties should throw an exception if required keys are not given.
@@ -123,13 +143,41 @@ class TestGenericModelSupport(MarqoTestCase):
 
         self.assertEqual(registry_test_model_properties, validated_model_properties)
 
-    def test_vectorise_accepts_dict(self):
+    def test_validate_model_properties_unknown_model_error(self):
+        """_validate_model_properties should throw an error if model is not in registry,
+            and if model_properties have not been given in index
+        """
+        model_name = "test-model"
+        tensor_search.create_vector_index(
+            index_name=self.index_name_1, config=self.config,
+            index_settings={
+                "index_defaults": {
+                    'model': model_name
+                }
+            }
+        )
+
+        model_properties = None
+
+        self.assertRaises(UnknownModelError, _validate_model_properties, model_name, model_properties)
+
+    def test_vectorise_with_custom_model_properties(self):
         model_name = "test-model"
 
         # this model is not in model_registry
         model_properties = {"name": "sentence-transformers/multi-qa-MiniLM-L6-cos-v1",
-                            "dimensions": 768,
+                            "dimensions": 384,
                             "tokens": 128,
                             "type": "sbert"}
 
         result = vectorise(model_name=model_name, model_properties=model_properties, content="some string")
+
+        assert np.array(result).shape[-1] == model_properties['dimensions']
+
+    def test_vectorize_search(self):
+        pass
+        # put in api tests
+        # create index
+        # add docs
+        # vectorize
+        # search
