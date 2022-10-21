@@ -393,16 +393,20 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                 if mediatype == MediaType.text:
                     # We can support more combinations of MediaType and FieldType combinations later.
                     if filetype == FileType.straight_text:
-                        pass
-                    else:
-                        raise TypeError(f"We do not support the file type {filetype} for media {mediatype}")
-                    if filetype == FileType.straight_text:
                         split_by = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][
                             NsField.split_method]
-                        split_length = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][NsField.split_length]
-                        split_overlap = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][NsField.split_overlap]
-                        content_chunks = text_processor.split_text(field_content, split_by=split_by, split_length=split_length, split_overlap=split_overlap)
+                        split_length = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][
+                            NsField.split_length]
+                        split_overlap = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][
+                            NsField.split_overlap]
+                        content_chunks = text_processor.split_text(field_content, split_by=split_by,
+                                                                   split_length=split_length,
+                                                                   split_overlap=split_overlap)
                         text_chunks = content_chunks
+                    else:
+                        raise TypeError(f"We do not support the file type {filetype} for media {mediatype}")
+
+
                 # mediatype is image
                 elif mediatype == MediaType.image:
                     if filetype == FileType.url:
@@ -856,7 +860,48 @@ def _vector_text_search(
 
     # TODO average over vectorized inputs with weights
 
-    # TODO content_routering to pass the """text""" to the correct model to vectorise it
+    try:
+        # Pass the text into the router and get the MediaType and FileType
+        text, mediatype, filetype = content_routering(text)
+    except:
+        errors.MarqoError("The search text is not supported")
+        # mediatype is text
+
+    if mediatype == MediaType.text:
+        # We can support more combinations of MediaType and FieldType combinations later.
+        if filetype == FileType.straight_text:
+            pass
+        else:
+            raise TypeError(f"We do not support the file type {filetype} for media {mediatype}")
+
+        # mediatype is image
+    elif mediatype == MediaType.image:
+        if filetype == FileType.url:
+            # Remove the downloaded file after loading the file into the memory
+            temp_file = text
+            text = PIL.Image.open(text)
+            os.remove(temp_file)
+        elif filetype == FileType.local:
+            text = PIL.Image.open(text)
+        elif filetype == FileType.PILImage:
+            pass
+        else:
+            raise TypeError(f"We do not support the file type {filetype} for media {mediatype}")
+
+        # mediatype is video
+    elif mediatype == MediaType.video:
+        if filetype == FileType.url:
+            # Remove the downloaded file after loading the file into the memory
+            temp_file = text
+            text = VideoFileClip(text)
+            os.remove(temp_file)
+        elif filetype == FileType.local:
+            text = VideoFileClip(text)
+        elif filetype == filetype.ListOfPILImage:
+            pass
+        else:
+            raise TypeError(f"We do not support the file type {filetype} for media {mediatype}")
+
     vectorised_text = s2_inference.vectorise(
         model_name=index_info.model_name, content=text, 
         device=selected_device,
