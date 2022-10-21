@@ -865,8 +865,9 @@ def _vector_text_search(
         text, mediatype, filetype = content_routering(text)
     except:
         errors.MarqoError("The search text is not supported")
-        # mediatype is text
 
+    # Process and load the "text" based on mediatype and fieltype
+    # mediatype is text
     if mediatype == MediaType.text:
         # We can support more combinations of MediaType and FieldType combinations later.
         if filetype == FileType.straight_text:
@@ -874,7 +875,7 @@ def _vector_text_search(
         else:
             raise TypeError(f"We do not support the file type {filetype} for media {mediatype}")
 
-        # mediatype is image
+    # mediatype is image
     elif mediatype == MediaType.image:
         if filetype == FileType.url:
             # Remove the downloaded file after loading the file into the memory
@@ -887,8 +888,7 @@ def _vector_text_search(
             pass
         else:
             raise TypeError(f"We do not support the file type {filetype} for media {mediatype}")
-
-        # mediatype is video
+    # mediatype is video
     elif mediatype == MediaType.video:
         if filetype == FileType.url:
             # Remove the downloaded file after loading the file into the memory
