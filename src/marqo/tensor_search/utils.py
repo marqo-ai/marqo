@@ -166,12 +166,6 @@ def read_env_vars_and_defaults(var: str) -> Optional[str]:
     If none is found, it will attempt to retrieve it from
     configs.default_env_vars(). If still unsuccessful, None is returned.
     """
-    print('read etc')
-    # pprint.pprint(os.environ)
-    print('var in eniron', var in os.environ)
-    print('var ', var)
-    if var in os.environ:
-        print('varvarvar in eniron', os.environ[var])
     try:
         return os.environ[var]
     except KeyError:

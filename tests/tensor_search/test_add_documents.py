@@ -404,11 +404,11 @@ class TestAddDocuments(MarqoTestCase):
             ([{123: "bad", "_id": "12345"}, {"_id": "cool"}], [("12345", 'error'), ("cool", 'result')]),
             ([{None: "bad", "_id": "12345"}, {"_id": "cool"}], [("12345", 'error'), ("cool", 'result')]),
             # handle bad content
-            ([{"bad": None, "_id": "12345"}, {"_id": "cool"}], [("12345", 'error'), ("cool", 'result')]),
+            ([{"bad": None, "_id": "12345"}, {"_id": "cool"}], [(None, 'error'), ("cool", 'result')]),
             ([{"bad": [1, 2, 3, 4], "_id": "12345"}, {"_id": "cool"}], [("12345", 'error'), ("cool", 'result')]),
             ([{"bad": ("cat", "dog"), "_id": "12345"}, {"_id": "cool"}], [("12345", 'error'), ("cool", 'result')]),
-            ([{"bad": set(), "_id": "12345"}, {"_id": "cool"}], [("12345", 'error'), ("cool", 'result')]),
-            ([{"bad": dict(), "_id": "12345"}, {"_id": "cool"}], [("12345", 'error'), ("cool", 'result')]),
+            ([{"bad": set(), "_id": "12345"}, {"_id": "cool"}], [(None, 'error'), ("cool", 'result')]),
+            ([{"bad": dict(), "_id": "12345"}, {"_id": "cool"}], [(None, 'error'), ("cool", 'result')]),
             # handle bad _ids
             ([{"bad": "hehehe", "_id": 12345}, {"_id": "cool"}], [(None, 'error'), ("cool", 'result')]),
             ([{"bad": "hehehe", "_id": 12345}, {"_id": "cool"}, {"bad": "hehehe", "_id": None}, {"field": "yep"},
@@ -872,12 +872,11 @@ class TestAddDocuments(MarqoTestCase):
         def run():
             update_res = tensor_search.add_documents(
                 config=self.config, index_name=self.index_name_1, docs=[
-                        {"_id": "123", 'Surviving field': "edf " * (max_size // 4)},
+                        {"_id": "123", 'Bad field': "edf " * (max_size // 4)},
                         {"_id": "789", "Breaker": "abc " * ((max_size // 4) - 500)},
                         {"_id": "456", "Luminosity": "exc " * (max_size // 4)},
                       ],
                 auto_refresh=True, update_mode='update')
-            pprint.pprint(update_res)
             items = update_res['items']
             assert update_res['errors']
             assert 'error' in items[0] and 'error' in items[2]
@@ -886,3 +885,37 @@ class TestAddDocuments(MarqoTestCase):
             assert 'error' not in items[1]
             return True
         assert run()
+
+    def test_doc_too_large_single_doc(self):
+        max_size = 400000
+        mock_environ = {enums.EnvVars.MARQO_MAX_DOC_BYTES: max_size}
+
+        @mock.patch("os.environ", mock_environ)
+        def run():
+            update_res = tensor_search.add_documents(
+                config=self.config, index_name=self.index_name_1, docs=[
+                        {"_id": "123", 'Bad field': "edf " * (max_size // 4)},
+                      ],
+                auto_refresh=True, update_mode='update')
+            items = update_res['items']
+            assert update_res['errors']
+            assert 'error' in items[0]
+            assert 'doc_too_large' == items[0]['code']
+            return True
+        assert run()
+
+    def test_doc_too_large_none_env_var(self):
+        for env_dict in [dict(), {enums.EnvVars.MARQO_MAX_DOC_BYTES: None}]:
+            @mock.patch("os.environ", env_dict)
+            def run():
+                update_res = tensor_search.add_documents(
+                    config=self.config, index_name=self.index_name_1, docs=[
+                            {"_id": "123", 'Some field': "Some content"},
+                          ],
+                    auto_refresh=True, update_mode='update')
+                items = update_res['items']
+                assert not update_res['errors']
+                assert 'error' not in items[0]
+                assert items[0]['result'] in ['created', 'updated']
+                return True
+            assert run()

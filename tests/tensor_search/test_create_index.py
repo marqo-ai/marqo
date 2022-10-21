@@ -155,15 +155,20 @@ class TestCreateIndex(MarqoTestCase):
             mock_read_env_vars = mock.MagicMock()
             mock_read_env_vars.return_value = lim
 
-            @mock.patch("marqo.tensor_search.utils.read_env_vars_and_defaults", mock_read_env_vars)
+            @mock.patch("os.environ", {EnvVars.MARQO_MAX_INDEX_FIELDS: lim})
             def run():
                 res_1 = tensor_search.add_documents(
                     index_name=self.index_name_1, docs=[{f"f{i}": "some content" for i in range(lim)}],
                     auto_refresh=True, config=self.config
                 )
                 assert not res_1['errors']
+                # Notice the lack of resiliency:
                 res_1_2 = tensor_search.add_documents(
-                    index_name=self.index_name_1, docs=[{f"f{i}": "some content" for i in range(lim // 2 + 1)}],
+                    index_name=self.index_name_1, docs=[
+                        {'f0': 'this is fine, but there is no resiliency.'},
+                        {f"f{i}": "some content" for i in range(lim // 2 + 1)},
+                        {'f0': 'this is fine. Still no resilieny.'}
+                    ],
                     auto_refresh=True, config=self.config
                 )
                 assert not res_1_2['errors']

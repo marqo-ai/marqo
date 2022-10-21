@@ -105,7 +105,10 @@ def validate_doc(doc: dict) -> dict:
 
     max_doc_size = utils.read_env_vars_and_defaults(var=enums.EnvVars.MARQO_MAX_DOC_BYTES)
     if max_doc_size is not None:
-        serialized = json.dumps(doc)
+        try:
+            serialized = json.dumps(doc)
+        except TypeError as e:
+            raise InvalidArgError(f"Unable to index document: it is not serializable! Document: `{doc}` ")
         if len(serialized) > int(max_doc_size):
             maybe_id = f" _id:`{doc['_id']}`" if '_id' in doc else ''
             raise DocTooLargeError(
