@@ -250,18 +250,21 @@ Marqo is a community project with the goal of making tensor search accessible to
 1. Run the full test suite (by using the command `tox` in this dir).
 2. Create a pull request with an attached github issue.
 
-<!-- start support-pitch -->
-
 
 ## Support
 
 - Join our [Slack community](https://join.slack.com/t/marqo-community/shared_invite/zt-1d737l76e-u~b3Rvey2IN2nGM4wyr44w) and chat with other community members about ideas.
 - Marqo community meetings (coming soon!)
 
-<!-- end support-pitch -->
+### Stargazers
+[![Stargazers repo roster for @marqo-ai/marqo](https://reporoster.com/stars/marqo-ai/marqo)](https://github.com/marqo-ai/marqo/stargazers)
+
+### Forkers
+[![Forkers repo roster for @marqo-ai/marqo](https://reporoster.com/forks/marqo-ai/marqo)](https://github.com/marqo-ai/marqo/network/members)
+
 
 ## Translations
 
-This readme is available in the following translactions:
+This readme is available in the following translations:
 
 - [中文 Chinese](README-translated/README-Chinese.md)🇨🇳
