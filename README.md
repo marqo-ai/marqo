@@ -264,4 +264,4 @@ Marqo is a community project with the goal of making tensor search accessible to
 
 This readme is available in the following translactions:
 
-- [Chinese](README-translated/README-Chinese.md)🇨🇳
+- [中文 Chinese](README-translated/README-Chinese.md)🇨🇳
