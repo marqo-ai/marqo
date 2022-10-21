@@ -2,6 +2,8 @@
 The functions defined here would have endpoints, later on.
 """
 import numpy as np
+import hashlib
+import json
 from marqo.s2_inference.errors import VectoriseError, InvalidModelSettingsError, ModelLoadError, UnknownModelError
 from PIL import UnidentifiedImageError
 from marqo.s2_inference.model_registry import load_model_properties
@@ -29,7 +31,7 @@ def vectorise(model_name: str, content: Union[str, List[str]], model_properties:
         VectoriseError: if the content can't be vectorised, for some reason.
     """
 
-    model_cache_key = _create_model_cache_key(model_name, device)
+    model_cache_key = _create_model_cache_key(model_name, model_properties, device)
 
     _update_available_models(model_cache_key, model_name, model_properties, device, normalize_embeddings)
 
@@ -41,7 +43,7 @@ def vectorise(model_name: str, content: Union[str, List[str]], model_properties:
     return _convert_vectorized_output(vectorised)
 
 
-def _create_model_cache_key(model_name: str, device: str) -> Tuple[str, str]:
+def _create_model_cache_key(model_name: str, model_properties: dict, device: str) -> Tuple[str, str]:
     """creates a key to store the loaded model by in the cache
 
     Args:
@@ -50,14 +52,18 @@ def _create_model_cache_key(model_name: str, device: str) -> Tuple[str, str]:
 
     Returns:
         str: _description_
-
-    Future_Change:
-        make the cache key more unique for scenarios such as the user
-        changing the properties but keeping the same model name
     """
+    model_cache_key = hashlib.md5()
 
-    model_cache_key = (model_name, device)
-    return model_cache_key
+    encoded_model_name = str.encode(model_name)
+    encoded_model_properties = json.dumps(model_properties, sort_keys=True).encode()
+    encoded_device = str.encode(device)
+
+    model_cache_key.update(encoded_model_name
+                           + encoded_model_properties
+                           + encoded_device)
+
+    return model_cache_key.hexdigest()
 
 
 def _update_available_models(model_cache_key: Tuple[str, str], model_name: str, model_properties: dict, device: str, normalize_embeddings: bool) -> None:

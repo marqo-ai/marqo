@@ -3,9 +3,9 @@ import numpy as np
 from marqo.errors import MarqoApiError, MarqoError, IndexNotFoundError
 from marqo.s2_inference.errors import InvalidModelSettingsError, UnknownModelError
 from marqo.tensor_search import tensor_search
-from marqo.client import Client
 
 from marqo.s2_inference.s2_inference import (
+    available_models,
     vectorise,
     _validate_model_properties,
 )
@@ -16,8 +16,6 @@ from tests.marqo_test import MarqoTestCase
 class TestGenericModelSupport(MarqoTestCase):
 
     def setUp(self):
-        mq = Client(**self.client_settings)
-        self.config = mq.config
         self.index_name_1 = "my-test-create-index-1"
         try:
             tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
@@ -53,14 +51,15 @@ class TestGenericModelSupport(MarqoTestCase):
                             "dimensions": 768,
                             "tokens": 128,
                             "type": "sbert"}
-        tensor_search.create_vector_index(
-            index_name=self.index_name_1, config=self.config,
-            index_settings={
-                "index_defaults": {
-                    'model_properties': model_properties
-                }
+
+        index_settings = {
+            "index_defaults": {
+                'model_properties': model_properties
             }
-        )
+        }
+
+        self.assertRaises(UnknownModelError, tensor_search.create_vector_index, config=self.config,
+                          index_name=self.index_name_1, index_settings=index_settings)
 
     def test_add_documents(self):
         """if given the right input, add_documents should work without any throwing any errors
@@ -173,4 +172,39 @@ class TestGenericModelSupport(MarqoTestCase):
         result = vectorise(model_name=model_name, model_properties=model_properties, content="some string")
 
         assert np.array(result).shape[-1] == model_properties['dimensions']
+
+    def test_modification_of_model_properties(self):
+        """available_models should get updated if the model_properties are modified
+            and model_name is unchanged
+        """
+        model_name = 'test-model'
+        model_properties = {"name": "sentence-transformers/all-mpnet-base-v2",
+                            "dimensions": 768,
+                            "tokens": 128,
+                            "type": "sbert"}
+        index_settings = {
+            "index_defaults": {
+                'model': model_name,
+                'model_properties': model_properties
+            }
+        }
+
+        tensor_search.create_vector_index(index_name=self.index_name_1,
+                                          config=self.config, index_settings=index_settings
+                                          )
+
+        vectorise(model_name=model_name, model_properties=model_properties, content="some string")
+        tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+
+        old_num_of_available_models = len(available_models)
+        model_properties['tokens'] = 256
+
+        tensor_search.create_vector_index(index_name=self.index_name_1,
+                                          config=self.config, index_settings=index_settings
+                                          )
+        vectorise(model_name=model_name, model_properties=model_properties, content="some string")
+
+        new_num_of_available_models = len(available_models)
+
+        self.assertEqual(new_num_of_available_models, old_num_of_available_models + 1)
 
