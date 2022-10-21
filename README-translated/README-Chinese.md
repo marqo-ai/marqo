@@ -17,22 +17,12 @@
 </p>
 
 
-[comment]: <> (An open-source tensor search engine that seamlessly integrates with your applications, websites, and workflow.)
 这是一个开源的张量（tensor）搜索引擎。它可以无缝地整合到你的应用、网页、工作流程中。
 
-[comment]: <> (Marqo cloud ☁️  is currently in beta. If you're interested, apply here: https://q78175g1wwa.typeform.com/to/d0PEuRPC)
 Marqo云服务☁正在测试中。 如果你感兴趣的话，你可以在这里申请：https://q78175g1wwa.typeform.com/to/d0PEuRPC
 
-[comment]: <> (## What is tensor search?)
 ## 什么是张量（tensor）搜索？
 
-[comment]: <> (
-Tensor search involves transforming documents, images and other data into collections of vectors called "tensors". Representing data as tensors allows us to match queries against documents with human-like understanding of the query and document's content. Tensor search can power a variety of use cases such as:
-- end user search and recommendations
-- multi-modal search image-to-image, text-to-image, image-to-text
-- chat bots and question and answer systems
-- text and image classification
-)
 张量搜索是一个涉及到把文件、图片和其他数据转换成一个向量集合（我们称之为张量）的过程。通过张量来表示数据可以允许我们像人类那样去匹配搜索请求和文件。张量搜索可以助力众多的应用场景包括：
 - 用户搜索和推荐系统
 - 多模式搜索（图片搜图片，文字搜图片，图片搜文字）
