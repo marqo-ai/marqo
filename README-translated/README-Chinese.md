@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logo2.svg" alt="Marqo"/>
+  <img src="../assets/logo2.svg" alt="Marqo"/>
 </p>
 
 <h1 align="center">Marqo</h1>
@@ -30,7 +30,7 @@ Marqo云服务☁正在测试中。 如果你感兴趣的话，你可以在这�
 - 文字和图片分类
 
 <p align="center">
-  <img src="assets/output.gif"/>
+  <img src="../assets/output.gif"/>
 </p>
 
 <!-- end marqo-description -->
