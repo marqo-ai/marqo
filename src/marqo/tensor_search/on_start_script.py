@@ -39,8 +39,12 @@ class PopulateCache:
             index_meta_cache.populate_cache(c)
         except errors.BackendCommunicationError as e:
             raise errors.BackendCommunicationError(
-                message="Can't connect to Marqo-os backend!\n"
-                        f"        OPENSEARCH_URL: {self.marqo_os_url}"
+                message="Can't connect to Marqo-os backend. \n"  
+                        "    Possible causes: \n"
+                        "        - If this is an arm64 machine, ensure you are using an external Marqo-os instance \n"
+                        "        - If you are using an external Marqo-os instance, check if it is running: `curl <YOUR MARQO-OS URL>` \n"
+                        "        - Ensure that the OPENSEARCH_URL environment variable defined in the `docker run marqo` command points to Marqo-os\n",
+                link="https://github.com/marqo-ai/marqo/tree/mainline/src/marqo#c-build-and-run-the-marqo-as-a-docker-container-connecting-to-marqo-os-which-is-running-on-the-host"
             ) from e
         # the following lines turns off auto create index
         # connection = HttpRequests(c)
@@ -80,6 +84,7 @@ class CUDAAvailable:
             device_names.append( {'id':device_id, 'name':id_to_device(device_id)})
         self.logger.info(f"found devices {device_names}")
 
+
 class NLTK: 
 
     """predownloads the nltk stuff
@@ -100,6 +105,7 @@ class NLTK:
         except LookupError:
             nltk.download('punkt')        
         self.logger.info("completed loading nltk")
+
 
 class ModelsForCacheing:
     
@@ -160,6 +166,7 @@ class DownloadStartText:
         print("###########################################################")
         print('\n')
 
+
 class DownloadFinishText:
 
     def run(self):
@@ -170,6 +177,7 @@ class DownloadFinishText:
         print("###########################################################")
         print("###########################################################")
         print('\n')
+
 
 class MarqoPhrase:
 
@@ -185,6 +193,7 @@ class MarqoPhrase:
         """
 
         print(message)
+
 
 class MarqoWelcome:
 
