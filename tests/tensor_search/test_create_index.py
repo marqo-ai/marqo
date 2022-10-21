@@ -185,10 +185,7 @@ class TestCreateIndex(MarqoTestCase):
             assert run()
 
     def test_field_limit_non_text_types(self):
-        mock_read_env_vars = mock.MagicMock()
-        mock_read_env_vars.return_value = 5
-
-        @mock.patch("marqo.tensor_search.utils.read_env_vars_and_defaults", mock_read_env_vars)
+        @mock.patch("os.environ", {EnvVars.MARQO_MAX_INDEX_FIELDS: 5})
         def run():
             docs = [
                 {"f1": "fgrrvb", "f2": 1234, "f3": 1.4, "f4": "hello hello", "f5": False},
@@ -198,10 +195,6 @@ class TestCreateIndex(MarqoTestCase):
             ]
             res_1 = tensor_search.add_documents(
                 index_name=self.index_name_1, docs=docs, auto_refresh=True, config=self.config
-            )
-            mapping_info = requests.get(
-                self.authorized_url + f"/{self.index_name_1}/_mapping",
-                verify=False
             )
             assert not res_1['errors']
             try:
