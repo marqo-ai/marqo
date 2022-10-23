@@ -2,6 +2,7 @@ import unittest
 from marqo.tensor_search.utils import construct_authorized_url
 from marqo import config
 
+
 class MarqoTestCase(unittest.TestCase):
 
     @classmethod

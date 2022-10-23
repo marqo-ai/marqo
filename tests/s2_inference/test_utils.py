@@ -14,11 +14,6 @@ import time
 
 class TestOutputs(unittest.TestCase):
 
-    def setUp(self) -> None:
-
-        pass
-
-        
     def test_check_output(self):
         # tests for checking the output type standardization
         list_o_list = [[1,2]]
@@ -40,7 +35,6 @@ class TestOutputs(unittest.TestCase):
         for name in names:
             for device in devices:
                 assert _create_model_cache_key(name, device) == (name, device)
-        
 
     def test_clear_model_cache(self):
         # tests clearing the model cache

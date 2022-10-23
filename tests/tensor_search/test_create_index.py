@@ -1,13 +1,13 @@
-import json
 import pprint
 import requests
-from marqo.tensor_search.enums import IndexSettingsField
+from marqo.tensor_search.enums import IndexSettingsField, EnvVars
 from marqo.errors import MarqoApiError, MarqoError, IndexNotFoundError
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search import configs
 from tests.marqo_test import MarqoTestCase
 from marqo.tensor_search.enums import IndexSettingsField as NsField
-
+from unittest import mock
+from marqo import errors
 
 class TestCreateIndex(MarqoTestCase):
 
@@ -144,3 +144,94 @@ class TestCreateIndex(MarqoTestCase):
             verify=False
         )
         assert intended_shard_count == int(resp.json()[self.index_name_1]['settings']['index']['number_of_shards'])
+
+    def test_field_limits(self):
+        index_limits = [1, 5, 10, 100, 1000]
+        for lim in index_limits:
+            try:
+                tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+            except IndexNotFoundError as s:
+                pass
+            mock_read_env_vars = mock.MagicMock()
+            mock_read_env_vars.return_value = lim
+
+            @mock.patch("os.environ", {EnvVars.MARQO_MAX_INDEX_FIELDS: lim})
+            def run():
+                res_1 = tensor_search.add_documents(
+                    index_name=self.index_name_1, docs=[{f"f{i}": "some content" for i in range(lim)}],
+                    auto_refresh=True, config=self.config
+                )
+                assert not res_1['errors']
+                # Notice the lack of resiliency:
+                res_1_2 = tensor_search.add_documents(
+                    index_name=self.index_name_1, docs=[
+                        {'f0': 'this is fine, but there is no resiliency.'},
+                        {f"f{i}": "some content" for i in range(lim // 2 + 1)},
+                        {'f0': 'this is fine. Still no resilieny.'}
+                    ],
+                    auto_refresh=True, config=self.config
+                )
+                assert not res_1_2['errors']
+                try:
+                    res_2 = tensor_search.add_documents(
+                        index_name=self.index_name_1, docs=[
+                            {'fx': "blah"}
+                        ], auto_refresh=True, config=self.config
+                    )
+                    raise AssertionError
+                except errors.IndexMaxFieldsError:
+                    pass
+                return True
+            assert run()
+
+    def test_field_limit_non_text_types(self):
+        @mock.patch("os.environ", {EnvVars.MARQO_MAX_INDEX_FIELDS: 5})
+        def run():
+            docs = [
+                {"f1": "fgrrvb", "f2": 1234, "f3": 1.4, "f4": "hello hello", "f5": False},
+                {"f1": "erf1f", "f2": 934, "f3": 4.0, "f4": "my name", "f5": True},
+                {"f1": "water is healthy", "f5": True},
+                {"f2": 49, "f3": 400.4, "f4": "alien message"}
+            ]
+            res_1 = tensor_search.add_documents(
+                index_name=self.index_name_1, docs=docs, auto_refresh=True, config=self.config
+            )
+            assert not res_1['errors']
+            try:
+                res_2 = tensor_search.add_documents(
+                    index_name=self.index_name_1, docs=[
+                        {'fx': "blah"}
+                    ], auto_refresh=True, config=self.config
+                )
+                raise AssertionError
+            except errors.IndexMaxFieldsError:
+                pass
+            return True
+
+        assert run()
+
+    def test_field_Limit_none_env_var(self):
+        """When the limit env var is undefined: we need to manually test it,
+        as the testing environment may have this env var defined."""
+        mock_read_env_vars = mock.MagicMock()
+        mock_read_env_vars.return_value = None
+
+        @mock.patch("marqo.tensor_search.utils.read_env_vars_and_defaults", mock_read_env_vars)
+        def run():
+            docs = [
+                {"f1": "fgrrvb", "f2": 1234, "f3": 1.4, "f4": "hello hello", "f5": False},
+                {"f1": "erf1f", "f2": 934, "f3": 4.0, "f4": "my name", "f5": True},
+                {"f1": "water is healthy", "f5": True},
+                {"f2": 49, "f3": 400.4, "f4": "alien message"}
+            ]
+            res_1 = tensor_search.add_documents(
+                index_name=self.index_name_1, docs=docs, auto_refresh=True, config=self.config
+            )
+            mapping_info = requests.get(
+                self.authorized_url + f"/{self.index_name_1}/_mapping",
+                verify=False
+            )
+            assert not res_1['errors']
+            return True
+        assert run()
+

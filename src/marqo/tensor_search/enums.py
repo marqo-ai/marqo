@@ -72,3 +72,11 @@ class OpenSearchDataType:
     float = "float"
     integer = "integer"
     to_be_defined = "to_be_defined"  # to be defined by OpenSearch
+
+
+class EnvVars:
+    MARQO_MAX_INDEX_FIELDS = "MARQO_MAX_INDEX_FIELDS"
+    MARQO_MAX_DOC_BYTES = "MARQO_MAX_DOC_BYTES"
+    MARQO_MAX_RETRIEVABLE_DOCS = "MARQO_MAX_RETRIEVABLE_DOCS"
+
+

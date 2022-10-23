@@ -1,5 +1,5 @@
 from marqo.tensor_search import enums as ns_enums
-from marqo.tensor_search.enums import IndexSettingsField as NsFields
+from marqo.tensor_search.enums import IndexSettingsField as NsFields, EnvVars
 from torch import multiprocessing as mp
 
 
@@ -23,3 +23,11 @@ def get_default_index_settings():
         NsFields.number_of_shards: 5
     }
 
+
+def default_env_vars() -> dict:
+
+    return {
+        EnvVars.MARQO_MAX_INDEX_FIELDS: None,
+        EnvVars.MARQO_MAX_DOC_BYTES: 100000,
+        EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: None
+    }

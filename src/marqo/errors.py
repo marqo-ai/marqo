@@ -123,6 +123,11 @@ class InvalidArgError(__InvalidRequestError):
     status_code = HTTPStatus.BAD_REQUEST
 
 
+class DocTooLargeError(__InvalidRequestError):
+    code = "doc_too_large"
+    status_code = HTTPStatus.BAD_REQUEST
+
+
 class BadRequestError(__InvalidRequestError):
     code = "bad_request"
     status_code = HTTPStatus.BAD_REQUEST
@@ -143,6 +148,13 @@ class HardwareCompatabilityError(__InvalidRequestError):
     """Error when a request incorrectly assumes that the server has a certain
     hardware configuration"""
     code = "hardware_compatability_error"
+    status_code = HTTPStatus.BAD_REQUEST
+
+
+class IndexMaxFieldsError(__InvalidRequestError):
+    """Error when attempting to index a document that increases the indexes' number of
+    fields above the index limit"""
+    code = "index_max_fields_error"
     status_code = HTTPStatus.BAD_REQUEST
 
 # ---MARQO INTERNAL ERROR---
