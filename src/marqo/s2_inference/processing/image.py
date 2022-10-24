@@ -494,9 +494,12 @@ class PatchifyPytorch:
         # we add the original unchanged so that it is always in the index
         # the bb of the original also provides the size which is required for later processing
         self.bboxes = [(0,0,self.size[0],self.size[1])] + self.bboxes_pt.numpy().astype(int).tolist() + self.bboxes_simple
+        #self.bboxes = replace_small_boxes(self.bboxes, min_area=40*40, new_size=(100,100))
+        #self.bboxes = clip_boxes(self.bboxes_orig,0,0,self.size[0],self.size[1])
         self.patches = patchify_image(self.image, self.bboxes)
 
         self.bboxes_orig = [rescale_box(bb, self.size, self.original_size) for bb in self.bboxes]
+        
 
 def patchify_image(image: ImageType, bboxes: Union[List[float], FloatTensor, ndarray]) -> List[ImageType]:
     """given a list of 4-tuple rectangles (x1, y1, x2, y2) return a list of 
@@ -627,7 +630,7 @@ class PatchifyYolox:
         self.device = device
         self.input_shape = (384, 384)
         self.top_k = 10
-        self.model_name = "yolox_s.onnx"
+        self.model_name = "/mnt/internal1/datasets/LVIS/YOLOX/yolox_s.onnx"
         model_type = ('yolox', device)
 
         if model_type not in available_models:
@@ -662,15 +665,22 @@ class PatchifyYolox:
 
         if self.filter_bb:
             self.boxes_xyxy = _filter_yolox(self.boxes_xyxy, self.scores)
+            self.boxes_xyxy = self.boxes_xyxy.astype(int).tolist()
+            self.boxes_xyxy = replace_small_boxes(self.boxes_xyxy, min_area=40*40, new_size=(80,80))
+            #print(self.boxes_xyxy)
+        
+        
 
         self.boxes_xyxy = _keep_topk(self.boxes_xyxy, k=self.top_k)
         # we add the original unchanged so that it is always in the index
         # the bb of the original also provides the size which is required for later processing
-        self.bboxes = [(0,0,self.size[0],self.size[1])] + self.boxes_xyxy.astype(int).tolist()
+        self.bboxes = [(0,0,self.size[0],self.size[1])] + self.boxes_xyxy
+        #print(self.bboxes)
         self.patches = patchify_image(self.image_pil, self.bboxes)
 
         self.bboxes_orig = [rescale_box(bb, self.size, self.original_size) for bb in self.bboxes]
-
+        self.bboxes_orig = clip_boxes(self.bboxes_orig,0,self.original_size[0],0, self.original_size[1])
+        
 
 def load_pretrained_mobilenet():
     """"
@@ -722,3 +732,32 @@ def filter_yolox_boxes(boxes, max_aspect_ratio: int = 4, min_area: int = 40*40):
     
     return inds
 
+def replace_small_boxes(boxes, min_area=40*40, new_size=(100,100)):
+
+    new_boxes = []
+    for box in boxes:
+        print(box)
+        area = (box[2]-box[0])*(box[3] - box[1])
+        if area < min_area:
+            xc = (box[2]-box[0])/2 + box[0]
+            yc = (box[3]-box[1])/2 + box[1]
+            box = (xc-new_size[0]/2, yc-new_size[1]/2, xc+new_size[0]/2, yc+new_size[1]/2)
+        print(box)
+        new_boxes.append(box)
+    return new_boxes
+
+def clip_boxes(boxes, xmin, xmax, ymin, ymax):
+
+    new_boxes = []
+    for box in boxes:
+        
+        x1, y1, x2, y2 = box
+        x1 = np.clip(x1, xmin, xmax) 
+        x2 = np.clip(x2, xmin, xmax) 
+        y1 = np.clip(y1, ymin, ymax) 
+        y2 = np.clip(y2, ymin, ymax) 
+        box = (x1, y1, x2, y2)
+        #print(box)
+        new_boxes.append(box)
+    return new_boxes
+    
