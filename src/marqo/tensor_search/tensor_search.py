@@ -703,7 +703,7 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
                                   f"MARQO_MAX_RETRIEVABLE_DOCS limit of [{max_docs_limit}]. ")
         above_zero_explanation = "The search result limit must be greater than or equal to 0."
         explanation = upper_bound_explanation if max_docs_limit is not None else above_zero_explanation
-        raise errors.InvalidArgError(f"{explanation} Marqo received search result limit of `{result_count}`.")
+        raise errors.IllegalRequestedDocCount(f"{explanation} Marqo received search result limit of `{result_count}`.")
 
     t0 = datetime.datetime.now()
 
@@ -761,7 +761,7 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
 def _lexical_search(
         config: Config, index_name: str, text: str, result_count: int = 3, return_doc_ids=True,
         searchable_attributes: Sequence[str] = None, filter_string: str = None,
-        attributes_to_retrieve: Optional[List[str]] = None):
+        attributes_to_retrieve: Optional[List[str]] = None, expose_facets: bool = False):
     """
 
     Args:
@@ -813,6 +813,11 @@ def _lexical_search(
             "query_string": {"query": filter_string}}]
     if attributes_to_retrieve is not None:
         body["_source"] = {"include": attributes_to_retrieve} if len(attributes_to_retrieve) > 0 else False
+    if not expose_facets:
+        if "_source" not in body:
+            body["_source"] = dict()
+        if body["_source"] is not False:
+            body["_source"]["exclude"] = ["*__vector*"]
     search_res = HttpRequests(config).get(path=f"{index_name}/_search", body=body)
 
     res_list = []
@@ -822,7 +827,7 @@ def _lexical_search(
             just_doc["_id"] = doc["_id"]
             just_doc["_score"] = doc["_score"]
         res_list.append({**just_doc, "_highlights": []})
-    return {'hits': res_list[:result_count]}
+    return {'hits': res_list}
 
 
 def _vector_text_search(
@@ -971,7 +976,10 @@ def _vector_text_search(
     except KeyError as e:
         # KeyError indicates we have received a non-successful result
         try:
-            if contextualised_filter in response["responses"][0]["error"]["root_cause"][0]["reason"]:
+            if "index.max_result_window" in response["responses"][0]["error"]["root_cause"][0]["reason"]:
+                raise errors.IllegalRequestedDocCount("Marqo-OS rejected the response due to too many requested results. "
+                                             "Try reducing the query's limit parameter") from e
+            elif contextualised_filter in response["responses"][0]["error"]["root_cause"][0]["reason"]:
                 raise errors.InvalidArgError("Syntax error, could not parse filter string") from e
             raise e
         except (KeyError, IndexError) as e2:

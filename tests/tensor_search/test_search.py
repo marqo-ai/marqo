@@ -4,7 +4,7 @@ from unittest import mock
 from marqo.tensor_search.enums import TensorField, SearchMethod, EnvVars
 from marqo.errors import (
     MarqoApiError, MarqoError, IndexNotFoundError, InvalidArgError,
-    InvalidFieldNameError
+    InvalidFieldNameError, IllegalRequestedDocCount
 )
 from marqo.tensor_search import tensor_search, constants, index_meta_cache
 import copy
@@ -50,20 +50,6 @@ class TestVectorSearch(MarqoTestCase):
             return_doc_ids=True, number_of_highlights=2, result_count=10
         )
         assert len(search_res['hits']) == 2
-
-    def test_vector_text_search_validate_result_count(self):
-        try:
-            tensor_search._vector_text_search(
-                config=self.config, index_name=self.index_name_1, result_count=-1, text="some text...")
-        except InvalidArgError as e:
-            assert "illegal result_count" in str(e)
-
-        try:
-            tensor_search._vector_text_search(
-                config=self.config, index_name=self.index_name_1,
-                result_count=constants.MAX_VECTOR_SEARCH_RESULT_COUNT + 1, text="some text...")
-        except InvalidArgError as e:
-            assert "illegal result_count" in str(e)
 
     def test_vector_search_against_empty_index(self):
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
@@ -230,8 +216,8 @@ class TestVectorSearch(MarqoTestCase):
                 searchable_attributes=["other field", "Cool Field 1"], return_doc_ids=True, result_count=-1
             )
             raise AssertionError
-        except InvalidArgError as e:
-            assert "result count" in str(e)
+        except IllegalRequestedDocCount as e:
+            pass
         try:
             # too small
             search_res = tensor_search.search(
@@ -239,8 +225,8 @@ class TestVectorSearch(MarqoTestCase):
                 searchable_attributes=["other field", "Cool Field 1"], return_doc_ids=True, result_count=1000000
             )
             raise AssertionError
-        except InvalidArgError as e:
-            assert "result count" in str(e)
+        except IllegalRequestedDocCount as e:
+            pass
         # should work with 0
         search_res = tensor_search.search(
             config=self.config, index_name=self.index_name_1, text="Exact match hehehe",
@@ -700,7 +686,7 @@ class TestVectorSearch(MarqoTestCase):
 
         tensor_search.add_documents(
             config=self.config, index_name=self.index_name_1,
-            docs=[{"Title": "a" + (" ".join(random.choices(population=vocab, k=25)))}
+            docs=[{"Title": "a " + (" ".join(random.choices(population=vocab, k=25)))}
                   for _ in range(2000)], auto_refresh=False
         )
         tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
@@ -737,10 +723,10 @@ class TestVectorSearch(MarqoTestCase):
 
         vocab = requests.get(vocab_source).text.splitlines()
 
-        tensor_search.add_documents(
+        tensor_search.add_documents_orchestrator(
             config=self.config, index_name=self.index_name_1,
-            docs=[{"Title": "a" + (" ".join(random.choices(population=vocab, k=25)))}
-                  for _ in range(2000)], auto_refresh=False
+            docs=[{"Title": "a " + (" ".join(random.choices(population=vocab, k=25)))}
+                  for _ in range(700)], auto_refresh=False, processes=4, batch_size=50
         )
         tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
 
