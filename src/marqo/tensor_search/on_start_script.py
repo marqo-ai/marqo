@@ -117,9 +117,8 @@ class ModelsForCacheing:
         import torch
       
         self.models = (
-            'hf/all_datasets_v4_MiniLM-L6',
             'onnx/all_datasets_v4_MiniLM-L6',
-            "ViT-B/16",
+            "ViT-L/14",
         )
         # TBD to include cross-encoder/ms-marco-TinyBERT-L-2-v2
 
