@@ -696,11 +696,14 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
     Returns:
 
     """
-    # TODO move this out into the config
-    MAX_RESULT_COUNT = 500
-
-    if result_count > MAX_RESULT_COUNT or result_count < 0:
-        raise errors.InvalidArgError("result count must be between 0 and 500!")
+    max_docs_limit = utils.read_env_vars_and_defaults(EnvVars.MARQO_MAX_RETRIEVABLE_DOCS)
+    check_upper = True if max_docs_limit is None else result_count <= int(max_docs_limit)
+    if not(check_upper and result_count >= 0):
+        upper_bound_explanation = ("The search result limit must be between 0 and the "
+                                  f"MARQO_MAX_RETRIEVABLE_DOCS limit of [{max_docs_limit}]. ")
+        above_zero_explanation = "The search result limit must be greater than or equal to 0."
+        explanation = upper_bound_explanation if max_docs_limit is not None else above_zero_explanation
+        raise errors.InvalidArgError(f"{explanation} Marqo received search result limit of `{result_count}`.")
 
     t0 = datetime.datetime.now()
 
@@ -864,9 +867,6 @@ def _vector_text_search(
         - max result count should be in a config somewhere
         - searching a non existent index should return a HTTP-type error
     """
-    if result_count < 0 or result_count > constants.MAX_VECTOR_SEARCH_RESULT_COUNT:
-        raise errors.InvalidArgError(
-            "tensor_search: vector_text_search: illegal result_count: {}".format(result_count))
 
     if config.cluster_is_s2search and filter_string is not None:
         raise errors.InvalidArgError(
