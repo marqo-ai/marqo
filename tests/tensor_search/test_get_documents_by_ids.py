@@ -123,7 +123,7 @@ class TestGetDocuments(MarqoTestCase):
         )
         tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
         for max_doc in [0, 1, 2, 5, 10, 100, 1000]:
-            mock_environ = {enums.EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: max_doc}
+            mock_environ = {enums.EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: str(max_doc)}
 
             @mock.patch("os.environ", mock_environ)
             def run():

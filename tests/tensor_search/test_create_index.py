@@ -155,7 +155,7 @@ class TestCreateIndex(MarqoTestCase):
             mock_read_env_vars = mock.MagicMock()
             mock_read_env_vars.return_value = lim
 
-            @mock.patch("os.environ", {EnvVars.MARQO_MAX_INDEX_FIELDS: lim})
+            @mock.patch("os.environ", {EnvVars.MARQO_MAX_INDEX_FIELDS: str(lim)})
             def run():
                 res_1 = tensor_search.add_documents(
                     index_name=self.index_name_1, docs=[{f"f{i}": "some content" for i in range(lim)}],
@@ -185,7 +185,7 @@ class TestCreateIndex(MarqoTestCase):
             assert run()
 
     def test_field_limit_non_text_types(self):
-        @mock.patch("os.environ", {EnvVars.MARQO_MAX_INDEX_FIELDS: 5})
+        @mock.patch("os.environ", {EnvVars.MARQO_MAX_INDEX_FIELDS: "5"})
         def run():
             docs = [
                 {"f1": "fgrrvb", "f2": 1234, "f3": 1.4, "f4": "hello hello", "f5": False},

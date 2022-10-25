@@ -866,7 +866,7 @@ class TestAddDocuments(MarqoTestCase):
 
     def test_doc_too_large(self):
         max_size = 400000
-        mock_environ = {enums.EnvVars.MARQO_MAX_DOC_BYTES: max_size}
+        mock_environ = {enums.EnvVars.MARQO_MAX_DOC_BYTES: str(max_size)}
 
         @mock.patch("os.environ", mock_environ)
         def run():
@@ -888,7 +888,7 @@ class TestAddDocuments(MarqoTestCase):
 
     def test_doc_too_large_single_doc(self):
         max_size = 400000
-        mock_environ = {enums.EnvVars.MARQO_MAX_DOC_BYTES: max_size}
+        mock_environ = {enums.EnvVars.MARQO_MAX_DOC_BYTES: str(max_size)}
 
         @mock.patch("os.environ", mock_environ)
         def run():
