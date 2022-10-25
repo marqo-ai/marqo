@@ -3,7 +3,8 @@ import pprint
 import uuid
 from marqo.tensor_search import enums
 from marqo.errors import (
-    IndexNotFoundError, InvalidDocumentIdError, InvalidArgError
+    IndexNotFoundError, InvalidDocumentIdError, InvalidArgError,
+    IllegalRequestedDocCount
 )
 from marqo.tensor_search import tensor_search
 from tests.marqo_test import MarqoTestCase
@@ -140,14 +141,14 @@ class TestGetDocuments(MarqoTestCase):
                         config=self.config, index_name=self.index_name_1,
                         document_ids=[docs[i]['_id'] for i in range(max_doc + 1)])
                     raise AssertionError
-                except InvalidArgError:
+                except IllegalRequestedDocCount:
                     pass
                 try:
                     very_oversized_search = tensor_search.get_documents_by_ids(
                          config=self.config, index_name=self.index_name_1,
                          document_ids=[docs[i]['_id'] for i in range(max_doc * 2)])
                     raise AssertionError
-                except InvalidArgError:
+                except IllegalRequestedDocCount:
                     pass
                 return True
         assert run()
