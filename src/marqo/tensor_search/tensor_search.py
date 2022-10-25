@@ -461,7 +461,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                 for text_chunk, vector_chunk in zip(text_chunks, vector_chunks):
                     # only add chunk values which are string, boolean or numeric
                     chunk_values_for_filtering = {}
-                    for key, value in doc.items():
+                    for key, value in copied.items():
                         if not (isinstance(value, str) or isinstance(value, float)
                                 or isinstance(value, bool) or isinstance(value, int)):
                             continue
