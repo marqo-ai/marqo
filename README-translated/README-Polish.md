@@ -268,7 +268,7 @@ Marqo to projekt społecznościowy, którego celem jest udostępnienie wyszukiwa
 Ten plik readme jest dostępny w następujących tłumaczeniach:
 
 - [English](../README.md)🇬🇧
-- [Français](README-French.md)
+- [Français](README-French.md)🇫🇷
 - [中文 Chinese](README-Chinese.md)🇨🇳
 - [Polski](README-Polish.md)🇵🇱
 - [Українська](README-Ukrainian.md)🇺🇦
