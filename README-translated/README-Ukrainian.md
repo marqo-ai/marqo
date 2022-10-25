@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logo2.svg" alt="Marqo"/>
+  <img src="../assets/logo2.svg" alt="Marqo"/>
 </p>
 
 <h1 align="center">Marqo</h1>
