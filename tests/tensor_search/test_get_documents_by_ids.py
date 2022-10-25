@@ -138,13 +138,15 @@ class TestGetDocuments(MarqoTestCase):
                 try:
                     oversized_search = tensor_search.get_documents_by_ids(
                         config=self.config, index_name=self.index_name_1,
-                        document_ids=[docs[i]['_id'] for i in range(max_doc)])
+                        document_ids=[docs[i]['_id'] for i in range(max_doc + 1)])
+                    raise AssertionError
                 except InvalidArgError:
                     pass
                 try:
                     very_oversized_search = tensor_search.get_documents_by_ids(
                          config=self.config, index_name=self.index_name_1,
-                         document_ids=[docs[i]['_id'] for i in range(max_doc)])
+                         document_ids=[docs[i]['_id'] for i in range(max_doc * 2)])
+                    raise AssertionError
                 except InvalidArgError:
                     pass
                 return True

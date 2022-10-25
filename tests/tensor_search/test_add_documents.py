@@ -565,9 +565,15 @@ class TestAddDocuments(MarqoTestCase):
                 url=F"{self.endpoint}/{self.index_name_1}/_doc/{doc_id}",
                 verify=False
             )
+            check_dict_no_id = copy.deepcopy(check_dict)
+            try:
+                del check_dict_no_id['_id']
+            except KeyError:
+                pass
             # make sure that the chunks have been updated
             for ch in updated_raw_doc.json()['_source']['__chunks']:
-                for field, expected_value in check_dict.items():
+                assert '_id' not in ch
+                for field, expected_value in check_dict_no_id.items():
                     assert ch[field] == expected_value
         return True
 
@@ -598,7 +604,7 @@ class TestAddDocuments(MarqoTestCase):
         )
 
     def test_put_documents_multiple_docs(self):
-        """mutliple docs updated at once"""
+        """multiple docs updated at once"""
         docs_ = [
             {"_id": "123", "Title": "Story of Joe Blogs", "Description": "Joe was a great farmer."},
             {"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}
@@ -859,9 +865,15 @@ class TestAddDocuments(MarqoTestCase):
             url=F"{self.endpoint}/{self.index_name_1}/_doc/789",
             verify=False
         )
+        check_dict_no_id = copy.deepcopy(check_dict)
+        try:
+            del check_dict_no_id['_id']
+        except KeyError:
+            pass
         # make sure that the chunks have been updated
         for ch in updated_raw_doc.json()['_source']['__chunks']:
-            for field, expected_value in check_dict.items():
+            assert '_id' not in ch
+            for field, expected_value in check_dict_no_id.items():
                 assert ch[field] == expected_value
 
     def test_doc_too_large(self):
