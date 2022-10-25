@@ -4,7 +4,6 @@ from marqo.tensor_search import enums
 from marqo.errors import (
     IndexNotFoundError, InvalidDocumentIdError, InvalidArgError
 )
-from marqo.client import Client
 from marqo.tensor_search import tensor_search
 from tests.marqo_test import MarqoTestCase
 
@@ -14,8 +13,6 @@ class TestGetDocuments(MarqoTestCase):
     def setUp(self) -> None:
         self.generic_header = {"Content-type": "application/json"}
         self.index_name_1 = "my-test-index-1"
-        c = Client(**self.client_settings)
-        self.config = c.config
         self._delete_testing_indices()
 
     def _delete_testing_indices(self):

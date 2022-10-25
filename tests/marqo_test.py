@@ -1,5 +1,6 @@
 import unittest
 from marqo.tensor_search.utils import construct_authorized_url
+from marqo import config
 
 
 class MarqoTestCase(unittest.TestCase):
@@ -18,3 +19,4 @@ class MarqoTestCase(unittest.TestCase):
             username=cls.client_settings["main_user"],
             password=cls.client_settings["main_password"]
         )
+        cls.config = config.Config(url=cls.authorized_url)
