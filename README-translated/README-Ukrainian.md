@@ -271,3 +271,4 @@ Marqo - це ком'юніті проект, метою якого є розпо
 - [中文 Chinese](README-Chinese.md)🇨🇳
 - [Polski](README-Polish.md)🇵🇱
 - [Українська](README-Ukrainian.md)🇺🇦
+- [Français](README-French.md)🇫🇷
