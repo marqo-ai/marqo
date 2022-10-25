@@ -31,7 +31,7 @@ Marqo хмара ☁️ на даний момент в бета-версії. �
 - класифікація тексту та зображення 
 
 <p align="center">
-  <img src="assets/output.gif"/>
+  <img src="../assets/output.gif?raw=true"/>
 </p>
 
 <!-- end marqo-description -->
