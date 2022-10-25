@@ -79,7 +79,7 @@ class TEST(Model):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.truncated_embedding_dim = 16
-        
+
     def load(self) -> None:
         self.model = SentenceTransformer(self.model_name, device=self.device)
 
@@ -97,3 +97,5 @@ class TEST(Model):
 
         if normalize:
             embeddings = nn.functional.normalize(embeddings, p=2, dim=1)
+
+        return embeddings
