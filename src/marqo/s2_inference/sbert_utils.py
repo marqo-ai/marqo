@@ -78,7 +78,8 @@ class TEST(Model):
     """
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-
+        self.truncated_embedding_dim = 16
+        
     def load(self) -> None:
         self.model = SentenceTransformer(self.model_name, device=self.device)
 
@@ -92,7 +93,7 @@ class TEST(Model):
 
         # seemed inconsistent with the normalization, = False, roll own
         embeddings = self.model.encode(sentence, batch_size=self.batch_size, 
-                        normalize_embeddings=False, convert_to_tensor=True)[:, :16]
+                        normalize_embeddings=False, convert_to_tensor=True)[:, :self.truncated_embedding_dim]
 
         if normalize:
             embeddings = nn.functional.normalize(embeddings, p=2, dim=1)
