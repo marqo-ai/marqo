@@ -602,13 +602,23 @@ def get_documents_by_ids(
         raise errors.InvalidArgError("Get documents must be passed a collection of IDs!")
     if len(document_ids) <= 0:
         raise errors.InvalidArgError("Can't get empty collection of IDs!")
+    max_docs_limit = utils.read_env_vars_and_defaults(EnvVars.MARQO_MAX_RETRIEVABLE_DOCS)
+    if max_docs_limit is not None and len(document_ids) > int(max_docs_limit):
+        raise errors.IllegalRequestedDocCount(
+            f"{len(document_ids)} documents were requested, which is more than the allowed limit of [{max_docs_limit}], "
+            f"set by the environment variable `{EnvVars.MARQO_MAX_RETRIEVABLE_DOCS}`")
+    docs = [
+        {"_index": index_name, "_id": validation.validate_id(doc_id)}
+        for doc_id in document_ids
+    ]
+    if not show_vectors:
+        for d in docs:
+            d["_source"] = dict()
+            d["_source"]["exclude"] = f"*{TensorField.vector_prefix}*"
     res = HttpRequests(config).get(
         f'_mget/',
         body={
-            "docs": [
-                {"_index": index_name, "_id": validation.validate_id(doc_id)}
-                for doc_id in document_ids
-            ]
+            "docs": docs,
         }
     )
     if "docs" in res:
@@ -817,7 +827,7 @@ def _lexical_search(
         if "_source" not in body:
             body["_source"] = dict()
         if body["_source"] is not False:
-            body["_source"]["exclude"] = ["*__vector*"]
+            body["_source"]["exclude"] = [f"*{TensorField.vector_prefix}*"]
     search_res = HttpRequests(config).get(path=f"{index_name}/_search", body=body)
 
     res_list = []

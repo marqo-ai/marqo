@@ -707,12 +707,12 @@ class TestVectorSearch(MarqoTestCase):
                     try:
                         oversized_search = tensor_search.search(search_method=search_method,
                             config=self.config, index_name=self.index_name_1, text='a', result_count=max_doc + 1)
-                    except InvalidArgError:
+                    except IllegalRequestedDocCount:
                         pass
                     try:
                         very_oversized_search = tensor_search.search(search_method=search_method,
                             config=self.config, index_name=self.index_name_1, text='a', result_count=(max_doc + 1) * 2)
-                    except InvalidArgError:
+                    except IllegalRequestedDocCount:
                         pass
                     return True
             assert run()
@@ -731,7 +731,8 @@ class TestVectorSearch(MarqoTestCase):
         tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
 
         for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
-            for mock_environ in [dict(), {EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: None}]:
+            for mock_environ in [dict(), {EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: None},
+                                 {EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: ''}]:
                 @mock.patch("os.environ", mock_environ)
                 def run():
                     lim = 500
