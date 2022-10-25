@@ -123,6 +123,11 @@ class InvalidArgError(__InvalidRequestError):
     status_code = HTTPStatus.BAD_REQUEST
 
 
+class IllegalRequestedDocCount(__InvalidRequestError):
+    code = "illegal_requested_doc_count"
+    status_code = HTTPStatus.BAD_REQUEST
+
+
 class DocTooLargeError(__InvalidRequestError):
     code = "doc_too_large"
     status_code = HTTPStatus.BAD_REQUEST

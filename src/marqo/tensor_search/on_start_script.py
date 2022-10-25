@@ -42,9 +42,13 @@ class PopulateCache:
                 message="Can't connect to Marqo-os backend. \n"  
                         "    Possible causes: \n"
                         "        - If this is an arm64 machine, ensure you are using an external Marqo-os instance \n"
-                        "        - If you are using an external Marqo-os instance, check if it is running: `curl <YOUR MARQO-OS URL>` \n"
-                        "        - Ensure that the OPENSEARCH_URL environment variable defined in the `docker run marqo` command points to Marqo-os\n",
-                link="https://github.com/marqo-ai/marqo/tree/mainline/src/marqo#c-build-and-run-the-marqo-as-a-docker-container-connecting-to-marqo-os-which-is-running-on-the-host"
+                        "        - If you are using an external Marqo-os instance, check if it is running: "
+                        "`curl <YOUR MARQO-OS URL>` \n"
+                        "        - Ensure that the OPENSEARCH_URL environment variable defined "
+                        "in the `docker run marqo` command points to Marqo-os\n",
+                link="https://github.com/marqo-ai/marqo/tree/mainline/src/marqo"
+                     "#c-build-and-run-the-marqo-as-a-docker-container-connecting-"
+                     "to-marqo-os-which-is-running-on-the-host"
             ) from e
         # the following lines turns off auto create index
         # connection = HttpRequests(c)
@@ -85,9 +89,8 @@ class CUDAAvailable:
         self.logger.info(f"found devices {device_names}")
 
 
-class NLTK: 
-
-    """predownloads the nltk stuff
+class NLTK:
+    """Pre-downloads the nltk stuff
     """
 
     logger = get_logger('NLTK setup')
@@ -108,7 +111,6 @@ class NLTK:
 
 
 class ModelsForCacheing:
-    
     """warms the in-memory model cache by preloading good defaults
     """
     logger = get_logger('ModelsForStartup')

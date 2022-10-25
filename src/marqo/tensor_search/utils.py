@@ -167,7 +167,11 @@ def read_env_vars_and_defaults(var: str) -> Optional[str]:
     configs.default_env_vars(). If still unsuccessful, None is returned.
     """
     try:
-        return os.environ[var]
+        var = os.environ[var]
+        if var is not None and len(var) == 0:
+            return None
+        else:
+            return var
     except KeyError:
         try:
             return configs.default_env_vars()[var]

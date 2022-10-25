@@ -155,14 +155,16 @@ class TestCreateIndex(MarqoTestCase):
             mock_read_env_vars = mock.MagicMock()
             mock_read_env_vars.return_value = lim
 
-            @mock.patch("os.environ", {EnvVars.MARQO_MAX_INDEX_FIELDS: lim})
+            @mock.patch("os.environ", {EnvVars.MARQO_MAX_INDEX_FIELDS: str(lim)})
             def run():
                 res_1 = tensor_search.add_documents(
-                    index_name=self.index_name_1, docs=[{f"f{i}": "some content" for i in range(lim)}],
+                    index_name=self.index_name_1, docs=[
+                        {f"f{i}": "some content" for i in range(lim)},
+                        {"_id": "1234", **{f"f{i}": "new content" for i in range(lim)}},
+                    ],
                     auto_refresh=True, config=self.config
                 )
                 assert not res_1['errors']
-                # Notice the lack of resiliency:
                 res_1_2 = tensor_search.add_documents(
                     index_name=self.index_name_1, docs=[
                         {'f0': 'this is fine, but there is no resiliency.'},
@@ -185,10 +187,10 @@ class TestCreateIndex(MarqoTestCase):
             assert run()
 
     def test_field_limit_non_text_types(self):
-        @mock.patch("os.environ", {EnvVars.MARQO_MAX_INDEX_FIELDS: 5})
+        @mock.patch("os.environ", {EnvVars.MARQO_MAX_INDEX_FIELDS: "5"})
         def run():
             docs = [
-                {"f1": "fgrrvb", "f2": 1234, "f3": 1.4, "f4": "hello hello", "f5": False},
+                {"f1": "fgrrvb", "f2": 1234, "f3": 1.4, "f4": "hello hello", "f5": False, "_id": "hehehehe"},
                 {"f1": "erf1f", "f2": 934, "f3": 4.0, "f4": "my name", "f5": True},
                 {"f1": "water is healthy", "f5": True},
                 {"f2": 49, "f3": 400.4, "f4": "alien message"}
@@ -222,7 +224,7 @@ class TestCreateIndex(MarqoTestCase):
                 {"f1": "fgrrvb", "f2": 1234, "f3": 1.4, "f4": "hello hello", "f5": False},
                 {"f1": "erf1f", "f2": 934, "f3": 4.0, "f4": "my name", "f5": True},
                 {"f1": "water is healthy", "f5": True},
-                {"f2": 49, "f3": 400.4, "f4": "alien message"}
+                {"f2": 49, "f3": 400.4, "f4": "alien message", "_id": "rkjn"}
             ]
             res_1 = tensor_search.add_documents(
                 index_name=self.index_name_1, docs=docs, auto_refresh=True, config=self.config
