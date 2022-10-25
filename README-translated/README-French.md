@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logo2.svg" alt="Marqo"/>
+  <img src="../assets/logo2.svg" alt="Marqo"/>
 </p>
 
 <h1 align="center">Marqo</h1>
@@ -30,7 +30,7 @@ La recherche tensorielle consiste à transformer des documents, des images et d'
 - la classification de textes et d'images
 
 <p align="center">
-  <img src="assets/output.gif"/>
+  <img src="../assets/output.gif"/>
 </p>
 
 <!-- end marqo-description -->
