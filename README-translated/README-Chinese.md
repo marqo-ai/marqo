@@ -262,7 +262,7 @@ Marqo是一个社区项目。我们的目标是让张量搜索能够被更多的
 **Translations:**
 
 - [English](../README.md)🇬🇧
-- [Français](README-French.md)
+- [Français](README-French.md)🇫🇷
 - [中文 Chinese](README-Chinese.md)🇨🇳
 - [Polski](README-Polish.md)🇵🇱
 - [Українська](README-Ukrainian.md)🇺🇦
