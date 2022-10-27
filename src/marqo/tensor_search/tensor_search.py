@@ -58,7 +58,6 @@ from marqo.s2_inference.clip_utils import _is_image
 from marqo.s2_inference.reranking import rerank
 from marqo.s2_inference import s2_inference
 from moviepy.editor import VideoFileClip
-import tempfile
 import cv2
 
 # We depend on _httprequests.py for now, but this may be replaced in the future, as
@@ -413,90 +412,88 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                 infer_if_media = index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]
 
                 #download the file into a tmpdirname
-                tempdirectory = tempfile.mkdtemp(prefix="marqo-cache-file-", dir = os.getcwd())
 
-                try:
-                    # Pass the field_content into the router and get the MediaType and FileType
-                    field_content, mediatype, filetype = content_routering(field_content,
-                                                                           download_path=tempdirectory, infer_if_media = infer_if_media)
-                except:
-                    # Add the error messsage to the doc
-                    document_is_valid = False
-                    routering_error = errors.InvalidArgError(message=f'Could not process given image: {field_content}')
-                    unsuccessful_docs.append(
-                        (i, {'_id': doc_id, 'error': routering_error.message, 'status': int(routering_error.status_code),
-                             'code': routering_error.code})
-                    )
-                    shutil.rmtree(tempdirectory)
-                    break
-                # Load and process the field content based on the MediaType and FileType.
-                # We may wrap these into a function later
-
-                # mediatype is text
-                if mediatype == MediaType.text:
-                    # We can support more combinations of MediaType and FieldType combinations later.
-                    if filetype == FileType.straight_text:
-                        split_by = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][
-                            NsField.split_method]
-                        split_length = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][
-                            NsField.split_length]
-                        split_overlap = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][
-                            NsField.split_overlap]
-                        content_chunks = text_processor.split_text(field_content, split_by=split_by,
-                                                                   split_length=split_length,
-                                                                   split_overlap=split_overlap)
-                        text_chunks = content_chunks
-                    else:
-                        raise TypeError(f"We do not support the file type {filetype} for media {mediatype}")
-
-
-                # mediatype is image
-                elif mediatype == MediaType.image:
-                    if filetype == FileType.url:
-                        # Remove the downloaded file after loading the file into the memory
-                        temp_file = field_content
-                        field_content = Image.open(field_content)
-                        os.remove(temp_file)
-                    elif filetype == FileType.local:
-                        field_content = Image.open(field_content)
-                    elif filetype == FileType.PILImage:
-                        pass
-                    else:
-                        raise TypeError(f"We do not support the file type {filetype} for media {mediatype}")
+                with tempfile.TemporaryDirectory(prefix="marqo-cache-file-index-", dir = os.getcwd()) as tempdirectory:
 
                     try:
-                        # in the future, if we have different chunking methods, make sure we catch possible
-                        # errors of different types generated here, too.
-                        image_method = index_info.index_settings[NsField.index_defaults][NsField.image_preprocessing][
-                            NsField.patch_method]
-                        content_chunks, text_chunks = image_processor.chunk_image(
-                            field_content, device=selected_device, method=image_method)
-                    except s2_inference_errors.S2InferenceError:
+                        # Pass the field_content into the router and get the MediaType and FileType
+                        field_content, mediatype, filetype = content_routering(field_content,
+                                                                               download_path=tempdirectory, infer_if_media = infer_if_media)
+                    except:
+                        # Add the error messsage to the doc
                         document_is_valid = False
-                        image_err = errors.InvalidArgError(message=f'Could not process given image: {field_content}')
+                        routering_error = errors.InvalidArgError(message=f'Could not process given image: {field_content}')
                         unsuccessful_docs.append(
-                            (i, {'_id': doc_id, 'error': image_err.message, 'status': int(image_err.status_code),
-                                 'code': image_err.code})
+                            (i, {'_id': doc_id, 'error': routering_error.message, 'status': int(routering_error.status_code),
+                                 'code': routering_error.code})
                         )
+                        shutil.rmtree(tempdirectory)
                         break
-                # mediatype is video
-                elif mediatype == MediaType.video:
-                    if filetype == FileType.url:
-                        field_content = VideoFileClip(field_content)
-                    elif filetype == FileType.local:
-                        field_content = VideoFileClip(field_content)
-                    elif filetype == filetype.ListOfPILImage:
-                        pass
-                    else:
-                        raise TypeError(f"We do not support the file type {filetype} for media {mediatype}")
+                    # Load and process the field content based on the MediaType and FileType.
+                    # We may wrap these into a function later
 
-                    chunk_length = index_info.index_settings[NsField.index_defaults][NsField.video_preprocessing][NsField.chunk_length]
-                    chunk_method = index_info.index_settings[NsField.index_defaults][NsField.video_preprocessing][NsField.chunk_method]
+                    # mediatype is text
+                    if mediatype == MediaType.text:
+                        # We can support more combinations of MediaType and FieldType combinations later.
+                        if filetype == FileType.straight_text:
+                            split_by = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][
+                                NsField.split_method]
+                            split_length = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][
+                                NsField.split_length]
+                            split_overlap = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][
+                                NsField.split_overlap]
+                            content_chunks = text_processor.split_text(field_content, split_by=split_by,
+                                                                       split_length=split_length,
+                                                                       split_overlap=split_overlap)
+                            text_chunks = content_chunks
+                        else:
+                            raise TypeError(f"We do not support the file type {filetype} for media {mediatype}")
 
-                    content_chunks, text_chunks = video_processor.chunk_video(field_content, chunk_length, chunk_method, device=selected_device)
 
-                # Remove the temp_directory after we load the content
-                shutil.rmtree(tempdirectory)
+                    # mediatype is image
+                    elif mediatype == MediaType.image:
+                        if filetype == FileType.url:
+                            # Remove the downloaded file after loading the file into the memory
+                            temp_file = field_content
+                            field_content = Image.open(field_content)
+                            os.remove(temp_file)
+                        elif filetype == FileType.local:
+                            field_content = Image.open(field_content)
+                        elif filetype == FileType.PILImage:
+                            pass
+                        else:
+                            raise TypeError(f"We do not support the file type {filetype} for media {mediatype}")
+
+                        try:
+                            # in the future, if we have different chunking methods, make sure we catch possible
+                            # errors of different types generated here, too.
+                            image_method = index_info.index_settings[NsField.index_defaults][NsField.image_preprocessing][
+                                NsField.patch_method]
+                            content_chunks, text_chunks = image_processor.chunk_image(
+                                field_content, device=selected_device, method=image_method)
+                        except s2_inference_errors.S2InferenceError:
+                            document_is_valid = False
+                            image_err = errors.InvalidArgError(message=f'Could not process given image: {field_content}')
+                            unsuccessful_docs.append(
+                                (i, {'_id': doc_id, 'error': image_err.message, 'status': int(image_err.status_code),
+                                     'code': image_err.code})
+                            )
+                            break
+                    # mediatype is video
+                    elif mediatype == MediaType.video:
+                        if filetype == FileType.url:
+                            field_content = VideoFileClip(field_content)
+                        elif filetype == FileType.local:
+                            field_content = VideoFileClip(field_content)
+                        elif filetype == filetype.ListOfPILImage:
+                            pass
+                        else:
+                            raise TypeError(f"We do not support the file type {filetype} for media {mediatype}")
+
+                        chunk_length = index_info.index_settings[NsField.index_defaults][NsField.video_preprocessing][NsField.chunk_length]
+                        chunk_method = index_info.index_settings[NsField.index_defaults][NsField.video_preprocessing][NsField.chunk_method]
+
+                        content_chunks, text_chunks = video_processor.chunk_video(field_content, chunk_length, chunk_method, device=selected_device)
 
                 normalize_embeddings = index_info.index_settings[NsField.index_defaults][NsField.normalize_embeddings]
                 infer_if_image = index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]
@@ -959,7 +956,7 @@ def _vector_text_search(
 
     # TODO average over vectorized inputs with weights
 
-    with tempfile.TemporaryDirectory(prefix="marqo-cache-file-", dir=os.getcwd()) as tempdirectory:
+    with tempfile.TemporaryDirectory(prefix="marqo-cache-file-search-", dir=os.getcwd()) as tempdirectory:
 
         try:
             # Pass the text into the router and get the MediaType and FileType
