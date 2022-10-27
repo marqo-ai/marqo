@@ -246,7 +246,7 @@ class TestEncoding(unittest.TestCase):
 
         names = ['microsoft/xclip-base-patch16-kinetics-600', 'microsoft/xclip-base-patch16-zero-shot']
 
-        video_array = np.random.rand(32, 224, 224, 3) * 255
+        video_array = np.random.rand(300, 224, 224, 3) * 255
         video_random = [Image.fromarray(i.astype("uint8")).convert("RGB") for i in video_array]
 
         videos = [video_random, video_random, [video_random, video_random]]
