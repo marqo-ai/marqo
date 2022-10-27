@@ -66,6 +66,10 @@ class IndexSettingsField:
     image_preprocessing = "image_preprocessing"
     patch_method = "patch_method"
 
+    video_preprocessing = 'video_processing'
+    chunk_length = 'chunk_length'
+    chunk_method = 'chunk_method'
+
     number_of_shards = "number_of_shards"
 
 
