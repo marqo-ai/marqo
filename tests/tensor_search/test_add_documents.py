@@ -7,7 +7,7 @@ import marqo.tensor_search.utils as marqo_utils
 import numpy as np
 import requests
 from marqo.tensor_search.enums import TensorField, IndexSettingsField, SearchMethod
-from marqo.client import Client
+from marqo.tensor_search import enums
 from marqo.errors import IndexNotFoundError, InvalidArgError, BadRequestError
 from marqo.tensor_search import tensor_search, index_meta_cache, backend
 from tests.marqo_test import MarqoTestCase
@@ -16,15 +16,11 @@ from tests.marqo_test import MarqoTestCase
 class TestAddDocuments(MarqoTestCase):
 
     def setUp(self) -> None:
-        mq = Client(**self.client_settings)
-        self.endpoint = mq.config.url
-        self.config = mq.config
-        self.client = mq
-
+        self.endpoint = self.authorized_url
         self.generic_header = {"Content-type": "application/json"}
         self.index_name_1 = "my-test-index-1"
         try:
-            self.client.delete_index(self.index_name_1)
+            tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         except IndexNotFoundError as s:
             pass
 
@@ -230,37 +226,36 @@ class TestAddDocuments(MarqoTestCase):
             assert "status" in item
 
     def test_add_documents_validation(self):
-        """These bad docs should raise errors"""
+        """These bad docs should return errors"""
         bad_doc_args = [
-            [{
-                    "_id": "123",
-                    "id": {},
-            }],
-            [{
-                "blahblah": {1243}
-            }],
-            [{
-                "blahblah": None
-            }],
-            [{
-                "blahblah": [None], "hehehe": 123
-            },{
-                "some other obj": "finnne"
-            }],
-            [{
-                "blahblah": [None], "hehehe": 123
-            }, {
-                "some other obj": AssertionError  # wtf lad!!!
-            }],
-            [{
-                "blahblah": max  # a func!!!
-            }]
+            [{"_id": "to_fail_123", "id": {}}],
+            # strict checking: only allowed fields:
+            [{"_id": "to_fail_123", "my_field": dict()}],
+            [{"_id": "to_fail_123", "my_field": ["wow", "this", "is"]}],
+            [{"_id": "to_fail_123", "my_field": ["wow", "this", "is"]},
+             {"_id": "to_pass_123", "my_field": 'some_content'}],
+            [{"_id": "to_fail_123", "my_field": [{"abc": "678"}]}],
+            [{"_id": "to_fail_123", "my_field": {"abc": "234"}}],
+            [{"_id": "to_fail_123", "my_field": {"abc": "234"}},
+             {"_id": "to_pass_123", "my_field": 'some_content'}],
+            # other checking:
+            [{"blahblah": {1243}, "_id": "to_fail_123"}],
+            [{"blahblah": None, "_id": "to_fail_123"}],
+            [{"_id": "to_fail_123", "blahblah": [None], "hehehe": 123},
+             {"_id": "to_fail_567", "some other obj": "finnne", 123: "heehee"}],
+            [{"_id": "to_fail_123", "blahblah": [None], "hehehe": 123},
+             {"_id": "to_fail_567", "some other obj": AssertionError}],
+            [{"_id": "to_fail_567", "blahblah": max}]
         ]
-        for bad_doc_arg in bad_doc_args:
-            add_res = tensor_search.add_documents(config=self.config, index_name=self.index_name_1,
-                                                  docs=bad_doc_arg, auto_refresh=True)
-            assert any(['error' in item for item in add_res['items']])
-
+        for update_mode in ('replace', 'update'):
+            for bad_doc_arg in bad_doc_args:
+                add_res = tensor_search.add_documents(
+                    config=self.config, index_name=self.index_name_1,
+                    docs=bad_doc_arg, auto_refresh=True, update_mode=update_mode)
+                assert add_res['errors'] is True
+                assert all(['error' in item for item in add_res['items'] if item['_id'].startswith('to_fail')])
+                assert all(['result' in item
+                            for item in add_res['items'] if item['_id'].startswith('to_pass')])
 
     def test_add_documents_set_device(self):
         """calling search with a specified device overrides device defined in config"""
@@ -355,7 +350,7 @@ class TestAddDocuments(MarqoTestCase):
             tensor_search.create_vector_index(
                 config=self.config, index_name=self.index_name_1, index_settings=image_index_config)
             docs_results = [
-                ([{"_id": "123","image_field": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png"},
+                ([{"_id": "123", "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png"},
                  {"_id": "789", "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png"},
                  {"_id": "456", "image_field": "https://www.marqo.ai/this/image/doesnt/exist.png"}],
                  [("123", "result"), ("789", "result"), ("456", "error")]
@@ -409,11 +404,11 @@ class TestAddDocuments(MarqoTestCase):
             ([{123: "bad", "_id": "12345"}, {"_id": "cool"}], [("12345", 'error'), ("cool", 'result')]),
             ([{None: "bad", "_id": "12345"}, {"_id": "cool"}], [("12345", 'error'), ("cool", 'result')]),
             # handle bad content
-            ([{"bad": None, "_id": "12345"}, {"_id": "cool"}], [("12345", 'error'), ("cool", 'result')]),
+            ([{"bad": None, "_id": "12345"}, {"_id": "cool"}], [(None, 'error'), ("cool", 'result')]),
             ([{"bad": [1, 2, 3, 4], "_id": "12345"}, {"_id": "cool"}], [("12345", 'error'), ("cool", 'result')]),
             ([{"bad": ("cat", "dog"), "_id": "12345"}, {"_id": "cool"}], [("12345", 'error'), ("cool", 'result')]),
-            ([{"bad": set(), "_id": "12345"}, {"_id": "cool"}], [("12345", 'error'), ("cool", 'result')]),
-            ([{"bad": dict(), "_id": "12345"}, {"_id": "cool"}], [("12345", 'error'), ("cool", 'result')]),
+            ([{"bad": set(), "_id": "12345"}, {"_id": "cool"}], [(None, 'error'), ("cool", 'result')]),
+            ([{"bad": dict(), "_id": "12345"}, {"_id": "cool"}], [(None, 'error'), ("cool", 'result')]),
             # handle bad _ids
             ([{"bad": "hehehe", "_id": 12345}, {"_id": "cool"}], [(None, 'error'), ("cool", 'result')]),
             ([{"bad": "hehehe", "_id": 12345}, {"_id": "cool"}, {"bad": "hehehe", "_id": None}, {"field": "yep"},
@@ -425,15 +420,19 @@ class TestAddDocuments(MarqoTestCase):
              [(None, 'error'), ("cool", 'result'), (None, 'error'), (None, 'result'), (None, 'error'),
               (None, 'error')]),
         ]
-        for docs, expected_results in docs_results:
-            add_res = tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs, auto_refresh=True)
-            assert len(add_res['items']) == len(expected_results)
-            for i, res_dict in enumerate(add_res['items']):
-                # if the expected id is None, then it assumed the id is
-                # generated and can't be asserted against
-                if expected_results[i][0] is not None:
-                    assert res_dict["_id"] == expected_results[i][0]
-                assert expected_results[i][1] in res_dict
+        for update_mode in ('update', 'replace'):
+            for docs, expected_results in docs_results:
+                add_res = tensor_search.add_documents(
+                    config=self.config, index_name=self.index_name_1, docs=docs, auto_refresh=True,
+                    update_mode=update_mode
+                )
+                assert len(add_res['items']) == len(expected_results)
+                for i, res_dict in enumerate(add_res['items']):
+                    # if the expected id is None, then it assumed the id is
+                    # generated and can't be asserted against
+                    if expected_results[i][0] is not None:
+                        assert res_dict["_id"] == expected_results[i][0]
+                    assert expected_results[i][1] in res_dict
 
     def test_mappings_arent_updated(self):
         """if a doc isn't added properly, we need to ensure that
@@ -474,21 +473,23 @@ class TestAddDocuments(MarqoTestCase):
              ({"good_field_1", "good_field_2"}, { "bad_field_1"})
              ),
         ]
-        for docs, (good_fields, bad_fields) in docs_results:
-            # good_fields should appear in the mapping.
-            # bad_fields should not
-            tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs, auto_refresh=True)
-            ii = backend.get_index_info(config=self.config, index_name=self.index_name_1)
-            customer_props = {field_name for field_name in ii.get_text_properties()}
-            reduced_vector_props = {field_name.replace(TensorField.vector_prefix, '')
-                                    for field_name in ii.get_text_properties()}
-            for field in good_fields:
-                assert field in customer_props
-                assert field in reduced_vector_props
+        for update_mode in ('update', 'replace'):
+            for docs, (good_fields, bad_fields) in docs_results:
+                # good_fields should appear in the mapping.
+                # bad_fields should not
+                tensor_search.add_documents(config=self.config, index_name=self.index_name_1,
+                                            docs=docs, auto_refresh=True, update_mode=update_mode)
+                ii = backend.get_index_info(config=self.config, index_name=self.index_name_1)
+                customer_props = {field_name for field_name in ii.get_text_properties()}
+                reduced_vector_props = {field_name.replace(TensorField.vector_prefix, '')
+                                        for field_name in ii.get_text_properties()}
+                for field in good_fields:
+                    assert field in customer_props
+                    assert field in reduced_vector_props
 
-            for field in bad_fields:
-                assert field not in customer_props
-                assert field not in reduced_vector_props
+                for field in bad_fields:
+                    assert field not in customer_props
+                    assert field not in reduced_vector_props
 
     def test_mappings_arent_updated_images(self):
         """if an image isn't added properly, we need to ensure that
@@ -564,9 +565,15 @@ class TestAddDocuments(MarqoTestCase):
                 url=F"{self.endpoint}/{self.index_name_1}/_doc/{doc_id}",
                 verify=False
             )
+            check_dict_no_id = copy.deepcopy(check_dict)
+            try:
+                del check_dict_no_id['_id']
+            except KeyError:
+                pass
             # make sure that the chunks have been updated
             for ch in updated_raw_doc.json()['_source']['__chunks']:
-                for field, expected_value in check_dict.items():
+                assert '_id' not in ch
+                for field, expected_value in check_dict_no_id.items():
                     assert ch[field] == expected_value
         return True
 
@@ -597,7 +604,7 @@ class TestAddDocuments(MarqoTestCase):
         )
 
     def test_put_documents_multiple_docs(self):
-        """mutliple docs updated at once"""
+        """multiple docs updated at once"""
         docs_ = [
             {"_id": "123", "Title": "Story of Joe Blogs", "Description": "Joe was a great farmer."},
             {"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}
@@ -812,7 +819,6 @@ class TestAddDocuments(MarqoTestCase):
         assert {'_id':'123'} == tensor_search.get_document_by_id(
             config=self.config, index_name=self.index_name_1, document_id='123')
 
-
     def test_put_no_update_existing_field(self):
         assert self.patch_documents_tests(
             docs_=[{'_id': '123', "abc": "567"}], update_docs=[{'_id': '123'}], get_docs=
@@ -859,7 +865,69 @@ class TestAddDocuments(MarqoTestCase):
             url=F"{self.endpoint}/{self.index_name_1}/_doc/789",
             verify=False
         )
+        check_dict_no_id = copy.deepcopy(check_dict)
+        try:
+            del check_dict_no_id['_id']
+        except KeyError:
+            pass
         # make sure that the chunks have been updated
         for ch in updated_raw_doc.json()['_source']['__chunks']:
-            for field, expected_value in check_dict.items():
+            assert '_id' not in ch
+            for field, expected_value in check_dict_no_id.items():
                 assert ch[field] == expected_value
+
+    def test_doc_too_large(self):
+        max_size = 400000
+        mock_environ = {enums.EnvVars.MARQO_MAX_DOC_BYTES: str(max_size)}
+
+        @mock.patch("os.environ", mock_environ)
+        def run():
+            update_res = tensor_search.add_documents(
+                config=self.config, index_name=self.index_name_1, docs=[
+                        {"_id": "123", 'Bad field': "edf " * (max_size // 4)},
+                        {"_id": "789", "Breaker": "abc " * ((max_size // 4) - 500)},
+                        {"_id": "456", "Luminosity": "exc " * (max_size // 4)},
+                      ],
+                auto_refresh=True, update_mode='update')
+            items = update_res['items']
+            assert update_res['errors']
+            assert 'error' in items[0] and 'error' in items[2]
+            assert 'doc_too_large' == items[0]['code'] and ('doc_too_large' == items[0]['code'])
+            assert items[1]['result'] == 'created'
+            assert 'error' not in items[1]
+            return True
+        assert run()
+
+    def test_doc_too_large_single_doc(self):
+        max_size = 400000
+        mock_environ = {enums.EnvVars.MARQO_MAX_DOC_BYTES: str(max_size)}
+
+        @mock.patch("os.environ", mock_environ)
+        def run():
+            update_res = tensor_search.add_documents(
+                config=self.config, index_name=self.index_name_1, docs=[
+                        {"_id": "123", 'Bad field': "edf " * (max_size // 4)},
+                      ],
+                auto_refresh=True, update_mode='update')
+            items = update_res['items']
+            assert update_res['errors']
+            assert 'error' in items[0]
+            assert 'doc_too_large' == items[0]['code']
+            return True
+        assert run()
+
+    def test_doc_too_large_none_env_var(self):
+        for env_dict in [dict(), {enums.EnvVars.MARQO_MAX_DOC_BYTES: None}]:
+            @mock.patch("os.environ", env_dict)
+            def run():
+                update_res = tensor_search.add_documents(
+                    config=self.config, index_name=self.index_name_1, docs=[
+                            {"_id": "123", 'Some field': "Some content"},
+                          ],
+                    auto_refresh=True, update_mode='update')
+                items = update_res['items']
+                assert not update_res['errors']
+                assert 'error' not in items[0]
+                assert items[0]['result'] in ['created', 'updated']
+                return True
+            assert run()

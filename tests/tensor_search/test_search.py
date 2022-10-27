@@ -1,26 +1,23 @@
 import math
 import pprint
 from unittest import mock
-
-from marqo.tensor_search.enums import TensorField, SearchMethod
-from marqo.client import Client
+from marqo.tensor_search.enums import TensorField, SearchMethod, EnvVars
 from marqo.errors import (
     MarqoApiError, MarqoError, IndexNotFoundError, InvalidArgError,
-    InvalidFieldNameError
+    InvalidFieldNameError, IllegalRequestedDocCount
 )
 from marqo.tensor_search import tensor_search, constants, index_meta_cache
 import copy
 from tests.marqo_test import MarqoTestCase
-
+import requests
+import random
 
 class TestVectorSearch(MarqoTestCase):
 
     def setUp(self) -> None:
-        self.client = Client(**self.client_settings)
         self.index_name_1 = "my-test-index-1"
         self.index_name_2 = "my-test-index-2"
         self.index_name_3 = "my-test-index-3"
-        self.config = copy.deepcopy(self.client.config)
         self._delete_test_indices()
 
     def _delete_test_indices(self, indices=None):
@@ -30,7 +27,7 @@ class TestVectorSearch(MarqoTestCase):
             ix_to_delete = indices
         for ix_name in ix_to_delete:
             try:
-                self.client.delete_index(ix_name)
+                tensor_search.delete_index(config=self.config, index_name=ix_name)
             except IndexNotFoundError as s:
                 pass
 
@@ -53,20 +50,6 @@ class TestVectorSearch(MarqoTestCase):
             return_doc_ids=True, number_of_highlights=2, result_count=10
         )
         assert len(search_res['hits']) == 2
-
-    def test_vector_text_search_validate_result_count(self):
-        try:
-            tensor_search._vector_text_search(
-                config=self.config, index_name=self.index_name_1, result_count=-1, text="some text...")
-        except InvalidArgError as e:
-            assert "illegal result_count" in str(e)
-
-        try:
-            tensor_search._vector_text_search(
-                config=self.config, index_name=self.index_name_1,
-                result_count=constants.MAX_VECTOR_SEARCH_RESULT_COUNT + 1, text="some text...")
-        except InvalidArgError as e:
-            assert "illegal result_count" in str(e)
 
     def test_vector_search_against_empty_index(self):
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
@@ -233,8 +216,8 @@ class TestVectorSearch(MarqoTestCase):
                 searchable_attributes=["other field", "Cool Field 1"], return_doc_ids=True, result_count=-1
             )
             raise AssertionError
-        except InvalidArgError as e:
-            assert "result count" in str(e)
+        except IllegalRequestedDocCount as e:
+            pass
         try:
             # too small
             search_res = tensor_search.search(
@@ -242,8 +225,8 @@ class TestVectorSearch(MarqoTestCase):
                 searchable_attributes=["other field", "Cool Field 1"], return_doc_ids=True, result_count=1000000
             )
             raise AssertionError
-        except InvalidArgError as e:
-            assert "result count" in str(e)
+        except IllegalRequestedDocCount as e:
+            pass
         # should work with 0
         search_res = tensor_search.search(
             config=self.config, index_name=self.index_name_1, text="Exact match hehehe",
@@ -487,7 +470,7 @@ class TestVectorSearch(MarqoTestCase):
                 },
                 {
                     "_id": "other doc", "a_float": 0.66, "bfield": "some text too", "my_int":5,
-                    "fake_int":"234", "fake_float":"1.23", "gapped field_name": "gap"
+                    "fake_int": "234", "fake_float": "1.23", "gapped field_name": "gap"
                 }
             ], auto_refresh=True)
 
@@ -695,4 +678,69 @@ class TestVectorSearch(MarqoTestCase):
                 except (InvalidArgError, InvalidFieldNameError):
                     pass
 
+    def test_limit_results(self):
+        """"""
+        vocab_source = "https://www.mit.edu/~ecprice/wordlist.10000"
 
+        vocab = requests.get(vocab_source).text.splitlines()
+
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1,
+            docs=[{"Title": "a " + (" ".join(random.choices(population=vocab, k=25)))}
+                  for _ in range(2000)], auto_refresh=False
+        )
+        tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
+        for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
+            for max_doc in [0, 1, 2, 5, 10, 100, 1000]:
+                mock_environ = {EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: str(max_doc)}
+
+                @mock.patch("os.environ", mock_environ)
+                def run():
+                    half_search = tensor_search.search(search_method=search_method,
+                        config=self.config, index_name=self.index_name_1, text='a', result_count=max_doc//2)
+                    assert half_search['limit'] == max_doc//2
+                    assert len(half_search['hits']) == max_doc//2
+                    limit_search = tensor_search.search(search_method=search_method,
+                        config=self.config, index_name=self.index_name_1, text='a', result_count=max_doc)
+                    assert limit_search['limit'] == max_doc
+                    assert len(limit_search['hits']) == max_doc
+                    try:
+                        oversized_search = tensor_search.search(search_method=search_method,
+                            config=self.config, index_name=self.index_name_1, text='a', result_count=max_doc + 1)
+                    except IllegalRequestedDocCount:
+                        pass
+                    try:
+                        very_oversized_search = tensor_search.search(search_method=search_method,
+                            config=self.config, index_name=self.index_name_1, text='a', result_count=(max_doc + 1) * 2)
+                    except IllegalRequestedDocCount:
+                        pass
+                    return True
+            assert run()
+
+    def test_limit_results_none(self):
+        """if env var isn't set or is None"""
+        vocab_source = "https://www.mit.edu/~ecprice/wordlist.10000"
+
+        vocab = requests.get(vocab_source).text.splitlines()
+
+        tensor_search.add_documents_orchestrator(
+            config=self.config, index_name=self.index_name_1,
+            docs=[{"Title": "a " + (" ".join(random.choices(population=vocab, k=25)))}
+                  for _ in range(700)], auto_refresh=False, processes=4, batch_size=50
+        )
+        tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
+
+        for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
+            for mock_environ in [dict(), {EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: None},
+                                 {EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: ''}]:
+                @mock.patch("os.environ", mock_environ)
+                def run():
+                    lim = 500
+                    half_search = tensor_search.search(
+                        search_method=search_method,
+                        config=self.config, index_name=self.index_name_1, text='a', result_count=lim)
+                    assert half_search['limit'] == lim
+                    assert len(half_search['hits']) == lim
+                    return True
+
+                assert run()

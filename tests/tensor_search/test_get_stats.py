@@ -1,7 +1,6 @@
 import json
 import pprint
 import time
-from marqo.client import Client
 from marqo.errors import IndexNotFoundError, MarqoError
 from marqo.tensor_search import tensor_search, constants, index_meta_cache
 import unittest
@@ -9,32 +8,33 @@ import copy
 from tests.marqo_test import MarqoTestCase
 
 
-class TestAddDocuments(MarqoTestCase):
+class TestGetStats(MarqoTestCase):
 
     def setUp(self) -> None:
         self.generic_header = {"Content-type": "application/json"}
-        self.client = Client(**self.client_settings)
         self.index_name_1 = "my-test-index-1"
-        self.config = copy.deepcopy(self.client.config)
         try:
-            self.client.delete_index(self.index_name_1)
+            tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         except IndexNotFoundError as s:
             pass
 
     def test_get_stats_empty(self):
         try:
-            self.client.delete_index(self.index_name_1)
+            tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         except IndexNotFoundError as s:
             pass
-        self.client.create_index(self.index_name_1)
-        assert self.client.index(self.index_name_1).get_stats()["numberOfDocuments"] == 0
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
+        assert tensor_search.get_stats(config=self.config, index_name=self.index_name_1)["numberOfDocuments"] == 0
 
     def test_get_stats_non_empty(self):
         try:
-            self.client.delete_index(self.index_name_1)
+            tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         except IndexNotFoundError as s:
             pass
-        self.client.index(self.index_name_1).add_documents(
-            [{"1": "2"},{"134": "2"},{"14": "62"},]
+        tensor_search.add_documents(
+            docs=[{"1": "2"},{"134": "2"},{"14": "62"},],
+            config=self.config,
+            index_name=self.index_name_1,
+            auto_refresh=True
         )
-        assert self.client.index(self.index_name_1).get_stats()["numberOfDocuments"] == 3
+        assert tensor_search.get_stats(config=self.config, index_name=self.index_name_1)["numberOfDocuments"] == 3
