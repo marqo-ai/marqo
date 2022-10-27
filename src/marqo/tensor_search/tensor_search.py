@@ -959,51 +959,49 @@ def _vector_text_search(
 
     # TODO average over vectorized inputs with weights
 
-    tempdirectory = tempfile.mkdtemp(prefix="marqo-cache-file-", dir=os.getcwd())
+    with tempfile.TemporaryDirectory(prefix="marqo-cache-file-", dir=os.getcwd()) as tempdirectory:
 
-    try:
-        # Pass the text into the router and get the MediaType and FileType
-        text, mediatype, filetype = content_routering(text, download_path=tempdirectory)
-    except:
-        errors.MarqoError("The search text is not supported")
+        try:
+            # Pass the text into the router and get the MediaType and FileType
+            text, mediatype, filetype = content_routering(text, download_path=tempdirectory)
+        except:
+            errors.MarqoError("The search text is not supported")
 
-    # Process and load the "text" based on mediatype and fieltype
-    # mediatype is text
-    if mediatype == MediaType.text:
-        # We can support more combinations of MediaType and FieldType combinations later.
-        if filetype == FileType.straight_text:
-            pass
-        else:
-            raise TypeError(f"We do not support the file type {filetype} for media {mediatype}")
+        # Process and load the "text" based on mediatype and fieltype
+        # mediatype is text
+        if mediatype == MediaType.text:
+            # We can support more combinations of MediaType and FieldType combinations later.
+            if filetype == FileType.straight_text:
+                pass
+            else:
+                raise TypeError(f"We do not support the file type {filetype} for media {mediatype}")
 
-    # mediatype is image
-    elif mediatype == MediaType.image:
-        if filetype == FileType.url:
-            # Remove the downloaded file after loading the file into the memory
-            temp_file = text
-            text = Image.open(text)
-            os.remove(temp_file)
-        elif filetype == FileType.local:
-            text = Image.open(text)
-        elif filetype == FileType.PILImage:
-            pass
-        else:
-            raise TypeError(f"We do not support the file type {filetype} for media {mediatype}")
-    # mediatype is video
-    elif mediatype == MediaType.video:
-        if filetype == FileType.url:
-            # Remove the downloaded file after loading the file into the memory
-            temp_file = text
-            text = VideoFileClip(text)
-            os.remove(temp_file)
-        elif filetype == FileType.local:
-            text = VideoFileClip(text)
-        elif filetype == filetype.ListOfPILImage:
-            pass
-        else:
-            raise TypeError(f"We do not support the file type {filetype} for media {mediatype}")
-
-    shutil.rmtree(tempdirectory)
+        # mediatype is image
+        elif mediatype == MediaType.image:
+            if filetype == FileType.url:
+                # Remove the downloaded file after loading the file into the memory
+                temp_file = text
+                text = Image.open(text)
+                os.remove(temp_file)
+            elif filetype == FileType.local:
+                text = Image.open(text)
+            elif filetype == FileType.PILImage:
+                pass
+            else:
+                raise TypeError(f"We do not support the file type {filetype} for media {mediatype}")
+        # mediatype is video
+        elif mediatype == MediaType.video:
+            if filetype == FileType.url:
+                # Remove the downloaded file after loading the file into the memory
+                temp_file = text
+                text = VideoFileClip(text)
+                os.remove(temp_file)
+            elif filetype == FileType.local:
+                text = VideoFileClip(text)
+            elif filetype == filetype.ListOfPILImage:
+                pass
+            else:
+                raise TypeError(f"We do not support the file type {filetype} for media {mediatype}")
 
     vectorised_text = s2_inference.vectorise(
         model_name=index_info.model_name, content=text, 
