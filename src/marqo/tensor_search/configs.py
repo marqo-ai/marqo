@@ -24,7 +24,7 @@ def get_default_index_settings():
                 NsFields.chunk_method: "merge",
             }
         },
-        NsFields.number_of_shards: 6
+        NsFields.number_of_shards: 5
     }
 
 
