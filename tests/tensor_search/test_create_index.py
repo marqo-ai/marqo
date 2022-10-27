@@ -75,13 +75,15 @@ class TestCreateIndex(MarqoTestCase):
         default_settings = tensor_search.configs.get_default_index_settings()
         default_text_preprocessing = default_settings[IndexSettingsField.index_defaults][IndexSettingsField.text_preprocessing]
         default_image_preprocessing = default_settings[IndexSettingsField.index_defaults][IndexSettingsField.image_preprocessing]
+        default_video_preprocessing = default_settings[IndexSettingsField.index_defaults][IndexSettingsField.video_preprocessing]
 
         assert retrieved_settings == {
             IndexSettingsField.index_defaults: {
                 IndexSettingsField.treat_urls_and_pointers_as_images: True,
                 IndexSettingsField.normalize_embeddings: False,
                 IndexSettingsField.text_preprocessing: default_text_preprocessing,
-                IndexSettingsField.image_preprocessing: default_image_preprocessing
+                IndexSettingsField.image_preprocessing: default_image_preprocessing,
+                IndexSettingsField.video_preprocessing: default_video_preprocessing,
             },
             IndexSettingsField.number_of_shards: default_settings[IndexSettingsField.number_of_shards]
         }
