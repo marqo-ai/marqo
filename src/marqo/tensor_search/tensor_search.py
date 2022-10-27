@@ -427,6 +427,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                         (i, {'_id': doc_id, 'error': routering_error.message, 'status': int(routering_error.status_code),
                              'code': routering_error.code})
                     )
+                    shutil.rmtree(tempdirectory)
                     break
                 # Load and process the field content based on the MediaType and FileType.
                 # We may wrap these into a function later
@@ -958,9 +959,11 @@ def _vector_text_search(
 
     # TODO average over vectorized inputs with weights
 
+    tempdirectory = tempfile.mkdtemp(prefix="marqo-cache-file-", dir=os.getcwd())
+
     try:
         # Pass the text into the router and get the MediaType and FileType
-        text, mediatype, filetype = content_routering(text)
+        text, mediatype, filetype = content_routering(text, download_path=tempdirectory)
     except:
         errors.MarqoError("The search text is not supported")
 
@@ -999,6 +1002,8 @@ def _vector_text_search(
             pass
         else:
             raise TypeError(f"We do not support the file type {filetype} for media {mediatype}")
+
+    shutil.rmtree(tempdirectory)
 
     vectorised_text = s2_inference.vectorise(
         model_name=index_info.model_name, content=text, 
