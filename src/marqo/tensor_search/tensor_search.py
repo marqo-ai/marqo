@@ -35,6 +35,7 @@ import datetime
 import functools
 import os
 import pprint
+import shutil
 import typing
 import uuid
 from typing import List, Optional, Union, Iterable, Sequence, Dict, Any
@@ -63,6 +64,7 @@ import cv2
 # We depend on _httprequests.py for now, but this may be replaced in the future, as
 # _httprequests.py is designed for the client
 from marqo._httprequests import HttpRequests
+import tempfile
 from marqo.config import Config
 from marqo import errors
 from marqo.s2_inference import errors as s2_inference_errors
@@ -410,11 +412,13 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
                 infer_if_media = index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]
 
-                #download the file in a tmpdirname
+                #download the file into a tmpdirname
+                tempdirectory = tempfile.mkdtemp(prefix="marqo-cache-file-", dir = os.getcwd())
 
                 try:
                     # Pass the field_content into the router and get the MediaType and FileType
-                    field_content, mediatype, filetype = content_routering(field_content, infer_if_media)
+                    field_content, mediatype, filetype = content_routering(field_content,
+                                                                           download_path=tempdirectory, infer_if_media = infer_if_media)
                 except:
                     # Add the error messsage to the doc
                     document_is_valid = False
@@ -477,18 +481,21 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                 # mediatype is video
                 elif mediatype == MediaType.video:
                     if filetype == FileType.url:
-                        #Remove the downloaded file after loading the file into the memory
-                        temp_file = field_content
                         field_content = VideoFileClip(field_content)
-                        os.remove(temp_file)
                     elif filetype == FileType.local:
                         field_content = VideoFileClip(field_content)
                     elif filetype == filetype.ListOfPILImage:
                         pass
                     else:
                         raise TypeError(f"We do not support the file type {filetype} for media {mediatype}")
-                    content_chunks, text_chunks = video_processor.chunk_video(field_content, device=selected_device)
 
+                    chunk_length = index_info.index_settings[NsField.index_defaults][NsField.video_preprocessing][NsField.chunk_length]
+                    chunk_method = index_info.index_settings[NsField.index_defaults][NsField.video_preprocessing][NsField.chunk_method]
+
+                    content_chunks, text_chunks = video_processor.chunk_video(field_content, chunk_length, chunk_method, device=selected_device)
+
+                # Remove the temp_directory after we load the content
+                shutil.rmtree(tempdirectory)
 
                 normalize_embeddings = index_info.index_settings[NsField.index_defaults][NsField.normalize_embeddings]
                 infer_if_image = index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]

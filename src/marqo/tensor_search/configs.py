@@ -18,9 +18,13 @@ def get_default_index_settings():
             # TODO move these into a processing dict with sub-dicts
             NsFields.image_preprocessing: {
                 NsFields.patch_method: None
+            },
+            NsFields.video_preprocessing: {
+                NsFields.chunk_length: 10,
+                NsFields.chunk_method: "merge",
             }
         },
-        NsFields.number_of_shards: 5
+        NsFields.number_of_shards: 6
     }
 
 

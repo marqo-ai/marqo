@@ -197,18 +197,18 @@ def get_filename_from_cd(cd):
         return None
     return fname[0]
 
-def content_routering(field_content, infer_if_media = True):
+def content_routering(field_content, download_path, infer_if_media = True):
     if isinstance(field_content, str):
         if infer_if_media:
             if validators.url(field_content):
                 try:
-                    downloaded_file = wget.download(field_content)
+                    downloaded_file = wget.download(field_content, out = download_path)
                     file_type, encoding = mimetypes.guess_type(downloaded_file)
                 except:
                     try:
                         r = requests.get(field_content, stream = True, allow_redirects=True).raw
                         downloaded_file = get_filename_from_cd(r.headers.get('content-disposition'))
-                        open(downloaded_file, 'wb').write(r.content)
+                        open(os.path.join(download_path, downloaded_file), 'wb').write(r.content)
                         file_type, encoding = mimetypes.guess_type(downloaded_file)
                     except:
                         raise errors.MarqoWebError(f"The url {field_content} is not downloadable.")

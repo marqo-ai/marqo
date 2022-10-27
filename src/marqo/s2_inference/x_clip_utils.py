@@ -188,6 +188,7 @@ class XCLIP:
         self.tokenizer = CLIPTokenizer.from_pretrained(self.model_type)
         self.visionmodel = XCLIPVisionModel.from_pretrained(self.model_type)
         self.num_input_frames = self.visionmodel.config.num_frames
+        self.video_input_processed = None
         self.model.eval()
 
     def _convert_output(self, output):
@@ -229,17 +230,12 @@ class XCLIP:
         elif isinstance(videos, list) and isinstance(videos[0], ImageType):
             video_input = [format_and_load_XCLIP_video(videos)]
 
-        #print("processing video")
+        sampled_input = [self.sub_sampling(_video) for _video in video_input]
 
-        self.video_input_processed = [self.processor(videos = list(_video), return_tensors = "pt") for _video in video_input]
-
-        #print(self.video_input_processed)
+        self.video_input_processed = [self.processor(videos = list(_video), return_tensors = "pt") for _video in sampled_input]
 
         with torch.no_grad():
-
             outputs = torch.cat([self.model.get_video_features(**video) for video in self.video_input_processed])
-            print(outputs.shape)
-
         if normalize:
             _shape_before = outputs.shape
             outputs /= self.normalize(outputs)
@@ -251,7 +247,7 @@ class XCLIP:
         converted_len = int(self.num_input_frames * frame_sample_rate)
         end_idx = np.random.randint(converted_len, seg_len)
         start_idx = end_idx - converted_len
-        indices = np.linspace(start_idx, end_idx, num=self.num_input_frames)
+        indices = np.linspace(start_idx, end_idx, num = self.num_input_frames)
         indices = np.clip(indices, start_idx, end_idx - 1).astype(np.int64)
         return [video[i] for i in indices]
 
