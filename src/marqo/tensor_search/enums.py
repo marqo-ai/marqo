@@ -15,8 +15,8 @@ class FileType:
     local = "local_path"
     straight_text = "straight_text"
     ndarray = "ndarray"
-    PILImage = "PILImage"
-    ListOfPILImage = "ListOfPILImage"
+    pil_image= "pil_image"
+    list_of_pil_images = "list_of_pil_images"
     default = "url"
 
 
