@@ -145,7 +145,7 @@ class ONNX_CLIP(object):
     Load a clip model and convert it to onnx version for faster inference
     """
 
-    def __init__(self, model_name, device="cpu", embedding_dim: int= None, truncate:bool = True,
+    def __init__(self, model_name, device="cpu", embedding_dim: int = None, truncate: bool = True,
                  visual_path="clip_visual.onnx", textual_path="clip_textual.onnx",
                  load=True, **kwargs):
         self.model_name = model_name
@@ -158,6 +158,7 @@ class ONNX_CLIP(object):
         self.visual_path = visual_path
         self.textual_path = textual_path
         self.onnx_model = None
+        self.truncate = truncate
 
         self.clip_load()
 
@@ -197,7 +198,7 @@ class ONNX_CLIP(object):
             self.onnx_model.start_sessions(providers=["CPUExecutionProvider"])
 
     def encode_text(self, sentence, normalize=True):
-        sentence = clip.tokenize(sentence).cpu()
+        sentence = clip.tokenize(sentence, truncate=self.truncate).cpu()
         sentence_onnx = sentence.detach().cpu().numpy().astype(np.int32)
         outputs = torch.tensor(self.onnx_model.encode_text(sentence_onnx))
 
@@ -208,9 +209,16 @@ class ONNX_CLIP(object):
         return self._convert_output(outputs)
 
     def encode_image(self, images, normalize=True):
-        images = self.clip_preprocess(images).cpu()
-        images_onnx = images.detach().cpu().numpy().astype(np.int32)
-        outputs = torch.tensor(self.onnx_model.encode_image(images_onnx))
+
+        if isinstance(images, list):
+            image_input = format_and_load_CLIP_images(images)
+        else:
+            image_input = [format_and_load_CLIP_image(images)]
+
+        self.image_input_processed = torch.stack([self.clip_preprocess(_img).to(self.device) for _img in image_input])
+
+        self.images_onnx = self.image_input_processed.detach().cpu().numpy().astype(np.float32)
+        outputs = torch.tensor(self.onnx_model.encode_image(self.images_onnx))
 
         if normalize:
             _shape_before = outputs.shape
