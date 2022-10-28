@@ -4,6 +4,7 @@ from marqo.s2_inference.sbert_utils import SBERT, TEST
 from marqo.s2_inference.random_utils import Random
 from marqo.s2_inference.clip_utils import CLIP, OPEN_CLIP
 from marqo.s2_inference.types import Any, Dict, List, Optional, Union, FloatTensor
+from marqo.s2_inference.clip_onnx_utils import ONNX_CLIP
 
 # we need to keep track of the embed dim and model load functions/classes
 # we can use this as a registry 
@@ -541,8 +542,20 @@ def _get_random_properties() -> Dict:
     }
     return RANDOM_MODEL_PROPERTIES
 
+def _get_onnx_clip_properties() -> Dict:
+    ONNX_CLIP_MODEL_PROPERTIES = {
+            "onnx/ViT-B/32":
+                {"name": "onnx/ViT-B/32",
+                "dimensions": 512,
+                "tokens":128,
+                "type":"onnx_clip",
+                "notes": ""},
+    }
+    return ONNX_CLIP_MODEL_PROPERTIES
+
 def _get_model_load_mappings() -> Dict:
     return {'clip':CLIP,
+            'onnx_clip': ONNX_CLIP,
             'open_clip': OPEN_CLIP,
             'sbert':SBERT, 
             'test':TEST, 
@@ -562,6 +575,7 @@ def load_model_properties() -> Dict:
     random_model_properties = _get_random_properties()
     hf_model_properties = _get_hf_properties()
     open_clip_model_properties = _get_open_clip_properties()
+    onnx_clip_properties = _get_onnx_clip_properties()
 
     # combine the above dicts
     model_properties = dict(clip_model_properties.items())
@@ -571,6 +585,7 @@ def load_model_properties() -> Dict:
     model_properties.update(random_model_properties)
     model_properties.update(hf_model_properties)
     model_properties.update(open_clip_model_properties)
+    model_properties.update(onnx_clip_properties)
 
     all_properties = dict()
     all_properties['models'] = model_properties
