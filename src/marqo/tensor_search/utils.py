@@ -197,7 +197,18 @@ def get_filename_from_cd(cd):
         return None
     return fname[0]
 
-def content_routering(field_content, download_path, infer_if_media = True):
+def content_routering(field_content: Union[str, ImageType], download_path: str, infer_if_media: bool = True):
+    '''
+    Detect the mediatype and filetype of the input.
+
+    Args:
+        field_content: provided fiel_content in the document. Can be a str (for text, image and video), or a PILImage (for image).
+        download_path: a temp_directory to save the downloaded file. this directory will be removed automatically
+        infer_if_media: if False, urls and pointers will be treated as text
+
+    Returns:
+        The mediatype (video, image, text) and the filetype (pointer, url, straight_text)
+    '''
     if isinstance(field_content, str):
         if infer_if_media:
             if validators.url(field_content):
@@ -232,7 +243,7 @@ def content_routering(field_content, download_path, infer_if_media = True):
     elif isinstance(field_content, ImageType):
         return field_content, MediaType.image, FileType.PILImage
     else:
-        raise errors.MarqoError(f"The input type {type(field_content)} is supported.")
+        raise errors.MarqoError(f"The input type {type(field_content)} is not supported.")
 def merge_dicts(base: dict, preferences: dict) -> dict:
     """Merges two dicts together. Fields in the base dict are overwritten by
     the preferences dict
