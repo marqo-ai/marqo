@@ -242,13 +242,10 @@ class XCLIP:
             assert outputs.shape == _shape_before
         return self._convert_output(outputs)
 
-    def sub_sampling(self, video, frame_sample_rate = 4):
+    def sub_sampling(self, video):
         seg_len = len(video)
-        converted_len = int(self.num_input_frames * frame_sample_rate)
-        end_idx = np.random.randint(converted_len, seg_len)
-        start_idx = end_idx - converted_len
-        indices = np.linspace(start_idx, end_idx, num = self.num_input_frames)
-        indices = np.clip(indices, start_idx, end_idx - 1).astype(np.int64)
+        indices = np.linspace(0, seg_len - 1, num = self.num_input_frames).astype(np.int64)
+        indices = np.clip(indices, 0, seg_len - 1).astype(np.int64)
         return [video[i] for i in indices]
 
 
