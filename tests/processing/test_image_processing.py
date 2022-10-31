@@ -13,12 +13,15 @@ from marqo.s2_inference.processing.image import (
     generate_boxes,
     PatchifySimple,
     PatchifyPytorch,
+    PatchifyViT,
+    PatchifyYolox,
     patchify_image,
     _process_patch_method,
     chunk_image,
     str2bool
 )
 
+from marqo.s2_inference.s2_inference import clear_loaded_models
 
 class TestImageChunking(unittest.TestCase):
 
@@ -176,108 +179,6 @@ class TestImageChunking(unittest.TestCase):
             path_out, params_out = _process_patch_method(url)
             assert path_out == path
             assert params_out == params
-
-    def test_PatchifySimple(self):
-
-        image_size = (400,500)
-        with tempfile.TemporaryDirectory() as d:
-            temp_file_name = os.path.join(d, 'test_image.png')
-            img = Image.fromarray(np.random.randint(0,255,size=image_size).astype(np.uint8))
-            img.save(temp_file_name)
-
-            patcher = PatchifySimple(size=image_size, hn=3, wn=3)
-            patcher.infer(img)
-            patcher.process()
-
-            assert len(patcher.patches) == len(patcher.bboxes)
-            assert len(patcher.patches) == len(patcher.bboxes_orig)
-            assert abs(np.array(patcher.patches[0]) - np.array(patcher.image_resized)).sum() < 1e-6
-
-            patcher = PatchifySimple(size=image_size, hn=3, wn=3)
-            patcher.infer(temp_file_name)
-            patcher.process()
-
-            assert len(patcher.patches) == len(patcher.bboxes)
-            assert len(patcher.patches) == len(patcher.bboxes_orig)
-            assert abs(np.array(patcher.patches[0]) - np.array(patcher.image_resized)).sum() < 1e-6
-
-    def test_PatchifyPytorch(self):
-
-        image_size = (400,500)
-        with tempfile.TemporaryDirectory() as d:
-            temp_file_name = os.path.join(d, 'test_image.png')
-            img = Image.fromarray(np.random.randint(0,255,size=image_size).astype(np.uint8))
-            img.save(temp_file_name)
-
-            patcher = PatchifyPytorch(size=image_size)
-            patcher.infer(img)
-            patcher.process()
-
-            assert len(patcher.patches) == len(patcher.bboxes)
-            assert len(patcher.patches) == len(patcher.bboxes_orig)
-            assert abs(np.array(patcher.patches[0]) - np.array(patcher.image)).sum() < 1e-6
-
-            patcher = PatchifyPytorch(size=image_size)
-            patcher.infer(temp_file_name)
-            patcher.process()
-
-            assert len(patcher.patches) == len(patcher.bboxes)
-            assert len(patcher.patches) == len(patcher.bboxes_orig)
-            assert abs(np.array(patcher.patches[0]) - np.array(patcher.image)).sum() < 1e-6
-
-    def test_PatchifyPytorchPrior(self):
-
-        image_size = (400,500)
-        with tempfile.TemporaryDirectory() as d:
-            temp_file_name = os.path.join(d, 'test_image.png')
-            img = Image.fromarray(np.random.randint(0,255,size=image_size).astype(np.uint8))
-            img.save(temp_file_name)
-
-            patcher = PatchifyPytorch(size=image_size, hn=3, wn=3, prior=True)
-            patcher.infer(img)
-            patcher.process()
-
-            assert len(patcher.patches) == len(patcher.bboxes)
-            assert len(patcher.patches) == len(patcher.bboxes_orig)
-            assert abs(np.array(patcher.patches[0]) - np.array(patcher.image)).sum() < 1e-6
-            assert len(patcher.bboxes_simple) == (3*3) + (3-1)*(3-1)
- 
-            patcher = PatchifyPytorch(size=image_size, hn=3, wn=3, prior=True)
-            patcher.infer(temp_file_name)
-            patcher.process()
-
-            assert len(patcher.patches) == len(patcher.bboxes)
-            assert len(patcher.patches) == len(patcher.bboxes_orig)
-            assert len(patcher.bboxes_simple) == (3*3) + (3-1)*(3-1)
-            assert abs(np.array(patcher.patches[0]) - np.array(patcher.image)).sum() < 1e-6
-
-
-    def test_PatchifyOverlap(self):
-
-        image_size = (400,500)
-        with tempfile.TemporaryDirectory() as d:
-            temp_file_name = os.path.join(d, 'test_image.png')
-            img = Image.fromarray(np.random.randint(0,255,size=image_size).astype(np.uint8))
-            img.save(temp_file_name)
-
-            patcher = PatchifySimple(size=image_size, hn=3, wn=3, overlap=True)
-            patcher.infer(img)
-            patcher.process()
-
-            assert len(patcher.patches) == len(patcher.bboxes)
-            assert len(patcher.patches) == len(patcher.bboxes_orig)
-            # the first term is non-overlapping, second term is overlapping, third term is original box
-            assert len(set(patcher.bboxes)) == (3*3) + (3-1)*(3-1) + 1 
-            assert abs(np.array(patcher.patches[0]) - np.array(patcher.image_resized)).sum() < 1e-6
-
-            patcher = PatchifySimple(size=image_size, hn=3, wn=3, overlap=True)
-            patcher.infer(temp_file_name)
-            patcher.process()
-
-            assert len(patcher.patches) == len(patcher.bboxes)
-            assert len(patcher.patches) == len(patcher.bboxes_orig)
-            assert len(set(patcher.bboxes)) == (3*3) + (3-1)*(3-1) + 1
-            assert abs(np.array(patcher.patches[0]) - np.array(patcher.image_resized)).sum() < 1e-6
 
 
     def test_patchify(self):
