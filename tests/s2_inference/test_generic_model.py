@@ -1,7 +1,7 @@
 import numpy as np
 
 from marqo.errors import MarqoApiError, MarqoError, IndexNotFoundError
-from marqo.s2_inference.errors import InvalidModelSettingsError, UnknownModelError
+from marqo.s2_inference.errors import InvalidModelPropertiesError, UnknownModelError
 from marqo.tensor_search import tensor_search
 
 from marqo.s2_inference.s2_inference import (
@@ -100,7 +100,7 @@ class TestGenericModelSupport(MarqoTestCase):
             "tokens": 128,
             "type": "sbert"}
 
-        self.assertRaises(InvalidModelSettingsError, _validate_model_properties, model_name, model_properties)
+        self.assertRaises(InvalidModelPropertiesError, _validate_model_properties, model_name, model_properties)
 
         """_validate_model_properties should not throw an exception if required keys are given.
         """
