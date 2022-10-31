@@ -4,7 +4,7 @@ The functions defined here would have endpoints, later on.
 import numpy as np
 import hashlib
 import json
-from marqo.s2_inference.errors import VectoriseError, InvalidModelSettingsError, ModelLoadError, UnknownModelError
+from marqo.s2_inference.errors import VectoriseError, InvalidModelPropertiesError, ModelLoadError, UnknownModelError
 from PIL import UnidentifiedImageError
 from marqo.s2_inference.model_registry import load_model_properties
 from marqo.s2_inference.configs import get_default_device,get_default_normalization,get_default_seq_length
@@ -87,7 +87,7 @@ def _validate_model_properties(model_name: str, model_properties: dict) -> dict:
         required_keys = ["name", "dimensions"]
         for key in required_keys:
             if key not in model_properties:
-                raise InvalidModelSettingsError(f'model {key} not in settings')
+                raise InvalidModelPropertiesError(f'model {key} not in settings')
 
         """updates model dict with default values if optional keys are missing
         """
