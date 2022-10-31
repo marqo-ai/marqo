@@ -15,7 +15,7 @@ from marqo.errors import (
     IndexAlreadyExistsError,
     InvalidIndexNameError,
     HardwareCompatabilityError,
-    IndexMaxFieldsError
+    IndexMaxFieldsError, TooManyRequestsError
 )
 from urllib3.exceptions import InsecureRequestWarning
 import warnings
@@ -150,6 +150,10 @@ def convert_to_marqo_web_error_and_raise(response: requests.Response, err: reque
         response_dict = response.json()
     except JSONDecodeError:
         raise_catchall_http_as_marqo_error(response=response, err=err)
+    if response.status_code == 429:
+        raise TooManyRequestsError(
+            message="Marqo-OS received too many requests! "
+                    "Please try reducing the frequency of add_documents and update_documents calls.")
 
     try:
         open_search_error_type = response_dict["error"]["type"]

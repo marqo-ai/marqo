@@ -93,6 +93,11 @@ class __InvalidRequestError(MarqoWebError):
     error_type = "invalid_request"
 
 
+class TooManyRequestsError(__InvalidRequestError):
+    code = "too_many_requests"
+    status_code = HTTPStatus.TOO_MANY_REQUESTS
+
+
 class IndexAlreadyExistsError(__InvalidRequestError):
     code = "index_already_exists"
     status_code = HTTPStatus.CONFLICT
