@@ -16,7 +16,7 @@ class VectoriseError(S2InferenceError):
     pass
 
 
-class InvalidModelSettingsError(S2InferenceError):
+class InvalidModelPropertiesError(S2InferenceError):
     pass
 
 
