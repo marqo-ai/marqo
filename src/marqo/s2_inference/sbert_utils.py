@@ -11,10 +11,11 @@ logger = get_logger(__name__)
 class Model:
     """ generic model wrapper class
     """
-    def __init__(self, model_name: str, device: str = 'cpu', batch_size: int = 2048, embedding_dim=None, max_seq_length=None) -> None:
+    def __init__(self, model_name: str, device: str = 'cpu', endpoint_url: str = None, batch_size: int = 2048, embedding_dim=None, max_seq_length=None) -> None:
 
         self.model_name = model_name
         self.device = device
+        self.endpoint_url = endpoint_url
         self.model = None
         self.embedding_dimension = embedding_dim
         self.batch_size = batch_size

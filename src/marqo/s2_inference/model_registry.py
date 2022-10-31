@@ -1,4 +1,5 @@
 from marqo.s2_inference.hf_utils import HF_MODEL
+from marqo.s2_inference.hf_endpoint_utils import HF_ENDPOINT
 from marqo.s2_inference.sbert_onnx_utils import SBERT_ONNX
 from marqo.s2_inference.sbert_utils import SBERT, TEST
 from marqo.s2_inference.random_utils import Random
@@ -542,13 +543,14 @@ def _get_random_properties() -> Dict:
     return RANDOM_MODEL_PROPERTIES
 
 def _get_model_load_mappings() -> Dict:
-    return {'clip':CLIP,
+    return {'clip': CLIP,
             'open_clip': OPEN_CLIP,
-            'sbert':SBERT, 
-            'test':TEST, 
-            'sbert_onnx':SBERT_ONNX,
-            'random':Random,
-            'hf':HF_MODEL}
+            'sbert': SBERT,
+            'test': TEST,
+            'sbert_onnx': SBERT_ONNX,
+            'random': Random,
+            'hf': HF_MODEL,
+            'hf_endpoint': HF_ENDPOINT}
 
 def load_model_properties() -> Dict:
     # also truncate the name if not already

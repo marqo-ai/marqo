@@ -4,7 +4,8 @@ The functions defined here would have endpoints, later on.
 import numpy as np
 import hashlib
 import json
-from marqo.s2_inference.errors import VectoriseError, InvalidModelSettingsError, ModelLoadError, UnknownModelError
+from marqo.s2_inference.errors import VectoriseError, InvalidModelPropertiesError, ModelLoadError, UnknownModelError
+from marqo.s2_inference.hf_endpoint_utils import HF_ENDPOINT
 from PIL import UnidentifiedImageError
 from marqo.s2_inference.model_registry import load_model_properties
 from marqo.s2_inference.configs import get_default_device,get_default_normalization,get_default_seq_length
@@ -87,11 +88,11 @@ def _validate_model_properties(model_name: str, model_properties: dict) -> dict:
         required_keys = ["name", "dimensions"]
         for key in required_keys:
             if key not in model_properties:
-                raise InvalidModelSettingsError(f'model {key} not in settings')
+                raise InvalidModelPropertiesError(f'model {key} not in settings')
 
         """updates model dict with default values if optional keys are missing
         """
-        optional_keys_values = [("type", "sbert"), ("tokens", get_default_seq_length())]
+        optional_keys_values = [("type", "sbert"), ("tokens", get_default_seq_length()), ('endpoint_url', None)]
         for key, value in optional_keys_values:
             if key not in model_properties:
                 model_properties[key] = value
@@ -267,9 +268,14 @@ def _load_model(model_name: str, model_properties: dict, device: str = get_defau
     loader = _get_model_loader(model_name, model_properties)
 
     max_sequence_length = model_properties.get('tokens', get_default_seq_length())
-
-    model = loader(model_name, device=device, embedding_dim=model_properties['dimensions'],
-                    max_seq_length=max_sequence_length)
+    endpoint_url = model_properties.get('endpoint_url', None)
+    embedding_dim = model_properties['dimensions']
+    if isinstance(loader, HF_ENDPOINT):
+        model = loader(model_name, device=device, endpoint_url=endpoint_url, embedding_dim=embedding_dim,
+                        max_seq_length=max_sequence_length)
+    else:
+        model = loader(model_name, device=device, embedding_dim=embedding_dim,
+                       max_seq_length=max_sequence_length)
 
     model.load()
 
