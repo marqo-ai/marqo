@@ -159,16 +159,24 @@ class ONNX_CLIP(object):
         self.textual_path = textual_path
         self.onnx_model = None
         self.truncate = truncate
+        self.load = load
 
-        self.clip_load()
 
-        if load:
+    def load(self):
+        if self.load:
             try:
-                self.load()
+                self.load_onnx()
             except:
                 self.onnx_converter()
         else:
             self.onnx_converter()
+
+    def load_onnx(self):
+        self.onnx_model = clip_onnx(None)
+        self.onnx_model.load_onnx(visual_path=self.visual_path,
+                                  textual_path=self.textual_path,
+                                  logit_scale=100.0000)  # model.logit_scale.exp()
+        self.onnx_model.start_sessions(providers=["CPUExecutionProvider"])
 
     @staticmethod
     def normalize(outputs):
@@ -185,6 +193,7 @@ class ONNX_CLIP(object):
             self.clip_model, self.clip_preprocess = clip.load(self.clip_name, device=self.device, jit=False)
 
     def onnx_converter(self):
+        self.clip_load()
         if self.image_onnx is None or self.text_onnx is None:
             dummy_input = np.random.rand(1000, 1000, 3) * 255
             dummy_input = dummy_input.astype("uint8")
@@ -198,6 +207,9 @@ class ONNX_CLIP(object):
             self.onnx_model.start_sessions(providers=["CPUExecutionProvider"])
 
     def encode_text(self, sentence, normalize=True):
+        if self.onnx_model is None:
+            self.load()
+
         sentence = clip.tokenize(sentence, truncate=self.truncate).cpu()
         sentence_onnx = sentence.detach().cpu().numpy().astype(np.int32)
         outputs = torch.tensor(self.onnx_model.encode_text(sentence_onnx))
@@ -209,6 +221,8 @@ class ONNX_CLIP(object):
         return self._convert_output(outputs)
 
     def encode_image(self, images, normalize=True):
+        if self.onnx_model is None:
+            self.load()
 
         if isinstance(images, list):
             image_input = format_and_load_CLIP_images(images)
@@ -228,6 +242,9 @@ class ONNX_CLIP(object):
 
     def encode(self, inputs: Union[str, ImageType, List[Union[str, ImageType]]],
                default: str = 'text', normalize=True, **kwargs) -> FloatTensor:
+
+        if self.onnx_model is None:
+            self.load()
 
         infer = kwargs.pop('infer', True)
 
@@ -249,9 +266,4 @@ class ONNX_CLIP(object):
             logger.debug('text')
             return self.encode_text(inputs, normalize=True)
 
-    def load(self):
-        self.onnx_model = clip_onnx(None)
-        self.onnx_model.load_onnx(visual_path=self.visual_path,
-                                  textual_path=self.textual_path,
-                                  logit_scale=100.0000)  # model.logit_scale.exp()
-        self.onnx_model.start_sessions(providers=["CPUExecutionProvider"])
+
