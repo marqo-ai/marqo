@@ -12,7 +12,7 @@ from marqo.s2_inference.types import Dict, List, Union, ImageType, Tuple, FloatT
 logger = get_logger('DINO')
 
 
-def _load_DINO_model(arch, patch_size, device):
+def _load_DINO_model(arch, device, patch_size=None):
     # arch -> ['vit_tiny', 'vit_small', 'vit_base']
     # build model
 
@@ -55,7 +55,7 @@ def _get_DINO_transform(image_size=(224, 224)):
     ])
 
 
-def DINO_inference(model, transform, img, patch_size, device="cpu"):
+def DINO_inference(model, transform, img=None, patch_size=None, device="cpu"):
 
     
     img = transform(img)
