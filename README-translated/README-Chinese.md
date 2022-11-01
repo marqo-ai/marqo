@@ -259,4 +259,12 @@ Marqo是一个社区项目。我们的目标是让张量搜索能够被更多的
 - 加入我们的 [Slack社区](https://join.slack.com/t/marqo-community/shared_invite/zt-1d737l76e-u~b3Rvey2IN2nGM4wyr44w) 并和其他社区成员分享你的看法
 - Marqo 社区面对面 (正在筹备中!)
 
+**Translations:**
+
+- [English](../README.md)🇬🇧
+- [Français](README-French.md)🇫🇷
+- [中文 Chinese](README-Chinese.md)🇨🇳
+- [Polski](README-Polish.md)🇵🇱
+- [Українська](README-Ukrainian.md)🇺🇦
+
 <!-- end support-pitch -->
