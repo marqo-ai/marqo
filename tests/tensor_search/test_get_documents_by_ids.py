@@ -1,12 +1,14 @@
 import functools
 import pprint
+import uuid
 from marqo.tensor_search import enums
 from marqo.errors import (
-    IndexNotFoundError, InvalidDocumentIdError, InvalidArgError
+    IndexNotFoundError, InvalidDocumentIdError, InvalidArgError,
+    IllegalRequestedDocCount
 )
 from marqo.tensor_search import tensor_search
 from tests.marqo_test import MarqoTestCase
-
+from unittest import mock
 
 class TestGetDocuments(MarqoTestCase):
 
@@ -108,3 +110,68 @@ class TestGetDocuments(MarqoTestCase):
                     raise AssertionError
                 except (InvalidDocumentIdError, InvalidArgError):
                     pass
+
+    def test_get_documents_env_limit(self):
+        tensor_search.create_vector_index(
+            config=self.config, index_name=self.index_name_1,
+            index_settings={enums.IndexSettingsField.index_defaults: {
+                enums.IndexSettingsField.model: enums.MlModel.bert
+            }})
+        docs = [{"Title": "a", "_id": uuid.uuid4().__str__()} for _ in range(2000)]
+        tensor_search.add_documents_orchestrator(
+            config=self.config, index_name=self.index_name_1,
+            docs=docs, auto_refresh=False, batch_size=50, processes=4
+        )
+        tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
+        for max_doc in [0, 1, 2, 5, 10, 100, 1000]:
+            mock_environ = {enums.EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: str(max_doc)}
+
+            @mock.patch("os.environ", mock_environ)
+            def run():
+                half_search = tensor_search.get_documents_by_ids(
+                   config=self.config, index_name=self.index_name_1,
+                   document_ids=[docs[i]['_id'] for i in range(max_doc // 2)])
+                assert len(half_search['results']) == max_doc // 2
+                limit_search = tensor_search.get_documents_by_ids(
+                    config=self.config, index_name=self.index_name_1,
+                    document_ids=[docs[i]['_id'] for i in range(max_doc)])
+                assert len(limit_search['results']) == max_doc
+                try:
+                    oversized_search = tensor_search.get_documents_by_ids(
+                        config=self.config, index_name=self.index_name_1,
+                        document_ids=[docs[i]['_id'] for i in range(max_doc + 1)])
+                    raise AssertionError
+                except IllegalRequestedDocCount:
+                    pass
+                try:
+                    very_oversized_search = tensor_search.get_documents_by_ids(
+                         config=self.config, index_name=self.index_name_1,
+                         document_ids=[docs[i]['_id'] for i in range(max_doc * 2)])
+                    raise AssertionError
+                except IllegalRequestedDocCount:
+                    pass
+                return True
+        assert run()
+
+    def test_limit_results_none(self):
+        """if env var isn't set or is None"""
+        docs = [{"Title": "a", "_id": uuid.uuid4().__str__()} for _ in range(2000)]
+
+        tensor_search.add_documents_orchestrator(
+            config=self.config, index_name=self.index_name_1,
+            docs=docs, auto_refresh=False, batch_size=50, processes=4
+        )
+        tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
+
+        for mock_environ in [dict(), {enums.EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: None},
+                             {enums.EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: ''}]:
+            @mock.patch("os.environ", mock_environ)
+            def run():
+                sample_size = 500
+                limit_search = tensor_search.get_documents_by_ids(
+                    config=self.config, index_name=self.index_name_1,
+                    document_ids=[docs[i]['_id'] for i in range(sample_size)])
+                assert len(limit_search['results']) == sample_size
+                return True
+
+            assert run()

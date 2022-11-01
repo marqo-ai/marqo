@@ -12,14 +12,14 @@
 <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg"></a>
 <a href="https://pypi.org/project/marqo/"><img src="https://img.shields.io/pypi/v/marqo?label=PyPI"></a>
 <a href="https://github.com/marqo-ai/marqo/actions/workflows/CI.yml"><img src="https://img.shields.io/github/workflow/status/marqo-ai/marqo/CI?label=CI"></a>
-<a href="https://pypistats.org/packages/marqo"><img alt="PyPI - Downloads from official pypistats" src="https://img.shields.io/pypi/dm/marqo?label=Downloads"></a>
+<a href="https://pepy.tech/project/marqo"><img alt="PyPI - Downloads from pepy" src="https://static.pepy.tech/personalized-badge/marqo?period=month&units=international_system&left_color=grey&right_color=blue&left_text=downloads/month"></a>
 <a align="center" href="https://join.slack.com/t/marqo-community/shared_invite/zt-1d737l76e-u~b3Rvey2IN2nGM4wyr44w"><img src="https://img.shields.io/badge/Slack-blueviolet?logo=slack&amp;logoColor=white"></a>
 </p>
 
 
 An open-source tensor search engine that seamlessly integrates with your applications, websites, and workflow. 
 
-Marqo cloud ☁️  is currently in beta. If you're interested, apply here: https://q78175g1wwa.typeform.com/to/d0PEuRPC
+Marqo cloud ☁️  is in beta. If you're interested, apply here: https://q78175g1wwa.typeform.com/to/d0PEuRPC
 
 ## What is tensor search?
 
@@ -74,7 +74,7 @@ results = mq.index("my-first-index").search(
 
 ```
 
-- `mq` is the client that wraps the`marqo` API
+- `mq` is the client that wraps the `marqo` API
 - `add_documents()` takes a list of documents, represented as python dicts, for indexing
 - `add_documents()` creates an index with default settings, if one does not already exist
 - You can optionally set a document's ID with the special `_id` field. Otherwise, Marqo will generate one.
