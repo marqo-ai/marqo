@@ -277,17 +277,16 @@ def str2bool(string: str) -> bool:
 
 
 
-def replace_small_boxes(boxes, min_area=40*40, new_size=(100,100)):
+def replace_small_boxes(boxes: Union[List[List[float]], List[Tuple[float]], ndarray], 
+                min_area: float = 40*40, new_size: Tuple = (100,100)):
 
     new_boxes = []
     for box in boxes:
         area = (box[2]-box[0])*(box[3] - box[1])
         if area < min_area:
-            #print(box)
             xc = (box[2]-box[0])/2 + box[0]
             yc = (box[3]-box[1])/2 + box[1]
             box = (xc-new_size[0]/2, yc-new_size[1]/2, xc+new_size[0]/2, yc+new_size[1]/2)
-            #print(box)
         new_boxes.append(box)
     return new_boxes
 

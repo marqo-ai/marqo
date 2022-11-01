@@ -14,10 +14,9 @@ from marqo.s2_inference.clip_utils import format_and_load_CLIP_image, _load_imag
 from marqo.s2_inference.errors import ChunkerError, ChunkerMethodProcessError
 
 from marqo.s2_inference.processing.DINO_utils import _load_DINO_model,attention_to_bboxs,DINO_inference
-from marqo.s2_inference.processing.pytorch_utils import load_pytorch_rcnn ,load_pretrained_mobilenet320
+from marqo.s2_inference.processing.pytorch_utils import load_pytorch
 from marqo.s2_inference.processing.yolox_utils import (
    _process_yolox,
-    _filter_yolox,
     _infer_yolox, 
     load_yolox_onnx,
 )
@@ -100,14 +99,14 @@ def chunk_image(image: Union[str, ImageType], device: str,
                     prior=True, hn=hn, wn=wn, nms=nms, filter_bb=filter_bb)
 
     elif method in ['marqo-yolo', 'yolox']:
-        patch = PatchifyYolox(device=device)
+        patch = PatchifyYolox(device=device, size=size)
     
     elif method in ['dino/v1', 'dino/v2']:
         if 'v1' in method:
-            patch = PatchifyViT(device=device, filter_bb=True, 
+            patch = PatchifyViT(device=device, filter_bb=True, size=size,
                         attention_method='abs', nms=True, replace_small=True)
         else:
-            patch = PatchifyViT(device=device, filter_bb=True, 
+            patch = PatchifyViT(device=device, filter_bb=True, size=size,
                         attention_method='pos', nms=True, replace_small=True)
     else:
         raise ValueError(f"unexpected image chunking type. found {method}")
@@ -166,6 +165,7 @@ class PatchifyModel:
         self.top_k = top_k
         self.filter_bb = filter_bb
         self.new_size = (100,100)
+        # consider changins
         self.iou_thresh = 0.6
         self.kwargs = kwargs
         self.n_postfilter = None
@@ -250,11 +250,17 @@ class PatchifyModel:
 
     def process(self):
 
-        self._replace_small_bb()
+        # v1
+        # self._replace_small_bb()
+        # self._filter_bb()
+        # self._nms_bb()
+        # self._keep_top_k()
+
         self._filter_bb()
+        self._replace_small_bb()
         self._nms_bb()
         self._keep_top_k()
-        
+
 
         # we add the original unchanged so that it is always in the index
         # the bb of the original also provides the size which is required for later processing
@@ -420,7 +426,6 @@ class PatchifyPytorch(PatchifyModel):
     """
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        #super()._calc_scores_bb()
         
         self.top_k_scores = 100
 
@@ -429,10 +434,7 @@ class PatchifyPytorch(PatchifyModel):
         # fill in with specifics
         self.model_name = 'faster_rcnn'
 
-        if self.model_name == 'faster_rcnn':
-            self.model_load_function = lambda x,y:load_pytorch_rcnn()
-        elif self.model_name == 'mobilenet':
-            self.model_load_function = lambda x,y:load_pretrained_mobilenet320()
+        self.model_load_function = load_pytorch
         
         self.allowed_model_types = (self.model_name)
         self.input_shape = (384, 384)
@@ -447,7 +449,6 @@ class PatchifyPytorch(PatchifyModel):
 
     def infer(self, image):
         self._load_image(image)
-
         self.batch = [self.preprocess(self.image_pt.to(self.device))]
         with torch.no_grad():
             self.results = self.model(self.batch)[0]
@@ -459,135 +460,13 @@ class PatchifyPytorch(PatchifyModel):
             self.scores = self.scores.tolist()
 
         self._keep_topk_sorted()
-        # make cv2 format
-        # self.image_cv = _PIL_to_opencv(self.image)
-        
-        # self.results, self.ratio = _infer_yolox(session=self.model, 
-        #                     preprocess=self.preprocess, opencv_image=self.image_cv, 
-        #                     input_shape=self.input_shape)
-
-        # self.boxes_xyxy, self.scores =  _process_yolox(output=self.results, ratio=self.ratio, size=self.input_shape)
-        # if isinstance(self.scores, (np.ndarray, np.generic)):
-        #     self.scores = self.scores.tolist()
-        
-
-
-# class PatchifyPytorch:
-#     """class to do the patching
-#     """
-#     def __init__(self, device='cpu', size=(240, 240), nms=True, filter_bb=True, 
-#                     prior=False, hn=3, wn=3, min_area=30*30):
-#         # TODO add option for combining model and prior
-#         self.size = size
-#         self.prior = prior
-#         self.min_area = min_area
-#         self.top_k = 10
-#         model_type = ('faster_rcnn', device)
-
-#         if model_type not in available_models:
-#             logger.info(f"loading model {model_type}")
-#             if model_type[0] == 'faster_rcnn':
-#                 func = load_pytorch_rcnn
-#             elif model_type[0] == 'mobilenet':
-#                 func = load_pretrained_mobilenet320
-#             else:
-#                 raise TypeError(f"wrong model for {model_type}")
-#             self.model, self.preprocess = func()
-
-#             available_models[model_type] = (self.model, self.preprocess)
-#         else:
-#             self.model, self.preprocess = available_models[model_type]
-
-#         self.device = device
-#         self.model.to(self.device)
-#         self.nms = nms
-#         self.filter_bb = filter_bb
-
-#         self.bboxes_simple = []
-#         self.hn = hn
-#         self.wn = wn
-
-#     def infer(self, image):
-
-#         self.image, self.image_pt, self.original_size = load_rcnn_image(image, size=self.size)
-#         self.batch = [self.preprocess(self.image_pt.to(self.device))]
-#         with torch.no_grad():
-#             self.results = self.model(self.batch)[0]
-        
-#         if self.prior:
-#             self.bboxes_simple = generate_boxes(self.size, self.hn, self.wn, overlap=True)
-              
-#     def process(self):
-#         self.areas = torch.tensor(calc_area(self.results['boxes'], self.size))
-#         self.bboxes_pt = self.results['boxes'].detach().cpu()
-        
-#         if self.filter_bb:
-#             inds = filter_boxes(self.bboxes_pt, min_area=self.min_area)
-#             self.bboxes_pt = self.bboxes_pt.clone().detach()[inds]
-#             self.areas = self.areas[inds]
-#         if self.nms:
-#             self.inds = torchvision.ops.nms(self.bboxes_pt, 1 - self.areas, 0.6)
-#             self.bboxes_pt = self.bboxes_pt.clone().detach()[self.inds]
-
-#         self.bboxes_pt = _keep_topk(self.bboxes_pt, k=self.top_k)
-#         # we add the original unchanged so that it is always in the index
-#         # the bb of the original also provides the size which is required for later processing
-#         self.bboxes = [(0,0,self.size[0],self.size[1])] + self.bboxes_pt.numpy().astype(int).tolist() + self.bboxes_simple
-#         #self.bboxes = replace_small_boxes(self.bboxes, min_area=40*40, new_size=(100,100))
-#         #self.bboxes = clip_boxes(self.bboxes_orig,0,0,self.size[0],self.size[1])
-#         self.patches = patchify_image(self.image, self.bboxes)
-
-#         self.bboxes_orig = [rescale_box(bb, self.size, self.original_size) for bb in self.bboxes]
-        
-
-# class PatchifyYolox:
-#     """class to do the patching
-#     """
-#     def __init__(self, device='cpu', size=(384, 384), filter_bb=True):
-
-#         self.size = size
-#         self.device = device
-#         self.input_shape = (384, 384)
-#         self.top_k = 10
-#         self.model_name = "/mnt/internal1/datasets/LVIS/YOLOX/yolox_s.onnx"
-#         model_type = ('yolox', device)
-
-#         if model_type not in available_models:
-#             logger.info(f"loading model {model_type}")
-#             if model_type[0] == 'yolox':
-#                 func = load_yolox_onnx
-#             else:
-#                 raise TypeErrror(f"wrong model for {model_type}")
-
-#             self.model, self.preprocess = func(self.model_name, self.device)
-
-#             available_models[model_type] = (self.model, self.preprocess)
-#         else:
-#             self.model, self.preprocess = available_models[model_type]
-
-#         self.filter_bb = filter_bb
-
-#     def infer(self, image):
-
-#         self.image_pil, self.image_pt, self.original_size = load_rcnn_image(image, size=self.size)
-#         # make cv2 format
-#         self.image = _PIL_to_opencv(self.image_pil)
-        
-#         self.results, self.ratio = _infer_yolox(session=self.model, 
-#                             preprocess=self.preprocess, opencv_image=self.image, 
-#                             input_shape=self.input_shape)
-
-#         self.boxes_xyxy, self.scores =  _process_yolox(output=self.results, ratio=self.ratio, size=self.input_shape)
-
-
-
+    
 
 class PatchifyYolox(PatchifyModel):
     """class to do the patching
     """
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        #super()._calc_scores_bb()
         
         self.top_k_scores = 100
 

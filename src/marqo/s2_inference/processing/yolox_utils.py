@@ -92,26 +92,3 @@ def _process_yolox(output, ratio, size=(384, 384)):
 
     return boxes_xyxy, scores
 
-def filter_yolox_boxes(boxes, max_aspect_ratio: int = 4, min_area: int = 40*40):
-
-    inds = []
-    for ind,box in enumerate(boxes):
-        box = box.tolist()
-        area = (box[2]-box[0])*(box[3] - box[1])
-        if area > min_area:
-            inds.append(ind)
-    
-    return inds
-
-def _filter_yolox(boxes_xyxy, scores):
-
-    # filter
-    inds_f = filter_yolox_boxes(boxes_xyxy)
-    ss = scores.max(-1)
-    boxes_xyxy_filtered = np.array([boxes_xyxy[_i] for _i in inds_f])
-    _s = np.array([ss[_i] for _i in inds_f])
-
-    inds = torchvision.ops.nms(torch.FloatTensor(boxes_xyxy_filtered), torch.FloatTensor(_s), 0.4)
-
-    return boxes_xyxy_filtered[inds]
-
