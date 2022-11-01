@@ -10,11 +10,9 @@ from marqo.s2_inference.processing.image import (
     PatchifyPytorch,
     PatchifyViT,
     PatchifyYolox,
-    patchify_image,
     chunk_image,
 )
 
-from marqo.s2_inference.s2_inference import clear_loaded_models
 
 class TestImageChunking(unittest.TestCase):
 
@@ -68,33 +66,6 @@ class TestImageChunking(unittest.TestCase):
             assert len(patcher.patches) == len(patcher.bboxes)
             assert len(patcher.patches) == len(patcher.bboxes_orig)
             assert abs(np.array(patcher.patches[0]) - np.array(patcher.image)).sum() < 1e-6
-
-    def test_PatchifyPytorchPrior(self):
-
-        image_size = (400,500)
-        with tempfile.TemporaryDirectory() as d:
-            temp_file_name = os.path.join(d, 'test_image.png')
-            img = Image.fromarray(np.random.randint(0,255,size=image_size).astype(np.uint8))
-            img.save(temp_file_name)
-
-            patcher = PatchifyPytorch(size=image_size, hn=3, wn=3, prior=True)
-            patcher.infer(img)
-            patcher.process()
-
-            assert len(patcher.patches) == len(patcher.bboxes)
-            assert len(patcher.patches) == len(patcher.bboxes_orig)
-            assert abs(np.array(patcher.patches[0]) - np.array(patcher.image)).sum() < 1e-6
-            assert len(patcher.bboxes_simple) == (3*3) + (3-1)*(3-1)
- 
-            patcher = PatchifyPytorch(size=image_size, hn=3, wn=3, prior=True)
-            patcher.infer(temp_file_name)
-            patcher.process()
-
-            assert len(patcher.patches) == len(patcher.bboxes)
-            assert len(patcher.patches) == len(patcher.bboxes_orig)
-            assert len(patcher.bboxes_simple) == (3*3) + (3-1)*(3-1)
-            assert abs(np.array(patcher.patches[0]) - np.array(patcher.image)).sum() < 1e-6
-
     
     def test_PatchifyOverlap(self):
 
@@ -203,24 +174,6 @@ class TestImageChunking(unittest.TestCase):
             assert len(patcher.patches) == len(patcher.bboxes_orig)
             assert abs(np.array(patcher.patches[0]) - np.array(patcher.image)).sum() < 1e-6
 
-    
-    def test_patchify(self):
-
-        image_size = (250, 200)
-        bboxes = [(0,0,250,200), (10, 20, 50, 70), (200, 150, 250, 200)]
-        with tempfile.TemporaryDirectory() as d:
-            temp_file_name = os.path.join(d, 'test_image.png')
-            img = Image.fromarray(np.random.randint(0,255, size=image_size).astype(np.uint8))
-            patches = patchify_image(img, bboxes)
-
-            assert len(patches) == len(bboxes)
-            assert isinstance(patches, list)
-            
-            for patch,bb in zip(patches, bboxes):
-                a = bb[2] - bb[0]
-                b = bb[3] - bb[1]
-                assert patch.size == (a, b)
-
     def test_chunk_image_simple(self):
 
         SIZE = (256, 384)
@@ -279,23 +232,6 @@ class TestImageChunking(unittest.TestCase):
             assert len(patches) >= 1
             assert patches[0].size == SIZE
 
-            patches, bboxes = chunk_image(img, device='cpu', 
-                                method = 'overlap/frcnn?wn=4&hn=2', size=SIZE)
-            
-            assert len(patches) >= (4*2) + (4-1)*(2-1) +  1
-            assert patches[0].size == SIZE
-
-            patches, bboxes = chunk_image(img, device='cpu', 
-                                method = 'overlap/frcnn?nms=false', size=SIZE)
-            
-            assert len(patches) >= (4*2) + (4-1)*(2-1) +  1
-            assert patches[0].size == SIZE
-
-            patches, bboxes = chunk_image(img, device='cpu', 
-                                method = 'overlap/frcnn?filter_bb=false', size=SIZE)
-            
-            assert len(patches) >= (4*2) + (4-1)*(2-1) +  1
-            assert patches[0].size == SIZE
 
     def test_chunk_image_yolox(self):
 

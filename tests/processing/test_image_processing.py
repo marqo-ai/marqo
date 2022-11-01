@@ -5,28 +5,70 @@ import os
 import numpy as np
 from PIL import Image
 
-from marqo.s2_inference.processing.image import (
+
+from marqo.s2_inference.processing.image_utils import (
     load_rcnn_image, 
-    calc_area,
-    filter_boxes,
+    replace_small_boxes,
+    _keep_topk,
     rescale_box,
-    generate_boxes,
-    PatchifySimple,
-    PatchifyPytorch,
-    PatchifyViT,
-    PatchifyYolox,
-    patchify_image,
+    clip_boxes,
+    _PIL_to_opencv, 
+    str2bool,
+    get_default_size,
     _process_patch_method,
-    chunk_image,
-    str2bool
+    patchify_image,
+    filter_boxes,
+    calc_area,
+    generate_boxes
 )
 
-from marqo.s2_inference.s2_inference import clear_loaded_models
+from marqo.s2_inference.processing.image import (
+    chunk_image,
+)
+
 
 class TestImageChunking(unittest.TestCase):
 
     def setUp(self) -> None:
         pass 
+
+    def test_replace_small_boxes(self):
+        
+        def _calc_area(box): return (box[2]-box[0])*(box[3] - box[1])
+
+        min_areas = [10*10, 40*40, 100*100]
+        new_sizes = [(100,100), (11,20), (45,67)]
+        for min_area,new_size in zip(min_areas, new_sizes):
+
+            boxes = [(0,0,10,20), (1,4,23,89), (0,0,211,32)]
+            new_boxes = replace_small_boxes(boxes, min_area=min_area, new_size=new_size)
+
+            for box,new_box in zip(boxes, new_boxes):
+                area = _calc_area(box)
+                if area < min_area:
+                    assert box != new_box
+                    assert _calc_area(new_box) == new_size[0]*new_size[1]
+                else:
+                    assert box == new_box
+                
+    def test_clip_boxes(self):
+        boxes = [(0,0,10,20), (1,4,23,89), (0,0,211,32)]
+        # xmin, ymin, xmax, ymax
+        limits = [(1,2,20,20), (0,0,40,90), (-1,5,11,31)]
+
+        for box,limit in zip(boxes, limits):
+            new_box = clip_boxes([box], *limit)
+
+            clipped = False
+            if box[0] < limit[0]:
+                clipped = True
+            if box[1] < limit[1]:
+                clipped = True
+            if box[2] < limit[2]:
+                clipped = True
+            if box[3] < limit[3]:
+                clipped = True
+
 
     def test_load_rcnn_image(self):
         image_size = (100,100,3)
@@ -255,25 +297,6 @@ class TestImageChunking(unittest.TestCase):
             
             assert len(patches) >= 1
             assert patches[0].size == SIZE
-
-            patches, bboxes = chunk_image(img, device='cpu', 
-                                method = 'overlap/frcnn?wn=4&hn=2', size=SIZE)
-            
-            assert len(patches) >= (4*2) + (4-1)*(2-1) +  1
-            assert patches[0].size == SIZE
-
-            patches, bboxes = chunk_image(img, device='cpu', 
-                                method = 'overlap/frcnn?nms=false', size=SIZE)
-            
-            assert len(patches) >= (4*2) + (4-1)*(2-1) +  1
-            assert patches[0].size == SIZE
-
-            patches, bboxes = chunk_image(img, device='cpu', 
-                                method = 'overlap/frcnn?filter_bb=false', size=SIZE)
-            
-            assert len(patches) >= (4*2) + (4-1)*(2-1) +  1
-            assert patches[0].size == SIZE
-
 
     def test_str2bool(self):
 
