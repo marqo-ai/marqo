@@ -1,6 +1,5 @@
 # from torch import FloatTensor
 # from typing import Any, Dict, List, Optional, Union
-from clip_onnx import clip_onnx
 import os
 import validators
 import requests
@@ -11,6 +10,10 @@ from PIL import Image
 
 from marqo.s2_inference.types import *
 from marqo.s2_inference.logger import get_logger
+import transformers
+
+import onnx
+import onnxruntime as ort
 
 logger = get_logger(__name__)
 
@@ -140,7 +143,7 @@ def _is_image(inputs: Union[str, List[Union[str, ImageType, ndarray]]]) -> bool:
         raise TypeError(f"expected type Image or str for inputs but received type {type(thing)}")
 
 
-class ONNX_CLIP(object):
+class JINA_ONNX_CLIP(object):
     """
     Load a clip model and convert it to onnx version for faster inference
     """
@@ -149,22 +152,17 @@ class ONNX_CLIP(object):
                  visual_path="clip_visual.onnx", textual_path="clip_textual.onnx",
                  load=True, **kwargs):
         self.model_name = model_name
-        self.clip_name = model_name.split("onnx/")[1]
+        self.clip_name = model_name.split("jina_onnx/")[1]
         self.clip_model = None
         self.clip_preprocess = None
         self.device = device
         self.image_onnx = None
         self.text_onnx = None
-        self.visual_path = visual_path
-        self.textual_path = textual_path
+        self.visual_session = None
+        self.text_session = None
         self.onnx_model = None
         self.truncate = truncate
 
-    def load(self):
-        try:
-            self.load_onnx()
-        except:
-            self.onnx_converter()
 
     @staticmethod
     def normalize(outputs):
@@ -178,32 +176,29 @@ class ONNX_CLIP(object):
 
     def clip_load(self):
         if self.clip_model is None or self.clip_preprocess is None:
-            self.clip_model, self.clip_preprocess = clip.load(self.clip_name, device="cpu", jit=False)
-
-    def onnx_converter(self):
-        self.clip_load()
-        if self.image_onnx is None or self.text_onnx is None:
-            dummy_input = np.random.rand(1000, 1000, 3) * 255
-            dummy_input = dummy_input.astype("uint8")
-
-            image = self.clip_preprocess(Image.fromarray(dummy_input).convert("RGB")).unsqueeze(0).cpu()
-
-            text = clip.tokenize(["a diagram", "a dog", "a cat"]).cpu()
-
-            self.onnx_model = clip_onnx(self.clip_model, visual_path=self.visual_path, textual_path=self.textual_path)
-            self.onnx_model.convert2onnx(image, text, verbose=True)
-            if self.device == "cuda":
-                self.onnx_model.start_sessions(providers=["CUDAExecutionProvider"])
-            else:
-                self.onnx_model.start_sessions(providers=["CPUExecutionProvider"])
+            self.clip_model, self.clip_preprocess = clip.load(self.clip_name, device=self.device, jit=False)
 
     def encode_text(self, sentence, normalize=True):
-        if self.onnx_model is None:
+        if self.visual_session is None:
             self.load()
 
-        sentence = clip.tokenize(sentence, truncate=self.truncate).cpu()
-        sentence_onnx = sentence.detach().cpu().numpy().astype(np.int32)
-        outputs = torch.tensor(self.onnx_model.encode_text(sentence_onnx))
+        tokenizer = transformers.AutoTokenizer.from_pretrained("openai/clip-vit-base-patch32")
+
+        result = tokenizer(
+            sentence,
+            max_length=77,
+            return_attention_mask=True,
+            return_tensors='pt',
+            padding='max_length',
+            truncation=True,
+        )
+
+        text_results = {
+            'input_ids': result['input_ids'].numpy().astype("int32"),
+            'attention_mask': result['attention_mask'].numpy().astype("int32"),
+        }
+
+        outputs = torch.tensor(self.text_session.run(None, text_results)[0])
 
         if normalize:
             _shape_before = outputs.shape
@@ -213,7 +208,7 @@ class ONNX_CLIP(object):
 
     def encode_image(self, images, normalize=True):
 
-        if self.onnx_model is None:
+        if self.visual_session is None:
             self.load()
 
         if isinstance(images, list):
@@ -223,8 +218,10 @@ class ONNX_CLIP(object):
 
         self.image_input_processed = torch.stack([self.clip_preprocess(_img).to(self.device) for _img in image_input])
 
-        self.images_onnx = self.image_input_processed.detach().cpu().numpy().astype(np.float32)
-        outputs = torch.tensor(self.onnx_model.encode_image(self.images_onnx))
+        self.images_onnx = self.image_input_processed.detach().cpu().numpy()
+
+        outputs = torch.tensor(self.visual_session.run(None, {"pixel_values" : self.images_onnx})[0])
+
 
         if normalize:
             _shape_before = outputs.shape
@@ -235,7 +232,7 @@ class ONNX_CLIP(object):
     def encode(self, inputs: Union[str, ImageType, List[Union[str, ImageType]]],
                default: str = 'text', normalize=True, **kwargs) -> FloatTensor:
 
-        if self.onnx_model is None:
+        if self.visual_session is None:
             self.load()
 
         infer = kwargs.pop('infer', True)
@@ -258,14 +255,8 @@ class ONNX_CLIP(object):
             logger.debug('text')
             return self.encode_text(inputs, normalize=True)
 
-    def load_onnx(self):
+    def load(self):
         self.clip_load()
-        self.onnx_model = clip_onnx(None)
-        self.onnx_model.load_onnx(visual_path=self.visual_path,
-                                  textual_path=self.textual_path,
-                                  logit_scale=100.0000)  # model.logit_scale.exp()
-        if self.device == "cuda":
-            self.onnx_model.start_sessions(providers=["CUDAExecutionProvider"])
-        else:
-            self.onnx_model.start_sessions(providers=["CPUExecutionProvider"])
+        self.visual_session = ort.InferenceSession("visual.onnx", providers=["CUDAExecutionProvider"])
+        self.text_session = ort.InferenceSession("textual.onnx", providers=["CUDAExecutionProvider"])
 
