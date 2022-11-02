@@ -1,3 +1,8 @@
+# Release 0.0.7
+
+## Bug fixes and minor changes
+- 429 (too many request errors) are propagated from Marqo-os to the user properly
+
 # Release 0.0.6
 
 ## New features
@@ -7,9 +12,11 @@
   - Chinese 🇨🇳 (by [@wanliAlex](https://github.com/wanliAlex))
   - French 🇫🇷 (by [@rym-oualha](https://github.com/rym-oualha))
   - Ukrainian 🇺🇦 (by [@dmyzlata](https://github.com/dmyzlata))
+  - Polish 🇵🇱 (by [@MichalLuck](https://github.com/MichalLuck))
 
 ## Breaking API changes
-The home `/` json response has been updated. If you have logic that reads the endpoint root, please update it. 
+- The home `/` json response has been updated. If you have logic that reads the endpoint root, please update it. 
+- The Python client's `add_documents()` and `update_documents()` `batch_size` parameter has been replaced by `server_batch_size` and `client_batch_size` parameters
 
 ## Non-breaking data model changes
 - Each text field just creates a top level Marqo-os text field, without any keywords 
@@ -20,23 +27,18 @@ The home `/` json response has been updated. If you have logic that reads the en
 - FastAPI single threaded concurrency
 - Refactoring out old code
 - Get documents by IDs and lexical search and no longer returns vectors if expose_facets isn't specified
+- Fixed batching bug in Python client
 
 ## Caveats
 - If a large request to add_documents or update_documents results in a document adding fields such that the index field limit is exceeded, the entire operation will fail (without resilience). Mitigate this sending `add_documents` and `update_documents` requests with smaller batches of documents. 
-- Fixing asynchronous indexing means that large scale ingestion can overwhelm Marqo's resources (this dependent on the machine running Marqo). For ingesting large batches of data we recommend: 
-  - server side batch size of 10
-  - client side batch size of 10 - 50
+- For optimal indexing of large volumes of images, we recommend that the images are hosted on the same region and cloud provider as Marqo.
 
+## Contributor shout-outs
 
+- For their translation work: [@rym-oualha](https://github.com/rym-oualha), [@dmyzlata](https://github.com/dmyzlata), [@wanliAlex](https://github.com/wanliAlex), [@dmyzlata](https://github.com/dmyzlata), [@MichalLuck](https://github.com/MichalLuck)
+- For reporting bugs and requesting features: [@kdewald](https://github.com/kdewald), [@llermaly](https://github.com/llermaly)
+- To our 900+ star gazers and 30+ forkers
 
-
-
-
-
-
-## Special thanks to our community contributors:
-
-[@rym-oualha](https://github.com/rym-oualha), [@dmyzlata](https://github.com/dmyzlata)
 
 # Release 0.0.5
 <!--SMALL BLURB ABOUT RELEASE-->
