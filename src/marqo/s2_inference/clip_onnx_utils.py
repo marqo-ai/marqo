@@ -146,7 +146,6 @@ class ONNX_CLIP(object):
     """
 
     def __init__(self, model_name, device = "cpu", embedding_dim: int = None, truncate: bool = True,
-                 visual_path="clip_visual.onnx", textual_path="clip_textual.onnx",
                  load=True, **kwargs):
         self.model_name = model_name
         self.clip_name = model_name.split("onnx/")[1]
@@ -155,8 +154,8 @@ class ONNX_CLIP(object):
         self.device = device
         self.image_onnx = None
         self.text_onnx = None
-        self.visual_path = visual_path
-        self.textual_path = textual_path
+        self.visual_path = self.model_name.replace("/", "-") + "-visual"
+        self.textual_path = self.model_name.replace("/", "-") + "-textual"
         self.onnx_model = None
         self.truncate = truncate
 

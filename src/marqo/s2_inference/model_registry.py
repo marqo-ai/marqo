@@ -548,9 +548,13 @@ def _get_onnx_clip_properties() -> Dict:
             "onnx/ViT-B/32":
                 {"name": "onnx/ViT-B/32",
                 "dimensions": 512,
-                "tokens":128,
                 "type":"onnx_clip",
                 "notes": ""},
+        "onnx/ViT-L/14":
+            {"name": "onnx/ViT-L/14",
+             "dimensions": 768,
+             "type": "onnx_clip",
+             "notes": ""},
     }
     return ONNX_CLIP_MODEL_PROPERTIES
 
