@@ -179,8 +179,15 @@ class ONNX_CLIP(object):
             return output.cpu().numpy()
 
     def clip_load(self):
+
         if self.clip_model is None or self.clip_preprocess is None:
             self.clip_model, self.clip_preprocess = clip.load(self.clip_name, device="cpu", jit=False)
+            # import open_clip
+            # model_name = self.clip_name.split("/", 3)[1]
+            # pretrained = self.clip_name.split("/", 3)[2]
+            # self.clip_model, _, self.clip_preprocess = open_clip.create_model_and_transforms(model_name,
+            #                                                                        pretrained=pretrained,
+            #                                                                        device="cpu", jit=False)
 
     def onnx_converter(self):
         self.clip_load()

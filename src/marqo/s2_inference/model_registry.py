@@ -555,6 +555,12 @@ def _get_onnx_clip_properties() -> Dict:
              "dimensions": 768,
              "type": "onnx_clip",
              "notes": ""},
+        "onnx/open_clip/ViT-L-14/openai":
+            {"name":"onnx/open_clip/ViT-L-14/openai",
+             "dimensions": 768,
+             "type":"onnx_clip",
+
+            }
     }
     return ONNX_CLIP_MODEL_PROPERTIES
 
