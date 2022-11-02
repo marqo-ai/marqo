@@ -158,6 +158,9 @@ class ONNX_CLIP(object):
         self.textual_path = self.model_name.replace("/", "-") + "-textual"
         self.onnx_model = None
         self.truncate = truncate
+        self.providers = ["CPUExecutionProvider"]
+        if self.device == "cuda":
+            self.providers.insert(0, 'CUDAExecutionProvider')
 
     def load(self):
         try:
@@ -191,10 +194,7 @@ class ONNX_CLIP(object):
 
             self.onnx_model = clip_onnx(self.clip_model, visual_path=self.visual_path, textual_path=self.textual_path)
             self.onnx_model.convert2onnx(image, text, verbose=True)
-            if self.device == "cuda":
-                self.onnx_model.start_sessions(providers=["CUDAExecutionProvider"])
-            else:
-                self.onnx_model.start_sessions(providers=["CPUExecutionProvider"])
+            self.onnx_model.start_sessions(providers=self.providers)
 
     def encode_text(self, sentence, normalize=True):
         if self.onnx_model is None:
@@ -263,8 +263,7 @@ class ONNX_CLIP(object):
         self.onnx_model.load_onnx(visual_path=self.visual_path,
                                   textual_path=self.textual_path,
                                   logit_scale=100.0000)  # model.logit_scale.exp()
-        if self.device == "cuda":
-            self.onnx_model.start_sessions(providers=["CUDAExecutionProvider"])
-        else:
-            self.onnx_model.start_sessions(providers=["CPUExecutionProvider"])
+        self.onnx_model.start_sessions(self.providers)
+
+
 
