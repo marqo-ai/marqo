@@ -6,8 +6,8 @@
 # Release 0.0.6
 
 ## New features
-- Health check endpoint: `GET /health`. An endpoint that can be used to inspect the status of Marqo and Marqo's backend (Marqo-os)
-- Marqo can be launched with environment variables that define limits around maximum number of fields per index, maximum document size and the maximum numnber of documents that can be retrieved.
+- Health check endpoint: `GET /health`. An endpoint that can be used to inspect the status of Marqo and Marqo's backend (Marqo-os). Read about usage [here](https://docs.marqo.ai/API-Reference/health/).
+- Marqo can be launched with environment variables that define limits around maximum number of fields per index, maximum document size and the maximum numnber of documents that can be retrieved. Read about usage [here](https://docs.marqo.ai/Advanced-Usage/configuration/).
 - README translations: 
   - Chinese 🇨🇳 (by [@wanliAlex](https://github.com/wanliAlex))
   - French 🇫🇷 (by [@rym-oualha](https://github.com/rym-oualha))
