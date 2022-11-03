@@ -19,6 +19,26 @@ def replace_title(data: dict) -> dict:
     data['title'] = data['title'].replace('- Wikipedia', '')
     return data
 
+def split_big_docs(data, field='content', char_len=5e4):
+    # there are some large documents which can cause issues for some users
+    new_data = []
+    for dat in data:
+        
+        content = dat[field]
+        N = len(content)
+        
+        if N >= char_len:
+            n_chunks = math.ceil(N / char_len)
+            new_content = np.array_split(list(content), n_chunks)
+            
+            for _content in new_content:
+                new_dat = copy.deepcopy(dat)
+                new_dat[field] = ''.join(_content)
+                new_data.append(new_dat)
+        else:
+            new_data.append(dat)
+    return new_data
+
 #####################################################
 ### STEP 1. load the data
 #####################################################
@@ -33,6 +53,8 @@ dataset_file = "simplewiki.json"
 data = read_json(dataset_file)
 # clean up the title
 data = [replace_title(d) for d in data]
+# split big ones to make it easier for users on all hardware
+data = split_big_docs(data)
 print(f"loaded data with {len(data)} entries")
 
 #####################################################
