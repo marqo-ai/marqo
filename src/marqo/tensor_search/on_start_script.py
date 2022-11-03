@@ -1,6 +1,7 @@
 from marqo.tensor_search.tensor_search_logging import get_logger
 import time
-from marqo.tensor_search import index_meta_cache
+from marqo.tensor_search.enums import EnvVars
+from marqo.tensor_search import index_meta_cache, utils
 from marqo import config
 from marqo.tensor_search.web import api_utils
 from marqo._httprequests import HttpRequests
@@ -118,10 +119,7 @@ class ModelsForCacheing:
     def __init__(self):
         import torch
       
-        self.models = (
-            'onnx/all_datasets_v4_MiniLM-L6',
-            "ViT-L/14",
-        )
+        self.models = utils.read_env_vars_and_defaults(EnvVars.MARQO_MODELS_TO_PRELOAD)
         # TBD to include cross-encoder/ms-marco-TinyBERT-L-2-v2
 
         self.default_devices = ['cpu'] if not torch.cuda.is_available() else ['cpu', 'cuda']
