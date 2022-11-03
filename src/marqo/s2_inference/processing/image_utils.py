@@ -31,6 +31,13 @@ def _PIL_to_opencv(pil_image: ImageType):
 
 
 def _keep_topk(boxes_xyxy, k=10):
+
+    if k == 0:
+        return []
+
+    if len(boxes_xyxy) <= k:
+        return boxes_xyxy
+        
     return boxes_xyxy[:k]
 
 

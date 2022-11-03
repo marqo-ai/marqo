@@ -7,6 +7,21 @@ from torchvision.models.detection import FasterRCNN_MobileNet_V3_Large_FPN_Weigh
 from torchvision.models.detection import fasterrcnn_resnet50_fpn_v2, FasterRCNN_ResNet50_FPN_V2_Weights
 from torchvision.models.detection import FCOS_ResNet50_FPN_Weights
 
+def load_pytorch(model_name, device):
+
+    if model_name in ('frcnn', 'faster_rcnn'):
+        model, preprocess = load_pytorch_rcnn()
+        model = model.to(device)
+        model.eval()
+    else:
+        raise RuntimeError("incorrect model specified")
+
+    return model, preprocess
+        # if self.model_name == 'faster_rcnn':
+        #     self.model_load_function = lambda x,y:load_pytorch_rcnn()
+        # elif self.model_name == 'mobilenet':
+        #     self.model_load_function = lambda x,y:load_pretrained_mobilenet320()
+
 def load_pretrained_mobilenet():
     """"
     loads marqo trained model
