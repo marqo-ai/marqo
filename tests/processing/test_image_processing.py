@@ -50,7 +50,21 @@ class TestImageChunking(unittest.TestCase):
                     assert _calc_area(new_box) == new_size[0]*new_size[1]
                 else:
                     assert box == new_box
-                
+
+    def test_keep_topk(self):
+        boxes = [(0,0,10,20), (1,4,23,89), (0,0,211,32)]
+        # xmin, ymin, xmax, ymax
+
+        top_k = _keep_topk(boxes, k=1)
+        assert len(top_k) == 1
+
+        top_k = _keep_topk(boxes, k=0)
+        assert len(top_k) == 0
+
+        top_k = _keep_topk(boxes, k=len(boxes)+1)
+        assert len(top_k) == len(boxes)
+
+
     def test_clip_boxes(self):
         boxes = [(0,0,10,20), (1,4,23,89), (0,0,211,32)]
         # xmin, ymin, xmax, ymax
@@ -59,15 +73,27 @@ class TestImageChunking(unittest.TestCase):
         for box,limit in zip(boxes, limits):
             new_box = clip_boxes([box], *limit)
 
-            clipped = False
             if box[0] < limit[0]:
-                clipped = True
+                assert new_box[0] == limit[0]
+            else:
+                assert new_box[0] == box[0]
+
             if box[1] < limit[1]:
-                clipped = True
-            if box[2] < limit[2]:
-                clipped = True
-            if box[3] < limit[3]:
-                clipped = True
+                assert new_box[1] == limit[1]
+            else:
+                assert new_box[1] == box[1]
+
+            if box[2] > limit[2]:
+                assert new_box[2] == limit[2]
+            else:
+                assert new_box[2] == box[2]
+
+            if box[3] > limit[3]:
+                assert new_box[3] == limit[3]
+            else:
+                assert new_box[3] == box[3]
+
+            
 
 
     def test_load_rcnn_image(self):
