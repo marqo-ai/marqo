@@ -33,5 +33,5 @@ def default_env_vars() -> dict:
         EnvVars.MARQO_MAX_INDEX_FIELDS: None,
         EnvVars.MARQO_MAX_DOC_BYTES: 100000,
         EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: None,
-        EnvVars.MARQO_MODELS_TO_PRELOAD: ['onnx/all_datasets_v4_MiniLM-L6', "ViT-L/14"]
+        EnvVars.MARQO_MODELS_TO_PRELOAD: ['hf/all_datasets_v4_MiniLM-L6', "ViT-L/14"]
     }
