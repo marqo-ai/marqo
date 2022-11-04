@@ -15,15 +15,15 @@ class TestOnStartScript(MarqoTestCase):
             ({enums.EnvVars.MARQO_MODELS_TO_PRELOAD: []}, []),
             ({enums.EnvVars.MARQO_MODELS_TO_PRELOAD: ""}, []),
             (dict(), configs.default_env_vars()[enums.EnvVars.MARQO_MODELS_TO_PRELOAD]),
-            ({enums.EnvVars.MARQO_MODELS_TO_PRELOAD: ["onnx/all_datasets_v4_mpnet-base"]},
-             ["onnx/all_datasets_v4_mpnet-base"]),
-            ({enums.EnvVars.MARQO_MODELS_TO_PRELOAD: json.dumps(["onnx/all_datasets_v4_mpnet-base"])},
-             ["onnx/all_datasets_v4_mpnet-base"]),
-            ({enums.EnvVars.MARQO_MODELS_TO_PRELOAD: ["onnx/all_datasets_v4_mpnet-base", "hf/all_datasets_v3_mpnet-base"]},
-             ["onnx/all_datasets_v4_mpnet-base", "hf/all_datasets_v3_mpnet-base"]),
+            ({enums.EnvVars.MARQO_MODELS_TO_PRELOAD: ["sentence-transformers/stsb-xlm-r-multilingual"]},
+             ["sentence-transformers/stsb-xlm-r-multilingual"]),
+            ({enums.EnvVars.MARQO_MODELS_TO_PRELOAD: json.dumps(["sentence-transformers/stsb-xlm-r-multilingual"])},
+             ["sentence-transformers/stsb-xlm-r-multilingual"]),
+            ({enums.EnvVars.MARQO_MODELS_TO_PRELOAD: ["sentence-transformers/stsb-xlm-r-multilingual", "hf/all_datasets_v3_mpnet-base"]},
+             ["sentence-transformers/stsb-xlm-r-multilingual", "hf/all_datasets_v3_mpnet-base"]),
             ({enums.EnvVars.MARQO_MODELS_TO_PRELOAD: json.dumps(
-                ["onnx/all_datasets_v4_mpnet-base", "hf/all_datasets_v3_mpnet-base"])},
-             ["onnx/all_datasets_v4_mpnet-base", "hf/all_datasets_v3_mpnet-base"]),
+                ["sentence-transformers/stsb-xlm-r-multilingual", "hf/all_datasets_v3_mpnet-base"])},
+             ["sentence-transformers/stsb-xlm-r-multilingual", "hf/all_datasets_v3_mpnet-base"]),
         ]
         for mock_environ, expected in environ_expected_models:
             mock_vectorise = mock.MagicMock()
