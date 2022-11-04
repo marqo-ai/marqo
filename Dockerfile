@@ -16,7 +16,7 @@ RUN apt-get update
 RUN apt-get install python3.8-distutils -y # python3-distutils
 RUN apt-get  install python3.8 python3-pip -y # pip is 276 MB!
 # TODO: up the RAM
-RUN pip3 --no-cache-dir install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu113 --upgrade
+
 RUN echo Target platform is "$TARGETPLATFORM"
 
 COPY requirements.txt requirements.txt
