@@ -1,0 +1,23 @@
+# tensor search:
+requests
+fastapi
+uvicorn[standard]
+fastapi_utils
+# testing:
+pytest
+tox
+# s2_inference:
+more_itertools
+nltk
+torch
+pillow
+numpy
+validators
+sentence-transformers
+open_clip_torch
+clip-marqo
+protobuf==3.20.1
+onnx==1.12.0
+onnxruntime==1.12.1
+pandas
+optimum
