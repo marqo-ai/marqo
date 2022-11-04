@@ -4,7 +4,9 @@ import os
 
 import numpy as np
 from PIL import Image
+ 
 
+from marqo.s2_inference.types import List, Tuple, ImageType
 
 from marqo.s2_inference.processing.image_utils import (
     load_rcnn_image, 
@@ -31,6 +33,26 @@ class TestImageChunking(unittest.TestCase):
 
     def setUp(self) -> None:
         pass 
+    
+    def test_get_default_size(self):
+
+        size = get_default_size()
+        assert isinstance(size, (Tuple, List))
+
+        assert len(size) == 2
+
+    def test_PIL_to_opencv(self):
+
+        image_size = (250, 200)
+        img = Image.fromarray(np.random.randint(0,255, size=image_size).astype(np.uint8))
+
+        assert isinstance(img, ImageType)
+
+        img_cv2 = _PIL_to_opencv(img)
+
+        assert isinstance(img_cv2, np.ndarray)
+
+        assert np.allclose( np.array(img.convert('RGB'))[:, :, ::-1],  img_cv2)
 
     def test_replace_small_boxes(self):
         
@@ -57,6 +79,12 @@ class TestImageChunking(unittest.TestCase):
 
         top_k = _keep_topk(boxes, k=1)
         assert len(top_k) == 1
+        assert top_k[0] == boxes[0]
+
+        top_k = _keep_topk(boxes, k=2)
+        assert len(top_k) == 2
+        assert top_k[0] == boxes[0]
+        assert top_k[1] == boxes[1]
 
         top_k = _keep_topk(boxes, k=0)
         assert len(top_k) == 0
@@ -71,8 +99,9 @@ class TestImageChunking(unittest.TestCase):
         limits = [(1,2,20,20), (0,0,40,90), (-1,5,11,31)]
 
         for box,limit in zip(boxes, limits):
-            new_box = clip_boxes([box], *limit)
-
+            new_boxs = clip_boxes([box], *limit)
+            new_box = new_boxs[0]
+            
             if box[0] < limit[0]:
                 assert new_box[0] == limit[0]
             else:

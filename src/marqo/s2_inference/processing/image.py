@@ -9,9 +9,9 @@ import torchvision
 
 from marqo.s2_inference.s2_inference import available_models
 from marqo.s2_inference.s2_inference import get_logger
-from marqo.s2_inference.types import Dict, List, Union, ImageType, Tuple, FloatTensor, ndarray
-from marqo.s2_inference.clip_utils import format_and_load_CLIP_image, _load_image_from_path
-from marqo.s2_inference.errors import ChunkerError, ChunkerMethodProcessError
+from marqo.s2_inference.types import Dict, List, Union, ImageType, Tuple, ndarray
+from marqo.s2_inference.clip_utils import format_and_load_CLIP_image
+from marqo.s2_inference.errors import ChunkerError
 
 from marqo.s2_inference.processing.DINO_utils import _load_DINO_model,attention_to_bboxs,DINO_inference
 from marqo.s2_inference.processing.pytorch_utils import load_pytorch
