@@ -11,5 +11,5 @@ if [[ "$TARGETPLATFORM" != "linux/arm64" ]]; then
   pip3 install --no-cache-dir torch==1.12.1+cu113 torchvision==0.13.1+cu113 torchaudio==0.12.1 --extra-index-url https://download.pytorch.org/whl/cu113 --upgrade
 else
   pip3 --no-cache-dir install --upgrade onnxruntime
-  pip3 --no-cache-dir install torch torchvision torchaudio
+  pip3 --no-cache-dir install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu113 --upgrade
 fi
