@@ -18,6 +18,11 @@ open_clip_torch
 clip-marqo
 protobuf==3.20.1
 onnx
+wget
+opencv-python
 onnxruntime
 pandas
 optimum
+moviepy
+youtube-dl
+pafy

@@ -5,12 +5,26 @@ from fastapi_utils.enums import StrEnum
 class MediaType:
     text = 'text'
     image = 'image'
+    video = 'video'
     default = 'text'
+
+class FileType:
+    youtube = "youtube"
+    tiktok = "tiktok"
+    url = "url"
+    local = "local_path"
+    straight_text = "straight_text"
+    ndarray = "ndarray"
+    pil_image= "pil_image"
+    list_of_pil_images = "list_of_pil_images"
+    default = "url"
+
 
 
 class MlModel:
     bert = "hf/all_datasets_v4_MiniLM-L6"
     clip = "ViT-L/14"
+    x_clip = "microsoft/xclip-base-patch16-kinetics-600"
 
 
 class SearchMethod(str, Enum):
@@ -51,6 +65,10 @@ class IndexSettingsField:
 
     image_preprocessing = "image_preprocessing"
     patch_method = "patch_method"
+
+    video_preprocessing = 'video_processing'
+    chunk_length = 'chunk_length'
+    chunk_method = 'chunk_method'
 
     number_of_shards = "number_of_shards"
 

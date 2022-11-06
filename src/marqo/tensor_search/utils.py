@@ -8,6 +8,17 @@ from marqo.tensor_search import enums, configs
 from typing import List, Optional, Union, Callable, Iterable, Sequence, Dict
 import copy
 import datetime
+import validators
+import mimetypes
+from PIL.Image import Image as ImageType
+from numpy import ndarray
+from urllib.parse import urlparse
+from marqo.tensor_search.enums import MediaType, FileType
+import os
+from marqo.tensor_search.enums import MediaType, FileType
+from typing import Tuple
+import requests, re
+import wget
 
 
 def dicts_to_jsonl(dicts: List[dict]) -> str:
@@ -139,6 +150,100 @@ def check_device_is_available(device: str) -> bool:
         return False
 
 
+def convert_to_MediaType(type_str: str) -> MediaType:
+    #This can actually be a dictionary
+    if type_str == "text":
+        return MediaType.text
+    elif type_str == "image":
+        return MediaType.image
+    elif type_str == "video":
+        return MediaType.video
+    else:
+        raise errors.MarqoError(f"Unspported type for {type_str}")
+
+def convert_to_FileType(type_str = "default") -> FileType:
+    #This can actually be a dictionary :(
+    if type_str == "default":
+        return FileType.default
+    elif type_str == "url":
+        return FileType.url
+    elif type_str == "www.youtube.com":
+        return FileType.youtube
+    elif type_str == "www.tiktok.com":
+        return FileType.tiktok
+    elif type_str == "local_path":
+        return FileType.local
+    elif type_str == "straight_text":
+        return FileType.straight_text
+    elif type_str == "ndarray":
+        return FileType.ndarray
+    elif type_str == "PILImage":
+        return FileType.PILImage
+    elif type_str == "ListOfPILImage":
+        return FileType.ListOfPILImage
+    else:
+        raise errors.MarqoError(f"Unsupported filetype for {type_str}")
+
+
+
+def get_filename_from_cd(cd):
+    """
+    Get filename from content-disposition
+    """
+    if not cd:
+        return None
+    fname = re.findall('filename=(.+)', cd)
+    if len(fname) == 0:
+        return None
+    return fname[0]
+
+def content_routering(field_content: Union[str, ImageType], download_path: str, infer_if_media: bool = True):
+    '''
+    Detect the mediatype and filetype of the input.
+
+    Args:
+        field_content: provided fiel_content in the document. Can be a str (for text, image and video), or a PILImage (for image).
+        download_path: a temp_directory to save the downloaded file. this directory will be removed automatically
+        infer_if_media: if False, urls and pointers will be treated as text
+
+    Returns:
+        The mediatype (video, image, text) and the filetype (pointer, url, straight_text)
+    '''
+    if isinstance(field_content, str):
+        if infer_if_media:
+            if validators.url(field_content):
+                try:
+                    downloaded_file = wget.download(field_content, out = download_path)
+                    file_type, encoding = mimetypes.guess_type(downloaded_file)
+                except:
+                    try:
+                        r = requests.get(field_content, stream = True, allow_redirects=True).raw
+                        downloaded_file = get_filename_from_cd(r.headers.get('content-disposition'))
+                        open(os.path.join(download_path, downloaded_file), 'wb').write(r.content)
+                        file_type, encoding = mimetypes.guess_type(downloaded_file)
+                    except:
+                        raise errors.MarqoWebError(f"The url {field_content} is not downloadable.")
+
+
+                if file_type:
+                    main_type = file_type.split("/")[0]
+                    return downloaded_file, convert_to_MediaType(main_type), convert_to_FileType()
+                else:
+                    raise errors.MarqoError(f"We can't recognize the Type of input url {field_content}")
+            elif os.path.isfile(field_content):
+                file_type, encoding = mimetypes.guess_type(field_content)
+                main_type = file_type.split("/")[0]
+                return field_content, convert_to_MediaType(main_type), FileType.local,
+            else:
+                return field_content, MediaType.text, FileType.straight_text
+
+        else:
+            return field_content, MediaType.text, FileType.straight_text
+
+    elif isinstance(field_content, ImageType):
+        return field_content, MediaType.image, FileType.PILImage
+    else:
+        raise errors.MarqoError(f"The input type {type(field_content)} is not supported.")
 def merge_dicts(base: dict, preferences: dict) -> dict:
     """Merges two dicts together. Fields in the base dict are overwritten by
     the preferences dict
@@ -177,6 +282,4 @@ def read_env_vars_and_defaults(var: str) -> Optional[str]:
             return configs.default_env_vars()[var]
         except KeyError:
             return None
-
-
 
