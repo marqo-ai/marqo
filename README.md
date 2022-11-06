@@ -211,7 +211,7 @@ results = mq.index("my-multimodal-index").search('https://upload.wikimedia.org/w
 ```
 
 ## Documentation
-The full documentation for Marqo can be found here [https://docs.marqo.ai//](https://docs.marqo.ai//).
+The full documentation for Marqo can be found here [https://docs.marqo.ai/](https://docs.marqo.ai/).
 
 ## Warning
 
