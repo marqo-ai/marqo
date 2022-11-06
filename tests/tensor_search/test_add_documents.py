@@ -811,6 +811,25 @@ class TestAddDocuments(MarqoTestCase):
             expected_ids={'789'}
         )
 
+    def test_put_document_override_non_tensor_field(self):
+        docs_ = [{"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}]
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs_, auto_refresh=True, non_tensor_fields=["Title"])
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs_, auto_refresh=True)
+        resp = tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="789", show_vectors=True)        
+
+        assert len(resp[enums.TensorField.tensor_facets]) == 1
+        assert enums.embedding in resp[enums.TensorField.tensor_facets][0]["Title"]
+        assert enums.embedding in resp[enums.TensorField.tensor_facets][0]["Description"]
+
+    def test_add_document_with_non_tensor_field(self):
+        docs_ = [{"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}]
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs_, auto_refresh=True, non_tensor_fields=["Title"])
+        resp = tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="789", show_vectors=True)        
+
+        assert len(resp[enums.TensorField.tensor_facets]) == 1
+        assert enums.embedding in resp[enums.TensorField.tensor_facets][0]["Title"]
+        assert enums.embedding not in resp[enums.TensorField.tensor_facets][0]["Description"]
+
     def test_put_no_update(self):
         tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[{'_id':'123'}],
                                     auto_refresh=True, update_mode='replace')
