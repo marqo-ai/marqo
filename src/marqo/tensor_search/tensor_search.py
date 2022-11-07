@@ -593,6 +593,38 @@ def get_document_by_id(
         return res
 
 
+def get_all_indexes(config: Config):
+    """returns all indexes in the cluster"""
+    res = HttpRequests(config).get(
+        path="_cat/indices?format=json"
+    )
+    return res
+
+
+def get_index_settings(config: Config, index_name: str):
+    """returns index settings"""
+    res = HttpRequests(config).get(
+        f'{index_name}/_settings'
+    )
+    return res
+
+
+def update_index_settings(config: Config, index_name: str, settings: Dict):
+    """updates index settings"""
+    res = HttpRequests(config).put(
+        f'{index_name}/_settings', body=settings
+    )
+    return res
+
+
+def split_index(config: Config, index_name: str, new_index_name: str, settings: Dict):
+    """splits index data shards into index with multiple of initial index shards"""
+    res = HttpRequests(config).post(
+        f'{index_name}/_split/{new_index_name}', body=settings
+    )
+    return res
+
+
 def get_documents_by_ids(
         config: Config, index_name: str, document_ids: List[str],
         show_vectors: bool = False,

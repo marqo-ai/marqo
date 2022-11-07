@@ -149,6 +149,7 @@ def add_or_update_documents(docs: List[Dict], index_name: str, refresh: bool = T
         batch_size=batch_size, processes=processes, device=device, update_mode='update'
     )
 
+
 @app.get("/indexes/{index_name}/documents/{document_id}")
 def get_document_by_id(index_name: str, document_id: str,
                              marqo_config: config.Config = Depends(generate_config),
@@ -177,6 +178,28 @@ def get_index_stats(index_name: str, marqo_config: config.Config = Depends(gener
     )
 
 
+@app.get("/indexes/{index_name}/_settings")
+def get_index_settings(index_name: str, marqo_config: config.Config = Depends(generate_config)):
+    return tensor_search.get_index_settings(
+        config=marqo_config, index_name=index_name
+    )
+
+
+@app.get("/indexes")
+def get_all_indexes(marqo_config: config.Config = Depends(generate_config)):
+    return tensor_search.get_all_indexes(
+        config=marqo_config
+    )
+
+
+@app.put("/indexes/{index_name}/_settings")
+def update_index_settings(index_name: str, settings: Dict,
+                          marqo_config: config.Config = Depends(generate_config)):
+    return tensor_search.update_index_settings(
+        config=marqo_config, index_name=index_name, settings=settings
+    )
+
+
 @app.delete("/indexes/{index_name}")
 def delete_index(index_name: str, marqo_config: config.Config = Depends(generate_config)):
     return tensor_search.delete_index(
@@ -190,6 +213,14 @@ def delete_docs(index_name: str, documentIds: List[str], refresh: bool = True,
     return tensor_search.delete_documents(
         index_name=index_name, config=marqo_config, doc_ids=documentIds,
         auto_refresh=refresh
+    )
+
+
+@app.post("/indexes/{index_name}/_split/{new_index_name}")
+def split_index(index_name: str, new_index_name: str, settings: Dict,
+                marqo_config: config.Config = Depends(generate_config)):
+    return tensor_search.split_index(
+        config=marqo_config, index_name=index_name, new_index_name=new_index_name, settings=settings
     )
 
 
