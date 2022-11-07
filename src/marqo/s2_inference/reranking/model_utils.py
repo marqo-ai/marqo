@@ -351,7 +351,10 @@ def _predict_owl(model, processed_inputs, post_process_function, size):
     with torch.no_grad():
         #print(processed_inputs.device, model.device)
         print(model.device)
-        outputs = model(**processed_inputs)#.to('cpu')
+        outputs = model(**processed_inputs)
+        # there is a bug in the hf code https://github.com/huggingface/transformers/blob/v4.24.0/src/transformers/models/owlvit/feature_extraction_owlvit.py#L140
+        outputs.logits = outputs.logits.to('cpu')
+        outputs.pred_boxes = outputs.pred_boxes.to('cpu')
         print("####################################################")
         # Target image sizes (height, width) to rescale box predictions [batch_size, 2]
         target_sizes = torch.Tensor([size[::-1]])
