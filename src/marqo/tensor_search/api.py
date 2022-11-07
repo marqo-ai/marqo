@@ -178,7 +178,7 @@ def get_index_stats(index_name: str, marqo_config: config.Config = Depends(gener
     )
 
 
-@app.get("/indexes/{index_name}/_settings")
+@app.get("/indexes/{index_name}/settings")
 def get_index_settings(index_name: str, marqo_config: config.Config = Depends(generate_config)):
     return tensor_search.get_index_settings(
         config=marqo_config, index_name=index_name
@@ -192,7 +192,7 @@ def get_all_indexes(marqo_config: config.Config = Depends(generate_config)):
     )
 
 
-@app.put("/indexes/{index_name}/_settings")
+@app.put("/indexes/{index_name}/settings")
 def update_index_settings(index_name: str, settings: Dict,
                           marqo_config: config.Config = Depends(generate_config)):
     return tensor_search.update_index_settings(
@@ -216,7 +216,7 @@ def delete_docs(index_name: str, documentIds: List[str], refresh: bool = True,
     )
 
 
-@app.post("/indexes/{index_name}/_split/{new_index_name}")
+@app.post("/indexes/{index_name}/split/{new_index_name}")
 def split_index(index_name: str, new_index_name: str, settings: Dict,
                 marqo_config: config.Config = Depends(generate_config)):
     return tensor_search.split_index(
