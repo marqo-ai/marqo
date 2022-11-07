@@ -38,7 +38,7 @@ def vectorise(model_name: str, content: Union[str, List[str]], model_properties:
 
     try:
         vectorised = available_models[model_cache_key].encode(content, normalize=normalize_embeddings, **kwargs)
-        print(vectorised)
+
     except UnidentifiedImageError as e:
         raise VectoriseError from e
 
@@ -267,13 +267,12 @@ def _load_model(model_name: str, model_properties: dict, device: str = get_defau
     """
 
     loader = _get_model_loader(model_name, model_properties)
-
     endpoint_url = model_properties.get('endpoint_url', None)
     api_token = model_properties.get('api_token', None)
     embedding_dim = model_properties['dimensions']
     max_sequence_length = model_properties.get('tokens', get_default_seq_length())
 
-    if isinstance(loader, HF_ENDPOINT):
+    if loader == HF_ENDPOINT:
         model = loader(model_name, device=device, endpoint_url=endpoint_url, api_token=api_token, embedding_dim=embedding_dim,
                         max_seq_length=max_sequence_length)
     else:

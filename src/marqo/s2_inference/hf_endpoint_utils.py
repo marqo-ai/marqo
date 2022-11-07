@@ -15,10 +15,13 @@ class HF_ENDPOINT(Model):
         super().__init__(*args, **kwargs)
 
     def load(self) -> None:
-        # print("loaded")
+
         pass
 
     def encode(self, sentence: Union[str, List[str]], normalize=True, **kwargs) -> Union[FloatTensor, np.ndarray]:
+        if isinstance(sentence, str):
+            sentence = [sentence]
+
         headers = {'Authorization': f'Bearer {self.api_token}'}
 
         json_data = {"inputs": sentence}
@@ -28,4 +31,6 @@ class HF_ENDPOINT(Model):
             headers=headers,
             json=json_data
         )
+
+        return res.json()['embeddings']
 
