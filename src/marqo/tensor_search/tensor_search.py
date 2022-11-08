@@ -511,6 +511,10 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                 if (params.doc_fields.contains(ctx._source.{TensorField.chunks}[i].{TensorField.field_name})) {{
                    ctx._source.{TensorField.chunks}.remove(i);
                 }}
+                // Check if the field should have a tensor, remove if not.
+                if (params.non_tensor_fields.contains(ctx._source.{TensorField.chunks}[i].{TensorField.field_name})) {{
+                    ctx._source.{TensorField.chunks}.remove(i);
+                }}
             }}
             
             // update the chunks, setting fields to the new data
@@ -535,6 +539,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                             "doc_fields": list(copied.keys()),
                             "new_chunks": chunks,
                             "customer_dict": copied,
+                            "non_tensor_fields": non_tensor_fields
                         },
                     }
                 })
