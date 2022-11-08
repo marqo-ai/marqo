@@ -55,6 +55,13 @@ import marqo
 
 mq = marqo.Client(url='http://localhost:8882')
 
+# Delete index if it exists (to avoid duplicate documents)
+try:
+    mq.index("my-first-index").delete()
+except:
+    print("my-first-index doesn't exist yet. creating it.")
+
+# Add documents to the index
 mq.index("my-first-index").add_documents([
     {
         "Title": "The Travels of Marco Polo",

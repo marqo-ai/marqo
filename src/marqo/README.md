@@ -2,7 +2,19 @@
 Thank you for contributing to Marqo! Contributions from the open source community help make Marqo be the tensor engine
 you want. 
 
-### A. Run the Marqo application locally (outside of docker):
+Before starting, clone the github repo
+```
+git clone https://github.com/marqo-ai/marqo.git
+```
+and install marqo dependencies
+```
+cd marqo
+pip install -r requirements.txt
+```
+
+## Select an option (from A-E) to get set up. In most cases, Option A is recommended. 
+
+### Option A. Run the Marqo application locally (outside of docker):
 
 1. Have a running Marqo-OS instance available to use. You can spin up a local instance with the following command
 (if you are using an arm64 machine, replace `marqoai/marqo-os:0.0.2` with `marqoai/marqo-os:0.0.2-arm`):
@@ -15,17 +27,18 @@ docker run --name marqo-os -id -p 9200:9200 -p 9600:9600 -e "discovery.type=sing
 ```bash
 # if you are running Marqo-OS locally: 
 export OPENSEARCH_URL="https://localhost:9200" && 
-    export PYTHONPATH="${PYTHONPATH}:<YOUR ABSOULTE PATH TO>/marqo/src" &&
+    export PYTHONPATH="${PYTHONPATH}:<YOUR ABSOLUTE PATH TO>/marqo/src" &&
     uvicorn api:app --host 0.0.0.0 --port 8882 --reload
 ```
 __Notes__:
 
 - This is for marqo-os (Marqo OpenSearch) running locally. You can alternatively set
 `OPENSEARCH_URL` to  a remote Marqo OpenSearch cluster 
-- To find the absolute path to the `marqo/src` directory, `cd` into the `marqo/src` directory and run `pwd` in your terminal
+- To find the absolute path to the `marqo/src` directory, `cd` into the `marqo/src` directory and run `pwd` in your terminal.
+- If python library errors occur, try `root/.../marqo/src` instead of `~/.../marqo/src`
 
 
-### B. Build and run the Marqo as a Docker container, that creates and manages its own internal Marqo-OS 
+### Option B. Build and run the Marqo as a Docker container, that creates and manages its own internal Marqo-OS 
 1. `cd` into the marqo root directory
 2. Run the following command:
 ```bash
@@ -34,7 +47,7 @@ docker rm -f marqo &&
      docker run --name marqo --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqo_docker_0
 ```
 
-### C. Build and run the Marqo as a Docker container, connecting to Marqo-OS which is running on the host:
+### Option C. Build and run the Marqo as a Docker container, connecting to Marqo-OS which is running on the host:
 1. Run the following command to run Marqo-OS (if you are using an arm64 machine, replace `marqoai/marqo-os:0.0.2` with `marqoai/marqo-os:0.0.2-arm`):
 ```bash
 docker run --name marqo-os -id -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" marqoai/marqo-os:0.0.2
@@ -53,20 +66,20 @@ __Notes__:
 
 - This is for marqo-os (Marqo OpenSearch) running locally. You can alternatively set
 `OPENSEARCH_URL` to  a remote Marqo OpenSearch cluster 
-### D. Pull marqo from `hub.docker.com` and run it
+### Option D. Pull marqo from `hub.docker.com` and run it
 ```
 docker rm -f marqo &&
     docker run --name marqo --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:0.0.7
 ```
 
-### E. Run marqo on arm64 (including M-series Macs) for development
+### Option E. Run marqo on arm64 (including M-series Macs) for development
 
 1. Run marqo-os,
 ```
 docker run --name marqo-os -id -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" marqoai/marqo-os:0.0.2-arm 
 ```
 
-2. Clone the Marqo github repo,
+2. Clone the Marqo github repo (if not already done),
 ```
 git clone https://github.com/marqo-ai/marqo.git
 ```
@@ -134,6 +147,26 @@ $ sudo apt-get update
 $ sudo apt-get install -y nvidia-docker2
 ```
 Once this is installed, one of the previous Docker commands can be run (either step B., C., or D.).
+
+### Using Marqo on an AWS machine
+1. Install docker
+
+To install Docker (through terminal) go to the [Official Docker Website](https://docs.docker.com/engine/install/ubuntu/)
+
+2. Set up SSH Config (to stop timeouts)
+
+Edit the SSH config file with `nano ~/.ssh/config` then insert the line: `ServerAliveInterval 50`
+
+3. Run marqo-os
+```
+sudo docker rm -f marqo-os; sudo docker run -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" marqoai/marqo-os:0.0.2-arm
+```
+
+4. Run marqo with a set OPENSEARCH_URL
+```
+sudo docker rm -f marqo; sudo docker run --name marqo -it --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway -e "OPENSEARCH_URL=https://localhost:9200" marqoai/marqo:0.0.6
+```
+
 
 #### Troubleshooting
 ##### Drivers
