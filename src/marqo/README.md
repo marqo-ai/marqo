@@ -2,15 +2,6 @@
 Thank you for contributing to Marqo! Contributions from the open source community help make Marqo be the tensor engine
 you want. 
 
-Before starting, clone the github repo
-```
-git clone https://github.com/marqo-ai/marqo.git
-```
-and install marqo dependencies
-```
-cd marqo
-pip install -r requirements.txt
-```
 
 ## Select an option (from A-E) to get set up. In most cases, Option A is recommended. 
 
@@ -22,8 +13,18 @@ pip install -r requirements.txt
 docker run --name marqo-os -id -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" marqoai/marqo-os:0.0.2
 ```
 
-2. `cd` into `src/marqo/tensor_search`
-3. Run the following command:
+2. Clone the github repo
+```
+git clone https://github.com/marqo-ai/marqo.git
+```
+3. Install marqo dependencies
+```
+cd marqo
+pip install -r requirements.txt
+```
+
+4. `cd` into `src/marqo/tensor_search`
+5. Run the following command:
 ```bash
 # if you are running Marqo-OS locally: 
 export OPENSEARCH_URL="https://localhost:9200" && 
@@ -148,7 +149,9 @@ $ sudo apt-get install -y nvidia-docker2
 ```
 Once this is installed, one of the previous Docker commands can be run (either step B., C., or D.).
 
-### Using Marqo on an AWS machine
+### Using Marqo on an AWS EC2 machine
+#### (Note: This is not recommended for production use cases.)
+
 1. Install docker
 
 To install Docker (through terminal) go to the [Official Docker Website](https://docs.docker.com/engine/install/ubuntu/)
@@ -162,7 +165,7 @@ Edit the SSH config file with `nano ~/.ssh/config` then insert the line: `Server
 sudo docker rm -f marqo-os; sudo docker run -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" marqoai/marqo-os:0.0.2-arm
 ```
 
-4. Run marqo with a set OPENSEARCH_URL
+4. Run marqo with a set `OPENSEARCH_URL`
 ```
 sudo docker rm -f marqo; sudo docker run --name marqo -it --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway -e "OPENSEARCH_URL=https://localhost:9200" marqoai/marqo:0.0.6
 ```
