@@ -118,16 +118,23 @@ def chunk_image(image: Union[str, ImageType], device: str,
     return patch.patches,patch.bboxes_orig
 
 class PatchifySimple:
-    """class to do the patching
+    """class to do the patching. this one creates non-pverlapping boixes and chunks the image
     """
-    def __init__(self, size=(512, 512), hn=3, wn=3, overlap=False, **kwargs):
+    def __init__(self, size: Tuple = (512, 512), hn: int = 3, wn: int = 3, overlap: bool = False, **kwargs):
+        """_summary_
 
+        Args:
+            size (Tuple, optional): _description_. Defaults to (512, 512).
+            hn (int, optional): _description_. Defaults to 3.
+            wn (int, optional): _description_. Defaults to 3.
+            overlap (bool, optional): _description_. Defaults to False.
+        """\
         self.size = size
         self.hn = hn
         self.wn = wn
         self.overlap = overlap
 
-    def infer(self, image):
+    def infer(self, image: Union[str, ImageType]):
 
         self.image = format_and_load_CLIP_image(image)
         self.original_size = self.image.size
@@ -146,12 +153,23 @@ class PatchifySimple:
 
 
 class PatchifyModel:
-    """class to do the patching
+    """class to do the patching. this is the base class for model based chunking
     """
-    def __init__(self, device='cpu', size=(224, 224), min_area = 60*60, 
-                nms=True, replace_small=True, top_k=10, 
-                filter_bb=True, min_area_replace = 60*60, **kwargs):
+    def __init__(self, device: str = 'cpu', size: Tuple = (224, 224), min_area: float = 60*60, 
+                nms: bool = True, replace_small: bool = True, top_k: int = 10, 
+                filter_bb: bool = True, min_area_replace: float = 60*60, **kwargs):
+        """_summary_
 
+        Args:
+            device (str, optional): _description_. Defaults to 'cpu'.
+            size (Tuple, optional): _description_. Defaults to (224, 224).
+            min_area (float, optional): _description_. Defaults to 60*60.
+            nms (bool, optional): _description_. Defaults to True.
+            replace_small (bool, optional): _description_. Defaults to True.
+            top_k (int, optional): _description_. Defaults to 10.
+            filter_bb (bool, optional): _description_. Defaults to True.
+            min_area_replace (float, optional): _description_. Defaults to 60*60.
+        """
         self.scores = []
 
         # this is the resized size 
@@ -229,7 +247,6 @@ class PatchifyModel:
         if self.nms:
             if len(self.boxes_xyxy) > 1:
                 logger.info(f"doing nms for {len(self.boxes_xyxy)} {self.n_postfilter} boxes...")
-                #print(self.scores.shape, len(self.boxes_xyxy))
                 self.scores_pt = torch.tensor(self.scores, dtype=torch.float32)
                 
                 self.inds = torchvision.ops.nms(torch.tensor(self.boxes_xyxy, dtype=torch.float32), 
@@ -261,7 +278,6 @@ class PatchifyModel:
         self._nms_bb()
         self._keep_top_k()
 
-
         # we add the original unchanged so that it is always in the index
         # the bb of the original also provides the size which is required for later processing
         self.bboxes = [(0,0,self.size[0],self.size[1])] + self.boxes_xyxy
@@ -272,7 +288,7 @@ class PatchifyModel:
 
 
 class PatchifyViT(PatchifyModel):
-    """class to do the patching
+    """class to do the patching for an attention based model
     """
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
@@ -296,7 +312,6 @@ class PatchifyViT(PatchifyModel):
                             self.patch_size, device=self.device)
 
         self.attentions_processed = self._process_attention(self.attentions, method=self.attention_method)
-        # TODO try each and maybe a then some nms? or box merging?
         
         self.boxes_xyxy = []
         for attention in self.attentions_processed:
@@ -309,7 +324,6 @@ class PatchifyViT(PatchifyModel):
         if len(self.boxes_xyxy) > 0:        
             self.scores = calc_area(self.boxes_xyxy, self.size)
         
-
     @staticmethod
     def _process_attention(attentions: ndarray, method: str = "abs") -> List[ndarray]:
 
@@ -324,105 +338,8 @@ class PatchifyViT(PatchifyModel):
         else:
             raise TypeError(f"unknown method of {method}")
 
-
-# class PatchifyViT(Patchify):
-#     """class to do the patching
-#     """
-#     def __init__(self, device='cpu', size=(224, 224), filter_bb=True, 
-#                     attention_method='abs', min_area = 40*40, nms=True, 
-#                     replace_small=True):
-
-#         self.size = size
-#         self.device = device
-#         self.input_shape = (224, 224)
-#         self.model_name = "vit_small"
-#         self.patch_size = 16
-#         self.attention_method = attention_method
-#         self.min_area = min_area
-#         self.nms = nms
-#         self.replace_small = replace_small
-#         self.top_k = 10
-
-#         model_type = (self.model_name, device)
-
-#         if model_type not in available_models:
-#             logger.info(f"loading model {model_type}")
-#             if model_type[0] in ['vit_small', 'vit_base']:
-#                 func = _load_DINO_model
-#             else:
-#                 raise TypeError(f"wrong model for {model_type}")
-
-#             self.model, self.preprocess = func(self.model_name, self.patch_size, self.device)
-
-#             available_models[model_type] = (self.model, self.preprocess)
-#         else:
-#             self.model, self.preprocess = available_models[model_type]
-
-#         self.filter_bb = filter_bb
-
-#     def infer(self, image):
-
-#         self.image, self.image_pt, self.original_size = load_rcnn_image(image, size=self.size)
-        
-#         self.attentions = DINO_inference(self.model, self.preprocess, self.image, 
-#                             self.patch_size, device=self.device)
-
-#     @staticmethod
-#     def _process_attention(attentions: ndarray, method: str = "abs") -> List[ndarray]:
-
-#         if method.startswith('abs'):
-#             return np.abs(attentions).mean(0)[np.newaxis, ...]
-
-#         elif method.startswith('pos'):
-#             attentions_copy = attentions[:]
-#             attentions_copy[attentions<0] = 0
-#             return attentions_copy
-
-#         else:
-#             raise TypeError(f"unknown method of {method}")
-
-        
-#     def process(self):
-
-#         self.attentions_processed = self._process_attention(self.attentions, method=self.attention_method)
-#         # TODO try each and maybe a then some nms? or box merging?
-        
-#         self.boxes_xyxy = []
-#         for attention in self.attentions_processed:
-#             self.boxes_xyxy += attention_to_bboxs(attention)
-
-#         if self.filter_bb:
-#             self.inds = filter_boxes(self.boxes_xyxy, min_area = self.min_area)
-#             self.boxes_xyxy = [bb for ind,bb in enumerate(self.boxes_xyxy) if ind in self.inds]
-#             # TODO update this
-#             # self.boxes_xyxy = replace_small_boxes(self.boxes_xyxy, min_area=40*40, new_size=(80,80))
-        
-#         if self.replace_small:
-#             if len(self.boxes_xyxy):
-#                 self.boxes_xyxy = replace_small_boxes(self.boxes_xyxy, min_area=40*40, 
-#                                 new_size=(100,100))
-#                 self.boxes_xyxy = clip_boxes(self.boxes_xyxy, 0, 0, self.size[0], self.size[1])
-
-#         if self.nms:
-#             if len(self.boxes_xyxy) > 0:
-#                 self.areas = torch.tensor(calc_area(self.boxes_xyxy, self.input_shape), dtype=torch.float32)
-#                 self.inds = torchvision.ops.nms(torch.tensor(self.boxes_xyxy, dtype=torch.float32), 1 - self.areas, 0.6)
-#                 self.boxes_xyxy =  [self.boxes_xyxy[ind] for ind in self.inds]
-
-#         if self.top_k is not None:
-#             self.boxes_xyxy = _keep_topk(self.boxes_xyxy, k=self.top_k)
-
-#         # we add the original unchanged so that it is always in the index
-#         # the bb of the original also provides the size which is required for later processing
-#         self.bboxes = [(0,0,self.size[0],self.size[1])] + self.boxes_xyxy
-#         #print(self.bboxes)
-#         self.patches = patchify_image(self.image, self.bboxes)
-
-#         self.bboxes_orig = [rescale_box(bb, self.size, self.original_size) for bb in self.bboxes]
-
-
 class PatchifyPytorch(PatchifyModel):
-    """class to do the patching
+    """class to do the patching for a pytorch based object detector
     """
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
@@ -463,7 +380,7 @@ class PatchifyPytorch(PatchifyModel):
     
 
 class PatchifyYolox(PatchifyModel):
-    """class to do the patching
+    """class to do the patching for a onnx yolox model
     """
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)

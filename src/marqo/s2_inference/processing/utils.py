@@ -17,6 +17,11 @@ Misc functions.
 Mostly copy-paste from torchvision references or other public repos like DETR:
 https://github.com/facebookresearch/detr/blob/master/util/misc.py
 """
+"""
+Marqo: This is copy-pasted without modification apart from this message 
+from this repo https://github.com/facebookresearch/dino
+"""
+
 import os
 import sys
 import time

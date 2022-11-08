@@ -7,14 +7,28 @@ from PIL import Image
 import cv2
 
 from marqo.s2_inference.s2_inference import get_logger
-from marqo.s2_inference.types import Dict, List, Union, ImageType, Tuple, FloatTensor, ndarray
+from marqo.s2_inference.types import Dict, List, Union, ImageType, Tuple, FloatTensor, ndarray, Any
 
 logger = get_logger('DINO')
 
 
-def _load_DINO_model(arch, device, patch_size=None):
-    # arch -> ['vit_tiny', 'vit_small', 'vit_base']
-    # build model
+def _load_DINO_model(arch: str, device: str, patch_size=None) -> Tuple[Any, Any]:
+    """ loads a vit dino model
+       # arch -> ['vit_tiny', 'vit_small', 'vit_base']
+    Args:
+        arch (str): _description_
+        device (str): _description_
+        patch_size (_type_, optional): _description_. Defaults to None.
+
+    Raises:
+        KeyError: _description_
+        KeyError: _description_
+        RuntimeError: _description_
+
+    Returns:
+        Tuple[Any, Any]: _description_
+    """
+  
 
     allowed_archs = ('vit_small', 'vit_base')
     allowed_patches = (8, 16)
@@ -47,7 +61,15 @@ def _load_DINO_model(arch, device, patch_size=None):
 
     return model, _get_DINO_transform()
 
-def _get_DINO_transform(image_size=(224, 224)):
+def _get_DINO_transform(image_size: Tuple = (224, 224)) -> Any:
+    """gets the preprocessing transform for dino models
+
+    Args:
+        image_size (Tuple, optional): _description_. Defaults to (224, 224).
+
+    Returns:
+        Any: _description_
+    """
     return pth_transforms.Compose([
     pth_transforms.Resize(image_size),
     pth_transforms.ToTensor(),
@@ -55,8 +77,20 @@ def _get_DINO_transform(image_size=(224, 224)):
     ])
 
 
-def DINO_inference(model, transform, img=None, patch_size=None, device="cpu"):
+def DINO_inference(model: Any, transform: Any, img: ImageType = None, 
+                        patch_size: int = None, device: str = "cpu") -> FloatTensor:
+    """runs inference for a model, transform and image
 
+    Args:
+        model (Any): _description_
+        transform (Any): _description_
+        img (ImageType, optional): _description_. Defaults to None.
+        patch_size (int, optional): _description_. Defaults to None.
+        device (str, optional): _description_. Defaults to "cpu".
+
+    Returns:
+        FloatTensor: _description_
+    """
     
     img = transform(img)
 
@@ -80,25 +114,44 @@ def DINO_inference(model, transform, img=None, patch_size=None, device="cpu"):
 
     return attentions
 
+# def PIL_to_cv2(pil_image: ImageType) -> ndarray:
+#     """switches between PIL and cv2 -  assumes BGR for cv2
 
-def PIL_to_cv2(pil_image):
-    open_cv_image = np.array(pil_image) 
-    # Convert RGB to BGR 
-    return open_cv_image[:, :, ::-1]
+#     Args:
+#         pil_image (ImageType): _description_
 
-def _rescale_image(image):
-    
+#     Returns:
+#         ndarray: _description_
+#     """
+#     open_cv_image = np.array(pil_image) 
+#     # Convert RGB to BGR 
+#     return open_cv_image[:, :, ::-1]
+
+def _rescale_image(image: ndarray) -> ndarray:
+    """rescales the image to be between 0-255
+        assumes positive values as it does not correct a bias
+
+    Args:
+        image (ndarray): _description_
+
+    Returns:
+        ndarray: _description_
+    """
     image /= image.max()
     image *= 255
     image = image.astype(np.uint8)
-    #dtype=np.uint8
     return image
 
-def combine_boxes(boxes):
-    pass
 
-def attention_to_bboxs(image):
-    
+def attention_to_bboxs(image: ImageType) -> List[Tuple]:
+    """turns attention maps into classless bounding boxes
+
+    Args:
+        image (ImageType): _description_
+
+    Returns:
+        List[Tuple]: _description_
+    """
     image = _rescale_image(image)
     backtorgb = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
     gray = cv2.cvtColor(backtorgb, cv2.COLOR_BGR2GRAY)
@@ -118,25 +171,3 @@ def attention_to_bboxs(image):
         bboxes.append(box)
 
     return bboxes
-
-# if __name__ == "__main__":
-#     image_name = "/Users/jesseclark/Downloads/IMG_20210507_195425.jpg"
-#     patch_size = 8
-# /home/jesse/code/stable-diffusion/scripts/data/hot-dog-100k/a_photo_with_a_hotdog_on_a_plate_taken_from_above_and_in_the_centerb0473c6d-101a-43ad-b9f9-975711c6ddbe.jpg
-#     model = _load_DINO_model("vit_small", patch_size, "cpu")
-
-#     image = Image.open(image_name) #PIL_to_cv2()
-
-#     attentions = DINO_inference(model, image, patch_size, image_size=(224,224), device="cpu")
-
-#     bboxes = attention_to_bboxs(np.abs(attentions).mean(0))
-
-# image_box = np.array(image.resize((224,224)))
-# for box in bboxes:
-    
-#     x1, y1, x2, y2 = box
-#     cv2.rectangle(image_box, (x1, y1), (x2, y2), (36,255,12), 2)
-
-# #cv2.imshow('thresh', thresh)
-# cv2.imshow('image', image)
-# # cv2.waitKey()

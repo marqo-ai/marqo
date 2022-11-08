@@ -349,22 +349,18 @@ def _predict_owl(model, processed_inputs, post_process_function, size):
         _type_: _description_
     """
     with torch.no_grad():
-        #print(processed_inputs.device, model.device)
-        print(model.device)
         outputs = model(**processed_inputs)
         # there is a bug in the hf code https://github.com/huggingface/transformers/blob/v4.24.0/src/transformers/models/owlvit/feature_extraction_owlvit.py#L140
         outputs.logits = outputs.logits.to('cpu')
         outputs.pred_boxes = outputs.pred_boxes.to('cpu')
-        print("####################################################")
         # Target image sizes (height, width) to rescale box predictions [batch_size, 2]
         target_sizes = torch.Tensor([size[::-1]])
         # Convert outputs (bounding boxes and class logits) to COCO API
         results = post_process_function(outputs=outputs, target_sizes=target_sizes)
-        print(results)
         return results
 
-def process_owl_results(results: Dict) -> List:
-    """_summary_
+def process_owl_results(results: List) -> List:
+    """wrapper for processing a list of resultsd from owl-vit
 
     Args:
         results (_type_): _description_
@@ -379,7 +375,15 @@ def process_owl_results(results: Dict) -> List:
     return rezs
 
 def _process_owl_result(result: List[Dict], identifier: str) -> Tuple[List, List, List]:
-    # process indiviudal result
+    """post-process the owl-vit results
+
+    Args:
+        result (List[Dict]): _description_
+        identifier (str): _description_
+
+    Returns:
+        Tuple[List, List, List]: _description_
+    """
     boxes, scores, _ = result[0]["boxes"], result[0]["scores"], result[0]["labels"]
  
     boxes_round = []

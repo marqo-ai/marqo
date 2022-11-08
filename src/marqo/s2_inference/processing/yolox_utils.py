@@ -7,14 +7,23 @@ import torchvision
 import onnxruntime
 
 from marqo.s2_inference.s2_inference import get_logger
-from marqo.s2_inference.types import Dict, List, Union, ImageType, Tuple, FloatTensor, ndarray
+from marqo.s2_inference.types import Dict, List, Union, ImageType, Tuple, FloatTensor, ndarray, Callable
 
 from marqo.s2_inference.processing.image_utils import _get_onnx_provider
 
 logger = get_logger("image_yolox_utils")
 
-def preprocess_yolox(img, input_size, swap=(2, 0, 1)):
+def preprocess_yolox(img: ndarray, input_size: Tuple, swap: Tuple = (2, 0, 1)) -> Tuple[ndarray, float]:
+    """prepares an image for yolox inference
 
+    Args:
+        img (ndarray): _description_
+        input_size (Tuple): _description_
+        swap (Tuple, optional): _description_. Defaults to (2, 0, 1).
+
+    Returns:
+        Tuple[ndarray, float]: _description_
+    """
     if len(img.shape) == 3:
         padded_img = np.ones((input_size[0], input_size[1], 3), dtype=np.uint8) * 114
     else:
@@ -33,7 +42,15 @@ def preprocess_yolox(img, input_size, swap=(2, 0, 1)):
     return padded_img, r
 
 def load_yolox_onnx(model_name: str, device: str) -> Tuple[onnxruntime.InferenceSession, preprocess_yolox]:
+    """_summary_
 
+    Args:
+        model_name (str): _description_
+        device (str): _description_
+
+    Returns:
+        Tuple[onnxruntime.InferenceSession, preprocess_yolox]: _description_
+    """
     fast_onnxprovider = _get_onnx_provider(device)
 
     session = onnxruntime.InferenceSession(model_name, providers=[fast_onnxprovider])
@@ -41,8 +58,17 @@ def load_yolox_onnx(model_name: str, device: str) -> Tuple[onnxruntime.Inference
 
     return session, preprocess
 
-def demo_postprocess(outputs, img_size, p6=False):
+def demo_postprocess(outputs: ndarray, img_size: Tuple[int, int], p6: bool = False) -> ndarray:
+    """yolox post processing function
 
+    Args:
+        outputs (ndarray): _description_
+        img_size (Tuple[int, int]): _description_
+        p6 (bool, optional): _description_. Defaults to False.
+
+    Returns:
+        ndarray: _description_
+    """
     grids = []
     expanded_strides = []
 
@@ -68,8 +94,19 @@ def demo_postprocess(outputs, img_size, p6=False):
 
     return outputs
 
-def _infer_yolox(session, preprocess, opencv_image, input_shape):
+def _infer_yolox(session: onnxruntime.InferenceSession, preprocess: preprocess_yolox, 
+                    opencv_image: ndarray, input_shape: Tuple[int, int]) -> Tuple[ndarray, float]:
+    """inference for onnx yolox
 
+    Args:
+        session (onnxruntime.InferenceSession): _description_
+        preprocess (preprocess_yolox): _description_
+        opencv_image (ndarray): _description_
+        input_shape (Tuple[int, int]): _description_
+
+    Returns:
+        Tuple[ndarray, float]: _description_
+    """
     img, ratio = preprocess(opencv_image, input_shape)
 
     ort_inputs = {session.get_inputs()[0].name: img[None, :, :, :]}
@@ -77,8 +114,17 @@ def _infer_yolox(session, preprocess, opencv_image, input_shape):
 
     return output, ratio
 
-def _process_yolox(output, ratio, size=(384, 384)):
+def _process_yolox(output: ndarray, ratio: float, size: Tuple = (384, 384)) -> Tuple[ndarray, ndarray]:
+    """takes the outputs and processes them 
 
+    Args:
+        output (ndarray): _description_
+        ratio (float): _description_
+        size (Tuple, optional): _description_. Defaults to (384, 384).
+
+    Returns:
+        Tuple[ndarray, ndarray]: _description_
+    """
     predictions = demo_postprocess(output[0], size)[0]
     boxes = predictions[:, :4]
     scores = predictions[:, 4:5] 

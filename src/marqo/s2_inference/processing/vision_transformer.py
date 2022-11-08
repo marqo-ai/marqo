@@ -15,6 +15,11 @@
 Mostly copy-paste from timm library.
 https://github.com/rwightman/pytorch-image-models/blob/master/timm/models/vision_transformer.py
 """
+"""
+Marqo: This is copy-pasted without modification apart from this message 
+from this repo https://github.com/facebookresearch/dino
+"""
+
 import math
 from functools import partial
 
