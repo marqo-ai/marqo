@@ -221,13 +221,14 @@ def _check_and_create_index_if_not_exist(config: Config, index_name: str):
 def add_documents_orchestrator(
         config: Config, index_name: str, docs: List[dict],
         auto_refresh: bool, batch_size: int = 0, processes: int = 1,
+        non_tensor_fields: List[str] = [],
         device=None, update_mode: str = 'replace'):
 
     if batch_size is None or batch_size == 0:
         logger.info(f"batch_size={batch_size} and processes={processes} - not doing any marqo side batching")
         return add_documents(
             config=config, index_name=index_name, docs=docs, auto_refresh=auto_refresh,
-            device=device, update_mode=update_mode
+            device=device, update_mode=update_mode, non_tensor_fields=non_tensor_fields
         )
     elif processes is not None and processes > 1:
 
@@ -238,9 +239,9 @@ def add_documents_orchestrator(
         results = parallel.add_documents_mp(
             config=config, index_name=index_name, docs=docs,
             auto_refresh=auto_refresh, batch_size=batch_size, processes=processes,
-            device=device, update_mode=update_mode
+            device=device, update_mode=update_mode, non_tensor_fields=non_tensor_fields
         )
-        
+
         # we need to force the cache to update as it does not propagate using mp
         # we just clear this index's entry and it will re-populate when needed next
         if index_name in get_cache():
@@ -312,7 +313,7 @@ def _infer_opensearch_data_type(
 
 
 def add_documents(config: Config, index_name: str, docs: List[dict], auto_refresh: bool,
-                  device=None, update_mode: str = "replace"):
+                  non_tensor_fields: List[str] = [], device=None, update_mode: str = "replace"):
     """
 
     Args:
@@ -320,6 +321,8 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
         index_name: name of the index
         docs: List of documents
         auto_refresh: Set to False if indexing lots of docs
+        non_tensor_fields: List of fields, within documents to not create tensors for. Default to
+          make tensors for all fields.
         device: Device used to carry out the document update.
         update_mode: {'replace' | 'update'}. If set to replace (default) just
 
@@ -397,6 +400,10 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
             if field not in existing_fields:
                 new_fields_from_doc.add((field, _infer_opensearch_data_type(copied[field])))
+
+            # Don't process text/image fields when explicitly told not to.
+            if field in non_tensor_fields:
+                continue
 
             # TODO put this into a function to determine routing
             if isinstance(field_content, (str, Image.Image)):
@@ -504,6 +511,10 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                 if (params.doc_fields.contains(ctx._source.{TensorField.chunks}[i].{TensorField.field_name})) {{
                    ctx._source.{TensorField.chunks}.remove(i);
                 }}
+                // Check if the field should have a tensor, remove if not.
+                else if (params.non_tensor_fields.contains(ctx._source.{TensorField.chunks}[i].{TensorField.field_name})) {{
+                    ctx._source.{TensorField.chunks}.remove(i);
+                }}
             }}
             
             // update the chunks, setting fields to the new data
@@ -528,6 +539,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                             "doc_fields": list(copied.keys()),
                             "new_chunks": chunks,
                             "customer_dict": copied,
+                            "non_tensor_fields": non_tensor_fields
                         },
                     }
                 })
