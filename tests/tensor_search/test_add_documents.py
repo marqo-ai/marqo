@@ -955,3 +955,68 @@ class TestAddDocuments(MarqoTestCase):
                 assert items[0]['result'] in ['created', 'updated']
                 return True
             assert run()
+
+    def test_no_tensor_field_replace(self):
+        # test replace and update workflows
+        tensor_search.add_documents(
+            self.config,
+            docs=[{"_id": "123", "myfield": "mydata", "myfield2": "mydata2"}],
+            auto_refresh=True, index_name=self.index_name_1
+        )
+        tensor_search.add_documents(
+            self.config,
+            docs=[{"_id": "123", "myfield": "mydata"}],
+            auto_refresh=True, index_name=self.index_name_1,
+            non_tensor_fields=["myfield"]
+        )
+        doc_w_facets = tensor_search.get_document_by_id(
+            self.config, index_name=self.index_name_1, document_id='123', show_vectors=True)
+        assert doc_w_facets[TensorField.tensor_facets] == []
+        assert 'myfield2' not in doc_w_facets
+
+    def test_no_tensor_field_update(self):
+        # test replace and update workflows
+        tensor_search.add_documents(
+            self.config,
+            docs=[{"_id": "123", "myfield": "mydata", "myfield2": "mydata2"}],
+            auto_refresh=True, index_name=self.index_name_1
+        )
+        tensor_search.add_documents(
+            self.config,
+            docs=[{"_id": "123", "myfield": "mydata"}],
+            auto_refresh=True, index_name=self.index_name_1,
+            non_tensor_fields=["myfield"], update_mode='update'
+        )
+        doc_w_facets = tensor_search.get_document_by_id(
+            self.config, index_name=self.index_name_1, document_id='123', show_vectors=True)
+        assert len(doc_w_facets[TensorField.tensor_facets]) == 1
+        assert 'myfield2' in doc_w_facets[TensorField.tensor_facets][0]
+        assert 'myfield' in doc_w_facets
+        assert 'myfield2' in doc_w_facets
+
+    def test_no_tensor_field_on_empty_ix(self):
+        tensor_search.add_documents(
+            self.config,
+            docs=[{"_id": "123", "myfield": "mydata"}],
+            auto_refresh=True, index_name=self.index_name_1,
+            non_tensor_fields=["myfield"]
+        )
+        doc_w_facets = tensor_search.get_document_by_id(
+            self.config, index_name=self.index_name_1, document_id='123', show_vectors=True)
+        assert doc_w_facets[TensorField.tensor_facets] == []
+        assert 'myfield' in doc_w_facets
+
+    def test_no_tensor_field_on_empty_ix_other_field(self):
+        tensor_search.add_documents(
+            self.config,
+            docs=[{"_id": "123", "myfield": "mydata", "myfield2": "mydata"}],
+            auto_refresh=True, index_name=self.index_name_1,
+            non_tensor_fields=["myfield"]
+        )
+        doc_w_facets = tensor_search.get_document_by_id(
+            self.config, index_name=self.index_name_1, document_id='123', show_vectors=True)
+        assert len(doc_w_facets[TensorField.tensor_facets]) == 1
+        assert 'myfield2' in doc_w_facets[TensorField.tensor_facets][0]
+        assert 'myfield' not in doc_w_facets[TensorField.tensor_facets][0]
+        assert 'myfield' in doc_w_facets
+        assert 'myfield2' in doc_w_facets
