@@ -9,5 +9,5 @@ fi
 if [[ "$TARGETPLATFORM" != "linux/arm64" ]]; then
   pip3 --no-cache-dir install --upgrade onnxruntime-gpu==1.12.1
 else
-  pip3 --no-cache-dir install --upgrade onnxruntime
+  pip3 --no-cache-dir install --upgrade onnxruntime==1.13.1
 fi
