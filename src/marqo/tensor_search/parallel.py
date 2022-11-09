@@ -203,7 +203,7 @@ def add_documents_mp(config=None, index_name=None, docs=None,
     start = time.time()
 
     chunkers = [IndexChunk(
-            config=config, index_name=index_name, docs=_docs,
+            config=config, index_name=index_name, docs=_docs, non_tensor_fields=non_tensor_fields,
             auto_refresh=auto_refresh, batch_size=batch_size, update_mode=update_mode,
             process_id=p_id, device=device_ids[p_id], threads_per_process=threads_per_process)
         for p_id,_docs in enumerate(np.array_split(docs, n_processes))]
