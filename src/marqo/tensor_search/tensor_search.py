@@ -254,12 +254,12 @@ def add_documents_orchestrator(
             raise errors.InvalidArgError("Batch size can't be less than 1!")
         logger.info(f"batch_size={batch_size} and processes={processes} - batching using a single process")
         return _batch_request(config=config, index_name=index_name, dataset=docs, device=device,
-                              batch_size=batch_size, verbose=False)
+                              batch_size=batch_size, verbose=False, non_tensor_fields=non_tensor_fields)
 
 
 def _batch_request(config: Config, index_name: str, dataset: List[dict], 
                    batch_size: int = 100, verbose: bool = True, device=None,
-                   update_mode: str = 'replace') -> List[Dict[str, Any]]:
+                   update_mode: str = 'replace', non_tensor_fields: List[str] = []) -> List[Dict[str, Any]]:
         """Batch by the number of documents"""
         logger.info(f"starting batch ingestion in sizes of {batch_size}")
 
@@ -280,7 +280,7 @@ def _batch_request(config: Config, index_name: str, dataset: List[dict],
             res = add_documents(
                 config=config, index_name=index_name,
                 docs=docs, auto_refresh=False, device=device,
-                update_mode=update_mode
+                update_mode=update_mode, non_tensor_fields=non_tensor_fields
             )
             total_batch_time = datetime.datetime.now() - t0
             num_docs = len(docs)
