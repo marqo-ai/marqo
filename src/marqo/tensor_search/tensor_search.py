@@ -512,7 +512,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                    ctx._source.{TensorField.chunks}.remove(i);
                 }}
                 // Check if the field should have a tensor, remove if not.
-                if (params.non_tensor_fields.contains(ctx._source.{TensorField.chunks}[i].{TensorField.field_name})) {{
+                else if (params.non_tensor_fields.contains(ctx._source.{TensorField.chunks}[i].{TensorField.field_name})) {{
                     ctx._source.{TensorField.chunks}.remove(i);
                 }}
             }}

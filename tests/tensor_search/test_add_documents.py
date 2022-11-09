@@ -817,9 +817,12 @@ class TestAddDocuments(MarqoTestCase):
         tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs_, auto_refresh=True)
         resp = tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="789", show_vectors=True)        
 
-        assert len(resp[enums.TensorField.tensor_facets]) == 1
-        assert enums.TensorField.embedding in resp[enums.TensorField.tensor_facets][0]["Title"]
-        assert enums.TensorField.embedding in resp[enums.TensorField.tensor_facets][0]["Description"]
+        assert len(resp[enums.TensorField.tensor_facets]) == 2
+        assert enums.TensorField.embedding in resp[enums.TensorField.tensor_facets][0]
+        assert enums.TensorField.embedding in resp[enums.TensorField.tensor_facets][1]
+        # the order doesn't really matter. We can test for both orderings if this breaks in the future
+        assert "Title" in resp[enums.TensorField.tensor_facets][0]
+        assert "Description" in resp[enums.TensorField.tensor_facets][1]
 
     def test_add_document_with_non_tensor_field(self):
         docs_ = [{"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}]
@@ -827,8 +830,9 @@ class TestAddDocuments(MarqoTestCase):
         resp = tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="789", show_vectors=True)        
 
         assert len(resp[enums.TensorField.tensor_facets]) == 1
-        assert enums.TensorField.embedding in resp[enums.TensorField.tensor_facets][0]["Title"]
-        assert enums.TensorField.embedding not in resp[enums.TensorField.tensor_facets][0]["Description"]
+        assert enums.TensorField.embedding in resp[enums.TensorField.tensor_facets][0]
+        assert "Title" not in resp[enums.TensorField.tensor_facets][0]
+        assert "Description" in resp[enums.TensorField.tensor_facets][0]
 
     def test_put_no_update(self):
         tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[{'_id':'123'}],
@@ -945,6 +949,7 @@ class TestAddDocuments(MarqoTestCase):
                           ],
                     auto_refresh=True, update_mode='update')
                 items = update_res['items']
+                pprint.pprint(items)
                 assert not update_res['errors']
                 assert 'error' not in items[0]
                 assert items[0]['result'] in ['created', 'updated']
