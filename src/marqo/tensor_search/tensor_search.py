@@ -259,7 +259,7 @@ def add_documents_orchestrator(
 
 def _batch_request(config: Config, index_name: str, dataset: List[dict], 
                    batch_size: int = 100, verbose: bool = True, device=None,
-                   update_mode: str = 'replace', non_tensor_fields = []) -> List[Dict[str, Any]]:
+                   update_mode: str = 'replace', non_tensor_fields: List[str] = []) -> List[Dict[str, Any]]:
         """Batch by the number of documents"""
         logger.info(f"starting batch ingestion in sizes of {batch_size}")
 

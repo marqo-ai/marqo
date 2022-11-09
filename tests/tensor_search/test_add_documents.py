@@ -11,6 +11,7 @@ from marqo.tensor_search import enums
 from marqo.errors import IndexNotFoundError, InvalidArgError, BadRequestError
 from marqo.tensor_search import tensor_search, index_meta_cache, backend
 from tests.marqo_test import MarqoTestCase
+import time
 
 
 class TestAddDocuments(MarqoTestCase):
@@ -23,6 +24,14 @@ class TestAddDocuments(MarqoTestCase):
             tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         except IndexNotFoundError as s:
             pass
+
+    def tearDown(self) -> None:
+        self.index_name_1 = "my-test-index-1"
+        try:
+            tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+        except IndexNotFoundError as s:
+            pass
+
 
     def _match_all(self, index_name, verbose=True):
         """Helper function"""
@@ -876,7 +885,7 @@ class TestAddDocuments(MarqoTestCase):
                   {"_id": "789", "Temp": 12.5},
                   ],
             auto_refresh=True, update_mode='update', processes=4, batch_size=1)
-
+        time.sleep(3)
         updated_doc = tensor_search.get_document_by_id(
             config=self.config, index_name=self.index_name_1, document_id='789'
         )
