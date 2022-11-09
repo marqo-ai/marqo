@@ -16,7 +16,7 @@ validators==0.20.0
 sentence-transformers==2.2.2
 open_clip_torch
 clip-marqo==1.0.2
-protobuf==3.20.1
+protobuf==4.21.9
 onnx==1.12.0
 onnxruntime==1.13.1
 pandas==1.5.1
