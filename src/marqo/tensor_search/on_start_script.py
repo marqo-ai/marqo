@@ -118,10 +118,7 @@ class ModelsForCacheing:
     def __init__(self):
         import torch
       
-        self.models = (
-            'onnx/all_datasets_v4_MiniLM-L6',
-            "ViT-L/14",
-        )
+        self.models = self.models = ['ViT-L/14']
         # TBD to include cross-encoder/ms-marco-TinyBERT-L-2-v2
 
         self.default_devices = ['cpu'] if not torch.cuda.is_available() else ['cpu', 'cuda']
