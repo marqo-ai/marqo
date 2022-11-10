@@ -1,12 +1,12 @@
 name: CI
 
 on:
-  workflow_dispatch:
-  push:
-    branches:
-      mainline
-    paths-ignore:
-      - '**.md'
+  # workflow_dispatch:
+  # push:
+  #   branches:
+  #     mainline
+  #  paths-ignore:
+  #    - '**.md'
 
 permissions:
   contents: read
