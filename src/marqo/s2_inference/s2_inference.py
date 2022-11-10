@@ -85,8 +85,8 @@ def _validate_model_properties(model_name: str, model_properties: dict) -> dict:
     """
     if model_properties is not None:
         if _is_model_inference_endpoint(model_properties):
-            required_keys = ["name", "type"]
-            optional_keys_values = [("dimensions", 384), ("tokens", get_default_seq_length())]
+            required_keys = ["name", 'dimensions', "type"]
+            optional_keys_values = [("tokens", get_default_seq_length())]
         else:
             required_keys = ["name", "dimensions"]
             optional_keys_values = [("type", "sbert"), ("tokens", get_default_seq_length())]
