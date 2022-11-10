@@ -407,14 +407,10 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                 normalize_embeddings = index_info.index_settings[NsField.index_defaults][NsField.normalize_embeddings]
                 infer_if_image = index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]
 
-
-                index_defaults = index_info.get_index_settings()["index_defaults"]
-                model_properties = index_defaults.get(NsField.model_properties, None)
-
                 try:
                     # in the future, if we have different underlying vectorising methods, make sure we catch possible
                     # errors of different types generated here, too.
-                    vector_chunks = s2_inference.vectorise(model_name=index_info.model_name, model_properties=model_properties, content=content_chunks,
+                    vector_chunks = s2_inference.vectorise(model_name=index_info.model_name, model_properties=_get_model_properties(index_info), content=content_chunks,
                                                            device=selected_device, normalize_embeddings=normalize_embeddings,
                                                            infer=infer_if_image)
                 except s2_inference_errors.S2InferenceError:
@@ -510,7 +506,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
         # the HttpRequest wrapper handles error logic
         update_mapping_response = backend.add_customer_field_properties(
             config=config, index_name=index_name, customer_field_names=new_fields,
-            model_properties = model_properties)
+            model_properties=_get_model_properties(index_info))
 
         index_parent_response = HttpRequests(config).post(
             path="_bulk", body=utils.dicts_to_jsonl(bulk_parent_dicts))
@@ -853,12 +849,9 @@ def _vector_text_search(
         raise errors.IndexNotFoundError(message="Tried to search a non-existent index: {}".format(index_name))
     selected_device = config.indexing_device if device is None else device
 
-    index_defaults = index_info.get_index_settings()["index_defaults"]
-    model_properties = index_defaults.get(NsField.model_properties, None)
-
     # TODO average over vectorized inputs with weights
     vectorised_text = s2_inference.vectorise(
-        model_name=index_info.model_name, model_properties=model_properties, content=text,
+        model_name=index_info.model_name, model_properties=_get_model_properties(index_info), content=text,
         device=selected_device,
         normalize_embeddings=index_info.index_settings['index_defaults']['normalize_embeddings'])[0]
 
@@ -1097,3 +1090,13 @@ def _select_model_from_media_type(media_type: Union[MediaType, str]) -> Union[Ml
     else:
         raise ValueError("_select_model_from_media_type(): "
                          "Received unknown media type: {}".format(media_type))
+
+
+def _get_model_properties(index_info):
+    index_defaults = index_info.get_index_settings()["index_defaults"]
+    try:
+        model_properties = index_defaults[NsField.model_properties]
+    except KeyError:
+        model_properties = s2_inference.get_model_properties_from_registry(index_info.model_name)
+
+    return model_properties
