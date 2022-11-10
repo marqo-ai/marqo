@@ -84,16 +84,21 @@ def _validate_model_properties(model_name: str, model_properties: dict) -> dict:
     """validate model_properties, if not given then return model_registry properties
     """
     if model_properties is not None:
+        if _is_model_inference_endpoint(model_properties):
+            required_keys = ["name", "type"]
+            optional_keys_values = [("dimensions", 384), ("tokens", get_default_seq_length())]
+        else:
+            required_keys = ["name", "dimensions"]
+            optional_keys_values = [("type", "sbert"), ("tokens", get_default_seq_length())]
+
         """checks model dict to see if all required keys are present
         """
-        required_keys = ["name", "dimensions"]
         for key in required_keys:
             if key not in model_properties:
                 raise InvalidModelPropertiesError(f'model {key} not in settings')
 
         """updates model dict with default values if optional keys are missing
         """
-        optional_keys_values = [("type", "sbert"), ("tokens", get_default_seq_length())]
         for key, value in optional_keys_values:
             if key not in model_properties:
                 model_properties[key] = value
@@ -246,8 +251,7 @@ def _get_model_loader(model_name: str, model_properties: dict) -> Any:
         dict: a dictionary describing properties of the model.
     """
 
-
-    model_type = model_properties['type']
+    model_type = _get_model_type(model_properties)
 
     if model_type not in MODEL_PROPERTIES['loaders']:
         raise KeyError(f"model_name={model_name} for model_type={model_type} not in allowed model types")
@@ -268,13 +272,11 @@ def _load_model(model_name: str, model_properties: dict, device: str = get_defau
 
     loader = _get_model_loader(model_name, model_properties)
     endpoint_url = model_properties.get('endpoint_url', None)
-    api_token = model_properties.get('api_token', None)
     embedding_dim = model_properties['dimensions']
     max_sequence_length = model_properties.get('tokens', get_default_seq_length())
 
-    if loader == HF_ENDPOINT:
-        model = loader(model_name, device=device, endpoint_url=endpoint_url, api_token=api_token, embedding_dim=embedding_dim,
-                        max_seq_length=max_sequence_length)
+    if _is_model_inference_endpoint(model_properties):
+        model = loader(model_name, device=device, endpoint_url=endpoint_url)
     else:
         model = loader(model_name, device=device, embedding_dim=embedding_dim,
                        max_seq_length=max_sequence_length)
@@ -282,6 +284,40 @@ def _load_model(model_name: str, model_properties: dict, device: str = get_defau
     model.load()
 
     return model
+
+
+def _is_model_inference_endpoint(model_properties: dict) -> bool:
+    """Returns a bool value telling if the model is an inference endpoint
+
+    Args:
+        model_properties (dict): _description_
+
+    Returns:
+        bool: if model in an endpoint then True else false
+    """
+    if model_properties is None or model_properties.get('endpoint_url') is None:
+        return False
+    else:
+        return True
+
+
+def _get_model_type(model_properties: dict) -> str:
+    """Returns the correct model_type
+
+    If model is an inference endpoint then it returns the endpoint version of the specified type
+
+        Args:
+            model_properties (dict): _description_
+
+        Returns:
+            str: model type
+        """
+    if _is_model_inference_endpoint(model_properties):
+        if model_properties['type'] == 'hf':
+            return 'hf_endpoint'
+
+    return model_properties['type']
+
 
 # def normalize(inputs):
 
