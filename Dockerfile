@@ -1,6 +1,5 @@
 ARG CUDA_VERSION=11.4.2
 FROM nvidia/cuda:${CUDA_VERSION}-cudnn8-runtime-ubuntu20.04 as cuda_image
-
 FROM ubuntu:20.04
 VOLUME /var/lib/docker
 ARG TARGETPLATFORM
@@ -16,21 +15,19 @@ RUN apt-get update
 RUN apt-get install python3.8-distutils -y # python3-distutils
 RUN apt-get  install python3.8 python3-pip -y # pip is 276 MB!
 # TODO: up the RAM
-
 RUN echo Target platform is "$TARGETPLATFORM"
-
 COPY requirements.txt requirements.txt
 RUN pip3 install --no-cache-dir -r requirements.txt
-
-RUN pip3 install --no-cache-dir torch==1.12.1+cu113 torchvision==0.13.1+cu113 torchaudio==0.12.1 --extra-index-url https://download.pytorch.org/whl/cu113 --upgrade
-
+COPY scripts scripts
+RUN bash scripts/install_onnx_gpu_for_amd.sh
+COPY scripts scripts
+RUN bash scripts/install_torch_amd.sh
 COPY dind_setup dind_setup
 RUN bash dind_setup/setup_dind.sh
 COPY scripts scripts
 RUN bash scripts/install_onnx_gpu_for_amd.sh
 COPY . /app
 ENV PYTHONPATH "${PYTHONPATH}:/app"
-
 RUN chmod +x ./run_marqo.sh
 CMD ["./run_marqo.sh"]
 ENTRYPOINT ["./run_marqo.sh"]

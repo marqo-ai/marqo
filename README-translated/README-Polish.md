@@ -41,8 +41,8 @@ Wyszukiwanie tensorowe polega na przekształcaniu dokumentów, obrazów i innych
 2. Użyj dokera, aby uruchomić Marqo (Mac users with M-series chips will need to [go here](#m-series-mac-users)):
 ```bash
 docker rm -f marqo;
-docker pull marqoai/marqo:0.0.7;
-docker run --name marqo -it --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:0.0.7
+docker pull marqoai/marqo:0.0.6;
+docker run --name marqo -it --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:0.0.6
 ```
 3. Zainstaluj klienta Marqo:
 ```bash
@@ -233,7 +233,7 @@ docker rm -f marqo-os; docker run -p 9200:9200 -p 9600:9600 -e "discovery.type=s
 docker rm -f marqo; docker run --name marqo --privileged \
     -p 8882:8882 --add-host host.docker.internal:host-gateway \
     -e "OPENSEARCH_URL=https://localhost:9200" \
-    marqoai/marqo:0.0.7
+    marqoai/marqo:0.0.6
 ```
 
 ## Kontrybutorzy
