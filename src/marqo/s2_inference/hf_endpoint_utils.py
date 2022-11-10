@@ -22,7 +22,8 @@ class HF_ENDPOINT(Model):
         if isinstance(sentence, str):
             sentence = [sentence]
 
-        headers = {'Authorization': f'Bearer {self.api_token}'}
+        headers = {'Authorization': f'Bearer {self._get_api_token()}'}
+
 
         json_data = {"inputs": sentence}
 
@@ -33,4 +34,7 @@ class HF_ENDPOINT(Model):
         )
 
         return res.json()['embeddings']
+
+    def _get_api_token(self) -> str:
+        return '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'
 
