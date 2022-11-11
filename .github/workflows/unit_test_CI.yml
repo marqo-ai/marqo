@@ -68,11 +68,18 @@ jobs:
           #pip install -r requirements.txt
           pip install tox
           pip install flake8
+
+      # fix $HOME not set issue
+      # TODO: Do we really need to set an email for this?
+      - name: Set Home Config
+        run: |
+          git config --system http.sslVerify false
+          git config --system user.email "joshua@marqo.ai"
         
       - name: Get Changed Directories
         id: changed-dir
         uses: tj-actions/changed-files@v29.0.1
-        with:
+        with:ftgyhth
           dir_names: true
       
       - name: Lint Changed Directories with flake8
