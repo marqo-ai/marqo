@@ -72,7 +72,11 @@ jobs:
           #pip install -r requirements.txt
           pip install tox
           pip install flake8
-        
+      
+      - name: Home Variable Take 2
+        run: |
+          sudo usermod -d $pwd ubuntu
+
       - name: Get Changed Directories
         id: changed-dir
         uses: tj-actions/changed-files@v29.0.1
