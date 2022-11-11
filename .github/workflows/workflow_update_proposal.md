@@ -17,17 +17,16 @@ AMD instance: t3.xlarge, 4CPUS, 16gbRAM, 50gb storage
 ARM instance: a1.xlarge, 4CPUs, 8gbRAM, 50gb storage  
 
 ### Setting up AMD64 Image
-A. Install Docker with https://docs.docker.com/engine/install/ubuntu/
+- Install Docker with https://docs.docker.com/engine/install/ubuntu/
 
-B. Enable Docker with:
+- Enable Docker with:
 ```bash
 sudo systemctl enable docker.service
 sudo systemctl enable containerd.service
 ```
 
-C. Install git with `sudo apt-get install git`
+- Install git with `sudo apt-get install git`
 
-D. 
 
 2. EC2 images (AMI) will then be created from these instances.
 
@@ -85,6 +84,8 @@ py3-dind_os
 py3-s2search
 ```
 The proposed solution would separate these environments into different workflows. Each workflow would run tests on a different environment.
+
+These workflows will be run after every merge to main. The `tox.ini` file will be modified so workflows can be run against any branch of choice.
 
 1. Unit Tests: `unit_test_CI.yml`
 ```yml
