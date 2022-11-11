@@ -36,12 +36,12 @@ jobs:
           ec2-instance-type: t3.xlarge
           subnet-id: subnet-0c2a972e132f7c1c7
           security-group-id: sg-0ac7bf9ad3b927b1f
-          iam-role-name: my-role-name # TODO optional, requires additional permissions
-          aws-resource-tags: > # TODO optional, requires additional permissions
-            [
-              {"Key": "Name", "Value": "ec2-github-runner"},
-              {"Key": "GitHubRepository", "Value": "${{ github.repository }}"}
-            ]
+          #iam-role-name: my-role-name # TODO optional, requires additional permissions
+          #aws-resource-tags: > # TODO optional, requires additional permissions
+          #  [
+          #    {"Key": "Name", "Value": "ec2-github-runner"},
+          #    {"Key": "GitHubRepository", "Value": "${{ github.repository }}"}
+          #  ]
 
   Test-Marqo:
     name: Run Marqo Test Suite
