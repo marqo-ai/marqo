@@ -56,7 +56,11 @@ jobs:
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
-          
+
+      - name: Set Home Variable
+        run: |
+          export HOME=$pwd
+
       - name: Set up Python 3.8
         uses: actions/setup-python@v3
         with:
