@@ -97,7 +97,8 @@ jobs:
         run: |
           # Set up conf file
           echo 'export MARQO_API_TESTS_ROOT="/home/runner/work/marqo/marqo"' >> conf
-          echo 'export S2SEARCH_URL="${{ secrets.S2SEARCH_URL }}"' >> conf
+          # TODO: Carry across this S2SEARCH_URL secret 
+          # echo 'export S2SEARCH_URL="${{ secrets.S2SEARCH_URL }}"' >> conf
           
       - name: Run Unit Tests
         run: tox -e py3-local_os_unit_tests_w_requirements
