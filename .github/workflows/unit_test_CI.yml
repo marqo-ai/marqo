@@ -75,7 +75,7 @@ jobs:
       
       - name: Home Variable Take 2
         run: |
-          sudo usermod -d $pwd ubuntu
+          sudo usermod --home ~ ubuntu
 
       - name: Get Changed Directories
         id: changed-dir
