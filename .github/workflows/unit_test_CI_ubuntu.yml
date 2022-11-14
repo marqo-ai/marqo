@@ -73,25 +73,22 @@ jobs:
           pip install tox
           pip install flake8
       
-      - name: Home Variable Take 2
-        run: |
-          sudo usermod --home ~ ubuntu
-
-      - name: Get Changed Directories
-        id: changed-dir
-        uses: tj-actions/changed-files@v29.0.1
-        with:
-          dir_names: true
+      # Testing removing linting part
+      #- name: Get Changed Directories
+      #  id: changed-dir
+      #  uses: tj-actions/changed-files@v29.0.1
+      #  with:
+      #    dir_names: true
       
-      - name: Lint Changed Directories with flake8
-        run: |
-          for dir in ${{ steps.changed-dir.outputs.all_changed_files }}; do
-            echo "$dir was changed"
-            # stop the build if there are Python syntax errors or undefined names
-            flake8 $dir --count --select=E9,F63,F7,F82 --show-source --statistics --filename *.py
-            # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-            flake8 $dir --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics --filename *.py
-          done
+      #- name: Lint Changed Directories with flake8
+      #  run: |
+      #    for dir in ${{ steps.changed-dir.outputs.all_changed_files }}; do
+      #      echo "$dir was changed"
+      #      # stop the build if there are Python syntax errors or undefined names
+      #      flake8 $dir --count --select=E9,F63,F7,F82 --show-source --statistics --filename *.py
+      #      # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
+      #      flake8 $dir --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics --filename *.py
+      #    done
         
       - name: Checkout marqo-api-tests repo
         uses: actions/checkout@v3
