@@ -9,8 +9,6 @@ tox
 # s2_inference:
 more_itertools
 nltk==3.7
-libpng
-jpeg
 torch==1.13.0
 torchvision==0.13.1
 Pillow==9.3.0
