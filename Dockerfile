@@ -3,7 +3,7 @@ FROM nvidia/cuda:${CUDA_VERSION}-cudnn8-runtime-ubuntu20.04 as cuda_image
 FROM ubuntu:20.04
 VOLUME /var/lib/docker
 ARG TARGETPLATFORM
-# this is required for onnx to find cuda
+# this is required for onnx to find  cuda
 COPY --from=cuda_image /usr/local/cuda/ /usr/local/cuda/
 WORKDIR /app
 RUN apt-get update
