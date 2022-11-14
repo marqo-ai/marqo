@@ -331,7 +331,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
     """
     t0 = datetime.datetime.now()
     bulk_parent_dicts = []
-
+    print("start add docs uijiknjk")
     try:
         index_info = backend.get_index_info(config=config, index_name=index_name)
     except errors.IndexNotFoundError as s:
@@ -352,7 +352,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
     selected_device = config.indexing_device if device is None else device
 
     unsuccessful_docs = []
-
+    print("jhere jnkrvjknrpqri")
     for i, doc in enumerate(docs):
 
         indexing_instructions = {'index' if update_mode == 'replace' else 'update': {"_index": index_name}}
@@ -404,10 +404,10 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
             # Don't process text/image fields when explicitly told not to.
             if field in non_tensor_fields:
                 continue
-
+            print("heerener ")
             # TODO put this into a function to determine routing
             if isinstance(field_content, (str, Image.Image)):
-                
+                print("heerener 2")
                 # TODO: better/consistent handling of a no-op for processing (but still vectorize)
 
                 # 1. check if urls should be downloaded -> "treat_pointers_and_urls_as_images":True
@@ -416,7 +416,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                 # 4. Determine media type of downloaded
                 # 5. load correct media type into memory -> PIL (images), videos (), audio (torchaudio)
                 # 6. if chunking -> then add the extra chunker
-
+                print("heerener 3")
                 if isinstance(field_content, str) and not _is_image(field_content):
                     
                     split_by = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][NsField.split_method]
@@ -424,15 +424,18 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                     split_overlap = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][NsField.split_overlap]
                     content_chunks = text_processor.split_text(field_content, split_by=split_by, split_length=split_length, split_overlap=split_overlap)
                     text_chunks = content_chunks
+                    print("heerener 4")
                 else:
                     # TODO put the logic for getting field parameters into a function and add per field options
                     image_method = index_info.index_settings[NsField.index_defaults][NsField.image_preprocessing][NsField.patch_method]
                     # the chunk_image contains the no-op logic as of now - method = None will be a no-op
+                    print("heerener 5")
                     try:
                         # in the future, if we have different chunking methods, make sure we catch possible
                         # errors of different types generated here, too.
                         content_chunks, text_chunks = image_processor.chunk_image(
                             field_content, device=selected_device, method=image_method)
+                        print("heerener 6")
                     except s2_inference_errors.S2InferenceError:
                         document_is_valid = False
                         image_err = errors.InvalidArgError(message=f'Could not process given image: {field_content}')
@@ -440,23 +443,28 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                             (i, {'_id': doc_id, 'error': image_err.message, 'status': int(image_err.status_code),
                                  'code': image_err.code})
                         )
+                        print("heerener 7")
                         break
-                
+                print("heerener 8")
                 normalize_embeddings = index_info.index_settings[NsField.index_defaults][NsField.normalize_embeddings]
                 infer_if_image = index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]
                 try:
+                    print("heerener 9")
                     # in the future, if we have different underlying vectorising methods, make sure we catch possible
                     # errors of different types generated here, too.
                     vector_chunks = s2_inference.vectorise(model_name=index_info.model_name, content=content_chunks,
                                                            device=selected_device, normalize_embeddings=normalize_embeddings,
                                                            infer=infer_if_image)
+                    print("heerener 10")
                 except s2_inference_errors.S2InferenceError:
+                    print("heerener 11")
                     document_is_valid = False
                     image_err = errors.InvalidArgError(message=f'Could not process given image: {field_content}')
                     unsuccessful_docs.append(
                         (i, {'_id': doc_id, 'error': image_err.message, 'status': int(image_err.status_code),
                              'code': image_err.code})
                     )
+                    print("heerener 12")
                     break
 
                 if (len(vector_chunks) != len(text_chunks)):
@@ -466,6 +474,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                         f"check the preprocessing functions and try again. ")
 
                 for text_chunk, vector_chunk in zip(text_chunks, vector_chunks):
+                    print("heerener 13")
                     # only add chunk values which are string, boolean or numeric
                     chunk_values_for_filtering = {}
                     for key, value in copied.items():
