@@ -61,6 +61,8 @@ def _load_image_from_path(image: str) -> ImageType:
     else:
         raise ValueError(f"input str of {image} is not a local file or a valid url")
 
+    img = img.convert("RGB")
+
     return img
 
 def format_and_load_CLIP_image(image: Union[str, ndarray, ImageType]) -> ImageType:
@@ -263,6 +265,45 @@ class OPEN_CLIP(CLIP):
             assert outputs.shape == _shape_before
 
         return self._convert_output(outputs)
+
+class OPENCV_CLIP(CLIP):
+    def __init__(self, model_type: str = "opencv/ViT-B/32", device: str = 'cpu',  embedding_dim: int = None,
+                            truncate: bool = True, **kwargs) -> None:
+        super().__init__(model_type, device,  embedding_dim, truncate , **kwargs)
+        self.model_type = model_type.split("opencv/")[0]
+
+    def load(self) -> None:
+
+        # https://github.com/openai/CLIP/issues/30
+        self.model, _ = clip.load(self.model_type, device='cpu', jit=False)
+        self.preprocess = self.opencv_process()
+        self.model = self.model.to(self.device)
+        self.tokenizer = clip.tokenize
+        self.model.eval()
+
+    def opencv_process(self):
+        from augmennt import transforms as at
+        from torchvision.transforms import Normalize
+
+        at_transform = at.Compose([
+        # this package can not convert the image mode, so we need to do the converstion first
+        self._convert_to_ndarray,  # at transform takes ndarray as input
+        at.Resize(224, interpolation="BICUBIC"),
+        at.CenterCrop(224),
+        at.ToTensor(),
+        Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711)),
+        ])
+        return at_transform
+
+    @staticmethod
+    def _convert_to_ndarray(image):
+        return np.array(image)
+
+
+
+
+
+
 
 
         

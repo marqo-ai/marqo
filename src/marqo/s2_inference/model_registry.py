@@ -2,7 +2,7 @@ from marqo.s2_inference.hf_utils import HF_MODEL
 from marqo.s2_inference.sbert_onnx_utils import SBERT_ONNX
 from marqo.s2_inference.sbert_utils import SBERT, TEST
 from marqo.s2_inference.random_utils import Random
-from marqo.s2_inference.clip_utils import CLIP, OPEN_CLIP
+from marqo.s2_inference.clip_utils import CLIP, OPEN_CLIP, OPENCV_CLIP
 from marqo.s2_inference.types import Any, Dict, List, Optional, Union, FloatTensor
 
 # we need to keep track of the embed dim and model load functions/classes
@@ -541,12 +541,25 @@ def _get_random_properties() -> Dict:
     }
     return RANDOM_MODEL_PROPERTIES
 
+def _get_test_properties() -> Dict:
+    TEST_MODEL_PROPERTIES = {
+        "opencv/ViT-B/32":
+            {"name": "ViT-B/32",
+             "dimensions": 512,
+             "notes": "CLIP ViT-B/32",
+             "type": "opencvclip",
+             },
+    }
+    return TEST_MODEL_PROPERTIES
+
+
 def _get_model_load_mappings() -> Dict:
     return {'clip':CLIP,
             'open_clip': OPEN_CLIP,
             'sbert':SBERT, 
             'test':TEST, 
             'sbert_onnx':SBERT_ONNX,
+            'opencvclip': OPENCV_CLIP,
             'random':Random, 
             'hf':HF_MODEL}
 
@@ -562,6 +575,7 @@ def load_model_properties() -> Dict:
     random_model_properties = _get_random_properties()
     hf_model_properties = _get_hf_properties()
     open_clip_model_properties = _get_open_clip_properties()
+    test_model_properties = _get_test_properties()
 
     # combine the above dicts
     model_properties = dict(clip_model_properties.items())
@@ -571,6 +585,7 @@ def load_model_properties() -> Dict:
     model_properties.update(random_model_properties)
     model_properties.update(hf_model_properties)
     model_properties.update(open_clip_model_properties)
+    model_properties.update(test_model_properties)
 
     all_properties = dict()
     all_properties['models'] = model_properties
