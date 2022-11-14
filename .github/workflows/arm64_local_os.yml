@@ -1,0 +1,106 @@
+name: arm64_local_os
+# runs Integration Tests on Local OS on an ARM64 Machine
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      mainline
+    paths-ignore:
+      - '**.md'
+
+permissions:
+  contents: read
+
+jobs:
+  Start-Runner:
+    name: Start self-hosted EC2 runner
+    runs-on: ubuntu-latest
+    outputs:
+      label: ${{ steps.start-ec2-runner.outputs.label }}
+      ec2-instance-id: ${{ steps.start-ec2-runner.outputs.ec2-instance-id }}
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Start EC2 runner
+        id: start-ec2-runner
+        uses: machulav/ec2-github-runner@v2
+        with:
+          mode: start
+          github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
+          ec2-image-id: ami-0d3e26da54d3713cd
+          ec2-instance-type: t3.xlarge
+          subnet-id: subnet-0c2a972e132f7c1c7
+          security-group-id: sg-0ac7bf9ad3b927b1f
+
+  Test-Marqo:
+    name: Run Marqo Test Suite
+    needs: Start-Runner # required to start the main job when the runner is ready
+    runs-on: ${{ needs.start-runner.outputs.label }} # run the job on the newly created runner
+                
+    environment: marqo-test-suite 
+    
+    steps:
+       
+      - name: Checkout marqo repo
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.8
+        uses: actions/setup-python@v3
+        with:
+          python-version: "3.8"
+          cache: "pip"
+          
+      - name: Install Dependencies
+        run: |
+          #pip install -r requirements.txt
+          pip install tox
+          pip install flake8
+      
+      # linting here
+  
+      - name: Checkout marqo-api-tests repo
+        uses: actions/checkout@v3
+        with:
+          repository: vicilliar/marqo-api-tests
+          
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+          
+      - name: Set up Environment
+        run: |
+          # Set up conf file
+          echo 'export MARQO_API_TESTS_ROOT="${{ github.workspace }}"' >> conf
+          # TODO: Carry across this S2SEARCH_URL secret 
+          # echo 'export S2SEARCH_URL="${{ secrets.S2SEARCH_URL }}"' >> conf
+          
+      - name: Run Integration Tests - ARM64 local_os
+        run: tox -e py3-arm64_local_os
+  
+  Stop-Runner:
+    name: Stop self-hosted EC2 runner
+    needs:
+      - Start-Runner # required to get output from the start-runner job
+      - Test-Marqo # required to wait when the main job is done
+    runs-on: ubuntu-latest
+    if: ${{ always() }} # required to stop the runner even if the error happened in the previous jobs
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Stop EC2 runner
+        uses: machulav/ec2-github-runner@v2
+        with:
+          mode: stop
+          github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
+          label: ${{ needs.start-runner.outputs.label }}
+          ec2-instance-id: ${{ needs.start-runner.outputs.ec2-instance-id }}
