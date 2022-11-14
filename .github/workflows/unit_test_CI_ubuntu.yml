@@ -104,7 +104,7 @@ jobs:
       - name: Set up Environment
         run: |
           # Set up conf file
-          echo 'export MARQO_API_TESTS_ROOT="/home/runner/work/marqo/marqo"' >> conf
+          echo 'export MARQO_API_TESTS_ROOT="${{ github.workspace }}"' >> conf
           # TODO: Carry across this S2SEARCH_URL secret 
           # echo 'export S2SEARCH_URL="${{ secrets.S2SEARCH_URL }}"' >> conf
           
