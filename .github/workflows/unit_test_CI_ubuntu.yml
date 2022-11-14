@@ -43,6 +43,12 @@ jobs:
           #    {"Key": "GitHubRepository", "Value": "${{ github.repository }}"}
           #  ]
 
+      - name: Install Github Runner Application
+        run: |
+          mkdir actions-runner && cd actions-runner
+          curl -O -L https://github.com/actions/runner/releases/download/v2.299.1/actions-runner-linux-x64-2.299.1.tar.gz
+          tar xzf ./actions-runner-linux-x64-2.299.1.tar.gz
+
   Test-Marqo:
     name: Run Marqo Test Suite
     needs: Start-Runner # required to start the main job when the runner is ready
@@ -89,7 +95,7 @@ jobs:
       #      # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
       #      flake8 $dir --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics --filename *.py
       #    done
-        
+  
       - name: Checkout marqo-api-tests repo
         uses: actions/checkout@v3
         with:
