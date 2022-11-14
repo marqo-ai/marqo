@@ -99,7 +99,7 @@ jobs:
       - name: Checkout marqo-api-tests repo
         uses: actions/checkout@v3
         with:
-          repository: marqo-ai/marqo-api-tests
+          repository: vicilliar/marqo-api-tests
           
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
