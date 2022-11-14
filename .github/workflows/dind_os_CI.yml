@@ -1,5 +1,5 @@
-name: unit_test_CI_amazon
-# runs unit tests on AMD64 machine
+name: dind_os_CI
+# runs Integration Tests on DIND OS on AMD64 machine
 
 on:
   workflow_dispatch:
@@ -32,16 +32,10 @@ jobs:
         with:
           mode: start
           github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
-          ec2-image-id: ami-04941c10e0322028e
+          ec2-image-id: ami-0d3e26da54d3713cd
           ec2-instance-type: t3.xlarge
           subnet-id: subnet-0c2a972e132f7c1c7
-          security-group-id: sg-0930e298b19bacd60
-          #iam-role-name: my-role-name # TODO optional, requires additional permissions
-          #aws-resource-tags: > # TODO optional, requires additional permissions
-          #  [
-          #    {"Key": "Name", "Value": "ec2-github-runner"},
-          #    {"Key": "GitHubRepository", "Value": "${{ github.repository }}"}
-          #  ]
+          security-group-id: sg-0ac7bf9ad3b927b1f
 
   Test-Marqo:
     name: Run Marqo Test Suite
@@ -57,10 +51,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set Home Variable
-        run: |
-          export HOME=$pwd
-
       - name: Set up Python 3.8
         uses: actions/setup-python@v3
         with:
@@ -73,30 +63,12 @@ jobs:
           pip install tox
           pip install flake8
       
-      - name: Home Variable Take 2
-        run: |
-          sudo usermod --home ~ ubuntu
-
-      - name: Get Changed Directories
-        id: changed-dir
-        uses: tj-actions/changed-files@v29.0.1
-        with:
-          dir_names: true
-      
-      - name: Lint Changed Directories with flake8
-        run: |
-          for dir in ${{ steps.changed-dir.outputs.all_changed_files }}; do
-            echo "$dir was changed"
-            # stop the build if there are Python syntax errors or undefined names
-            flake8 $dir --count --select=E9,F63,F7,F82 --show-source --statistics --filename *.py
-            # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-            flake8 $dir --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics --filename *.py
-          done
-        
+      # linting here
+  
       - name: Checkout marqo-api-tests repo
         uses: actions/checkout@v3
         with:
-          repository: marqo-ai/marqo-api-tests
+          repository: vicilliar/marqo-api-tests
           
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
@@ -108,8 +80,8 @@ jobs:
           # TODO: Carry across this S2SEARCH_URL secret 
           # echo 'export S2SEARCH_URL="${{ secrets.S2SEARCH_URL }}"' >> conf
           
-      - name: Run Unit Tests
-        run: tox -e py3-local_os_unit_tests_w_requirements
+      - name: Run Integration Tests - dind_os
+        run: tox -e py3-dind_os
   
   Stop-Runner:
     name: Stop self-hosted EC2 runner
