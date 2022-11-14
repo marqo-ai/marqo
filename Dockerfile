@@ -12,8 +12,8 @@ RUN apt-get install apt-transport-https ca-certificates curl gnupg2 software-pro
 RUN apt-get update
 RUN add-apt-repository ppa:deadsnakes/ppa
 RUN apt-get update
-RUN apt-get install python3.8-distutils -y # python3-distutils
-RUN apt-get  install python3.8 python3-pip -y # pip is 276 MB!
+RUN apt-get install python3.10-distutils -y # python3-distutils
+RUN apt-get  install python3.10 python3-pip -y # pip is 276 MB!
 # TODO: up the RAM
 RUN echo Target platform is "$TARGETPLATFORM"
 COPY requirements.txt requirements.txt
