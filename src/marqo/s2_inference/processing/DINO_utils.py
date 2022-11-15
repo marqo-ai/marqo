@@ -8,11 +8,13 @@ import cv2
 
 from marqo.s2_inference.s2_inference import get_logger
 from marqo.s2_inference.types import Dict, List, Union, ImageType, Tuple, FloatTensor, ndarray, Any
+from marqo.s2_inference.errors import ModelLoadError
 
 logger = get_logger('DINO')
 
 
-def _load_DINO_model(arch: str, device: str, patch_size=None) -> Tuple[Any, Any]:
+def _load_DINO_model(arch: str, device: str, patch_size: int = None,
+                    image_size: Tuple = (224, 224)) -> Tuple[Any, Any]:
     """ loads a vit dino model
        # arch -> ['vit_tiny', 'vit_small', 'vit_base']
     Args:
@@ -54,12 +56,12 @@ def _load_DINO_model(arch: str, device: str, patch_size=None) -> Tuple[Any, Any]
             model = torch.hub.load('facebookresearch/dino:main', 'dino_vitb16')
 
     else:
-        raise RuntimeError("wrong")
+        raise ModelLoadError(f"unknown model of arch:{arch} and patch_size:{patch_size}")
 
     model.eval()
     model.to(device)
 
-    return model, _get_DINO_transform()
+    return model, _get_DINO_transform(image_size=image_size)
 
 def _get_DINO_transform(image_size: Tuple = (224, 224)) -> Any:
     """gets the preprocessing transform for dino models
@@ -82,8 +84,8 @@ def DINO_inference(model: Any, transform: Any, img: ImageType = None,
     """runs inference for a model, transform and image
 
     Args:
-        model (Any): _description_
-        transform (Any): _description_
+        model (Any): ('vit_small', 'vit_base')
+        transform (Any): _get_DINO_transform
         img (ImageType, optional): _description_. Defaults to None.
         patch_size (int, optional): _description_. Defaults to None.
         device (str, optional): _description_. Defaults to "cpu".
@@ -114,20 +116,7 @@ def DINO_inference(model: Any, transform: Any, img: ImageType = None,
 
     return attentions
 
-# def PIL_to_cv2(pil_image: ImageType) -> ndarray:
-#     """switches between PIL and cv2 -  assumes BGR for cv2
-
-#     Args:
-#         pil_image (ImageType): _description_
-
-#     Returns:
-#         ndarray: _description_
-#     """
-#     open_cv_image = np.array(pil_image) 
-#     # Convert RGB to BGR 
-#     return open_cv_image[:, :, ::-1]
-
-def _rescale_image(image: ndarray) -> ndarray:
+def _rescale_image(image: Union[ndarray, ImageType]) -> ndarray:
     """rescales the image to be between 0-255
         assumes positive values as it does not correct a bias
 
@@ -137,15 +126,20 @@ def _rescale_image(image: ndarray) -> ndarray:
     Returns:
         ndarray: _description_
     """
+
+    if isinstance(image, ImageType):
+        image = np.array(image.convert('RGB'))
+
+    image = image*1.0
     image /= image.max()
     image *= 255
     image = image.astype(np.uint8)
     return image
 
 
-def attention_to_bboxs(image: ImageType) -> List[Tuple]:
+def attention_to_bboxs(image: ndarray) -> List[Tuple]:
     """turns attention maps into classless bounding boxes
-
+    expects a single dim attention e.g, attentions.size = (x, y)
     Args:
         image (ImageType): _description_
 

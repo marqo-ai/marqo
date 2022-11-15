@@ -128,7 +128,7 @@ class PatchifySimple:
             hn (int, optional): _description_. Defaults to 3.
             wn (int, optional): _description_. Defaults to 3.
             overlap (bool, optional): _description_. Defaults to False.
-        """\
+        """
         self.size = size
         self.hn = hn
         self.wn = wn
