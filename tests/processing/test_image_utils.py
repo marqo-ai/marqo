@@ -24,10 +24,6 @@ from marqo.s2_inference.processing.image_utils import (
     generate_boxes
 )
 
-from marqo.s2_inference.processing.image import (
-    chunk_image,
-)
-
 
 class TestImageUtils(unittest.TestCase):
 
@@ -294,64 +290,6 @@ class TestImageUtils(unittest.TestCase):
                 a = bb[2] - bb[0]
                 b = bb[3] - bb[1]
                 assert patch.size == (a, b)
-
-    def test_chunk_image_simple(self):
-
-        SIZE = (256, 384)
-        with tempfile.TemporaryDirectory() as d:
-            temp_file_name = os.path.join(d, 'test_image.png')
-            img = Image.fromarray(np.random.randint(0,255, 
-                            size=SIZE).astype(np.uint8))
-            img.save(temp_file_name)
-
-            patches, bboxes = chunk_image(img, device='cpu', 
-                                method = 'simple', size=SIZE)
-            
-            assert len(patches) == (3*3) + 1
-            assert patches[0].size == SIZE
-
-            patches, bboxes = chunk_image(img, device='cpu', 
-                                method = 'simple?hn=2&wn=3', size=SIZE)
-            
-            assert len(patches) == (2*3) + 1, len(patches)
-            assert patches[0].size == SIZE
-
-
-    def test_chunk_image_overlap(self):
-
-        SIZE = (256, 384)
-        with tempfile.TemporaryDirectory() as d:
-            temp_file_name = os.path.join(d, 'test_image.png')
-            img = Image.fromarray(np.random.randint(0,255, 
-                            size=SIZE).astype(np.uint8))
-            img.save(temp_file_name)
-
-            patches, bboxes = chunk_image(img, device='cpu', 
-                                method = 'overlap', size=SIZE)
-            
-            assert len(patches) == (3*3) + (3-1)*(3-1) +  1
-            assert patches[0].size == SIZE
-
-            patches, bboxes = chunk_image(img, device='cpu', 
-                                method = 'overlap?wn=4&hn=2', size=SIZE)
-            
-            assert len(patches) == (4*2) + (4-1)*(2-1) +  1
-            assert patches[0].size == SIZE
-
-    def test_chunk_image_pytorch(self):
-
-        SIZE = (256, 384)
-        with tempfile.TemporaryDirectory() as d:
-            temp_file_name = os.path.join(d, 'test_image.png')
-            img = Image.fromarray(np.random.randint(0,255, 
-                            size=SIZE).astype(np.uint8))
-            img.save(temp_file_name)
-
-            patches, bboxes = chunk_image(img, device='cpu', 
-                                method = 'frcnn', size=SIZE)
-            
-            assert len(patches) >= 1
-            assert patches[0].size == SIZE
 
     def test_str2bool(self):
 
