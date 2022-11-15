@@ -29,3 +29,8 @@ class TestImageUtils(unittest.TestCase):
     def test_load_pytorch(self):
 
         model, preprocess = load_pytorch(model_name='frcnn', device=self.device)
+        
+        try:
+            model, preprocess = load_pytorch(model_name='frc-nn', device=self.device)
+        except Exception as e:
+            assert "incorrect model specified" in str(e)
