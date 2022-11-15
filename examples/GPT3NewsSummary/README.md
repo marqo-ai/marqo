@@ -4,7 +4,7 @@
 
 My name is Iain Mackie and I lead NLP investments at <a href="https://thecreatorfund.com/">Creator Fund</a> and previously worked in Quant trading. I am currently finishing my PhD in neural search systems at the <a href="https://grilllab.ai/">University of Glasgow</a> and recently won the $500k grand prize at the <a href="https://www.digit.fyi/next-gen-ai-assistant-from-glasgow-uni-wins-amazon-taskbot-challenge/">Alexa TaskBot Challenge</a>.🤖 
 
-Given my passion for startups and NLP...I could not be happier to announce Creator Fund's £650,000 Pre-Seed investment into Marqo. Creator Fund (European Deep Tech) is joined by Blackbird (top VC in Australia/NZ), Activation Fund (US SaaS VC), and many high-profile angels. A global start to a global journey! 🚀    
+Given my passion for startups and NLP...I could not be happier to announce that Creator Fund has led a £660,000 Pre-Seed investment into Marqo. Marqo allows search engines to think like humans through neural search. The Melbourne-based company is led by two senior engineers from Amazon Robotics and Australia.
 
 ## What is neural search?
 
@@ -26,7 +26,7 @@ The problem is that multimodal search can be extremely beneficial in many multim
 More than just the technology, we are backing two incredible founders. Jesse has a PhD in Physics from La Trogue, Postdocs at UCL and Stanford, and was a Lead Machine Learning Scientist at Alexa and Amazon Robotics. Tom Hamer has software degrees from Australian National University and Cambridge, and was a software engineer within AWS' ElasticSearch and Database teams. Together, they have built a team of search enthusiasts with the passion and skillset to enable developers worldwide effortless access to neural search. 
 
 <p align="center">
-    <img src="https://github.com/iain-mackie/marqo-gpt3/blob/main/assets/marqo_photo.jpeg" alt="Jesse & Tom" width="420" height="600" >
+    <img src="https://github.com/marqo-ai/marqo/blob/mainline/examples/GPT3NewsSummary/assets/marqo_photo.jpeg" alt="Jesse & Tom" width="420" height="600" >
 
 Marqo's open-source Github <a href="https://github.com/marqo-ai/marqo">Github</a> has reached 1.1k+ 🌟 in 6 weeks (top 10 trending libraries!). They have also launched the cloud beta that allows customers to pay-per-query and reduces costs due to pooled resources (<a href="https://q78175g1wwa.typeform.com/to/d0PEuRPC">join waiting list</a>). Lastly, they are building a community of search enthusiasts tackling different problems (<a href="https://join.slack.com/t/marqo-community/shared_invite/zt-1d737l76e-u~b3Rvey2IN2nGM4wyr44w">Slack</a>).
 
@@ -39,7 +39,7 @@ I wanted to build a fun search application within minutes to show the ease and p
 The plan is to use Marqo's search to provide useful context for a generation algorithm; we use OpenAI's GPT3 API (<a href="https://openai.com/api/">link</a>). This is more formally called "retrieval-augmented generation" and helps with generation tasks that require specific knowledge that the model has not seen during training. For example, company-specific documents and news data that's "in the future". Overview of what we're planning: 
 
 <p align="center">
-    <img src="https://github.com/iain-mackie/marqo-gpt3/blob/main/assets/overview.png" alt="Overview" width="500" height="350" >
+    <img src="https://github.com/marqo-ai/marqo/blob/mainline/examples/GPT3NewsSummary/assets/overview.png" alt="Overview" width="500" height="350" >
 
 
 Thus, we can see the problem when we solely ask GPT3, "What is happening in business today?" It does not know and thus generates a generic response:
@@ -118,4 +118,4 @@ Sucess! You'll notice that using Marqo to add relevant and temporally correct co
   <li>Tesla stock has hit a 2-year low after CEO Elon Musk sold $4 billion worth of shares</li>
 </ol>
 
-Full code: <a href="https://github.com/iain-mackie/marqo-gpt3/blob/main/main.py">here</a> (you'll need GPT3 API token)
+Full code: <a href="https://github.com/marqo-ai/marqo/blob/mainline/examples/GPT3NewsSummary/main.py">here</a> (you'll need GPT3 API token)
