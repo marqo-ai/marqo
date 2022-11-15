@@ -1,17 +1,34 @@
-
 import cv2
 import numpy as np
+
 import torch
 import torchvision
-
 import onnxruntime
+import huggingface_hub
 
 from marqo.s2_inference.s2_inference import get_logger
 from marqo.s2_inference.types import Dict, List, Union, ImageType, Tuple, FloatTensor, ndarray, Callable
-
 from marqo.s2_inference.processing.image_utils import _get_onnx_provider
 
 logger = get_logger("image_yolox_utils")
+
+def get_default_yolox_model() -> Dict:
+    return {
+        "repo_id":'Marqo/marqo-yolo-v1',
+        "filename": 'yolox_s.onnx',
+    }
+
+def _download_yolox(repo_id : str, filename: str) -> str:
+    """ downloads the model artefacts from hf
+
+    Args:
+        repo_name (str): _description_
+        filename (str): _description_
+
+    Returns:
+        str: _description_
+    """
+    return huggingface_hub.hf_hub_download(repo_id=repo_id, filename=filename)
 
 def preprocess_yolox(img: ndarray, input_size: Tuple, swap: Tuple = (2, 0, 1)) -> Tuple[ndarray, float]:
     """prepares an image for yolox inference
