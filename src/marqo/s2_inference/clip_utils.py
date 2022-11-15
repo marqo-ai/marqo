@@ -189,7 +189,7 @@ class CLIP:
 
     def encode_image(self, images: Union[str, ImageType, List[Union[str, ImageType]]], 
                         normalize = True) -> FloatTensor:
-        print("hereCLIPPY-2")
+
         if self.model is None:
             self.load()
 
@@ -200,20 +200,20 @@ class CLIP:
             image_input = [format_and_load_CLIP_image(images)]
 
         self.image_input_processed = torch.stack([self.preprocess(_img).to(self.device) for _img in image_input])
-        print("hereCLIPPY-3")
+
         with torch.no_grad():
             outputs = self.model.encode_image(self.image_input_processed)
-        print("hereCLIPPY-4")
+
         if normalize:
             _shape_before = outputs.shape
             outputs /= self.normalize(outputs)
             assert outputs.shape == _shape_before
-        print("hereCLIPPY-5")
+
         return self._convert_output(outputs)
 
     def encode(self, inputs: Union[str, ImageType, List[Union[str, ImageType]]], 
                                 default: str = 'text', normalize = True, **kwargs) -> FloatTensor:
-        print("hereCLIPPY 1")
+
         infer = kwargs.pop('infer', True)
 
         if infer and _is_image(inputs):
