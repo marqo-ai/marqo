@@ -4,6 +4,8 @@ from marqo.s2_inference.sbert_utils import SBERT, TEST
 from marqo.s2_inference.random_utils import Random
 from marqo.s2_inference.clip_utils import CLIP, OPEN_CLIP, OPENCV_CLIP
 from marqo.s2_inference.types import Any, Dict, List, Optional, Union, FloatTensor
+from marqo.s2_inference.clip_onnx_utils import ONNX_CLIP
+from marqo.s2_inference.opencv_clip_utils import FULLOPENCV_CLIP
 
 # we need to keep track of the embed dim and model load functions/classes
 # we can use this as a registry 
@@ -549,6 +551,20 @@ def _get_test_properties() -> Dict:
              "notes": "CLIP ViT-B/32",
              "type": "opencvclip",
              },
+        "onnx/ViT-B/32":
+            {
+                "name" : "onnx/ViT-B/32",
+                "dimensions" : 512,
+                "notes" : "onnx version of ViT-B/32",
+                "type" : "onnxclip",
+            },
+        "fullopencv/ViT-B/32":
+            {
+                "name" : "fullopencv/ViT-B/32",
+                "dimensions" : 512,
+                "notes" : "read from opencv2, clip ViT-B/32",
+                "type" : "fullopencv",
+            }
     }
     return TEST_MODEL_PROPERTIES
 
@@ -560,6 +576,8 @@ def _get_model_load_mappings() -> Dict:
             'test':TEST, 
             'sbert_onnx':SBERT_ONNX,
             'opencvclip': OPENCV_CLIP,
+            'onnxclip': ONNX_CLIP,
+            "fullopencv" : FULLOPENCV_CLIP,
             'random':Random, 
             'hf':HF_MODEL}
 
