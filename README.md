@@ -213,10 +213,6 @@ results = mq.index("my-multimodal-index").search('https://upload.wikimedia.org/w
 ## Documentation
 The full documentation for Marqo can be found here [https://docs.marqo.ai/](https://docs.marqo.ai/).
 
-## Warning
-
-Note that you should not run other applications on Marqo's Opensearch cluster as Marqo automatically changes and adapts the settings on the cluster.
-
 ## M series Mac users
 Marqo does not yet support the docker-in-docker backend configuration for the arm64 architecture. This means that if you have an M series Mac, you will also need to run marqo's backend, marqo-os, locally.
 

@@ -41,7 +41,6 @@ The plan is to use Marqo's search to provide useful context for a generation alg
 <p align="center">
     <img src="https://github.com/marqo-ai/marqo/blob/mainline/examples/GPT3NewsSummary/assets/overview.png" alt="Overview" width="500" height="350" >
 
-
 Thus, we can see the problem when we solely ask GPT3, "What is happening in business today?" It does not know and thus generates a generic response:
 ```
 Question: What is happening in business today?
