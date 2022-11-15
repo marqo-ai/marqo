@@ -27,6 +27,32 @@ sudo systemctl enable containerd.service
 
 - Install git with `sudo apt-get install git`
 
+### Setting up CUDA Image
+- Follow all the steps for AMD64 and ARM64
+
+- Install `nvidia-docker` like this:
+```bash
+distribution=$(. /etc/os-release;echo $ID$VERSION_ID) \
+      && curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg \
+      && curl -s -L https://nvidia.github.io/libnvidia-container/$distribution/libnvidia-container.list | \
+            sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
+            sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+
+sudo apt-get update
+sudo apt-get install -y nvidia-docker2
+```
+
+- Install latest Nvidia Driver with:
+```
+sudo apt install -y nvidia-driver-515 nvidia-dkms-515
+```
+
+- Reboot the system with:
+```
+sudo reboot
+```
+
+
 
 2. EC2 images (AMI) will then be created from these instances.
 
