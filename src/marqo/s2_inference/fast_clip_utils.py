@@ -1,13 +1,14 @@
 # from torch import FloatTensor
 # from typing import Any, Dict, List, Optional, Union
+from clip_onnx import clip_onnx
 import os
 import validators
 import requests
 import numpy as np
 import clip
 import torch
+from PIL import Image
 import cv2
-import open_clip
 
 from marqo.s2_inference.types import *
 from marqo.s2_inference.logger import get_logger
@@ -30,7 +31,7 @@ def format_and_load_CLIP_images(images: List[Union[str, ndarray, ImageType]]) ->
         TypeError: _description_
 
     Returns:
-        List[ImageType]: list of PIL images
+        List[ndarray]: list of ndarray images (cv2 support)
     """
     if not isinstance(images, list):
         raise TypeError(f"expected list but received {type(images)}")
@@ -41,9 +42,12 @@ def format_and_load_CLIP_images(images: List[Union[str, ndarray, ImageType]]) ->
 
     return results
 
+def _convert_to_rgb(image):
+    return cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
 
 def _load_image_from_path(image: str) -> ndarray:
-    """loads an image into PIL from a string path that is
+    """loads an ndarray image from a string path that is
     either local or a url
 
     Args:
@@ -65,9 +69,6 @@ def _load_image_from_path(image: str) -> ndarray:
         raise ValueError(f"input str of {image} is not a local file or a valid url")
     return _convert_to_rgb(img)
 
-def _convert_to_rgb(image):
-    return cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-
 
 def format_and_load_CLIP_image(image: Union[str, ndarray, ImageType]) -> ndarray:
     """standardizes the input to be a PIL image
@@ -87,7 +88,6 @@ def format_and_load_CLIP_image(image: Union[str, ndarray, ImageType]) -> ndarray
         img = _load_image_from_path(image)
     elif isinstance(image, np.ndarray):
         img = image.astype("uint8")
-
     elif isinstance(image, ImageType):
         img = np.array(image).astype("unit8")
     else:
@@ -143,29 +143,57 @@ def _is_image(inputs: Union[str, List[Union[str, ImageType, ndarray]]]) -> bool:
         raise TypeError(f"expected type Image or str for inputs but received type {type(thing)}")
 
 
-class FULLOPENCV_CLIP:
+class Fast_CLIP(object):
     """
-    conveniance class wrapper to make clip work easily for both text and image encoding
+    This model uses the open_cv based preprocessing to speed up the preprocessing of the image.
+
+    (NOTE THAT due to different preprocessing strategies, the results might be different from the original clip)
+
+    This image uses the onnx model to speed up the inference speed.
     """
 
-    def __init__(self, model_type: str = "fullopencv/ViT-B/32", device: str = 'cpu', embedding_dim: int = None,
-                 truncate: bool = True, **kwargs) -> None:
-
-        self.model_type = model_type.split("fullopencv/")[1]
+    def __init__(self, model_name, device = "cpu", embedding_dim: int = None, truncate: bool = True,
+                 load=True, **kwargs):
+        self.model_name = model_name
+        self.clip_name = model_name.split("fast/")[1]
+        self.clip_model = None
+        self.clip_preprocess = None
         self.device = device
-        self.model = None
-        self.tokenizer = None
-        self.processor = None
-        self.embedding_dimension = embedding_dim
+        self.image_onnx = None
+        self.text_onnx = None
+        self.visual_path = self.model_name.replace("/", "-") + "-visual"
+        self.textual_path = self.model_name.replace("/", "-") + "-textual"
+        self.onnx_model = None
         self.truncate = truncate
+        self.providers = ["CPUExecutionProvider"]
+        if self.device == "cuda":
+            self.providers.insert(0, 'CUDAExecutionProvider')
 
-    def load(self) -> None:
-        # https://github.com/openai/CLIP/issues/30
-        self.model, _ = clip.load(self.model_type, device='cpu', jit=False)
-        self.preprocess = self.opencv_process()
-        self.model = self.model.to(self.device)
-        self.tokenizer = clip.tokenize
-        self.model.eval()
+    def load(self):
+        try:
+            self.load_onnx()
+        except:
+            self.onnx_converter()
+
+    @staticmethod
+    def _convert_to_ndarray(image):
+        return np.array(image)
+
+    @staticmethod
+    def normalize(outputs):
+        return outputs.norm(dim=-1, keepdim=True)
+
+    def _convert_output(self, output):
+        if self.device == 'cpu':
+            return output.numpy()
+        elif self.device.startswith('cuda'):
+            return output.cpu().numpy()
+
+    def clip_load(self):
+
+        if self.clip_model is None or self.clip_preprocess is None:
+            self.clip_model, _ = clip.load(self.clip_name, device="cpu", jit=False)
+            self.clip_preprocess = self.opencv_process()
 
     def opencv_process(self):
         from augmennt import transforms as at
@@ -179,54 +207,48 @@ class FULLOPENCV_CLIP:
         ])
         return at_transform
 
-    @staticmethod
-    def _convert_to_ndarray(image):
-        return np.array(image)
+    def onnx_converter(self):
+        self.clip_load()
+        if self.image_onnx is None or self.text_onnx is None:
+            dummy_input = np.random.rand(1000, 1000, 3) * 255
+            dummy_input = dummy_input.astype("uint8")
 
-    def _convert_output(self, output):
+            image = self.clip_preprocess(Image.fromarray(dummy_input).convert("RGB")).unsqueeze(0).cpu()
 
-        if self.device == 'cpu':
-            return output.numpy()
-        elif self.device.startswith('cuda'):
-            return output.cpu().numpy()
+            text = clip.tokenize(["a diagram", "a dog", "a cat"]).cpu()
 
-    @staticmethod
-    def normalize(outputs):
-        return outputs.norm(dim=-1, keepdim=True)
+            self.onnx_model = clip_onnx(self.clip_model, visual_path=self.visual_path, textual_path=self.textual_path)
+            self.onnx_model.convert2onnx(image, text, verbose=True)
+            self.onnx_model.start_sessions(providers=self.providers)
 
-    def encode_text(self, sentence: Union[str, List[str]], normalize=True) -> FloatTensor:
-
-        if self.model is None:
+    def encode_text(self, sentence, normalize=True):
+        if self.onnx_model is None:
             self.load()
 
-        text = self.tokenizer(sentence, truncate=self.truncate).to(self.device)
-
-        with torch.no_grad():
-            outputs = self.model.encode_text(text)
+        sentence = clip.tokenize(sentence, truncate=self.truncate).cpu()
+        sentence_onnx = sentence.detach().cpu().numpy().astype(np.int32)
+        outputs = torch.tensor(self.onnx_model.encode_text(sentence_onnx))
 
         if normalize:
             _shape_before = outputs.shape
             outputs /= self.normalize(outputs)
             assert outputs.shape == _shape_before
-
         return self._convert_output(outputs)
 
-    def encode_image(self, images: Union[str, ImageType, List[Union[str, ImageType]]],
-                     normalize=True) -> FloatTensor:
+    def encode_image(self, images, normalize=True):
 
-        if self.model is None:
+        if self.onnx_model is None:
             self.load()
 
-        # default to batch encoding
         if isinstance(images, list):
             image_input = format_and_load_CLIP_images(images)
         else:
             image_input = [format_and_load_CLIP_image(images)]
 
-        self.image_input_processed = torch.stack([self.preprocess(_img).to(self.device) for _img in image_input])
+        self.image_input_processed = torch.stack([self.clip_preprocess(_img).to(self.device) for _img in image_input])
 
-        with torch.no_grad():
-            outputs = self.model.encode_image(self.image_input_processed)
+        self.images_onnx = self.image_input_processed.detach().cpu().numpy().astype(np.float32)
+        outputs = torch.tensor(self.onnx_model.encode_image(self.images_onnx))
 
         if normalize:
             _shape_before = outputs.shape
@@ -236,6 +258,9 @@ class FULLOPENCV_CLIP:
 
     def encode(self, inputs: Union[str, ImageType, List[Union[str, ImageType]]],
                default: str = 'text', normalize=True, **kwargs) -> FloatTensor:
+
+        if self.onnx_model is None:
+            self.load()
 
         infer = kwargs.pop('infer', True)
 
@@ -252,9 +277,18 @@ class FULLOPENCV_CLIP:
 
         if is_image:
             logger.debug('image')
-            return self.encode_image(inputs, normalize=normalize)
+            return self.encode_image(inputs, normalize=True)
         else:
             logger.debug('text')
-            return self.encode_text(inputs, normalize=normalize)
+            return self.encode_text(inputs, normalize=True)
+
+    def load_onnx(self):
+        self.clip_load()
+        self.onnx_model = clip_onnx(None)
+        self.onnx_model.load_onnx(visual_path=self.visual_path,
+                                  textual_path=self.textual_path,
+                                  logit_scale=100.0000)  # model.logit_scale.exp()
+        self.onnx_model.start_sessions(self.providers)
+
 
 
