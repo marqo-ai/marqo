@@ -29,7 +29,7 @@ from marqo.s2_inference.processing.image import (
 )
 
 
-class TestImageChunking(unittest.TestCase):
+class TestImageUtils(unittest.TestCase):
 
     def setUp(self) -> None:
         pass 
