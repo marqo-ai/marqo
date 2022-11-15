@@ -53,7 +53,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up Python 3.9   # TODO: Check if 3.9 is okay isntead of 3.8
+      - name: Set up Python 3.9   # TODO: Check if 3.9 is okay instead of 3.8
         run:  |
           sudo apt-get -y install python3.9
           sudo apt-get -y install pip

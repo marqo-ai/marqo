@@ -16,12 +16,12 @@ AMD instance: t3.xlarge, 4CPUS, 16gbRAM, 50gb storage
 
 ARM instance: a1.xlarge, 4CPUs, 8gbRAM, 50gb storage  
 
-### Setting up AMD64 Image
+### Setting up AMD64 & ARM64 Image
 - Install Docker with https://docs.docker.com/engine/install/ubuntu/
 
 - Enable Docker with:
 ```bash
-sudo systemctl enable docker.service
+sudo systemctl enable docker.service  
 sudo systemctl enable containerd.service
 ```
 
