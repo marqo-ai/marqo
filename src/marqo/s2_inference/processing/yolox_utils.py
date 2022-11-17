@@ -70,7 +70,15 @@ def load_yolox_onnx(model_name: str, device: str) -> Tuple[onnxruntime.Inference
     """
     fast_onnxprovider = _get_onnx_provider(device)
 
-    session = onnxruntime.InferenceSession(model_name, providers=[fast_onnxprovider])
+    # can deadlock using mp ingestion
+    # TODO have a way to tell it is in a mp
+    sess_options = onnxruntime.SessionOptions()
+    # sess_options.intra_op_num_threads = 1
+    # sess_options.inter_op_num_threads = 1
+
+    session = onnxruntime.InferenceSession(model_name, sess_options=sess_options, providers=[fast_onnxprovider])
+    session.disable_fallback()
+    logger.info(f"using yolox onnx provider:{session.get_providers()} after requesting {fast_onnxprovider}")
     preprocess = preprocess_yolox
 
     return session, preprocess

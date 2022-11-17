@@ -19,6 +19,8 @@ from marqo.s2_inference.processing.yolox_utils import (
    _process_yolox,
     _infer_yolox, 
     load_yolox_onnx,
+    get_default_yolox_model,
+    _download_yolox
 )
 
 from marqo.s2_inference.processing.image_utils import (
@@ -93,15 +95,10 @@ def chunk_image(image: Union[str, ImageType], device: str,
     elif method in ['fastercnn', 'frcnn']:
         patch = PatchifyPytorch(device=device, size=size, nms=nms, filter_bb=filter_bb)
 
-    elif method in ['overlap/fastercnn', 'overlap/frcnn', 
-                        'fastercnn/overlap', 'frcnn/overlap']:
-        patch = PatchifyPytorch(device=device, size=size, 
-                    prior=True, hn=hn, wn=wn, nms=nms, filter_bb=filter_bb)
-
     elif method in ['marqo-yolo', 'yolox']:
         patch = PatchifyYolox(device=device, size=size)
     
-    elif method in ['dino/v1', 'dino/v2']:
+    elif method in ['dino-v1', 'dino-v2', 'dino/v1', 'dino/v2']:
         if 'v1' in method:
             patch = PatchifyViT(device=device, filter_bb=True, size=size,
                         attention_method='abs', nms=True, replace_small=True)
@@ -149,7 +146,6 @@ class PatchifySimple:
         self.patches = patchify_image(self.image_resized, self.bboxes)
 
         self.bboxes_orig = [rescale_box(bb, self.size, self.original_size) for bb in self.bboxes]
-
 
 
 class PatchifyModel:
@@ -358,11 +354,11 @@ class PatchifyPytorch(PatchifyModel):
         self.inds = []
         self.iou_thresh = 0.6
 
-    def _keep_topk_sorted(self):
-        if len(self.scores) > self.top_k_scores:
-            self.inds = np.argsort(np.array(self.scores).squeeze())[::-1][:self.top_k_scores]
-            self.boxes_xyxy = [self.boxes_xyxy[ind] for ind in self.inds]
-            self.scores = [self.scores[ind] for ind in self.inds]
+    # def _keep_topk_sorted(self):
+    #     if len(self.scores) > self.top_k_scores:
+    #         self.inds = np.argsort(np.array(self.scores).squeeze())[::-1][:self.top_k_scores]
+    #         self.boxes_xyxy = [self.boxes_xyxy[ind] for ind in self.inds]
+    #         self.scores = [self.scores[ind] for ind in self.inds]
 
     def infer(self, image):
         self._load_image(image)
@@ -376,7 +372,7 @@ class PatchifyPytorch(PatchifyModel):
         if isinstance(self.scores, (np.ndarray, np.generic)):
             self.scores = self.scores.tolist()
 
-        self._keep_topk_sorted()
+        self._keep_top_k_sorted()
     
 
 class PatchifyYolox(PatchifyModel):
@@ -390,7 +386,8 @@ class PatchifyYolox(PatchifyModel):
     def _get_model_specific_parameters(self):
      
         # fill in with specifics
-        self.model_name = "/mnt/internal1/datasets/LVIS/YOLOX/yolox_s.onnx"
+        self.yolox_default = get_default_yolox_model()
+        self.model_name = _download_yolox(**self.yolox_default)
        
         self.model_load_function = load_yolox_onnx
         self.allowed_model_types = (self.model_name)
@@ -398,11 +395,11 @@ class PatchifyYolox(PatchifyModel):
         self.inds = []
         self.iou_thresh = 0.6
 
-    def _keep_topk_sorted(self):
-        if len(self.scores) > self.top_k_scores:
-            self.inds = np.argsort(np.array(self.scores).squeeze())[::-1][:self.top_k_scores]
-            self.boxes_xyxy = [self.boxes_xyxy[ind] for ind in self.inds]
-            self.scores = [self.scores[ind] for ind in self.inds]
+    # def _keep_topk_sorted(self):
+    #     if len(self.scores) > self.top_k_scores:
+    #         self.inds = np.argsort(np.array(self.scores).squeeze())[::-1][:self.top_k_scores]
+    #         self.boxes_xyxy = [self.boxes_xyxy[ind] for ind in self.inds]
+    #         self.scores = [self.scores[ind] for ind in self.inds]
 
     def infer(self, image):
         self._load_image(image)
@@ -418,4 +415,4 @@ class PatchifyYolox(PatchifyModel):
         if isinstance(self.scores, (np.ndarray, np.generic)):
             self.scores = self.scores.tolist()
         
-        self._keep_topk_sorted()
+        self._keep_top_k_sorted()

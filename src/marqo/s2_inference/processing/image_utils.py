@@ -8,7 +8,7 @@ import onnxruntime
 from marqo.s2_inference.s2_inference import get_logger
 from marqo.s2_inference.types import Dict, List, Union, ImageType, Tuple, FloatTensor, ndarray
 from marqo.s2_inference.clip_utils import _load_image_from_path
-from marqo.s2_inference.errors import ChunkerError, ChunkerMethodProcessError
+from marqo.s2_inference.errors import ChunkerMethodProcessError
 
 from torchvision import transforms
 
@@ -121,84 +121,8 @@ def calc_area(bboxes: Union[List[List], FloatTensor, ndarray], size: Union[None,
     areas = [(bb[2]-bb[0])*(bb[3]-bb[1])/A for bb in bboxes]
     return areas
 
-def distance_matrix(v: Union[ndarray, FloatTensor], vectors: Union[ndarray, FloatTensor]) -> List[float]:
-    """calculates the distances between a vector v and a array of vectors vectors
-
-    Args:
-        v (Union[ndarray, FloatTensor]): _description_
-        vectors (Union[ndarray, FloatTensor]): _description_
-
-    Returns:
-        List[Float]: _description_
-    """
-    # TODO vectorize
-    return [_mse(v, u) for u in vectors]
-
-def get_centers(vectors: Union[ndarray, FloatTensor]) -> ndarray:
-    """calculates the centers of rectangles given the 4-tuple (x1,y1,x2,y2)
-
-    Args:
-        vectors (Union[ndarray, FloatTensor]): _description_
-
-    Returns:
-        ndarray: _description_
-    """
-    x_c = (vectors[:,2] - vectors[:,0])/2 + vectors[:,0]
-    y_c = (vectors[:,3] - vectors[:,1])/2 + vectors[:,1]
-    
-    return np.stack([x_c, y_c], axis=-1)
-
-def _mse(a: Union[FloatTensor, ndarray], b: Union[FloatTensor, ndarray]) -> float:
-    """mean squared error of two vectors
-
-    Args:
-        a (Union[FloatTensor, ndarray]): _description_
-        b (Union[FloatTensor, ndarray]): _description_
-
-    Returns:
-        Float: _description_
-    """
-    return np.sum(np.abs(a - b)**2)
-
-def greedy_select(vectors: Union[FloatTensor, ndarray]) -> Tuple[List[int], List[float]]:
-    """greedily selects the farthest point from the centroid of all selected points
-
-    Args:
-        vectors (Union[FloatTensor, ndarray]): _description_
-
-    Returns:
-        Tuple[List[int], List[Float]]: _description_
-    """
-    vectors_orig = copy.deepcopy(vectors)
-    vectors = copy.deepcopy(vectors)
-    # selecte a vector
-    out_inds = []
-    largest_distances = []
-    # we need the indices of our original vectors
-    inds = list(range(len(vectors)))
-    # we need a starting vector, could also be selected other ways
-    start_ind = inds[0]
-    # this is our ordered indices that we use to get the keep order
-    out_inds.append(start_ind)
-    # we need the start vector, this will be updated with an average
-    v = vectors[start_ind]
-    while len(out_inds) != len(inds): # could also terminate early
-
-        # get the distance to all
-        distances = distance_matrix(v, vectors)
-        # the next is found by taking the furthest away from v
-        next_ind = inds[np.argmax(distances)]
-        # we add it to the list
-        out_inds.append(next_ind)
-        # now get the next reference ind
-        v = np.mean(vectors_orig[out_inds][:3], axis=0)
-        # now set all the seen ones to the mean so the are not selected
-        vectors[out_inds] = v
-
-        largest_distances.append(distances[next_ind])
-    return out_inds, largest_distances
-
-def filter_boxes(bboxes: Union[FloatTensor, ndarray], max_aspect_ratio: int = 4, min_area: int = 40*40) -> List[int]:
+def filter_boxes(bboxes: Union[FloatTensor, ndarray], max_aspect_ratio: int = 4, 
+                    min_area: int = 40*40, min_k: int = 3) -> List[int]:
     """filters a list of bounding boxes given as the 4-tuple (x1, y1, x2, y2)
     by area and aspect ratio
 
@@ -206,7 +130,7 @@ def filter_boxes(bboxes: Union[FloatTensor, ndarray], max_aspect_ratio: int = 4,
         bboxes (Union[FloatTensor, ndarray]): _description_
         max_aspect_ratio (int, optional): _description_. Defaults to 4.
         min_area (int, optional): _description_. Defaults to 40*40.
-
+        min_k : always keep this many
     Returns:
         List[ind]: _description_
     """
@@ -220,6 +144,41 @@ def filter_boxes(bboxes: Union[FloatTensor, ndarray], max_aspect_ratio: int = 4,
     
     return inds
 
+# def filter_boxes_with_min_k(bboxes: Union[FloatTensor, ndarray], max_aspect_ratio: int = 4, 
+#                     min_area: int = 40*40, min_k: int = 3) -> List[int]:
+#     """filters a list of bounding boxes given as the 4-tuple (x1, y1, x2, y2)
+#     by area and aspect ratio
+
+#     Args:
+#         bboxes (Union[FloatTensor, ndarray]): _description_
+#         max_aspect_ratio (int, optional): _description_. Defaults to 4.
+#         min_area (int, optional): _description_. Defaults to 40*40.
+#         min_k : always keep this many
+#     Returns:
+#         List[ind]: _description_
+#     """
+#     data = []
+#     N = len(bboxes)
+#     for ind,bb in enumerate(bboxes):
+#         w, h = (bb[2] - bb[0]), (bb[3] - bb[1])
+#         area = w*h
+#         aspect = max(w,h)/min(w,h)
+#         data.append((ind,area,aspect))    
+        
+#     # now filter but repect a minimum
+#     data = [d for d in data if (d[1] >= min_area and d[2] <= max_aspect_ratio)]
+#     inds, areas, aspects = zip(*data)
+#     data_left = sorted([d for d in data if not (d[1] >= min_area and d[2] <= max_aspect_ratio)], key=lambda x:-x[1])
+#     if len(data_left) == 0:
+#         return inds
+
+#     inds_left, _, _ = zip(*data_left)
+#     assert not bool(set(inds) & set(inds_left))
+#     if len(inds) < min_k:
+#         delta = min_k - len(inds)
+#         inds += inds_left[:delta]
+
+#     return inds
 
 def rescale_box(box: Union[List[float], ndarray, FloatTensor], from_size: Tuple, to_size: Tuple) -> Tuple:
     """rescales a bounding box between two different image sizes
