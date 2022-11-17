@@ -75,6 +75,7 @@ def create_vector_index(
         media_type: 'text'|'image'
     """
     if index_settings is not None:
+        _check_model_name(index_settings)
         the_index_settings = _autofill_index_settings(index_settings=index_settings)
     else:
         the_index_settings = configs.get_default_index_settings()
@@ -133,6 +134,13 @@ def create_vector_index(
         index_settings=the_index_settings
     )
     return response
+
+
+def _check_model_name(index_settings):
+    model_name = index_settings[NsField.index_defaults].get(NsField.model)
+    model_properties = index_settings[NsField.index_defaults].get(NsField.model_properties)
+    if model_properties is not None and model_name is None:
+        raise s2_inference_errors.UnknownModelError(f"No model name found for model_properties={model_properties}")
 
 
 def _marqo_field_limit_to_os_limit(marqo_index_field_limit: int) -> int:
@@ -407,7 +415,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
             # TODO put this into a function to determine routing
             if isinstance(field_content, (str, Image.Image)):
-                
+
                 # TODO: better/consistent handling of a no-op for processing (but still vectorize)
 
                 # 1. check if urls should be downloaded -> "treat_pointers_and_urls_as_images":True
@@ -418,7 +426,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                 # 6. if chunking -> then add the extra chunker
 
                 if isinstance(field_content, str) and not _is_image(field_content):
-                    
+
                     split_by = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][NsField.split_method]
                     split_length = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][NsField.split_length]
                     split_overlap = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][NsField.split_overlap]
@@ -441,13 +449,14 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                                  'code': image_err.code})
                         )
                         break
-                
+
                 normalize_embeddings = index_info.index_settings[NsField.index_defaults][NsField.normalize_embeddings]
                 infer_if_image = index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]
+
                 try:
                     # in the future, if we have different underlying vectorising methods, make sure we catch possible
                     # errors of different types generated here, too.
-                    vector_chunks = s2_inference.vectorise(model_name=index_info.model_name, content=content_chunks,
+                    vector_chunks = s2_inference.vectorise(model_name=index_info.model_name, model_properties=_get_model_properties(index_info), content=content_chunks,
                                                            device=selected_device, normalize_embeddings=normalize_embeddings,
                                                            infer=infer_if_image)
                 except s2_inference_errors.S2InferenceError:
@@ -548,7 +557,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
         # the HttpRequest wrapper handles error logic
         update_mapping_response = backend.add_customer_field_properties(
             config=config, index_name=index_name, customer_field_names=new_fields,
-            model_properties=s2_inference.get_model_properties(model_name=index_info.model_name))
+            model_properties=_get_model_properties(index_info))
 
         index_parent_response = HttpRequests(config).post(
             path="_bulk", body=utils.dicts_to_jsonl(bulk_parent_dicts))
@@ -762,10 +771,10 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
         )
     else:
         raise errors.InvalidArgError(f"Search called with unknown search method: {search_method}")
-    
+
     if reranker is not None:
-        rerank.rerank_search_results(search_result=search_result, query=text, 
-                    model_name=reranker, device=config.indexing_device, 
+        rerank.rerank_search_results(search_result=search_result, query=text,
+                    model_name=reranker, device=config.indexing_device,
                 searchable_attributes=searchable_attributes, num_highlights=1 if simplified_format else num_highlights)
 
     time_taken = datetime.datetime.now() - t0
@@ -908,7 +917,7 @@ def _vector_text_search(
 
     # TODO average over vectorized inputs with weights
     vectorised_text = s2_inference.vectorise(
-        model_name=index_info.model_name, content=text, 
+        model_name=index_info.model_name, model_properties=_get_model_properties(index_info), content=text,
         device=selected_device,
         normalize_embeddings=index_info.index_settings['index_defaults']['normalize_embeddings'])[0]
 
@@ -1152,4 +1161,11 @@ def _select_model_from_media_type(media_type: Union[MediaType, str]) -> Union[Ml
                          "Received unknown media type: {}".format(media_type))
 
 
+def _get_model_properties(index_info):
+    index_defaults = index_info.get_index_settings()["index_defaults"]
+    try:
+        model_properties = index_defaults[NsField.model_properties]
+    except KeyError:
+        model_properties = s2_inference.get_model_properties_from_registry(index_info.model_name)
 
+    return model_properties
