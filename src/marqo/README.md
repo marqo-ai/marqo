@@ -2,6 +2,8 @@
 Thank you for contributing to Marqo! Contributions from the open source community help make Marqo be the tensor engine
 you want. 
 
+See [here](https://github.com/marqo-ai/marqo/blob/mainline/CONTRIBUTING.md#unit-tests) for how to run unit tests.
+
 ### A. Run the Marqo application locally (outside of docker):
 
 1. Have a running Marqo-OS instance available to use. You can spin up a local instance with the following command
@@ -56,7 +58,7 @@ __Notes__:
 ### D. Pull marqo from `hub.docker.com` and run it
 ```
 docker rm -f marqo &&
-    docker run --name marqo --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:0.0.5
+    docker run --name marqo --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:0.0.6
 ```
 
 ### E. Run marqo on arm64 (including M-series Macs) for development
