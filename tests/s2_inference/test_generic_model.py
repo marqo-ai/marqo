@@ -1,6 +1,6 @@
 import numpy as np
 
-from marqo.errors import MarqoApiError, MarqoError, IndexNotFoundError
+from marqo.errors import IndexNotFoundError
 from marqo.s2_inference.errors import InvalidModelPropertiesError, UnknownModelError
 from marqo.tensor_search import tensor_search
 
