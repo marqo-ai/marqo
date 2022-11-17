@@ -27,6 +27,7 @@ def vectorise(model_name: str, content: Union[str, List[str]], device: str = get
     Raises:
         VectoriseError: if the content can't be vectorised, for some reason.
     """
+
     model_cache_key = _create_model_cache_key(model_name, device)
 
     if model_cache_key not in available_models:

@@ -13,7 +13,7 @@ Python 3.8
 1. Download the Dataset from
     [Clothing Dataset](https://github.com/alexeygrigorev/clothing-dataset) into the directory where the `simple_marqo_demo.py` script is found.
 
-2. Run this command inside the script directory to setup an HTTP server
+2. Run this command inside the script directory to setup an HTTP server:
     ```
     python3 -m http.server 8222
     ```
@@ -22,7 +22,7 @@ Python 3.8
 
 3. Make sure to run the Marqo docker container via the following command:
     ```
-    docker run --name marqo -it --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:0.0.3
+    docker run --name marqo -it --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:0.0.4
     ```
 
 4. Install Marqo

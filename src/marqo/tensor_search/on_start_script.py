@@ -1,9 +1,17 @@
 from marqo.tensor_search.tensor_search_logging import get_logger
 import time
+from marqo.tensor_search import index_meta_cache
+from marqo import config
+from marqo.tensor_search.web import api_utils
+from marqo._httprequests import HttpRequests
+from marqo import errors
 
-def on_start():
+
+def on_start(marqo_os_url: str):
         
-    to_run_on_start = (DownloadStartText(), 
+    to_run_on_start = (
+                        PopulateCache(marqo_os_url),
+                        DownloadStartText(),
                         CUDAAvailable(), 
                         ModelsForCacheing(), 
                         NLTK(), 
@@ -14,6 +22,42 @@ def on_start():
 
     for thing_to_start in to_run_on_start:
         thing_to_start.run()
+
+
+class PopulateCache:
+    """Populates the cache on start"""
+
+    def __init__(self, marqo_os_url: str):
+        self.marqo_os_url = marqo_os_url
+        pass
+
+    def run(self):
+        c = config.Config(api_utils.upconstruct_authorized_url(
+            opensearch_url=self.marqo_os_url
+        ))
+        try:
+            index_meta_cache.populate_cache(c)
+        except errors.BackendCommunicationError as e:
+            raise errors.BackendCommunicationError(
+                message="Can't connect to Marqo-os backend. \n"  
+                        "    Possible causes: \n"
+                        "        - If this is an arm64 machine, ensure you are using an external Marqo-os instance \n"
+                        "        - If you are using an external Marqo-os instance, check if it is running: "
+                        "`curl <YOUR MARQO-OS URL>` \n"
+                        "        - Ensure that the OPENSEARCH_URL environment variable defined "
+                        "in the `docker run marqo` command points to Marqo-os\n",
+                link="https://github.com/marqo-ai/marqo/tree/mainline/src/marqo"
+                     "#c-build-and-run-the-marqo-as-a-docker-container-connecting-"
+                     "to-marqo-os-which-is-running-on-the-host"
+            ) from e
+        # the following lines turns off auto create index
+        # connection = HttpRequests(c)
+        # connection.put(
+        #     path="_cluster/settings",
+        #     body={
+        #         "persistent": {"action.auto_create_index": "false"}
+        #     })
+
 
 class CUDAAvailable:
 
@@ -44,9 +88,9 @@ class CUDAAvailable:
             device_names.append( {'id':device_id, 'name':id_to_device(device_id)})
         self.logger.info(f"found devices {device_names}")
 
-class NLTK: 
 
-    """predownloads the nltk stuff
+class NLTK:
+    """Pre-downloads the nltk stuff
     """
 
     logger = get_logger('NLTK setup')
@@ -65,8 +109,8 @@ class NLTK:
             nltk.download('punkt')        
         self.logger.info("completed loading nltk")
 
+
 class ModelsForCacheing:
-    
     """warms the in-memory model cache by preloading good defaults
     """
     logger = get_logger('ModelsForStartup')
@@ -74,12 +118,7 @@ class ModelsForCacheing:
     def __init__(self):
         import torch
       
-        self.models = []
-        # (
-        #     'hf/all_datasets_v4_MiniLM-L6',
-        #     'onnx/all_datasets_v4_MiniLM-L6',
-        #     "ViT-B/16",
-        # )
+        self.models = self.models = ['ViT-L/14']
         # TBD to include cross-encoder/ms-marco-TinyBERT-L-2-v2
 
         self.default_devices = ['cpu'] if not torch.cuda.is_available() else ['cpu', 'cuda']
@@ -125,6 +164,7 @@ class DownloadStartText:
         print("###########################################################")
         print('\n')
 
+
 class DownloadFinishText:
 
     def run(self):
@@ -135,6 +175,7 @@ class DownloadFinishText:
         print("###########################################################")
         print("###########################################################")
         print('\n')
+
 
 class MarqoPhrase:
 
@@ -150,6 +191,7 @@ class MarqoPhrase:
         """
 
         print(message)
+
 
 class MarqoWelcome:
 

@@ -88,6 +88,7 @@ class IndexChunk:
     def __init__(self, config=None, index_name: str = None, docs: List[Dict] = [], 
                         auto_refresh: bool = False, batch_size: int = 50, 
                         device: str = None, process_id: int = 0, 
+                        non_tensor_fields: List[str] = [],
                         threads_per_process: int = None, update_mode: str = 'replace'):
 
         self.config = copy.deepcopy(config)
@@ -102,6 +103,7 @@ class IndexChunk:
         self.update_mode = update_mode
         self.config.indexing_device = device if device is not None else self.config.indexing_device
         self.threads_per_process = threads_per_process
+        self.non_tensor_fields = non_tensor_fields
 
     def process(self):  
 
@@ -126,10 +128,10 @@ class IndexChunk:
             
             if n_processed % progress_display_frequency == 0:
                 logger.info(f'process={self.process_id} completed={percent_done}/100% on device={self.device}')
-            
+
             results.append(tensor_search.add_documents(
                 config=self.config, index_name=self.index_name, docs=_doc, auto_refresh=self.auto_refresh,
-                update_mode=self.update_mode
+                update_mode=self.update_mode, non_tensor_fields=self.non_tensor_fields
             ))
             t_chunk_end = time.time()
 
@@ -163,13 +165,15 @@ def get_threads_per_process(processes: int):
 
 def add_documents_mp(config=None, index_name=None, docs=None, 
                      auto_refresh=None, batch_size=50, processes=1, device=None,
-                     update_mode: str = None):
+                     non_tensor_fields: List[str] = [], update_mode: str = None):
     """add documents using parallel processing using ray
     Args:
         documents (_type_): _description_
         config (_type_, optional): _description_. Defaults to None.
         index_name (_type_, optional): _description_. Defaults to None.
         auto_refresh (_type_, optional): _description_. Defaults to None.
+        non_tensor_fields (_type, List[str]): _description_. Fields within documents not to create 
+          tensors for. Defaults to create tensors for all fields.
         update_mode (str, optional):
     
     Assumes running on the same host right now. Ray or something else should 
@@ -196,12 +200,13 @@ def add_documents_mp(config=None, index_name=None, docs=None,
     # get the device ids for each process based on the process count and available devices
     device_ids = get_device_ids(n_processes, selected_device)
 
-    start  = time.time()
+    start = time.time()
 
-    chunkers = [IndexChunk(config=config, index_name=index_name, docs=_docs,
-                            auto_refresh=auto_refresh, batch_size=batch_size, update_mode=update_mode,
-                            process_id=p_id, device=device_ids[p_id], threads_per_process=threads_per_process)
-                            for p_id,_docs in enumerate(np.array_split(docs, n_processes))]
+    chunkers = [IndexChunk(
+            config=config, index_name=index_name, docs=_docs, non_tensor_fields=non_tensor_fields,
+            auto_refresh=auto_refresh, batch_size=batch_size, update_mode=update_mode,
+            process_id=p_id, device=device_ids[p_id], threads_per_process=threads_per_process)
+        for p_id,_docs in enumerate(np.array_split(docs, n_processes))]
     logger.info(f'Performing parallel now across devices {device_ids}...')
     with mp.Pool(n_processes) as pool:
         results = pool.map(_run_chunker, chunkers)
