@@ -221,8 +221,11 @@ def _check_and_create_index_if_not_exist(config: Config, index_name: str):
 def add_documents_orchestrator(
         config: Config, index_name: str, docs: List[dict],
         auto_refresh: bool, batch_size: int = 0, processes: int = 1,
-        non_tensor_fields: List[str] = [],
+        non_tensor_fields=None,
         device=None, update_mode: str = 'replace'):
+
+    if non_tensor_fields is None:
+        non_tensor_fields = []
 
     if batch_size is None or batch_size == 0:
         logger.info(f"batch_size={batch_size} and processes={processes} - not doing any marqo side batching")
@@ -257,10 +260,13 @@ def add_documents_orchestrator(
                               batch_size=batch_size, verbose=False, non_tensor_fields=non_tensor_fields)
 
 
-def _batch_request(config: Config, index_name: str, dataset: List[dict], 
+def _batch_request(config: Config, index_name: str, dataset: List[dict],
                    batch_size: int = 100, verbose: bool = True, device=None,
-                   update_mode: str = 'replace', non_tensor_fields: List[str] = []) -> List[Dict[str, Any]]:
+                   update_mode: str = 'replace', non_tensor_fields=None) -> List[Dict[str, Any]]:
         """Batch by the number of documents"""
+        if non_tensor_fields is None:
+            non_tensor_fields = []
+
         logger.info(f"starting batch ingestion in sizes of {batch_size}")
 
         deeper = ((doc, i, batch_size) for i, doc in enumerate(dataset))
@@ -313,7 +319,7 @@ def _infer_opensearch_data_type(
 
 
 def add_documents(config: Config, index_name: str, docs: List[dict], auto_refresh: bool,
-                  non_tensor_fields: List[str] = [], device=None, update_mode: str = "replace"):
+                  non_tensor_fields=None, device=None, update_mode: str = "replace"):
     """
 
     Args:
@@ -329,6 +335,9 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
     Returns:
 
     """
+    if non_tensor_fields is None:
+        non_tensor_fields = []
+
     t0 = datetime.datetime.now()
     bulk_parent_dicts = []
 
@@ -999,8 +1008,11 @@ def _vector_text_search(
         # KeyError indicates we have received a non-successful result
         try:
             if "index.max_result_window" in response["responses"][0]["error"]["root_cause"][0]["reason"]:
-                raise errors.IllegalRequestedDocCount("Marqo-OS rejected the response due to too many requested results. "
-                                             "Try reducing the query's limit parameter") from e
+                raise errors.IllegalRequestedDocCount(
+                    "Marqo-OS rejected the response due to too many requested results. "
+                    "Try reducing the query's limit parameter") from e
+            elif 'parse_exception' in response["responses"][0]["error"]["root_cause"][0]["reason"]:
+                raise errors.InvalidArgError("Syntax error, could not parse filter string") from e
             elif contextualised_filter in response["responses"][0]["error"]["root_cause"][0]["reason"]:
                 raise errors.InvalidArgError("Syntax error, could not parse filter string") from e
             raise e
