@@ -3,8 +3,8 @@
 #####################################################
 
 from marqo import Client
-import glob
 import os
+import pandas as pd 
 
 #####################################################
 ### STEP 1. start Marqo
@@ -17,24 +17,12 @@ import os
 #####################################################
 
 
-data_dir = "/home/jesse/code/stable-diffusion/scripts/coco/"
-
-files = glob.glob(data_dir + '*.jpg')
-
-docker_path = 'http://host.docker.internal:8222/'
-
-# we start an image server for easier access from within docker
-#pid = subprocess.Popen(['python3', '-m', 'http.server', '8222', '--directory', data_dir], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
-
-# we want to map the filename only with its docker path
-files_map = {os.path.basename(f):f for f in files}
-
-# update them to use the correct path
-files_docker = [f.replace(data_dir, docker_path) for f in files]
+data = pd.read_csv('files.csv', index_col=0)
 
 # now we create our documents for indexing - a list of python dicts with keys as field names
-documents = [{"image_docker":file_docker, '_id':os.path.basename(file_docker)} for file_docker,file_local in zip(files_docker, files)]
-#documents = [{"image_docker":file_local, '_id':os.path.basename(file_docker)} for file_docker,file_local in zip(files_docker, files)]
+documents = [{"image_location":s3_uri, '_id':os.path.basename(s3_uri)} for s3_uri in data['s3_uri']]
+# if you have the images locally, see the instructions 
+# here https://marqo.pages.dev/Advanced-Usage/images/ for the best ways to index 
 
 
 #####################################################
