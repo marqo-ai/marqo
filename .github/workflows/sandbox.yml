@@ -61,7 +61,7 @@ jobs:
     name: Stop self-hosted EC2 runner
     needs:
       - Start-Runner # required to get output from the start-runner job
-      - Test-Marqo # required to wait when the main job is done
+      - Sandbox # required to wait when the main job is done
     runs-on: ubuntu-latest
     if: ${{ always() }} # required to stop the runner even if the error happened in the previous jobs
     steps:
