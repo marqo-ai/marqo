@@ -63,7 +63,7 @@ jobs:
           pip install tox
           pip install flake8
       
-      # linting here
+      # TODO: linting here
   
       - name: Checkout marqo-api-tests repo
         uses: actions/checkout@v3
@@ -77,8 +77,6 @@ jobs:
         run: |
           # Set up conf file
           echo 'export MARQO_API_TESTS_ROOT="${{ github.workspace }}"' >> conf
-          # TODO: Carry across this S2SEARCH_URL secret 
-          # echo 'export S2SEARCH_URL="${{ secrets.S2SEARCH_URL }}"' >> conf
           
       - name: Run Integration Tests - local_os
         run: tox -e py3-local_os
