@@ -78,7 +78,7 @@ jobs:
           # Set up conf file
           echo 'export MARQO_API_TESTS_ROOT="${{ github.workspace }}"' >> conf
           # TODO: Carry across this S2SEARCH_URL secret 
-          # echo 'export S2SEARCH_URL="${{ secrets.S2SEARCH_URL }}"' >> conf
+          echo 'export S2SEARCH_URL="${{ secrets.S2SEARCH_URL }}"' >> conf
           
       - name: Run Integration Tests - s2search
         run: tox -e py3-s2search
