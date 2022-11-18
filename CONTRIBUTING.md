@@ -12,7 +12,7 @@ We welcome contributions to the codebase. Here are some coding guidelines to fol
 * Where possible, we explicitly state the arg names when calling a function. 
   This makes refactoring easier. If possible, use `func(a=1, b=2)` rather than `func(1, 2)`
 
-### Error usage
+#### Error usage
 - Errors raised that concern non-user-facing functionality
 (for example, related to vectors), should raise an `InternalError` or its subclass
 - Errors arising from calls S2 Inference's API should raise an `S2InferenceError`    
@@ -28,6 +28,7 @@ During a minor release we bump the patch number: 0.1.5 -> 0.1.6
 - Once Marqo is in major version 1 (1.0.0), the public API will be considered 'defined' and Marqo's versioning will follow the typical semantic versioning pattern
 - If we are still in major version 0, and complexity and stability needs necessitates it, we can force all bug fixes and optimisations to increment the patch number
   (rather than it being optional). In this case this section will be updated to reflect the change.
+
 
 ### Releasing changes
 - Run unit tests and ensure they all pass (read the testing section below for more details)
