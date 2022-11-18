@@ -46,16 +46,11 @@ jobs:
     steps:
       - name: Output current context
         run:  |
-          echo "${{ github }}"
+          echo "${{ github.context }}"
       
       - name: Output current repo
         run:  |
-          echo "${{ github.repository_owner }}"
-
-      - name: Checkout marqo-api-tests repo
-        uses: actions/checkout@v3
-        with:
-          repository: vicilliar/marqo-api-tests
+          echo "${{ github.repository }}"
   
   Stop-Runner:
     name: Stop self-hosted EC2 runner
