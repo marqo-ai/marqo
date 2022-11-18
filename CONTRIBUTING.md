@@ -54,6 +54,7 @@ During a minor release we bump the patch number: 0.1.5 -> 0.1.6
     - Non-breaking changes
   - . ##  Bug fixes 
   - . ### Testing
+  -  . ## Contributor shout outs
 
 ### Testing
 

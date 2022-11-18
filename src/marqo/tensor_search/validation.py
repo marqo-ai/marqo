@@ -1,9 +1,12 @@
+import json
 import pprint
 import typing
 from marqo.tensor_search import constants
-from marqo.tensor_search import enums
+from marqo.tensor_search import enums, utils
 from typing import Iterable, Container
-from marqo.errors import MarqoError, InvalidFieldNameError, InvalidArgError, InternalError, InvalidDocumentIdError
+from marqo.errors import (
+    MarqoError, InvalidFieldNameError, InvalidArgError, InternalError,
+    InvalidDocumentIdError, DocTooLargeError)
 from marqo.tensor_search.enums import TensorField
 from marqo.tensor_search import constants
 from typing import Any, Type
@@ -96,8 +99,22 @@ def validate_doc(doc: dict) -> dict:
     """
     if not isinstance(doc, dict):
         raise InvalidArgError("Docs must be dicts")
+
     if len(doc) <= 0:
         raise InvalidArgError("Can't index an empty dict.")
+
+    max_doc_size = utils.read_env_vars_and_defaults(var=enums.EnvVars.MARQO_MAX_DOC_BYTES)
+    if max_doc_size is not None:
+        try:
+            serialized = json.dumps(doc)
+        except TypeError as e:
+            raise InvalidArgError(f"Unable to index document: it is not serializable! Document: `{doc}` ")
+        if len(serialized) > int(max_doc_size):
+            maybe_id = f" _id:`{doc['_id']}`" if '_id' in doc else ''
+            raise DocTooLargeError(
+                f"Document{maybe_id} with length `{len(serialized)}` exceeds "
+                f"the allowed document size limit of [{max_doc_size}]."
+            )
     return doc
 
 
