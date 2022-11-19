@@ -5,7 +5,9 @@
 from marqo import Client
 import os
 import pandas as pd 
-
+from utils import download_file, extract_zip
+import glob
+import subprocess
 #####################################################
 ### STEP 1. start Marqo
 #####################################################
@@ -17,10 +19,31 @@ import pandas as pd
 #####################################################
 
 
+# this will pull directly from the s3 bucket if True, otherwise it will pull for local indexing
+use_remote = False
+
 data = pd.read_csv('files.csv', index_col=0)
 
-# now we create our documents for indexing - a list of python dicts with keys as field names
-documents = [{"image_location":s3_uri, '_id':os.path.basename(s3_uri)} for s3_uri in data['s3_uri']]
+local_dir = os.getcwd() + '/images/'
+if not use_remote:
+    zip_file_url = 'https://marqo-public-datasets.s3.us-east-2.amazonaws.com/demos/ImageSearchLocalisation/images.zip'
+    zip_file = download_file(zip_file_url, local_dir=local_dir)
+    extract_zip(zip_file, local_dir=local_dir)
+    # alternatively you can download the files individually
+    #downloaded = download_parallel(urls=data['s3_uri'].tolist(), local_dir=local_dir)
+    locators = glob.glob(local_dir + '*.jpg')
+    docker_path = 'http://host.docker.internal:8222/'
+
+    # we start an image server for easier access from within docker
+    pid = subprocess.Popen(['python3', '-m', 'http.server', '8222', '--directory', local_dir], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+
+else:
+    # now we create our documents for indexing - a list of python dicts with keys as field names
+    locators = data['s3_uri']
+
+
+documents = [{"image_location":s3_uri, '_id':os.path.basename(s3_uri)} for s3_uri in locators]
+
 # if you have the images locally, see the instructions 
 # here https://marqo.pages.dev/Advanced-Usage/images/ for the best ways to index 
 
