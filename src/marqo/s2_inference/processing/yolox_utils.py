@@ -14,7 +14,7 @@ logger = get_logger("image_yolox_utils")
 
 def get_default_yolox_model() -> Dict:
     return {
-        "repo_id":'Marqo/marqo-yolo-v1',
+        "repo_id":'Marqo/marqo-yolo-v2',
         "filename": 'yolox_s.onnx',
     }
 
