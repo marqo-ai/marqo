@@ -149,5 +149,8 @@ def get_cluster_indices(config: Config):
     """Gets the name of all indices"""
     res = HttpRequests(config).get(path="_aliases")
     indices = set(res.keys())
-    relevant_indices = indices - constants.INDEX_NAMES_TO_IGNORE
+    indices_no_protected_prefixes = {index_name for index_name in indices
+                                     if not any([index_name.startswith(prefix) for prefix in
+                                                constants.INDEX_NAME_PREFIXES_TO_IGNORE])}
+    relevant_indices = indices_no_protected_prefixes - constants.INDEX_NAMES_TO_IGNORE
     return relevant_indices

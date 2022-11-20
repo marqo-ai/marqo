@@ -74,10 +74,13 @@ def create_vector_index(
     Args:
         media_type: 'text'|'image'
     """
+    validation.validate_index_name(index_name)
+
     if index_settings is not None:
         the_index_settings = _autofill_index_settings(index_settings=index_settings)
     else:
         the_index_settings = configs.get_default_index_settings()
+
     vector_index_settings = {
         "settings": {
             "index": {
@@ -1140,6 +1143,18 @@ def delete_index(config: Config, index_name):
     if index_name in get_cache():
         del get_cache()[index_name]
     return res
+
+
+def get_indexes(config: Config):
+    res = backend.get_cluster_indices(config=config)
+
+    body = {
+        'results': [
+            {'index_name': ix} for ix in res
+        ]
+    }
+    return body
+
 
 
 def _select_model_from_media_type(media_type: Union[MediaType, str]) -> Union[MlModel, str]:
