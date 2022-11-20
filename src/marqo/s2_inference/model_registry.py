@@ -572,7 +572,29 @@ def _get_test_properties() -> Dict:
                 "dimensions": 512,
                 "notes": "read from opencv2, clip ViT-B/32, inference using onnx",
                 "type": "fastclip",
-            }
+            },
+        "fast/ViT-L/14":
+            {
+                "name": "fast/ViT-L/14",
+                "dimensions": 768,
+                "notes": "read from opencv2, clip ViT-L/14, inference using onnx",
+                "type": "fastclip",
+            },
+        "onnx/ViT-L/14":
+            {
+                "name": "onnx/ViT-L/14",
+                "dimensions": 768,
+                "notes": "read from opencv2, clip ViT-L/14, inference using onnx",
+                "type": "onnxclip",
+            },
+        "fullopencv/ViT-L/14":
+            {
+                "name": "fullopencv/ViT-L/14",
+                "dimensions": 768,
+                "notes": "read from opencv2, clip ViT-L/14",
+                "type": "fullopencv",
+            },
+
     }
     return TEST_MODEL_PROPERTIES
 

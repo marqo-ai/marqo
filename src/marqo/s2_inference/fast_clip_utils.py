@@ -67,7 +67,12 @@ def _load_image_from_path(image: str) -> ndarray:
         img = cv2.imdecode(np.asarray(bytearray(resp.read()), dtype="uint8"), cv2.IMREAD_COLOR)
     else:
         raise ValueError(f"input str of {image} is not a local file or a valid url")
-    return _convert_to_rgb(img)
+
+    if isinstance(img, ndarray):
+        return _convert_to_rgb(img)
+    else:
+        raise ValueError(f"input str of {image} is not valid")
+
 
 
 def format_and_load_CLIP_image(image: Union[str, ndarray, ImageType]) -> ndarray:
@@ -193,6 +198,7 @@ class Fast_CLIP(object):
 
         if self.clip_model is None or self.clip_preprocess is None:
             self.clip_model, _ = clip.load(self.clip_name, device="cpu", jit=False)
+            self.resolution = self.clip_model.visual.input_resolution
             self.clip_preprocess = self.opencv_process()
 
     def opencv_process(self):
@@ -200,8 +206,8 @@ class Fast_CLIP(object):
         from torchvision.transforms import Normalize
 
         at_transform = at.Compose([
-            at.Resize(224, interpolation="BICUBIC"),
-            at.CenterCrop(224),
+            at.Resize(self.resolution, interpolation="BICUBIC"),
+            at.CenterCrop(self.resolution),
             at.ToTensor(),
             Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711)),
         ])
@@ -213,7 +219,7 @@ class Fast_CLIP(object):
             dummy_input = np.random.rand(1000, 1000, 3) * 255
             dummy_input = dummy_input.astype("uint8")
 
-            image = self.clip_preprocess(Image.fromarray(dummy_input).convert("RGB")).unsqueeze(0).cpu()
+            image = self.clip_preprocess(dummy_input).unsqueeze(0).cpu()
 
             text = clip.tokenize(["a diagram", "a dog", "a cat"]).cpu()
 
