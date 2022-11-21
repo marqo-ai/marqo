@@ -30,7 +30,7 @@ jobs:
       - name: Build `marqoai/marqo`
         run: |
           DOCKER_BUILDKIT=1 
-          docker buildx build --platform linux/arm64,linux/amd64 --push . -t marqoai/marqo:${{ github.ref_name }}
+          docker buildx build --platform linux/arm64,linux/amd64 --push . -t marqoai/marqo:test-${{ github.ref_name }}
 
       - name: Push `marqoai/marqo` to DockerHub
-        run: docker push $marqoai/marqo:${{ github.ref_name }}
+        run: docker push $marqoai/marqo:test-${{ github.ref_name }}
