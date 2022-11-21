@@ -129,7 +129,8 @@ class ModelsForCacheing:
             except json.JSONDecodeError as e:
                 raise errors.EnvVarError(
                     f"Could not parse environment variable `{EnvVars.MARQO_MODELS_TO_PRELOAD}`. "
-                    f"Please ensure that this a JSON-encoded array of strings."
+                    f"Please ensure that this a JSON-encoded array of strings. For example:\n"
+                    f"""export {EnvVars.MARQO_MODELS_TO_PRELOAD}='["ViT-L/14", "onnx/all_datasets_v4_MiniLM-L6"]'"""
                 ) from e
         else:
             self.models = warmed_models
