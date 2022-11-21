@@ -207,6 +207,11 @@ def refresh_index(index_name: str, marqo_config: config.Config = Depends(generat
 def check_health(marqo_config: config.Config = Depends(generate_config)):
     return tensor_search.check_health(config=marqo_config)
 
+
+@app.get("/indexes")
+def get_indexes(marqo_config: config.Config = Depends(generate_config)):
+    return tensor_search.get_indexes(config=marqo_config)
+
 # try these curl commands:
 
 # ADD DOCS:
