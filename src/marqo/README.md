@@ -9,9 +9,8 @@ See [here](https://github.com/marqo-ai/marqo/blob/mainline/CONTRIBUTING.md#unit-
 ### Option A. Run the Marqo application locally (outside of docker):
 
 1. Have a running Marqo-OS instance available to use. You can spin up a local instance with the following command
-(if you are using an arm64 machine, replace `marqoai/marqo-os:0.0.2` with `marqoai/marqo-os:0.0.2-arm`):
 ```bash
-docker run --name marqo-os -id -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" marqoai/marqo-os:0.0.2
+docker run --name marqo-os -id -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" opensearchproject/opensearch:2.4.0
 ```
 
 2. Clone the github repo
@@ -50,9 +49,9 @@ docker rm -f marqo &&
 ```
 
 ### Option C. Build and run the Marqo as a Docker container, connecting to Marqo-OS which is running on the host:
-1. Run the following command to run Marqo-OS (if you are using an arm64 machine, replace `marqoai/marqo-os:0.0.2` with `marqoai/marqo-os:0.0.2-arm`):
+1. Run the following command to run Marqo-OS
 ```bash
-docker run --name marqo-os -id -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" marqoai/marqo-os:0.0.2
+docker run --name marqo-os -id -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" opensearchproject/opensearch:2.4.0
 ```
 
 2. `cd` into the marqo root directory
@@ -78,7 +77,7 @@ docker rm -f marqo &&
 
 1. Run marqo-os,
 ```
-docker run --name marqo-os -id -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" marqoai/marqo-os:0.0.2-arm 
+docker run --name marqo-os -id -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" opensearchproject/opensearch:2.4.0
 ```
 
 2. Clone the Marqo github repo (if not already done),
@@ -163,7 +162,7 @@ Edit the SSH config file with `nano ~/.ssh/config` then insert the line: `Server
 
 3. Run marqo-os
 ```
-sudo docker rm -f marqo-os; sudo docker run -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" marqoai/marqo-os:0.0.2-arm
+sudo docker rm -f marqo-os; sudo docker run -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" opensearchproject/opensearch:2.4.0
 ```
 
 4. Run marqo with a set `OPENSEARCH_URL`
