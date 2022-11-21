@@ -36,7 +36,7 @@ if not use_remote:
 
     # we start an image server for easier access from within docker
     pid = subprocess.Popen(['python3', '-m', 'http.server', '8222', '--directory', local_dir], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
-
+    locators = [docker_path + os.path.basename(f) for f in locators]
 else:
     # now we create our documents for indexing - a list of python dicts with keys as field names
     locators = data['s3_uri']

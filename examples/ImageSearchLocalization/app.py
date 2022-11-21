@@ -75,7 +75,7 @@ def draw_box(img, box):
 def main():
 
     data_dir = "/home/jesse/code/stable-diffusion/scripts/coco/"
-    image_location = 'image_docker'
+    image_location = 'image_location'
     highlights = '_highlights'
     device = 'cuda'
     
@@ -119,7 +119,7 @@ def main():
 
         index_name = 'visual-search-frcnn'
 
-
+    print(index_name)
     option_reranker = s5.radio('Select three known variables:',
                   ['None',
                    "google/owlvit-base-patch32",
