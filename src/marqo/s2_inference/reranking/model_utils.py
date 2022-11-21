@@ -228,6 +228,7 @@ class HFClassificationOnnx:
         """
         self.inputs = self._prepare_inputs(inputs)
         # couldn't find aaaaany documentation on passing tokenizer arguments through the pipeline
+        # leaving these here for reference
         # https://github.com/huggingface/transformers/blob/main/src/transformers/pipelines/__init__.py#L750
         # https://stackoverflow.com/questions/67849833/how-to-truncate-input-in-the-huggingface-pipeline
         self.predictions = self.onnx_classifier(self.inputs, **self.tokenizer_kwargs)
@@ -360,7 +361,7 @@ def _predict_owl(model, processed_inputs, post_process_function, size):
         return results
 
 def process_owl_results(results: List) -> List:
-    """wrapper for processing a list of resultsd from owl-vit
+    """wrapper for processing a list of resultsd from owl-vitexi
 
     Args:
         results (_type_): _description_
