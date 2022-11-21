@@ -12,7 +12,7 @@
 <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg"></a>
 <a href="https://pypi.org/project/marqo/"><img src="https://img.shields.io/pypi/v/marqo?label=PyPI"></a>
 <a href="https://github.com/marqo-ai/marqo/actions/workflows/CI.yml"><img src="https://img.shields.io/github/workflow/status/marqo-ai/marqo/CI?label=CI"></a>
-<a href="https://pypistats.org/packages/marqo"><img alt="PyPI - Downloads from official pypistats" src="https://img.shields.io/pypi/dm/marqo?label=Downloads"></a>
+<a href="https://pepy.tech/project/marqo"><img alt="PyPI - Downloads from pepy" src="https://static.pepy.tech/personalized-badge/marqo?period=month&units=international_system&left_color=grey&right_color=blue&left_text=downloads/month"></a>
 <a align="center" href="https://join.slack.com/t/marqo-community/shared_invite/zt-1d737l76e-u~b3Rvey2IN2nGM4wyr44w"><img src="https://img.shields.io/badge/Slack-blueviolet?logo=slack&amp;logoColor=white"></a>
 </p>
 
@@ -41,8 +41,8 @@ Wyszukiwanie tensorowe polega na przekształcaniu dokumentów, obrazów i innych
 2. Użyj dokera, aby uruchomić Marqo (Mac users with M-series chips will need to [go here](#m-series-mac-users)):
 ```bash
 docker rm -f marqo;
-docker pull marqoai/marqo:0.0.7;
-docker run --name marqo -it --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:0.0.7
+docker pull marqoai/marqo:0.0.6;
+docker run --name marqo -it --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:0.0.6
 ```
 3. Zainstaluj klienta Marqo:
 ```bash
@@ -233,7 +233,7 @@ docker rm -f marqo-os; docker run -p 9200:9200 -p 9600:9600 -e "discovery.type=s
 docker rm -f marqo; docker run --name marqo --privileged \
     -p 8882:8882 --add-host host.docker.internal:host-gateway \
     -e "OPENSEARCH_URL=https://localhost:9200" \
-    marqoai/marqo:0.0.7
+    marqoai/marqo:0.0.6
 ```
 
 ## Kontrybutorzy

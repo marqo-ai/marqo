@@ -1,5 +1,4 @@
 import json
-
 from marqo.tensor_search.tensor_search_logging import get_logger
 import time
 from marqo.tensor_search.enums import EnvVars
