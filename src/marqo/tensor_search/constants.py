@@ -1,5 +1,6 @@
 INDEX_NAMES_TO_IGNORE = {
-    '.opendistro_security'
+    '.opendistro_security',
+    '.opendistro-security'
 }
 INDEX_NAME_PREFIXES_TO_IGNORE = {
     'security-auditlog-'
