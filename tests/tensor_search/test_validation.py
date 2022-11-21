@@ -6,7 +6,8 @@ import copy
 from unittest import mock
 from marqo.errors import (
     MarqoError, InvalidFieldNameError, InternalError,
-    InvalidDocumentIdError, InvalidArgError, DocTooLargeError
+    InvalidDocumentIdError, InvalidArgError, DocTooLargeError,
+    InvalidIndexNameError
 )
 
 
@@ -230,6 +231,14 @@ class TestValidation(unittest.TestCase):
 
         assert run()
 
-
+    def test_index_name_validation(self):
+        assert "my-index-name" == validation.validate_index_name("my-index-name")
+        bad_names = ['.opendistro_security', 'security-auditlog-', 'security-auditlog-100']
+        for n in bad_names:
+            try:
+                validation.validate_index_name(n)
+                raise AssertionError
+            except InvalidIndexNameError:
+                pass
 
 

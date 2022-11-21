@@ -79,6 +79,7 @@ results = mq.index("my-first-index").search(
 - `add_documents()` creates an index with default settings, if one does not already exist
 - You can optionally set a document's ID with the special `_id` field. Otherwise, Marqo will generate one.
 - If the index doesn't exist, Marqo will create it. If it exists then Marqo will add the documents to the index.
+- Running this code multiple times could result in duplicate documents. To reset the index, you can delete it first using `mq.index("my-first-index").delete()`
 
 Let's have a look at the results:
 

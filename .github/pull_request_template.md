@@ -16,5 +16,14 @@
 * **Does this PR introduce a breaking change?** (What changes might users need to make in their application due to this PR?)
 
 
+* **Have unit tests been run against this PR?** (Has there also been any additional testing?)
+
+
+* **Related Python client changes** (link commit/PR here)
+
+
+* **Related documentation changes** (link commit/PR here)
+
+
 * **Other information**:
 
