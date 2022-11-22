@@ -76,7 +76,7 @@ if [[ ! $OPENSEARCH_URL ]]; then
       echo "OpenSearch is running"
   else
       echo "OpenSearch not found; running OpenSearch"
-      docker run --name marqo-os -id -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" marqoai/marqo-os:0.0.2 &
+      docker run --name marqo-os -id -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" marqoai/marqo-os:0.0.3 &
       docker start marqo-os &
       until [[ $(curl -v --silent --insecure $OPENSEARCH_URL 2>&1 | grep Unauthorized) ]]; do
         sleep 0.1;

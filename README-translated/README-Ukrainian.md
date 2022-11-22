@@ -225,7 +225,7 @@ Marqo ще не підтримує docker-in-docker бекенд конфігу�
 1. В одному терміналі запустіть наступну команду для початку opensearch:
 
 ```shell
-docker rm -f marqo-os; docker run -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" marqoai/marqo-os:0.0.2-arm
+docker rm -f marqo-os; docker run -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" marqoai/marqo-os:0.0.3-arm
 ```
 
 2. В іншому терміналі запустіть наступну команду для запуску Marqo:
