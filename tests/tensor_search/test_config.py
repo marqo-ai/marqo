@@ -54,26 +54,42 @@ class TestConfig(MarqoTestCase):
         assert run()
 
     def test_set_url_localhost(self):
-        def run():
+        @mock.patch("urllib3.disable_warnings")
+        def run(mock_dis_warnings):
             c = config.Config(url="https://localhost:9200")
             assert not c.cluster_is_remote
+            mock_dis_warnings.assert_called()
             return True
         assert run()
 
     def test_set_url_0000(self):
-        def run():
+        @mock.patch("urllib3.disable_warnings")
+        def run(mock_dis_warnings):
             c = config.Config(url="https://0.0.0.0:9200")
             assert not c.cluster_is_remote
+            mock_dis_warnings.assert_called()
             return True
         assert run()
 
     def test_set_url_127001(self):
-        def run():
+        @mock.patch("urllib3.disable_warnings")
+        def run(mock_dis_warnings):
             c = config.Config(url="https://127.0.0.1:9200")
             assert not c.cluster_is_remote
+            mock_dis_warnings.assert_called()
             return True
         assert run()
 
+    def test_set_url_remote(self):
+        @mock.patch("urllib3.disable_warnings")
+        @mock.patch("warnings.resetwarnings")
+        def run(mock_reset_warnings, mock_dis_warnings):
+            c = config.Config(url="https://some-cluster-somewhere:9200")
+            assert c.cluster_is_remote
+            mock_dis_warnings.assert_not_called()
+            mock_reset_warnings.assert_called()
+            return True
+        assert run()
 
     def test_url_is_s2search(self):
         c = config.Config(url="https://s2search.io/abdcde:9200")

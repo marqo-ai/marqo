@@ -14,11 +14,8 @@ from marqo.errors import (
     DocumentNotFoundError,
     IndexAlreadyExistsError,
     InvalidIndexNameError,
-    HardwareCompatabilityError,
-    IndexMaxFieldsError, TooManyRequestsError
+    HardwareCompatabilityError
 )
-from urllib3.exceptions import InsecureRequestWarning
-import warnings
 
 ALLOWED_OPERATIONS = {requests.delete, requests.get, requests.post, requests.put}
 
@@ -48,40 +45,38 @@ class HttpRequests:
         if content_type is not None and content_type:
             req_headers['Content-Type'] = content_type
 
-        with warnings.catch_warnings():
-            if not self.config.cluster_is_remote:
-                warnings.simplefilter('ignore', InsecureRequestWarning)
-            try:
-                request_path = self.config.url + '/' + path
-                if isinstance(body, bytes):
-                    response = http_method(
-                        request_path,
-                        timeout=self.config.timeout,
-                        headers=req_headers,
-                        data=body,
-                        verify=to_verify
-                    )
-                elif isinstance(body, str):
-                    response = http_method(
-                        request_path,
-                        timeout=self.config.timeout,
-                        headers=req_headers,
-                        data=body,
-                        verify=to_verify
-                    )
-                else:
-                    response = http_method(
-                        request_path,
-                        timeout=self.config.timeout,
-                        headers=req_headers,
-                        data=json.dumps(body) if body else None,
-                        verify=to_verify
-                    )
-                return self.__validate(response)
-            except requests.exceptions.Timeout as err:
-                raise BackendTimeoutError(str(err)) from err
-            except requests.exceptions.ConnectionError as err:
-                raise BackendCommunicationError(str(err)) from err
+        try:
+            request_path = self.config.url + '/' + path
+            if isinstance(body, bytes):
+                response = http_method(
+                    request_path,
+                    timeout=self.config.timeout,
+                    headers=req_headers,
+                    data=body,
+                    verify=to_verify
+                )
+            elif isinstance(body, str):
+                response = http_method(
+                    request_path,
+                    timeout=self.config.timeout,
+                    headers=req_headers,
+                    data=body,
+                    verify=to_verify
+                )
+            else:
+                response = http_method(
+                    request_path,
+                    timeout=self.config.timeout,
+                    headers=req_headers,
+                    data=json.dumps(body) if body else None,
+                    verify=to_verify
+                )
+            return self.__validate(response)
+
+        except requests.exceptions.Timeout as err:
+            raise BackendTimeoutError(str(err)) from err
+        except requests.exceptions.ConnectionError as err:
+            raise BackendCommunicationError(str(err)) from err
 
     def get(
         self, path: str,
@@ -150,10 +145,6 @@ def convert_to_marqo_web_error_and_raise(response: requests.Response, err: reque
         response_dict = response.json()
     except JSONDecodeError:
         raise_catchall_http_as_marqo_error(response=response, err=err)
-    if response.status_code == 429:
-        raise TooManyRequestsError(
-            message="Marqo-OS received too many requests! "
-                    "Please try reducing the frequency of add_documents and update_documents calls.")
 
     try:
         open_search_error_type = response_dict["error"]["type"]
@@ -172,11 +163,6 @@ def convert_to_marqo_web_error_and_raise(response: requests.Response, err: reque
                 raise HardwareCompatabilityError(
                     message=f"Filtering is not yet supported for arm-based architectures"
                 ) from err
-        elif open_search_error_type == "illegal_argument_exception":
-            reason = response_dict["error"]["reason"].lower()
-            if "limit of total fields" in reason and "exceeded" in reason:
-                raise IndexMaxFieldsError(message="Exceeded maximum number of "
-                                                  "allowed fields for this index.")
     except KeyError:
         pass
 

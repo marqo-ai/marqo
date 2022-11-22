@@ -7,11 +7,9 @@ import marqo.tensor_search.utils as marqo_utils
 import numpy as np
 import requests
 from marqo.tensor_search.enums import TensorField, IndexSettingsField, SearchMethod
-from marqo.tensor_search import enums
 from marqo.errors import IndexNotFoundError, InvalidArgError, BadRequestError
 from marqo.tensor_search import tensor_search, index_meta_cache, backend
 from tests.marqo_test import MarqoTestCase
-import time
 
 
 class TestAddDocuments(MarqoTestCase):
@@ -24,14 +22,6 @@ class TestAddDocuments(MarqoTestCase):
             tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         except IndexNotFoundError as s:
             pass
-
-    def tearDown(self) -> None:
-        self.index_name_1 = "my-test-index-1"
-        try:
-            tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
-        except IndexNotFoundError as s:
-            pass
-
 
     def _match_all(self, index_name, verbose=True):
         """Helper function"""
@@ -413,11 +403,11 @@ class TestAddDocuments(MarqoTestCase):
             ([{123: "bad", "_id": "12345"}, {"_id": "cool"}], [("12345", 'error'), ("cool", 'result')]),
             ([{None: "bad", "_id": "12345"}, {"_id": "cool"}], [("12345", 'error'), ("cool", 'result')]),
             # handle bad content
-            ([{"bad": None, "_id": "12345"}, {"_id": "cool"}], [(None, 'error'), ("cool", 'result')]),
+            ([{"bad": None, "_id": "12345"}, {"_id": "cool"}], [("12345", 'error'), ("cool", 'result')]),
             ([{"bad": [1, 2, 3, 4], "_id": "12345"}, {"_id": "cool"}], [("12345", 'error'), ("cool", 'result')]),
             ([{"bad": ("cat", "dog"), "_id": "12345"}, {"_id": "cool"}], [("12345", 'error'), ("cool", 'result')]),
-            ([{"bad": set(), "_id": "12345"}, {"_id": "cool"}], [(None, 'error'), ("cool", 'result')]),
-            ([{"bad": dict(), "_id": "12345"}, {"_id": "cool"}], [(None, 'error'), ("cool", 'result')]),
+            ([{"bad": set(), "_id": "12345"}, {"_id": "cool"}], [("12345", 'error'), ("cool", 'result')]),
+            ([{"bad": dict(), "_id": "12345"}, {"_id": "cool"}], [("12345", 'error'), ("cool", 'result')]),
             # handle bad _ids
             ([{"bad": "hehehe", "_id": 12345}, {"_id": "cool"}], [(None, 'error'), ("cool", 'result')]),
             ([{"bad": "hehehe", "_id": 12345}, {"_id": "cool"}, {"bad": "hehehe", "_id": None}, {"field": "yep"},
@@ -574,15 +564,9 @@ class TestAddDocuments(MarqoTestCase):
                 url=F"{self.endpoint}/{self.index_name_1}/_doc/{doc_id}",
                 verify=False
             )
-            check_dict_no_id = copy.deepcopy(check_dict)
-            try:
-                del check_dict_no_id['_id']
-            except KeyError:
-                pass
             # make sure that the chunks have been updated
             for ch in updated_raw_doc.json()['_source']['__chunks']:
-                assert '_id' not in ch
-                for field, expected_value in check_dict_no_id.items():
+                for field, expected_value in check_dict.items():
                     assert ch[field] == expected_value
         return True
 
@@ -613,7 +597,7 @@ class TestAddDocuments(MarqoTestCase):
         )
 
     def test_put_documents_multiple_docs(self):
-        """multiple docs updated at once"""
+        """mutliple docs updated at once"""
         docs_ = [
             {"_id": "123", "Title": "Story of Joe Blogs", "Description": "Joe was a great farmer."},
             {"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}
@@ -820,29 +804,6 @@ class TestAddDocuments(MarqoTestCase):
             expected_ids={'789'}
         )
 
-    def test_put_document_override_non_tensor_field(self):
-        docs_ = [{"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}]
-        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs_, auto_refresh=True, non_tensor_fields=["Title"])
-        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs_, auto_refresh=True)
-        resp = tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="789", show_vectors=True)        
-
-        assert len(resp[enums.TensorField.tensor_facets]) == 2
-        assert enums.TensorField.embedding in resp[enums.TensorField.tensor_facets][0]
-        assert enums.TensorField.embedding in resp[enums.TensorField.tensor_facets][1]
-        # the order doesn't really matter. We can test for both orderings if this breaks in the future
-        assert "Title" in resp[enums.TensorField.tensor_facets][0]
-        assert "Description" in resp[enums.TensorField.tensor_facets][1]
-
-    def test_add_document_with_non_tensor_field(self):
-        docs_ = [{"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}]
-        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs_, auto_refresh=True, non_tensor_fields=["Title"])
-        resp = tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="789", show_vectors=True)        
-
-        assert len(resp[enums.TensorField.tensor_facets]) == 1
-        assert enums.TensorField.embedding in resp[enums.TensorField.tensor_facets][0]
-        assert "Title" not in resp[enums.TensorField.tensor_facets][0]
-        assert "Description" in resp[enums.TensorField.tensor_facets][0]
-
     def test_put_no_update(self):
         tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[{'_id':'123'}],
                                     auto_refresh=True, update_mode='replace')
@@ -885,7 +846,7 @@ class TestAddDocuments(MarqoTestCase):
                   {"_id": "789", "Temp": 12.5},
                   ],
             auto_refresh=True, update_mode='update', processes=4, batch_size=1)
-        time.sleep(3)
+
         updated_doc = tensor_search.get_document_by_id(
             config=self.config, index_name=self.index_name_1, document_id='789'
         )
@@ -897,135 +858,7 @@ class TestAddDocuments(MarqoTestCase):
             url=F"{self.endpoint}/{self.index_name_1}/_doc/789",
             verify=False
         )
-        check_dict_no_id = copy.deepcopy(check_dict)
-        try:
-            del check_dict_no_id['_id']
-        except KeyError:
-            pass
         # make sure that the chunks have been updated
         for ch in updated_raw_doc.json()['_source']['__chunks']:
-            assert '_id' not in ch
-            for field, expected_value in check_dict_no_id.items():
+            for field, expected_value in check_dict.items():
                 assert ch[field] == expected_value
-
-    def test_doc_too_large(self):
-        max_size = 400000
-        mock_environ = {enums.EnvVars.MARQO_MAX_DOC_BYTES: str(max_size)}
-
-        @mock.patch("os.environ", mock_environ)
-        def run():
-            update_res = tensor_search.add_documents(
-                config=self.config, index_name=self.index_name_1, docs=[
-                        {"_id": "123", 'Bad field': "edf " * (max_size // 4)},
-                        {"_id": "789", "Breaker": "abc " * ((max_size // 4) - 500)},
-                        {"_id": "456", "Luminosity": "exc " * (max_size // 4)},
-                      ],
-                auto_refresh=True, update_mode='update')
-            items = update_res['items']
-            assert update_res['errors']
-            assert 'error' in items[0] and 'error' in items[2]
-            assert 'doc_too_large' == items[0]['code'] and ('doc_too_large' == items[0]['code'])
-            assert items[1]['result'] == 'created'
-            assert 'error' not in items[1]
-            return True
-        assert run()
-
-    def test_doc_too_large_single_doc(self):
-        max_size = 400000
-        mock_environ = {enums.EnvVars.MARQO_MAX_DOC_BYTES: str(max_size)}
-
-        @mock.patch("os.environ", mock_environ)
-        def run():
-            update_res = tensor_search.add_documents(
-                config=self.config, index_name=self.index_name_1, docs=[
-                        {"_id": "123", 'Bad field': "edf " * (max_size // 4)},
-                      ],
-                auto_refresh=True, update_mode='update')
-            items = update_res['items']
-            assert update_res['errors']
-            assert 'error' in items[0]
-            assert 'doc_too_large' == items[0]['code']
-            return True
-        assert run()
-
-    def test_doc_too_large_none_env_var(self):
-        for env_dict in [dict(), {enums.EnvVars.MARQO_MAX_DOC_BYTES: None}]:
-            @mock.patch("os.environ", env_dict)
-            def run():
-                update_res = tensor_search.add_documents(
-                    config=self.config, index_name=self.index_name_1, docs=[
-                            {"_id": "123", 'Some field': "Some content"},
-                          ],
-                    auto_refresh=True, update_mode='update')
-                items = update_res['items']
-                pprint.pprint(items)
-                assert not update_res['errors']
-                assert 'error' not in items[0]
-                assert items[0]['result'] in ['created', 'updated']
-                return True
-            assert run()
-
-    def test_no_tensor_field_replace(self):
-        # test replace and update workflows
-        tensor_search.add_documents(
-            self.config,
-            docs=[{"_id": "123", "myfield": "mydata", "myfield2": "mydata2"}],
-            auto_refresh=True, index_name=self.index_name_1
-        )
-        tensor_search.add_documents(
-            self.config,
-            docs=[{"_id": "123", "myfield": "mydata"}],
-            auto_refresh=True, index_name=self.index_name_1,
-            non_tensor_fields=["myfield"]
-        )
-        doc_w_facets = tensor_search.get_document_by_id(
-            self.config, index_name=self.index_name_1, document_id='123', show_vectors=True)
-        assert doc_w_facets[TensorField.tensor_facets] == []
-        assert 'myfield2' not in doc_w_facets
-
-    def test_no_tensor_field_update(self):
-        # test replace and update workflows
-        tensor_search.add_documents(
-            self.config,
-            docs=[{"_id": "123", "myfield": "mydata", "myfield2": "mydata2"}],
-            auto_refresh=True, index_name=self.index_name_1
-        )
-        tensor_search.add_documents(
-            self.config,
-            docs=[{"_id": "123", "myfield": "mydata"}],
-            auto_refresh=True, index_name=self.index_name_1,
-            non_tensor_fields=["myfield"], update_mode='update'
-        )
-        doc_w_facets = tensor_search.get_document_by_id(
-            self.config, index_name=self.index_name_1, document_id='123', show_vectors=True)
-        assert len(doc_w_facets[TensorField.tensor_facets]) == 1
-        assert 'myfield2' in doc_w_facets[TensorField.tensor_facets][0]
-        assert 'myfield' in doc_w_facets
-        assert 'myfield2' in doc_w_facets
-
-    def test_no_tensor_field_on_empty_ix(self):
-        tensor_search.add_documents(
-            self.config,
-            docs=[{"_id": "123", "myfield": "mydata"}],
-            auto_refresh=True, index_name=self.index_name_1,
-            non_tensor_fields=["myfield"]
-        )
-        doc_w_facets = tensor_search.get_document_by_id(
-            self.config, index_name=self.index_name_1, document_id='123', show_vectors=True)
-        assert doc_w_facets[TensorField.tensor_facets] == []
-        assert 'myfield' in doc_w_facets
-
-    def test_no_tensor_field_on_empty_ix_other_field(self):
-        tensor_search.add_documents(
-            self.config,
-            docs=[{"_id": "123", "myfield": "mydata", "myfield2": "mydata"}],
-            auto_refresh=True, index_name=self.index_name_1,
-            non_tensor_fields=["myfield"]
-        )
-        doc_w_facets = tensor_search.get_document_by_id(
-            self.config, index_name=self.index_name_1, document_id='123', show_vectors=True)
-        assert len(doc_w_facets[TensorField.tensor_facets]) == 1
-        assert 'myfield2' in doc_w_facets[TensorField.tensor_facets][0]
-        assert 'myfield' not in doc_w_facets[TensorField.tensor_facets][0]
-        assert 'myfield' in doc_w_facets
-        assert 'myfield2' in doc_w_facets

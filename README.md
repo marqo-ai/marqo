@@ -12,14 +12,14 @@
 <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg"></a>
 <a href="https://pypi.org/project/marqo/"><img src="https://img.shields.io/pypi/v/marqo?label=PyPI"></a>
 <a href="https://github.com/marqo-ai/marqo/actions/workflows/CI.yml"><img src="https://img.shields.io/github/workflow/status/marqo-ai/marqo/CI?label=CI"></a>
-<a href="https://pepy.tech/project/marqo"><img alt="PyPI - Downloads from pepy" src="https://static.pepy.tech/personalized-badge/marqo?period=month&units=international_system&left_color=grey&right_color=blue&left_text=downloads/month"></a>
+<a href="https://pypistats.org/packages/marqo"><img alt="PyPI - Downloads from official pypistats" src="https://img.shields.io/pypi/dm/marqo?label=Downloads"></a>
 <a align="center" href="https://join.slack.com/t/marqo-community/shared_invite/zt-1d737l76e-u~b3Rvey2IN2nGM4wyr44w"><img src="https://img.shields.io/badge/Slack-blueviolet?logo=slack&amp;logoColor=white"></a>
 </p>
 
 
 An open-source tensor search engine that seamlessly integrates with your applications, websites, and workflow. 
 
-Marqo cloud ☁️  is in beta. If you're interested, apply here: https://q78175g1wwa.typeform.com/to/d0PEuRPC
+Marqo cloud ☁️  is currently in beta. If you're interested, apply here: https://q78175g1wwa.typeform.com/to/d0PEuRPC
 
 ## What is tensor search?
 
@@ -41,8 +41,8 @@ Tensor search involves transforming documents, images and other data into collec
 2. Use docker to run Marqo (Mac users with M-series chips will need to [go here](#m-series-mac-users)):
 ```bash
 docker rm -f marqo;
-docker pull marqoai/marqo:0.0.6;
-docker run --name marqo -it --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:0.0.6
+docker pull marqoai/marqo:0.0.5;
+docker run --name marqo -it --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:0.0.5
 ```
 3. Install the Marqo client:
 ```bash
@@ -74,7 +74,7 @@ results = mq.index("my-first-index").search(
 
 ```
 
-- `mq` is the client that wraps the `marqo` API
+- `mq` is the client that wraps the`marqo` API
 - `add_documents()` takes a list of documents, represented as python dicts, for indexing
 - `add_documents()` creates an index with default settings, if one does not already exist
 - You can optionally set a document's ID with the special `_id` field. Otherwise, Marqo will generate one.
@@ -211,7 +211,11 @@ results = mq.index("my-multimodal-index").search('https://upload.wikimedia.org/w
 ```
 
 ## Documentation
-The full documentation for Marqo can be found here [https://docs.marqo.ai/](https://docs.marqo.ai/).
+The full documentation for Marqo can be found here [https://marqo.pages.dev/](https://marqo.pages.dev/).
+
+## Warning
+
+Note that you should not run other applications on Marqo's Opensearch cluster as Marqo automatically changes and adapts the settings on the cluster.
 
 ## M series Mac users
 Marqo does not yet support the docker-in-docker backend configuration for the arm64 architecture. This means that if you have an M series Mac, you will also need to run marqo's backend, marqo-os, locally.
@@ -229,7 +233,7 @@ docker rm -f marqo-os; docker run -p 9200:9200 -p 9600:9600 -e "discovery.type=s
 docker rm -f marqo; docker run --name marqo --privileged \
     -p 8882:8882 --add-host host.docker.internal:host-gateway \
     -e "OPENSEARCH_URL=https://localhost:9200" \
-    marqoai/marqo:0.0.6
+    marqoai/marqo:0.0.5
 ```
 
 ## Contributors
@@ -246,25 +250,12 @@ Marqo is a community project with the goal of making tensor search accessible to
 1. Run the full test suite (by using the command `tox` in this dir).
 2. Create a pull request with an attached github issue.
 
+<!-- start support-pitch -->
+
 
 ## Support
 
 - Join our [Slack community](https://join.slack.com/t/marqo-community/shared_invite/zt-1d737l76e-u~b3Rvey2IN2nGM4wyr44w) and chat with other community members about ideas.
 - Marqo community meetings (coming soon!)
 
-### Stargazers
-[![Stargazers repo roster for @marqo-ai/marqo](https://reporoster.com/stars/marqo-ai/marqo)](https://github.com/marqo-ai/marqo/stargazers)
-
-### Forkers
-[![Forkers repo roster for @marqo-ai/marqo](https://reporoster.com/forks/marqo-ai/marqo)](https://github.com/marqo-ai/marqo/network/members)
-
-
-## Translations
-
-This readme is available in the following translations:
-
-- [English](README.md)🇬🇧
-- [Français](README-translated/README-French.md)🇫🇷
-- [中文 Chinese](README-translated/README-Chinese.md)🇨🇳
-- [Polski](README-translated/README-Polish.md)🇵🇱
-- [Українська](README-translated/README-Ukrainian.md)🇺🇦
+<!-- end support-pitch -->

@@ -78,12 +78,11 @@ class TEST(Model):
     """
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.truncated_embedding_dim = 16
 
     def load(self) -> None:
         self.model = SentenceTransformer(self.model_name, device=self.device)
 
-    def encode(self, sentence: Union[str, List[str]], normalize: bool = True, **kwargs) -> Union[FloatTensor, np.ndarray]:
+    def encode(self, sentence: Union[str, List[str]], **kwargs) -> Union[FloatTensor, np.ndarray]:
 
         if self.model is None:
             self.load()
@@ -91,11 +90,4 @@ class TEST(Model):
         if isinstance(sentence, str):
             sentence = [sentence]
 
-        # seemed inconsistent with the normalization, = False, roll own
-        embeddings = self.model.encode(sentence, batch_size=self.batch_size, 
-                        normalize_embeddings=False, convert_to_tensor=True)[:, :self.truncated_embedding_dim]
-
-        if normalize:
-            embeddings = nn.functional.normalize(embeddings, p=2, dim=1)
-
-        return embeddings
+        return self.model.encode(sentence, batch_size=self.batch_size, **kwargs)[:, :16]

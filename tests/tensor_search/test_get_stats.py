@@ -8,7 +8,7 @@ import copy
 from tests.marqo_test import MarqoTestCase
 
 
-class TestGetStats(MarqoTestCase):
+class TestAddDocuments(MarqoTestCase):
 
     def setUp(self) -> None:
         self.generic_header = {"Content-type": "application/json"}

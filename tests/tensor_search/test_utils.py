@@ -144,21 +144,3 @@ class TestUtils(unittest.TestCase):
         assert preferences_hash == hash(json.dumps(preferences))
         assert base_hash == hash(json.dumps(base))
 
-    def test_read_env_vars_and_defaults(self):
-        """Make sure the priority order is expected
-        (environment vars > defaults else None) """
-        for key, mock_real_environ, default_vars, expected in [
-            ("SOME_VAR", dict(), dict(), None),
-            ("SOME_VAR", {"SOME_VAR": "1234"}, dict(), "1234"),
-            ("SOME_VAR", dict(), {"SOME_VAR": "1234"}, "1234"),
-            ("SOME_VAR", {"SOME_VAR": "111"}, {"SOME_VAR": "333"}, "111"),
-        ]:
-            mock_default_env_vars = mock.MagicMock()
-            mock_default_env_vars.return_value = default_vars
-
-            @mock.patch("marqo.tensor_search.configs.default_env_vars", mock_default_env_vars)
-            @mock.patch("os.environ", mock_real_environ)
-            def run():
-                assert expected == utils.read_env_vars_and_defaults(var=key)
-                return True
-            assert run()

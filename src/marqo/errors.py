@@ -60,10 +60,7 @@ class MarqoWebError(Exception):
     def __init__(self, message: str, status_code: int = None,
                  error_type: str = None, code: str = None,
                  link: str = None) -> None:
-        base_message = ("Please create an issue on Marqo's GitHub repo"
-                        " (https://github.com/marqo-ai/marqo/issues) "
-                        "if this problem persists.")
-        self.message = f"{message}\n{base_message}"
+        self.message = message
 
         if self.status_code is None:
             self.status_code = status_code
@@ -79,7 +76,7 @@ class MarqoWebError(Exception):
         super().__init__(self.message)
 
     def __str__(self) -> str:
-        return f'{self.__class__.__name__} Message: {self.message}'
+        return f'MarqoWebError: {self.__class__.__name__} Error message: {self.message}'
 
 # ---MARQO USER ERRORS---
 
@@ -91,11 +88,6 @@ class __InvalidRequestError(MarqoWebError):
         self.message = message
 
     error_type = "invalid_request"
-
-
-class TooManyRequestsError(__InvalidRequestError):
-    code = "too_many_requests"
-    status_code = HTTPStatus.TOO_MANY_REQUESTS
 
 
 class IndexAlreadyExistsError(__InvalidRequestError):
@@ -128,16 +120,6 @@ class InvalidArgError(__InvalidRequestError):
     status_code = HTTPStatus.BAD_REQUEST
 
 
-class IllegalRequestedDocCount(__InvalidRequestError):
-    code = "illegal_requested_doc_count"
-    status_code = HTTPStatus.BAD_REQUEST
-
-
-class DocTooLargeError(__InvalidRequestError):
-    code = "doc_too_large"
-    status_code = HTTPStatus.BAD_REQUEST
-
-
 class BadRequestError(__InvalidRequestError):
     code = "bad_request"
     status_code = HTTPStatus.BAD_REQUEST
@@ -160,12 +142,6 @@ class HardwareCompatabilityError(__InvalidRequestError):
     code = "hardware_compatability_error"
     status_code = HTTPStatus.BAD_REQUEST
 
-
-class IndexMaxFieldsError(__InvalidRequestError):
-    """Error when attempting to index a document that increases the indexes' number of
-    fields above the index limit"""
-    code = "index_max_fields_error"
-    status_code = HTTPStatus.BAD_REQUEST
 
 # ---MARQO INTERNAL ERROR---
 

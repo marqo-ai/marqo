@@ -2,7 +2,6 @@ import unittest
 from marqo.tensor_search.utils import construct_authorized_url
 from marqo import config
 
-
 class MarqoTestCase(unittest.TestCase):
 
     @classmethod
@@ -12,6 +11,7 @@ class MarqoTestCase(unittest.TestCase):
             "main_user": "admin",
             "main_password": "admin"
         }
+        s2search_settings = {}
         cls.client_settings = local_opensearch_settings
         cls.authorized_url = construct_authorized_url(
             url_base=cls.client_settings["url"],
