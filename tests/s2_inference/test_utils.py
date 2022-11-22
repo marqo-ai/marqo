@@ -5,7 +5,8 @@ from marqo.s2_inference.s2_inference import (
     _convert_vectorized_output, 
     available_models,
     clear_loaded_models,
-    _create_model_cache_key
+    _create_model_cache_key,
+    get_model_properties_from_registry
     )
 
 from torch import FloatTensor, linalg, equal
@@ -34,7 +35,7 @@ class TestOutputs(unittest.TestCase):
 
         for name in names:
             for device in devices:
-                assert _create_model_cache_key(name, device) == (name, device)
+                assert _create_model_cache_key(name, get_model_properties_from_registry(name), device) == (name, device)
 
     def test_clear_model_cache(self):
         # tests clearing the model cache
@@ -47,7 +48,7 @@ class TestOutputs(unittest.TestCase):
         keys = []
         for name in names:
             _ = vectorise(name, 'hello', device=device)
-            key = _create_model_cache_key(name, device)
+            key = _create_model_cache_key(name, get_model_properties_from_registry(name), device)
             keys.append(key)
             
         print(sorted(set(available_models.keys())), sorted(set(keys)))
@@ -69,7 +70,7 @@ class TestOutputs(unittest.TestCase):
         keys = []
         for name in names:
             
-            key = _create_model_cache_key(name, device)
+            key = _create_model_cache_key(name, get_model_properties_from_registry(name), device)
             assert key not in list(available_models.keys())
             _ = vectorise(name, 'hello', device=device)
             assert key in list(available_models.keys())
@@ -88,7 +89,7 @@ class TestOutputs(unittest.TestCase):
         keys = []
         for name in names:
             
-            key = _create_model_cache_key(name, device)
+            key = _create_model_cache_key(name, get_model_properties_from_registry(name), device)
             assert key not in list(available_models.keys())
             t0 = time.time()
             _ = vectorise(name, 'hello', device=device)

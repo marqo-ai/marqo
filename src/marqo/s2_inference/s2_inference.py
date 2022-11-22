@@ -21,8 +21,13 @@ def vectorise(model_name: str, content: Union[str, List[str]], model_properties:
     """vectorizes the content by model name
 
     Args:
-        model_name (str) : _description_
+        model_name (str) : Acts as an identifying alias if model_properties is given.
+                        If model_properties is None then model_name is used to fetch properties from model_registry
         content (_type_): _description_
+        model_properties(dict): {"name": str, "dimensions": int, "tokens": int, "type": str}
+                                if model_properties['name'] is not in model_registry, these properties are used to fetch the model
+                                if model_properties['name'] is in model_registry, default properties are overridden
+                                model_properties can be None only if model_name is a model present in the registry
 
     Returns:
         List[List[float]]: _description_
@@ -263,7 +268,7 @@ def _load_model(model_name: str, model_properties: dict, device: str = get_defau
     Returns:
         Any: _description_
     """
-
+    print(f"loading for: model_name={model_name} and properties={model_properties}")
     loader = _get_model_loader(model_name, model_properties)
 
     max_sequence_length = model_properties.get('tokens', get_default_seq_length())

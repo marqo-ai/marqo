@@ -155,7 +155,7 @@ class ModelsForCacheing:
                 for n in range(N):
     
                     t0 = time.time()
-                    _ = vectorise(model, test_string, device=device)                
+                    _ = vectorise(model, test_string, device=device)
                     t1 = time.time()
                     t += (t1 - t0)
                 message = f"{(t)/float((N))} for {model} and {device}"
