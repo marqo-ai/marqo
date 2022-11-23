@@ -166,7 +166,7 @@ class ONNX_CLIP(object):
         try:
             self.load_onnx()
         except:
-            logger("Can not find existing onnx model. Start converting")
+            print("Can not find existing onnx model. Start converting")
             self.onnx_converter()
 
     @staticmethod
