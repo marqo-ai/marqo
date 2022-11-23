@@ -178,6 +178,7 @@ class Fast_CLIP(object):
         try:
             self.load_onnx()
         except:
+            print("Can not find existing onnx model. Start converting")
             self.onnx_converter()
 
     @staticmethod
