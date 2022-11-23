@@ -166,13 +166,13 @@ class Fast_CLIP(object):
         self.device = device
         self.image_onnx = None
         self.text_onnx = None
-        self.visual_path = self.model_name.replace("/", "-") + "-visual"
-        self.textual_path = self.model_name.replace("/", "-") + "-textual"
+        self.visual_path = "onnx-" + self.clip_name.replace("/", "-") + "-visual"
+        self.textual_path = "onnx-" + self.clip_name.replace("/", "-") + "-textual"
         self.onnx_model = None
         self.truncate = truncate
-        self.providers = ["CPUExecutionProvider"]
+        self.providers = ["CPUExecutionProvider",]
         if self.device == "cuda":
-            self.providers.insert(0, 'CUDAExecutionProvider')
+            self.providers.insert(0, ['TensorrtExecutionProvider','CUDAExecutionProvider'])
 
     def load(self):
         try:
