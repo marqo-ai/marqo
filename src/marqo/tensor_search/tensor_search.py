@@ -277,7 +277,7 @@ def _batch_request(config: Config, index_name: str, dataset: List[dict],
         def batch_requests(gathered, doc_tuple):
             doc, i, the_batch_size = doc_tuple
             if i % the_batch_size == 0:
-                gathered.append([doc,])
+                gathered.append([doc, ])
             else:
                 gathered[-1].append(doc)
             return gathered
