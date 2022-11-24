@@ -29,7 +29,7 @@ class TestEncoding(unittest.TestCase):
 
         for name in names:
             model_properties = get_model_properties_from_registry(name)
-            model = _load_model(name, model_properties=model_properties, device=device, )
+            model = _load_model(model_properties['name'], model_properties=model_properties, device=device, )
 
             for sentence in sentences:
                 output_v = vectorise(name, sentence, model_properties, device, normalize_embeddings=True)
@@ -61,7 +61,8 @@ class TestEncoding(unittest.TestCase):
         eps = 1e-9
 
         for name in names:
-            model = _load_model(name, model_properties=get_model_properties_from_registry(name), device=device)
+            model_properties = get_model_properties_from_registry(name)
+            model = _load_model(model_properties['name'], model_properties=model_properties, device=device)
             assert abs(model.encode('hello') - model.encode(['hello'])).sum() < eps
 
     def test_load_hf_text_model(self):
@@ -70,7 +71,8 @@ class TestEncoding(unittest.TestCase):
         eps = 1e-9
 
         for name in names:
-            model = _load_model(name, model_properties=get_model_properties_from_registry(name), device=device)
+            model_properties = get_model_properties_from_registry(name)
+            model = _load_model(model_properties['name'], model_properties=model_properties, device=device)
             assert abs(model.encode('hello') - model.encode(['hello'])).sum() < eps
 
     def test_load_onnx_sbert_text_model(self):
@@ -79,7 +81,8 @@ class TestEncoding(unittest.TestCase):
         eps = 1e-9
 
         for name in names:
-            model = _load_model(name, model_properties=get_model_properties_from_registry(name), device=device)
+            model_properties = get_model_properties_from_registry(name)
+            model = _load_model(model_properties['name'], model_properties=model_properties, device=device)
             assert abs(model.encode('hello') - model.encode(['hello'])).sum() < eps
 
     def test_compare_onnx_sbert_text_models(self):
@@ -91,9 +94,11 @@ class TestEncoding(unittest.TestCase):
 
         for name_sbert, name_onnx in names_sbert_onnx:
             for sentence in sentences:
-                model_onnx = _load_model(name_onnx, model_properties=get_model_properties_from_registry(name_onnx),device=device)
+                model_properties_sbert = get_model_properties_from_registry(name_sbert)
+                model_sbert = _load_model(model_properties_sbert['name'], model_properties=model_properties_sbert, device=device)
 
-                model_sbert = _load_model(name_sbert, model_properties=get_model_properties_from_registry(name_sbert), device=device)
+                model_properties_onnx = get_model_properties_from_registry(name_onnx)
+                model_onnx = _load_model(model_properties_onnx['name'], model_properties=model_properties_onnx, device=device)
 
                 assert abs(model_onnx.encode(sentence) - model_sbert.encode(sentence)).sum() < eps
 
@@ -105,8 +110,8 @@ class TestEncoding(unittest.TestCase):
         device = 'cpu'
 
         for name in names:
-
-            model = _load_model(name, model_properties=get_model_properties_from_registry(name), device=device)
+            model_properties = get_model_properties_from_registry(name)
+            model = _load_model(model_properties['name'], model_properties=model_properties, device=device)
 
             for sentence in sentences:
                 output = model.encode(sentence)
@@ -121,8 +126,8 @@ class TestEncoding(unittest.TestCase):
         eps = 1e-6
 
         for name in names:
-
-            model = _load_model(name, model_properties=get_model_properties_from_registry(name), device=device)
+            model_properties = get_model_properties_from_registry(name)
+            model = _load_model(model_properties['name'], model_properties=model_properties, device=device)
 
             for sentence in sentences:
                 output = model.encode(sentence, normalize=True)
@@ -143,8 +148,8 @@ class TestEncoding(unittest.TestCase):
         eps = 1e-3
 
         for name in names:
-
-            model = _load_model(name, model_properties=get_model_properties_from_registry(name), device=device)
+            model_properties = get_model_properties_from_registry(name)
+            model = _load_model(model_properties['name'], model_properties=model_properties, device=device)
 
             for sentence in sentences:
                 output = model.encode(sentence, normalize=False)
@@ -165,7 +170,7 @@ class TestEncoding(unittest.TestCase):
 
         for name in names:
             model_properties = get_model_properties_from_registry(name)
-            model = _load_model(name, model_properties=model_properties, device=device)
+            model = _load_model(model_properties['name'], model_properties=model_properties, device=device)
 
             for sentence in sentences:
                 output_v = vectorise(name, sentence, model_properties, device, normalize_embeddings=True)
