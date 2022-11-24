@@ -7,17 +7,19 @@ import json
 from marqo.s2_inference.errors import VectoriseError, InvalidModelPropertiesError, ModelLoadError, UnknownModelError
 from PIL import UnidentifiedImageError
 from marqo.s2_inference.model_registry import load_model_properties
-from marqo.s2_inference.configs import get_default_device,get_default_normalization,get_default_seq_length
+from marqo.s2_inference.configs import get_default_device, get_default_normalization, get_default_seq_length
 from marqo.s2_inference.types import *
 from marqo.s2_inference.logger import get_logger
+
 logger = get_logger(__name__)
 
 available_models = dict()
 MODEL_PROPERTIES = load_model_properties()
 
 
-def vectorise(model_name: str, content: Union[str, List[str]], model_properties: dict = None, device: str = get_default_device(),
-                                    normalize_embeddings: bool = get_default_normalization(), **kwargs) -> List[List[float]]:
+def vectorise(model_name: str, content: Union[str, List[str]], model_properties: dict = None,
+              device: str = get_default_device(), normalize_embeddings: bool = get_default_normalization(), **kwargs) -> \
+List[List[float]]:
     """vectorizes the content by model name
 
     Args:
@@ -36,9 +38,10 @@ def vectorise(model_name: str, content: Union[str, List[str]], model_properties:
         VectoriseError: if the content can't be vectorised, for some reason.
     """
 
-    model_cache_key = _create_model_cache_key(model_name, model_properties, device)
+    validated_model_properties = _validate_model_properties(model_name, model_properties)
+    model_cache_key = _create_model_cache_key(model_name, validated_model_properties, device)
 
-    _update_available_models(model_cache_key, model_name, model_properties, device, normalize_embeddings)
+    _update_available_models(model_cache_key, model_name, validated_model_properties, device, normalize_embeddings)
 
     try:
         vectorised = available_models[model_cache_key].encode(content, normalize=normalize_embeddings, **kwargs)
@@ -48,39 +51,39 @@ def vectorise(model_name: str, content: Union[str, List[str]], model_properties:
     return _convert_vectorized_output(vectorised)
 
 
-def _create_model_cache_key(model_name: str, model_properties: dict, device: str) -> Tuple[str, str]:
+def _create_model_cache_key(model_name: str, model_properties: dict, device: str) -> str:
     """creates a key to store the loaded model by in the cache
 
     Args:
         model_name (str): _description_
+        model_properties (dict): _description_
         device (str): _description_
 
     Returns:
         str: _description_
     """
-    model_cache_key = hashlib.md5()
+    model_cache_key = (model_name
+                       + model_properties.get('name', '')
+                       + str(model_properties.get('dimensions', ''))
+                       + model_properties.get('type', '')
+                       + device)
 
-    encoded_model_name = str.encode(model_name)
-    encoded_model_properties = json.dumps(model_properties, sort_keys=True).encode()
-    encoded_device = str.encode(device)
-
-    model_cache_key.update(encoded_model_name
-                           + encoded_model_properties
-                           + encoded_device)
-
-    return model_cache_key.hexdigest()
+    return model_cache_key
 
 
-def _update_available_models(model_cache_key: Tuple[str, str], model_name: str, model_properties: dict, device: str, normalize_embeddings: bool) -> None:
+def _update_available_models(model_cache_key: Tuple[str, str], model_name: str, validated_model_properties: dict,
+                             device: str,
+                             normalize_embeddings: bool) -> None:
     """loads the model if it is not already loaded
     """
     if model_cache_key not in available_models:
         try:
-            validated_model_properties = _validate_model_properties(model_name, model_properties)
-            available_models[model_cache_key] = _load_model(validated_model_properties['name'], validated_model_properties, device=device)
+            available_models[model_cache_key] = _load_model(validated_model_properties['name'],
+                                                            validated_model_properties, device=device)
             logger.info(f'loaded {model_name} on device {device} with normalization={normalize_embeddings}')
         except:
-            raise ModelLoadError(f"Unable to load model={model_name} on device={device} with normalization={normalize_embeddings}")
+            raise ModelLoadError(
+                f"Unable to load model={model_name} on device={device} with normalization={normalize_embeddings}")
 
 
 def _validate_model_properties(model_name: str, model_properties: dict) -> dict:
@@ -163,7 +166,8 @@ def _check_output_type(output: List[List[float]]) -> bool:
     return True
 
 
-def _float_tensor_to_list(output: FloatTensor, device: str = get_default_device()) -> Union[List[List[float]], List[float]]:
+def _float_tensor_to_list(output: FloatTensor, device: str = get_default_device()) -> Union[
+    List[List[float]], List[float]]:
     """
 
     Args:
@@ -176,7 +180,7 @@ def _float_tensor_to_list(output: FloatTensor, device: str = get_default_device(
     return output.detach().to(device).tolist()
 
 
-def _nd_array_to_list(output : ndarray) -> Union[List[List[float]], List[float]]:
+def _nd_array_to_list(output: ndarray) -> Union[List[List[float]], List[float]]:
     """
 
     Args:
@@ -189,7 +193,8 @@ def _nd_array_to_list(output : ndarray) -> Union[List[List[float]], List[float]]
     return output.tolist()
 
 
-def _convert_vectorized_output(output: Union[FloatTensor, ndarray, List[List[float]]], fp16: bool = False) -> List[List[float]]:
+def _convert_vectorized_output(output: Union[FloatTensor, ndarray, List[List[float]]], fp16: bool = False) -> List[
+    List[float]]:
     """converts the model outputs to a list of lists of floats
     also checks the input dim, expects (samples x vector dim)
     if a single sample is present, will pad the first dim to make it (1 x vector_dim)
@@ -249,7 +254,6 @@ def _get_model_loader(model_name: str, model_properties: dict) -> Any:
         dict: a dictionary describing properties of the model.
     """
 
-
     model_type = model_properties['type']
 
     if model_type not in MODEL_PROPERTIES['loaders']:
@@ -275,7 +279,7 @@ def _load_model(model_name: str, model_properties: dict, device: str = get_defau
     max_sequence_length = model_properties.get('tokens', get_default_seq_length())
 
     model = loader(model_name, device=device, embedding_dim=model_properties['dimensions'],
-                    max_seq_length=max_sequence_length)
+                   max_seq_length=max_sequence_length)
 
     model.load()
 

@@ -35,7 +35,12 @@ class TestOutputs(unittest.TestCase):
 
         for name in names:
             for device in devices:
-                assert _create_model_cache_key(name, get_model_properties_from_registry(name), device) == (name, device)
+                model_properties = get_model_properties_from_registry(name)
+                assert _create_model_cache_key(name, model_properties, device) == (name
+                                                                                   +model_properties['name']
+                                                                                   +str(model_properties['dimensions'])
+                                                                                   +model_properties['type']
+                                                                                   +device)
 
     def test_clear_model_cache(self):
         # tests clearing the model cache
@@ -84,12 +89,11 @@ class TestOutputs(unittest.TestCase):
         device = 'cpu'
         assert available_models == dict()
 
-        names = ['RN50', "sentence-transformers/all-MiniLM-L6-v1", "all-MiniLM-L6-v1"]
+        names = ["RN50", "sentence-transformers/all-MiniLM-L6-v1", "all-MiniLM-L6-v1"]
 
-        keys = []
         for name in names:
-            
-            key = _create_model_cache_key(name, get_model_properties_from_registry(name), device)
+            model_properties = get_model_properties_from_registry(name)
+            key = _create_model_cache_key(name, model_properties, device)
             assert key not in list(available_models.keys())
             t0 = time.time()
             _ = vectorise(name, 'hello', device=device)
