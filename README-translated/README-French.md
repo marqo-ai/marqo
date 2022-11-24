@@ -225,7 +225,7 @@ Pour exécuter Marqo sur un Mac série M, suivez les étapes suivantes.
 1. Dans un terminal, exécutez la commande suivante pour lancer opensearch :
 
 ```shell
-docker rm -f marqo-os; docker run -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" marqoai/marqo-os:0.0.2-arm
+docker rm -f marqo-os; docker run -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" marqoai/marqo-os:0.0.3-arm
 ```
 
 2. Dans un autre terminal, exécutez la commande suivante pour lancer Marqo :
