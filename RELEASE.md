@@ -22,7 +22,7 @@ Special thanks to [@iain-mackie](https://github.com/iain-mackie) for this exampl
 - Updated developer guide ([#164](https://github.com/marqo-ai/marqo/pull/164))
 - Updated requirements which prevented Marqo being built as an arm64 image ([#173](https://github.com/marqo-ai/marqo/pull/173))
 - Backend updated to use marqo-os:0.0.3 ([#183](https://github.com/marqo-ai/marqo/pull/183))
-- Default request timeout has been increase from 2 to 75 seconds ([#184](https://github.com/marqo-ai/marqo/pull/184))
+- Default request timeout has been increased from 2 to 75 seconds ([#184](https://github.com/marqo-ai/marqo/pull/184))
 
 ## Contributor shout-outs
 - For work on the GPT3 news summary generation example: [@iain-mackie](https://github.com/iain-mackie)
