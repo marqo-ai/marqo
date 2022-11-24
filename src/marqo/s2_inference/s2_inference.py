@@ -262,7 +262,8 @@ def _load_model(model_name: str, model_properties: dict, device: str = get_defau
     """_summary_
 
     Args:
-        model_name (str): _description_
+        model_name (str): Actual model_name to be fetched from external library
+                        prefer passing it in the form of model_properties['name']
         device (str, optional): _description_. Defaults to 'cpu'.
 
     Returns:
