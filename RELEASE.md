@@ -10,7 +10,7 @@ This helps speed up indexing and reduce storage for fields where keyword search 
 and categorical fields. These fields can still be used for filtering. 
 Read about usage [here](https://docs.marqo.ai/API-Reference/documents/#query-parameters).
 - Configurable preloaded models([#155](https://github.com/marqo-ai/marqo/pull/155)).
-Specify which machine model to load as Marqo starts. This prevents a delay during initial search and index commands after 
+Specify which machine learning model to load as Marqo starts. This prevents a delay during initial search and index commands after 
 Marqo starts. Read about usage [here](https://docs.marqo.ai/Advanced-Usage/configuration/#preloading-models).
 - New [example](https://github.com/marqo-ai/marqo/tree/mainline/examples/GPT3NewsSummary) 
 and [article](https://medium.com/creator-fund/building-search-engines-that-think-like-humans-e019e6fb6389): 
