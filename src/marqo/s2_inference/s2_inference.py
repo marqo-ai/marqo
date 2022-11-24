@@ -66,6 +66,7 @@ def _create_model_cache_key(model_name: str, model_properties: dict, device: str
                        + model_properties.get('name', '')
                        + str(model_properties.get('dimensions', ''))
                        + model_properties.get('type', '')
+                       + str(model_properties.get('tokens', ''))
                        + device)
 
     return model_cache_key
