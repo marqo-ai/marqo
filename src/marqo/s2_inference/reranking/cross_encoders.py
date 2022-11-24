@@ -44,11 +44,12 @@ class FormattedResults:
     output should be a dataframe with all fields required.
     """    
     
-    def __init__(self, results: Dict, highlights_field: str = ResultsFields.highlights):
+    def __init__(self, results: Dict, highlights_field: str = ResultsFields.highlights, searchable_fields: List[str] = None):
 
         self.results = results
         self.highlights_field = highlights_field
-        
+        self.searchable_fields = searchable_fields
+
         # check ids exist and if not create some
         self._fill_doc_ids(self.results)
 
@@ -62,6 +63,10 @@ class FormattedResults:
         Returns:
             _type_: _description_
         """
+
+        if self.searchable_fields is not None and isinstance(self.searchable_fields, list):
+            self.results[ResultsFields.hits] = [r for r in self.results[ResultsFields.hits] if all(s in r for s in self.searchable_fields)]
+
         self.results_df = pd.DataFrame(self.results[ResultsFields.hits])
 
         def _get_highlights(content):
@@ -157,7 +162,7 @@ class ReRanker:
     def load_model(self):
         pass
 
-    def format_results(self, results: Dict, query: str = None):
+    def format_results(self, results: Dict, query: str = None, searchable_fields: List[str] = None):
         """standardize the way the results are formatted to go to a standard cross-encoder
 
         Args:
@@ -165,7 +170,7 @@ class ReRanker:
             query (str, optional): _description_. Defaults to None.
         """
         self.results = results
-        self.formatted_results = FormattedResults(self.results)
+        self.formatted_results = FormattedResults(self.results, searchable_fields=searchable_fields)
 
     @staticmethod
     def _prepare_inputs(inputs_df: pd.DataFrame, query_column: str = Columns.query, 
@@ -409,7 +414,7 @@ class ReRankerOwl(ReRanker):
         if self.model is None:
             self.load_model()
 
-        self.format_results(results)
+        self.format_results(results, searchable_fields=image_attributes)
 
         # first stage of formatting converts results dict to dataframe
         self.inputs_df = self.formatted_results.format_for_model(self.formatted_results.results_df, self.image_attributes, query=query)
