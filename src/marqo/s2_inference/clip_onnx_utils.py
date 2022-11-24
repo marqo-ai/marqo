@@ -160,7 +160,7 @@ class ONNX_CLIP(object):
         self.truncate = truncate
         self.providers = ["CPUExecutionProvider",]
         if self.device == "cuda":
-            self.providers = self.providers + ['TensorrtExecutionProvider','CUDAExecutionProvider']
+            self.providers = ['TensorrtExecutionProvider','CUDAExecutionProvider'] +  self.providers
 
     def load(self):
         try:
