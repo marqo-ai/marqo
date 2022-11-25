@@ -40,6 +40,22 @@ def vectorise(model_name: str, content: Union[str, List[str]], device: str = get
 
     return _convert_vectorized_output(vectorised)
 
+
+def generate(model_name: str, device, *args, **kwargs) -> List[Tuple[Any]]:
+    model_cache_key = _create_model_cache_key(model_name, device)
+
+    if model_cache_key not in available_models:
+        available_models[model_cache_key] = _load_model(model_name, device=device)
+        logger.info(f'loaded {model_name} on device {device}')
+    try:
+        # generated is happy to inserted back into Marqo
+        generated = available_models[model_cache_key].predict( *args, **kwargs)
+    except UnidentifiedImageError as e:
+        raise VectoriseError from e
+    return generated
+
+
+
 def _create_model_cache_key(model_name: str, device: str) -> Tuple:
     """creates a key to store the loaded model by in the cache
 
