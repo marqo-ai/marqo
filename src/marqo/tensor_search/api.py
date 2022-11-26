@@ -215,7 +215,7 @@ def get_indexes(marqo_config: config.Config = Depends(generate_config)):
 
 
 @app.post("/enrichment")
-def enrichment(body: EnrichmentQuery, marqo_config: config.Config = Depends(generate_config),
+def post_enrichment(body: EnrichmentQuery, marqo_config: config.Config = Depends(generate_config),
                device: str = Depends(api_validation.validate_device)):
     return enrichment.enrich(
         documents=body.documents,
