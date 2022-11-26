@@ -27,4 +27,5 @@ class TestEnrichment(MarqoTestCase):
             indexing_instructions=[],
             device='cpu'
         )
+        print('resultresult')
         pprint.pprint(result)
