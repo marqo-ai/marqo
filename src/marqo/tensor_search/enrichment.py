@@ -26,7 +26,7 @@ def enrich(documents: List[dict], enrichment: dict, device, indexing_instruction
         kwargs = _parse_kwargs(doc=doc, kwargs=enrichment["kwargs"])
         # Pandu - we may might want to call this task?  enrichment["model"] -> enrichment["task"]
         # Jesse - happy to call this task
-        generated = generate(enrichment["model"], device, [], kwargs)
+        generated = generate(task=enrichment["model"], device=device, **kwargs)
         for i, to_field in enumerate(enrichment["to"]):
             doc[to_field] = generated[i]
     return documents
