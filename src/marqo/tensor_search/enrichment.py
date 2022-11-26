@@ -22,16 +22,22 @@ enrich( documents=[{
 
 
 def enrich(documents: List[dict], enrichment: dict, device, indexing_instructions=None, config=None):
+    result_list = []
     for doc in documents:
         kwargs = _parse_kwargs(doc=doc, kwargs=enrichment["kwargs"])
         generated = generate(task=enrichment["task"], device=device, **kwargs)
+        if len(generated) != len(enrichment["to"]):
+            result_list.append({'result': 'error', 'reason': (
+                f'length of task output ({len(generated)} != '
+                f'length of "to" field ({len(enrichment["to"])})'
+            )})
+        else:
+            result_list.append({"result": "successful"})
         for i, to_field in enumerate(enrichment["to"]):
             doc[to_field] = generated[i]
     return {
         "documents": documents,
-        "results": [
-            {"result": "successful"} for _ in documents
-        ]
+        "results": result_list
     }
 
 
