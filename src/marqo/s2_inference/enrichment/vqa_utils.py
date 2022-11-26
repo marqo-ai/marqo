@@ -3,7 +3,7 @@ from lavis.models import load_model_and_preprocess
 from marqo.s2_inference.types import *
 from marqo.s2_inference.errors import EnrichmentError
 from marqo.s2_inference.logger import get_logger
-
+from marqo.s2_inference.clip_utils import format_and_load_CLIP_images
 from marqo.s2_inference.enrichment import enums
 
 logger = get_logger("enrichment")
@@ -19,48 +19,112 @@ class VQA:
     # these basically map out the tasks
     mappings = get_allowed_vqa_tasks()
 
-    def __init__(self, model: str = "vqa", device: str = 'cpu', **kwargs) -> None:
-
-        self.task = task
-        if self.task not in self.mappings:
-            raise EnrichmentError(f"incorrect enrichment type specified {self.task} expected one of {list(self.mappings.keys())}")
+    def __init__(self, device: str = 'cpu', **kwargs) -> None:
+        
         self.device = device
 
-        self.name_and_model = self.mappings[self.task]
+        self.name_and_model = {"name":'blip_vqa', 'model_type':'vqav2'}
 
         self.model = None
         self.vis_processors = None
         self.txt_processors = None
+        self.answers = None
+        self.kwargs = kwargs
 
     def load(self):
-        logger.info(f"loading {self.model_type} using {self.name_and_model['name']} and {self.name_and_model['model']}")
+        logger.info(f"loading {self.name_and_model} using {self.name_and_model['name']} and {self.name_and_model['model_type']}")
         self.model, self.vis_processors, self.txt_processors = load_model_and_preprocess(name=self.name_and_model['name'], 
                                                         model_type=self.name_and_model['model_type'], 
                                                         is_eval=True, device=self.device)
 
     def predict(self, task, *args, **kwargs):
-         """
-     getting called once per doc that might itself have multiple questions
-     {
-            "attributes": [{"string": "Bathroom, Bedroom, Study, Yard"} ]
-            "image_field": {'document_field":"Image location"}
-     	},
-     	->
-    {
-            "attributes": ["Bathroom, Bedroom, Study, Yard"]
-            "image_field": "https://s3.image.png"
-     	},
+        """
+        getting called once per doc that might itself have multiple questions
+      
+        {
+                "attributes": ["Bathroom, Bedroom, Study, Yard"]
+                "image_field": "https://s3.image.png"
+            },
 
 
         Args:
             task (_type_): _description_
         """
 
-        
+        self.task = task
+        if self.task not in self.mappings:
+            raise EnrichmentError(f"incorrect enrichment type specified {self.task} expected one of {list(self.mappings.keys())}")
 
-    # def _infer(self, )
+        image_query_pairs = _process_kwargs_vqa(kwargs)
+        print(image_query_pairs)
+        self._infer(self.task, image_query_pairs)
 
-def _process_kwargs_vqa(kwargs_dict: Dict) -> Dict:
+    @staticmethod
+    def _load_images(image_names: List[str]):
+        print(image_names)
+        images = format_and_load_CLIP_images(image_names)
+        return images
+
+    @staticmethod
+    def _format_questions_for_task(task: str, questions: List[str]) -> List[str]:
+        if task == "attribute-extraction":
+            template = get_attribute_extraction_template()
+            return [template.format(q) for q in questions] 
+        else:
+            return list(questions)
+
+
+    def _infer(self, task, image_query_pairs):
+
+        image_names, questions = zip(*image_query_pairs)
+
+        # optionally modify question based on task
+        questions = self._format_questions_for_task(task, questions)
+        # preload the images
+        images = self._load_images(image_names=list(image_names))
+
+        # loop through and infer - can batch later
+        answers = []
+        for qi,(raw_image,question) in enumerate(zip(images,questions)):
+            
+            image = self.vis_processors["eval"](raw_image).unsqueeze(0).to(self.device)
+            question = self.txt_processors["eval"](question)
+            result = self.model.predict_answers(samples={"image": image, "text_input": question}, inference_method="generate")[0]
+            answers.append(result)
+            print(qi, type(raw_image), question, result)
+
+        # optionally convert answers dpending on task
+        self.answers = _format_answers_for_task(task, answers)
+
+        # put in a check for now on output type
+        if not _check_output_type(self.answers):
+            raise EnrichmentError(f"incorrect output type found {type(self.answers)} for {self.answers}")
+
+def _format_answers_for_task(task, answers):
+    
+    if task == "attribute-extraction":
+        return [convert_to_bool(a) for a in answers] 
+    else:
+        return answers
+
+
+def _check_output_type(output: List[Union[str, bool, int, float]]) -> bool:
+    type_correct = False
+    if isinstance(output, List):
+        if len(output) == []:
+            return True
+        type_correct = all(isinstance(v, (str, float, int)) for v in output)
+    return type_correct
+
+def get_attribute_extraction_template() -> str:
+    return "does this picture have a {} in it?"
+
+def convert_to_bool(str_in: str, positives: List[Any] = ['yes', True, 'True', 'true', 1, '1', 'y', 't']) -> bool:
+    if str(str_in).lower() in positives:
+        return True
+    return False 
+
+def _process_kwargs_vqa(kwargs_dict: Dict) -> Tuple[List[Any], List[Any]]:
     """_summary_
     {
                 "attributes": ["Bathroom, Bedroom, Study, Yard"]
@@ -125,105 +189,7 @@ def _process_kwargs_vqa(kwargs_dict: Dict) -> Dict:
     list_of_images = [image_field]*N
 
     image_query_pairs = list(zip(list_of_images, list_of_queries))
-
     return image_query_pairs
+    # return list_of_images, list_of_queries
 
 
-# class CLIP:
-    
-#     """
-#     conveniance class wrapper to make clip work easily for both text and image encoding
-#     """
-
-#     def __init__(self, model_type: str = "ViT-B/32", device: str = 'cpu',  embedding_dim: int = None,
-#                             truncate: bool = True, **kwargs) -> None:
-
-#         self.model_type = model_type
-#         self.device = device
-#         self.model = None
-#         self.tokenizer = None
-#         self.processor = None
-#         self.embedding_dimension = embedding_dim
-#         self.truncate = truncate
-
-#     def load(self) -> None:
-
-#         # https://github.com/openai/CLIP/issues/30
-#         self.model, self.preprocess = clip.load(self.model_type, device='cpu', jit=False)
-#         self.model = self.model.to(self.device)
-#         self.tokenizer = clip.tokenize
-#         self.model.eval()
-    
-#     def _convert_output(self, output):
-
-#         if self.device == 'cpu':
-#             return output.numpy()
-#         elif self.device.startswith('cuda'):
-#             return output.cpu().numpy()
-
-#     @staticmethod
-#     def normalize(outputs):
-#         return outputs.norm(dim=-1, keepdim=True)
-
-#     def encode_text(self, sentence: Union[str, List[str]], normalize = True) -> FloatTensor:
-        
-#         if self.model is None:
-#             self.load()
-        
-#         text = self.tokenizer(sentence, truncate=self.truncate).to(self.device)
-
-#         with torch.no_grad():
-#             outputs =  self.model.encode_text(text)
-
-#         if normalize:
-#             _shape_before = outputs.shape
-#             outputs /= self.normalize(outputs)
-#             assert outputs.shape == _shape_before
-
-#         return self._convert_output(outputs)
-
-#     def encode_image(self, images: Union[str, ImageType, List[Union[str, ImageType]]], 
-#                         normalize = True) -> FloatTensor:
-        
-#         if self.model is None:
-#             self.load()
-
-#         # default to batch encoding
-#         if isinstance(images, list):
-#             image_input = format_and_load_CLIP_images(images)
-#         else:
-#             image_input = [format_and_load_CLIP_image(images)]
-
-#         self.image_input_processed = torch.stack([self.preprocess(_img).to(self.device) for _img in image_input])
-    
-#         with torch.no_grad():
-#             outputs = self.model.encode_image(self.image_input_processed)
-
-#         if normalize:
-#             _shape_before = outputs.shape
-#             outputs /= self.normalize(outputs)
-#             assert outputs.shape == _shape_before
-#         return self._convert_output(outputs)
-
-#     def encode(self, inputs: Union[str, ImageType, List[Union[str, ImageType]]], 
-#                                 default: str = 'text', normalize = True, **kwargs) -> FloatTensor:
-
-#         infer = kwargs.pop('infer', True)
-
-#         if infer and _is_image(inputs):
-#             is_image = True
-#         else:
-#             is_image = False
-#             if default == 'text':
-#                 is_image = False
-#             elif default == 'image':
-#                 is_image = True
-#             else:
-#                 raise ValueError(f"expected default='image' or default='text' but received {default}")
-
-#         if is_image:
-#             logger.debug('image')
-#             return self.encode_image(inputs, normalize=normalize)
-#         else:
-#             logger.debug('text')
-#             return self.encode_text(inputs, normalize=normalize)
