@@ -60,7 +60,7 @@ def generate(task: str, device, *args, **kwargs) -> List[Tuple[Any]]:
     model_cache_key = _create_model_cache_key(model_name, device)
 
     if model_cache_key not in available_models:
-        available_models[model_cache_key] = _load_model_enrichment(model_name=model_name, device=device)
+        available_models[model_cache_key] = _load_model_enrichment(device=device)
         logger.info(f'loaded {task} on device {device}')
     try:
         # generated is happy to inserted back into Marqo
