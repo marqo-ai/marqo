@@ -56,12 +56,12 @@ class VQA:
             raise EnrichmentError(f"incorrect enrichment type specified {self.task} expected one of {list(self.mappings.keys())}")
 
         image_query_pairs = _process_kwargs_vqa(kwargs)
-        print(image_query_pairs)
         self._infer(self.task, image_query_pairs)
+
+        return self.answers
 
     @staticmethod
     def _load_images(image_names: List[str]):
-        print(image_names)
         images = format_and_load_CLIP_images(image_names)
         return images
 
@@ -91,7 +91,6 @@ class VQA:
             question = self.txt_processors["eval"](question)
             result = self.model.predict_answers(samples={"image": image, "text_input": question}, inference_method="generate")[0]
             answers.append(result)
-            print(qi, type(raw_image), question, result)
 
         # optionally convert answers dpending on task
         self.answers = _format_answers_for_task(task, answers)
