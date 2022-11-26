@@ -12,15 +12,15 @@ class TestEnrichment(MarqoTestCase):
         result = enrichment.enrich(
             documents=[
                 {
-                    "Description": "A photo of a house",
-                    "Image location": "https://s3.image.png"
+                    "Description": "A photo of a hippo",
+                    "Image location": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png"
                 }
             ],
             enrichment={
                 "model": "attribute-extraction",
-                "to": ["Is_bathroom", "Is_Bedroom", "Is_Study", "Is_Yard"],
+                "to": ["Is_bathroom", "Is_Bedroom", "Is_Study", "Is_Yard", "Is_Hippo"],
                 "kwargs": {
-                    "attributes": [{"string": "Bathroom, Bedroom, Study, Yard"}],
+                    "attributes": [{"string": "Bathroom, Bedroom, Study, Yard, Hippo"}],
                     "image_field": {"document_field": "Image location"}
                 },
             },
