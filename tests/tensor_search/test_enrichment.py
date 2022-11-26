@@ -29,3 +29,4 @@ class TestEnrichment(MarqoTestCase):
         )
         print('resultresult')
         pprint.pprint(result)
+    

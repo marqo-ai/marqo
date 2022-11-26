@@ -29,7 +29,12 @@ def enrich(documents: List[dict], enrichment: dict, device, indexing_instruction
         generated = generate(task=enrichment["model"], device=device, **kwargs)
         for i, to_field in enumerate(enrichment["to"]):
             doc[to_field] = generated[i]
-    return documents
+    return {
+        "documents": documents,
+        "results": [
+            {"result": "successful"} for _ in documents
+        ]
+    }
 
 
 def _parse_kwargs(doc: dict, kwargs: dict) -> dict:
