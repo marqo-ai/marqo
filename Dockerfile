@@ -16,7 +16,7 @@ RUN apt-get install python3.8-distutils -y # python3-distutils
 RUN apt-get  install python3.8 python3-pip -y # pip is 276 MB!
 # TODO: up the RAM
 RUN echo Target platform is "$TARGETPLATFORM"
-RUN apt-get install git-all -y
+RUN apt-get install git -y
 COPY requirements.txt requirements.txt
 RUN pip3 install --no-cache-dir -r requirements.txt
 COPY scripts scripts
