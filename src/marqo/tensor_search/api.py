@@ -1,11 +1,11 @@
 """The API entrypoint for Tensor Search"""
 import typing
 from fastapi.responses import JSONResponse
-from models.api_models import SearchQuery
+from models.api_models import SearchQuery, EnrichmentQuery
 from fastapi import FastAPI, Request, Depends, HTTPException
 from marqo.errors import MarqoWebError, MarqoError
 from fastapi import FastAPI, Query
-from marqo.tensor_search import tensor_search
+from marqo.tensor_search import tensor_search, enrichment
 from marqo import config
 from typing import List, Dict
 import os
@@ -13,6 +13,7 @@ from marqo.tensor_search.web import api_validation, api_utils
 from marqo.tensor_search import utils
 from marqo.tensor_search.on_start_script import on_start
 from marqo import version
+
 
 def replace_host_localhosts(OPENSEARCH_IS_INTERNAL: str, OS_URL: str):
     """Replaces a host's localhost URL with one that can be referenced from
@@ -211,6 +212,15 @@ def check_health(marqo_config: config.Config = Depends(generate_config)):
 @app.get("/indexes")
 def get_indexes(marqo_config: config.Config = Depends(generate_config)):
     return tensor_search.get_indexes(config=marqo_config)
+
+
+@app.post("/enrichment")
+def enrichment(body: EnrichmentQuery, marqo_config: config.Config = Depends(generate_config),
+               device: str = Depends(api_validation.validate_device)):
+    return enrichment.enrich(
+        documents=body.documents,
+        indexing_instructions=body.indexing_instructions,
+        config=marqo_config, device=device)
 
 # try these curl commands:
 

@@ -21,7 +21,7 @@ enrich( documents=[{
 """
 
 
-def enrich(documents: List[dict], enrichment: dict, device, indexing_instructions=None):
+def enrich(documents: List[dict], enrichment: dict, device, indexing_instructions=None, config=None):
     for doc in documents:
         kwargs = _parse_kwargs(doc=doc, kwargs=enrichment["kwargs"])
         generated = generate(task=enrichment["task"], device=device, **kwargs)
@@ -90,7 +90,6 @@ def _expand_arg(doc: dict, arg: dict) -> str:
     Raises:
         errors.ArgParseError
     """
-    print('argarg', arg)
     if not isinstance(arg, dict):
         raise errors.ArgParseError(
             f"Keyword argument object must be a dictionary! "

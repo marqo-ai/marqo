@@ -34,3 +34,9 @@ class ErrorResponse(BaseModel):
     code: str
     type: str
     link: str
+
+
+class EnrichmentQuery(BaseModel):
+    documents: List[Dict]
+    enrichment: Dict
+    indexing_instructions: Union[None, Dict]
