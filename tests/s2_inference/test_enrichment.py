@@ -7,6 +7,10 @@ from marqo.s2_inference.enrichment.vqa_utils import (
     get_allowed_vqa_tasks,
     VQA
 )
+
+from marqo.s2_inference.s2_inference import generate
+
+
 class TestEncoding(unittest.TestCase):
 
     def setUp(self) -> None:
@@ -150,3 +154,38 @@ class TestEncoding(unittest.TestCase):
         model.predict(task, [], **parsed_kwargs)
 
         assert model.answers == ['one']
+    
+    def test_generate(self):
+        """
+                generate(
+        "attribute-extraction", 
+        [ ],
+        {
+                    "attributes": ["Bathroom, Bedroom, Study, Yard"]
+                    "image_field": "https://s3.image.png"
+                 }
+        )
+        """
+        task = "attribute-extraction"
+        # output from _parse_kwargs in enrichment.py
+        parsed_kwargs = {
+                "attributes": ["hippo, water, car, truck"],
+                "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+            }
+
+        results = generate(task, 'cpu', [], **parsed_kwargs)
+
+        assert results == [True, True, False, False]
+
+
+        task = "question-answer"
+
+        # output from _parse_kwargs in enrichment.py
+        parsed_kwargs = {
+                "query": "how many hippos are in the picture?",
+                "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+            }
+
+        results = generate(task, 'cpu', [], **parsed_kwargs)
+
+        assert results == ['one']
