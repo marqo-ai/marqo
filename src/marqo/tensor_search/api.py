@@ -219,6 +219,7 @@ def enrichment(body: EnrichmentQuery, marqo_config: config.Config = Depends(gene
                device: str = Depends(api_validation.validate_device)):
     return enrichment.enrich(
         documents=body.documents,
+        enrichment=body.enrichment,
         indexing_instructions=body.indexing_instructions,
         config=marqo_config, device=device)
 
