@@ -8,6 +8,7 @@ from marqo.s2_inference.model_registry import load_model_properties
 from marqo.s2_inference.configs import get_default_device,get_default_normalization,get_default_seq_length
 from marqo.s2_inference.types import *
 from marqo.s2_inference.logger import get_logger
+from timeit import default_timer as timer
 logger = get_logger(__name__)
 
 available_models = dict()
@@ -28,6 +29,9 @@ def vectorise(model_name: str, content: Union[str, List[str]], device: str = get
         VectoriseError: if the content can't be vectorised, for some reason.
     """
 
+    logger.info(f"The client gives {len(content)} documents to vectorise")
+    start = timer()
+
     model_cache_key = _create_model_cache_key(model_name, device)
 
     if model_cache_key not in available_models:
@@ -35,9 +39,12 @@ def vectorise(model_name: str, content: Union[str, List[str]], device: str = get
         logger.info(f'loaded {model_name} on device {device} with normalization={normalize_embeddings}')
     try:
         vectorised = available_models[model_cache_key].encode(content, normalize=normalize_embeddings, **kwargs)
+
     except UnidentifiedImageError as e:
         raise VectoriseError from e
 
+    end = timer()
+    logger.info(f"It take about {(end - start):.3f}s to vectorise all documents. The average time for each document is {((end - start) / len(content)):.3f}s")
     return _convert_vectorized_output(vectorised)
 
 def _create_model_cache_key(model_name: str, device: str) -> Tuple:

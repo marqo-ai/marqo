@@ -8,6 +8,7 @@ import clip
 import torch
 from PIL import Image
 import open_clip
+from timeit import default_timer as timer
 
 from marqo.s2_inference.types import *
 from marqo.s2_inference.logger import get_logger
@@ -152,6 +153,8 @@ class CLIP:
         self.processor = None
         self.embedding_dimension = embedding_dim
         self.truncate = truncate
+        self.num_of_inputs = None
+
 
     def load(self) -> None:
 
@@ -195,6 +198,8 @@ class CLIP:
         if self.model is None:
             self.load()
 
+        time1 = timer()
+
         # default to batch encoding
         if isinstance(images, list):
             image_input = format_and_load_CLIP_images(images)
@@ -202,7 +207,10 @@ class CLIP:
             image_input = [format_and_load_CLIP_image(images)]
 
         self.image_input_processed = torch.stack([self.preprocess(_img).to(self.device) for _img in image_input])
-    
+
+        time2 = timer()
+        logger.info(f"It take about {(time2- time1):.3f}s to preprocess all images. The average time for each image is {((time2 - time1) / self.num_of_inputs):.3f}s")
+
         with torch.no_grad():
             outputs = self.model.encode_image(self.image_input_processed)
 
@@ -210,13 +218,17 @@ class CLIP:
             _shape_before = outputs.shape
             outputs /= self.normalize(outputs)
             assert outputs.shape == _shape_before
+
+        time3 = timer()
+        logger.info(f"It take about {(time3 - time2):.3f}s to encode all images. The average time for each image is {((time3 - time2) / self.num_of_inputs):.3f}s")
+
         return self._convert_output(outputs)
 
     def encode(self, inputs: Union[str, ImageType, List[Union[str, ImageType]]], 
                                 default: str = 'text', normalize = True, **kwargs) -> FloatTensor:
 
         infer = kwargs.pop('infer', True)
-
+        self.num_of_inputs = len(inputs)
         if infer and _is_image(inputs):
             is_image = True
         else:
