@@ -47,15 +47,19 @@ image_key = "Image Location"
 
 def main():
 
+    # we use a temp dir for the image and store it so it can be read by marqo
     image_dir = os.getcwd() + '/temp/'
     Path(image_dir).mkdir(parents=True, exist_ok=True)
     start_image_server(image_dir)
 
+    # logo for the app
     logo = load_marqo_logo()
     st.image(logo)
 
+    # set the indexing device
     device = 'cpu'
 
+    # this is the file upload button
     uploaded_file = st.file_uploader("", type=['jpg','png','jpeg'])
     
     if uploaded_file is not None:
@@ -67,11 +71,7 @@ def main():
             st.markdown('<p style="text-align: center;">Selected image</p>',unsafe_allow_html=True)
             st.image(image, width=512)  
 
-        # col11, col22 = st.columns(2)
-
-        # form1 = col11.form(key='my-form1')
-        # submit1 = form1.form_submit_button('Get attributes...')
-        
+        # use a tempfile for the uploaded image and make a copy for marqo    
         temp_file = NamedTemporaryFile(delete=False)
         if uploaded_file:
             temp_file.write(uploaded_file.getvalue())
@@ -80,11 +80,13 @@ def main():
         image = Image.open(temp_file.name)
         image.save(save_name)
 
+        # here we have the text input for the task
         text_in = st.empty()
         sentence = text_in.text_input("Enter custom attributes (e.g. house, bedroom ) or a question (what color is the wall?)")
 
         if sentence:
 
+            # we determine the task based on the structure of the input, i.e. ? -> question answering
             is_qa = False
             if ',' in sentence or not sentence.endswith('?'):
                 columns = sentence.split(',')
