@@ -81,7 +81,7 @@ def main():
         image.save(save_name)
 
         text_in = st.empty()
-        sentence = text_in.text_input("Enter custom attributes (e.g. house, bedroom ) or a question (what color is the wall?")
+        sentence = text_in.text_input("Enter custom attributes (e.g. house, bedroom ) or a question (what color is the wall?)")
 
         if sentence:
 
