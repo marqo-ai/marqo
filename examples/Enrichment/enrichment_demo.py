@@ -96,10 +96,17 @@ df_qa.to_csv("data_qa.csv")
 ############################# Step 3. Index them into marqo
 ############################################################################
 
+settings = {
+ "treat_urls_and_pointers_as_images":True,
+ "model":"ViT-B/32" # the best performance is ViT-L/14 but check your RAM.
+}
 
-mq.index("test").add_documents(enriched_ae['documents'], device=device)
+index_name = 'test_enrichment'
 
+mq.create_index(index_name, **settings)
 
-mq.index("test").search("hippo", filter_string="Is_Hippo:true")
+mq.index(index_name).add_documents(enriched_ae['documents'], device=device)
 
-mq.index("test").search("hippo", filter_string="Is_Hippo:true and Is_Bedroom:true")
+mq.index(index_name).search("hippo", filter_string="Is_Hippo:true")
+
+mq.index(index_name).search("hippo", filter_string="Is_Hippo:true and Is_Bedroom:true")
