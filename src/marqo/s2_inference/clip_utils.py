@@ -166,13 +166,14 @@ class CLIP:
     
     def _convert_output(self, output):
         print(output.dtype)
-        start = timer()
         if self.device == 'cpu':
+            start = timer()
             output = output.numpy()
             end = timer()
             logger.info(f"It takes {(end - start):.3f}s to convert the output to ndarray")
             return output
         elif self.device.startswith('cuda'):
+            start = timer()
             output = output.cpu().numpy()
             end = timer()
             logger.info(f"It takes {(end - start):.3f}s to convert the output to ndarray")
