@@ -165,6 +165,7 @@ class CLIP:
         self.model.eval()
     
     def _convert_output(self, output):
+        print(output.dtype)
         start = timer()
         if self.device == 'cpu':
             output = output.numpy()
