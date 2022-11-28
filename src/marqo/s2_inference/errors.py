@@ -23,3 +23,8 @@ class ModelLoadError(S2InferenceError):
 class RerankerError(S2InferenceError):
     pass
 
+class RerankerImageError(S2InferenceError):
+    pass
+
+class RerankerNameError(S2InferenceError):
+    pass
