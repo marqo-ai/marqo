@@ -3,7 +3,7 @@ import copy
 import numpy as np
 
 from marqo.s2_inference.reranking import rerank
-from marqo.s2_inference.errors import RerankerError
+from marqo.s2_inference.errors import RerankerError,RerankerNameError
 
 
 class TestRerankingWithModels(unittest.TestCase):
@@ -183,8 +183,8 @@ class TestRerankingWithModels(unittest.TestCase):
         try:
             rerank.rerank_search_results(search_result=results_lexical, query='hippo', model_name=model_name, 
                             device='cpu')
-        except RerankerError as e:
-            pass
+        except Exception as e:
+            assert 'found searchable_attributes=None' in str(e)
 
         rerank.rerank_search_results(search_result=results_lexical, query='hippo', model_name=model_name, 
                             device='cpu', searchable_attributes=[image_location])
@@ -204,6 +204,44 @@ class TestRerankingWithModels(unittest.TestCase):
         assert all( len(doc['_highlights']) >= 1 for doc in results_lexical['hits'])
 
         assert all( isinstance(doc['_score'], (int, float, np.float32)) for doc in results_lexical['hits'])
+
+    def test_reranking_images_incorrect_model(self):
+        # not all results have the searchable filed to rerank over
+        results_lexical = {'hits': 
+                    [{'attributes': 'yello head. pruple shirt. black sweater.',
+                        'location': 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png',
+                        'other': 'some other text',
+                        # this one has no id
+                        '_score': 1.4017934,
+                        '_highlights': [],
+                        },
+                        {'attributes': 'face is viking. body is white turtleneck. background is pearl',
+                        # missing locations
+                        'other': 'some more text',
+                        '_id': 'QmRR6PBkgCdhiSYBM3AY3EWhn4ZbeR2X8Ygpy2veLkcPC5',
+                        '_score': 0.2876821,
+                        '_highlights': [],
+                        },
+                        # this one has less fields
+                        {'attributes': 'face is bowlcut. body is blue . background is grey. head is tan',
+                        'location': 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png',
+                        '_id': 'QmTVYuULK1Qbzh21Y3hzeTFny5AGUSUGAXoGjLqNB2b1at',
+                        '_score': 0.2876821,
+                        '_highlights': [],
+                        }],
+                        'processingTimeMs': 49,
+                        'query': 'yellow turtleneck',
+                        'limit': 10}
+
+        results_lexical_copy = copy.deepcopy(results_lexical)
+        model_name = "google/owlvt-base-patch32"
+        image_location = 'location'
+        try:
+            rerank.rerank_search_results(search_result=results_lexical, query='hippo', model_name=model_name, 
+                            device='cpu', searchable_attributes=[image_location])
+        except RerankerError as e:
+            assert "could not find model_name=" in str(e)
+            #print(e)
 
     def test_reranking_images_owl_inconsistent_highlights(self):
         # not all results have the searchable filed to rerank over
