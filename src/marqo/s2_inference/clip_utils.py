@@ -230,9 +230,6 @@ class CLIP:
 
         time3 = timer()
         logger.info(f"It take about {(time3 - time2):.3f}s to encode all images. The average time for each image is {((time3 - time2) / self.num_of_inputs):.3f}s")
-        print(outputs.dtype)
-        outputs = outputs.type(torch.half)
-        print(outputs.dtype)
 
         return self._convert_output(outputs)
 
