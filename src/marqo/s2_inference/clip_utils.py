@@ -147,7 +147,8 @@ class CLIP:
                             truncate: bool = True, **kwargs) -> None:
 
         self.model_type = model_type
-        self.device = device
+        self.load_device = device
+        self.device = "cuda"
         self.model = None
         self.tokenizer = None
         self.processor = None
@@ -159,13 +160,13 @@ class CLIP:
     def load(self) -> None:
 
         # https://github.com/openai/CLIP/issues/30
-        self.model, self.preprocess = clip.load(self.model_type, device="cpu", jit=False)
+        self.model, self.preprocess = clip.load(self.model_type, device=self.load_device, jit=False)
         self.model = self.model.to(self.device)
         self.tokenizer = clip.tokenize
         self.model.eval()
 
     def _convert_output(self, output):
-        output = output.to(torch.float16)
+        #output = output.to(torch.float16)
         original_type = output.dtype
         if self.device == 'cpu':
             start = timer()
