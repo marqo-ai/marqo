@@ -170,13 +170,13 @@ class CLIP:
             start = timer()
             output = output.numpy()
             end = timer()
-            logger.info(f"It takes {(end - start):.3f}s to convert the output to ndarray")
+            logger.info(f"It takes {(end - start):.3f}s to convert the output to ndarray from cpu")
             return output
         elif self.device.startswith('cuda'):
             start = timer()
             output = output.cpu().numpy()
             end = timer()
-            logger.info(f"It takes {(end - start):.3f}s to convert the output to ndarray")
+            logger.info(f"It takes {(end - start):.3f}s to convert the output to ndarray from cuda")
             return output
 
     @staticmethod
