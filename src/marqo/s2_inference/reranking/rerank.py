@@ -2,7 +2,11 @@
 from marqo.s2_inference.reranking.enums import ResultsFields
 from marqo.s2_inference.reranking.cross_encoders import ReRankerText, ReRankerOwl
 from marqo.s2_inference.types import Dict, List
-from marqo.s2_inference.errors import RerankerError
+from marqo.s2_inference.errors import RerankerError,RerankerImageError, RerankerNameError
+from PIL import UnidentifiedImageError
+from marqo.s2_inference.logger import get_logger
+
+logger = get_logger('reranker')
 
 def rerank_search_results(search_result: Dict, query: str, model_name: str, device: str, 
                 searchable_attributes: List[str] = None, num_highlights: int = 1, 
@@ -28,12 +32,23 @@ def rerank_search_results(search_result: Dict, query: str, model_name: str, devi
         # owl needs the image location, while the text based ones can handle different number of fields but concat the text
         if searchable_attributes in (None, [], (), ''):
             raise RerankerError(f"found searchable_attributes={searchable_attributes} but expected list of strings for {model_name}")
+        
+        if len(searchable_attributes) > 1:
+            logger.info(f"currently only a single attribute can be reranked over for {model_name}. taking the first field {[searchable_attributes[0]]} from {searchable_attributes}")
+            searchable_attributes = [searchable_attributes[0]]
 
-        reranker = ReRankerOwl(model_name=model_name, device=device, image_size=(240,240))
-        reranker.rerank(query=query, results=search_result, image_attributes=searchable_attributes)
+        try:
+            reranker = ReRankerOwl(model_name=model_name, device=device, image_size=(240,240))
+            reranker.rerank(query=query, results=search_result, image_attributes=searchable_attributes)
+        except (UnidentifiedImageError, RerankerNameError) as e:
+            raise RerankerError(message=str(e)) from e
+
     else:
-        reranker = ReRankerText(model_name=model_name, device=device, num_highlights=num_highlights)
-        reranker.rerank(query=query, results=search_result, searchable_attributes=searchable_attributes)
+        try:
+            reranker = ReRankerText(model_name=model_name, device=device, num_highlights=num_highlights)
+            reranker.rerank(query=query, results=search_result, searchable_attributes=searchable_attributes)
+        except Exception as e:
+            raise RerankerError(message=str(e)) from e
 
     if overwrite_original_scores_highlights:
         cleanup_final_reranked_results(search_result)
