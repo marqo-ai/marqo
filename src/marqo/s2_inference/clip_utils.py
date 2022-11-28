@@ -159,12 +159,13 @@ class CLIP:
     def load(self) -> None:
 
         # https://github.com/openai/CLIP/issues/30
-        self.model, self.preprocess = clip.load(self.model_type, device=self.device, jit=False)
+        self.model, self.preprocess = clip.load(self.model_type, device="cpu", jit=False)
         self.model = self.model.to(self.device)
         self.tokenizer = clip.tokenize
         self.model.eval()
 
     def _convert_output(self, output):
+        output = output.type(torch.float16)
         if self.device == 'cpu':
             start = timer()
             output = output.numpy()
