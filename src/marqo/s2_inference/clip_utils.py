@@ -206,10 +206,13 @@ class CLIP:
         else:
             image_input = [format_and_load_CLIP_image(images)]
 
+        time4 = timer()
+        logger.info(f"It takes about {(time4- time1):.3f}s to load all images. The average time for each image is {((time4 - time1) / self.num_of_inputs):.3f}s")
+
         self.image_input_processed = torch.stack([self.preprocess(_img).to(self.device) for _img in image_input])
 
         time2 = timer()
-        logger.info(f"It take about {(time2- time1):.3f}s to preprocess all images. The average time for each image is {((time2 - time1) / self.num_of_inputs):.3f}s")
+        logger.info(f"It takes about {(time2- time4):.3f}s to preprocess all images. The average time for each image is {((time2 - time1) / self.num_of_inputs):.3f}s")
 
         with torch.no_grad():
             outputs = self.model.encode_image(self.image_input_processed)
