@@ -165,7 +165,7 @@ class CLIP:
         self.model.eval()
 
     def _convert_output(self, output):
-        output = output.type(torch.cuda.float16)
+        output = output.type(torch.float16)
         original_type = output.dtype
         if self.device == 'cpu':
             start = timer()
