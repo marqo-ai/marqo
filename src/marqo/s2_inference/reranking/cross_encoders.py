@@ -25,7 +25,7 @@ from marqo.s2_inference.reranking.model_utils import (
     _process_owl_result,
     _keep_top_k
     )
-
+from marqo.s2_inference.errors import RerankerNameError
 from marqo.s2_inference.clip_utils import _load_image_from_path
 from marqo.s2_inference.reranking.enums import Columns, ResultsFields
 from marqo.s2_inference.reranking.configs import get_default_text_processing_parameters
@@ -340,7 +340,6 @@ class ReRankerText(ReRanker):
         self.get_reranked_results()
 
 
-
 class ReRankerOwl(ReRanker):
     # we might need the index config to get the processing params
     # "google/owlvit-base-patch32"
@@ -365,7 +364,7 @@ class ReRankerOwl(ReRanker):
         self._get_model_mapping()
 
         if self.model_name not in self._model_map:
-            raise ValueError(f"could not find model_name={self.model_name} in mappings {self._model_map}")
+            raise RerankerNameError(f"could not find model_name={self.model_name} in mappings {list(self._model_map.keys())}")
 
     def _get_model_mapping(self):
 
