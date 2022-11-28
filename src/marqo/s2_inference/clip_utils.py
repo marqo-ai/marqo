@@ -165,11 +165,17 @@ class CLIP:
         self.model.eval()
     
     def _convert_output(self, output):
-
+        start = timer()
         if self.device == 'cpu':
-            return output.numpy()
+            output = output.numpy()
+            end = timer()
+            logger.info(f"It takes {(end - start):.f3}s to convert the output to ndarray")
+            return output
         elif self.device.startswith('cuda'):
-            return output.cpu().numpy()
+            output = output.cpu().numpy()
+            end = timer()
+            logger.info(f"It takes {(end - start):.f3}s to convert the output to ndarray")
+            return output
 
     @staticmethod
     def normalize(outputs):
@@ -212,7 +218,7 @@ class CLIP:
         self.image_input_processed = torch.stack([self.preprocess(_img).to(self.device) for _img in image_input])
 
         time2 = timer()
-        logger.info(f"It takes about {(time2- time4):.3f}s to preprocess all images. The average time for each image is {((time2 - time1) / self.num_of_inputs):.3f}s")
+        logger.info(f"It takes about {(time2- time4):.3f}s to preprocess all images. The average time for each image is {((time2 - time4) / self.num_of_inputs):.3f}s")
 
         with torch.no_grad():
             outputs = self.model.encode_image(self.image_input_processed)
