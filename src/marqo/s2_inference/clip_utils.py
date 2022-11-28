@@ -6,7 +6,7 @@ import requests
 import numpy as np
 import clip
 import torch
-from PIL import Image
+from PIL import Image,UnidentifiedImageError
 import open_clip
 
 from marqo.s2_inference.types import *
@@ -59,7 +59,7 @@ def _load_image_from_path(image: str) -> ImageType:
     elif validators.url(image):
         img = Image.open(requests.get(image, stream=True).raw)
     else:
-        raise ValueError(f"input str of {image} is not a local file or a valid url")
+        raise UnidentifiedImageError(f"input str of {image} is not a local file or a valid url")
 
     return img
 
@@ -85,7 +85,7 @@ def format_and_load_CLIP_image(image: Union[str, ndarray, ImageType]) -> ImageTy
     elif isinstance(image, ImageType):
         img = image
     else:
-        raise TypeError(f"input of type {type(image)} did not match allowed types of str, np.ndarray, ImageType")
+        raise UnidentifiedImageError(f"input of type {type(image)} did not match allowed types of str, np.ndarray, ImageType")
 
     return img
 
@@ -101,7 +101,7 @@ def _is_image(inputs: Union[str, List[Union[str, ImageType, ndarray]]]) -> bool:
     if isinstance(inputs, list):
 
         if len(inputs) == 0:
-            raise TypeError("received empty list, expected at least one element.")
+            raise UnidentifiedImageError("received empty list, expected at least one element.")
 
         thing = inputs[0]
     else:
@@ -118,7 +118,7 @@ def _is_image(inputs: Union[str, List[Union[str, ImageType, ndarray]]]) -> bool:
         # if it is a local file without extension, then raise an error
         if os.path.isfile(thing):
             # we could also read the first part of the file and infer
-            raise TypeError(f"local file [{thing}] extension {extension} does not match allowed file types of {_allowed}")
+            raise UnidentifiedImageError(f"local file [{thing}] extension {extension} does not match allowed file types of {_allowed}")
         else:
             # if it is not a local file and does not have an extension
             # check if url
@@ -126,13 +126,12 @@ def _is_image(inputs: Union[str, List[Union[str, ImageType, ndarray]]]) -> bool:
                 return True
             else:
                 False
-                # raise ValueError(f"{thing} cannot be identified as a local file, url or image")
 
     # if it is an array, then it is an image
     elif isinstance(thing, (ImageType, ndarray)):
         return True
     else:
-        raise TypeError(f"expected type Image or str for inputs but received type {type(thing)}")
+        raise UnidentifiedImageError(f"expected type Image or str for inputs but received type {type(thing)}")
 
 class CLIP:
     
@@ -224,7 +223,7 @@ class CLIP:
             elif default == 'image':
                 is_image = True
             else:
-                raise ValueError(f"expected default='image' or default='text' but received {default}")
+                raise UnidentifiedImageError(f"expected default='image' or default='text' but received {default}")
 
         if is_image:
             logger.debug('image')
