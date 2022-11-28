@@ -165,18 +165,19 @@ class CLIP:
         self.model.eval()
 
     def _convert_output(self, output):
-        output = output.type(torch.float16)
+        output = output.type(torch.cuda.float16)
+        original_type = output.dtype
         if self.device == 'cpu':
             start = timer()
             output = output.numpy()
             end = timer()
-            logger.info(f"It takes {(end - start):.3f}s to convert the output with {output.dtype} to ndarray from cpu")
+            logger.info(f"It takes {(end - start):.3f}s to convert the output with {original_type} to ndarray from cpu")
             return output
         elif self.device.startswith('cuda'):
             start = timer()
             output = output.cpu().numpy()
             end = timer()
-            logger.info(f"It takes {(end - start):.3f}s to convert the output with {output.dtype} to ndarray from cuda")
+            logger.info(f"It takes {(end - start):.3f}s to convert the output with {original_type} to ndarray from cuda")
             return output
 
     @staticmethod
