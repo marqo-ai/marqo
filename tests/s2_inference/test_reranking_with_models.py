@@ -4,6 +4,7 @@ import numpy as np
 
 from marqo.s2_inference.reranking import rerank
 from marqo.s2_inference.errors import RerankerError,RerankerNameError
+from marqo.s2_inference.s2_inference import clear_loaded_models
 
 
 class TestRerankingWithModels(unittest.TestCase):
@@ -11,6 +12,9 @@ class TestRerankingWithModels(unittest.TestCase):
     def setUp(self) -> None:
 
         pass
+
+    def tearDown(self) -> None:
+        clear_loaded_models()
 
     def test_reranking_text_sbert(self):
 

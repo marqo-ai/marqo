@@ -4,6 +4,7 @@ import os
 
 import numpy as np
 from PIL import Image
+from marqo.s2_inference.s2_inference import clear_loaded_models
 
 from marqo.s2_inference.processing.image import (
     PatchifySimple,
@@ -18,6 +19,9 @@ class TestImageChunking(unittest.TestCase):
 
     def setUp(self) -> None:
         pass 
+
+    def tearDown(self) -> None:
+        clear_loaded_models()
 
     def test_PatchifySimple(self):
 

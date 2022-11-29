@@ -7,6 +7,7 @@ from PIL import Image
 import onnxruntime
 
 from marqo.s2_inference.types import ndarray
+from marqo.s2_inference.s2_inference import clear_loaded_models
 
 from marqo.s2_inference.processing.yolox_utils import (
     get_default_yolox_model,
@@ -25,6 +26,10 @@ class TestImageUtils(unittest.TestCase):
         self.test_image_name = 'https://avatars.githubusercontent.com/u/13092433?v=4'
         self.test_image = np.array(Image.open(requests.get(self.test_image_name, stream=True).raw))
         self.size = (384, 384)
+
+    def tearDown(self) -> None:
+        clear_loaded_models()
+
 
     def test_yolox_config(self):
         params = get_default_yolox_model()

@@ -8,6 +8,7 @@ from PIL import Image
 import torch
 
 from marqo.s2_inference.types import List, Dict, ImageType
+from marqo.s2_inference.s2_inference import clear_loaded_models
 
 from marqo.s2_inference.processing.DINO_utils import (
     _load_DINO_model,
@@ -25,7 +26,9 @@ class TestImageUtils(unittest.TestCase):
         self.test_image_name = 'https://avatars.githubusercontent.com/u/13092433?v=4'
         self.test_image = Image.open(requests.get(self.test_image_name, stream=True).raw)
         self.size = (224, 224)
-
+    
+    def tearDown(self) -> None:
+        clear_loaded_models()
 
     def test_load_transform(self):
         tform = _get_DINO_transform(image_size=self.size)
