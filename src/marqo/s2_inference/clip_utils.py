@@ -8,7 +8,7 @@ import clip
 import torch
 from PIL import Image
 import open_clip
-from timeit import default_timer as timer
+from datetime import datetime as timer
 
 from marqo.s2_inference.types import *
 from marqo.s2_inference.logger import get_logger
@@ -160,13 +160,17 @@ class CLIP:
     def load(self) -> None:
 
         # https://github.com/openai/CLIP/issues/30
+
+        #JIT might also change the performance
         self.model, self.preprocess = clip.load(self.model_type, device=self.load_device, jit=False)
         self.model = self.model.to(self.device)
         self.tokenizer = clip.tokenize
         self.model.eval()
 
     def _convert_output(self, output):
-        output = output.to(torch.float16)
+
+        #test some here
+        output = output.to(torch.float32)
         original_type = output.dtype
         if self.device == 'cpu':
             start = timer()
@@ -223,6 +227,7 @@ class CLIP:
 
         time2 = timer()
         logger.info(f"It takes about {(time2- time4):.3f}s to preprocess all images. The average time for each image is {((time2 - time4) / self.num_of_inputs):.3f}s")
+        torch.cuda.synchronize()
 
         with torch.no_grad():
             outputs = self.model.encode_image(self.image_input_processed)
@@ -232,6 +237,7 @@ class CLIP:
             outputs /= self.normalize(outputs)
             assert outputs.shape == _shape_before
 
+        torch.cuda.synchronize()
         time3 = timer()
         logger.info(f"It take about {(time3 - time2):.3f}s to encode all images. The average time for each image is {((time3 - time2) / self.num_of_inputs):.3f}s")
 
