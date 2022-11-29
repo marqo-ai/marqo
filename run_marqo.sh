@@ -76,7 +76,7 @@ if [[ ! $OPENSEARCH_URL ]]; then
       echo "OpenSearch is running"
   else
       echo "OpenSearch not found; running OpenSearch"
-      docker run --name marqo-os -id -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" marqoai/marqo-os:0.0.2 &
+      docker run --name marqo-os -id -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" marqoai/marqo-os:0.0.3 &
       docker start marqo-os &
       until [[ $(curl -v --silent --insecure $OPENSEARCH_URL 2>&1 | grep Unauthorized) ]]; do
         sleep 0.1;
@@ -88,7 +88,7 @@ export OPENSEARCH_URL
 export OPENSEARCH_IS_INTERNAL
 # Start the tensor search web app in the background
 cd /app/src/marqo/tensor_search || exit
-uvicorn api:app --host 0.0.0.0 --port 8882 &
+uvicorn api:app --host 0.0.0.0 --port 8882 --timeout-keep-alive 75 &
 api_pid=$!
 wait "$api_pid"
 

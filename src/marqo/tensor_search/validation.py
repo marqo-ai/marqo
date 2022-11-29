@@ -6,7 +6,7 @@ from marqo.tensor_search import enums, utils
 from typing import Iterable, Container
 from marqo.errors import (
     MarqoError, InvalidFieldNameError, InvalidArgError, InternalError,
-    InvalidDocumentIdError, DocTooLargeError)
+    InvalidDocumentIdError, DocTooLargeError, InvalidIndexNameError)
 from marqo.tensor_search.enums import TensorField
 from marqo.tensor_search import constants
 from typing import Any, Type
@@ -193,3 +193,26 @@ def validate_id(_id: str):
     if not _id:
         raise InvalidDocumentIdError("Document ID must can't be empty")
     return _id
+
+
+def validate_index_name(name: str) -> str:
+    """Validates the index name.
+
+    Args:
+        name: the name of the index
+
+    Returns:
+        name, if no errors have been raised.
+
+    Raises
+        InvalidIndexNameError
+    """
+    if name in constants.INDEX_NAMES_TO_IGNORE:
+        raise InvalidIndexNameError(
+            f"Index name `{name}` conflicts with a protected name. "
+            f"Please chose a different name for your index.")
+    if any([name.startswith(protected_prefix) for protected_prefix in constants.INDEX_NAME_PREFIXES_TO_IGNORE]):
+        raise InvalidIndexNameError(
+            f"Index name `{name}` starts with a protected prefix. "
+            f"Please chose a different name for your index.")
+    return name

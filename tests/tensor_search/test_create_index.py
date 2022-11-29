@@ -237,3 +237,9 @@ class TestCreateIndex(MarqoTestCase):
             return True
         assert run()
 
+    def test_create_index_protected_name(self):
+        try:
+            tensor_search.create_vector_index(config=self.config, index_name='.opendistro_security')
+            raise AssertionError
+        except errors.InvalidIndexNameError:
+            pass
