@@ -34,10 +34,10 @@ jobs:
           github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
 
           # ARM Runner Image
-          ec2-image-id: ami-08815b73e51f336f5
+          ec2-image-id: ${{ secrets.ARM_EC2_IMAGE_ID }}
           ec2-instance-type: a1.xlarge
-          subnet-id: subnet-011602eb168d440da
-          security-group-id: sg-060f59c9d3c43f2c5
+          subnet-id: ${{ secrets.ARM_SUBNET_ID }}
+          security-group-id: ${{ secrets.ARM_SECURITY_GROUP_ID }}
 
   Test-Marqo:
     name: Run Marqo Test Suite

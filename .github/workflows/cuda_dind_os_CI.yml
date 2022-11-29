@@ -34,10 +34,10 @@ jobs:
           github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
 
           # CUDA AMD64 instance
-          ec2-image-id: ami-0f7233dd59b1eca63
+          ec2-image-id: ${{ secrets.CUDA_EC2_IMAGE_ID }}
           ec2-instance-type: g4dn.xlarge
-          subnet-id: subnet-0f02bbb353082d3b2
-          security-group-id: sg-053c4a228b2f60dce
+          subnet-id: ${{ secrets.CUDA_SUBNET_ID }}
+          security-group-id: ${{ secrets.SECURITY_GROUP_ID }}
 
   Test-Marqo:
     name: Run Marqo Test Suite
