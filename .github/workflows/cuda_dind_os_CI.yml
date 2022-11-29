@@ -37,7 +37,7 @@ jobs:
           ec2-image-id: ${{ secrets.CUDA_EC2_IMAGE_ID }}
           ec2-instance-type: g4dn.xlarge
           subnet-id: ${{ secrets.CUDA_SUBNET_ID }}
-          security-group-id: ${{ secrets.SECURITY_GROUP_ID }}
+          security-group-id: ${{ secrets.CUDA_SECURITY_GROUP_ID }}
 
   Test-Marqo:
     name: Run Marqo Test Suite
