@@ -22,7 +22,7 @@ Python 3.8
 
 3. Make sure to run the Marqo docker container via the following command:
     ```
-    docker run --name marqo -it --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:0.0.4
+    docker run --name marqo -it --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:latest
     ```
 
 4. Install Marqo

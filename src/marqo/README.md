@@ -71,7 +71,7 @@ __Notes__:
 ### Option D. Pull marqo from `hub.docker.com` and run it
 ```
 docker rm -f marqo &&
-    docker run --name marqo --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:0.0.6
+    docker run --name marqo --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:latest
 ```
 
 ### Option E. Run marqo on arm64 (including M-series Macs) for development
@@ -168,7 +168,7 @@ sudo docker rm -f marqo-os; sudo docker run -p 9200:9200 -p 9600:9600 -e "discov
 
 4. Run marqo with a set `OPENSEARCH_URL`
 ```
-sudo docker rm -f marqo; sudo docker run --name marqo -it --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway -e "OPENSEARCH_URL=https://localhost:9200" marqoai/marqo:0.0.6
+sudo docker rm -f marqo; sudo docker run --name marqo -it --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway -e "OPENSEARCH_URL=https://localhost:9200" marqoai/marqo:latest
 ```
 
 
