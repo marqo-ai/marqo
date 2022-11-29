@@ -227,6 +227,7 @@ class CLIP:
 
         time2 = timer()
         logger.info(f"It takes about {(time2- time4):.3f}s to preprocess all images. The average time for each image is {((time2 - time4) / self.num_of_inputs):.3f}s")
+
         if self.device.startswith("cuda"):
             torch.cuda.synchronize()
 
@@ -240,6 +241,7 @@ class CLIP:
 
         if self.device.startswith("cuda"):
             torch.cuda.synchronize()
+
         time3 = timer()
         logger.info(f"It take about {(time3 - time2):.3f}s to encode all images. The average time for each image is {((time3 - time2) / self.num_of_inputs):.3f}s")
 
