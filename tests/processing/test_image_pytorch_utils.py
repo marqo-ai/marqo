@@ -5,7 +5,7 @@ import os
 import numpy as np
 from PIL import Image
  
-
+from marqo.s2_inference.s2_inference import clear_loaded_models
 from marqo.s2_inference.types import List, Dict, ImageType
 
 from marqo.s2_inference.processing.pytorch_utils import (
@@ -18,6 +18,9 @@ class TestImageUtils(unittest.TestCase):
 
     def setUp(self) -> None:
         self.device = 'cpu'
+
+    def tearDown(self) -> None:
+        clear_loaded_models()
     
     def test_get_rcnn_params(self):
 

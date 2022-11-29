@@ -193,7 +193,7 @@ class TestRerankingWithModels(unittest.TestCase):
         rerank.rerank_search_results(search_result=results_lexical, query='hippo', model_name=model_name, 
                             device='cpu', searchable_attributes=[image_location])
 
-        # for owl, if the document does not have the searchable_field it is removed from the results
+        # for owl, if the document does not have the searchable_field it is removed from the reranked results
         N_out = len([d for d in results_lexical['hits'] if image_location in d])
         N_in = len([d for d in results_lexical_copy['hits'] if image_location in d])
 
