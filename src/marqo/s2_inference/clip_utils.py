@@ -8,7 +8,7 @@ import clip
 import torch
 from PIL import Image
 import open_clip
-from datetime import datetime as timer
+from timeit import default_timer as timer
 
 from marqo.s2_inference.types import *
 from marqo.s2_inference.logger import get_logger
@@ -227,7 +227,8 @@ class CLIP:
 
         time2 = timer()
         logger.info(f"It takes about {(time2- time4):.3f}s to preprocess all images. The average time for each image is {((time2 - time4) / self.num_of_inputs):.3f}s")
-        torch.cuda.synchronize()
+        if self.device.startswith("cuda"):
+            torch.cuda.synchronize()
 
         with torch.no_grad():
             outputs = self.model.encode_image(self.image_input_processed)
@@ -237,7 +238,8 @@ class CLIP:
             outputs /= self.normalize(outputs)
             assert outputs.shape == _shape_before
 
-        torch.cuda.synchronize()
+        if self.device.startswith("cuda"):
+            torch.cuda.synchronize()
         time3 = timer()
         logger.info(f"It take about {(time3 - time2):.3f}s to encode all images. The average time for each image is {((time3 - time2) / self.num_of_inputs):.3f}s")
 
