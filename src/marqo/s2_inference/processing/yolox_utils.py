@@ -10,7 +10,7 @@ from marqo.s2_inference.s2_inference import get_logger
 from marqo.s2_inference.types import Dict, List, Union, ImageType, Tuple, FloatTensor, ndarray, Callable
 from marqo.s2_inference.processing.image_utils import _get_onnx_provider
 
-logger = get_logger("image_yolox_utils")
+logger = get_logger(__name__)
 
 def get_default_yolox_model() -> Dict:
     return {

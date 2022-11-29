@@ -58,7 +58,7 @@ class FormattedResults:
         self._get_searchable_columns()
 
     def results_to_df(self) -> None:
-        """_summary_
+        """ converts the results dict from search into a dataframe for easier manipulation
 
         Returns:
             _type_: _description_
@@ -126,7 +126,6 @@ class FormattedResults:
         if ResultsFields.original_score not in results_df:
             results_df[ResultsFields.original_score] = 1.0
 
-        
         inputs = []
         for field in searchable_fields:
             _inputs_df = results_df[[field, ResultsFields.reranked_id, ResultsFields.original_score]]
@@ -223,10 +222,13 @@ class ReRanker:
 
 
     def rerank(self, query, results):
+        # this gets filled on for the task (text/images)
         pass
 
 class ReRankerText(ReRanker):
-
+    """
+    class for reranking with hf based text models
+    """
     def __init__(self, model_name: str, device: str = 'cpu', max_length: int = 512, num_highlights: int = 1, 
                         split_params: Dict = get_default_text_processing_parameters()):
         super().__init__()
@@ -341,10 +343,9 @@ class ReRankerText(ReRanker):
 
 
 class ReRankerOwl(ReRanker):
-    # we might need the index config to get the processing params
-    # "google/owlvit-base-patch32"
-    # "google/owlvit-base-patch16"
-    # "google/owlvit-large-patch14"
+    
+    """reranker for owl based image reranking
+    """
 
     def __init__(self, model_name: str, device: str, image_size: Tuple):
         super().__init__()
@@ -389,7 +390,7 @@ class ReRankerOwl(ReRanker):
     @staticmethod
     def load_images(content: List[str], size: Tuple[int]) -> Tuple[ImageType, List[Tuple]]:
 
-        # TODO do web urls as well - fast laoding could be hard -
+        # uses same underlying loader as all other image models ffrom clip_utils
         images, original_size = zip(*[_load_image(f, size=size) for f in content])
 
         # use highlights
@@ -399,6 +400,8 @@ class ReRankerOwl(ReRanker):
 
     def rerank(self, query: str, results: Dict, image_attributes: List, num_highlights: int = 1):
         
+        # TODO add image based reranking when it is available
+        # https://github.com/huggingface/transformers/pull/20136
         self.results = results
         self.image_attributes = image_attributes
         self.num_highlights = num_highlights
@@ -465,7 +468,7 @@ class ReRankerOwl(ReRanker):
 
 @functools.lru_cache
 def _load_image(filename: str, size: Tuple = None) -> ImageType:
-    """loads a PIL image
+    """loads a PIL image with optional resizing
 
     Args:
         filename (str): _description_

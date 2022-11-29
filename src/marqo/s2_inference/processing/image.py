@@ -1,5 +1,3 @@
-import copy
-import requests
 from functools import partial
 
 import PIL
@@ -39,10 +37,9 @@ from marqo.s2_inference.processing.image_utils import (
     generate_boxes
 )
 
-logger = get_logger('image_chunks')
+logger = get_logger(__name__)
 
 
-    
 def chunk_image(image: Union[str, ImageType], device: str, 
                         method: str = 'simple', size=get_default_size()) -> Tuple[List[ImageType], ndarray]:
     """_summary_
@@ -222,6 +219,8 @@ class PatchifyModel:
         # output are unprocessed bounding boxes        
 
     def _filter_bb(self):
+        """filters bounding boxes based on size and aspect ratio
+        """
         if self.filter_bb:
             self.n_prefilter = len(self.boxes_xyxy)
             self.inds = filter_boxes(self.boxes_xyxy, min_area = self.min_area)
@@ -232,6 +231,9 @@ class PatchifyModel:
             logger.info(f"filtered {self.n_prefilter} boxes to {self.n_postfilter}")
 
     def _replace_small_bb(self):
+        """replaces boxes that are smaller than some area with a minimum sized box centered
+        on the old one. if the box is out of bounds it is clipped to the image boundries
+        """
         if self.replace_small:
             if len(self.boxes_xyxy):
                 self.boxes_xyxy = replace_small_boxes(self.boxes_xyxy, min_area=self.min_area_replace, 
@@ -240,6 +242,8 @@ class PatchifyModel:
 
    
     def _nms_bb(self):
+        """performs class agnostic nms over the bounding boxes
+        """
         if self.nms:
             if len(self.boxes_xyxy) > 1:
                 logger.info(f"doing nms for {len(self.boxes_xyxy)} {self.n_postfilter} boxes...")
@@ -252,6 +256,8 @@ class PatchifyModel:
                 self.scores =  [self.scores[ind] for ind in self.inds]
 
     def _keep_top_k_sorted(self):
+        """sort the boxes based on score and keep top k
+        """
         if len(self.scores) > self.top_k_scores:
             self.inds = np.argsort(np.array(self.scores).squeeze())[::-1][:self.top_k_scores]
             self.boxes_xyxy = [self.boxes_xyxy[ind] for ind in self.inds]
@@ -277,7 +283,7 @@ class PatchifyModel:
         # we add the original unchanged so that it is always in the index
         # the bb of the original also provides the size which is required for later processing
         self.bboxes = [(0,0,self.size[0],self.size[1])] + self.boxes_xyxy
-        #print(self.bboxes)
+        
         self.patches = patchify_image(self.image, self.bboxes)
 
         self.bboxes_orig = [rescale_box(bb, self.size, self.original_size) for bb in self.bboxes]
@@ -317,12 +323,25 @@ class PatchifyViT(PatchifyModel):
         self._keep_top_k_sorted()
 
     def _calc_scores_bb(self):
+        """we have no scores for the boxes so we go off area
+        """
         if len(self.boxes_xyxy) > 0:        
             self.scores = calc_area(self.boxes_xyxy, self.size)
         
     @staticmethod
     def _process_attention(attentions: ndarray, method: str = "abs") -> List[ndarray]:
+        """processes a N x grey-scale attention maps 
 
+        Args:
+            attentions (ndarray): _description_
+            method (str, optional): _description_. Defaults to "abs".
+
+        Raises:
+            TypeError: _description_
+
+        Returns:
+            List[ndarray]: _description_
+        """
         if method.startswith('abs'):
             return np.abs(attentions).mean(0)[np.newaxis, ...]
 
@@ -353,12 +372,6 @@ class PatchifyPytorch(PatchifyModel):
         self.input_shape = (384, 384)
         self.inds = []
         self.iou_thresh = 0.6
-
-    # def _keep_topk_sorted(self):
-    #     if len(self.scores) > self.top_k_scores:
-    #         self.inds = np.argsort(np.array(self.scores).squeeze())[::-1][:self.top_k_scores]
-    #         self.boxes_xyxy = [self.boxes_xyxy[ind] for ind in self.inds]
-    #         self.scores = [self.scores[ind] for ind in self.inds]
 
     def infer(self, image):
         self._load_image(image)
@@ -394,12 +407,6 @@ class PatchifyYolox(PatchifyModel):
         self.input_shape = (384, 384)
         self.inds = []
         self.iou_thresh = 0.6
-
-    # def _keep_topk_sorted(self):
-    #     if len(self.scores) > self.top_k_scores:
-    #         self.inds = np.argsort(np.array(self.scores).squeeze())[::-1][:self.top_k_scores]
-    #         self.boxes_xyxy = [self.boxes_xyxy[ind] for ind in self.inds]
-    #         self.scores = [self.scores[ind] for ind in self.inds]
 
     def infer(self, image):
         self._load_image(image)

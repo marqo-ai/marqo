@@ -4,15 +4,14 @@ import requests
 import cv2
 import numpy as np
 import onnxruntime
+from torchvision import transforms
 
 from marqo.s2_inference.s2_inference import get_logger
 from marqo.s2_inference.types import Dict, List, Union, ImageType, Tuple, FloatTensor, ndarray
 from marqo.s2_inference.clip_utils import _load_image_from_path
 from marqo.s2_inference.errors import ChunkerMethodProcessError
 
-from torchvision import transforms
-
-logger = get_logger("image_utils")
+logger = get_logger(__name__)
 
 
 def get_default_size() -> Tuple:
@@ -39,7 +38,6 @@ def _PIL_to_opencv(pil_image: ImageType) -> ndarray:
         return cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
     raise TypeError(f"expected a PIL image but received {type(pil_image)}")
 
-
 def _keep_topk(boxes_xyxy: Union[ndarray, FloatTensor], k: int = 10) -> Union[ndarray, FloatTensor]:
     """keeps first k elements
 
@@ -58,7 +56,6 @@ def _keep_topk(boxes_xyxy: Union[ndarray, FloatTensor], k: int = 10) -> Union[nd
 
     return boxes_xyxy[:k]
 
-
 def _get_onnx_provider(device: str) -> str:
     """determine where the model should run based on specified device
     """
@@ -74,7 +71,6 @@ def _get_onnx_provider(device: str) -> str:
 
     logger.info(f"onnx_provider:{fast_onnxprovider}")
     return fast_onnxprovider
-
 
 def load_rcnn_image(image_name: str, size: Tuple = (320,320)) -> Tuple[ImageType, FloatTensor, Tuple[int, int]]:
     """this is the loading and processing for the input
@@ -100,7 +96,6 @@ def load_rcnn_image(image_name: str, size: Tuple = (320,320)) -> Tuple[ImageType
     
     image_pt = transforms.ToTensor()(image)
     return image, image_pt,original_size
-
 
 def calc_area(bboxes: Union[List[List], FloatTensor, ndarray], size: Union[None, Tuple[int, int]] = None) -> List[float]:
     """calculates the fractional area of a rectangle given 4 numbers (2points)
@@ -143,42 +138,6 @@ def filter_boxes(bboxes: Union[FloatTensor, ndarray], max_aspect_ratio: int = 4,
             inds.append(ind)
     
     return inds
-
-# def filter_boxes_with_min_k(bboxes: Union[FloatTensor, ndarray], max_aspect_ratio: int = 4, 
-#                     min_area: int = 40*40, min_k: int = 3) -> List[int]:
-#     """filters a list of bounding boxes given as the 4-tuple (x1, y1, x2, y2)
-#     by area and aspect ratio
-
-#     Args:
-#         bboxes (Union[FloatTensor, ndarray]): _description_
-#         max_aspect_ratio (int, optional): _description_. Defaults to 4.
-#         min_area (int, optional): _description_. Defaults to 40*40.
-#         min_k : always keep this many
-#     Returns:
-#         List[ind]: _description_
-#     """
-#     data = []
-#     N = len(bboxes)
-#     for ind,bb in enumerate(bboxes):
-#         w, h = (bb[2] - bb[0]), (bb[3] - bb[1])
-#         area = w*h
-#         aspect = max(w,h)/min(w,h)
-#         data.append((ind,area,aspect))    
-        
-#     # now filter but repect a minimum
-#     data = [d for d in data if (d[1] >= min_area and d[2] <= max_aspect_ratio)]
-#     inds, areas, aspects = zip(*data)
-#     data_left = sorted([d for d in data if not (d[1] >= min_area and d[2] <= max_aspect_ratio)], key=lambda x:-x[1])
-#     if len(data_left) == 0:
-#         return inds
-
-#     inds_left, _, _ = zip(*data_left)
-#     assert not bool(set(inds) & set(inds_left))
-#     if len(inds) < min_k:
-#         delta = min_k - len(inds)
-#         inds += inds_left[:delta]
-
-#     return inds
 
 def rescale_box(box: Union[List[float], ndarray, FloatTensor], from_size: Tuple, to_size: Tuple) -> Tuple:
     """rescales a bounding box between two different image sizes
@@ -254,8 +213,6 @@ def str2bool(string: str) -> bool:
     """
     return string.lower() in ("true", "1", "t")
 
-
-
 def replace_small_boxes(boxes: Union[List[List[float]], List[Tuple[float]], ndarray], 
                 min_area: float = 40*40, new_size: Tuple = (100,100)) -> List[Tuple]:
     """replaces bounding boxes given as (x0,y0,x1,y1) and any below min_area
@@ -303,7 +260,6 @@ def clip_boxes(boxes: Union[List, ndarray], xmin: int, ymin: int, xmax: int, yma
         new_boxes.append(box)
     return new_boxes
     
-
 def patchify_image(image: ImageType, bboxes: Union[List[float], FloatTensor, ndarray]) -> List[ImageType]:
     """given a list of 4-tuple rectangles (x1, y1, x2, y2) return a list of 
     cropped images

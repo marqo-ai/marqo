@@ -10,7 +10,7 @@ from marqo.s2_inference.s2_inference import get_logger
 from marqo.s2_inference.types import Dict, List, Union, ImageType, Tuple, FloatTensor, ndarray, Any
 from marqo.s2_inference.errors import ModelLoadError
 
-logger = get_logger('DINO')
+logger = get_logger(__name__)
 
 
 def _load_DINO_model(arch: str, device: str, patch_size: int = None,
