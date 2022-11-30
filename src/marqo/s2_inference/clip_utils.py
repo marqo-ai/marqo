@@ -6,7 +6,7 @@ import requests
 import numpy as np
 import clip
 import torch
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 import open_clip
 
 from marqo.s2_inference.types import *
@@ -59,7 +59,7 @@ def _load_image_from_path(image: str) -> ImageType:
     elif validators.url(image):
         img = Image.open(requests.get(image, stream=True).raw)
     else:
-        raise ValueError(f"input str of {image} is not a local file or a valid url")
+        raise UnidentifiedImageError(f"input str of {image} is not a local file or a valid url")
 
     return img
 
