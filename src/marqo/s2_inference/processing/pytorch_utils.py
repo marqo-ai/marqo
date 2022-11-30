@@ -7,6 +7,7 @@ from torchvision.models.detection import FasterRCNN_MobileNet_V3_Large_FPN_Weigh
 from torchvision.models.detection import fasterrcnn_resnet50_fpn_v2, FasterRCNN_ResNet50_FPN_V2_Weights
 from torchvision.models.detection import FCOS_ResNet50_FPN_Weights
 
+
 def load_pytorch(model_name: str, device: str):
     """loads the pytorch based object detector
 
@@ -45,6 +46,7 @@ def load_pretrained_mobilenet():
     transform = weights.transforms()
     model.load_state_dict(checkpoint['model'])
     model.eval()
+
     return model, transform
 
 def load_pretrained_mobilenet320():
@@ -63,6 +65,7 @@ def load_pretrained_mobilenet320():
     transform = weights.transforms()
     model.load_state_dict(checkpoint['model'])
     model.eval()
+    
     return model, transform
 
 def load_pytorch_fcos():

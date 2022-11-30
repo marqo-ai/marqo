@@ -1,9 +1,7 @@
 import torch
 import torch.nn as nn
-import torchvision
 from torchvision import transforms as pth_transforms
 import numpy as np
-from PIL import Image
 import cv2
 
 from marqo.s2_inference.s2_inference import get_logger
@@ -31,7 +29,6 @@ def _load_DINO_model(arch: str, device: str, patch_size: int = None,
         Tuple[Any, Any]: _description_
     """
   
-
     allowed_archs = ('vit_small', 'vit_base')
     allowed_patches = (8, 16)
     if arch not in allowed_archs:
@@ -77,7 +74,6 @@ def _get_DINO_transform(image_size: Tuple = (224, 224)) -> Any:
     pth_transforms.ToTensor(),
     pth_transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
     ])
-
 
 def DINO_inference(model: Any, transform: Any, img: ImageType = None, 
                         patch_size: int = None, device: str = "cpu") -> FloatTensor:
@@ -136,7 +132,6 @@ def _rescale_image(image: Union[ndarray, ImageType]) -> ndarray:
     image = image.astype(np.uint8)
     return image
 
-
 def attention_to_bboxs(image: ndarray) -> List[Tuple]:
     """turns attention maps into classless bounding boxes
     expects a single dim attention e.g, attentions.size = (x, y)
@@ -146,6 +141,7 @@ def attention_to_bboxs(image: ndarray) -> List[Tuple]:
     Returns:
         List[Tuple]: _description_
     """
+    
     image = _rescale_image(image)
     backtorgb = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
     gray = cv2.cvtColor(backtorgb, cv2.COLOR_BGR2GRAY)

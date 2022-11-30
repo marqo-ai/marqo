@@ -109,7 +109,9 @@ def chunk_image(image: Union[str, ImageType], device: str,
         patch.process()
     except PIL.UnidentifiedImageError as e:
         raise ChunkerError from e
+
     return patch.patches,patch.bboxes_orig
+
 
 class PatchifySimple:
     """class to do the patching. this one creates non-pverlapping boixes and chunks the image
@@ -240,7 +242,6 @@ class PatchifyModel:
                                 new_size=self.new_size)
                 self.boxes_xyxy = clip_boxes(self.boxes_xyxy, 0, 0, self.size[0], self.size[1])
 
-   
     def _nms_bb(self):
         """performs class agnostic nms over the bounding boxes
         """
@@ -295,7 +296,6 @@ class PatchifyViT(PatchifyModel):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         
-        
     def _get_model_specific_parameters(self):
      
         # fill in with specifics
@@ -305,7 +305,6 @@ class PatchifyViT(PatchifyModel):
 
         self.model_load_function = partial(_load_DINO_model, patch_size=self.patch_size)
         self.allowed_model_types = ('vit_small', 'vit_base')
-
 
     def infer(self, image):
         self._load_image(image)
@@ -352,6 +351,7 @@ class PatchifyViT(PatchifyModel):
 
         else:
             raise TypeError(f"unknown method of {method}")
+
 
 class PatchifyPytorch(PatchifyModel):
     """class to do the patching for a pytorch based object detector

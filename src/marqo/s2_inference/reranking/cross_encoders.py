@@ -1,14 +1,11 @@
 from functools import partial
 import functools
-import requests
 import validators
-import time
 import uuid
 from collections import defaultdict
 
 import pandas as pd
 pd.options.mode.chained_assignment = None
-from PIL import Image
 import numpy as np
 import torch
 
@@ -18,7 +15,6 @@ from marqo.s2_inference.reranking.model_utils import (
     load_owl_vit,
     _process_owl_inputs,
     _predict_owl,
-    process_owl_results,
     sort_owl_boxes_scores,
     _verify_model_inputs,
     _convert_cross_encoder_output,
@@ -82,7 +78,6 @@ class FormattedResults:
 
         if self.highlights_field in self.results_df:
             self.results_df[self.highlights_field] = self.results_df[self.highlights_field].apply(_get_highlights)
-
 
     @staticmethod
     def _fill_doc_ids(results: Dict) -> None:
@@ -155,6 +150,7 @@ class FormattedResults:
 class ReRanker:
     """base class for the rerankers
     """
+
     def __init__(self, ):
         pass 
 
@@ -220,10 +216,10 @@ class ReRanker:
 
         self.results[ResultsFields.hits] = sorted(self.results[ResultsFields.hits], key=lambda x:x[ResultsFields.reranker_score], reverse=True)
 
-
     def rerank(self, query, results):
         # this gets filled on for the task (text/images)
         pass
+
 
 class ReRankerText(ReRanker):
     """
@@ -376,7 +372,6 @@ class ReRankerOwl(ReRanker):
             "owl/ViT-B/32":"google/owlvit-base-patch32",
             "owl/ViT-B/16":"google/owlvit-base-patch16",
             "owl/ViT-L/14":"google/owlvit-large-patch14",
-
         }
 
     def load_model(self):
@@ -462,7 +457,6 @@ class ReRankerOwl(ReRanker):
         # now merge back with original - filed_content is the image pointer and can be used as the identifier
         self.inputs_df = self.boxes_scores_df.merge(self.inputs_df, left_on=Columns.field_content, right_on=Columns.field_content)
 
-
         self.get_reranked_results(highlight_content_column=Columns.bbox_original)
         
 
@@ -481,4 +475,5 @@ def _load_image(filename: str, size: Tuple = None) -> ImageType:
     original_size = im.size
     if size is not None:
         im = im.resize(size).convert('RGB')
+        
     return im,original_size

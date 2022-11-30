@@ -1,4 +1,3 @@
-import copy
 import requests
 
 import cv2
@@ -91,10 +90,9 @@ def load_rcnn_image(image_name: str, size: Tuple = (320,320)) -> Tuple[ImageType
         raise TypeError(f"received {type(image_name)} but expected a string or PIL image")
 
     original_size = image.size
-
     image = image.convert('RGB').resize(size)
-    
     image_pt = transforms.ToTensor()(image)
+
     return image, image_pt,original_size
 
 def calc_area(bboxes: Union[List[List], FloatTensor, ndarray], size: Union[None, Tuple[int, int]] = None) -> List[float]:
@@ -114,6 +112,7 @@ def calc_area(bboxes: Union[List[List], FloatTensor, ndarray], size: Union[None,
     else:
         A = size[0]*size[1]*1.0
     areas = [(bb[2]-bb[0])*(bb[3]-bb[1])/A for bb in bboxes]
+
     return areas
 
 def filter_boxes(bboxes: Union[FloatTensor, ndarray], max_aspect_ratio: int = 4, 
@@ -233,6 +232,7 @@ def replace_small_boxes(boxes: Union[List[List[float]], List[Tuple[float]], ndar
             yc = (box[3]-box[1])/2 + box[1]
             box = (xc-new_size[0]/2, yc-new_size[1]/2, xc+new_size[0]/2, yc+new_size[1]/2)
         new_boxes.append(box)
+
     return new_boxes
 
 def clip_boxes(boxes: Union[List, ndarray], xmin: int, ymin: int, xmax: int, ymax: int) -> List[Tuple]:
@@ -258,6 +258,7 @@ def clip_boxes(boxes: Union[List, ndarray], xmin: int, ymin: int, xmax: int, yma
         y2 = np.clip(y2, ymin, ymax) 
         box = (x1, y1, x2, y2)
         new_boxes.append(box)
+        
     return new_boxes
     
 def patchify_image(image: ImageType, bboxes: Union[List[float], FloatTensor, ndarray]) -> List[ImageType]:

@@ -1,8 +1,5 @@
 import cv2
 import numpy as np
-
-import torch
-import torchvision
 import onnxruntime
 import huggingface_hub
 
@@ -56,6 +53,7 @@ def preprocess_yolox(img: ndarray, input_size: Tuple, swap: Tuple = (2, 0, 1)) -
 
     padded_img = padded_img.transpose(swap)
     padded_img = np.ascontiguousarray(padded_img, dtype=np.float32)
+    
     return padded_img, r
 
 def load_yolox_onnx(model_name: str, device: str) -> Tuple[onnxruntime.InferenceSession, preprocess_yolox]:
