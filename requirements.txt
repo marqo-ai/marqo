@@ -18,6 +18,6 @@ open-clip-torch==2.0.2
 clip-marqo==1.0.2
 protobuf==3.20.1
 onnx==1.12.0
-onnxruntime==1.13.1
+onnxruntime-gpu
 pandas==1.5.1
 optimum==1.4.1
