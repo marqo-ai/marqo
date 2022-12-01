@@ -36,12 +36,12 @@ class TestOutputs(unittest.TestCase):
         for name in names:
             for device in devices:
                 model_properties = get_model_properties_from_registry(name)
-                assert _create_model_cache_key(name, model_properties, device) == (name
-                                                                                   +model_properties.get('name', '')
-                                                                                   +str(model_properties.get('dimensions', ''))
-                                                                                   +model_properties.get('type', '')
-                                                                                   +str(model_properties.get('tokens', ''))
-                                                                                   +device)
+                assert _create_model_cache_key(name, device, model_properties) == (name
+                                                                                   + model_properties.get('name', '')
+                                                                                   + str(model_properties.get('dimensions', ''))
+                                                                                   + model_properties.get('type', '')
+                                                                                   + str(model_properties.get('tokens', ''))
+                                                                                   + device)
 
     def test_clear_model_cache(self):
         # tests clearing the model cache
@@ -54,7 +54,7 @@ class TestOutputs(unittest.TestCase):
         keys = []
         for name in names:
             _ = vectorise(name, 'hello', device=device)
-            key = _create_model_cache_key(name, get_model_properties_from_registry(name), device)
+            key = _create_model_cache_key(name, device, get_model_properties_from_registry(name))
             keys.append(key)
 
         print(sorted(set(available_models.keys())), sorted(set(keys)))
@@ -76,7 +76,7 @@ class TestOutputs(unittest.TestCase):
         keys = []
         for name in names:
 
-            key = _create_model_cache_key(name, get_model_properties_from_registry(name), device)
+            key = _create_model_cache_key(name, device, get_model_properties_from_registry(name))
             assert key not in list(available_models.keys())
             _ = vectorise(name, 'hello', device=device)
             assert key in list(available_models.keys())
@@ -94,7 +94,7 @@ class TestOutputs(unittest.TestCase):
 
         for name in names:
             model_properties = get_model_properties_from_registry(name)
-            key = _create_model_cache_key(name, model_properties, device)
+            key = _create_model_cache_key(name, device, model_properties)
             assert key not in list(available_models.keys())
             t0 = time.time()
             _ = vectorise(name, 'hello', device=device)

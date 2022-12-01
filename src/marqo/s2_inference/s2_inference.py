@@ -18,8 +18,8 @@ MODEL_PROPERTIES = load_model_properties()
 
 
 def vectorise(model_name: str, content: Union[str, List[str]], model_properties: dict = None,
-              device: str = get_default_device(), normalize_embeddings: bool = get_default_normalization(), **kwargs) -> \
-List[List[float]]:
+              device: str = get_default_device(), normalize_embeddings: bool = get_default_normalization(),
+              **kwargs) -> List[List[float]]:
     """vectorizes the content by model name
 
     Args:
@@ -39,7 +39,7 @@ List[List[float]]:
     """
 
     validated_model_properties = _validate_model_properties(model_name, model_properties)
-    model_cache_key = _create_model_cache_key(model_name, validated_model_properties, device)
+    model_cache_key = _create_model_cache_key(model_name, device, validated_model_properties)
 
     _update_available_models(model_cache_key, model_name, validated_model_properties, device, normalize_embeddings)
 
@@ -51,7 +51,7 @@ List[List[float]]:
     return _convert_vectorized_output(vectorised)
 
 
-def _create_model_cache_key(model_name: str, model_properties: dict, device: str) -> str:
+def _create_model_cache_key(model_name: str, device: str, model_properties: dict = dict()) -> str:
     """creates a key to store the loaded model by in the cache
 
     Args:
