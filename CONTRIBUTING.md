@@ -35,7 +35,9 @@ During a minor release we bump the patch number: 0.1.5 -> 0.1.6
 - Generate a pull request to the `mainline` branch. These will be reviewed before merging
 - After merging to `mainline`, please delete the branch with the pull request
 - A Github integration pipeline will run. After all tests pass, build a multiplatform docker image for the `linux/arm64` and `linux/amd64` platforms, pushing it to the
-`marqoai/marqo` repository. Make sure it is tagged with the version number (`marqoai/marqo:0.1.5`)   
+`marqoai/marqo` repository. Make sure it is tagged with the version number (`-t marqoai/marqo:0.1.5`). If it is a pre-release intended for testing, also push it to the test tag (add `-t marqoai/marqo:test`). If it is a release, 
+also push it to the latest tag (add `-t marqoai/marqo:latest`). 
+
 - For releases, please record changes in  `RELEASE.md`. Then create a 
 [github release](https://docs.github.com/en/repositories/releasing-projects-on-github/managing-releases-in-a-repository) 
 (with a short summary of changes) that links to the changes in `RELEASE.md`.
