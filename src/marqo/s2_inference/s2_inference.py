@@ -2,8 +2,6 @@
 The functions defined here would have endpoints, later on.
 """
 import numpy as np
-import hashlib
-import json
 from marqo.s2_inference.errors import VectoriseError, InvalidModelPropertiesError, ModelLoadError, UnknownModelError
 from PIL import UnidentifiedImageError
 from marqo.s2_inference.model_registry import load_model_properties
