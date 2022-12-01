@@ -1,3 +1,35 @@
+# Release 0.0.8
+
+## New features
+- Get indexes endpoint: `GET /indexes` ([#181](https://github.com/marqo-ai/marqo/pull/181)). Use this endpoint to inspect
+existing Marqo indexes. 
+Read about usage [here](https://docs.marqo.ai/API-Reference/indexes/#list-indexes).
+- Non-tensor fields([#161](https://github.com/marqo-ai/marqo/pull/161)). 
+During the indexing phase, mark fields as non-tensor to prevent tensors being created for them. 
+This helps speed up indexing and reduce storage for fields where keyword search is good enough. For example: email, name 
+and categorical fields. These fields can still be used for filtering. 
+Read about usage [here](https://docs.marqo.ai/API-Reference/documents/#query-parameters).
+- Configurable preloaded models([#155](https://github.com/marqo-ai/marqo/pull/155)).
+Specify which machine learning model to load as Marqo starts. This prevents a delay during initial search and index commands after 
+Marqo starts. Read about usage [here](https://docs.marqo.ai/Advanced-Usage/configuration/#preloading-models).
+- New [example](https://github.com/marqo-ai/marqo/tree/mainline/examples/GPT3NewsSummary) 
+and [article](https://medium.com/creator-fund/building-search-engines-that-think-like-humans-e019e6fb6389): 
+use Marqo to provide context for up-to-date GPT3 news summary generation 
+([#171](https://github.com/marqo-ai/marqo/pull/171), [#174](https://github.com/marqo-ai/marqo/pull/174)).
+Special thanks to [@iain-mackie](https://github.com/iain-mackie) for this example. 
+
+## Bug fixes and minor changes
+- Updated developer guide ([#164](https://github.com/marqo-ai/marqo/pull/164))
+- Updated requirements which prevented Marqo being built as an arm64 image ([#173](https://github.com/marqo-ai/marqo/pull/173))
+- Backend updated to use marqo-os:0.0.3 ([#183](https://github.com/marqo-ai/marqo/pull/183))
+- Default request timeout has been increased from 2 to 75 seconds ([#184](https://github.com/marqo-ai/marqo/pull/184))
+
+## Contributor shout-outs
+- For work on the GPT3 news summary generation example: [@iain-mackie](https://github.com/iain-mackie)
+- For contributing the non-tensor fields feature: [@jeadie](https://github.com/jeadie)
+- Thank you to our users who raise issues and give us valuable feeback  
+- Thank you to our 1.4k+ star gazers and 50+ forkers!
+
 # Release 0.0.7
 
 ## Bug fixes and minor changes

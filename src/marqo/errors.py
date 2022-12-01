@@ -9,13 +9,21 @@ class MarqoError(Exception):
     These will be caught and returned to the user as 5xx internal errors
 
     """
-
+    code = None
     def __init__(self, message: str) -> None:
         self.message = message
         super().__init__(self.message)
 
     def __str__(self) -> str:
-        return f'MarqoError. Error message: {self.message}'
+        return f'MarqoError {self.__class__.__name__} Message: {self.message}'
+
+
+class EnvVarError(MarqoError):
+
+    code = "env_var_error"
+
+    def __init__(self, message: str):
+        self.message = message
 
 
 class MarqoApiError(MarqoError):

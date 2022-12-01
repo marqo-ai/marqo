@@ -1,6 +1,9 @@
+import json
 from marqo.tensor_search.tensor_search_logging import get_logger
 import time
-from marqo.tensor_search import index_meta_cache
+from marqo.tensor_search.enums import EnvVars
+# we need to import backend before index_meta_cache to prevent circular import error:
+from marqo.tensor_search import backend, index_meta_cache, utils
 from marqo import config
 from marqo.tensor_search.web import api_utils
 from marqo._httprequests import HttpRequests
@@ -117,8 +120,20 @@ class ModelsForCacheing:
 
     def __init__(self):
         import torch
-      
-        self.models = self.models = ['ViT-L/14']
+        warmed_models = utils.read_env_vars_and_defaults(EnvVars.MARQO_MODELS_TO_PRELOAD)
+        if warmed_models is None:
+            self.models = []
+        elif isinstance(warmed_models, str):
+            try:
+                self.models = json.loads(warmed_models)
+            except json.JSONDecodeError as e:
+                raise errors.EnvVarError(
+                    f"Could not parse environment variable `{EnvVars.MARQO_MODELS_TO_PRELOAD}`. "
+                    f"Please ensure that this a JSON-encoded array of strings. For example:\n"
+                    f"""export {EnvVars.MARQO_MODELS_TO_PRELOAD}='["ViT-L/14", "onnx/all_datasets_v4_MiniLM-L6"]'"""
+                ) from e
+        else:
+            self.models = warmed_models
         # TBD to include cross-encoder/ms-marco-TinyBERT-L-2-v2
 
         self.default_devices = ['cpu'] if not torch.cuda.is_available() else ['cpu', 'cuda']

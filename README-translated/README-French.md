@@ -41,8 +41,8 @@ La recherche tensorielle consiste à transformer des documents, des images et d'
 2. Utilisez Docker pour exécuter Marqo (les utilisateurs de Mac avec des puces M-series devront [aller ici](#m-series-mac-users)) :
 ```bash
 docker rm -f marqo;
-docker pull marqoai/marqo:0.0.6;
-docker run --name marqo -it --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:0.0.6
+docker pull marqoai/marqo:latest;
+docker run --name marqo -it --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:latest
 ```
 3. Installez le client Marqo :
 ```bash
@@ -225,7 +225,7 @@ Pour exécuter Marqo sur un Mac série M, suivez les étapes suivantes.
 1. Dans un terminal, exécutez la commande suivante pour lancer opensearch :
 
 ```shell
-docker rm -f marqo-os; docker run -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" marqoai/marqo-os:0.0.2-arm
+docker rm -f marqo-os; docker run -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" marqoai/marqo-os:0.0.3-arm
 ```
 
 2. Dans un autre terminal, exécutez la commande suivante pour lancer Marqo :
@@ -233,7 +233,7 @@ docker rm -f marqo-os; docker run -p 9200:9200 -p 9600:9600 -e "discovery.type=s
 docker rm -f marqo; docker run --name marqo --privileged \
     -p 8882:8882 --add-host host.docker.internal:host-gateway \
     -e "OPENSEARCH_URL=https://localhost:9200" \
-    marqoai/marqo:0.0.6
+    marqoai/marqo:latest
 ```
 
 ## Contributeurs

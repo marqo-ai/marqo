@@ -12,7 +12,7 @@ We welcome contributions to the codebase. Here are some coding guidelines to fol
 * Where possible, we explicitly state the arg names when calling a function. 
   This makes refactoring easier. If possible, use `func(a=1, b=2)` rather than `func(1, 2)`
 
-### Error usage
+#### Error usage
 - Errors raised that concern non-user-facing functionality
 (for example, related to vectors), should raise an `InternalError` or its subclass
 - Errors arising from calls S2 Inference's API should raise an `S2InferenceError`    
@@ -29,12 +29,15 @@ During a minor release we bump the patch number: 0.1.5 -> 0.1.6
 - If we are still in major version 0, and complexity and stability needs necessitates it, we can force all bug fixes and optimisations to increment the patch number
   (rather than it being optional). In this case this section will be updated to reflect the change.
 
+
 ### Releasing changes
 - Run unit tests and ensure they all pass (read the testing section below for more details)
 - Generate a pull request to the `mainline` branch. These will be reviewed before merging
 - After merging to `mainline`, please delete the branch with the pull request
 - A Github integration pipeline will run. After all tests pass, build a multiplatform docker image for the `linux/arm64` and `linux/amd64` platforms, pushing it to the
-`marqoai/marqo` repository. Make sure it is tagged with the version number (`marqoai/marqo:0.1.5`)   
+`marqoai/marqo` repository. Make sure it is tagged with the version number (`-t marqoai/marqo:0.1.5`). If it is a pre-release intended for testing, also push it to the test tag (add `-t marqoai/marqo:test`). If it is a release, 
+also push it to the latest tag (add `-t marqoai/marqo:latest`). 
+
 - For releases, please record changes in  `RELEASE.md`. Then create a 
 [github release](https://docs.github.com/en/repositories/releasing-projects-on-github/managing-releases-in-a-repository) 
 (with a short summary of changes) that links to the changes in `RELEASE.md`.
@@ -69,7 +72,7 @@ If you don't have the exact python version specified in the `tox.ini` file, you 
 1. Ensure you have marqo-os running:
 ```bash
 docker rm -f marqo-os
-docker run -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" --name marqo-os marqoai/marqo-os:0.0.2
+docker run -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" --name marqo-os marqoai/marqo-os:0.0.3
 ```
 2. run `tox` in the Marqo home directory
 
