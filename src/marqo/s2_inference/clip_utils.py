@@ -219,11 +219,11 @@ class CLIP:
         else:
             image_input = [format_and_load_CLIP_image(images)]
         # end image loading, start image preprocessing
-        time_stamp2 = timer()
+        #time_stamp2 = timer()
         self.image_input_processed = torch.stack([self.preprocess(_img).to(self.device) for _img in image_input])
 
         # end image preprocessing, start image encoding
-        time_stamp3 = timer()
+        #time_stamp3 = timer()
 
         if self.device.startswith("cuda"):
             torch.cuda.synchronize()
@@ -240,11 +240,11 @@ class CLIP:
             torch.cuda.synchronize()
 
         # end image encoding, end all
-        time_stamp4 = timer()
+        #time_stamp4 = timer()
 
-        logger.info(f"Time per facet for <Image>: Loading = {(time_stamp2 - time_stamp1)/self.num_of_inputs:.3f}s, "
-                    f"Preprocess = {(time_stamp3 - time_stamp2)/self.num_of_inputs:.3f}s, "
-                    f"Encoding = {(time_stamp4 - time_stamp3)/self.num_of_inputs:.3f}s.")
+        #logger.info(f"Time per facet for <Image>: Loading = {(time_stamp2 - time_stamp1)/self.num_of_inputs:.3f}s, "
+        #            f"Preprocess = {(time_stamp3 - time_stamp2)/self.num_of_inputs:.3f}s, "
+        #            f"Encoding = {(time_stamp4 - time_stamp3)/self.num_of_inputs:.3f}s.")
         return self._convert_output(outputs)
 
     def encode(self, inputs: Union[str, ImageType, List[Union[str, ImageType]]], 

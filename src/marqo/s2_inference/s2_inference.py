@@ -29,8 +29,8 @@ def vectorise(model_name: str, content: Union[str, List[str]], device: str = get
         VectoriseError: if the content can't be vectorised, for some reason.
     """
 
-    logger.info(f"====>>The client gives {len(content)} facets to vectorise")
-    start = timer()
+    #logger.info(f"====>>The client gives {len(content)} facets to vectorise")
+    #start = timer()
 
     model_cache_key = _create_model_cache_key(model_name, device)
 
@@ -43,8 +43,8 @@ def vectorise(model_name: str, content: Union[str, List[str]], device: str = get
     except UnidentifiedImageError as e:
         raise VectoriseError from e
 
-    end = timer()
-    logger.info(f"<<====Total vectorise time: {(end - start):.3f}s. Average vectorise time: {((end - start) / len(content)):.3f}s/facet")
+    #end = timer()
+    #logger.info(f"<<====Total vectorise time: {(end - start):.3f}s. Average vectorise time: {((end - start) / len(content)):.3f}s/facet")
     return _convert_vectorized_output(vectorised)
 
 def _create_model_cache_key(model_name: str, device: str) -> Tuple:
