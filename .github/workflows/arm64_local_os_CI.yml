@@ -1,4 +1,4 @@
-name: arm64_local_os
+name: arm64_local_os_CI
 # runs Integration Tests on Local OS on an ARM64 Machine
 # take 2
 on:
