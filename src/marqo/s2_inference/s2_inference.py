@@ -49,7 +49,7 @@ def vectorise(model_name: str, content: Union[str, List[str]], model_properties:
     return _convert_vectorized_output(vectorised)
 
 
-def _create_model_cache_key(model_name: str, device: str, model_properties: dict = dict()) -> str:
+def _create_model_cache_key(model_name: str, device: str, model_properties: dict = None) -> str:
     """creates a key to store the loaded model by in the cache
 
     Args:
@@ -60,6 +60,9 @@ def _create_model_cache_key(model_name: str, device: str, model_properties: dict
     Returns:
         str: _description_
     """
+    if model_properties is None:
+        model_properties = dict()
+
     model_cache_key = (model_name
                        + model_properties.get('name', '')
                        + str(model_properties.get('dimensions', ''))
