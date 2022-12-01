@@ -68,7 +68,7 @@ jobs:
       - name: Checkout marqo-api-tests repo
         uses: actions/checkout@v3
         with:
-          repository: vicilliar/marqo-api-tests   # TODO: change the repo link back to the main one. for ALL CI FILES
+          repository: marqo-ai/marqo-api-tests
           
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
