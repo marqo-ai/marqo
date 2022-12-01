@@ -140,6 +140,8 @@ def create_vector_index(
 
 
 def _check_model_name(index_settings):
+    """Checks if model_properties is given then model_name is given as well
+    """
     model_name = index_settings[NsField.index_defaults].get(NsField.model)
     model_properties = index_settings[NsField.index_defaults].get(NsField.model_properties)
     if model_properties is not None and model_name is None:

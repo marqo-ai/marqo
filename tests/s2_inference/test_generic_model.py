@@ -45,7 +45,7 @@ class TestGenericModelSupport(MarqoTestCase):
 
     def test_create_index_with_model_properties_without_model_name(self):
         """create_vector_index should throw an error
-            if model_properties are given without a model name
+            if model_properties are given without model_name
         """
         model_properties = {"name": "sentence-transformers/all-mpnet-base-v2",
                             "dimensions": 768,
@@ -54,6 +54,7 @@ class TestGenericModelSupport(MarqoTestCase):
 
         index_settings = {
             "index_defaults": {
+                # 'model': model_name,
                 'model_properties': model_properties
             }
         }
