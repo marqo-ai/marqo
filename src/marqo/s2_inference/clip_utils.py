@@ -6,7 +6,7 @@ import requests
 import numpy as np
 import clip
 import torch
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 import open_clip
 
 from marqo.s2_inference.types import *
@@ -47,8 +47,8 @@ def load_image_from_path(image_path: str) -> ImageType:
         image_path (str): Local or remote path to image.
 
     Raises:
-        ValueError: If the local path is invalid, or getting the image from a 
-        remote server returns a non-success status code.
+        ValueError: If the local path is invalid, and is not a url
+        UnidentifiedImageError: If the image is irretrievable or unprocessable.
 
     Returns:
         ImageType: In-memory PIL image.
@@ -59,7 +59,7 @@ def load_image_from_path(image_path: str) -> ImageType:
     elif validators.url(image_path):
         resp = requests.get(image_path, stream=True)
         if not resp.ok:
-            raise ValueError(f"image url {image_path} returned a {resp.status_code}. Reason {resp.reason}")
+            raise UnidentifiedImageError(f"image url {image_path} returned a {resp.status_code}. Reason {resp.reason}")
         img = Image.open(resp.raw)
     else:
         raise ValueError(f"input str of {image_path} is not a local file or a valid url")
