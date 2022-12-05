@@ -334,6 +334,21 @@ class OPENCV_CLIP(CLIP):
     def _convert_to_ndarray(image):
         return np.array(image)
 
+class CUDA_CLIP(CLIP):
+    def __init__(self, model_type: str = "opencv/ViT-B/32", device: str = 'cpu', embedding_dim: int = None,
+                 truncate: bool = True, **kwargs) -> None:
+        super().__init__(model_type, device, embedding_dim, truncate, **kwargs)
+        assert self.device=="cuda", "The device should be cuda."
+    def load(self) -> None:
+
+        # https://github.com/openai/CLIP/issues/30
+
+        #JIT might also change the performance
+        self.model, self.preprocess = clip.load(self.model_type, device="cuda", jit=False)
+        self.model = self.model.to(self.device)
+        self.tokenizer = clip.tokenize
+        self.model.eval()
+
 
 
 
