@@ -81,6 +81,8 @@ jobs:
           echo 'export MARQO_API_TESTS_ROOT="${{ github.workspace }}"' >> conf
           
       - name: Run CUDA Integration Tests - dind_os
+        env:
+          MQ_API_TEST_BRANCH: ${{ github.ref }}
         run: tox -e py3-cuda_dind_os
   
   Stop-Runner:
