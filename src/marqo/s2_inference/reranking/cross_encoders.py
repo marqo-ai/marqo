@@ -26,7 +26,7 @@ from marqo.s2_inference.reranking.model_utils import (
     _keep_top_k
     )
 
-from marqo.s2_inference.clip_utils import _load_image_from_path
+from marqo.s2_inference.clip_utils import load_image_from_path
 from marqo.s2_inference.reranking.enums import Columns, ResultsFields
 from marqo.s2_inference.reranking.configs import get_default_text_processing_parameters
 from marqo.s2_inference.processing import text as text_processor
@@ -470,7 +470,7 @@ def _load_image(filename: str, size: Tuple = None) -> ImageType:
     Returns:
         ImageType: _description_
     """
-    im = _load_image_from_path(filename)
+    im = load_image_from_path(filename)
     original_size = im.size
     if size is not None:
         im = im.resize(size).convert('RGB')
