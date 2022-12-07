@@ -9,7 +9,7 @@ on:
         default: ""
         description: >
           This is optional. If left unset, the docker image built from this branch is tested.
-          If set, the docker specified docker image is tested. For example "marqoai/marqo:test"
+          If set, the specified docker image is tested. For example "marqoai/marqo:test"
   push:
     branches:
       mainline
