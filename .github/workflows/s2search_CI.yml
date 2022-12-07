@@ -82,7 +82,7 @@ jobs:
           
       - name: Run Integration Tests - s2search
         env:
-          MQ_API_TEST_BRANCH: ${{ github.ref }}
+          MQ_API_TEST_BRANCH: ${GITHUB_REF##*/}
         run: tox -e py3-s2search
   
   Stop-Runner:
