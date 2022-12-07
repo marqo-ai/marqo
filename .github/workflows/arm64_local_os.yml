@@ -3,6 +3,13 @@ name: arm64_local_os
 # take 2
 on:
   workflow_dispatch:
+    inputs:
+      image_to_test:
+        required: false
+        default: ""
+        description: >
+          This is optional. If left unset, the docker image built from this branch is tested.
+          If set, the docker specified docker image is tested. For example "marqoai/marqo:test"
   push:
     branches:
       mainline
@@ -83,6 +90,7 @@ jobs:
       - name: Run Integration Tests - ARM64 local_os
         run: |
           export MQ_API_TEST_BRANCH="${GITHUB_REF##*/}"
+          export MQ_API_TEST_IMG="${{ github.event.inputs.image_to_test }}"
           tox -e py3-arm64_local_os
   
   Stop-Runner:
