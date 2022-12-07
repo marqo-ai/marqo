@@ -79,9 +79,9 @@ jobs:
           echo 'export MARQO_API_TESTS_ROOT="${{ github.workspace }}"' >> conf
           
       - name: Run Integration Tests - dind_os
-        env:
-          MQ_API_TEST_BRANCH: ${{ github.ref.split('/')[2:].join('/') }}
-        run: tox -e py3-dind_os
+        run: |
+          export MQ_API_TEST_BRANCH="${GITHUB_REF##*/}"
+          tox -e py3-dind_os
   
   Stop-Runner:
     name: Stop self-hosted EC2 runner
