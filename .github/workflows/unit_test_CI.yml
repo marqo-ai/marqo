@@ -98,7 +98,7 @@ jobs:
           
       - name: Run Unit Tests
         env:
-          MQ_API_TEST_BRANCH: ${GITHUB_REF##*/}
+          MQ_API_TEST_BRANCH: "${GITHUB_REF##*/}"
         run: tox -e py3-local_os_unit_tests_w_requirements
   
   Stop-Runner:
