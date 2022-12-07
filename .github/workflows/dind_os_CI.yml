@@ -6,7 +6,7 @@ on:
     inputs:
       image_to_test:
         required: false
-        default: ""
+        default: marqo_docker_0
         description: >
           This is optional. If left unset, the docker image built from this branch is tested.
           If set, the specified docker image is tested. For example "marqoai/marqo:test"

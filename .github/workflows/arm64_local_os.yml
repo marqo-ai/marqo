@@ -1,12 +1,12 @@
 name: arm64_local_os
 # runs Integration Tests on Local OS on an ARM64 Machine
-# take 2
 on:
   workflow_dispatch:
     inputs:
       image_to_test:
         required: false
-        default: ""
+        # This is the name of the docker image that is built by the build script:
+        default: marqo_docker_0
         description: >
           This is optional. If left unset, the docker image built from this branch is tested.
           If set, the specified docker image is tested. For example "marqoai/marqo:test"
