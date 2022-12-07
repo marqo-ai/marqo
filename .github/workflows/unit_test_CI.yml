@@ -3,13 +3,6 @@ name: unit_test_CI
 
 on:
   workflow_dispatch:
-    inputs:
-      image_to_test:
-        required: false
-        default: marqo_docker_0
-        description: >
-          This is optional. If left as the default value "marqo_docker_0", the docker image built from this branch is tested.
-          Otherwise, the specified docker image is tested. For example "marqoai/marqo:test"
   push:
     branches:
       mainline
@@ -106,7 +99,6 @@ jobs:
       - name: Run Unit Tests
         run: |
           export MQ_API_TEST_BRANCH="${GITHUB_REF##*/}"
-          export MQ_API_TEST_IMG="${{ github.event.inputs.image_to_test }}"
           tox -e py3-local_os_unit_tests_w_requirements
   
   Stop-Runner:
