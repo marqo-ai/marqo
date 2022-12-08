@@ -930,11 +930,15 @@ def _vector_text_search(
     selected_device = config.indexing_device if device is None else device
 
     # TODO average over vectorized inputs with weights
-    vectorised_text = s2_inference.vectorise(
-        model_name=index_info.model_name, model_properties=_get_model_properties(index_info), content=text,
-        device=selected_device,
-        normalize_embeddings=index_info.index_settings['index_defaults']['normalize_embeddings'])[0]
-
+    try:
+        vectorised_text = s2_inference.vectorise(
+            model_name=index_info.model_name, model_properties=_get_model_properties(index_info), content=text,
+            device=selected_device,
+            normalize_embeddings=index_info.index_settings['index_defaults']['normalize_embeddings'])[0]
+    except s2_inference_errors.S2InferenceError as e:
+        raise errors.BadRequestError(
+            message=f"Problem vectorising query. Reason: {str(e)}"
+        )
     body = []
 
     if searchable_attributes is None:
