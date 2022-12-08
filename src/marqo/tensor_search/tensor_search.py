@@ -473,9 +473,11 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                     vector_chunks = s2_inference.vectorise(model_name=index_info.model_name, model_properties=_get_model_properties(index_info), content=content_chunks,
                                                            device=selected_device, normalize_embeddings=normalize_embeddings,
                                                            infer=infer_if_image)
-                except s2_inference_errors.UnknownModelError as ume:
+                except (s2_inference_errors.UnknownModelError,
+                        s2_inference_errors.InvalidModelPropertiesError,
+                        s2_inference_errors.ModelLoadError) as model_error:
                     raise errors.BadRequestError(
-                        message=f'Problem vectorising query. Reason: {str(ume)}',
+                        message=f'Problem vectorising query. Reason: {str(model_error)}',
                         # link="https://marqo.pages.dev/latest/Models-Reference/dense_retrieval/"
                     )
                 except s2_inference_errors.S2InferenceError:
@@ -940,11 +942,13 @@ def _vector_text_search(
             model_name=index_info.model_name, model_properties=_get_model_properties(index_info), content=text,
             device=selected_device,
             normalize_embeddings=index_info.index_settings['index_defaults']['normalize_embeddings'])[0]
-    except s2_inference_errors.UnknownModelError as ume:
+    except (s2_inference_errors.UnknownModelError,
+            s2_inference_errors.InvalidModelPropertiesError,
+            s2_inference_errors.ModelLoadError) as model_error:
         raise errors.BadRequestError(
-            message=f'Problem vectorising query. Reason: {str(ume)}',
+            message=f'Problem vectorising query. Reason: {str(model_error)}',
             # link="https://marqo.pages.dev/latest/Models-Reference/dense_retrieval/"
-        )
+    )
     except s2_inference_errors.S2InferenceError as s2e:
         raise errors.BadRequestError(
             message=f"Problem vectorising query. Reason: {str(s2e)}"

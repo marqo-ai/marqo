@@ -73,7 +73,7 @@ def _create_model_cache_key(model_name: str, device: str, model_properties: dict
     return model_cache_key
 
 
-def _update_available_models(model_cache_key: Tuple[str, str], model_name: str, validated_model_properties: dict,
+def _update_available_models(model_cache_key: str, model_name: str, validated_model_properties: dict,
                              device: str,
                              normalize_embeddings: bool) -> None:
     """loads the model if it is not already loaded
@@ -85,7 +85,9 @@ def _update_available_models(model_cache_key: Tuple[str, str], model_name: str, 
             logger.info(f'loaded {model_name} on device {device} with normalization={normalize_embeddings}')
         except:
             raise ModelLoadError(
-                f"Unable to load model={model_name} on device={device} with normalization={normalize_embeddings}")
+                f"Unable to load model={model_name} on device={device} with normalization={normalize_embeddings}. "
+                f"If you are trying to load a custom model, please check that the model_properties are correct "
+                f"and the model has valid access permission. ")
 
 
 def _validate_model_properties(model_name: str, model_properties: dict) -> dict:
@@ -97,7 +99,7 @@ def _validate_model_properties(model_name: str, model_properties: dict) -> dict:
         required_keys = ["name", "dimensions"]
         for key in required_keys:
             if key not in model_properties:
-                raise InvalidModelPropertiesError(f'model {key} not in model_properties')
+                raise InvalidModelPropertiesError(f"model_properties has missing key '{key}'. ")
 
         """updates model dict with default values if optional keys are missing
         """
