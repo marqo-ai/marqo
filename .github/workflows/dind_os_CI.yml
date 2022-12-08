@@ -67,7 +67,7 @@ jobs:
       - name: Install Dependencies
         run: |
           #pip install -r requirements.txt
-          pip install tox
+          pip install tox==3.26
           pip install flake8
       
       # linting here
