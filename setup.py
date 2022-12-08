@@ -30,6 +30,7 @@ setup(
         "fastapi",
         "uvicorn[standard]",
         "fastapi_utils",
+        "opencv-python"
     ],
     name="marqo-engine",
     version="0.1.10",
