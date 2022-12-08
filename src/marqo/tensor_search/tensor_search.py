@@ -473,6 +473,11 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                     vector_chunks = s2_inference.vectorise(model_name=index_info.model_name, model_properties=_get_model_properties(index_info), content=content_chunks,
                                                            device=selected_device, normalize_embeddings=normalize_embeddings,
                                                            infer=infer_if_image)
+                except s2_inference_errors.UnknownModelError as ume:
+                    raise errors.BadRequestError(
+                        message=f'Problem vectorising query. Reason: {str(ume)}',
+                        # link="https://marqo.pages.dev/latest/Models-Reference/dense_retrieval/"
+                    )
                 except s2_inference_errors.S2InferenceError:
                     document_is_valid = False
                     image_err = errors.InvalidArgError(message=f'Could not process given image: {field_content}')
@@ -935,9 +940,14 @@ def _vector_text_search(
             model_name=index_info.model_name, model_properties=_get_model_properties(index_info), content=text,
             device=selected_device,
             normalize_embeddings=index_info.index_settings['index_defaults']['normalize_embeddings'])[0]
-    except s2_inference_errors.S2InferenceError as e:
+    except s2_inference_errors.UnknownModelError as ume:
         raise errors.BadRequestError(
-            message=f"Problem vectorising query. Reason: {str(e)}"
+            message=f'Problem vectorising query. Reason: {str(ume)}',
+            # link="https://marqo.pages.dev/latest/Models-Reference/dense_retrieval/"
+        )
+    except s2_inference_errors.S2InferenceError as s2e:
+        raise errors.BadRequestError(
+            message=f"Problem vectorising query. Reason: {str(s2e)}"
         )
     body = []
 
@@ -1199,6 +1209,12 @@ def _get_model_properties(index_info):
     try:
         model_properties = index_defaults[NsField.model_properties]
     except KeyError:
-        model_properties = s2_inference.get_model_properties_from_registry(index_info.model_name)
+        try:
+            model_properties = s2_inference.get_model_properties_from_registry(index_info.model_name)
+        except s2_inference_errors.UnknownModelError:
+            raise s2_inference_errors.UnknownModelError(
+                f"Could not find model properties for model={index_info.model_name}. "
+                f"Please check that the model name is correct. "
+                f"Please provide model_properties if the model is a custom model and is not supported by default")
 
     return model_properties

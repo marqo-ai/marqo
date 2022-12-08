@@ -97,7 +97,7 @@ def _validate_model_properties(model_name: str, model_properties: dict) -> dict:
         required_keys = ["name", "dimensions"]
         for key in required_keys:
             if key not in model_properties:
-                raise InvalidModelPropertiesError(f'model {key} not in settings')
+                raise InvalidModelPropertiesError(f'model {key} not in model_properties')
 
         """updates model dict with default values if optional keys are missing
         """
@@ -136,7 +136,8 @@ def get_model_properties_from_registry(model_name: str) -> dict:
     """
 
     if model_name not in MODEL_PROPERTIES['models']:
-        raise UnknownModelError(f"Could not find model properties for model={model_name}")
+        raise UnknownModelError(f"Could not find model properties in model registry for model={model_name}. " 
+                                f"Model is not supported by default.")
 
     return MODEL_PROPERTIES['models'][model_name]
 
