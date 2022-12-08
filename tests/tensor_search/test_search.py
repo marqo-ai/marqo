@@ -388,7 +388,7 @@ class TestVectorSearch(MarqoTestCase):
                 {"abc": "some text", "other field": "baaadd", "_id": "5678", "my_string": "b"},
                 {"abc": "some text", "other field": "Close match hehehe", "_id": "1234", "an_int": 2},
                 {"abc": "some text", "other field": "Close match hehehe", "_id": "1233", "my_bool": True},
-                {"abc": "some text", "floaty field": 0.548, "_id": "344", "my_bool": True},
+                {"abc": "some text", "Floaty Field": 0.548, "_id": "344", "my_bool": True},
             ], auto_refresh=True)
 
         res = tensor_search.search(
@@ -405,7 +405,7 @@ class TestVectorSearch(MarqoTestCase):
         assert res_mult['hits'][1]['_id'] != res_mult['hits'][0]['_id']
 
         res_float = tensor_search.search(
-            config=self.config, index_name=self.index_name_1, text='', filter="(floaty\ field:[0 TO 1]) AND (abc:(some text))")
+            config=self.config, index_name=self.index_name_1, text='', filter="(Floaty\ Field:[0 TO 1]) AND (abc:(some text))")
         get_res = tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id='344')
 
         assert len(res_float['hits']) == 1
