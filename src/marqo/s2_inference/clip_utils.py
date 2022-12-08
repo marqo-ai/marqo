@@ -62,7 +62,7 @@ def load_image_from_path(image_path: str) -> ImageType:
             raise UnidentifiedImageError(f"image url {image_path} returned a {resp.status_code}. Reason {resp.reason}")
         img = Image.open(resp.raw)
     else:
-        raise UnidentifiedImageError(f"input str of {image} is not a local file or a valid url")
+        raise UnidentifiedImageError(f"input str of {image_path} is not a local file or a valid url")
 
     return img
 

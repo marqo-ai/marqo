@@ -7,7 +7,7 @@ from torchvision import transforms
 
 from marqo.s2_inference.s2_inference import get_logger
 from marqo.s2_inference.types import Dict, List, Union, ImageType, Tuple, FloatTensor, ndarray
-from marqo.s2_inference.clip_utils import _load_image_from_path
+from marqo.s2_inference.clip_utils import load_image_from_path
 from marqo.s2_inference.errors import ChunkerMethodProcessError
 
 logger = get_logger(__name__)
@@ -85,7 +85,7 @@ def load_rcnn_image(image_name: str, size: Tuple = (320,320)) -> Tuple[ImageType
     if isinstance(image_name, ImageType):
         image = image_name 
     elif isinstance(image_name, str):
-        image = _load_image_from_path(image_name)
+        image = load_image_from_path(image_name)
     else:
         raise TypeError(f"received {type(image_name)} but expected a string or PIL image")
 
