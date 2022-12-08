@@ -41,8 +41,8 @@ Tensor search involves transforming documents, images and other data into collec
 2. Use docker to run Marqo (Mac users with M-series chips will need to [go here](#m-series-mac-users)):
 ```bash
 docker rm -f marqo;
-docker pull marqoai/marqo:0.0.6;
-docker run --name marqo -it --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:0.0.6
+docker pull marqoai/marqo:latest;
+docker run --name marqo -it --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:latest
 ```
 3. Install the Marqo client:
 ```bash
@@ -79,6 +79,7 @@ results = mq.index("my-first-index").search(
 - `add_documents()` creates an index with default settings, if one does not already exist
 - You can optionally set a document's ID with the special `_id` field. Otherwise, Marqo will generate one.
 - If the index doesn't exist, Marqo will create it. If it exists then Marqo will add the documents to the index.
+- Running this code multiple times could result in duplicate documents. To reset the index, you can delete it first using `mq.index("my-first-index").delete()`
 
 Let's have a look at the results:
 
@@ -221,7 +222,7 @@ To run Marqo on an M series Mac, follow the next steps.
 1. In one terminal run the following command to start opensearch:
 
 ```shell
-docker rm -f marqo-os; docker run -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" marqoai/marqo-os:0.0.2-arm
+docker rm -f marqo-os; docker run -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" marqoai/marqo-os:0.0.3-arm
 ```
 
 2. In another terminal run the following command to launch Marqo:
@@ -229,7 +230,7 @@ docker rm -f marqo-os; docker run -p 9200:9200 -p 9600:9600 -e "discovery.type=s
 docker rm -f marqo; docker run --name marqo --privileged \
     -p 8882:8882 --add-host host.docker.internal:host-gateway \
     -e "OPENSEARCH_URL=https://localhost:9200" \
-    marqoai/marqo:0.0.6
+    marqoai/marqo:latest
 ```
 
 ## Contributors

@@ -1,5 +1,6 @@
 """Communication with Marqo's persistence and search layer (OpenSearch)"""
 import json
+import typing
 from marqo.tensor_search.models.index_info import IndexInfo
 # client-specific modules - we may want to replace these:
 from marqo._httprequests import HttpRequests
@@ -146,8 +147,23 @@ def add_customer_field_properties(config: Config, index_name: str,
 
 
 def get_cluster_indices(config: Config):
-    """Gets the name of all indices"""
+    """Gets the name of all indices, excluding system indices"""
     res = HttpRequests(config).get(path="_aliases")
-    indices = set(res.keys())
-    relevant_indices = indices - constants.INDEX_NAMES_TO_IGNORE
-    return relevant_indices
+    return _remove_system_indices(res.keys())
+
+
+def _remove_system_indices(index_names: typing.Iterable) -> set:
+    """Removes system indices from the set of indices
+
+    Args:
+        index_names: all names of indices, retrieved from an index
+
+    Returns:
+        A set of indices that don't include system indices
+    """
+    indices = set(index_names)
+    indices_no_protected_prefixes = {index_name for index_name in indices
+                                     if not any([index_name.startswith(prefix) for prefix in
+                                                constants.INDEX_NAME_PREFIXES_TO_IGNORE])}
+    indices_no_system_names = indices_no_protected_prefixes - constants.INDEX_NAMES_TO_IGNORE
+    return indices_no_system_names

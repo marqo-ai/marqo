@@ -41,8 +41,8 @@ Marqo云服务☁正在测试中。 如果你感兴趣的话，你可以在这�
 2. 通过docker来运行Marqo (M系列芯片的Mac用户需要点击这里 [go here](#m-series-mac-users)):
 ```bash
 docker rm -f marqo;
-docker pull marqoai/marqo:0.0.6;
-docker run --name marqo -it --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:0.0.6
+docker pull marqoai/marqo:latest;
+docker run --name marqo -it --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:latest
 ```
 3. 安装 Marqo client:
 ```bash
@@ -225,7 +225,7 @@ results = mq.index("my-multimodal-index").search('https://upload.wikimedia.org/w
 1. 在一个终端（terminal） 运行如下命令来启动引擎：
 
 ```shell
-docker rm -f marqo-os; docker run -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" marqoai/marqo-os:0.0.2-arm
+docker rm -f marqo-os; docker run -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" marqoai/marqo-os:0.0.3-arm
 ```
 
 2. 在另一个终端（terminal）运行如下命令来启动Marqo:
@@ -233,7 +233,7 @@ docker rm -f marqo-os; docker run -p 9200:9200 -p 9600:9600 -e "discovery.type=s
 docker rm -f marqo; docker run --name marqo --privileged \
     -p 8882:8882 --add-host host.docker.internal:host-gateway \
     -e "OPENSEARCH_URL=https://localhost:9200" \
-    marqoai/marqo:0.0.6
+    marqoai/marqo:latest
 ```
 
 ## 贡献者
