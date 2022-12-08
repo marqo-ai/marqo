@@ -99,7 +99,11 @@ def contextualise_filter(filter_string: str, simple_properties: typing.Iterable)
     """
     contextualised_filter = filter_string
     for field in simple_properties:
-        contextualised_filter = contextualised_filter.replace(f'{field}:', f'{enums.TensorField.chunks}.{field}:')
+        if ' ' in field:
+            field_with_escaped_space = field.replace(' ', '\ ')
+            contextualised_filter = contextualised_filter.replace(f'{field_with_escaped_space}:', f'{enums.TensorField.chunks}.{field_with_escaped_space}:')
+        else:
+            contextualised_filter = contextualised_filter.replace(f'{field}:', f'{enums.TensorField.chunks}.{field}:')
     return contextualised_filter
 
 
