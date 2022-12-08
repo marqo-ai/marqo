@@ -1,13 +1,14 @@
 import numpy as np
 
 from marqo.errors import IndexNotFoundError
-from marqo.s2_inference.errors import InvalidModelPropertiesError, UnknownModelError
+from marqo.s2_inference.errors import InvalidModelPropertiesError, UnknownModelError, ModelLoadError
 from marqo.tensor_search import tensor_search
 
 from marqo.s2_inference.s2_inference import (
     available_models,
     vectorise,
     _validate_model_properties,
+    _update_available_models
 )
 
 from tests.marqo_test import MarqoTestCase
@@ -60,7 +61,7 @@ class TestGenericModelSupport(MarqoTestCase):
         }
 
         self.assertRaises(UnknownModelError, tensor_search.create_vector_index, config=self.config,
-                          index_name=self.index_name_1, index_settings=index_settings)
+            index_name=self.index_name_1, index_settings=index_settings)
 
     def test_add_documents(self):
         """if given the right input, add_documents should work without any throwing any errors
@@ -87,7 +88,7 @@ class TestGenericModelSupport(MarqoTestCase):
                 "_id": "123",
                 "title 1": "content 1",
                 "desc 2": "content 2. blah blah blah"
-            }]
+            } ]
         auto_refresh = True
 
         tensor_search.add_documents(config=config, index_name=index_name, docs=docs, auto_refresh=auto_refresh)
@@ -105,8 +106,8 @@ class TestGenericModelSupport(MarqoTestCase):
 
         """_validate_model_properties should not throw an exception if required keys are given.
         """
-        model_properties['dimensions'] = 768
-        model_properties['name'] = "sentence-transformers/all-mpnet-base-v2"
+        model_properties[ 'dimensions' ] = 768
+        model_properties[ 'name' ] = "sentence-transformers/all-mpnet-base-v2"
 
         validated_model_properties = _validate_model_properties(model_name, model_properties)
 
@@ -161,6 +162,22 @@ class TestGenericModelSupport(MarqoTestCase):
 
         self.assertRaises(UnknownModelError, _validate_model_properties, model_name, model_properties)
 
+    def test_update_available_models_model_load_error(self):
+        """_update_available_models should throw an error if model_name given in
+            model_properties does not exist
+        """
+        model_cache_key = "sample-cache-key"
+        model_name = "test-model"
+        model_properties = {"name": "incorect-model-name",
+                            "dimensions": 768,
+                            "tokens": 128,
+                            "type": "sbert"}
+        device = "cpu"
+        normalize_embeddings = True
+
+        self.assertRaises(ModelLoadError, _update_available_models, model_cache_key,
+            model_name, model_properties, device, normalize_embeddings)
+
     def test_vectorise_with_custom_model_properties(self):
         model_name = "test-model"
 
@@ -172,7 +189,7 @@ class TestGenericModelSupport(MarqoTestCase):
 
         result = vectorise(model_name=model_name, model_properties=model_properties, content="some string")
 
-        assert np.array(result).shape[-1] == model_properties['dimensions']
+        assert np.array(result).shape[ -1 ] == model_properties[ 'dimensions' ]
 
     def test_modification_of_model_properties(self):
         """available_models should get updated if the model_properties are modified
@@ -191,21 +208,20 @@ class TestGenericModelSupport(MarqoTestCase):
         }
 
         tensor_search.create_vector_index(index_name=self.index_name_1,
-                                          config=self.config, index_settings=index_settings
-                                          )
+            config=self.config, index_settings=index_settings
+        )
 
         vectorise(model_name=model_name, model_properties=model_properties, content="some string")
         tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
 
         old_num_of_available_models = len(available_models)
-        model_properties['tokens'] = 256
+        model_properties[ 'tokens' ] = 256
 
         tensor_search.create_vector_index(index_name=self.index_name_1,
-                                          config=self.config, index_settings=index_settings
-                                          )
+            config=self.config, index_settings=index_settings
+        )
         vectorise(model_name=model_name, model_properties=model_properties, content="some string")
 
         new_num_of_available_models = len(available_models)
 
         self.assertEqual(new_num_of_available_models, old_num_of_available_models + 1)
-
