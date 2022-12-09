@@ -114,31 +114,4 @@ class TestOutputs(unittest.TestCase):
             assert _convert_vectorized_output(float_tensor) == list_o_list
             assert _convert_vectorized_output(numpy_array) == list_o_list
             
-    # def test_normalize(self):
-    #     list_o_lists = [ [[1,2], [3,4]],
-    #                         [[1,2]], (np.random.rand(100,100)-0.5).tolist()
-    #                     ]
-    #     eps = 1e-6
-
-    #     for list_o_list in list_o_lists:
-    #         float_tensor = FloatTensor(list_o_list)
-    #         numpy_array = np.array(list_o_list)
-
-    #         normed_list = normalize_2d(list_o_list)
-    #         normed_ft = normalize_2d(float_tensor)
-    #         normed_np = normalize_2d(numpy_array)
-
-    #         assert FloatTensor(normed_list).dim() == 2
-    #         assert normed_ft.dim() == 2
-    #         assert FloatTensor(normed_np).dim() == 2
-
-    #         norm_normed_list = linalg.vector_norm(FloatTensor(normed_np), dim=1, ord=2)
-    #         norm_normed_ft = linalg.vector_norm(FloatTensor(normed_ft), dim=1, ord=2)
-    #         norm_normed_np = linalg.vector_norm(FloatTensor(normed_np), dim=1, ord=2)
-
-    #         assert max(abs(norm_normed_ft - norm_normed_list)) < eps
-    #         assert max(abs(norm_normed_ft - norm_normed_np)) < eps
-
-    #         assert abs(min(norm_normed_list) - 1) < eps and abs(max(norm_normed_list) - 1) < eps
-    #         assert abs(min(norm_normed_ft) - 1) < eps and abs(max(norm_normed_ft) - 1) < eps
-    #         assert abs(min(norm_normed_np) - 1) < eps and abs(max(norm_normed_np) - 1) < eps
+   

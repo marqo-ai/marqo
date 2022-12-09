@@ -4,7 +4,7 @@ import torch
 
 from marqo.s2_inference.types import FloatTensor
 from marqo.s2_inference.s2_inference import clear_loaded_models
-from marqo.s2_inference.model_registry import load_model_properties, _get_open_clip_properties
+from marqo.s2_inference.model_registry import _get_open_clip_properties
 
 from marqo.s2_inference.s2_inference import (
     _load_model,

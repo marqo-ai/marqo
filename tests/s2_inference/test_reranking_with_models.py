@@ -457,3 +457,44 @@ class TestRerankingWithModels(unittest.TestCase):
         assert all( len(doc['_highlights']) == 0 for doc in results_lexical['hits'])
 
         assert all( isinstance(doc['_score'], (int, float, np.float32)) for doc in results_lexical['hits'])
+
+    def test_reranking_images_owl_no_image(self):
+        
+        # the urls are alll incorrect
+
+        results_lexical = {'hits': 
+                [{'attributes': 'yello head. pruple shirt. black sweater.',
+                    'location': 'https://raw.githubusercontent/ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png',
+                    'other': 'some other text',
+                    # this one has no id
+                    '_score': 1.4017934,
+                    '_highlights': [],
+                    },
+                    {'attributes': 'face is viking. body is white turtleneck. background is pearl',
+                    # missing locations
+                    'other': 'some more text',
+                    'location': 'https://raw.githubusercontent.com/sts/mainline/assets/ai_hippo_statue.png',
+                    '_id': 'QmRR6PBkgCdhiSYBM3AY3EWhn4ZbeR2X8Ygpy2veLkcPC5',
+                    '_score': 0.2876821,
+                    '_highlights': [],
+                    },
+                    # this one has less fields
+                    {'attributes': 'face is bowlcut. body is blue . background is grey. head is tan',
+                    'location': 'https://raw.githubusercontent.com/ma/inline/assets/ai_hippo_realistic.png',
+                    '_id': 'QmTVYuULK1Qbzh21Y3hzeTFny5AGUSUGAXoGjLqNB2b1at',
+                    '_score': 0.2876821,
+                    '_highlights': [],
+                    }],
+                    'processingTimeMs': 49,
+                    'query': 'yellow turtleneck',
+                    'limit': 10}
+
+        results_lexical_copy = copy.deepcopy(results_lexical)
+        model_name = "google/owlvit-base-patch32"
+        image_location = 'location'
+    
+        try:
+            rerank.rerank_search_results(search_result=results_lexical, query='hippo', model_name=model_name, 
+                                device='cpu', searchable_attributes=[image_location])
+        except Exception as e:
+            assert True #"cannot find image" in str(e)
