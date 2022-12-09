@@ -422,8 +422,9 @@ class ReRankerOwl(ReRanker):
         # todo unzip and get image location
         queries, image_names = zip(*self.model_inputs)
 
+        # try:
         self.images, self.original_sizes = self.load_images(image_names, self.image_size)
-
+        
         # # TODO check query type before making a list
         _b, _s, _i, _bo = [], [], [], []
 
