@@ -10,6 +10,12 @@ from marqo.s2_inference.processing.image_utils import _get_onnx_provider
 logger = get_logger(__name__)
 
 def get_default_yolox_model() -> Dict:
+    """this is for the marqo-yolox onnx weights.
+        this points to the huggingface model repo
+
+    Returns:
+        Dict: _description_
+    """
     return {
         "repo_id":'Marqo/marqo-yolo-v2',
         "filename": 'yolox_s.onnx',
@@ -19,11 +25,11 @@ def _download_yolox(repo_id : str, filename: str) -> str:
     """ downloads the model artefacts from hf
 
     Args:
-        repo_name (str): _description_
-        filename (str): _description_
+        repo_name (str): 
+        filename (str): 
 
     Returns:
-        str: _description_
+        str: the local path to the weights
     """
     return huggingface_hub.hf_hub_download(repo_id=repo_id, filename=filename)
 
@@ -31,12 +37,12 @@ def preprocess_yolox(img: ndarray, input_size: Tuple, swap: Tuple = (2, 0, 1)) -
     """prepares an image for yolox inference
 
     Args:
-        img (ndarray): _description_
-        input_size (Tuple): _description_
-        swap (Tuple, optional): _description_. Defaults to (2, 0, 1).
+        img (ndarray): 
+        input_size (Tuple): 
+        swap (Tuple, optional): . Defaults to (2, 0, 1).
 
     Returns:
-        Tuple[ndarray, float]: _description_
+        Tuple[ndarray, float]: 
     """
     if len(img.shape) == 3:
         padded_img = np.ones((input_size[0], input_size[1], 3), dtype=np.uint8) * 114
@@ -57,7 +63,7 @@ def preprocess_yolox(img: ndarray, input_size: Tuple, swap: Tuple = (2, 0, 1)) -
     return padded_img, r
 
 def load_yolox_onnx(model_name: str, device: str) -> Tuple[onnxruntime.InferenceSession, preprocess_yolox]:
-    """_summary_
+    """ loads the yolox onnx model
 
     Args:
         model_name (str): _description_
@@ -68,11 +74,7 @@ def load_yolox_onnx(model_name: str, device: str) -> Tuple[onnxruntime.Inference
     """
     fast_onnxprovider = _get_onnx_provider(device)
 
-    # can deadlock using mp ingestion
-    # TODO have a way to tell it is in a mp
     sess_options = onnxruntime.SessionOptions()
-    # sess_options.intra_op_num_threads = 1
-    # sess_options.inter_op_num_threads = 1
 
     session = onnxruntime.InferenceSession(model_name, sess_options=sess_options, providers=[fast_onnxprovider])
     session.disable_fallback()
@@ -83,11 +85,12 @@ def load_yolox_onnx(model_name: str, device: str) -> Tuple[onnxruntime.Inference
 
 def demo_postprocess(outputs: ndarray, img_size: Tuple[int, int], p6: bool = False) -> ndarray:
     """yolox post processing function
-
+        formats the raw outputs into scores and bounding boxes
     Args:
-        outputs (ndarray): _description_
-        img_size (Tuple[int, int]): _description_
-        p6 (bool, optional): _description_. Defaults to False.
+        outputs (ndarray): the outputs from the yolox model inference
+        img_size (Tuple[int, int]): the size of the input image
+        p6 (bool, optional): model architecture parameter. marqo-yolo v1 and v2 should be False. 
+                            check the model architecture for anything else. Defaults to False.
 
     Returns:
         ndarray: _description_
@@ -122,10 +125,10 @@ def _infer_yolox(session: onnxruntime.InferenceSession, preprocess: preprocess_y
     """inference for onnx yolox
 
     Args:
-        session (onnxruntime.InferenceSession): _description_
-        preprocess (preprocess_yolox): _description_
-        opencv_image (ndarray): _description_
-        input_shape (Tuple[int, int]): _description_
+        session (onnxruntime.InferenceSession): the onnx session of the model
+        preprocess (preprocess_yolox): the preprocess function for the input image
+        opencv_image (ndarray):the opencv formatted input image 
+        input_shape (Tuple[int, int]): the shape of the input image
 
     Returns:
         Tuple[ndarray, float]: _description_
@@ -141,9 +144,9 @@ def _process_yolox(output: ndarray, ratio: float, size: Tuple = (384, 384)) -> T
     """takes the outputs and processes them 
 
     Args:
-        output (ndarray): _description_
-        ratio (float): _description_
-        size (Tuple, optional): _description_. Defaults to (384, 384).
+        output (ndarray): processes the outpus of the yolox inference
+        ratio (float): the ratio between original and inferred sizes.
+        size (Tuple, optional): . Defaults to (384, 384).
 
     Returns:
         Tuple[ndarray, ndarray]: _description_

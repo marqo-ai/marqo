@@ -7,7 +7,7 @@ import torchvision
 
 from marqo.s2_inference.s2_inference import available_models
 from marqo.s2_inference.s2_inference import get_logger
-from marqo.s2_inference.types import Dict, List, Union, ImageType, Tuple, ndarray
+from marqo.s2_inference.types import Dict, List, Union, ImageType, Tuple, ndarray, Literal
 from marqo.s2_inference.clip_utils import format_and_load_CLIP_image
 from marqo.s2_inference.errors import ChunkerError
 
@@ -41,16 +41,17 @@ logger = get_logger(__name__)
 
 
 def chunk_image(image: Union[str, ImageType], device: str, 
-                        method: str = 'simple', size=get_default_size()) -> Tuple[List[ImageType], ndarray]:
+                        method: Literal[ 'simple', 'overlap',  'frcnn', 'marqo-yolo', 'yolox', 'dino-v1', 'dino-v2'],
+                        size=get_default_size()) -> Tuple[List[ImageType], ndarray]:
     """_summary_
     wrapper function to do the chunking and return the patches and their bounding boxes
     in the original coordinates system
 
     Args:
-        image (Union[str, ImageType]): _description_
-        device (str): _description_
-        method (str, optional): _description_. Defaults to 'simple'.
-        size (_type_, optional): _description_. Defaults to get_default_size().
+        image (Union[str, ImageType]): image to process
+        device (str): device to load models onto
+        method (str, optional): the method to use. Defaults to 'simple'.
+        size (_type_, optional): size the image should be loaded in as. Defaults to get_default_size().
 
     Raises:
         TypeError: _description_
@@ -58,7 +59,7 @@ def chunk_image(image: Union[str, ImageType], device: str,
         ChunkerError: Raises ChunkerError, if the chunker can't work for some reason
 
     Returns:
-        Tuple[List[ImageType], ndarray]: _description_
+        Tuple[List[ImageType], ndarray]: list of PIL images and the corresponding bounding boxes
     """
 
     HN = 3
@@ -114,16 +115,16 @@ def chunk_image(image: Union[str, ImageType], device: str,
 
 
 class PatchifySimple:
-    """class to do the patching. this one creates non-pverlapping boixes and chunks the image
+    """class to do the patching. this one creates non-overlapping boixes and chunks the image
     """
     def __init__(self, size: Tuple = (512, 512), hn: int = 3, wn: int = 3, overlap: bool = False, **kwargs):
         """_summary_
 
         Args:
-            size (Tuple, optional): _description_. Defaults to (512, 512).
-            hn (int, optional): _description_. Defaults to 3.
-            wn (int, optional): _description_. Defaults to 3.
-            overlap (bool, optional): _description_. Defaults to False.
+            size (Tuple, optional): size the image is resied to. Defaults to (512, 512).
+            hn (int, optional): number of boxes in the horizontal. Defaults to 3.
+            wn (int, optional): number of boxes in the vertical. Defaults to 3.
+            overlap (bool, optional): should they also have overlapping boxes? Defaults to False.
         """
         self.size = size
         self.hn = hn
@@ -156,14 +157,16 @@ class PatchifyModel:
         """_summary_
 
         Args:
-            device (str, optional): _description_. Defaults to 'cpu'.
-            size (Tuple, optional): _description_. Defaults to (224, 224).
-            min_area (float, optional): _description_. Defaults to 60*60.
-            nms (bool, optional): _description_. Defaults to True.
-            replace_small (bool, optional): _description_. Defaults to True.
-            top_k (int, optional): _description_. Defaults to 10.
-            filter_bb (bool, optional): _description_. Defaults to True.
-            min_area_replace (float, optional): _description_. Defaults to 60*60.
+            device (str, optional): the device to run the model on. Defaults to 'cpu'.
+            size (Tuple, optional): the final image size to go to the model. Defaults to (224, 224).
+            min_area (float, optional): the min area (pixels) that a box must meet to be kept. 
+                areas lower than this are removed. Defaults to 60*60.
+            nms (bool, optional): perform nms or not. Defaults to True.
+            replace_small (bool, optional): boxes smaller than min_area_replace are replaced with
+                        boxes centered on the same position but larger size. Defaults to True.
+            top_k (int, optional): keep this many boxes after all processin (max). Defaults to 10.
+            filter_bb (bool, optional): perform filtering on the proposed boxes. Defaults to True.
+            min_area_replace (float, optional): boxes with areas smaller than this are replaced with larger ones. Defaults to 60*60.
         """
         self.scores = []
 
@@ -328,12 +331,12 @@ class PatchifyViT(PatchifyModel):
             self.scores = calc_area(self.boxes_xyxy, self.size)
         
     @staticmethod
-    def _process_attention(attentions: ndarray, method: str = "abs") -> List[ndarray]:
+    def _process_attention(attentions: ndarray, method: Literal['abs', 'pos']) -> List[ndarray]:
         """processes a N x grey-scale attention maps 
 
         Args:
-            attentions (ndarray): _description_
-            method (str, optional): _description_. Defaults to "abs".
+            attentions (ndarray):
+            method (str, optional):  Defaults to "abs".
 
         Raises:
             TypeError: _description_
@@ -359,6 +362,7 @@ class PatchifyPytorch(PatchifyModel):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         
+        # keep this many based on initial scoring before doing nms and other processing
         self.top_k_scores = 100
 
     def _get_model_specific_parameters(self):

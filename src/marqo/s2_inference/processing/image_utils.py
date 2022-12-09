@@ -41,8 +41,8 @@ def _keep_topk(boxes_xyxy: Union[ndarray, FloatTensor], k: int = 10) -> Union[nd
     """keeps first k elements
 
     Args:
-        boxes_xyxy (Union[ndarray, FloatTensor]): _description_
-        k (int, optional): _description_. Defaults to 10.
+        boxes_xyxy (Union[ndarray, FloatTensor]): list of boxes
+        k (int, optional): the umber to keep. Defaults to 10.
 
     Returns:
         Union[ndarray, FloatTensor]: _description_
@@ -75,11 +75,11 @@ def load_rcnn_image(image_name: str, size: Tuple = (320,320)) -> Tuple[ImageType
     """this is the loading and processing for the input
 
     Args:
-        image_name (str): _description_
-        size (Tuple, optional): _description_.
+        image_name (str): the image or image name
+        size (Tuple, optional): the size the image will be resized to.
 
     Returns:
-        Tuple[ImageType, FloatTensor, Tuple[int, int]]: _description_
+        Tuple[ImageType, FloatTensor, Tuple[int, int]]: return the PIL image, pytorch image and the original image size
     """
     
     if isinstance(image_name, ImageType):
@@ -100,11 +100,11 @@ def calc_area(bboxes: Union[List[List], FloatTensor, ndarray], size: Union[None,
     (x1, y1, x2, y2) and the original size
 
     Args:
-        bboxes (Union[List[List], FloatTensor, ndarray]): _description_
-        size (Tuple[int, int]): _description_
+        bboxes (Union[List[List], FloatTensor, ndarray]): List of bounding boxes
+        size (Tuple[int, int]): the size of the image (w, h) to calc the area
 
     Returns:
-        List[Float]: _description_
+        List[Float]: a list of areas
     """
 
     if size is None:
@@ -116,17 +116,17 @@ def calc_area(bboxes: Union[List[List], FloatTensor, ndarray], size: Union[None,
     return areas
 
 def filter_boxes(bboxes: Union[FloatTensor, ndarray], max_aspect_ratio: int = 4, 
-                    min_area: int = 40*40, min_k: int = 3) -> List[int]:
+                    min_area: int = 40*40) -> List[int]:
     """filters a list of bounding boxes given as the 4-tuple (x1, y1, x2, y2)
-    by area and aspect ratio
+    by area and aspect ratio. needs to meet both aspect ratio and area criteria to be kept
+    returns the indices of the boxes that satisfy the conditions
 
     Args:
-        bboxes (Union[FloatTensor, ndarray]): _description_
-        max_aspect_ratio (int, optional): _description_. Defaults to 4.
+        bboxes (Union[FloatTensor, ndarray]): the boxes
+        max_aspect_ratio (int, optional): max aspect ratio before being filtered out. Defaults to 4.
         min_area (int, optional): _description_. Defaults to 40*40.
-        min_k : always keep this many
     Returns:
-        List[ind]: _description_
+        List[ind]: list of indices
     """
     inds = []
     for ind,bb in enumerate(bboxes):
@@ -142,12 +142,12 @@ def rescale_box(box: Union[List[float], ndarray, FloatTensor], from_size: Tuple,
     """rescales a bounding box between two different image sizes
 
     Args:
-        box (Union[List[float], ndarray, FloatTensor]): _description_
-        from_size (Tuple): _description_
-        to_size (Tuple): _description_
+        box (Union[List[float], ndarray, FloatTensor]): bounding boxes
+        from_size (Tuple): the original size 
+        to_size (Tuple): the size to rescale to
 
     Returns:
-        Tuple: _description_
+        Tuple: the rescaled boxes
     """
     Fy = to_size[1]/from_size[1]
     Fx = to_size[0]/from_size[0]
@@ -167,9 +167,9 @@ def generate_boxes(image_size: Tuple[int, int], hn: int, wn: int, overlap: bool 
     horizontal and vertical directions
 
     Args:
-        image_size (Tuple[int, int]): _description_
-        hn (int): _description_
-        wn (int): _description_
+        image_size (Tuple[int, int]): a tuple of sizes for the image (w, h)
+        hn (int): integer number of boxes in the horizontal direction
+        wn (int):  integer number of boxes in the vertical direction
 
     Returns:
         List[Tuple]: _description_
@@ -205,10 +205,10 @@ def str2bool(string: str) -> bool:
     """converts a string into a bool
 
     Args:
-        string (str): _description_
+        string (str):
 
     Returns:
-        bool: _description_
+        bool: 
     """
     return string.lower() in ("true", "1", "t")
 
@@ -217,12 +217,14 @@ def replace_small_boxes(boxes: Union[List[List[float]], List[Tuple[float]], ndar
     """replaces bounding boxes given as (x0,y0,x1,y1) and any below min_area
     are replaced with boxes of size new_size
     Args:
-        boxes (Union[List[List[float]], List[Tuple[float]], ndarray]): _description_
-        min_area (float, optional): _description_. Defaults to 40*40.
-        new_size (Tuple, optional): _description_. Defaults to (100,100).
+        boxes (Union[List[List[float]], List[Tuple[float]], ndarray]): list of bounding boxes
+        min_area (float, optional): min area that a box needs to meet to not be 
+                                    replaced with one that is new_size. Defaults to 40*40.
+        new_size (Tuple, optional): the new size the boxes should be if they are 
+                                    less than min_area. Defaults to (100,100).
 
     Returns:
-        List[Tuple]: _description_
+        List[Tuple]: list of bounding bozes with small ones being replaced with larger ones
     """
     new_boxes = []
     for box in boxes:
@@ -236,14 +238,15 @@ def replace_small_boxes(boxes: Union[List[List[float]], List[Tuple[float]], ndar
     return new_boxes
 
 def clip_boxes(boxes: Union[List, ndarray], xmin: int, ymin: int, xmax: int, ymax: int) -> List[Tuple]:
-    """given a list or iterable 4-tuple of floats or ints, clip these to be within the limits
+    """given a list or iterable 4-tuple of floats or ints, clip these to be within the limits.
+        given as 4 tuple x1, y1, x2, y2
 
     Args:
         boxes (Union[List, ndarray]): _description_
-        xmin (int): _description_
-        ymin (int): _description_
-        xmax (int): _description_
-        ymax (int): _description_
+        xmin (int): smallest x val
+        ymin (int): smallest y val
+        xmax (int): largest x val
+        ymax (int): largest y val
 
     Returns:
         List[Tuple]: _description_
@@ -267,11 +270,11 @@ def patchify_image(image: ImageType, bboxes: Union[List[float], FloatTensor, nda
     See PIL documentation for coord system
 
     Args:
-        image (ImageType): _description_
-        bboxes (Union[List[float], FloatTensor, ndarray]): _description_
+        image (ImageType):input image to make into patches
+        bboxes (Union[List[float], FloatTensor, ndarray]): the boxes to use for patching
 
     Returns:
-        List[ImageType]: _description_
+        List[ImageType]: list of cropped images
     """
     return [image.crop(bb) for bb in bboxes]
 

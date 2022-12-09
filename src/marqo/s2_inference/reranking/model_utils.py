@@ -361,13 +361,13 @@ def _predict_owl(model, processed_inputs, post_process_function, size):
         return results
 
 def process_owl_results(results: List) -> List:
-    """wrapper for processing a list of resultsd from owl-vitexi
+    """wrapper for processing a list of results from owl-vit
 
     Args:
-        results (_type_): _description_
+        results (_type_): the results that come from owl inference
 
     Returns:
-        _type_: _description_
+        _type_: processed owl results, boxes, scores and a string ientifier
     """
     rezs = []
     for result in results:
@@ -379,8 +379,8 @@ def _process_owl_result(result: List[Dict], identifier: str) -> Tuple[List, List
     """post-process the owl-vit results
 
     Args:
-        result (List[Dict]): _description_
-        identifier (str): _description_
+        result (List[Dict]): the output of owl inference
+        identifier (str): a string that is used to id the results
 
     Returns:
         Tuple[List, List, List]: _description_

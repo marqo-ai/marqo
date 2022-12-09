@@ -5,20 +5,21 @@ import numpy as np
 import cv2
 
 from marqo.s2_inference.s2_inference import get_logger
-from marqo.s2_inference.types import Dict, List, Union, ImageType, Tuple, FloatTensor, ndarray, Any
+from marqo.s2_inference.types import Dict, List, Union, ImageType, Tuple, FloatTensor, ndarray, Any, Literal
 from marqo.s2_inference.errors import ModelLoadError
 
 logger = get_logger(__name__)
 
 
-def _load_DINO_model(arch: str, device: str, patch_size: int = None,
+def _load_DINO_model(arch: Literal['vit_small', 'vit_base'], device: str, patch_size: int = None,
                     image_size: Tuple = (224, 224)) -> Tuple[Any, Any]:
     """ loads a vit dino model
        # arch -> ['vit_tiny', 'vit_small', 'vit_base']
     Args:
-        arch (str): _description_
-        device (str): _description_
-        patch_size (_type_, optional): _description_. Defaults to None.
+        arch (str): the model architecture
+        device (str): cpu or cuda
+        patch_size (_type_, optional): the number of patches for the model. note this needs to exactly match
+                                        the number the model was trained with.
 
     Raises:
         KeyError: _description_
@@ -26,7 +27,7 @@ def _load_DINO_model(arch: str, device: str, patch_size: int = None,
         RuntimeError: _description_
 
     Returns:
-        Tuple[Any, Any]: _description_
+        Tuple[Any, Any]: the model and transform for the inputs
     """
   
     allowed_archs = ('vit_small', 'vit_base')
@@ -64,15 +65,20 @@ def _get_DINO_transform(image_size: Tuple = (224, 224)) -> Any:
     """gets the preprocessing transform for dino models
 
     Args:
-        image_size (Tuple, optional): _description_. Defaults to (224, 224).
+        image_size (Tuple, optional): The final size of the image before going to the model
 
     Returns:
         Any: _description_
     """
+    
+    # do not modify these unless you know exactly what you are doing!
+    IMG_MEAN = (0.485, 0.456, 0.406)
+    IMG_STD = (0.229, 0.224, 0.225)
+
     return pth_transforms.Compose([
     pth_transforms.Resize(image_size),
     pth_transforms.ToTensor(),
-    pth_transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+    pth_transforms.Normalize(IMG_MEAN, IMG_STD),
     ])
 
 def DINO_inference(model: Any, transform: Any, img: ImageType = None, 
@@ -82,12 +88,12 @@ def DINO_inference(model: Any, transform: Any, img: ImageType = None,
     Args:
         model (Any): ('vit_small', 'vit_base')
         transform (Any): _get_DINO_transform
-        img (ImageType, optional): _description_. Defaults to None.
-        patch_size (int, optional): _description_. Defaults to None.
-        device (str, optional): _description_. Defaults to "cpu".
+        img (ImageType, optional): the image to infer on. Defaults to None.
+        patch_size (int, optional): the patch size the model architecture uses. Defaults to None.
+        device (str, optional): device for the model to run on. Defaults to "cpu".
 
     Returns:
-        FloatTensor: _description_
+        FloatTensor: returns N x w x h tensor
     """
     
     img = transform(img)
@@ -117,10 +123,10 @@ def _rescale_image(image: Union[ndarray, ImageType]) -> ndarray:
         assumes positive values as it does not correct a bias
 
     Args:
-        image (ndarray): _description_
+        image (ndarray): the input image to rescale
 
     Returns:
-        ndarray: _description_
+        ndarray: the rescaled image
     """
 
     if isinstance(image, ImageType):
@@ -136,10 +142,10 @@ def attention_to_bboxs(image: ndarray) -> List[Tuple]:
     """turns attention maps into classless bounding boxes
     expects a single dim attention e.g, attentions.size = (x, y)
     Args:
-        image (ImageType): _description_
+        image (ndarray): the greyscale image to use to generate bounding boxes for
 
     Returns:
-        List[Tuple]: _description_
+        List[Tuple]: List of tuples for the bounding boxes
     """
     
     image = _rescale_image(image)
