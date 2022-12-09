@@ -5,9 +5,8 @@
 from marqo import Client
 import os
 import pandas as pd 
-from utils import download_file, extract_zip
-import glob
-import subprocess
+from utils import download_data
+
 #####################################################
 ### STEP 1. start Marqo
 #####################################################
@@ -21,27 +20,13 @@ import subprocess
 
 # this will pull directly from the s3 bucket if True, otherwise it will pull for local indexing
 use_remote = False
-in_docker = False
+in_docker = True
 
 data = pd.read_csv('files.csv', index_col=0)
-
+docker_path = 'http://host.docker.internal:8222/'
 local_dir = os.getcwd() + '/images/'
-if not use_remote:
-    zip_file_url = 'https://marqo-public-datasets.s3.us-east-2.amazonaws.com/demos/ImageSearchLocalisation/images.zip'
-    zip_file = download_file(zip_file_url, local_dir=local_dir)
-    extract_zip(zip_file, local_dir=local_dir)
-    # alternatively you can download the files individually
-    #downloaded = download_parallel(urls=data['s3_uri'].tolist(), local_dir=local_dir)
-    locators = glob.glob(local_dir + '*.jpg')
-    docker_path = 'http://host.docker.internal:8222/'
 
-    # we start an image server for easier access from within docker
-    pid = subprocess.Popen(['python3', '-m', 'http.server', '8222', '--directory', local_dir], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
-    #locators = [docker_path + os.path.basename(f) for f in locators]
-else:
-    # now we create our documents for indexing - a list of python dicts with keys as field names
-    locators = data['s3_uri']
-
+locators = download_data(data=data, download_dir=local_dir, use_remote=use_remote, in_docker=in_docker, docker_path=docker_path)
 
 documents = [{"image_location":s3_uri, '_id':os.path.basename(s3_uri)} for s3_uri in locators]
 
@@ -57,7 +42,7 @@ client = Client()
 
 # setup the settings so we can comapre the different methods
 index_name_prefix = "visual-search"
-patch_methods = ["dino/v1", "dino/v2", "frcnn", None, "yolox"]
+patch_methods = ["dino/v1", None, "yolox"] #["dino/v1", "dino/v2", "frcnn", None, "yolox"]
 model_name = "ViT-B/32"
 n_processes = 3
 batch_size = 50
@@ -98,22 +83,3 @@ for patch_method in patch_methods:
 
     response = client.index(index_name).add_documents(documents, device='cuda', 
                                 server_batch_size=batch_size, processes=n_processes)
-
-
-
-
-# #####################################################
-# ### STEP 4. Search
-# ######################################################
-
-# response = client.index(index_name).search("house", reranker= "google/owlvit-base-patch32")
-
-# rank = 0
-
-# bbox = list(response['hits'][rank]['_highlights'].values())[0]
-# local_file = files_map[response['hits'][rank]['_id']]
-# image = Image.open(local_file)
-
-# image_cropped = image.crop(bbox)
-
-# image_cropped.show()
