@@ -2,7 +2,7 @@
 The functions defined here would have endpoints, later on.
 """
 import numpy as np
-from marqo.s2_inference.errors import VectoriseError
+from marqo.s2_inference.errors import VectoriseError, EnrichmentError
 from PIL import UnidentifiedImageError
 from marqo.s2_inference.model_registry import load_model_properties
 from marqo.s2_inference.configs import get_default_device,get_default_normalization,get_default_seq_length
@@ -39,6 +39,37 @@ def vectorise(model_name: str, content: Union[str, List[str]], device: str = get
         raise VectoriseError from e
 
     return _convert_vectorized_output(vectorised)
+
+def generate(task: str, device, *args, **kwargs) -> List[Tuple[Any]]:
+    """
+     getting called once per doc that might itself have multiple questions
+     {
+            "attributes": [{"string": "Bathroom, Bedroom, Study, Yard"} ]
+            "image_field": {'document_field":"Image location"}
+     	},
+     	->
+    {
+            "attributes": ["Bathroom, Bedroom, Study, Yard"]
+            "image_field": "https://s3.image.png"
+     	},
+    The names of keyword arguments are fixed according to the model. The model should validate
+    the kwargs
+    """
+    # we have only one model right now for two tasks
+    model_name = 'vqa'
+    model_cache_key = _create_model_cache_key(model_name, device)
+
+    if model_cache_key not in available_models:
+        available_models[model_cache_key] = _load_model_enrichment(model_name, device=device)
+        logger.info(f'loaded {task} on device {device}')
+    try:
+        # generated is happy to inserted back into Marqo
+        generated = available_models[model_cache_key].predict(task, *args, **kwargs)
+    except UnidentifiedImageError as e:
+        raise EnrichmentError from e
+    return generated
+
+
 
 def _create_model_cache_key(model_name: str, device: str) -> Tuple:
     """creates a key to store the loaded model by in the cache
@@ -203,6 +234,25 @@ def _get_model_loader(model_name: str) -> Any:
 
     return MODEL_PROPERTIES['loaders'][model_type]
 
+def _load_model_enrichment(model_name: str, device: str = get_default_device()) -> Any:
+    """ load an enrichment model - not sure this goes in the registry yet
+    leave it out for now 
+    Args:
+        model_name (str): _description_
+        device (str, optional): _description_. Defaults to 'cpu'.
+
+    Returns:
+        Any: _description_
+    """
+
+    loader = MODEL_PROPERTIES['loaders'][model_name]
+
+    # TODO VQA params
+    model = loader(device=device)
+    
+    model.load()
+
+    return model
 
 def _load_model(model_name: str, device: str = get_default_device()) -> Any:
     """_summary_

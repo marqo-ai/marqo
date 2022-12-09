@@ -14,3 +14,6 @@ class ChunkerError(S2InferenceError):
 
 class VectoriseError(S2InferenceError):
     pass
+
+class EnrichmentError(S2InferenceError):
+    pass

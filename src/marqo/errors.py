@@ -136,6 +136,11 @@ class InvalidArgError(__InvalidRequestError):
     status_code = HTTPStatus.BAD_REQUEST
 
 
+class ArgParseError(InvalidArgError):
+    code = "argument_parse_error"
+    status_code = HTTPStatus.BAD_REQUEST
+
+
 class IllegalRequestedDocCount(__InvalidRequestError):
     code = "illegal_requested_doc_count"
     status_code = HTTPStatus.BAD_REQUEST

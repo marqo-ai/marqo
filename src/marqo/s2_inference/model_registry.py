@@ -3,6 +3,7 @@ from marqo.s2_inference.sbert_onnx_utils import SBERT_ONNX
 from marqo.s2_inference.sbert_utils import SBERT, TEST
 from marqo.s2_inference.random_utils import Random
 from marqo.s2_inference.clip_utils import CLIP, OPEN_CLIP
+from marqo.s2_inference.enrichment.vqa_utils import VQA
 from marqo.s2_inference.types import Any, Dict, List, Optional, Union, FloatTensor
 
 # we need to keep track of the embed dim and model load functions/classes
@@ -548,7 +549,8 @@ def _get_model_load_mappings() -> Dict:
             'test':TEST, 
             'sbert_onnx':SBERT_ONNX,
             'random':Random, 
-            'hf':HF_MODEL}
+            'hf':HF_MODEL,
+            'vqa':VQA}
 
 def load_model_properties() -> Dict:
     # also truncate the name if not already
