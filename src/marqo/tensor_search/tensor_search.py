@@ -781,9 +781,12 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
         logger.info("reranking using {}".format(reranker))
         if searchable_attributes is None:
             raise errors.InvalidArgError(f"searchable_attributes cannot be None when re-ranking. Specify which fields to search and rerank over.")
-        rerank.rerank_search_results(search_result=search_result, query=text, 
-                    model_name=reranker, device=config.indexing_device if device is None else device, 
-                searchable_attributes=searchable_attributes, num_highlights=1 if simplified_format else num_highlights)
+        try:
+            rerank.rerank_search_results(search_result=search_result, query=text, 
+                        model_name=reranker, device=config.indexing_device if device is None else device, 
+                    searchable_attributes=searchable_attributes, num_highlights=1 if simplified_format else num_highlights)
+        except Exception as e:
+            raise errors.BadRequestError(f"reranking failure due to {str(e)}")
 
     time_taken = datetime.datetime.now() - t0
     search_result["processingTimeMs"] = round(time_taken.total_seconds() * 1000)
