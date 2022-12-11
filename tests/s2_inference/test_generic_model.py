@@ -17,7 +17,8 @@ from tests.marqo_test import MarqoTestCase
 class TestGenericModelSupport(MarqoTestCase):
 
     def setUp(self):
-        self.index_name_1 = "my-test-create-index-1"
+        self.index_name_1 = "my-test-index-1"
+        self.index_name_2 = "my-test-index-2"
         try:
             tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         except IndexNotFoundError as e:
@@ -88,7 +89,7 @@ class TestGenericModelSupport(MarqoTestCase):
                 "_id": "123",
                 "title 1": "content 1",
                 "desc 2": "content 2. blah blah blah"
-            } ]
+            }]
         auto_refresh = True
 
         tensor_search.add_documents(config=config, index_name=index_name, docs=docs, auto_refresh=auto_refresh)
@@ -106,8 +107,8 @@ class TestGenericModelSupport(MarqoTestCase):
 
         """_validate_model_properties should not throw an exception if required keys are given.
         """
-        model_properties[ 'dimensions' ] = 768
-        model_properties[ 'name' ] = "sentence-transformers/all-mpnet-base-v2"
+        model_properties['dimensions'] = 768
+        model_properties['name'] = "sentence-transformers/all-mpnet-base-v2"
 
         validated_model_properties = _validate_model_properties(model_name, model_properties)
 
@@ -178,7 +179,7 @@ class TestGenericModelSupport(MarqoTestCase):
         self.assertRaises(ModelLoadError, _update_available_models, model_cache_key,
             model_name, model_properties, device, normalize_embeddings)
 
-    def test_vectorise_with_custom_model_properties(self):
+    def test_custom_model_gets_loaded(self):
         model_name = "test-model"
 
         # this model is not in model_registry
@@ -189,13 +190,38 @@ class TestGenericModelSupport(MarqoTestCase):
 
         result = vectorise(model_name=model_name, model_properties=model_properties, content="some string")
 
-        assert np.array(result).shape[ -1 ] == model_properties[ 'dimensions' ]
+        self.assertEqual(np.array(result).shape[-1], model_properties['dimensions'])
+
+    def test_vectorise_with_default_model_different_properties(self):
+        """same models with different properties should return different outputs
+        """
+        model_name = 'sentence-transformers/all-mpnet-base-v2'
+        model_properties_default = {"name": "sentence-transformers/all-mpnet-base-v2",
+                                    "dimensions": 768,
+                                    "tokens": 128,
+                                    "type": "sbert"}
+
+        model_properties_custom = {"name": "sentence-transformers/all-mpnet-base-v2",
+                                   "dimensions": 768,
+                                   "tokens": 4,
+                                   "type": "sbert"}
+
+        content = "A path or url to a tensorflow index checkpoint file (e.g, ./tf_model/model.ckpt.index). In this " \
+                  "case, from_tf should be set to True and a configuration object should be provided as config " \
+                  "argument. This loading path is slower than converting the TensorFlow checkpoint in a PyTorch model " \
+                  "using the provided conversion scripts and loading the PyTorch model afterwards. "
+
+        res_default = vectorise(model_name=model_name, model_properties=model_properties_default, content=content)
+        res_custom = vectorise(model_name='custom-model', model_properties=model_properties_custom, content=content)
+
+        self.assertNotEqual(res_default, res_custom)
+        # self.assertEqual(np.array(res_default).shape[-1], np.array(res_custom).shape[-1])
 
     def test_modification_of_model_properties(self):
         """available_models should get updated if the model_properties are modified
             and model_name is unchanged
         """
-        model_name = 'test-model'
+        model_name = 'test-model-in-registry'
         model_properties = {"name": "sentence-transformers/all-mpnet-base-v2",
                             "dimensions": 768,
                             "tokens": 128,
@@ -215,7 +241,7 @@ class TestGenericModelSupport(MarqoTestCase):
         tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
 
         old_num_of_available_models = len(available_models)
-        model_properties[ 'tokens' ] = 256
+        model_properties['tokens'] = 256
 
         tensor_search.create_vector_index(index_name=self.index_name_1,
             config=self.config, index_settings=index_settings
