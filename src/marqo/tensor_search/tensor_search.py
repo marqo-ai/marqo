@@ -963,7 +963,7 @@ def _vector_text_search(
                         "knn": {
                             f"{TensorField.chunks}.{vector_field}": {
                                 "vector": vectorised_text,
-                                "k": k
+                                "k": result_count
                             }
                         }
                     },
