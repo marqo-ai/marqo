@@ -45,7 +45,7 @@ from marqo.tensor_search.enums import (
 from marqo.tensor_search.enums import IndexSettingsField as NsField
 from marqo.tensor_search import utils, backend, validation, configs, parallel
 from marqo.tensor_search.formatting import _clean_doc
-from marqo.tensor_search.index_meta_cache import get_cache,get_index_info
+from marqo.tensor_search.index_meta_cache import get_cache, get_index_info
 from marqo.tensor_search import index_meta_cache
 from marqo.tensor_search.models.index_info import IndexInfo
 from marqo.tensor_search import constants
@@ -64,12 +64,13 @@ from marqo.s2_inference import errors as s2_inference_errors
 import threading
 
 from marqo.tensor_search.tensor_search_logging import get_logger
+
 logger = get_logger(__name__)
 
 
 def create_vector_index(
-        config: Config, index_name: str, media_type: Union[str, MediaType] = MediaType.default,
-        refresh_interval: str = "1s", index_settings = None):
+    config: Config, index_name: str, media_type: Union[ str, MediaType ] = MediaType.default,
+    refresh_interval: str = "1s", index_settings=None):
     """
     Args:
         media_type: 'text'|'image'
@@ -87,9 +88,9 @@ def create_vector_index(
             "index": {
                 "knn": True,
                 "knn.algo_param.ef_search": 100,
-                "refresh_interval":  refresh_interval
+                "refresh_interval": refresh_interval
             },
-            "number_of_shards": the_index_settings[NsField.number_of_shards],
+            "number_of_shards": the_index_settings[ NsField.number_of_shards ],
 
         },
         "mappings": {
@@ -125,15 +126,15 @@ def create_vector_index(
 
     if max_marqo_fields is not None:
         max_os_fields = _marqo_field_limit_to_os_limit(int(max_marqo_fields))
-        vector_index_settings["settings"]["mapping"] = {"total_fields": {"limit": int(max_os_fields)}}
-    model_name = the_index_settings[NsField.index_defaults][NsField.model]
-    vector_index_settings["mappings"]["_meta"][NsField.index_settings] = the_index_settings
-    vector_index_settings["mappings"]["_meta"]["model"] = model_name
+        vector_index_settings[ "settings" ][ "mapping" ] = {"total_fields": {"limit": int(max_os_fields)}}
+    model_name = the_index_settings[ NsField.index_defaults ][ NsField.model ]
+    vector_index_settings[ "mappings" ][ "_meta" ][ NsField.index_settings ] = the_index_settings
+    vector_index_settings[ "mappings" ][ "_meta" ][ "model" ] = model_name
 
     response = HttpRequests(config).put(path=index_name, body=vector_index_settings)
 
-    get_cache()[index_name] = IndexInfo(
-        model_name=model_name, properties=vector_index_settings["mappings"]["properties"].copy(),
+    get_cache()[ index_name ] = IndexInfo(
+        model_name=model_name, properties=vector_index_settings[ "mappings" ][ "properties" ].copy(),
         index_settings=the_index_settings
     )
     return response
@@ -142,8 +143,8 @@ def create_vector_index(
 def _check_model_name(index_settings):
     """Checks if model_properties is given then model_name is given as well
     """
-    model_name = index_settings[NsField.index_defaults].get(NsField.model)
-    model_properties = index_settings[NsField.index_defaults].get(NsField.model_properties)
+    model_name = index_settings[ NsField.index_defaults ].get(NsField.model)
+    model_properties = index_settings[ NsField.index_defaults ].get(NsField.model_properties)
     if model_properties is not None and model_name is None:
         raise s2_inference_errors.UnknownModelError(f"No model name found for model_properties={model_properties}")
 
@@ -183,10 +184,10 @@ def _autofill_index_settings(index_settings: dict):
     # if NsField.index_defaults not in copied_settings:
     #     copied_settings[NsField.index_defaults] = default_settings[NsField.index_defaults]
 
-    if NsField.treat_urls_and_pointers_as_images in copied_settings[NsField.index_defaults] and \
-            copied_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images] is True\
-            and copied_settings[NsField.index_defaults][NsField.model] is None:
-        copied_settings[NsField.index_defaults][NsField.model] = MlModel.clip
+    if NsField.treat_urls_and_pointers_as_images in copied_settings[ NsField.index_defaults ] and \
+        copied_settings[ NsField.index_defaults ][ NsField.treat_urls_and_pointers_as_images ] is True \
+        and copied_settings[ NsField.index_defaults ][ NsField.model ] is None:
+        copied_settings[ NsField.index_defaults ][ NsField.model ] = MlModel.clip
 
     # make sure the first level of keys are present, if not add all of those defaults
     # for key in list(default_settings):
@@ -200,24 +201,24 @@ def _autofill_index_settings(index_settings: dict):
     #         copied_settings[NsField.index_defaults][key] = default_settings[NsField.index_defaults][key]
 
     # text preprocessing sub fields - fills any missing sub-dict fields if some of the first level are present
-    for key in list(default_settings[NsField.index_defaults][NsField.text_preprocessing]):
-        if key not in copied_settings[NsField.index_defaults][NsField.text_preprocessing] or \
-                copied_settings[NsField.index_defaults][NsField.text_preprocessing][key] is None:
-            copied_settings[NsField.index_defaults][NsField.text_preprocessing][key] \
-                = default_settings[NsField.index_defaults][NsField.text_preprocessing][key]
+    for key in list(default_settings[ NsField.index_defaults ][ NsField.text_preprocessing ]):
+        if key not in copied_settings[ NsField.index_defaults ][ NsField.text_preprocessing ] or \
+            copied_settings[ NsField.index_defaults ][ NsField.text_preprocessing ][ key ] is None:
+            copied_settings[ NsField.index_defaults ][ NsField.text_preprocessing ][ key ] \
+                = default_settings[ NsField.index_defaults ][ NsField.text_preprocessing ][ key ]
 
     # image preprocessing sub fields - fills any missing sub-dict fields
-    for key in list(default_settings[NsField.index_defaults][NsField.image_preprocessing]):
-        if key not in copied_settings[NsField.index_defaults][NsField.image_preprocessing] or \
-                copied_settings[NsField.index_defaults][NsField.image_preprocessing][key] is None:
-            copied_settings[NsField.index_defaults][NsField.image_preprocessing][key] \
-                = default_settings[NsField.index_defaults][NsField.image_preprocessing][key]
+    for key in list(default_settings[ NsField.index_defaults ][ NsField.image_preprocessing ]):
+        if key not in copied_settings[ NsField.index_defaults ][ NsField.image_preprocessing ] or \
+            copied_settings[ NsField.index_defaults ][ NsField.image_preprocessing ][ key ] is None:
+            copied_settings[ NsField.index_defaults ][ NsField.image_preprocessing ][ key ] \
+                = default_settings[ NsField.index_defaults ][ NsField.image_preprocessing ][ key ]
 
     return copied_settings
 
 
 def get_stats(config: Config, index_name: str):
-    doc_count = HttpRequests(config).post(path=F"{index_name}/_count")["count"]
+    doc_count = HttpRequests(config).post(path=F"{index_name}/_count")[ "count" ]
     return {
         "numberOfDocuments": doc_count
     }
@@ -232,13 +233,12 @@ def _check_and_create_index_if_not_exist(config: Config, index_name: str):
 
 
 def add_documents_orchestrator(
-        config: Config, index_name: str, docs: List[dict],
-        auto_refresh: bool, batch_size: int = 0, processes: int = 1,
-        non_tensor_fields=None,
-        device=None, update_mode: str = 'replace'):
-
+    config: Config, index_name: str, docs: List[ dict ],
+    auto_refresh: bool, batch_size: int = 0, processes: int = 1,
+    non_tensor_fields=None,
+    device=None, update_mode: str = 'replace'):
     if non_tensor_fields is None:
-        non_tensor_fields = []
+        non_tensor_fields = [ ]
 
     if batch_size is None or batch_size == 0:
         logger.info(f"batch_size={batch_size} and processes={processes} - not doing any marqo side batching")
@@ -262,7 +262,7 @@ def add_documents_orchestrator(
         # we just clear this index's entry and it will re-populate when needed next
         if index_name in get_cache():
             logger.info(f'deleting cache entry for {index_name} after parallel add documents')
-            del get_cache()[index_name]
+            del get_cache()[ index_name ]
 
         return results
     else:
@@ -270,53 +270,53 @@ def add_documents_orchestrator(
             raise errors.InvalidArgError("Batch size can't be less than 1!")
         logger.info(f"batch_size={batch_size} and processes={processes} - batching using a single process")
         return _batch_request(config=config, index_name=index_name, dataset=docs, device=device,
-                              batch_size=batch_size, verbose=False, non_tensor_fields=non_tensor_fields)
+            batch_size=batch_size, verbose=False, non_tensor_fields=non_tensor_fields)
 
 
-def _batch_request(config: Config, index_name: str, dataset: List[dict],
+def _batch_request(config: Config, index_name: str, dataset: List[ dict ],
                    batch_size: int = 100, verbose: bool = True, device=None,
-                   update_mode: str = 'replace', non_tensor_fields=None) -> List[Dict[str, Any]]:
-        """Batch by the number of documents"""
-        if non_tensor_fields is None:
-            non_tensor_fields = []
+                   update_mode: str = 'replace', non_tensor_fields=None) -> List[ Dict[ str, Any ] ]:
+    """Batch by the number of documents"""
+    if non_tensor_fields is None:
+        non_tensor_fields = [ ]
 
-        logger.info(f"starting batch ingestion in sizes of {batch_size}")
+    logger.info(f"starting batch ingestion in sizes of {batch_size}")
 
-        deeper = ((doc, i, batch_size) for i, doc in enumerate(dataset))
+    deeper = ((doc, i, batch_size) for i, doc in enumerate(dataset))
 
-        def batch_requests(gathered, doc_tuple):
-            doc, i, the_batch_size = doc_tuple
-            if i % the_batch_size == 0:
-                gathered.append([doc, ])
-            else:
-                gathered[-1].append(doc)
-            return gathered
+    def batch_requests(gathered, doc_tuple):
+        doc, i, the_batch_size = doc_tuple
+        if i % the_batch_size == 0:
+            gathered.append([ doc, ])
+        else:
+            gathered[ -1 ].append(doc)
+        return gathered
 
-        batched = functools.reduce(lambda x, y: batch_requests(x, y), deeper, [])
+    batched = functools.reduce(lambda x, y: batch_requests(x, y), deeper, [ ])
 
-        def verbosely_add_docs(i, docs):
-            t0 = datetime.datetime.now()
-            res = add_documents(
-                config=config, index_name=index_name,
-                docs=docs, auto_refresh=False, device=device,
-                update_mode=update_mode, non_tensor_fields=non_tensor_fields
-            )
-            total_batch_time = datetime.datetime.now() - t0
-            num_docs = len(docs)
+    def verbosely_add_docs(i, docs):
+        t0 = datetime.datetime.now()
+        res = add_documents(
+            config=config, index_name=index_name,
+            docs=docs, auto_refresh=False, device=device,
+            update_mode=update_mode, non_tensor_fields=non_tensor_fields
+        )
+        total_batch_time = datetime.datetime.now() - t0
+        num_docs = len(docs)
 
-            logger.info(f"    batch {i}: ingested {num_docs} docs. Time taken: {total_batch_time}. "
-                        f"Average timer per doc {total_batch_time/num_docs}")
-            if verbose:
-                logger.info(f"        results from indexing batch {i}: {res}")
-            return res
+        logger.info(f"    batch {i}: ingested {num_docs} docs. Time taken: {total_batch_time}. "
+                    f"Average timer per doc {total_batch_time / num_docs}")
+        if verbose:
+            logger.info(f"        results from indexing batch {i}: {res}")
+        return res
 
-        results = [verbosely_add_docs(i, docs) for i, docs in enumerate(batched)]
-        logger.info('completed batch ingestion.')
-        return results
+    results = [ verbosely_add_docs(i, docs) for i, docs in enumerate(batched) ]
+    logger.info('completed batch ingestion.')
+    return results
 
 
 def _infer_opensearch_data_type(
-        sample_field_content: typing.Any) -> Union[OpenSearchDataType, None]:
+    sample_field_content: typing.Any) -> Union[ OpenSearchDataType, None ]:
     """
     Raises:
         Exception if sample_field_content list or dict
@@ -331,7 +331,7 @@ def _infer_opensearch_data_type(
         return None
 
 
-def add_documents(config: Config, index_name: str, docs: List[dict], auto_refresh: bool,
+def add_documents(config: Config, index_name: str, docs: List[ dict ], auto_refresh: bool,
                   non_tensor_fields=None, device=None, update_mode: str = "replace"):
     """
 
@@ -349,10 +349,10 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
     """
     if non_tensor_fields is None:
-        non_tensor_fields = []
+        non_tensor_fields = [ ]
 
     t0 = datetime.datetime.now()
-    bulk_parent_dicts = []
+    bulk_parent_dicts = [ ]
 
     try:
         index_info = backend.get_index_info(config=config, index_name=index_name)
@@ -373,7 +373,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
     selected_device = config.indexing_device if device is None else device
 
-    unsuccessful_docs = []
+    unsuccessful_docs = [ ]
 
     for i, doc in enumerate(docs):
 
@@ -388,12 +388,12 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
             validation.validate_doc(doc)
 
             if "_id" in doc:
-                doc_id = validation.validate_id(doc["_id"])
-                del copied["_id"]
+                doc_id = validation.validate_id(doc[ "_id" ])
+                del copied[ "_id" ]
             else:
                 doc_id = str(uuid.uuid4())
 
-            [validation.validate_field_name(field) for field in copied]
+            [ validation.validate_field_name(field) for field in copied ]
         except errors.__InvalidRequestError as err:
             unsuccessful_docs.append(
                 (i, {'_id': doc_id if doc_id is not None else '',
@@ -402,16 +402,16 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
             continue
 
         if update_mode == "replace":
-            indexing_instructions["index"]["_id"] = doc_id
+            indexing_instructions[ "index" ][ "_id" ] = doc_id
         else:
-            indexing_instructions["update"]["_id"] = doc_id
+            indexing_instructions[ "update" ][ "_id" ] = doc_id
 
-        chunks = []
+        chunks = [ ]
 
         for field in copied:
 
             try:
-                field_content = validation.validate_field_content(copied[field])
+                field_content = validation.validate_field_content(copied[ field ])
             except errors.InvalidArgError as err:
                 document_is_valid = False
                 unsuccessful_docs.append(
@@ -421,7 +421,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                 break
 
             if field not in existing_fields:
-                new_fields_from_doc.add((field, _infer_opensearch_data_type(copied[field])))
+                new_fields_from_doc.add((field, _infer_opensearch_data_type(copied[ field ])))
 
             # Don't process text/image fields when explicitly told not to.
             if field in non_tensor_fields:
@@ -441,14 +441,18 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
                 if isinstance(field_content, str) and not _is_image(field_content):
 
-                    split_by = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][NsField.split_method]
-                    split_length = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][NsField.split_length]
-                    split_overlap = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][NsField.split_overlap]
+                    split_by = index_info.index_settings[ NsField.index_defaults ][ NsField.text_preprocessing ][
+                        NsField.split_method ]
+                    split_length = index_info.index_settings[ NsField.index_defaults ][ NsField.text_preprocessing ][
+                        NsField.split_length ]
+                    split_overlap = index_info.index_settings[ NsField.index_defaults ][ NsField.text_preprocessing ][
+                        NsField.split_overlap ]
                     content_chunks = text_processor.split_text(field_content, split_by=split_by, split_length=split_length, split_overlap=split_overlap)
                     text_chunks = content_chunks
                 else:
                     # TODO put the logic for getting field parameters into a function and add per field options
-                    image_method = index_info.index_settings[NsField.index_defaults][NsField.image_preprocessing][NsField.patch_method]
+                    image_method = index_info.index_settings[ NsField.index_defaults ][ NsField.image_preprocessing ][
+                        NsField.patch_method ]
                     # the chunk_image contains the no-op logic as of now - method = None will be a no-op
                     try:
                         # in the future, if we have different chunking methods, make sure we catch possible
@@ -464,21 +468,23 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                         )
                         break
 
-                normalize_embeddings = index_info.index_settings[NsField.index_defaults][NsField.normalize_embeddings]
-                infer_if_image = index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]
+                normalize_embeddings = index_info.index_settings[ NsField.index_defaults ][
+                    NsField.normalize_embeddings ]
+                infer_if_image = index_info.index_settings[ NsField.index_defaults ][
+                    NsField.treat_urls_and_pointers_as_images ]
 
                 try:
                     # in the future, if we have different underlying vectorising methods, make sure we catch possible
                     # errors of different types generated here, too.
                     vector_chunks = s2_inference.vectorise(model_name=index_info.model_name, model_properties=_get_model_properties(index_info), content=content_chunks,
-                                                           device=selected_device, normalize_embeddings=normalize_embeddings,
-                                                           infer=infer_if_image)
+                        device=selected_device, normalize_embeddings=normalize_embeddings,
+                        infer=infer_if_image)
                 except (s2_inference_errors.UnknownModelError,
                         s2_inference_errors.InvalidModelPropertiesError,
                         s2_inference_errors.ModelLoadError) as model_error:
                     raise errors.BadRequestError(
                         message=f'Problem vectorising query. Reason: {str(model_error)}',
-                        # link="https://marqo.pages.dev/latest/Models-Reference/dense_retrieval/"
+                        link="https://marqo.pages.dev/latest/Models-Reference/dense_retrieval/"
                     )
                 except s2_inference_errors.S2InferenceError:
                     document_is_valid = False
@@ -502,7 +508,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                         if not (isinstance(value, str) or isinstance(value, float)
                                 or isinstance(value, bool) or isinstance(value, int)):
                             continue
-                        chunk_values_for_filtering[key] = value
+                        chunk_values_for_filtering[ key ] = value
                     chunks.append({
                         utils.generate_vector_name(field): vector_chunk,
                         TensorField.field_content: text_chunk,
@@ -511,13 +517,13 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                     })
         if document_is_valid:
             new_fields = new_fields.union(new_fields_from_doc)
-            if update_mode =='replace':
-                copied[TensorField.chunks] = chunks
+            if update_mode == 'replace':
+                copied[ TensorField.chunks ] = chunks
                 bulk_parent_dicts.append(indexing_instructions)
                 bulk_parent_dicts.append(copied)
             else:
                 to_upsert = copied.copy()
-                to_upsert[TensorField.chunks] = chunks
+                to_upsert[ TensorField.chunks ] = chunks
                 bulk_parent_dicts.append(indexing_instructions)
                 bulk_parent_dicts.append({
                     "upsert": to_upsert,
@@ -590,55 +596,55 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
     t1 = datetime.datetime.now()
 
-    def translate_add_doc_response(response: Optional[dict], time_diff: datetime.timedelta) -> dict:
+    def translate_add_doc_response(response: Optional[ dict ], time_diff: datetime.timedelta) -> dict:
         """translates OpenSearch response dict into Marqo dict"""
-        item_fields_to_remove = ['_index', '_primary_term', '_seq_no', '_shards', '_version']
+        item_fields_to_remove = [ '_index', '_primary_term', '_seq_no', '_shards', '_version' ]
         result_dict = {}
-        new_items = []
+        new_items = [ ]
 
         if response is not None:
             copied_res = copy.deepcopy(response)
 
-            result_dict['errors'] = copied_res['errors']
+            result_dict[ 'errors' ] = copied_res[ 'errors' ]
             actioned = "index" if update_mode == 'replace' else 'update'
 
-            for item in copied_res["items"]:
+            for item in copied_res[ "items" ]:
                 for to_remove in item_fields_to_remove:
-                    if to_remove in item[actioned]:
-                        del item[actioned][to_remove]
-                new_items.append(item[actioned])
+                    if to_remove in item[ actioned ]:
+                        del item[ actioned ][ to_remove ]
+                new_items.append(item[ actioned ])
 
         if unsuccessful_docs:
-            result_dict['errors'] = True
+            result_dict[ 'errors' ] = True
 
         for loc, error_info in unsuccessful_docs:
             new_items.insert(loc, error_info)
 
-        result_dict["processingTimeMs"] = time_diff.total_seconds() * 1000
-        result_dict["index_name"] = index_name
-        result_dict["items"] = new_items
+        result_dict[ "processingTimeMs" ] = time_diff.total_seconds() * 1000
+        result_dict[ "index_name" ] = index_name
+        result_dict[ "items" ] = new_items
         return result_dict
 
-    return translate_add_doc_response(response=index_parent_response, time_diff= t1 - t0)
+    return translate_add_doc_response(response=index_parent_response, time_diff=t1 - t0)
 
 
 def get_document_by_id(
-        config: Config, index_name: str, document_id: str, show_vectors: bool = False):
+    config: Config, index_name: str, document_id: str, show_vectors: bool = False):
     """returns document by its ID"""
     validation.validate_id(document_id)
     res = HttpRequests(config).get(
         f'{index_name}/_doc/{document_id}'
     )
     if "_source" in res:
-        return _clean_doc(res["_source"], doc_id=document_id, include_vectors=show_vectors)
+        return _clean_doc(res[ "_source" ], doc_id=document_id, include_vectors=show_vectors)
     else:
         return res
 
 
 def get_documents_by_ids(
-        config: Config, index_name: str, document_ids: List[str],
-        show_vectors: bool = False,
-    ):
+    config: Config, index_name: str, document_ids: List[ str ],
+    show_vectors: bool = False,
+):
     """returns documents by their IDs"""
     if not isinstance(document_ids, typing.Collection):
         raise errors.InvalidArgError("Get documents must be passed a collection of IDs!")
@@ -655,8 +661,8 @@ def get_documents_by_ids(
     ]
     if not show_vectors:
         for d in docs:
-            d["_source"] = dict()
-            d["_source"]["exclude"] = f"*{TensorField.vector_prefix}*"
+            d[ "_source" ] = dict()
+            d[ "_source" ][ "exclude" ] = f"*{TensorField.vector_prefix}*"
     res = HttpRequests(config).get(
         f'_mget/',
         body={
@@ -665,23 +671,23 @@ def get_documents_by_ids(
     )
     if "docs" in res:
         to_return = {
-            "results": []
+            "results": [ ]
         }
-        for doc in res['docs']:
-            if not doc['found']:
-                to_return['results'].append({
-                    '_id': doc['_id'],
+        for doc in res[ 'docs' ]:
+            if not doc[ 'found' ]:
+                to_return[ 'results' ].append({
+                    '_id': doc[ '_id' ],
                     TensorField.found: False})
             else:
-                to_return['results'].append(
+                to_return[ 'results' ].append(
                     {TensorField.found: True,
-                     ** _clean_doc(doc["_source"], doc_id=doc["_id"], include_vectors=show_vectors)})
+                     **_clean_doc(doc[ "_source" ], doc_id=doc[ "_id" ], include_vectors=show_vectors)})
         return to_return
     else:
         return res
 
 
-def delete_documents(config: Config, index_name: str, doc_ids: List[str], auto_refresh):
+def delete_documents(config: Config, index_name: str, doc_ids: List[ str ], auto_refresh):
     """Deletes documents """
     if not doc_ids:
         raise errors.InvalidDocumentIdError("doc_ids can't be empty!")
@@ -706,7 +712,7 @@ def delete_documents(config: Config, index_name: str, doc_ids: List[str], auto_r
         "index_name": index_name, "status": "succeeded",
         "type": "documentDeletion", "details": {
             "receivedDocumentIds": len(doc_ids),
-            "deletedDocuments": delete_res_backend["deleted"],
+            "deletedDocuments": delete_res_backend[ "deleted" ],
         },
         "duration": utils.create_duration_string(t1 - t0),
         "startedAt": utils.format_timestamp(t0),
@@ -715,15 +721,15 @@ def delete_documents(config: Config, index_name: str, doc_ids: List[str], auto_r
     return delete_res
 
 
-def refresh_index(config: Config,  index_name: str):
+def refresh_index(config: Config, index_name: str):
     return HttpRequests(config).post(path=F"{index_name}/_refresh")
 
 
 def search(config: Config, index_name: str, text: str, result_count: int = 3, highlights=True, return_doc_ids=True,
-           search_method: Union[str, SearchMethod, None] = SearchMethod.TENSOR,
-           searchable_attributes: Iterable[str] = None, verbose: int = 0, num_highlights: int = 3,
-           reranker: Union[str, Dict] = None, simplified_format: bool = True, filter: str = None,
-           attributes_to_retrieve: Optional[List[str]] = None,
+           search_method: Union[ str, SearchMethod, None ] = SearchMethod.TENSOR,
+           searchable_attributes: Iterable[ str ] = None, verbose: int = 0, num_highlights: int = 3,
+           reranker: Union[ str, Dict ] = None, simplified_format: bool = True, filter: str = None,
+           attributes_to_retrieve: Optional[ List[ str ] ] = None,
            device=None) -> Dict:
     """The root search method. Calls the specific search method
 
@@ -750,9 +756,9 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
     """
     max_docs_limit = utils.read_env_vars_and_defaults(EnvVars.MARQO_MAX_RETRIEVABLE_DOCS)
     check_upper = True if max_docs_limit is None else result_count <= int(max_docs_limit)
-    if not(check_upper and result_count >= 0):
+    if not (check_upper and result_count >= 0):
         upper_bound_explanation = ("The search result limit must be between 0 and the "
-                                  f"MARQO_MAX_RETRIEVABLE_DOCS limit of [{max_docs_limit}]. ")
+                                   f"MARQO_MAX_RETRIEVABLE_DOCS limit of [{max_docs_limit}]. ")
         above_zero_explanation = "The search result limit must be greater than or equal to 0."
         explanation = upper_bound_explanation if max_docs_limit is not None else above_zero_explanation
         raise errors.IllegalRequestedDocCount(f"{explanation} Marqo received search result limit of `{result_count}`.")
@@ -760,11 +766,11 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
     t0 = datetime.datetime.now()
 
     if searchable_attributes is not None:
-        [validation.validate_field_name(attribute) for attribute in searchable_attributes]
+        [ validation.validate_field_name(attribute) for attribute in searchable_attributes ]
     if attributes_to_retrieve is not None:
         if not isinstance(attributes_to_retrieve, (List, typing.Tuple)):
             raise errors.InvalidArgError("attributes_to_retrieve must be a sequence!")
-        [validation.validate_field_name(attribute) for attribute in attributes_to_retrieve]
+        [ validation.validate_field_name(attribute) for attribute in attributes_to_retrieve ]
     if verbose:
         print(f"determined_search_method: {search_method}, text query: {text}")
     # if we can't see the index name in cache, we request it and wait for the info
@@ -795,25 +801,25 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
 
     if reranker is not None:
         rerank.rerank_search_results(search_result=search_result, query=text,
-                    model_name=reranker, device=config.indexing_device,
-                searchable_attributes=searchable_attributes, num_highlights=1 if simplified_format else num_highlights)
+            model_name=reranker, device=config.indexing_device,
+            searchable_attributes=searchable_attributes, num_highlights=1 if simplified_format else num_highlights)
 
     time_taken = datetime.datetime.now() - t0
-    search_result["processingTimeMs"] = round(time_taken.total_seconds() * 1000)
-    search_result["query"] = text
-    search_result["limit"] = result_count
+    search_result[ "processingTimeMs" ] = round(time_taken.total_seconds() * 1000)
+    search_result[ "query" ] = text
+    search_result[ "limit" ] = result_count
 
     if not highlights:
-        for hit in search_result["hits"]:
-            del hit["_highlights"]
+        for hit in search_result[ "hits" ]:
+            del hit[ "_highlights" ]
 
     return search_result
 
 
 def _lexical_search(
-        config: Config, index_name: str, text: str, result_count: int = 3, return_doc_ids=True,
-        searchable_attributes: Sequence[str] = None, filter_string: str = None,
-        attributes_to_retrieve: Optional[List[str]] = None, expose_facets: bool = False):
+    config: Config, index_name: str, text: str, result_count: int = 3, return_doc_ids=True,
+    searchable_attributes: Sequence[ str ] = None, filter_string: str = None,
+    attributes_to_retrieve: Optional[ List[ str ] ] = None, expose_facets: bool = False):
     """
 
     Args:
@@ -861,33 +867,33 @@ def _lexical_search(
         "size": result_count,
     }
     if filter_string is not None:
-        body["query"]["bool"]["filter"] = [{
-            "query_string": {"query": filter_string}}]
+        body[ "query" ][ "bool" ][ "filter" ] = [ {
+            "query_string": {"query": filter_string}} ]
     if attributes_to_retrieve is not None:
-        body["_source"] = {"include": attributes_to_retrieve} if len(attributes_to_retrieve) > 0 else False
+        body[ "_source" ] = {"include": attributes_to_retrieve} if len(attributes_to_retrieve) > 0 else False
     if not expose_facets:
         if "_source" not in body:
-            body["_source"] = dict()
-        if body["_source"] is not False:
-            body["_source"]["exclude"] = [f"*{TensorField.vector_prefix}*"]
+            body[ "_source" ] = dict()
+        if body[ "_source" ] is not False:
+            body[ "_source" ][ "exclude" ] = [ f"*{TensorField.vector_prefix}*" ]
     search_res = HttpRequests(config).get(path=f"{index_name}/_search", body=body)
 
-    res_list = []
-    for doc in search_res['hits']['hits']:
-        just_doc = _clean_doc(doc["_source"].copy()) if "_source" in doc else dict()
+    res_list = [ ]
+    for doc in search_res[ 'hits' ][ 'hits' ]:
+        just_doc = _clean_doc(doc[ "_source" ].copy()) if "_source" in doc else dict()
         if return_doc_ids:
-            just_doc["_id"] = doc["_id"]
-            just_doc["_score"] = doc["_score"]
-        res_list.append({**just_doc, "_highlights": []})
+            just_doc[ "_id" ] = doc[ "_id" ]
+            just_doc[ "_score" ] = doc[ "_score" ]
+        res_list.append({**just_doc, "_highlights": [ ]})
     return {'hits': res_list}
 
 
 def _vector_text_search(
-        config: Config, index_name: str, text: str, result_count: int = 5, return_doc_ids=False,
-        searchable_attributes: Iterable[str] = None, number_of_highlights=3,
-        verbose=0, raise_on_searchable_attribs=False, hide_vectors=True, k=500,
-        simplified_format=True, filter_string: str = None, device=None,
-        attributes_to_retrieve: Optional[List[str]] = None):
+    config: Config, index_name: str, text: str, result_count: int = 5, return_doc_ids=False,
+    searchable_attributes: Iterable[ str ] = None, number_of_highlights=3,
+    verbose=0, raise_on_searchable_attribs=False, hide_vectors=True, k=500,
+    simplified_format=True, filter_string: str = None, device=None,
+    attributes_to_retrieve: Optional[ List[ str ] ] = None):
     """
     Args:
         config:
@@ -941,19 +947,19 @@ def _vector_text_search(
         vectorised_text = s2_inference.vectorise(
             model_name=index_info.model_name, model_properties=_get_model_properties(index_info), content=text,
             device=selected_device,
-            normalize_embeddings=index_info.index_settings['index_defaults']['normalize_embeddings'])[0]
+            normalize_embeddings=index_info.index_settings[ 'index_defaults' ][ 'normalize_embeddings' ])[ 0 ]
     except (s2_inference_errors.UnknownModelError,
             s2_inference_errors.InvalidModelPropertiesError,
             s2_inference_errors.ModelLoadError) as model_error:
         raise errors.BadRequestError(
             message=f'Problem vectorising query. Reason: {str(model_error)}',
             # link="https://marqo.pages.dev/latest/Models-Reference/dense_retrieval/"
-    )
-    except s2_inference_errors.S2InferenceError as s2e:
-        raise errors.BadRequestError(
-            message=f"Problem vectorising query. Reason: {str(s2e)}"
         )
-    body = []
+    except s2_inference_errors.S2InferenceError as s2_error:
+        raise errors.BadRequestError(
+            message=f"Problem vectorising query. Reason: {str(s2_error)}"
+        )
+    body = [ ]
 
     if searchable_attributes is None:
         vector_properties_to_search = index_info.get_vector_properties().keys()
@@ -985,7 +991,7 @@ def _vector_text_search(
                     "path": TensorField.chunks,
                     "inner_hits": {
                         "_source": {
-                            "exclude": ["*__vector*"]
+                            "exclude": [ "*__vector*" ]
                         }
                     },
                     "query": {
@@ -1001,19 +1007,21 @@ def _vector_text_search(
             }
         }
         if hide_vectors:
-            search_query["_source"] = {
-                "exclude": ["*__vector*"]
+            search_query[ "_source" ] = {
+                "exclude": [ "*__vector*" ]
             }
-            search_query["query"]["nested"]["inner_hits"]["_source"] = {
-                "exclude": ["*__vector*"]
+            search_query[ "query" ][ "nested" ][ "inner_hits" ][ "_source" ] = {
+                "exclude": [ "*__vector*" ]
             }
         if attributes_to_retrieve is not None:
-            search_query["_source"] = {"include": attributes_to_retrieve} if len(attributes_to_retrieve) > 0 else False
+            search_query[ "_source" ] = {
+                "include": attributes_to_retrieve} if len(attributes_to_retrieve) > 0 else False
         if filter_string is not None:
-            search_query["query"]["nested"]["query"]["knn"][f"{TensorField.chunks}.{vector_field}"]["filter"] = {
+            search_query[ "query" ][ "nested" ][ "query" ][ "knn" ][ f"{TensorField.chunks}.{vector_field}" ][
+                "filter" ] = {
                 "query_string": {"query": f"{contextualised_filter}"}
             }
-        body += [{"index": index_name}, search_query]
+        body += [ {"index": index_name}, search_query ]
 
     if verbose:
         print("vector search body:")
@@ -1022,8 +1030,9 @@ def _vector_text_search(
             for i, q in enumerate(readable_body):
                 if "index" in q:
                     continue
-                for vec in list(q["query"]["nested"]["query"]["knn"].keys()):
-                    readable_body[i]["query"]["nested"]["query"]["knn"][vec]["vector"] = readable_body[i]["query"]["nested"]["query"]["knn"][vec]["vector"][:5]
+                for vec in list(q[ "query" ][ "nested" ][ "query" ][ "knn" ].keys()):
+                    readable_body[ i ][ "query" ][ "nested" ][ "query" ][ "knn" ][ vec ][ "vector" ] = \
+                    readable_body[ i ][ "query" ][ "nested" ][ "query" ][ "knn" ][ vec ][ "vector" ][ :5 ]
             pprint.pprint(readable_body)
         if verbose == 2:
             pprint.pprint(body, compact=True)
@@ -1031,21 +1040,21 @@ def _vector_text_search(
     if not body:
         # empty body means that there are no vector fields associated with the index.
         # This probably means the index is emtpy
-        return {"hits": []}
+        return {"hits": [ ]}
     response = HttpRequests(config).get(path=F"{index_name}/_msearch", body=utils.dicts_to_jsonl(body))
 
     try:
-        responses = [r['hits']['hits'] for r in response["responses"]]
+        responses = [ r[ 'hits' ][ 'hits' ] for r in response[ "responses" ] ]
     except KeyError as e:
         # KeyError indicates we have received a non-successful result
         try:
-            if "index.max_result_window" in response["responses"][0]["error"]["root_cause"][0]["reason"]:
+            if "index.max_result_window" in response[ "responses" ][ 0 ][ "error" ][ "root_cause" ][ 0 ][ "reason" ]:
                 raise errors.IllegalRequestedDocCount(
                     "Marqo-OS rejected the response due to too many requested results. "
                     "Try reducing the query's limit parameter") from e
-            elif 'parse_exception' in response["responses"][0]["error"]["root_cause"][0]["reason"]:
+            elif 'parse_exception' in response[ "responses" ][ 0 ][ "error" ][ "root_cause" ][ 0 ][ "reason" ]:
                 raise errors.InvalidArgError("Syntax error, could not parse filter string") from e
-            elif contextualised_filter in response["responses"][0]["error"]["root_cause"][0]["reason"]:
+            elif contextualised_filter in response[ "responses" ][ 0 ][ "error" ][ "root_cause" ][ 0 ][ "reason" ]:
                 raise errors.InvalidArgError("Syntax error, could not parse filter string") from e
             raise e
         except (KeyError, IndexError) as e2:
@@ -1058,13 +1067,13 @@ def _vector_text_search(
         pprint.pprint(responses)
     for i, query_res in enumerate(responses):
         for doc in query_res:
-            doc_chunks = doc["inner_hits"][TensorField.chunks]["hits"]["hits"]
-            if doc["_id"] in gathered_docs:
-                gathered_docs[doc["_id"]]["doc"] = doc
-                gathered_docs[doc["_id"]]["chunks"].extend(doc_chunks)
+            doc_chunks = doc[ "inner_hits" ][ TensorField.chunks ][ "hits" ][ "hits" ]
+            if doc[ "_id" ] in gathered_docs:
+                gathered_docs[ doc[ "_id" ] ][ "doc" ] = doc
+                gathered_docs[ doc[ "_id" ] ][ "chunks" ].extend(doc_chunks)
             else:
-                gathered_docs[doc["_id"]] = {
-                    "_id": doc["_id"],
+                gathered_docs[ doc[ "_id" ] ] = {
+                    "_id": doc[ "_id" ],
                     "doc": doc,
                     "chunks": doc_chunks
                 }
@@ -1072,23 +1081,23 @@ def _vector_text_search(
     # Filter out docs with no inner hits:
 
     for doc_id in list(gathered_docs.keys()):
-        if not gathered_docs[doc_id]["chunks"]:
-            del gathered_docs[doc_id]
+        if not gathered_docs[ doc_id ][ "chunks" ]:
+            del gathered_docs[ doc_id ]
 
     # SORT THE DOCS HERE
 
     def sort_chunks(docs: dict) -> dict:
         to_be_sorted = docs.copy()
         for doc_id in list(to_be_sorted.keys()):
-            to_be_sorted[doc_id]["chunks"] = sorted(
-                to_be_sorted[doc_id]["chunks"], key=lambda x: x["_score"], reverse=True)
+            to_be_sorted[ doc_id ][ "chunks" ] = sorted(
+                to_be_sorted[ doc_id ][ "chunks" ], key=lambda x: x[ "_score" ], reverse=True)
         return to_be_sorted
 
     docs_chunks_sorted = sort_chunks(gathered_docs)
 
-    def sort_docs(docs: dict) -> List[dict]:
+    def sort_docs(docs: dict) -> List[ dict ]:
         as_list = list(docs.values())
-        return sorted(as_list,  key=lambda x: x["chunks"][0]["_score"], reverse=True)
+        return sorted(as_list, key=lambda x: x[ "chunks" ][ 0 ][ "_score" ], reverse=True)
 
     completely_sorted = sort_docs(docs_chunks_sorted)
 
@@ -1100,41 +1109,42 @@ def _vector_text_search(
             pprint.pprint(completely_sorted)
 
     # format output:
-    def format_ordered_docs_preserving(ordered_docs_w_chunks: List[dict], num_highlights: Optional[int]) -> dict:
+    def format_ordered_docs_preserving(ordered_docs_w_chunks: List[ dict ], num_highlights: Optional[ int ]) -> dict:
         """Formats docs so that it preserves the original document, unless doc_ids are returned
         Args:
             ordered_docs_w_chunks:
             num_highlights: number of highlights to return.
         Returns:
         """
-        return {'hits': [dict([
-            ('doc', _clean_doc(doc['doc']["_source"], doc_id=doc['_id'] if return_doc_ids else None)),
-            ('highlights', [{
-                    the_chunk["_source"][TensorField.field_name]: the_chunk["_source"][TensorField.field_content]
-                } for the_chunk in doc['chunks']][:num_highlights])
-        ]) for doc in ordered_docs_w_chunks][:result_count]}
+        return {'hits': [ dict([
+            ('doc', _clean_doc(doc[ 'doc' ][ "_source" ], doc_id=doc[ '_id' ] if return_doc_ids else None)),
+            ('highlights', [ {
+                the_chunk[ "_source" ][ TensorField.field_name ]: the_chunk[ "_source" ][ TensorField.field_content ]
+            } for the_chunk in doc[ 'chunks' ] ][ :num_highlights ])
+        ]) for doc in ordered_docs_w_chunks ][ :result_count ]}
 
     # format output:
-    def format_ordered_docs_simple(ordered_docs_w_chunks: List[dict]) -> dict:
+    def format_ordered_docs_simple(ordered_docs_w_chunks: List[ dict ]) -> dict:
         """Only one highlight is returned
         Args:
             ordered_docs_w_chunks:
         Returns:
         """
-        simple_results = []
+        simple_results = [ ]
 
         for d in ordered_docs_w_chunks:
-            if "_source" in d['doc']:
-                cleaned = _clean_doc(d['doc']["_source"], doc_id=d['_id'])
+            if "_source" in d[ 'doc' ]:
+                cleaned = _clean_doc(d[ 'doc' ][ "_source" ], doc_id=d[ '_id' ])
             else:
-                cleaned = _clean_doc(dict(), doc_id=d['_id'])
+                cleaned = _clean_doc(dict(), doc_id=d[ '_id' ])
 
-            cleaned["_highlights"] = {
-                d["chunks"][0]["_source"][TensorField.field_name]: d["chunks"][0]["_source"][TensorField.field_content]
+            cleaned[ "_highlights" ] = {
+                d[ "chunks" ][ 0 ][ "_source" ][ TensorField.field_name ]: d[ "chunks" ][ 0 ][ "_source" ][
+                    TensorField.field_content ]
             }
-            cleaned["_score"] = d["chunks"][0]["_score"]
+            cleaned[ "_score" ] = d[ "chunks" ][ 0 ][ "_score" ]
             simple_results.append(cleaned)
-        return {"hits": simple_results[:result_count]}
+        return {"hits": simple_results[ :result_count ]}
 
     if simplified_format:
         return format_ordered_docs_simple(ordered_docs_w_chunks=completely_sorted)
@@ -1163,13 +1173,13 @@ def check_health(config: Config):
 
     if marqo_os_health_check is not None:
         if "status" in marqo_os_health_check:
-            marqo_os_status = marqo_os_health_check['status']
+            marqo_os_status = marqo_os_health_check[ 'status' ]
         else:
             marqo_os_status = "red"
     else:
         marqo_os_status = "red"
 
-    marqo_status = marqo_status if statuses[marqo_status] >= statuses[marqo_os_status] else marqo_os_status
+    marqo_status = marqo_status if statuses[ marqo_status ] >= statuses[ marqo_os_status ] else marqo_os_status
 
     return {
         "status": marqo_status,
@@ -1182,7 +1192,7 @@ def check_health(config: Config):
 def delete_index(config: Config, index_name):
     res = HttpRequests(config).delete(path=index_name)
     if index_name in get_cache():
-        del get_cache()[index_name]
+        del get_cache()[ index_name ]
     return res
 
 
@@ -1197,8 +1207,7 @@ def get_indexes(config: Config):
     return body
 
 
-
-def _select_model_from_media_type(media_type: Union[MediaType, str]) -> Union[MlModel, str]:
+def _select_model_from_media_type(media_type: Union[ MediaType, str ]) -> Union[ MlModel, str ]:
     if media_type == MediaType.text:
         return MlModel.bert
     elif media_type == MediaType.image:
@@ -1209,9 +1218,9 @@ def _select_model_from_media_type(media_type: Union[MediaType, str]) -> Union[Ml
 
 
 def _get_model_properties(index_info):
-    index_defaults = index_info.get_index_settings()["index_defaults"]
+    index_defaults = index_info.get_index_settings()[ "index_defaults" ]
     try:
-        model_properties = index_defaults[NsField.model_properties]
+        model_properties = index_defaults[ NsField.model_properties ]
     except KeyError:
         try:
             model_properties = s2_inference.get_model_properties_from_registry(index_info.model_name)

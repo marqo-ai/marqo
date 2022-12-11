@@ -86,7 +86,8 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
         except:
             raise ModelLoadError(
                 f"Unable to load model={model_name} on device={device} with normalization={normalize_embeddings}. "
-                f"If you are trying to load a custom model, please check that the model_properties are correct "
+                f"If you are trying to load a custom model, "
+                f"please check that model_properties={validated_model_properties} is correct "
                 f"and the model has valid access permission. ")
 
 
