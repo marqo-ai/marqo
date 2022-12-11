@@ -956,7 +956,7 @@ def _vector_text_search(
                     "path": TensorField.chunks,
                     "inner_hits": {
                         "_source": {
-                            "exclude": ["*__vector*"]
+                            "include": ["__chunks.__field_content", "__chunks.__field_name"]
                         }
                     },
                     "query": {
@@ -972,11 +972,9 @@ def _vector_text_search(
             }
         }
         if hide_vectors:
+            field_names = list(index_info.get_text_properties().keys())
             search_query["_source"] = {
-                "exclude": ["*__vector*"]
-            }
-            search_query["query"]["nested"]["inner_hits"]["_source"] = {
-                "exclude": ["*__vector*"]
+                "include": ["__chunks.__field_content", "__chunks.__field_name"] + field_names
             }
         if attributes_to_retrieve is not None:
             search_query["_source"] = {"include": attributes_to_retrieve} if len(attributes_to_retrieve) > 0 else False
@@ -1003,7 +1001,11 @@ def _vector_text_search(
         # empty body means that there are no vector fields associated with the index.
         # This probably means the index is emtpy
         return {"hits": []}
+
     response = HttpRequests(config).get(path=F"{index_name}/_msearch", body=utils.dicts_to_jsonl(body))
+
+    if verbose:
+        print(f'Opensearch reported {response["took"]}ms search latency')
 
     try:
         responses = [r['hits']['hits'] for r in response["responses"]]
