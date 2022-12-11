@@ -80,7 +80,7 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
     """
     if model_cache_key not in available_models:
         try:
-            available_models[model_cache_key] = _load_model(validated_model_properties['name'],
+            available_models[model_cache_key] = _load_model(model_name,
                                                             validated_model_properties, device=device)
             logger.info(f'loaded {model_name} on device {device} with normalization={normalize_embeddings}')
         except:
@@ -280,11 +280,11 @@ def _load_model(model_name: str, model_properties: dict, device: str = get_defau
         Any: _description_
     """
     print(f"loading for: model_name={model_name} and properties={model_properties}")
-    loader = _get_model_loader(model_name, model_properties)
+    loader = _get_model_loader(model_properties['name'], model_properties)
 
     max_sequence_length = model_properties.get('tokens', get_default_seq_length())
 
-    model = loader(model_name, device=device, embedding_dim=model_properties['dimensions'],
+    model = loader(model_properties['name'], device=device, embedding_dim=model_properties['dimensions'],
                    max_seq_length=max_sequence_length)
 
     model.load()
