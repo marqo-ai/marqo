@@ -974,7 +974,7 @@ def _vector_text_search(
         if attributes_to_retrieve is not None:
             field_names = list(filter(lambda x: x in attributes_to_retrieve, field_names))
         search_query["_source"] = {
-            "include": ["__chunks.__field_content", "__chunks.__field_name"] + field_names
+            "include":  field_names
         }
 
         if filter_string is not None:
@@ -1004,7 +1004,7 @@ def _vector_text_search(
     response = HttpRequests(config).get(path=F"{index_name}/_msearch", body=utils.dicts_to_jsonl(body))
 
     if verbose:
-        print(f'Opensearch reported {response["took"]}ms search latency')
+        logger.info(f'Opensearch reported {response["took"]}ms search latency')
 
     try:
         responses = [r['hits']['hits'] for r in response["responses"]]
