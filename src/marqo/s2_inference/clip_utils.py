@@ -211,7 +211,7 @@ class CLIP:
             self.load()
 
         # starting the image loading
-        time_stamp1 = timer()
+        #time_stamp1 = timer()
 
         # default to batch encoding
         if isinstance(images, list):
@@ -223,7 +223,7 @@ class CLIP:
         self.image_input_processed = torch.stack([self.preprocess(_img).to(self.device) for _img in image_input])
 
         # end image preprocessing, start image encoding
-        #time_stamp3 = timer()
+        # time_stamp3 = timer()
 
         if self.device.startswith("cuda"):
             torch.cuda.synchronize()
