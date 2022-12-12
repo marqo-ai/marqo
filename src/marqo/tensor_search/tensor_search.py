@@ -867,7 +867,7 @@ def _lexical_search(
 def _vector_text_search(
         config: Config, index_name: str, text: str, result_count: int = 5, return_doc_ids=False,
         searchable_attributes: Iterable[str] = None, number_of_highlights=3,
-        verbose=0, raise_on_searchable_attribs=False, hide_vectors=True, k=500,
+        verbose=0, raise_on_searchable_attribs=False, k=500,
         simplified_format=True, filter_string: str = None, device=None,
         attributes_to_retrieve: Optional[List[str]] = None):
     """
@@ -883,8 +883,6 @@ def _vector_text_search(
             descending order of relevancy. Otherwise will return this number of highlights
         verbose: if 0 - nothing is printed. if 1 - data is printed without vectors, if 2 - full
             objects are printed out
-        hide_vectors: if True, vectors won't be returned from OpenSearch. This reduces the size
-            of data transfers
         attributes_to_retrieve: if set, only returns these fields
     Returns:
 
@@ -956,7 +954,7 @@ def _vector_text_search(
                     "path": TensorField.chunks,
                     "inner_hits": {
                         "_source": {
-                            "exclude": ["*__vector*"]
+                            "include": ["__chunks.__field_content", "__chunks.__field_name"]
                         }
                     },
                     "query": {
@@ -971,15 +969,11 @@ def _vector_text_search(
                 }
             }
         }
-        if hide_vectors:
-            search_query["_source"] = {
-                "exclude": ["*__vector*"]
-            }
-            search_query["query"]["nested"]["inner_hits"]["_source"] = {
-                "exclude": ["*__vector*"]
-            }
+
+        field_names = list(index_info.get_text_properties().keys())
         if attributes_to_retrieve is not None:
             search_query["_source"] = {"include": attributes_to_retrieve} if len(attributes_to_retrieve) > 0 else False
+
         if filter_string is not None:
             search_query["query"]["nested"]["query"]["knn"][f"{TensorField.chunks}.{vector_field}"]["filter"] = {
                 "query_string": {"query": f"{contextualised_filter}"}
@@ -1003,7 +997,11 @@ def _vector_text_search(
         # empty body means that there are no vector fields associated with the index.
         # This probably means the index is emtpy
         return {"hits": []}
+
     response = HttpRequests(config).get(path=F"{index_name}/_msearch", body=utils.dicts_to_jsonl(body))
+
+    if verbose:
+        logger.info(f'Opensearch reported {response["took"]}ms search latency')
 
     try:
         responses = [r['hits']['hits'] for r in response["responses"]]
