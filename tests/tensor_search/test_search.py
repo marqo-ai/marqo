@@ -227,12 +227,21 @@ class TestVectorSearch(MarqoTestCase):
             raise AssertionError
         except IllegalRequestedDocCount as e:
             pass
-        # should work with 0
+        try:
+            # should not work with 0
+            search_res = tensor_search.search(
+                config=self.config, index_name=self.index_name_1, text="Exact match hehehe",
+                searchable_attributes=["other field", "Cool Field 1"], return_doc_ids=True, result_count=0
+            )
+            raise AssertionError
+        except IllegalRequestedDocCount as e:
+            pass
+        # should work with 1:
         search_res = tensor_search.search(
             config=self.config, index_name=self.index_name_1, text="Exact match hehehe",
-            searchable_attributes=["other field", "Cool Field 1"], return_doc_ids=True, result_count=0
+            searchable_attributes=["other field", "Cool Field 1"], return_doc_ids=True, result_count=1
         )
-        assert len(search_res["hits"]) == 0
+        assert len(search_res['hits']) >= 1
 
     def test_highlights_tensor(self):
         tensor_search.add_documents(

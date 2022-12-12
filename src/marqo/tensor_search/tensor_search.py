@@ -732,8 +732,8 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
     """
     max_docs_limit = utils.read_env_vars_and_defaults(EnvVars.MARQO_MAX_RETRIEVABLE_DOCS)
     check_upper = True if max_docs_limit is None else result_count <= int(max_docs_limit)
-    if not(check_upper and result_count >= 0):
-        upper_bound_explanation = ("The search result limit must be between 0 and the "
+    if not(check_upper and result_count > 0):
+        upper_bound_explanation = ("The search result limit must be greater than 0 and less than or equal to the"
                                   f"MARQO_MAX_RETRIEVABLE_DOCS limit of [{max_docs_limit}]. ")
         above_zero_explanation = "The search result limit must be greater than or equal to 0."
         explanation = upper_bound_explanation if max_docs_limit is not None else above_zero_explanation
@@ -963,7 +963,7 @@ def _vector_text_search(
                         "knn": {
                             f"{TensorField.chunks}.{vector_field}": {
                                 "vector": vectorised_text,
-                                "k": k
+                                "k": result_count
                             }
                         }
                     },
