@@ -972,10 +972,7 @@ def _vector_text_search(
 
         field_names = list(index_info.get_text_properties().keys())
         if attributes_to_retrieve is not None:
-            field_names = list(filter(lambda x: x in attributes_to_retrieve, field_names))
-        search_query["_source"] = {
-            "include":  field_names
-        }
+            search_query["_source"] = {"include": attributes_to_retrieve} if len(attributes_to_retrieve) > 0 else False
 
         if filter_string is not None:
             search_query["query"]["nested"]["query"]["knn"][f"{TensorField.chunks}.{vector_field}"]["filter"] = {
