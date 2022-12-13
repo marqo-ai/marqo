@@ -4,9 +4,11 @@
 
 from marqo import Client
 from marqo.errors import MarqoApiError
-import torch
+import numpy as np
 import json
 import pprint
+import copy
+import math
 
 def read_json(filename: str) -> dict:
     # reads a json file
@@ -90,7 +92,7 @@ device = 'cpu'
 # here we use parallel indexing to speed up the task
 # Note: to use multiprocessing you will want at least 8GB of RAM and the maximum number 
 # of processes that can be supported will be system dependent. 
-responses = client.index(index_name).add_documents(data, device=device, processes=2, batch_size=50)
+responses = client.index(index_name).add_documents(data, device=device, processes=2, server_batch_size=50, client_batch_size=50)
 
 # optionally take a look at the responses
 #pprint.print(responses)
