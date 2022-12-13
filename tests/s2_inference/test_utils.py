@@ -1,11 +1,12 @@
 import unittest
 
 from marqo.s2_inference.s2_inference import (
-    _check_output_type, vectorise, 
-    _convert_vectorized_output, 
+    _check_output_type, vectorise,
+    _convert_vectorized_output,
     available_models,
     clear_loaded_models,
-    _create_model_cache_key
+    _create_model_cache_key,
+    get_model_properties_from_registry
     )
 
 from torch import FloatTensor, linalg, equal
@@ -19,7 +20,7 @@ class TestOutputs(unittest.TestCase):
         list_o_list = [[1,2]]
         float_tensor = FloatTensor(list_o_list)
         numpy_array = np.array(list_o_list)
-        
+
         assert not _check_output_type(float_tensor)
         assert not _check_output_type(numpy_array)
 
@@ -34,7 +35,13 @@ class TestOutputs(unittest.TestCase):
 
         for name in names:
             for device in devices:
-                assert _create_model_cache_key(name, device) == (name, device)
+                model_properties = get_model_properties_from_registry(name)
+                assert _create_model_cache_key(name, device, model_properties) == (name
+                                                                                   + model_properties.get('name', '')
+                                                                                   + str(model_properties.get('dimensions', ''))
+                                                                                   + model_properties.get('type', '')
+                                                                                   + str(model_properties.get('tokens', ''))
+                                                                                   + device)
 
     def test_clear_model_cache(self):
         # tests clearing the model cache
@@ -47,9 +54,9 @@ class TestOutputs(unittest.TestCase):
         keys = []
         for name in names:
             _ = vectorise(name, 'hello', device=device)
-            key = _create_model_cache_key(name, device)
+            key = _create_model_cache_key(name, device, get_model_properties_from_registry(name))
             keys.append(key)
-            
+
         print(sorted(set(available_models.keys())), sorted(set(keys)))
         assert sorted(set(available_models.keys())) == sorted(set(keys))
 
@@ -60,7 +67,7 @@ class TestOutputs(unittest.TestCase):
     def test_model_is_getting_cached(self):
         # test the model is cached on subsequent calls
         clear_loaded_models()
-        
+
         device = 'cpu'
         assert available_models == dict()
 
@@ -68,8 +75,8 @@ class TestOutputs(unittest.TestCase):
 
         keys = []
         for name in names:
-            
-            key = _create_model_cache_key(name, device)
+
+            key = _create_model_cache_key(name, device, get_model_properties_from_registry(name))
             assert key not in list(available_models.keys())
             _ = vectorise(name, 'hello', device=device)
             assert key in list(available_models.keys())
@@ -79,16 +86,15 @@ class TestOutputs(unittest.TestCase):
     def test_cache_is_quicker(self):
         # test the model is cached on subsequent calls
         clear_loaded_models()
-        
+
         device = 'cpu'
         assert available_models == dict()
 
-        names = ['RN50', "sentence-transformers/all-MiniLM-L6-v1", "all-MiniLM-L6-v1"]
+        names = ["RN50", "sentence-transformers/all-MiniLM-L6-v1", "all-MiniLM-L6-v1"]
 
-        keys = []
         for name in names:
-            
-            key = _create_model_cache_key(name, device)
+            model_properties = get_model_properties_from_registry(name)
+            key = _create_model_cache_key(name, device, model_properties)
             assert key not in list(available_models.keys())
             t0 = time.time()
             _ = vectorise(name, 'hello', device=device)
@@ -102,7 +108,7 @@ class TestOutputs(unittest.TestCase):
 
 
     def test_convert_output(self):
-        
+
         list_o_lists = [ [[1,2], [3,4]],
                             [[1,2]]
                         ]
@@ -113,7 +119,7 @@ class TestOutputs(unittest.TestCase):
             assert _convert_vectorized_output(list_o_list) == list_o_list
             assert _convert_vectorized_output(float_tensor) == list_o_list
             assert _convert_vectorized_output(numpy_array) == list_o_list
-            
+
     # def test_normalize(self):
     #     list_o_lists = [ [[1,2], [3,4]],
     #                         [[1,2]], (np.random.rand(100,100)-0.5).tolist()

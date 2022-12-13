@@ -14,3 +14,15 @@ class ChunkerError(S2InferenceError):
 
 class VectoriseError(S2InferenceError):
     pass
+
+
+class InvalidModelPropertiesError(S2InferenceError):
+    pass
+
+
+class ModelLoadError(S2InferenceError):
+    pass
+
+
+class UnknownModelError(S2InferenceError):
+    pass
