@@ -1,3 +1,14 @@
+# Release 0.0.10
+
+
+
+# Release 0.0.9
+## Optimisations 
+- Set k to limit to for Marqo-os search queries (https://github.com/marqo-ai/marqo/pull/219)
+- Set default kNN m value to 16  (https://github.com/marqo-ai/marqo/pull/222)
+- Reduced the amount of metadata returned from Marqo-os, on searches (https://github.com/marqo-ai/marqo/pull/218)
+
+
 # Release 0.0.8
 
 ## New features
