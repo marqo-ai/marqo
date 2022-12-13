@@ -227,6 +227,9 @@ def _load_model(model_name: str, device: str = get_default_device()) -> Any:
     model.load()
 
     return model
+def get_available_models():
+    return available_models
+
 
 # def normalize(inputs):
 
