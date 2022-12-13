@@ -45,7 +45,7 @@ from marqo.tensor_search.enums import (
 from marqo.tensor_search.enums import IndexSettingsField as NsField
 from marqo.tensor_search import utils, backend, validation, configs, parallel
 from marqo.tensor_search.formatting import _clean_doc
-from marqo.tensor_search.index_meta_cache import get_cache,get_index_info
+from marqo.tensor_search.index_meta_cache import get_cache, get_index_info
 from marqo.tensor_search import index_meta_cache
 from marqo.tensor_search.models.index_info import IndexInfo
 from marqo.tensor_search import constants
@@ -64,12 +64,13 @@ from marqo.s2_inference import errors as s2_inference_errors
 import threading
 
 from marqo.tensor_search.tensor_search_logging import get_logger
+
 logger = get_logger(__name__)
 
 
 def create_vector_index(
-        config: Config, index_name: str, media_type: Union[str, MediaType] = MediaType.default,
-        refresh_interval: str = "1s", index_settings = None):
+    config: Config, index_name: str, media_type: Union[str, MediaType] = MediaType.default,
+    refresh_interval: str = "1s", index_settings=None):
     """
     Args:
         media_type: 'text'|'image'
@@ -77,6 +78,7 @@ def create_vector_index(
     validation.validate_index_name(index_name)
 
     if index_settings is not None:
+        _check_model_name(index_settings)
         the_index_settings = _autofill_index_settings(index_settings=index_settings)
     else:
         the_index_settings = configs.get_default_index_settings()
@@ -86,7 +88,7 @@ def create_vector_index(
             "index": {
                 "knn": True,
                 "knn.algo_param.ef_search": 100,
-                "refresh_interval":  refresh_interval
+                "refresh_interval": refresh_interval
             },
             "number_of_shards": the_index_settings[NsField.number_of_shards],
 
@@ -136,6 +138,15 @@ def create_vector_index(
         index_settings=the_index_settings
     )
     return response
+
+
+def _check_model_name(index_settings):
+    """Checks if model_properties is given then model_name is given as well
+    """
+    model_name = index_settings[NsField.index_defaults].get(NsField.model)
+    model_properties = index_settings[NsField.index_defaults].get(NsField.model_properties)
+    if model_properties is not None and model_name is None:
+        raise s2_inference_errors.UnknownModelError(f"No model name found for model_properties={model_properties}")
 
 
 def _marqo_field_limit_to_os_limit(marqo_index_field_limit: int) -> int:
@@ -266,43 +277,43 @@ def add_documents_orchestrator(
 def _batch_request(config: Config, index_name: str, dataset: List[dict],
                    batch_size: int = 100, verbose: bool = True, device=None,
                    update_mode: str = 'replace', non_tensor_fields=None) -> List[Dict[str, Any]]:
-        """Batch by the number of documents"""
-        if non_tensor_fields is None:
-            non_tensor_fields = []
+    """Batch by the number of documents"""
+    if non_tensor_fields is None:
+        non_tensor_fields = []
 
-        logger.info(f"starting batch ingestion in sizes of {batch_size}")
+    logger.info(f"starting batch ingestion in sizes of {batch_size}")
 
-        deeper = ((doc, i, batch_size) for i, doc in enumerate(dataset))
+    deeper = ((doc, i, batch_size) for i, doc in enumerate(dataset))
 
-        def batch_requests(gathered, doc_tuple):
-            doc, i, the_batch_size = doc_tuple
-            if i % the_batch_size == 0:
-                gathered.append([doc, ])
-            else:
-                gathered[-1].append(doc)
-            return gathered
+    def batch_requests(gathered, doc_tuple):
+        doc, i, the_batch_size = doc_tuple
+        if i % the_batch_size == 0:
+            gathered.append([doc, ])
+        else:
+            gathered[-1].append(doc)
+        return gathered
 
-        batched = functools.reduce(lambda x, y: batch_requests(x, y), deeper, [])
+    batched = functools.reduce(lambda x, y: batch_requests(x, y), deeper, [])
 
-        def verbosely_add_docs(i, docs):
-            t0 = datetime.datetime.now()
-            res = add_documents(
-                config=config, index_name=index_name,
-                docs=docs, auto_refresh=False, device=device,
-                update_mode=update_mode, non_tensor_fields=non_tensor_fields
-            )
-            total_batch_time = datetime.datetime.now() - t0
-            num_docs = len(docs)
+    def verbosely_add_docs(i, docs):
+        t0 = datetime.datetime.now()
+        res = add_documents(
+            config=config, index_name=index_name,
+            docs=docs, auto_refresh=False, device=device,
+            update_mode=update_mode, non_tensor_fields=non_tensor_fields
+        )
+        total_batch_time = datetime.datetime.now() - t0
+        num_docs = len(docs)
 
-            logger.info(f"    batch {i}: ingested {num_docs} docs. Time taken: {total_batch_time}. "
-                        f"Average timer per doc {total_batch_time/num_docs}")
-            if verbose:
-                logger.info(f"        results from indexing batch {i}: {res}")
-            return res
+        logger.info(f"    batch {i}: ingested {num_docs} docs. Time taken: {total_batch_time}. "
+                    f"Average timer per doc {total_batch_time / num_docs}")
+        if verbose:
+            logger.info(f"        results from indexing batch {i}: {res}")
+        return res
 
-        results = [verbosely_add_docs(i, docs) for i, docs in enumerate(batched)]
-        logger.info('completed batch ingestion.')
-        return results
+    results = [verbosely_add_docs(i, docs) for i, docs in enumerate(batched)]
+    logger.info('completed batch ingestion.')
+    return results
 
 
 def _infer_opensearch_data_type(
@@ -419,7 +430,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
             # TODO put this into a function to determine routing
             if isinstance(field_content, (str, Image.Image)):
-                
+
                 # TODO: better/consistent handling of a no-op for processing (but still vectorize)
 
                 # 1. check if urls should be downloaded -> "treat_pointers_and_urls_as_images":True
@@ -430,15 +441,19 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                 # 6. if chunking -> then add the extra chunker
 
                 if isinstance(field_content, str) and not _is_image(field_content):
-                    
-                    split_by = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][NsField.split_method]
-                    split_length = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][NsField.split_length]
-                    split_overlap = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][NsField.split_overlap]
+
+                    split_by = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][
+                        NsField.split_method]
+                    split_length = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][
+                        NsField.split_length]
+                    split_overlap = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][
+                        NsField.split_overlap]
                     content_chunks = text_processor.split_text(field_content, split_by=split_by, split_length=split_length, split_overlap=split_overlap)
                     text_chunks = content_chunks
                 else:
                     # TODO put the logic for getting field parameters into a function and add per field options
-                    image_method = index_info.index_settings[NsField.index_defaults][NsField.image_preprocessing][NsField.patch_method]
+                    image_method = index_info.index_settings[NsField.index_defaults][NsField.image_preprocessing][
+                        NsField.patch_method]
                     # the chunk_image contains the no-op logic as of now - method = None will be a no-op
                     try:
                         # in the future, if we have different chunking methods, make sure we catch possible
@@ -453,15 +468,25 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                                  'code': image_err.code})
                         )
                         break
-                
-                normalize_embeddings = index_info.index_settings[NsField.index_defaults][NsField.normalize_embeddings]
-                infer_if_image = index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]
+
+                normalize_embeddings = index_info.index_settings[NsField.index_defaults][
+                    NsField.normalize_embeddings]
+                infer_if_image = index_info.index_settings[NsField.index_defaults][
+                    NsField.treat_urls_and_pointers_as_images]
+
                 try:
                     # in the future, if we have different underlying vectorising methods, make sure we catch possible
                     # errors of different types generated here, too.
-                    vector_chunks = s2_inference.vectorise(model_name=index_info.model_name, content=content_chunks,
-                                                           device=selected_device, normalize_embeddings=normalize_embeddings,
-                                                           infer=infer_if_image)
+                    vector_chunks = s2_inference.vectorise(model_name=index_info.model_name, model_properties=_get_model_properties(index_info), content=content_chunks,
+                        device=selected_device, normalize_embeddings=normalize_embeddings,
+                        infer=infer_if_image)
+                except (s2_inference_errors.UnknownModelError,
+                        s2_inference_errors.InvalidModelPropertiesError,
+                        s2_inference_errors.ModelLoadError) as model_error:
+                    raise errors.BadRequestError(
+                        message=f'Problem vectorising query. Reason: {str(model_error)}',
+                        link="https://marqo.pages.dev/latest/Models-Reference/dense_retrieval/"
+                    )
                 except s2_inference_errors.S2InferenceError:
                     document_is_valid = False
                     image_err = errors.InvalidArgError(message=f'Could not process given image: {field_content}')
@@ -493,7 +518,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                     })
         if document_is_valid:
             new_fields = new_fields.union(new_fields_from_doc)
-            if update_mode =='replace':
+            if update_mode == 'replace':
                 copied[TensorField.chunks] = chunks
                 bulk_parent_dicts.append(indexing_instructions)
                 bulk_parent_dicts.append(copied)
@@ -560,7 +585,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
         # the HttpRequest wrapper handles error logic
         update_mapping_response = backend.add_customer_field_properties(
             config=config, index_name=index_name, customer_field_names=new_fields,
-            model_properties=s2_inference.get_model_properties(model_name=index_info.model_name))
+            model_properties=_get_model_properties(index_info))
 
         index_parent_response = HttpRequests(config).post(
             path="_bulk", body=utils.dicts_to_jsonl(bulk_parent_dicts))
@@ -601,7 +626,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
         result_dict["items"] = new_items
         return result_dict
 
-    return translate_add_doc_response(response=index_parent_response, time_diff= t1 - t0)
+    return translate_add_doc_response(response=index_parent_response, time_diff=t1 - t0)
 
 
 def get_document_by_id(
@@ -657,7 +682,7 @@ def get_documents_by_ids(
             else:
                 to_return['results'].append(
                     {TensorField.found: True,
-                     ** _clean_doc(doc["_source"], doc_id=doc["_id"], include_vectors=show_vectors)})
+                     **_clean_doc(doc["_source"], doc_id=doc["_id"], include_vectors=show_vectors)})
         return to_return
     else:
         return res
@@ -697,7 +722,7 @@ def delete_documents(config: Config, index_name: str, doc_ids: List[str], auto_r
     return delete_res
 
 
-def refresh_index(config: Config,  index_name: str):
+def refresh_index(config: Config, index_name: str):
     return HttpRequests(config).post(path=F"{index_name}/_refresh")
 
 
@@ -732,10 +757,11 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
     """
     max_docs_limit = utils.read_env_vars_and_defaults(EnvVars.MARQO_MAX_RETRIEVABLE_DOCS)
     check_upper = True if max_docs_limit is None else result_count <= int(max_docs_limit)
-    if not(check_upper and result_count >= 0):
-        upper_bound_explanation = ("The search result limit must be between 0 and the "
+    if not(check_upper and result_count > 0):
+        upper_bound_explanation = ("The search result limit must be greater than 0 and less than or equal to the"
                                   f"MARQO_MAX_RETRIEVABLE_DOCS limit of [{max_docs_limit}]. ")
-        above_zero_explanation = "The search result limit must be greater than or equal to 0."
+
+        above_zero_explanation = "The search result limit must be greater than 0."
         explanation = upper_bound_explanation if max_docs_limit is not None else above_zero_explanation
         raise errors.IllegalRequestedDocCount(f"{explanation} Marqo received search result limit of `{result_count}`.")
 
@@ -776,15 +802,15 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
         raise errors.InvalidArgError(f"Search called with unknown search method: {search_method}")
 
     logger.info("reranking using {}".format(reranker))
-    
+
     if reranker is not None:
         logger.info("reranking using {}".format(reranker))
         if searchable_attributes is None:
             raise errors.InvalidArgError(f"searchable_attributes cannot be None when re-ranking. Specify which fields to search and rerank over.")
         try:
-            rerank.rerank_search_results(search_result=search_result, query=text, 
-                        model_name=reranker, device=config.indexing_device if device is None else device, 
-                    searchable_attributes=searchable_attributes, num_highlights=1 if simplified_format else num_highlights)
+            rerank.rerank_search_results(search_result=search_result, query=text,
+                model_name=reranker, device=config.indexing_device if device is None else device,
+                searchable_attributes=searchable_attributes, num_highlights=1 if simplified_format else num_highlights)
         except Exception as e:
             raise errors.BadRequestError(f"reranking failure due to {str(e)}")
 
@@ -891,8 +917,6 @@ def _vector_text_search(
             descending order of relevancy. Otherwise will return this number of highlights
         verbose: if 0 - nothing is printed. if 1 - data is printed without vectors, if 2 - full
             objects are printed out
-        hide_vectors: if True, vectors won't be returned from OpenSearch. This reduces the size
-            of data transfers
         attributes_to_retrieve: if set, only returns these fields
     Returns:
 
@@ -927,11 +951,22 @@ def _vector_text_search(
     selected_device = config.indexing_device if device is None else device
 
     # TODO average over vectorized inputs with weights
-    vectorised_text = s2_inference.vectorise(
-        model_name=index_info.model_name, content=text, 
-        device=selected_device,
-        normalize_embeddings=index_info.index_settings['index_defaults']['normalize_embeddings'])[0]
-
+    try:
+        vectorised_text = s2_inference.vectorise(
+            model_name=index_info.model_name, model_properties=_get_model_properties(index_info), content=text,
+            device=selected_device,
+            normalize_embeddings=index_info.index_settings['index_defaults']['normalize_embeddings'])[0]
+    except (s2_inference_errors.UnknownModelError,
+            s2_inference_errors.InvalidModelPropertiesError,
+            s2_inference_errors.ModelLoadError) as model_error:
+        raise errors.BadRequestError(
+            message=f'Problem vectorising query. Reason: {str(model_error)}',
+            # link="https://marqo.pages.dev/latest/Models-Reference/dense_retrieval/"
+        )
+    except s2_inference_errors.S2InferenceError as s2_error:
+        raise errors.BadRequestError(
+            message=f"Problem vectorising query. Reason: {str(s2_error)}"
+        )
     body = []
 
     if searchable_attributes is None:
@@ -964,14 +999,14 @@ def _vector_text_search(
                     "path": TensorField.chunks,
                     "inner_hits": {
                         "_source": {
-                            "exclude": ["*__vector*"]
+                            "include": ["__chunks.__field_content", "__chunks.__field_name"]
                         }
                     },
                     "query": {
                         "knn": {
                             f"{TensorField.chunks}.{vector_field}": {
                                 "vector": vectorised_text,
-                                "k": k
+                                "k": result_count
                             }
                         }
                     },
@@ -979,17 +1014,14 @@ def _vector_text_search(
                 }
             }
         }
-        if hide_vectors:
-            search_query["_source"] = {
-                "exclude": ["*__vector*"]
-            }
-            search_query["query"]["nested"]["inner_hits"]["_source"] = {
-                "exclude": ["*__vector*"]
-            }
+
+        field_names = list(index_info.get_text_properties().keys())
         if attributes_to_retrieve is not None:
             search_query["_source"] = {"include": attributes_to_retrieve} if len(attributes_to_retrieve) > 0 else False
+
         if filter_string is not None:
-            search_query["query"]["nested"]["query"]["knn"][f"{TensorField.chunks}.{vector_field}"]["filter"] = {
+            search_query["query"]["nested"]["query"]["knn"][f"{TensorField.chunks}.{vector_field}"][
+                "filter"] = {
                 "query_string": {"query": f"{contextualised_filter}"}
             }
         body += [{"index": index_name}, search_query]
@@ -1002,7 +1034,8 @@ def _vector_text_search(
                 if "index" in q:
                     continue
                 for vec in list(q["query"]["nested"]["query"]["knn"].keys()):
-                    readable_body[i]["query"]["nested"]["query"]["knn"][vec]["vector"] = readable_body[i]["query"]["nested"]["query"]["knn"][vec]["vector"][:5]
+                    readable_body[i]["query"]["nested"]["query"]["knn"][vec]["vector"] = \
+                        readable_body[i]["query"]["nested"]["query"]["knn"][vec]["vector"][:5]
             pprint.pprint(readable_body)
         if verbose == 2:
             pprint.pprint(body, compact=True)
@@ -1011,7 +1044,11 @@ def _vector_text_search(
         # empty body means that there are no vector fields associated with the index.
         # This probably means the index is emtpy
         return {"hits": []}
+
     response = HttpRequests(config).get(path=F"{index_name}/_msearch", body=utils.dicts_to_jsonl(body))
+
+    if verbose:
+        logger.info(f'Opensearch reported {response["took"]}ms search latency')
 
     try:
         responses = [r['hits']['hits'] for r in response["responses"]]
@@ -1067,7 +1104,7 @@ def _vector_text_search(
 
     def sort_docs(docs: dict) -> List[dict]:
         as_list = list(docs.values())
-        return sorted(as_list,  key=lambda x: x["chunks"][0]["_score"], reverse=True)
+        return sorted(as_list, key=lambda x: x["chunks"][0]["_score"], reverse=True)
 
     completely_sorted = sort_docs(docs_chunks_sorted)
 
@@ -1089,8 +1126,8 @@ def _vector_text_search(
         return {'hits': [dict([
             ('doc', _clean_doc(doc['doc']["_source"], doc_id=doc['_id'] if return_doc_ids else None)),
             ('highlights', [{
-                    the_chunk["_source"][TensorField.field_name]: the_chunk["_source"][TensorField.field_content]
-                } for the_chunk in doc['chunks']][:num_highlights])
+                the_chunk["_source"][TensorField.field_name]: the_chunk["_source"][TensorField.field_content]
+            } for the_chunk in doc['chunks']][:num_highlights])
         ]) for doc in ordered_docs_w_chunks][:result_count]}
 
     # format output:
@@ -1109,7 +1146,8 @@ def _vector_text_search(
                 cleaned = _clean_doc(dict(), doc_id=d['_id'])
 
             cleaned["_highlights"] = {
-                d["chunks"][0]["_source"][TensorField.field_name]: d["chunks"][0]["_source"][TensorField.field_content]
+                d["chunks"][0]["_source"][TensorField.field_name]: d["chunks"][0]["_source"][
+                    TensorField.field_content]
             }
             cleaned["_score"] = d["chunks"][0]["_score"]
             simple_results.append(cleaned)
@@ -1176,7 +1214,6 @@ def get_indexes(config: Config):
     return body
 
 
-
 def _select_model_from_media_type(media_type: Union[MediaType, str]) -> Union[MlModel, str]:
     if media_type == MediaType.text:
         return MlModel.bert
@@ -1187,4 +1224,17 @@ def _select_model_from_media_type(media_type: Union[MediaType, str]) -> Union[Ml
                          "Received unknown media type: {}".format(media_type))
 
 
+def _get_model_properties(index_info):
+    index_defaults = index_info.get_index_settings()["index_defaults"]
+    try:
+        model_properties = index_defaults[NsField.model_properties]
+    except KeyError:
+        try:
+            model_properties = s2_inference.get_model_properties_from_registry(index_info.model_name)
+        except s2_inference_errors.UnknownModelError:
+            raise s2_inference_errors.UnknownModelError(
+                f"Could not find model properties for model={index_info.model_name}. "
+                f"Please check that the model name is correct. "
+                f"Please provide model_properties if the model is a custom model and is not supported by default")
 
+    return model_properties

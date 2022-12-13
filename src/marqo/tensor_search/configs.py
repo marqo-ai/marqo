@@ -9,6 +9,7 @@ def get_default_index_settings():
         NsFields.index_defaults: {
             NsFields.treat_urls_and_pointers_as_images: False, # only used for models that have text and vision encoders
             NsFields.model: ns_enums.MlModel.bert,
+#            NsFields.model_properties: dict(),
             NsFields.normalize_embeddings: True,
             NsFields.text_preprocessing: {
                 NsFields.split_length: 2,
@@ -32,6 +33,7 @@ def default_env_vars() -> dict:
     return {
         EnvVars.MARQO_MAX_INDEX_FIELDS: None,
         EnvVars.MARQO_MAX_DOC_BYTES: 100000,
-        EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: None,
+        EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: 10000,
         EnvVars.MARQO_MODELS_TO_PRELOAD: ['hf/all_datasets_v4_MiniLM-L6', "ViT-L/14"]
     }
+

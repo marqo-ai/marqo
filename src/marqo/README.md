@@ -198,3 +198,11 @@ To check your driver and maximum CUDA version supported, type the following into
 nvidia-smi
 ```
 Pytorch comes with its own bundled CUDA which allows many different CUDA versions to be used. Follow the [getting started](https://pytorch.org/get-started/locally/) to see how to install different versions of pytorch and CUDA.
+
+## Extracting `openapi.json` (swagger API spec)
+To get just the json, run this command (if Marqo is running locally)
+```
+curl http://localhost:8882/openapi.json
+```
+To get the human readable spec, visit `http://localhost:8882/docs`
+
