@@ -75,7 +75,7 @@ def chunk_image(image: Union[str, ImageType], device: str,
     
     # get the paramters from the method 'url'
     method, params = _process_patch_method(method)
-    logger.info(f"found method={method} and params={params}")
+    logger.debug(f"found method={method} and params={params}")
 
     # format the paramters to pass through
     hn = int(params.get('hn', HN))
@@ -233,7 +233,7 @@ class PatchifyModel:
             if len(self.scores) == self.n_prefilter:
                 self.scores = [bb for ind,bb in enumerate(self.scores) if ind in self.inds]
             self.n_postfilter = len(self.boxes_xyxy)
-            logger.info(f"filtered {self.n_prefilter} boxes to {self.n_postfilter}")
+            logger.debug(f"filtered {self.n_prefilter} boxes to {self.n_postfilter}")
 
     def _replace_small_bb(self):
         """replaces boxes that are smaller than some area with a minimum sized box centered
@@ -250,7 +250,7 @@ class PatchifyModel:
         """
         if self.nms:
             if len(self.boxes_xyxy) > 1:
-                logger.info(f"doing nms for {len(self.boxes_xyxy)} {self.n_postfilter} boxes...")
+                logger.debug(f"doing nms for {len(self.boxes_xyxy)} {self.n_postfilter} boxes...")
                 self.scores_pt = torch.tensor(self.scores, dtype=torch.float32)
                 
                 self.inds = torchvision.ops.nms(torch.tensor(self.boxes_xyxy, dtype=torch.float32), 
