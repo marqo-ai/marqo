@@ -185,8 +185,8 @@ def _autofill_index_settings(index_settings: dict):
     #     copied_settings[NsField.index_defaults] = default_settings[NsField.index_defaults]
 
     if NsField.treat_urls_and_pointers_as_images in copied_settings[NsField.index_defaults] and \
-        copied_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images] is True \
-        and copied_settings[NsField.index_defaults][NsField.model] is None:
+            copied_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images] is True\
+            and copied_settings[NsField.index_defaults][NsField.model] is None:
         copied_settings[NsField.index_defaults][NsField.model] = MlModel.clip
 
     # make sure the first level of keys are present, if not add all of those defaults
@@ -203,14 +203,14 @@ def _autofill_index_settings(index_settings: dict):
     # text preprocessing sub fields - fills any missing sub-dict fields if some of the first level are present
     for key in list(default_settings[NsField.index_defaults][NsField.text_preprocessing]):
         if key not in copied_settings[NsField.index_defaults][NsField.text_preprocessing] or \
-            copied_settings[NsField.index_defaults][NsField.text_preprocessing][key] is None:
+                copied_settings[NsField.index_defaults][NsField.text_preprocessing][key] is None:
             copied_settings[NsField.index_defaults][NsField.text_preprocessing][key] \
                 = default_settings[NsField.index_defaults][NsField.text_preprocessing][key]
 
     # image preprocessing sub fields - fills any missing sub-dict fields
     for key in list(default_settings[NsField.index_defaults][NsField.image_preprocessing]):
         if key not in copied_settings[NsField.index_defaults][NsField.image_preprocessing] or \
-            copied_settings[NsField.index_defaults][NsField.image_preprocessing][key] is None:
+                copied_settings[NsField.index_defaults][NsField.image_preprocessing][key] is None:
             copied_settings[NsField.index_defaults][NsField.image_preprocessing][key] \
                 = default_settings[NsField.index_defaults][NsField.image_preprocessing][key]
 
@@ -233,10 +233,11 @@ def _check_and_create_index_if_not_exist(config: Config, index_name: str):
 
 
 def add_documents_orchestrator(
-    config: Config, index_name: str, docs: List[dict],
-    auto_refresh: bool, batch_size: int = 0, processes: int = 1,
-    non_tensor_fields=None,
-    device=None, update_mode: str = 'replace'):
+        config: Config, index_name: str, docs: List[dict],
+        auto_refresh: bool, batch_size: int = 0, processes: int = 1,
+        non_tensor_fields=None,
+        device=None, update_mode: str = 'replace'):
+
     if non_tensor_fields is None:
         non_tensor_fields = []
 
@@ -270,7 +271,7 @@ def add_documents_orchestrator(
             raise errors.InvalidArgError("Batch size can't be less than 1!")
         logger.info(f"batch_size={batch_size} and processes={processes} - batching using a single process")
         return _batch_request(config=config, index_name=index_name, dataset=docs, device=device,
-            batch_size=batch_size, verbose=False, non_tensor_fields=non_tensor_fields)
+                              batch_size=batch_size, verbose=False, non_tensor_fields=non_tensor_fields)
 
 
 def _batch_request(config: Config, index_name: str, dataset: List[dict],
@@ -316,7 +317,7 @@ def _batch_request(config: Config, index_name: str, dataset: List[dict],
 
 
 def _infer_opensearch_data_type(
-    sample_field_content: typing.Any) -> Union[OpenSearchDataType, None]:
+        sample_field_content: typing.Any) -> Union[OpenSearchDataType, None]:
     """
     Raises:
         Exception if sample_field_content list or dict
@@ -629,7 +630,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
 
 def get_document_by_id(
-    config: Config, index_name: str, document_id: str, show_vectors: bool = False):
+        config: Config, index_name: str, document_id: str, show_vectors: bool = False):
     """returns document by its ID"""
     validation.validate_id(document_id)
     res = HttpRequests(config).get(
@@ -642,9 +643,9 @@ def get_document_by_id(
 
 
 def get_documents_by_ids(
-    config: Config, index_name: str, document_ids: List[str],
-    show_vectors: bool = False,
-):
+        config: Config, index_name: str, document_ids: List[str],
+        show_vectors: bool = False,
+    ):
     """returns documents by their IDs"""
     if not isinstance(document_ids, typing.Collection):
         raise errors.InvalidArgError("Get documents must be passed a collection of IDs!")
@@ -759,7 +760,7 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
     if not(check_upper and result_count > 0):
         upper_bound_explanation = ("The search result limit must be greater than 0 and less than or equal to the"
                                   f"MARQO_MAX_RETRIEVABLE_DOCS limit of [{max_docs_limit}]. ")
-                                  
+
         above_zero_explanation = "The search result limit must be greater than 0."
         explanation = upper_bound_explanation if max_docs_limit is not None else above_zero_explanation
         raise errors.IllegalRequestedDocCount(f"{explanation} Marqo received search result limit of `{result_count}`.")
@@ -800,10 +801,18 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
     else:
         raise errors.InvalidArgError(f"Search called with unknown search method: {search_method}")
 
+    logger.info("reranking using {}".format(reranker))
+
     if reranker is not None:
-        rerank.rerank_search_results(search_result=search_result, query=text,
-            model_name=reranker, device=config.indexing_device,
-            searchable_attributes=searchable_attributes, num_highlights=1 if simplified_format else num_highlights)
+        logger.info("reranking using {}".format(reranker))
+        if searchable_attributes is None:
+            raise errors.InvalidArgError(f"searchable_attributes cannot be None when re-ranking. Specify which fields to search and rerank over.")
+        try:
+            rerank.rerank_search_results(search_result=search_result, query=text,
+                model_name=reranker, device=config.indexing_device if device is None else device,
+                searchable_attributes=searchable_attributes, num_highlights=1 if simplified_format else num_highlights)
+        except Exception as e:
+            raise errors.BadRequestError(f"reranking failure due to {str(e)}")
 
     time_taken = datetime.datetime.now() - t0
     search_result["processingTimeMs"] = round(time_taken.total_seconds() * 1000)
@@ -818,9 +827,9 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
 
 
 def _lexical_search(
-    config: Config, index_name: str, text: str, result_count: int = 3, return_doc_ids=True,
-    searchable_attributes: Sequence[str] = None, filter_string: str = None,
-    attributes_to_retrieve: Optional[List[str]] = None, expose_facets: bool = False):
+        config: Config, index_name: str, text: str, result_count: int = 3, return_doc_ids=True,
+        searchable_attributes: Sequence[str] = None, filter_string: str = None,
+        attributes_to_retrieve: Optional[List[str]] = None, expose_facets: bool = False):
     """
 
     Args:
@@ -890,11 +899,11 @@ def _lexical_search(
 
 
 def _vector_text_search(
-    config: Config, index_name: str, text: str, result_count: int = 5, return_doc_ids=False,
-    searchable_attributes: Iterable[str] = None, number_of_highlights=3,
-    verbose=0, raise_on_searchable_attribs=False, k=500,
-    simplified_format=True, filter_string: str = None, device=None,
-    attributes_to_retrieve: Optional[List[str]] = None):
+        config: Config, index_name: str, text: str, result_count: int = 5, return_doc_ids=False,
+        searchable_attributes: Iterable[str] = None, number_of_highlights=3,
+        verbose=0, raise_on_searchable_attribs=False, hide_vectors=True, k=500,
+        simplified_format=True, filter_string: str = None, device=None,
+        attributes_to_retrieve: Optional[List[str]] = None):
     """
     Args:
         config:

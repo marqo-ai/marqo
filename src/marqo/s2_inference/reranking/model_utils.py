@@ -228,6 +228,7 @@ class HFClassificationOnnx:
         """
         self.inputs = self._prepare_inputs(inputs)
         # couldn't find aaaaany documentation on passing tokenizer arguments through the pipeline
+        # leaving these here for reference
         # https://github.com/huggingface/transformers/blob/main/src/transformers/pipelines/__init__.py#L750
         # https://stackoverflow.com/questions/67849833/how-to-truncate-input-in-the-huggingface-pipeline
         self.predictions = self.onnx_classifier(self.inputs, **self.tokenizer_kwargs)
@@ -307,12 +308,16 @@ def load_owl_vit(model_name: str, device: str = 'cpu') -> Dict:
     Returns:
         Dict: _description_
     """
-    if ('owl', device) in available_models:
-        model, processor = available_models[('owl', device)] 
+
+    model_cache_key = (model_name, device)
+
+    if model_cache_key in available_models:
+        logger.info(f"loading {model_cache_key} from cache...")
+        model, processor = available_models[model_cache_key] 
     else:
         processor = OwlViTProcessor.from_pretrained(model_name)
-        model = OwlViTForObjectDetection.from_pretrained(model_name)
-        available_models[('owl', device)] = model, processor
+        model = OwlViTForObjectDetection.from_pretrained(model_name).to(device)
+        available_models[model_cache_key] = model, processor
 
     model.eval()
 
@@ -346,22 +351,23 @@ def _predict_owl(model, processed_inputs, post_process_function, size):
     """
     with torch.no_grad():
         outputs = model(**processed_inputs)
-
+        # there is a bug in the hf code https://github.com/huggingface/transformers/blob/v4.24.0/src/transformers/models/owlvit/feature_extraction_owlvit.py#L140
+        outputs.logits = outputs.logits.to('cpu')
+        outputs.pred_boxes = outputs.pred_boxes.to('cpu')
         # Target image sizes (height, width) to rescale box predictions [batch_size, 2]
         target_sizes = torch.Tensor([size[::-1]])
         # Convert outputs (bounding boxes and class logits) to COCO API
         results = post_process_function(outputs=outputs, target_sizes=target_sizes)
-
         return results
 
-def process_owl_results(results: Dict) -> List:
-    """_summary_
+def process_owl_results(results: List) -> List:
+    """wrapper for processing a list of results from owl-vit
 
     Args:
-        results (_type_): _description_
+        results (_type_): the results that come from owl inference
 
     Returns:
-        _type_: _description_
+        _type_: processed owl results, boxes, scores and a string ientifier
     """
     rezs = []
     for result in results:
@@ -370,7 +376,15 @@ def process_owl_results(results: Dict) -> List:
     return rezs
 
 def _process_owl_result(result: List[Dict], identifier: str) -> Tuple[List, List, List]:
-    # process indiviudal result
+    """post-process the owl-vit results
+
+    Args:
+        result (List[Dict]): the output of owl inference
+        identifier (str): a string that is used to id the results
+
+    Returns:
+        Tuple[List, List, List]: _description_
+    """
     boxes, scores, _ = result[0]["boxes"], result[0]["scores"], result[0]["labels"]
  
     boxes_round = []

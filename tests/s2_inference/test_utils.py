@@ -1,8 +1,8 @@
 import unittest
 
 from marqo.s2_inference.s2_inference import (
-    _check_output_type, vectorise,
-    _convert_vectorized_output,
+    _check_output_type, vectorise, 
+    _convert_vectorized_output, 
     available_models,
     clear_loaded_models,
     _create_model_cache_key,
@@ -36,12 +36,16 @@ class TestOutputs(unittest.TestCase):
         for name in names:
             for device in devices:
                 model_properties = get_model_properties_from_registry(name)
-                assert _create_model_cache_key(name, device, model_properties) == (name
-                                                                                   + model_properties.get('name', '')
-                                                                                   + str(model_properties.get('dimensions', ''))
-                                                                                   + model_properties.get('type', '')
-                                                                                   + str(model_properties.get('tokens', ''))
-                                                                                   + device)
+                assert (
+                            _create_model_cache_key(name, device, model_properties)
+                            == (
+                               name
+                               + model_properties.get('name', '')
+                               + str(model_properties.get('dimensions', ''))
+                               + model_properties.get('type', '')
+                               + str(model_properties.get('tokens', ''))
+                               + device)
+                )
 
     def test_clear_model_cache(self):
         # tests clearing the model cache
@@ -106,7 +110,6 @@ class TestOutputs(unittest.TestCase):
 
         clear_loaded_models()
 
-
     def test_convert_output(self):
 
         list_o_lists = [ [[1,2], [3,4]],
@@ -119,32 +122,4 @@ class TestOutputs(unittest.TestCase):
             assert _convert_vectorized_output(list_o_list) == list_o_list
             assert _convert_vectorized_output(float_tensor) == list_o_list
             assert _convert_vectorized_output(numpy_array) == list_o_list
-
-    # def test_normalize(self):
-    #     list_o_lists = [ [[1,2], [3,4]],
-    #                         [[1,2]], (np.random.rand(100,100)-0.5).tolist()
-    #                     ]
-    #     eps = 1e-6
-
-    #     for list_o_list in list_o_lists:
-    #         float_tensor = FloatTensor(list_o_list)
-    #         numpy_array = np.array(list_o_list)
-
-    #         normed_list = normalize_2d(list_o_list)
-    #         normed_ft = normalize_2d(float_tensor)
-    #         normed_np = normalize_2d(numpy_array)
-
-    #         assert FloatTensor(normed_list).dim() == 2
-    #         assert normed_ft.dim() == 2
-    #         assert FloatTensor(normed_np).dim() == 2
-
-    #         norm_normed_list = linalg.vector_norm(FloatTensor(normed_np), dim=1, ord=2)
-    #         norm_normed_ft = linalg.vector_norm(FloatTensor(normed_ft), dim=1, ord=2)
-    #         norm_normed_np = linalg.vector_norm(FloatTensor(normed_np), dim=1, ord=2)
-
-    #         assert max(abs(norm_normed_ft - norm_normed_list)) < eps
-    #         assert max(abs(norm_normed_ft - norm_normed_np)) < eps
-
-    #         assert abs(min(norm_normed_list) - 1) < eps and abs(max(norm_normed_list) - 1) < eps
-    #         assert abs(min(norm_normed_ft) - 1) < eps and abs(max(norm_normed_ft) - 1) < eps
-    #         assert abs(min(norm_normed_np) - 1) < eps and abs(max(norm_normed_np) - 1) < eps
+            

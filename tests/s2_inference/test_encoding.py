@@ -19,6 +19,9 @@ class TestEncoding(unittest.TestCase):
 
         pass
 
+    def tearDown(self) -> None:
+        clear_loaded_models()
+
     def test_vectorize(self):
 
         names = ["all-MiniLM-L6-v1", "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6",

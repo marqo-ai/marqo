@@ -1,300 +1,142 @@
-import copy
+from functools import partial
+
 import PIL
-from marqo.s2_inference.errors import ChunkerError
 import numpy as np
 import torch
-from torchvision.models.detection import FasterRCNN_MobileNet_V3_Large_FPN_Weights, fasterrcnn_mobilenet_v3_large_fpn
-from torchvision.models.detection import fasterrcnn_resnet50_fpn_v2, FasterRCNN_ResNet50_FPN_V2_Weights
-from torchvision import transforms
-from torchvision.models.detection import FCOS_ResNet50_FPN_Weights
 import torchvision
 
 from marqo.s2_inference.s2_inference import available_models
 from marqo.s2_inference.s2_inference import get_logger
-from marqo.s2_inference.types import Dict, List, Union, ImageType, Tuple, FloatTensor, ndarray
-from marqo.s2_inference.clip_utils import format_and_load_CLIP_image, load_image_from_path
+from marqo.s2_inference.types import Dict, List, Union, ImageType, Tuple, ndarray, Literal
+from marqo.s2_inference.clip_utils import format_and_load_CLIP_image
+from marqo.s2_inference.errors import ChunkerError
 
-logger = get_logger('image_chunks')
+from marqo.s2_inference.processing.DINO_utils import _load_DINO_model,attention_to_bboxs,DINO_inference
+from marqo.s2_inference.processing.pytorch_utils import load_pytorch
+from marqo.s2_inference.processing.yolox_utils import (
+   _process_yolox,
+    _infer_yolox, 
+    load_yolox_onnx,
+    get_default_yolox_model,
+    _download_yolox
+)
 
-def get_default_rcnn_params() -> Dict:
-    """sets the default params for a faster-rcnn in pytorch
+from marqo.s2_inference.processing.image_utils import (
+    load_rcnn_image, 
+    replace_small_boxes,
+    _keep_topk,
+    rescale_box,
+    clip_boxes,
+    _PIL_to_opencv, 
+    str2bool,
+    get_default_size,
+    _process_patch_method,
+    patchify_image,
+    filter_boxes,
+    calc_area,
+    generate_boxes
+)
 
-    Returns:
-        Dict: _description_
-    """
-    return {'box_score_thresh':0.0001, 
-            'box_nms_thresh':0.01, 
-            'rpn_pre_nms_top_n_test':200, 
-            'box_detections_per_img':100,
-            'rpn_post_nms_top_n_test':100, 
-            'min_size':320,
-    }
-
-def get_default_size() -> Tuple:
-    """this sets the default image size used for inference for the chunker
-
-    Returns:
-        Tuple: _description_
-    """
-    return (240,240)
-
-def load_pytorch_rcnn():
-    """loads the pytorch faster rcnn model
-
-    Returns:
-        _type_: _description_
-    """
-    weights = FasterRCNN_ResNet50_FPN_V2_Weights.DEFAULT
-    model = fasterrcnn_resnet50_fpn_v2(weights=weights, 
-                         **get_default_rcnn_params()
-                        )
-    # required for detector models otherwise they require targets for inference
-    model.eval()
-
-    # preprocessor lives in the 'weights'
-    preprocess = weights.transforms()
-    
-    return model, preprocess
-
-def load_pytorch_fcos():
-    """this loads the pytorch fcos model
-
-    Returns:
-        _type_: _description_
-    """
-    weights = FCOS_ResNet50_FPN_Weights.DEFAULT
-
-    model = torchvision.models.detection.fcos_resnet50_fpn(weights=weights,
-                        **get_default_rcnn_params())
-    model.eval()
-
-    preprocess = weights.transforms()
-    
-    return model, preprocess
+logger = get_logger(__name__)
 
 
-def load_rcnn_image(image_name: str, size: Tuple = (320,320)) -> Tuple[ImageType, FloatTensor, Tuple[int, int]]:
-    """this is the loading and processing for the input
+def chunk_image(image: Union[str, ImageType], device: str, 
+                        method: Literal[ 'simple', 'overlap',  'frcnn', 'marqo-yolo', 'yolox', 'dino-v1', 'dino-v2'],
+                        size=get_default_size()) -> Tuple[List[ImageType], ndarray]:
+    """_summary_
+    wrapper function to do the chunking and return the patches and their bounding boxes
+    in the original coordinates system
 
     Args:
-        image_name (str): _description_
-        size (Tuple, optional): _description_.
+        image (Union[str, ImageType]): image to process
+        device (str): device to load models onto
+        method (str, optional): the method to use. Defaults to 'simple'.
+        size (_type_, optional): size the image should be loaded in as. Defaults to get_default_size().
+
+    Raises:
+        TypeError: _description_
+        ValueError: _description_
+        ChunkerError: Raises ChunkerError, if the chunker can't work for some reason
 
     Returns:
-        Tuple[ImageType, FloatTensor, Tuple[int, int]]: _description_
+        Tuple[List[ImageType], ndarray]: list of PIL images and the corresponding bounding boxes
     """
+
+    HN = 3
+    WN = 3
+
+    if method in [None, 'none', '', "None", ' ']:
+        if isinstance(image, str):
+            return [image],[image]      
+        elif isinstance(image, ImageType):
+            return [image], [(0, 0, image.size[0], image.size[1])]
+        else:
+            raise TypeError(f'only pointers to an image or a PIL image are allowed. received {type(image)}')
     
-    if isinstance(image_name, ImageType):
-        image = image_name 
-    elif isinstance(image_name, str):
-        image = load_image_from_path(image_name)
+    # get the paramters from the method 'url'
+    method, params = _process_patch_method(method)
+    logger.debug(f"found method={method} and params={params}")
+
+    # format the paramters to pass through
+    hn = int(params.get('hn', HN))
+    wn = int(params.get('wn', WN))
+    nms = str2bool(params.get('nms', 'True'))
+    filter_bb = str2bool(params.get('filter_bb', 'True'))
+
+    if method == 'simple':
+        patch = PatchifySimple(size=size, hn=hn, wn=wn)
+
+    elif method == 'overlap':
+        patch = PatchifySimple(size=size, hn=hn, wn=wn, 
+        overlap=True)
+    
+    elif method in ['fastercnn', 'frcnn']:
+        patch = PatchifyPytorch(device=device, size=size, nms=nms, filter_bb=filter_bb)
+
+    elif method in ['marqo-yolo', 'yolox']:
+        patch = PatchifyYolox(device=device, size=size)
+    
+    elif method in ['dino-v1', 'dino-v2', 'dino/v1', 'dino/v2']:
+        if 'v1' in method:
+            patch = PatchifyViT(device=device, filter_bb=True, size=size,
+                        attention_method='abs', nms=True, replace_small=True)
+        else:
+            patch = PatchifyViT(device=device, filter_bb=True, size=size,
+                        attention_method='pos', nms=True, replace_small=True)
     else:
-        raise TypeError(f"received {type(image_name)} but expected a string or PIL image")
+        raise ValueError(f"unexpected image chunking type. found {method}")
+    try:
+        patch.infer(image)
+        patch.process()
+    except PIL.UnidentifiedImageError as e:
+        raise ChunkerError from e
 
-    original_size = image.size
-
-    image = image.convert('RGB').resize(size)
-    
-    image_pt = transforms.ToTensor()(image)
-    return image, image_pt,original_size
-
-
-def calc_area(bboxes: Union[List[List], FloatTensor, ndarray], size: Union[None, Tuple[int, int]] = None) -> List[float]:
-    """calculates the fractional area of a rectangle given 4 numbers (2points)
-    (x1, y1, x2, y2) and the original size
-
-    Args:
-        bboxes (Union[List[List], FloatTensor, ndarray]): _description_
-        size (Tuple[int, int]): _description_
-
-    Returns:
-        List[Float]: _description_
-    """
-
-    if size is None:
-        A = 1.0
-    else:
-        A = size[0]*size[1]*1.0
-    areas = [(bb[2]-bb[0])*(bb[3]-bb[1])/A for bb in bboxes]
-    return areas
-
-
-
-
-def distance_matrix(v: Union[ndarray, FloatTensor], vectors: Union[ndarray, FloatTensor]) -> List[float]:
-    """calculates the distances between a vector v and a array of vectors vectors
-
-    Args:
-        v (Union[ndarray, FloatTensor]): _description_
-        vectors (Union[ndarray, FloatTensor]): _description_
-
-    Returns:
-        List[Float]: _description_
-    """
-    # TODO vectorize
-    return [_mse(v, u) for u in vectors]
-
-def get_centers(vectors: Union[ndarray, FloatTensor]) -> ndarray:
-    """calculates the centers of rectangles given the 4-tuple (x1,y1,x2,y2)
-
-    Args:
-        vectors (Union[ndarray, FloatTensor]): _description_
-
-    Returns:
-        ndarray: _description_
-    """
-    x_c = (vectors[:,2] - vectors[:,0])/2 + vectors[:,0]
-    y_c = (vectors[:,3] - vectors[:,1])/2 + vectors[:,1]
-    
-    return np.stack([x_c, y_c], axis=-1)
-
-def _mse(a: Union[FloatTensor, ndarray], b: Union[FloatTensor, ndarray]) -> float:
-    """mean squared error of two vectors
-
-    Args:
-        a (Union[FloatTensor, ndarray]): _description_
-        b (Union[FloatTensor, ndarray]): _description_
-
-    Returns:
-        Float: _description_
-    """
-    return np.sum(np.abs(a - b)**2)
-
-def greedy_select(vectors: Union[FloatTensor, ndarray]) -> Tuple[List[int], List[float]]:
-    """greedily selects the farthest point from the centroid of all selected points
-
-    Args:
-        vectors (Union[FloatTensor, ndarray]): _description_
-
-    Returns:
-        Tuple[List[int], List[Float]]: _description_
-    """
-    vectors_orig = copy.deepcopy(vectors)
-    vectors = copy.deepcopy(vectors)
-    # selecte a vector
-    out_inds = []
-    largest_distances = []
-    # we need the indices of our original vectors
-    inds = list(range(len(vectors)))
-    # we need a starting vector, could also be selected other ways
-    start_ind = inds[0]
-    # this is our ordered indices that we use to get the keep order
-    out_inds.append(start_ind)
-    # we need the start vector, this will be updated with an average
-    v = vectors[start_ind]
-    while len(out_inds) != len(inds): # could also terminate early
-
-        # get the distance to all
-        distances = distance_matrix(v, vectors)
-        # the next is found by taking the furthest away from v
-        next_ind = inds[np.argmax(distances)]
-        # we add it to the list
-        out_inds.append(next_ind)
-        # now get the next reference ind
-        v = np.mean(vectors_orig[out_inds][:3], axis=0)
-        # now set all the seen ones to the mean so the are not selected
-        vectors[out_inds] = v
-
-        largest_distances.append(distances[next_ind])
-    return out_inds, largest_distances
-
-def filter_boxes(bboxes: Union[FloatTensor, ndarray], max_aspect_ratio: int = 4, min_area: int = 40*40) -> List[int]:
-    """filters a list of bounding boxes given as the 4-tuple (x1, y1, x2, y2)
-    by area and aspect ratio
-
-    Args:
-        bboxes (Union[FloatTensor, ndarray]): _description_
-        max_aspect_ratio (int, optional): _description_. Defaults to 4.
-        min_area (int, optional): _description_. Defaults to 40*40.
-
-    Returns:
-        List[ind]: _description_
-    """
-    inds = []
-    for ind,bb in enumerate(bboxes):
-        w, h = (bb[2] - bb[0]), (bb[3] - bb[1])
-        area = w*h
-        aspect = max(w,h)/min(w,h)
-        if area > min_area and aspect < max_aspect_ratio:
-            inds.append(ind)
-    
-    return inds
-
-
-def rescale_box(box: Union[List[float], ndarray, FloatTensor], from_size: Tuple, to_size: Tuple) -> Tuple:
-    """rescales a bounding box between two different image sizes
-
-    Args:
-        box (Union[List[float], ndarray, FloatTensor]): _description_
-        from_size (Tuple): _description_
-        to_size (Tuple): _description_
-
-    Returns:
-        Tuple: _description_
-    """
-    Fy = to_size[1]/from_size[1]
-    Fx = to_size[0]/from_size[0]
-
-    x1, y1, x2, y2 = box
-
-    x1_n = x1*Fx
-    x2_n = x2*Fx
-
-    y1_n = y1*Fy
-    y2_n = y2*Fy
-
-    return (x1_n, y1_n, x2_n, y2_n)
-
-
-# TODO generate boxes with overlap - take the bottom corners as centers
-def generate_boxes(image_size: Tuple[int, int], hn: int, wn: int) -> List[Tuple]:
-    """does a simple bounding box generation based on the desired number in the 
-    horizontal and vertical directions
-
-    Args:
-        image_size (Tuple[int, int]): _description_
-        hn (int): _description_
-        wn (int): _description_
-
-    Returns:
-        List[Tuple]: _description_
-    """
-    img_width, img_height = image_size
-
-    height = img_height // hn
-
-    width = img_width // wn
-
-    bboxes = []
-    for i in range(0,img_height, height):
-        for j in range(0,img_width, width):
-            p1 = j+width
-            p2 = i+height
-            box = (j, i, p1, p2)
-            if p1 > img_width or p2 > img_height:
-                continue
-            bboxes.append(box)
-
-    return bboxes
-
+    return patch.patches,patch.bboxes_orig
 
 
 class PatchifySimple:
-    """class to do the patching
+    """class to do the patching. this one creates non-overlapping boixes and chunks the image
     """
-    def __init__(self, size=(512, 512), hn=3, wn=3, **kwargs):
+    def __init__(self, size: Tuple = (512, 512), hn: int = 3, wn: int = 3, overlap: bool = False, **kwargs):
+        """_summary_
 
+        Args:
+            size (Tuple, optional): size the image is resied to. Defaults to (512, 512).
+            hn (int, optional): number of boxes in the horizontal. Defaults to 3.
+            wn (int, optional): number of boxes in the vertical. Defaults to 3.
+            overlap (bool, optional): should they also have overlapping boxes? Defaults to False.
+        """
         self.size = size
         self.hn = hn
         self.wn = wn
+        self.overlap = overlap
 
-
-    def infer(self, image):
+    def infer(self, image: Union[str, ImageType]):
 
         self.image = format_and_load_CLIP_image(image)
         self.original_size = self.image.size
         self.image_resized = self.image.resize(self.size)
-        self.bboxes_simple = generate_boxes(self.size, self.hn, self.wn)
+        self.bboxes_simple = generate_boxes(self.size, self.hn, self.wn, overlap=self.overlap)
 
     def process(self):
         
@@ -306,143 +148,282 @@ class PatchifySimple:
         self.bboxes_orig = [rescale_box(bb, self.size, self.original_size) for bb in self.bboxes]
 
 
-class PatchifyPytorch:
-    """class to do the patching
+class PatchifyModel:
+    """class to do the patching. this is the base class for model based chunking
     """
-    def __init__(self, device='cpu', size=(240, 240), nms=True, filter_bb=True):
+    def __init__(self, device: str = 'cpu', size: Tuple = (224, 224), min_area: float = 60*60, 
+                nms: bool = True, replace_small: bool = True, top_k: int = 10, 
+                filter_bb: bool = True, min_area_replace: float = 60*60, **kwargs):
+        """_summary_
 
+        Args:
+            device (str, optional): the device to run the model on. Defaults to 'cpu'.
+            size (Tuple, optional): the final image size to go to the model. Defaults to (224, 224).
+            min_area (float, optional): the min area (pixels) that a box must meet to be kept. 
+                areas lower than this are removed. Defaults to 60*60.
+            nms (bool, optional): perform nms or not. Defaults to True.
+            replace_small (bool, optional): boxes smaller than min_area_replace are replaced with
+                        boxes centered on the same position but larger size. Defaults to True.
+            top_k (int, optional): keep this many boxes after all processin (max). Defaults to 10.
+            filter_bb (bool, optional): perform filtering on the proposed boxes. Defaults to True.
+            min_area_replace (float, optional): boxes with areas smaller than this are replaced with larger ones. Defaults to 60*60.
+        """
+        self.scores = []
+
+        # this is the resized size 
         self.size = size
+        self.device = device
 
-        model_type = ('faster_rcnn', device)
+        self.min_area = min_area
+        self.min_area_replace = min_area_replace
+        self.nms = nms
+        self.replace_small = replace_small
+        self.top_k = top_k
+        self.filter_bb = filter_bb
+        self.new_size = (100,100)
+        # consider changins
+        self.iou_thresh = 0.6
+        self.kwargs = kwargs
+        self.n_postfilter = None
+
+        # this one happens at the first stage before processing the bboxes
+        self.top_k_scores = 100
+
+        self._get_model_specific_parameters()
+        self._load_and_cache_model()
+
+    def _get_model_specific_parameters(self):
+        # fill in with specifics
+        self.model_name = None
+        self.model_load_function = lambda x:x
+        self.allowed_model_types = ()
+
+    def _load_and_cache_model(self):
+        model_type = (self.model_name, self.device)
 
         if model_type not in available_models:
             logger.info(f"loading model {model_type}")
-            if model_type[0] == 'faster_rcnn':
-                func = load_pytorch_rcnn
-            elif model_type[0] == 'mobilenet':
-                func = load_pretrained_mobilenet320
+            if model_type[0] in self.allowed_model_types:
+                func = self.model_load_function
             else:
                 raise TypeError(f"wrong model for {model_type}")
-            self.model, self.preprocess = func()
+
+            self.model, self.preprocess = func(self.model_name, self.device)
 
             available_models[model_type] = (self.model, self.preprocess)
         else:
             self.model, self.preprocess = available_models[model_type]
 
-        self.device = device
-        self.model.to(self.device)
-        self.nms = nms
-        self.filter_bb = filter_bb
+    def _load_image(self, image):
+        self.image, self.image_pt, self.original_size = load_rcnn_image(image, size=self.size)
 
     def infer(self, image):
+        self._load_image(image)
+        # input is image
+        pass
+        # output are unprocessed bounding boxes        
 
-        self.image, self.image_pt, self.original_size = load_rcnn_image(image, size=self.size)
-        self.batch = [self.preprocess(self.image_pt.to(self.device))]
-        with torch.no_grad():
-            self.results = self.model(self.batch)[0]
-        
-    def process(self):
-        self.areas = torch.tensor(calc_area(self.results['boxes'], self.size))
-        self.bboxes_pt = self.results['boxes'].detach().cpu()
-        
+    def _filter_bb(self):
+        """filters bounding boxes based on size and aspect ratio
+        """
         if self.filter_bb:
-            inds = filter_boxes(self.bboxes_pt)
-            self.bboxes_pt = self.bboxes_pt.clone().detach()[inds]
-            self.areas = self.areas[inds]
+            self.n_prefilter = len(self.boxes_xyxy)
+            self.inds = filter_boxes(self.boxes_xyxy, min_area = self.min_area)
+            self.boxes_xyxy = [bb for ind,bb in enumerate(self.boxes_xyxy) if ind in self.inds]
+            if len(self.scores) == self.n_prefilter:
+                self.scores = [bb for ind,bb in enumerate(self.scores) if ind in self.inds]
+            self.n_postfilter = len(self.boxes_xyxy)
+            logger.debug(f"filtered {self.n_prefilter} boxes to {self.n_postfilter}")
+
+    def _replace_small_bb(self):
+        """replaces boxes that are smaller than some area with a minimum sized box centered
+        on the old one. if the box is out of bounds it is clipped to the image boundries
+        """
+        if self.replace_small:
+            if len(self.boxes_xyxy):
+                self.boxes_xyxy = replace_small_boxes(self.boxes_xyxy, min_area=self.min_area_replace, 
+                                new_size=self.new_size)
+                self.boxes_xyxy = clip_boxes(self.boxes_xyxy, 0, 0, self.size[0], self.size[1])
+
+    def _nms_bb(self):
+        """performs class agnostic nms over the bounding boxes
+        """
         if self.nms:
-            self.inds = torchvision.ops.nms(self.bboxes_pt, 1 - self.areas, 0.6)
-            self.bboxes_pt = self.bboxes_pt.clone().detach()[self.inds]
+            if len(self.boxes_xyxy) > 1:
+                logger.debug(f"doing nms for {len(self.boxes_xyxy)} {self.n_postfilter} boxes...")
+                self.scores_pt = torch.tensor(self.scores, dtype=torch.float32)
+                
+                self.inds = torchvision.ops.nms(torch.tensor(self.boxes_xyxy, dtype=torch.float32), 
+                                                                    self.scores_pt.squeeze(), self.iou_thresh)
+                
+                self.boxes_xyxy =  [self.boxes_xyxy[ind] for ind in self.inds]
+                self.scores =  [self.scores[ind] for ind in self.inds]
+
+    def _keep_top_k_sorted(self):
+        """sort the boxes based on score and keep top k
+        """
+        if len(self.scores) > self.top_k_scores:
+            self.inds = np.argsort(np.array(self.scores).squeeze())[::-1][:self.top_k_scores]
+            self.boxes_xyxy = [self.boxes_xyxy[ind] for ind in self.inds]
+            self.scores = [self.scores[ind] for ind in self.inds]
+
+    def _keep_top_k(self):
+        if self.top_k is not None and self.top_k > len(self.boxes_xyxy):
+            self.boxes_xyxy = _keep_topk(self.boxes_xyxy, k=self.top_k)
+
+    def process(self):
+
+        # v1
+        # self._replace_small_bb()
+        # self._filter_bb()
+        # self._nms_bb()
+        # self._keep_top_k()
+
+        self._filter_bb()
+        self._replace_small_bb()
+        self._nms_bb()
+        self._keep_top_k()
+
         # we add the original unchanged so that it is always in the index
         # the bb of the original also provides the size which is required for later processing
-        self.bboxes = [(0,0,self.size[0],self.size[1])] + self.bboxes_pt.numpy().astype(int).tolist()
+        self.bboxes = [(0,0,self.size[0],self.size[1])] + self.boxes_xyxy
+        
         self.patches = patchify_image(self.image, self.bboxes)
 
         self.bboxes_orig = [rescale_box(bb, self.size, self.original_size) for bb in self.bboxes]
 
-def patchify_image(image: ImageType, bboxes: Union[List[float], FloatTensor, ndarray]) -> List[ImageType]:
-    """given a list of 4-tuple rectangles (x1, y1, x2, y2) return a list of 
-    cropped images
-    See PIL documentation for coord system
 
-    Args:
-        image (ImageType): _description_
-        bboxes (Union[List[float], FloatTensor, ndarray]): _description_
-
-    Returns:
-        List[ImageType]: _description_
+class PatchifyViT(PatchifyModel):
+    """class to do the patching for an attention based model
     """
-    return [image.crop(bb) for bb in bboxes]
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        
+    def _get_model_specific_parameters(self):
+     
+        # fill in with specifics
+        self.model_name = 'vit_small'
+        self.patch_size = 16
+        self.attention_method = self.kwargs.get('attention_method', 'pos')
 
-def chunk_image(image: Union[str, ImageType], device: str, method: str = 'simple') -> Tuple[List[ImageType], ndarray]:
-    """wrapper function to do the chunking and return the patches and their bounding boxes
-    in the original coordinates system
+        self.model_load_function = partial(_load_DINO_model, patch_size=self.patch_size)
+        self.allowed_model_types = ('vit_small', 'vit_base')
 
-    Args:
-        image (Union[str, ImageType]): _description_
-        device (str): _description_
+    def infer(self, image):
+        self._load_image(image)
 
-    Returns:
-        Tuple[List[ImageType], ndarray]: _description_
+        self.attentions = DINO_inference(self.model, self.preprocess, self.image, 
+                            self.patch_size, device=self.device)
 
-    Raises ChunkerError, if the chunker can't work for some reason
-    """
+        self.attentions_processed = self._process_attention(self.attentions, method=self.attention_method)
+        
+        self.boxes_xyxy = []
+        for attention in self.attentions_processed:
+            self.boxes_xyxy += attention_to_bboxs(attention)
 
-    if method in [None, 'none', '', "None", ' ']:
-        if isinstance(image, str):
-            return [image],[image]      
-        elif isinstance(image, ImageType):
-            return [image], [(0, 0, image.size[0], image.size[1])]
+        self._calc_scores_bb()
+        self._keep_top_k_sorted()
+
+    def _calc_scores_bb(self):
+        """we have no scores for the boxes so we go off area
+        """
+        if len(self.boxes_xyxy) > 0:        
+            self.scores = calc_area(self.boxes_xyxy, self.size)
+        
+    @staticmethod
+    def _process_attention(attentions: ndarray, method: Literal['abs', 'pos']) -> List[ndarray]:
+        """processes a N x grey-scale attention maps 
+
+        Args:
+            attentions (ndarray):
+            method (str, optional):  Defaults to "abs".
+
+        Raises:
+            TypeError: _description_
+
+        Returns:
+            List[ndarray]: _description_
+        """
+        if method.startswith('abs'):
+            return np.abs(attentions).mean(0)[np.newaxis, ...]
+
+        elif method.startswith('pos'):
+            attentions_copy = attentions[:]
+            attentions_copy[attentions<0] = 0
+            return attentions_copy
+
         else:
-            raise TypeError(f'only pointers to an image or a PIL image are allowed. received {type(image)}')
-    if method == 'simple':
-        patch = PatchifySimple(size=(512, 512), hn=3, wn=3)
-    elif method in ['fastercnn', 'frcnn']:
-        patch = PatchifyPytorch(device=device, size=get_default_size())
-    else:
-        raise ValueError(f"unexpected image chunking type. found {method}")
-    try:
-        patch.infer(image)
-        patch.process()
-    except PIL.UnidentifiedImageError as e:
-        raise ChunkerError from e
-    return patch.patches,patch.bboxes_orig
+            raise TypeError(f"unknown method of {method}")
 
 
-def load_pretrained_mobilenet():
-    """"
-    loads marqo trained model
+class PatchifyPytorch(PatchifyModel):
+    """class to do the patching for a pytorch based object detector
     """
-    model = fasterrcnn_mobilenet_v3_large_fpn(device='cpu', num_classes=1204,
-    box_score_thresh=0.0001, box_nms_thresh=0.01, 
-                            rpn_pre_nms_top_n_test=200, 
-                            box_detections_per_img=100,
-                            rpn_post_nms_top_n_test=100, min_size=320)
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        
+        # keep this many based on initial scoring before doing nms and other processing
+        self.top_k_scores = 100
 
-    checkpoint_file = 'awesome_mode.pth'
-    checkpoint = torch.load(checkpoint_file, map_location="cpu")
-    weights = FasterRCNN_MobileNet_V3_Large_FPN_Weights.DEFAULT
-    transform = weights.transforms()
-    model.load_state_dict(checkpoint['model'])
-    model.eval()
-    return model, transform
+    def _get_model_specific_parameters(self):
+     
+        # fill in with specifics
+        self.model_name = 'faster_rcnn'
 
-def load_pretrained_mobilenet320():
-    """"
-    loads marqo trained model
+        self.model_load_function = load_pytorch
+        
+        self.allowed_model_types = (self.model_name)
+        self.input_shape = (384, 384)
+        self.inds = []
+        self.iou_thresh = 0.6
+
+    def infer(self, image):
+        self._load_image(image)
+        self.batch = [self.preprocess(self.image_pt.to(self.device))]
+        with torch.no_grad():
+            self.results = self.model(self.batch)[0]
+
+        self.boxes_xyxy = self.results['boxes'].detach().cpu().numpy()
+        self.scores = self.results['scores'].detach().cpu().numpy()
+
+        if isinstance(self.scores, (np.ndarray, np.generic)):
+            self.scores = self.scores.tolist()
+
+        self._keep_top_k_sorted()
+    
+
+class PatchifyYolox(PatchifyModel):
+    """class to do the patching for a onnx yolox model
     """
-    model = fasterrcnn_mobilenet_v3_large_fpn(device='cpu', num_classes=1204,
-    box_score_thresh=0.0001, box_nms_thresh=0.01, 
-                            rpn_pre_nms_top_n_test=200, 
-                            box_detections_per_img=100,
-                            rpn_post_nms_top_n_test=100, min_size=320)
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        
+        self.top_k_scores = 100
 
-    checkpoint_file = 'model_17.pth'
-    checkpoint = torch.load(checkpoint_file, map_location="cpu")
-    weights = FasterRCNN_MobileNet_V3_Large_FPN_Weights.DEFAULT
-    transform = weights.transforms()
-    model.load_state_dict(checkpoint['model'])
-    model.eval()
-    return model, transform
+    def _get_model_specific_parameters(self):
+     
+        # fill in with specifics
+        self.yolox_default = get_default_yolox_model()
+        self.model_name = _download_yolox(**self.yolox_default)
+       
+        self.model_load_function = load_yolox_onnx
+        self.allowed_model_types = (self.model_name)
+        self.input_shape = (384, 384)
+        self.inds = []
+        self.iou_thresh = 0.6
 
-# TODO add YOLOX https://github.com/Megvii-BaseDetection/YOLOX
-# TODO add onnx support https://pytorch.org/vision/0.12/generated/torchvision.models.detection.fasterrcnn_resnet50_fpn.html
+    def infer(self, image):
+        self._load_image(image)
+
+        # make cv2 format
+        self.image_cv = _PIL_to_opencv(self.image)
+        
+        self.results, self.ratio = _infer_yolox(session=self.model, 
+                            preprocess=self.preprocess, opencv_image=self.image_cv, 
+                            input_shape=self.input_shape)
+
+        self.boxes_xyxy, self.scores =  _process_yolox(output=self.results, ratio=self.ratio, size=self.input_shape)
+        if isinstance(self.scores, (np.ndarray, np.generic)):
+            self.scores = self.scores.tolist()
+        
+        self._keep_top_k_sorted()
