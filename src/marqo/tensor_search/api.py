@@ -212,7 +212,7 @@ def check_health(marqo_config: config.Config = Depends(generate_config)):
 def get_indexes(marqo_config: config.Config = Depends(generate_config)):
     return tensor_search.get_indexes(config=marqo_config)
 
-@app.get("/get_loaded_models")
+@app.get("/models")
 def get_loaded_models():
     return tensor_search.get_available_models()
 
