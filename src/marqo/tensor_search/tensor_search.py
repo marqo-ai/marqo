@@ -1180,4 +1180,10 @@ def _select_model_from_media_type(media_type: Union[MediaType, str]) -> Union[Ml
 
 
 def get_loaded_models():
-    return s2_inference.get_available_models()
+    res = s2_inference.get_available_models()
+
+    body = {
+        'results' : res
+    }
+
+    return body
