@@ -1182,6 +1182,8 @@ def _select_model_from_media_type(media_type: Union[MediaType, str]) -> Union[Ml
 def get_loaded_models():
     res = s2_inference.get_available_models()
     body = {
-        'results' : res
+        'results' : [
+            {"model_name": ix} for ix in res
+        ]
     }
     return body

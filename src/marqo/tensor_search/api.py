@@ -214,8 +214,7 @@ def get_indexes(marqo_config: config.Config = Depends(generate_config)):
 
 @app.get("/models")
 def get_loaded_models():
-    return {"message": "model test",
-            "version": version.get_version()}
+    return tensor_search.get_loaded_models()
 
 # try these curl commands:
 
