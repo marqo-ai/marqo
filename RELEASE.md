@@ -1,3 +1,16 @@
+# Release 0.0.9
+## Optimisations 
+- Set k to limit to for Marqo-os search queries (https://github.com/marqo-ai/marqo/pull/219)
+- Reduced the amount of metadata returned from Marqo-os, on searches (https://github.com/marqo-ai/marqo/pull/218)
+
+## Non-breaking data model changes
+- Set default kNN m value to 16 (https://github.com/marqo-ai/marqo/pull/222)
+
+## Bug fixes
+- Better error messages when downloading an image fails (https://github.com/marqo-ai/marqo/pull/198)
+- Bug where filtering wouldn't work on fields with spaces (https://github.com/marqo-ai/marqo/pull/213), resolving https://github.com/marqo-ai/marqo/issues/115
+
+
 # Release 0.0.8
 
 ## New features
