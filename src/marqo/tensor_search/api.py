@@ -13,7 +13,6 @@ from marqo.tensor_search.web import api_validation, api_utils
 from marqo.tensor_search import utils
 from marqo.tensor_search.on_start_script import on_start
 from marqo import version
-from marqo.s2_inference.s2_inference import get_available_models
 
 def replace_host_localhosts(OPENSEARCH_IS_INTERNAL: str, OS_URL: str):
     """Replaces a host's localhost URL with one that can be referenced from
@@ -215,7 +214,7 @@ def get_indexes(marqo_config: config.Config = Depends(generate_config)):
 
 @app.get("/get_loaded_models")
 def get_loaded_models():
-    return get_available_models()
+    return tensor_search.get_available_models()
 
 # try these curl commands:
 

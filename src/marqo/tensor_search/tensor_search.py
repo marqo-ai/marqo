@@ -55,6 +55,7 @@ from marqo.s2_inference.clip_utils import _is_image
 from marqo.s2_inference.reranking import rerank
 from marqo.s2_inference import s2_inference
 
+
 # We depend on _httprequests.py for now, but this may be replaced in the future, as
 # _httprequests.py is designed for the client
 from marqo._httprequests import HttpRequests
@@ -1178,3 +1179,5 @@ def _select_model_from_media_type(media_type: Union[MediaType, str]) -> Union[Ml
 
 
 
+def get_loaded_models():
+    return s2_inference.get_available_models()
