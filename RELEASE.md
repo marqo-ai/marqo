@@ -1,3 +1,17 @@
+# Release 0.0.10
+
+## New features 
+- Generic model support (https://github.com/marqo-ai/marqo/pull/179). Create an index with your favourite SBERT-type models from HuggingFace! Read about usage [here](https://marqo.pages.dev/0.0.10/Models-Reference/dense_retrieval/#generic-models)
+- Visual search update
+
+## Bug fixes
+- Fixed imports and outdated Python client usage in Wikipedia demo (https://github.com/marqo-ai/marqo/pull/216) 
+
+## Contributor shout-outs
+- Thank you to [@georgewritescode](https://github.com/georgewritescode) for debugging and updating the Wikipedia demo
+- Thank you to our 1.8k stargazers and 60+ forkers!
+
+
 # Release 0.0.9
 ## Optimisations 
 - Set k to limit to for Marqo-os search queries (https://github.com/marqo-ai/marqo/pull/219)
