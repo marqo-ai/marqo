@@ -2,7 +2,8 @@
 
 ## New features 
 - Generic model support (https://github.com/marqo-ai/marqo/pull/179). Create an index with your favourite SBERT-type models from HuggingFace! Read about usage [here](https://marqo.pages.dev/0.0.10/Models-Reference/dense_retrieval/#generic-models)
-- Visual search update
+- Visual search update 1. (https://github.com/marqo-ai/marqo/pull/214). In addition to faster-rcnn, you can now use yolox or attention based (DINO) region proposal as a patching method at indexing time. This allows localization as the sub patches of the image can be searched.
+- Visual search update 2. (https://github.com/marqo-ai/marqo/pull/214). Owl-ViT has been added as an (optional) reranker when searching images. The images are reranked based on the top scoring box from Owl-ViT. The location of the proposal is also returned allowing open-vocabulary localisation when searching images. Only text based queries are supported currently but image based queries will be added soon.
 
 ## Bug fixes
 - Fixed imports and outdated Python client usage in Wikipedia demo (https://github.com/marqo-ai/marqo/pull/216) 
