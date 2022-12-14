@@ -212,9 +212,11 @@ def check_health(marqo_config: config.Config = Depends(generate_config)):
 def get_indexes(marqo_config: config.Config = Depends(generate_config)):
     return tensor_search.get_indexes(config=marqo_config)
 
+
 @app.get("/models")
 def get_loaded_models():
     return tensor_search.get_loaded_models()
+
 
 @app.delete("/models/eject-model?model-name={model_name}&device={device}")
 def eject_model(model_name: str, device: str):
