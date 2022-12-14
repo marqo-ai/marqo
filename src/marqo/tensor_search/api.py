@@ -216,7 +216,7 @@ def get_indexes(marqo_config: config.Config = Depends(generate_config)):
 def get_loaded_models():
     return tensor_search.get_loaded_models()
 
-@app.delete("/models/delete?model_name={model_name}&device={device}")
+@app.delete("/models/eject-model?model_name={model_name}&device={device}")
 def eject_model(model_name: str, device: str):
     return tensor_search.eject_model(model_name = model_name, device =device)
 
