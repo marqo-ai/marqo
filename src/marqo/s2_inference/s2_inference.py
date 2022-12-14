@@ -230,6 +230,15 @@ def _load_model(model_name: str, device: str = get_default_device()) -> Any:
 def get_available_models():
     return available_models
 
+def eject_model(model_name:str, device:str) -> dict:
+    model_cache_key = _create_model_cache_key(model_name, device)
+    if model_cache_key in available_models:
+        del available_models[model_cache_key]
+        return {"message": f"eject model success, eject model_name = \"{model_name}\" from device = \"{device}\" "}
+    else:
+        raise KeyError(f"model_name={model_name} device = f{device} is not loaded yet")
+
+
 
 # def normalize(inputs):
 

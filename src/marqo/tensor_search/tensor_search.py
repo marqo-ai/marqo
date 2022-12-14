@@ -1187,3 +1187,6 @@ def get_loaded_models() -> dict:
         ]
     }
     return body
+
+def eject_model(model_name: str, device: str) -> dict:
+    return s2_inference.eject_model(model_name, device)

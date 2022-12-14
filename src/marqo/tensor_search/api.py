@@ -216,6 +216,10 @@ def get_indexes(marqo_config: config.Config = Depends(generate_config)):
 def get_loaded_models():
     return tensor_search.get_loaded_models()
 
+@app.delete("/models/{model_name}/{device}")
+def eject_model(model_name: str, device: str):
+    return tensor_search.eject_model(model_name = model_name, device =device)
+
 # try these curl commands:
 
 # ADD DOCS:
