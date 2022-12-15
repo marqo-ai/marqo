@@ -1245,7 +1245,7 @@ def _get_model_properties(index_info):
 def get_loaded_models() -> dict:
     available_models = s2_inference.get_available_models()
     message = {
-        'results' : [
+        'models' : [
             {"model_name": ix[0], "device": ix[1]} for ix in available_models
         ]
     }
@@ -1254,12 +1254,13 @@ def get_loaded_models() -> dict:
 def eject_model(model_name: str, device: str) -> dict:
     try:
        result = s2_inference.eject_model(model_name, device)
-    except s2_inference_errors.UnknownModelError as e:
-        raise errors.IndexNotFoundError(message = str(e))
+    except s2_inference_errors.ModelNotLoadedError as e:
+        raise errors.ModelNotLoadedError(message=str(e))
     return result
 
 
 
 def get_cuda_info() -> dict:
-    return {"results": f"You are using {round(torch.cuda.memory_allocated() / 1024**3, 1)}|"
-                       f"{round(torch.cuda.get_device_properties(0).total_memory/ 1024**3, 1)} GiB on device=cuda"}
+    return {"device": "cuda",
+            "memory_usage": f"{round(torch.cuda.memory_allocated() / 1024**3, 1)} GiB",
+            "total_device_memory": f"{round(torch.cuda.get_device_properties(0).total_memory/ 1024**3, 1)} GiB"}

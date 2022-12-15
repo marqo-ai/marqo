@@ -4,7 +4,7 @@ The functions defined here would have endpoints, later on.
 import numpy as np
 import torch
 from marqo.s2_inference.errors import VectoriseError
-from marqo.s2_inference.errors import UnknownModelError
+from marqo.s2_inference.errors import UnknownModelError, ModelNotLoadedError
 from PIL import UnidentifiedImageError
 from marqo.s2_inference.model_registry import load_model_properties
 from marqo.s2_inference.configs import get_default_device,get_default_normalization,get_default_seq_length
@@ -241,7 +241,7 @@ def eject_model(model_name:str,device:str):
             torch.cuda.empty_cache()
         return {"message":f"eject SUCCESS, eject model_name={model_name} from device={device}"}
     else:
-        raise UnknownModelError(f"The model_name={model_name} device={device} is not loaded")
+        raise ModelNotLoadedError(f"The model_name={model_name} device={device} is not loaded")
 
 
 
