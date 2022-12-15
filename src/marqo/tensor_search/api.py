@@ -299,5 +299,5 @@ curl -XGET http://localhost:8882/models
 
 # eject a model
 """
-curl -XDELETE http://localhost:8882/models/eject-model?model_name=ViT-L/14?model_device=cpu
+curl -XDELETE http://localhost:8882/models/eject-model?model_name=ViT-L/14&model_device=cpu
 """
