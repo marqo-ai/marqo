@@ -37,6 +37,8 @@ import pprint
 import typing
 import uuid
 from typing import List, Optional, Union, Iterable, Sequence, Dict, Any
+
+import torch.cuda
 from PIL import Image
 from marqo.tensor_search.enums import (
     MediaType, MlModel, TensorField, SearchMethod, OpenSearchDataType,
@@ -1190,3 +1192,6 @@ def get_loaded_models() -> dict:
 
 def eject_model(model_name: str, device: str) -> dict:
     return s2_inference.eject_model(model_name, device)
+
+def get_cuda_info() -> dict:
+    return {"results": f"You are using {torch.cuda.memory_allocated()}GB | {torch.cuda.memory_cached()}GB on device=cuda"}

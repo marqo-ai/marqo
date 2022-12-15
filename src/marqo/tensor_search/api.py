@@ -305,4 +305,6 @@ curl -X DELETE 'http://localhost:8882/models?model_name=ViT-L/14&model_device=cu
 
 curl -X DELETE 'http://localhost:8882/models?model_name=hf/all_datasets_v4_MiniLM-L6&model_device=cuda' 
 
+curl -X DELETE 'http://localhost:8882/models?model_name=hf/all_datasets_v4_MiniLM-L6&model_device=cpu' 
+
 """
