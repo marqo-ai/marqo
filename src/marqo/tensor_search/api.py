@@ -219,7 +219,7 @@ def get_loaded_models():
 
 
 @app.delete("/models")
-def eject_model(model_name, model_device):
+def eject_model(model_name:str, model_device:str):
     return {"model_name", model_name, "model_device", model_device}
 
 
@@ -303,4 +303,5 @@ curl -XGET http://localhost:8882/models
 curl -XDELETE http://localhost:8882/models/ViT-L-14/cuda
 
 curl -X DELETE 'http://localhost:8882/models?model_name=ViT-L/14&model_device=cuda'
+
 """
