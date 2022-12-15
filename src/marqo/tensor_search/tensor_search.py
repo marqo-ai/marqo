@@ -1243,22 +1243,24 @@ def _get_model_properties(index_info):
 
 
 def get_loaded_models() -> dict:
-    res = s2_inference.get_available_models()
-    body = {
+    available_models = s2_inference.get_available_models()
+    message = {
         'results' : [
-            {"model_name": ix[0], "device": ix[1]} for ix in res
+            {"model_name": ix[0], "device": ix[1]} for ix in available_models
         ]
     }
-    return body
+    return message
 
 def eject_model(model_name: str, device: str) -> dict:
     try:
        result = s2_inference.eject_model(model_name, device)
     except s2_inference_errors.UnknownModelError as e:
-        raise s2_inference_errors.UnknownModelError(str(e))
+        raise errors.MarqoWebError(message = str(e), code="model not loaded", error_type="backend_error",
+                                   status_code=400)
     return result
 
 
 
 def get_cuda_info() -> dict:
-    return {"results": f"You are using {round(torch.cuda.memory_allocated() / 1024**3, 1)}|{round(torch.cuda.get_device_properties(0).total_memory/ 1024**3, 1)}GiB on device=cuda"}
+    return {"results": f"You are using {round(torch.cuda.memory_allocated() / 1024**3, 1)}|"
+                       f"{round(torch.cuda.get_device_properties(0).total_memory/ 1024**3, 1)} GiB on device=cuda"}
