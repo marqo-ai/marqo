@@ -222,6 +222,10 @@ def get_loaded_models():
 def eject_model(model_name:str, model_device:str):
     return tensor_search.eject_model(model_name = model_name, device = model_device)
 
+@app.get("/models/cuda")
+def get_cuda_info():
+    return tensor_search.get_cuda_info()
+
 
 # try these curl commands:
 
