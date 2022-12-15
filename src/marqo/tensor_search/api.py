@@ -218,7 +218,7 @@ def get_loaded_models():
     return tensor_search.get_loaded_models()
 
 
-@app.delete("/models/eject-model")
+@app.delete("/models/")
 def eject_model(model_name: str, model_device: str):
     return tensor_search.eject_model(model_name, model_device)
 
