@@ -16,7 +16,7 @@ docker run --name marqo-os -id -p 9200:9200 -p 9600:9600 -e "discovery.type=sing
 
 2. Clone the github repo
 ```
-git clone git@github.com:marqo-ai/marqo.git
+git clone https://github.com/marqo-ai/marqo.git
 ```
 3. Install marqo dependencies
 ```
@@ -37,7 +37,7 @@ __Notes__:
 - This is for marqo-os (Marqo OpenSearch) running locally. You can alternatively set
 `OPENSEARCH_URL` to  a remote Marqo OpenSearch cluster 
 - To find the absolute path to the `marqo/src` directory, `cd` into the `marqo/src` directory and run `pwd` in your terminal.
-- If python library errors occur, try `/root/.../marqo/src` instead of `~/.../marqo/src`
+- If python library errors occur, you might be using $HOME instead of your absolute path. try `/.../marqo/src` instead of `~/.../marqo/src`
 
 
 ### Option B. Build and run the Marqo as a Docker container, that creates and manages its own internal Marqo-OS 
@@ -83,7 +83,7 @@ docker run --name marqo-os -id -p 9200:9200 -p 9600:9600 -e "discovery.type=sing
 
 2. Clone the Marqo github repo (if not already done),
 ```
-git clone git@github.com:marqo-ai/marqo.git
+git clone https://github.com/marqo-ai/marqo.git
 ```
 
 3. change into the Marqo directory,
