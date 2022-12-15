@@ -218,7 +218,7 @@ def get_loaded_models():
     return tensor_search.get_loaded_models()
 
 
-@app.delete("/models/{model_name}/{model_device}")
+@app.delete("/models")
 def eject_model(model_name:str, model_device:str):
     return tensor_search.eject_model(model_name,model_device)
 
@@ -300,5 +300,7 @@ curl -XGET http://localhost:8882/models
 
 # eject a model
 """
-curl -XDELETE http://localhost:8882/models/?model_name=ViT-L/14&model_device=cpu
+curl -XDELETE http://localhost:8882/models/ViT-L-14/cuda
+
+curl -X DELETE http://localhost:8882/models/?model_name=ViT-L/14&model_device=cuda
 """

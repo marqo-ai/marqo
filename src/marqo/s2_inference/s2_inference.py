@@ -236,7 +236,7 @@ def eject_model(model_name:str, device:str) -> dict:
         del available_models[model_cache_key]
         return {"message": f"eject model success, eject model_name = \"{model_name}\" from device = \"{device}\" "}
     else:
-        raise KeyError(f"model_name={model_name} device = f{device} is not loaded yet")
+        raise KeyError(f"model_name={model_name} device = {device} is not loaded yet")
 
 
 
