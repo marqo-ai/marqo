@@ -1194,4 +1194,4 @@ def eject_model(model_name: str, device: str) -> dict:
     return s2_inference.eject_model(model_name, device)
 
 def get_cuda_info() -> dict:
-    return {"results": f"You are using {torch.cuda.memory_allocated() / 1024**2}GB | {torch.cuda.memory_reserved()/ 1024**2}GB on device=cuda"}
+    return {"results": f"You are using {round(torch.cuda.memory_allocated() / 1024**2, 1)}MiB | {round(torch.cuda.memory_reserved()/ 1024**2, 1)}GB on device=cuda"}
