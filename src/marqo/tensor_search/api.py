@@ -220,7 +220,7 @@ def get_loaded_models():
 
 @app.delete("/models/eject-model")
 def eject_model(model_name: str, device: str, model_info: List[str] = Query(default = [])):
-    return tensor_search.eject_model(model_name = model_info["model_name"], model_device = model_name["model_device"])
+    return tensor_search.eject_model(model_name = model_info["model-name"], model_device = model_name["model-device"])
 
 # try these curl commands:
 
@@ -299,5 +299,5 @@ curl -XGET http://localhost:8882/models
 
 # eject a model
 """
-curl -XDELETE http://localhost:8882/models/eject-model?model-name=ViT-L/14?device=cpu
+curl -XDELETE http://localhost:8882/models/eject-model?model-name=ViT-L/14?model-device=cpu
 """
