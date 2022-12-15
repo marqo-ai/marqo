@@ -8,6 +8,7 @@ from marqo.s2_inference.model_registry import load_model_properties
 from marqo.s2_inference.configs import get_default_device,get_default_normalization,get_default_seq_length
 from marqo.s2_inference.types import *
 from marqo.s2_inference.logger import get_logger
+import torch
 logger = get_logger(__name__)
 
 available_models = dict()
@@ -234,6 +235,8 @@ def eject_model(model_name:str, device:str) -> dict:
     model_cache_key = _create_model_cache_key(model_name, device)
     if model_cache_key in available_models:
         del available_models[model_cache_key]
+        if device.startswith("cuda"):
+            torch.cuda.empty_cache()
         return {"message": f"eject model success, eject model_name = {model_name} from device = {device} "}
     else:
         raise KeyError(f"model_name={model_name} device = {device} is not loaded yet")
