@@ -95,8 +95,9 @@ class MarqoWebError(Exception):
 class __InvalidRequestError(MarqoWebError):
     """abstract error"""
 
-    def __init__(self, message: str):
+    def __init__(self, message: str, link: str = None):
         self.message = message
+        self.link = link
 
     error_type = "invalid_request"
 

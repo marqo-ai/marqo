@@ -14,6 +14,8 @@ RUN add-apt-repository ppa:deadsnakes/ppa
 RUN apt-get update
 RUN apt-get install python3.8-distutils -y # python3-distutils
 RUN apt-get  install python3.8 python3-pip -y # pip is 276 MB!
+# opencv requirements
+RUN apt-get install ffmpeg libsm6 libxext6 -y
 # TODO: up the RAM
 RUN echo Target platform is "$TARGETPLATFORM"
 COPY requirements.txt requirements.txt
