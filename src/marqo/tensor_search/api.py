@@ -299,7 +299,7 @@ curl -XDELETE http://localhost:8882/indexes/my-irst-ix
 
 # check cuda info
 """
-curl -XGET http://localhost:8882/models/cuda
+curl -XGET http://localhost:8882/cuda
 """
 
 # check the loaded models
