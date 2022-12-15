@@ -1255,8 +1255,7 @@ def eject_model(model_name: str, device: str) -> dict:
     try:
        result = s2_inference.eject_model(model_name, device)
     except s2_inference_errors.UnknownModelError as e:
-        raise errors.MarqoWebError(message = str(e), code="model not loaded", error_type="backend_error",
-                                   status_code=400)
+        raise errors.IndexNotFoundError(message = str(e))
     return result
 
 
