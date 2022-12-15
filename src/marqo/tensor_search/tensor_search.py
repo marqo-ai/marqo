@@ -1252,7 +1252,13 @@ def get_loaded_models() -> dict:
     return body
 
 def eject_model(model_name: str, device: str) -> dict:
-    return s2_inference.eject_model(model_name, device)
+    try:
+       result = s2_inference.eject_model(model_name, device)
+    except s2_inference_errors.UnknownModelError as e:
+        raise s2_inference_errors.UnknownModelError(str(e))
+    return result
+
+
 
 def get_cuda_info() -> dict:
     return {"results": f"You are using {round(torch.cuda.memory_allocated() / 1024**3, 1)}|{round(torch.cuda.get_device_properties(0).total_memory/ 1024**3, 1)}GiB on device=cuda"}
