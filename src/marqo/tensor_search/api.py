@@ -218,10 +218,10 @@ def get_loaded_models():
     return tensor_search.get_loaded_models()
 
 
-@app.delete("/models")
-def eject_model(model_name:str):
-    #return tensor_search.eject_model(model_info[0], model_info[1])
-    return {"a":model_name}
+@app.delete("/models/{model_name}/{model_device}")
+def eject_model(model_name:str, model_device:str):
+    return tensor_search.eject_model(model_name,model_device)
+
 
 # try these curl commands:
 
