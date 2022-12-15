@@ -297,6 +297,11 @@ curl -XPOST  http://localhost:8882/indexes/my-irst-ix/documents/delete-batch -H 
 curl -XDELETE http://localhost:8882/indexes/my-irst-ix
 """
 
+# check cuda info
+"""
+curl -XGET http://localhost:8882/models/cuda
+"""
+
 # check the loaded models
 """
 curl -XGET http://localhost:8882/models
