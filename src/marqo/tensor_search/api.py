@@ -302,5 +302,5 @@ curl -XGET http://localhost:8882/models
 """
 curl -XDELETE http://localhost:8882/models/ViT-L-14/cuda
 
-curl -X DELETE http://localhost:8882/models/?model_name=ViT-L/14&model_device=cuda
+curl -X DELETE 'http://localhost:8882/models?model_name=ViT-L/14&model_device=cuda'
 """
