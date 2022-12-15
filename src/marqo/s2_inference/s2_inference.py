@@ -239,7 +239,7 @@ def eject_model(model_name:str, device:str) -> dict:
             torch.cuda.empty_cache()
         return {"message": f"eject model success, eject model_name = {model_name} from device = {device} "}
     else:
-        raise KeyError(f"model_name={model_name} device = {device} is not loaded yet")
+        return {"message": f"eject UNSUCCESS!! model_name={model_name} device = {device} is not loaded yet"}
 
 
 
