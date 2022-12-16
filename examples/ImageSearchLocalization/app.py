@@ -167,7 +167,7 @@ def main():
         image = load_image(temp_file.name)
         image.save(save_name)
         
-        query = save_name#.replace(data_dir, "http://localhost:8223/")
+        query = save_name.replace(data_dir, docker_image_server_prefix)
         # To View Uploaded Image
         st.image(image, width=250)
 
