@@ -577,7 +577,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
     logger.info(f"      add_documents pre-processing: took {(total_preproc_time):.3f}s total for {batch_size} docs, "
                 f"for an average of {(total_preproc_time / batch_size):.3f}s per doc.")
     
-    logger.info(f"      add_documents vectorise: took {(total_vectorise_time):.3f}s for {batch_size} docs, " 
+    logger.info(f"          add_documents vectorise: took {(total_vectorise_time):.3f}s for {batch_size} docs, " 
                 f"for an average of {(total_vectorise_time / batch_size):.3f}s per doc.")
     
     if bulk_parent_dicts:
@@ -810,7 +810,6 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
     else:
         raise errors.InvalidArgError(f"Search called with unknown search method: {search_method}")
     
-    
     if reranker is not None:
         # SEARCH TIMER-LOGGER (reranking)
         start_rerank_time = timer()
@@ -819,7 +818,7 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
                 searchable_attributes=searchable_attributes, num_highlights=1 if simplified_format else num_highlights)
         end_rerank_time = timer()
         total_rerank_time = end_rerank_time - start_rerank_time
-        logger.info(f"search ({search_method.lower()}) reranking: took {(total_rerank_timee):.3f}s to rerank results.")
+        logger.info(f"search ({search_method.lower()}) reranking: took {(total_rerank_time):.3f}s to rerank results.")
 
     time_taken = timer() - t0
     search_result["processingTimeMs"] = round(time_taken * 1000)
@@ -1071,7 +1070,7 @@ def _vector_text_search(
     
     end_preprocess_time = timer()
     total_preprocess_time = end_preprocess_time - start_preprocess_time
-    logger.info(f"search (vector) pre-processing: took {(total_preprocess_time):.3f}s to vectorize and process query.")
+    logger.info(f"search (tensor) pre-processing: took {(total_preprocess_time):.3f}s to vectorize and process query.")
 
     # SEARCH TIMER-LOGGER (roundtrip)
     start_search_http_time = timer()
@@ -1081,7 +1080,7 @@ def _vector_text_search(
     total_search_http_time = end_search_http_time - start_search_http_time
     
     num_responses = len(response["responses"])     # TODO JOSHUA find num_results
-    logger.info(f"search (vector) roundtrip: took {(total_search_http_time):.3f}s to send search query (roundtrip) to Marqo-os and received {num_responses} responses.")
+    logger.info(f"search (tensor) roundtrip: took {(total_search_http_time):.3f}s to send search query (roundtrip) to Marqo-os and received {num_responses} responses.")
 
     # SEARCH TIMER-LOGGER (post-processing)
     start_postprocess_time = timer()
@@ -1194,7 +1193,7 @@ def _vector_text_search(
 
     end_postprocess_time = timer()
     total_postprocess_time = end_postprocess_time - start_postprocess_time
-    logger.info(f"search (vector) post-processing: took {(total_postprocess_time):.3f}s to sort and format {len(completely_sorted)} results.")
+    logger.info(f"search (tensor) post-processing: took {(total_postprocess_time):.3f}s to sort and format {len(completely_sorted)} results from Marqo-os.")
     return res
 
 def check_health(config: Config):
