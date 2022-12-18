@@ -832,7 +832,7 @@ def _lexical_search(
         "query": {
             "bool": {
                 "should": [
-                    {"match": {field: text}}
+                    {"query_string": {"query": text, "fields": [field]}}
                     for field in fields_to_search
                 ],
                 "must_not": [
