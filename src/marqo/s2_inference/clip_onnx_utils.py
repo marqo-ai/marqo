@@ -363,7 +363,7 @@ class ONNX_CLIP_16(ONNX_CLIP):
         end1  = timer()
 
         start2 = timer()
-        outputs = torch.tensor(self.visual_session.run(None, {"input":self.images_onnx}))[0]
+        outputs = torch.tensor(self.visual_session.run(None, {"input":self.images_onnx})).to(self.device)[0]
 
         if normalize:
             _shape_before = outputs.shape
