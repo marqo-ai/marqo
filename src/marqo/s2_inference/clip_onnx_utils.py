@@ -11,6 +11,7 @@ import torch
 from PIL import Image
 import open_clip
 from onnxmltools.utils import float16_converter
+import onnx
 
 from marqo.s2_inference.types import *
 from marqo.s2_inference.logger import get_logger
@@ -324,8 +325,8 @@ class ONNX_CLIP_16(ONNX_CLIP):
             onnx.save_model(self.visual_model_fp16, self.visual_path_16)
             onnx.save_model(self.textual_model_fp16, self.textual_path_16)
 
-            self.visual_session = onnxruntime.InferenceSession(self.visual_model_fp16, providers=["CUDAExecutionProvider","CPUExecutionProvider"])
-            self.textual_session = onnxruntime.InferenceSession(self.textual_model_fp16, providers=["CUDAExecutionProvider", "CPUExecutionProvider"])
+            self.visual_session = onnxruntime.InferenceSession(self.visual_path_fp16, providers=["CUDAExecutionProvider","CPUExecutionProvider"])
+            self.textual_session = onnxruntime.InferenceSession(self.textual_path_fp16, providers=["CUDAExecutionProvider", "CPUExecutionProvider"])
 
     def load_onnx(self):
         print("Loading visual_session and textual_session for onnx-float16")
