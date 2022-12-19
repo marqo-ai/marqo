@@ -296,8 +296,8 @@ class ONNX_CLIP_16(ONNX_CLIP):
         self.tokenize = None
         if self.device == "cuda":
             self.providers = ['CUDAExecutionProvider',] + self.providers
-        self.visual_path_16 = "onnx16-" + self.clip_name.replace("/", "-") + "-visual"
-        self.textual_path_16 = "onnx16-" + self.clip_name.replace("/", "-") + "-textual"
+        self.visual_path_fp16 = "onnx16-" + self.clip_name.replace("/", "-") + "-visual"
+        self.textual_path_fp16 = "onnx16-" + self.clip_name.replace("/", "-") + "-textual"
 
 
     def clip_load(self):
@@ -319,20 +319,23 @@ class ONNX_CLIP_16(ONNX_CLIP):
                                         textual_path=self.textual_path)
             self.onnx_model.convert2onnx(image, text, verbose=True)
 
+
+            print("Start float16-onnx Conversion")
             self.visual_model_fp16 = float16_converter.convert_float_to_float16_model_path(self.visual_path)
             self.textual_model_fp16 = float16_converter.convert_float_to_float16_model_path(self.textual_path)
 
-            onnx.save_model(self.visual_model_fp16, self.visual_path_16)
-            onnx.save_model(self.textual_model_fp16, self.textual_path_16)
+            onnx.save_model(self.visual_model_fp16, self.visual_path_fp16)
+            onnx.save_model(self.textual_model_fp16, self.textual_path_fp16)
 
-            self.visual_session = onnxruntime.InferenceSession(self.visual_path_fp16, providers=["CUDAExecutionProvider","CPUExecutionProvider"])
-            self.textual_session = onnxruntime.InferenceSession(self.textual_path_fp16, providers=["CUDAExecutionProvider", "CPUExecutionProvider"])
+            self.load_onnx()
+
 
     def load_onnx(self):
+        self.clip_load()
         print("Loading visual_session and textual_session for onnx-float16")
-        self.visual_session = onnxruntime.InferenceSession(self.visual_model_fp16,
+        self.visual_session = onnxruntime.InferenceSession(self.visual_path_fp16,
                                                           providers=["CUDAExecutionProvider", "CPUExecutionProvider"])
-        self.textual_session = onnxruntime.InferenceSession(self.textual_model_fp16,
+        self.textual_session = onnxruntime.InferenceSession(self.textual_path_fp16,
                                                             providers=["CUDAExecutionProvider", "CPUExecutionProvider"])
 
     def encode_text(self, sentence, normalize=True):
@@ -341,7 +344,7 @@ class ONNX_CLIP_16(ONNX_CLIP):
 
         sentence = clip.tokenize(sentence, truncate=self.truncate).cpu()
         sentence_onnx = sentence.detach().cpu().numpy().astype(np.int64)
-        outputs = torch.tensor(self.textual_session(None, {"input":sentence_onnx}))
+        outputs = torch.tensor(self.textual_session.run(None, {"input":sentence_onnx}))[0]
 
         if normalize:
             _shape_before = outputs.shape
@@ -362,7 +365,7 @@ class ONNX_CLIP_16(ONNX_CLIP):
         self.image_input_processed = torch.stack([self.clip_preprocess(_img).to(self.device) for _img in image_input])
 
         self.images_onnx = self.image_input_processed.detach().cpu().numpy().astype(np.float16)
-        outputs = torch.tensor(self.visual_session.run(None, {"input":self.images_onnx}))
+        outputs = torch.tensor(self.visual_session.run(None, {"input":self.images_onnx}))[0]
 
         if normalize:
             _shape_before = outputs.shape
