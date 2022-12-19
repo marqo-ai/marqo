@@ -182,10 +182,17 @@ class ONNX_CLIP(object):
         return outputs.norm(dim=-1, keepdim=True)
 
     def _convert_output(self, output):
+        start = timer()
         if self.device == 'cpu':
-            return output.numpy()
+            output = output.numpy()
+            end = timer()
+            print(f"conversion time {round((end - start)*1000)}ms")
+            return output
         elif self.device.startswith('cuda'):
-            return output.cpu().numpy()
+            output = output.cpu().numpy()
+            end = timer()
+            print(f"conversion time {round((end - start) * 1000)}ms")
+            return output
 
     def clip_load(self):
 
