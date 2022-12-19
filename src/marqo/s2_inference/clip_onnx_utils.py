@@ -372,3 +372,26 @@ class ONNX_CLIP_16(ONNX_CLIP):
             outputs /= self.normalize(outputs)
             assert outputs.shape == _shape_before
         return self._convert_output(outputs)
+
+    def encode(self, inputs: Union[str, ImageType, List[Union[str, ImageType]]],
+               default: str = 'text', normalize=True, **kwargs) -> FloatTensor:
+
+        infer = kwargs.pop('infer', True)
+
+        if infer and _is_image(inputs):
+            is_image = True
+        else:
+            is_image = False
+            if default == 'text':
+                is_image = False
+            elif default == 'image':
+                is_image = True
+            else:
+                raise ValueError(f"expected default='image' or default='text' but received {default}")
+
+        if is_image:
+            logger.debug('image')
+            return self.encode_image(inputs, normalize=True)
+        else:
+            logger.debug('text')
+            return self.encode_text(inputs, normalize=True)
