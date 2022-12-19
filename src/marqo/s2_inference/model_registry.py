@@ -4,7 +4,7 @@ from marqo.s2_inference.sbert_utils import SBERT, TEST
 from marqo.s2_inference.random_utils import Random
 from marqo.s2_inference.clip_utils import CLIP, OPEN_CLIP, OPENCV_CLIP, CUDA_CLIP
 from marqo.s2_inference.types import Any, Dict, List, Optional, Union, FloatTensor
-from marqo.s2_inference.clip_onnx_utils import ONNX_CLIP
+from marqo.s2_inference.clip_onnx_utils import ONNX_CLIP, ONNX_CLIP_16
 from marqo.s2_inference.opencv_clip_utils import FULLOPENCV_CLIP
 from marqo.s2_inference.fast_clip_utils import Fast_CLIP
 
@@ -601,6 +601,13 @@ def _get_test_properties() -> Dict:
                 "notes:": "load the model from cuda",
                 "type": "cudaclip",
             },
+        "onnx16/ViT-L/14":
+            {
+                "name":"onnx16/ViT-L/14",
+                "dimensions":768,
+                "note": "a float16 version of onnx model converting from open clip",
+                "type":"onnx16clip",
+            }
 
     }
     return TEST_MODEL_PROPERTIES
@@ -618,6 +625,7 @@ def _get_model_load_mappings() -> Dict:
             'random':Random,
             'cudaclip':CUDA_CLIP,
             'fastclip': Fast_CLIP,
+            'onnx16clip':ONNX_CLIP_16,
             'hf':HF_MODEL}
 
 def load_model_properties() -> Dict:

@@ -1,5 +1,6 @@
 # from torch import FloatTensor
 # from typing import Any, Dict, List, Optional, Union
+import onnx
 from clip_onnx import clip_onnx
 import os
 import validators
@@ -8,6 +9,8 @@ import numpy as np
 import clip
 import torch
 from PIL import Image
+import open_clip
+from onnxmltools.utils import float16_converter
 
 from marqo.s2_inference.types import *
 from marqo.s2_inference.logger import get_logger
@@ -159,6 +162,7 @@ class ONNX_CLIP(object):
         self.onnx_model = None
         self.truncate = truncate
         self.providers = ["CPUExecutionProvider",]
+        self.tokenize = None
         if self.device == "cuda":
             self.providers = ['TensorrtExecutionProvider','CUDAExecutionProvider'] + self.providers
 
@@ -183,6 +187,7 @@ class ONNX_CLIP(object):
 
         if self.clip_model is None or self.clip_preprocess is None:
             self.clip_model, self.clip_preprocess = clip.load(self.clip_name, device="cpu", jit=False)
+            self.tokenize = clip.tokenize
 
     def onnx_converter(self):
         self.clip_load()
@@ -192,7 +197,7 @@ class ONNX_CLIP(object):
 
             image = self.clip_preprocess(Image.fromarray(dummy_input).convert("RGB")).unsqueeze(0).cpu()
 
-            text = clip.tokenize(["a diagram", "a dog", "a cat"]).cpu()
+            text = self.tokenize(["a diagram", "a dog", "a cat"]).cpu()
 
             self.onnx_model = clip_onnx(self.clip_model, visual_path=self.visual_path, textual_path=self.textual_path)
             self.onnx_model.convert2onnx(image, text, verbose=True)
@@ -262,10 +267,100 @@ class ONNX_CLIP(object):
     def load_onnx(self):
         self.clip_load()
         self.onnx_model = clip_onnx(None)
-        self.onnx_model.load_onnx(visual_path=self.visual_path,
-                                  textual_path=self.textual_path,
+        self.onnx_model.load_onnx(visual_path=self.visual_path_16,
+                                  textual_path=self.textual_path_16,
                                   logit_scale=100.0000)  # model.logit_scale.exp()
         self.onnx_model.start_sessions(self.providers)
 
 
 
+class ONNX_CLIP_16(ONNX_CLIP):
+    def __init__(self, model_name, device="cpu", embedding_dim: int = None, truncate: bool = True,
+                 load=True, **kwargs):
+
+        self.model_name = model_name
+        self.clip_name = model_name.split("onnx16/")[1]
+        self.clip_model = None
+        self.clip_preprocess = None
+        self.device = device
+        self.image_onnx = None
+        self.text_onnx = None
+        self.visual_path = "onnx-" + self.clip_name.replace("/", "-") + "-visual"
+        self.textual_path = "onnx-" + self.clip_name.replace("/", "-") + "-textual"
+        self.onnx_model = None
+        self.truncate = truncate
+        self.providers = ["CPUExecutionProvider", ]
+        self.tokenize = None
+        if self.device == "cuda":
+            self.providers = ['TensorrtExecutionProvider', 'CUDAExecutionProvider'] + self.providers
+        self.visual_path_16 = "onnx16-" + self.clip_name.replace("/", "-") + "-visual"
+        self.textual_path_16 = "onnx16-" + self.clip_name.replace("/", "-") + "-textual"
+
+
+    def clip_load(self):
+        if self.clip_model is None or self.clip_preprocess is None or self.tokenize is None:
+            self.clip_model, _, self.clip_preprocess = open_clip.create_model_and_transforms('ViT-L-14', pretrained='openai')
+            self.tokenize = open_clip.get_tokenizer('ViT-L-14')
+
+    def onnx_converter(self):
+        self.clip_load()
+        if self.image_onnx is None or self.text_onnx is None:
+            dummy_input = np.random.rand(1000, 1000, 3) * 255
+            dummy_input = dummy_input.astype("uint8")
+
+            image = self.clip_preprocess(Image.fromarray(dummy_input).convert("RGB")).unsqueeze(0).cpu()
+
+            text = self.tokenize(["a diagram", "a dog", "a cat"]).cpu()
+
+            self.onnx_model = clip_onnx(self.clip_model, visual_path=self.visual_path,
+                                        textual_path=self.textual_path)
+            self.onnx_model.convert2onnx(image, text, verbose=True)
+
+            self.visual_model_fp16 = float16_converter.convert_float_to_float16_model_path(self.visual_path)
+            self.textual_model_fp16 = float16_converter.convert_float_to_float16_model_path(self.textual_path)
+
+            onnx.save_model(self.visual_model_fp16,self.visual_path_16)
+            onnx.save_model(self.textual_model_fp16,self.textual_path_16)
+            self.load_onnx()
+    def load_onnx(self):
+        self.clip_load()
+        self.onnx_model = clip_onnx(None)
+        self.onnx_model.load_onnx(visual_path=self.visual_path_16,
+                                  textual_path=self.textual_path_16,
+                                  logit_scale=100.0000)  # model.logit_scale.exp()
+        self.onnx_model.start_sessions(self.providers)
+
+    def encode_text(self, sentence, normalize=True):
+        if self.onnx_model is None:
+            self.load()
+
+        sentence = clip.tokenize(sentence, truncate=self.truncate).cpu()
+        sentence_onnx = sentence.detach().cpu().numpy().astype(np.int64)
+        outputs = torch.tensor(self.onnx_model.encode_text(sentence_onnx))
+
+        if normalize:
+            _shape_before = outputs.shape
+            outputs /= self.normalize(outputs)
+            assert outputs.shape == _shape_before
+        return self._convert_output(outputs)
+
+    def encode_image(self, images, normalize=True):
+
+        if self.onnx_model is None:
+            self.load()
+
+        if isinstance(images, list):
+            image_input = format_and_load_CLIP_images(images)
+        else:
+            image_input = [format_and_load_CLIP_image(images)]
+
+        self.image_input_processed = torch.stack([self.clip_preprocess(_img).to(self.device) for _img in image_input])
+
+        self.images_onnx = self.image_input_processed.detach().cpu().numpy().astype(np.float16)
+        outputs = torch.tensor(self.onnx_model.encode_image(self.images_onnx))
+
+        if normalize:
+            _shape_before = outputs.shape
+            outputs /= self.normalize(outputs)
+            assert outputs.shape == _shape_before
+        return self._convert_output(outputs)
