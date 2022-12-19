@@ -376,6 +376,8 @@ class ONNX_CLIP_16(ONNX_CLIP):
             _shape_before = outputs.shape
             outputs /= self.normalize(outputs)
             assert outputs.shape == _shape_before
+
+        torch.cuda.synchronize(device=None)
         end2 = timer()
 
         print(f"preprocessing time {round((end1-start1)*1000)}ms, encoding time {round((end2 - start2)*1000)}ms")
