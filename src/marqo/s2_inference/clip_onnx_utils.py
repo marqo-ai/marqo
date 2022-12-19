@@ -14,6 +14,8 @@ from onnxmltools.utils import float16_converter
 
 from marqo.s2_inference.types import *
 from marqo.s2_inference.logger import get_logger
+import onnxruntime
+
 
 logger = get_logger(__name__)
 
@@ -321,15 +323,16 @@ class ONNX_CLIP_16(ONNX_CLIP):
 
             onnx.save_model(self.visual_model_fp16, self.visual_path_16)
             onnx.save_model(self.textual_model_fp16, self.textual_path_16)
-            self.load_onnx()
+
+            self.visual_session = onnxruntime.InferenceSession(self.visual_model_fp16, providers=["CUDAExecutionProvider","CPUExecutionProvider"])
+            self.textual_session = onnxruntime.InferenceSession(self.textual_model_fp16, providers=["CUDAExecutionProvider", "CPUExecutionProvider"])
+
     def load_onnx(self):
-        self.clip_load()
-        self.onnx_model = clip_onnx(None)
-        print("Loading float16 model...")
-        self.onnx_model.load_onnx(visual_path=self.visual_path_16,
-                                  textual_path=self.textual_path_16,
-                                  logit_scale=100.0000)  # model.logit_scale.exp()
-        self.onnx_model.start_sessions(self.providers)
+        print("Loading visual_session and textual_session for onnx-float16")
+        self.visual_session = onnxruntime.InferenceSession(self.visual_model_fp16,
+                                                          providers=["CUDAExecutionProvider", "CPUExecutionProvider"])
+        self.textual_session = onnxruntime.InferenceSession(self.textual_model_fp16,
+                                                            providers=["CUDAExecutionProvider", "CPUExecutionProvider"])
 
     def encode_text(self, sentence, normalize=True):
         if self.onnx_model is None:
@@ -337,7 +340,7 @@ class ONNX_CLIP_16(ONNX_CLIP):
 
         sentence = clip.tokenize(sentence, truncate=self.truncate).cpu()
         sentence_onnx = sentence.detach().cpu().numpy().astype(np.int64)
-        outputs = torch.tensor(self.onnx_model.encode_text(sentence_onnx))
+        outputs = torch.tensor(self.textual_session(None, {"input":sentence_onnx}))
 
         if normalize:
             _shape_before = outputs.shape
@@ -358,7 +361,7 @@ class ONNX_CLIP_16(ONNX_CLIP):
         self.image_input_processed = torch.stack([self.clip_preprocess(_img).to(self.device) for _img in image_input])
 
         self.images_onnx = self.image_input_processed.detach().cpu().numpy().astype(np.float16)
-        outputs = torch.tensor(self.onnx_model.encode_image(self.images_onnx))
+        outputs = torch.tensor(self.visual_session.run(None, {"input":self.images_onnx}))
 
         if normalize:
             _shape_before = outputs.shape
