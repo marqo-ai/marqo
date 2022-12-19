@@ -292,7 +292,7 @@ class ONNX_CLIP_16(ONNX_CLIP):
         self.providers = ["CPUExecutionProvider", ]
         self.tokenize = None
         if self.device == "cuda":
-            self.providers = ['TensorrtExecutionProvider', 'CUDAExecutionProvider'] + self.providers
+            self.providers = ['CUDAExecutionProvider',] + self.providers
         self.visual_path_16 = "onnx16-" + self.clip_name.replace("/", "-") + "-visual"
         self.textual_path_16 = "onnx16-" + self.clip_name.replace("/", "-") + "-textual"
 
@@ -319,12 +319,13 @@ class ONNX_CLIP_16(ONNX_CLIP):
             self.visual_model_fp16 = float16_converter.convert_float_to_float16_model_path(self.visual_path)
             self.textual_model_fp16 = float16_converter.convert_float_to_float16_model_path(self.textual_path)
 
-            onnx.save_model(self.visual_model_fp16,self.visual_path_16)
-            onnx.save_model(self.textual_model_fp16,self.textual_path_16)
+            onnx.save_model(self.visual_model_fp16, self.visual_path_16)
+            onnx.save_model(self.textual_model_fp16, self.textual_path_16)
             self.load_onnx()
     def load_onnx(self):
         self.clip_load()
         self.onnx_model = clip_onnx(None)
+        print("Loading float16 model...")
         self.onnx_model.load_onnx(visual_path=self.visual_path_16,
                                   textual_path=self.textual_path_16,
                                   logit_scale=100.0000)  # model.logit_scale.exp()
