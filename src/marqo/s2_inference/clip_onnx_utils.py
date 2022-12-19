@@ -347,7 +347,7 @@ class ONNX_CLIP_16(ONNX_CLIP):
                                                             providers=["CUDAExecutionProvider", "CPUExecutionProvider"])
 
     def encode_text(self, sentence, normalize=True):
-        sentence = self.tokenize(sentence, truncate=self.truncate).cpu()
+        sentence = self.tokenize(sentence).cpu()
         sentence_onnx = sentence.detach().cpu().numpy().astype(np.int64)
         outputs = torch.tensor(self.textual_session.run(None, {"input":sentence_onnx}))[0]
 
