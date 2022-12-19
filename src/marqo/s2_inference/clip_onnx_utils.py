@@ -278,10 +278,13 @@ class ONNX_CLIP(object):
     def load_onnx(self):
         self.clip_load()
         self.onnx_model = clip_onnx(None)
-        self.onnx_model.load_onnx(visual_path=self.visual_path_16,
-                                  textual_path=self.textual_path_16,
+        self.onnx_model.load_onnx(visual_path=self.visual_path,
+                                  textual_path=self.textual_path,
                                   logit_scale=100.0000)  # model.logit_scale.exp()
         self.onnx_model.start_sessions(self.providers)
+
+
+
 
 
 
@@ -349,7 +352,7 @@ class ONNX_CLIP_16(ONNX_CLIP):
     def encode_text(self, sentence, normalize=True):
         sentence = self.tokenize(sentence).cpu()
         sentence_onnx = sentence.detach().cpu().numpy().astype(np.int64)
-        outputs = torch.tensor(self.textual_session.run(None, {"input":sentence_onnx}))[0]
+        outputs = torch.tensor(self.textual_session.run(None, {"input":sentence_onnx})).to(self.device)[0]
 
         if normalize:
             _shape_before = outputs.shape
@@ -376,8 +379,8 @@ class ONNX_CLIP_16(ONNX_CLIP):
             _shape_before = outputs.shape
             outputs /= self.normalize(outputs)
             assert outputs.shape == _shape_before
-
-        torch.cuda.synchronize(device=None)
+        if self.device.startswith("cuda"):
+            torch.cuda.synchronize(device=None)
         end2 = timer()
 
         print(f"preprocessing time {round((end1-start1)*1000)}ms, encoding time {round((end2 - start2)*1000)}ms")
