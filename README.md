@@ -238,7 +238,7 @@ Marqo is a community project with the goal of making tensor search accessible to
 
 ## Dev set up
 1. Create a virtual env ```python -m venv ./venv```
-2. Activate the virtual environment ```source ./venv/bin/activate```
+2. Activate the virtual environment ```source ./venv/bin/activate``` (on Linux or Mac) or ```./venv/Scripts/activate``` (on Windows)
 3. Install requirements from the requirements file: ```pip install -r requirements.txt```
 4. Run tests by running the tox file. CD into this dir and then run "tox"
 5. If you update dependencies, make sure to delete the .tox dir and rerun
