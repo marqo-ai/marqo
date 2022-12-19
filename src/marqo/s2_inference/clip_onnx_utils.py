@@ -15,6 +15,7 @@ import onnx
 
 from marqo.s2_inference.types import *
 from marqo.s2_inference.logger import get_logger
+from timeit import default_timer as timer
 import onnxruntime
 
 
@@ -355,15 +356,22 @@ class ONNX_CLIP_16(ONNX_CLIP):
         else:
             image_input = [format_and_load_CLIP_image(images)]
 
-        self.image_input_processed = torch.stack([self.clip_preprocess(_img).to(self.device) for _img in image_input])
 
+        start1 = timer()
+        self.image_input_processed = torch.stack([self.clip_preprocess(_img).to(self.device) for _img in image_input])
         self.images_onnx = self.image_input_processed.detach().cpu().numpy().astype(np.float16)
+        end1  = timer()
+
+        start2 = timer()
         outputs = torch.tensor(self.visual_session.run(None, {"input":self.images_onnx}))[0]
 
         if normalize:
             _shape_before = outputs.shape
             outputs /= self.normalize(outputs)
             assert outputs.shape == _shape_before
+        end2 = timer()
+
+        print(f"preprocessing time {round((end1-start1)*1000)}ms, encoding time {round((end2 - start2)*1000)}ms")
         return self._convert_output(outputs)
 
     def encode(self, inputs: Union[str, ImageType, List[Union[str, ImageType]]],
