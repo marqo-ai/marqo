@@ -339,9 +339,6 @@ class ONNX_CLIP_16(ONNX_CLIP):
                                                             providers=["CUDAExecutionProvider", "CPUExecutionProvider"])
 
     def encode_text(self, sentence, normalize=True):
-        if self.onnx_model is None:
-            self.load()
-
         sentence = clip.tokenize(sentence, truncate=self.truncate).cpu()
         sentence_onnx = sentence.detach().cpu().numpy().astype(np.int64)
         outputs = torch.tensor(self.textual_session.run(None, {"input":sentence_onnx}))[0]
@@ -353,10 +350,6 @@ class ONNX_CLIP_16(ONNX_CLIP):
         return self._convert_output(outputs)
 
     def encode_image(self, images, normalize=True):
-
-        if self.onnx_model is None:
-            self.load()
-
         if isinstance(images, list):
             image_input = format_and_load_CLIP_images(images)
         else:
