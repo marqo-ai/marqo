@@ -86,7 +86,10 @@ def format_and_load_CLIP_image(image: Union[str, ndarray, ImageType]) -> ImageTy
     """
     # check for the input type
     if isinstance(image, str):
+        start = timer()
         img = _load_image_from_path(image)
+        end = timer()
+        print(f"Loading image from path time {round((end - start)*1000)} ms")
     elif isinstance(image, np.ndarray):
         img = Image.fromarray(image.astype('uint8'), 'RGB')
 
