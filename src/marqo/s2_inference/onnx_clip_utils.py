@@ -13,13 +13,13 @@ from huggingface_hub import hf_hub_download
 from marqo.s2_inference.types import *
 from marqo.s2_inference.logger import get_logger
 import onnxruntime as ort
-from timeit import default_timer as timer
-import psutil
+
 logger = get_logger(__name__)
 
-load1, load5, load15 = psutil.getloadavg()
-
 _HF_MODE_DOWNLOAD = {
+    '''
+    Please check the link https://huggingface.co/Marqo for available models.
+    '''
     "onnx32/openai/ViT-L/14":
         {
             "repo_id": "Marqo/onnx32-openai-ViT-L-14",
@@ -180,18 +180,15 @@ class CLIP_ONNX(object):
         self.load_clip()
         self.load_onnx()
 
-
     @staticmethod
     def normalize(outputs):
         return outputs.norm(dim=-1, keepdim=True)
-
 
     def _convert_output(self, output):
         if self.device == 'cpu':
             return output.numpy()
         elif self.device.startswith('cuda'):
             return output.cpu().numpy()
-
 
     def load_clip(self):
         if self.source == "openai":
@@ -204,12 +201,12 @@ class CLIP_ONNX(object):
             self.tokenizer = open_clip.get_tokenizer(clip_name)
             del clip_model
 
-
     def encode_text(self, sentence, normalize=True):
         text = clip.tokenize(sentence, truncate=self.truncate).cpu()
         text_onnx = text.detach().cpu().numpy().astype(np.int32)
 
         onnx_input_text = {self.textual_session.get_inputs()[0].name: text_onnx}
+        # The onnx output has the shape [1,1,768], we need to squeeze the dimension
         outputs = torch.squeeze(torch.tensor(np.array(self.textual_session.run(None, onnx_input_text))))
 
         if normalize:
@@ -217,7 +214,6 @@ class CLIP_ONNX(object):
             outputs /= self.normalize(outputs)
             assert outputs.shape == _shape_before
         return self._convert_output(outputs)
-
 
     def encode_image(self, images, normalize=True):
         if isinstance(images, list):
@@ -229,7 +225,6 @@ class CLIP_ONNX(object):
         images_onnx = image_input_processed.detach().cpu().numpy().astype(self.visual_type)
 
         onnx_input_image = {self.visual_session.get_inputs()[0].name: images_onnx}
-
         # The onnx output has the shape [1,1,768], we need to squeeze the dimension
         outputs = torch.squeeze(torch.tensor(np.array(self.visual_session.run(None, onnx_input_image))))
 
@@ -239,7 +234,6 @@ class CLIP_ONNX(object):
             assert outputs.shape == _shape_before
 
         return self._convert_output(outputs)
-
 
     def encode(self, inputs: Union[str, ImageType, List[Union[str, ImageType]]],
                default: str = 'text', normalize=True, **kwargs) -> FloatTensor:
@@ -274,7 +268,6 @@ class CLIP_ONNX(object):
         self.textual_file = self.download_model(self.model_info["repo_id"], self.model_info["textual_file"])
         self.visual_session = ort.InferenceSession(self.visual_file, providers=self.provider)
         self.textual_session = ort.InferenceSession(self.textual_file, providers=self.provider)
-
 
     @staticmethod
     def download_model(repo_id:str, filename:str, cache_folder:str = None) -> str:
