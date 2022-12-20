@@ -1,7 +1,6 @@
 # from torch import FloatTensor
 # from typing import Any, Dict, List, Optional, Union
 import onnx
-from clip_onnx import clip_onnx
 import os
 import validators
 import requests
@@ -11,12 +10,9 @@ import torch
 from PIL import Image
 import open_clip
 from onnxmltools.utils import float16_converter
-import onnx
 from huggingface_hub import hf_hub_download
-
 from marqo.s2_inference.types import *
 from marqo.s2_inference.logger import get_logger
-from timeit import default_timer as timer
 import onnxruntime as ort
 
 
