@@ -13,7 +13,7 @@ from huggingface_hub import hf_hub_download
 from marqo.s2_inference.types import *
 from marqo.s2_inference.logger import get_logger
 import onnxruntime as ort
-
+from timeit import default_timer as timer
 
 logger = get_logger(__name__)
 
@@ -156,7 +156,7 @@ class CLIP_ONNX(object):
         self.onnx_type, self.source, self.clip_model = self.model_name.split("/", 2)
         self.device = device
         self.truncate = truncate
-        self.provider = ["CUDAExecutionProvider", "CPUExecutionProvider"] if self.device.startswith("cuda") else ["CPUExecutionProvider"]
+        self.provider = ['CUDAExecutionProvider', "CPUExecutionProvider"] if self.device.startswith("cuda") else ["CPUExecutionProvider"]
         self.visual_session = None
         self.textual_session = None
         self.model_info = _HF_MODE_DOWNLOAD[self.model_name]
@@ -214,7 +214,13 @@ class CLIP_ONNX(object):
         images_onnx = image_input_processed.detach().cpu().numpy().astype(np.float32)
 
         # The onnx output has the shape [1,1,768], we need to squeeze the dimension
+        start = timer()
+
         outputs = torch.squeeze(torch.tensor(np.array(self.visual_session.run(None, {"input": images_onnx}))))
+
+        end = timer()
+
+        print(f"Inference time = {round((start - end)*1000)}ms")
 
 
         if normalize:
