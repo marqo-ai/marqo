@@ -69,25 +69,7 @@ def _load_image_from_path(image: str) -> ImageType:
     if os.path.isfile(image):
         img = Image.open(image)
     elif validators.url(image):
-        start = timer()
-        try:
-            f = requests.get(image, stream=True, timeout=0.01).raw
-        except requests.exceptions.Timeout:
-            logger.info(f"The http request to image = {image} timed out.")
-            pass
-        end = timer()
-        print(f"Http Request time = {round((end - start)*1000)}ms")
-
-        start = timer()
-        img = Image.open(f)
-        end = timer()
-        print(f"Open Image time = {round((end - start)*1000)}ms")
-        cpu_usage = (load15 / os.cpu_count()) * 100
-        print("The CPU usage is : ", cpu_usage)
-        print('RAM memory % used:', psutil.virtual_memory()[2])
-        # Getting usage of virtual_memory in GB ( 4th field)
-        print('RAM Used (GB):', psutil.virtual_memory()[3] / 1000000000)
-
+        img = Image.open(requests.get(image, stream=True).raw)
     else:
         raise ValueError(f"input str of {image} is not a local file or a valid url")
 
