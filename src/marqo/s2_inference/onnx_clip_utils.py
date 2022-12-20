@@ -68,7 +68,12 @@ def _load_image_from_path(image: str) -> ImageType:
         img = Image.open(image)
     elif validators.url(image):
         start = timer()
-        img = Image.open(requests.get(image, stream=True).raw)
+        f = requests.get(image, stream=True).raw
+        end = timer()
+        print(f"Request time = {round((end - start)*1000)}ms")
+
+        start = timer()
+        img = Image.open(f)
         end = timer()
         print(f"Request time = {round((end - start)*1000)}ms")
     else:
