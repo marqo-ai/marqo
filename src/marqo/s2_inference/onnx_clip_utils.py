@@ -214,13 +214,7 @@ class CLIP_ONNX(object):
         images_onnx = image_input_processed.detach().cpu().numpy().astype(np.float32)
 
         # The onnx output has the shape [1,1,768], we need to squeeze the dimension
-        start = timer()
-
         outputs = torch.squeeze(torch.tensor(np.array(self.visual_session.run(None, {"input": images_onnx}))))
-
-        end = timer()
-
-        print(f"Inference time = {round((start - end)*1000)}ms")
 
 
         if normalize:
@@ -263,6 +257,8 @@ class CLIP_ONNX(object):
         self.textual_file = self.download_model(self.model_info["repo_id"], self.model_info["textual_file"])
         self.visual_session = ort.InferenceSession(self.visual_file, providers=self.provider)
         self.textual_session = ort.InferenceSession(self.textual_file, providers=self.provider)
+        self.visual_session.disable_fallback()
+        self.textual_session.disable_fallback()
 
     @staticmethod
     def download_model(repo_id:str, filename:str, cache_folder:str = None) -> str:
