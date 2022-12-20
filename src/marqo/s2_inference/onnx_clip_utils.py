@@ -70,7 +70,11 @@ def _load_image_from_path(image: str) -> ImageType:
         img = Image.open(image)
     elif validators.url(image):
         start = timer()
-        f = requests.get(image, stream=True, timeout=0.01).raw
+        try:
+            f = requests.get(image, stream=True, timeout=0.01).raw
+        except requests.exceptions.Timeout:
+            logger.info(f"The http request to image = {image} timed out.")
+            pass
         end = timer()
         print(f"Http Request time = {round((end - start)*1000)}ms")
 
