@@ -256,8 +256,10 @@ class CLIP_ONNX(object):
     def load_onnx(self):
         self.visual_file = self.download_model(self.model_info["repo_id"], self.model_info["visual_file"])
         self.textual_file = self.download_model(self.model_info["repo_id"], self.model_info["textual_file"])
-        self.visual_session = ort.InferenceSession(self.visual_file, providers=self.provider)
-        self.textual_session = ort.InferenceSession(self.textual_file, providers=self.provider)
+        opts = ort.SessionOptions()
+        opts.intra_op_num_threads = 1
+        self.visual_session = ort.InferenceSession(self.visual_file, opts, providers=self.provider)
+        self.textual_session = ort.InferenceSession(self.textual_file, opts, providers=self.provider)
         self.visual_session.disable_fallback()
         self.textual_session.disable_fallback()
 
