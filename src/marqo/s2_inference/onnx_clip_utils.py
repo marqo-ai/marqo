@@ -175,7 +175,6 @@ class CLIP_ONNX(object):
         if self.device == 'cpu':
             return output.numpy()
         elif self.device.startswith('cuda'):
-            output = output.cpu().numpy()
             return output.cpu().numpy()
 
 
