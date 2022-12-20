@@ -204,11 +204,13 @@ class CLIP_ONNX(object):
 
 
     def encode_image(self, images, normalize=True):
+        start = timer()
         if isinstance(images, list):
             image_input = format_and_load_CLIP_images(images)
         else:
             image_input = [format_and_load_CLIP_image(images)]
-
+        end = timer()
+        print(f"Image loading Time = {round((end - start) * 1000)}ms")
 
         start = timer()
         image_input_processed = torch.stack([self.clip_preprocess(_img).to(self.device) for _img in image_input])
