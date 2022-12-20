@@ -224,6 +224,7 @@ def eject_model(model_name:str, model_device:str):
 
 
 @app.get("/device/cuda/{device}")
+# TODO: Add device detection and raise error
 def get_cuda_info(device: int = 0):
     return tensor_search.get_cuda_info(device)
 
