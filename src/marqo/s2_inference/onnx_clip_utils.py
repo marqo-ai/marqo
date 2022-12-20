@@ -14,8 +14,10 @@ from marqo.s2_inference.types import *
 from marqo.s2_inference.logger import get_logger
 import onnxruntime as ort
 from timeit import default_timer as timer
-
+import psutil
 logger = get_logger(__name__)
+
+load1, load5, load15 = psutil.getloadavg()
 
 _HF_MODE_DOWNLOAD = {
     "onnx32/openai/ViT-L/14":
@@ -68,7 +70,7 @@ def _load_image_from_path(image: str) -> ImageType:
         img = Image.open(image)
     elif validators.url(image):
         start = timer()
-        f = requests.get(image, stream=True).raw
+        f = requests.get(image, stream=True, timeout=0.01).raw
         end = timer()
         print(f"Http Request time = {round((end - start)*1000)}ms")
 
@@ -76,6 +78,12 @@ def _load_image_from_path(image: str) -> ImageType:
         img = Image.open(f)
         end = timer()
         print(f"Open Image time = {round((end - start)*1000)}ms")
+        cpu_usage = (load15 / os.cpu_count()) * 100
+        print("The CPU usage is : ", cpu_usage)
+        print('RAM memory % used:', psutil.virtual_memory()[2])
+        # Getting usage of virtual_memory in GB ( 4th field)
+        print('RAM Used (GB):', psutil.virtual_memory()[3] / 1000000000)
+
     else:
         raise ValueError(f"input str of {image} is not a local file or a valid url")
 
