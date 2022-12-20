@@ -212,15 +212,22 @@ def check_health(marqo_config: config.Config = Depends(generate_config)):
 def get_indexes(marqo_config: config.Config = Depends(generate_config)):
     return tensor_search.get_indexes(config=marqo_config)
 
+
 @app.get("/models")
 def get_loaded_models():
     return tensor_search.get_loaded_models()
+
+
 @app.delete("/models")
 def eject_model(model_name:str, model_device:str):
     return tensor_search.eject_model(model_name = model_name, device = model_device)
-@app.get("/device/cuda")
-def get_cuda_info():
-    return tensor_search.get_cuda_info()
+
+
+@app.get("/device/cuda/{device}")
+def get_cuda_info(device: int = 0):
+    return tensor_search.get_cuda_info(device)
+
+
 
 # try these curl commands:
 

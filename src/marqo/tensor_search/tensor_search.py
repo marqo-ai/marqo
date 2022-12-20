@@ -1251,10 +1251,10 @@ def get_loaded_models() -> dict:
 def eject_model(model_name: str, device: str) -> dict:
     try:
        result = s2_inference.eject_model(model_name, device)
-    except s2_inference_errors.ModelNotLoadedError as e:
-        raise errors.ModelNotLoadedError(message=str(e))
+    except s2_inference_errors.ModelNotInCache as e:
+        raise errors.ModelNotInCache(message=str(e))
     return result
-def get_cuda_info() -> dict:
+def get_cuda_info(device: int = 0) -> dict:
     return {"device": "cuda",
             "memory_usage": f"{round(torch.cuda.memory_allocated() / 1024**3, 1)} GiB",
-            "total_device_memory": f"{round(torch.cuda.get_device_properties(0).total_memory/ 1024**3, 1)} GiB"}
+            "total_device_memory": f"{round(torch.cuda.get_device_properties(device).total_memory/ 1024**3, 1)} GiB"}

@@ -43,5 +43,6 @@ class RerankerImageError(S2InferenceError):
 class RerankerNameError(S2InferenceError):
     pass
 
-class ModelNotLoadedError(S2InferenceError):
+
+class ModelNotInCache(S2InferenceError):
     pass

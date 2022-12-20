@@ -292,8 +292,10 @@ def _load_model(model_name: str, model_properties: dict, device: str = get_defau
 
     return model
 
+
 def get_available_models():
     return available_models
+
 
 def eject_model(model_name:str,device:str):
     model_cache_key = _create_model_cache_key(model_name, device)
