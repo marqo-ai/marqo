@@ -70,12 +70,12 @@ def _load_image_from_path(image: str) -> ImageType:
         start = timer()
         f = requests.get(image, stream=True).raw
         end = timer()
-        print(f"Request time = {round((end - start)*1000)}ms")
+        print(f"Http Request time = {round((end - start)*1000)}ms")
 
         start = timer()
         img = Image.open(f)
         end = timer()
-        print(f"Request time = {round((end - start)*1000)}ms")
+        print(f"Open Image time = {round((end - start)*1000)}ms")
     else:
         raise ValueError(f"input str of {image} is not a local file or a valid url")
 
