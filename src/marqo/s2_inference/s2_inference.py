@@ -36,28 +36,17 @@ def vectorise(model_name: str, content: Union[str, List[str]], model_properties:
     Raises:
         VectoriseError: if the content can't be vectorised, for some reason.
     """
-
-    vec_start = timer()
-
-    start = timer()
     validated_model_properties = _validate_model_properties(model_name, model_properties)
     model_cache_key = _create_model_cache_key(model_name, device, validated_model_properties)
 
     _update_available_models(model_cache_key, model_name, validated_model_properties, device, normalize_embeddings)
-    end = timer()
-    print(f"Model Loading Time = {round((end - start) * 1000)}ms")
 
-    start = timer()
+
     try:
         vectorised = available_models[model_cache_key].encode(content, normalize=normalize_embeddings, **kwargs)
     except UnidentifiedImageError as e:
         raise VectoriseError from e
-    end = timer()
-    print(f"vectorise Time = {round((end - start) * 1000)}ms")
 
-
-    vec_end = timer()
-    print(f"==================>Total Time = {round((vec_end - vec_start) * 1000)}ms <==========================")
 
     return _convert_vectorized_output(vectorised)
 

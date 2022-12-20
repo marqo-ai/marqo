@@ -212,25 +212,16 @@ class CLIP_ONNX(object):
         end = timer()
         print(f"Image loading Time = {round((end - start) * 1000)}ms")
 
-        start = timer()
         image_input_processed = torch.stack([self.clip_preprocess(_img).to(self.device) for _img in image_input])
         images_onnx = image_input_processed.detach().cpu().numpy().astype(np.float32)
-        end = timer()
-        print(f"Preprocess Time = {round((end - start)*1000)}ms")
 
-        start =timer()
         # The onnx output has the shape [1,1,768], we need to squeeze the dimension
         outputs = torch.squeeze(torch.tensor(np.array(self.visual_session.run(None, {"input": images_onnx}))))
-        end = timer()
-        print(f"Inference Time = {round((end - start)*1000)}ms")
 
-        start = timer()
         if normalize:
             _shape_before = outputs.shape
             outputs /= self.normalize(outputs)
             assert outputs.shape == _shape_before
-        end = timer()
-        print(f"Normalize Time = {round((end - start) * 1000)}ms")
 
         return self._convert_output(outputs)
 
