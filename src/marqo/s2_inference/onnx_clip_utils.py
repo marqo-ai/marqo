@@ -67,7 +67,10 @@ def _load_image_from_path(image: str) -> ImageType:
     if os.path.isfile(image):
         img = Image.open(image)
     elif validators.url(image):
+        start = timer()
         img = Image.open(requests.get(image, stream=True).raw)
+        end = timer()
+        print(f"Request time = {round((end - start)*1000)}ms")
     else:
         raise ValueError(f"input str of {image} is not a local file or a valid url")
 
@@ -86,10 +89,7 @@ def format_and_load_CLIP_image(image: Union[str, ndarray, ImageType]) -> ImageTy
     """
     # check for the input type
     if isinstance(image, str):
-        start = timer()
         img = _load_image_from_path(image)
-        end = timer()
-        print(f"Loading image from path time {round((end - start)*1000)} ms")
     elif isinstance(image, np.ndarray):
         img = Image.fromarray(image.astype('uint8'), 'RGB')
 
@@ -207,13 +207,10 @@ class CLIP_ONNX(object):
 
 
     def encode_image(self, images, normalize=True):
-        start = timer()
         if isinstance(images, list):
             image_input = format_and_load_CLIP_images(images)
         else:
             image_input = [format_and_load_CLIP_image(images)]
-        end = timer()
-        print(f"Image loading Time = {round((end - start) * 1000)}ms")
 
         image_input_processed = torch.stack([self.clip_preprocess(_img).to(self.device) for _img in image_input])
         images_onnx = image_input_processed.detach().cpu().numpy().astype(np.float32)
