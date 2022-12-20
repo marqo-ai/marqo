@@ -9,7 +9,6 @@ import clip
 import torch
 from PIL import Image
 import open_clip
-from onnxmltools.utils import float16_converter
 from huggingface_hub import hf_hub_download
 from marqo.s2_inference.types import *
 from marqo.s2_inference.logger import get_logger
