@@ -521,6 +521,13 @@ def _get_onnx_clip_properties() -> Dict:
                 "type":"clip_onnx",
                 "note":"the onnx float32 version of openai ViT-L/14"
             },
+        "onnx16/openai/ViT-L/14":
+            {
+                "name": "onnx16/openai/ViT-L/14",
+                "dimensions": 768,
+                "type": "clip_onnx",
+                "note": "the onnx float16 version of openai ViT-L/14"
+            },
     }
     return ONNX_CLIP_MODEL_PROPERTIES
 

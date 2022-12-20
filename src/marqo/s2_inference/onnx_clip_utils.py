@@ -27,6 +27,14 @@ _HF_MODE_DOWNLOAD = {
             "textual_file": "onnx32-openai-ViT-L-14-textual.onnx",
             "token": None
         },
+    "onnx16/openai/ViT-L/14":
+        {
+            "repo_id": "Marqo/onnx16-openai-ViT-L-14",
+            "visual_file": "onnx16-openai-ViT-L-14-visual.onnx",
+            "textual_file": "onnx16-openai-ViT-L-14-textual.onnx",
+            "token": None
+
+        }
 }
 
 
@@ -163,6 +171,11 @@ class CLIP_ONNX(object):
         self.textual_session = None
         self.model_info = _HF_MODE_DOWNLOAD[self.model_name]
 
+        if self.onnx_type == "onnx16":
+            self.visual_type = np.float16
+        elif self.onnx_type == "onnx32":
+            self.visual_type == np.float32
+
     def load(self):
         self.load_clip()
         self.load_onnx()
@@ -193,10 +206,11 @@ class CLIP_ONNX(object):
 
 
     def encode_text(self, sentence, normalize=True):
-        sentence = clip.tokenize(sentence, truncate=self.truncate).cpu()
-        sentence_onnx = sentence.detach().cpu().numpy().astype(np.int32)
+        text = clip.tokenize(sentence, truncate=self.truncate).cpu()
+        text_onnx = text.detach().cpu().numpy().astype(np.int32)
 
-        outputs = torch.squeeze(torch.tensor(np.array(self.textual_session.run(None, {"input":sentence_onnx}))))
+        onnx_input_text = {self.textual_session.get_inputs()[0].name: text_onnx}
+        outputs = torch.squeeze(torch.tensor(np.array(self.textual_session.run(None, onnx_input_text))))
 
         if normalize:
             _shape_before = outputs.shape
@@ -212,10 +226,12 @@ class CLIP_ONNX(object):
             image_input = [format_and_load_CLIP_image(images)]
 
         image_input_processed = torch.stack([self.clip_preprocess(_img).to(self.device) for _img in image_input])
-        images_onnx = image_input_processed.detach().cpu().numpy().astype(np.float32)
+        images_onnx = image_input_processed.detach().cpu().numpy().astype(self.visual_type)
+
+        onnx_input_image = {self.visual_session.get_inputs()[0].name: images_onnx}
 
         # The onnx output has the shape [1,1,768], we need to squeeze the dimension
-        outputs = torch.squeeze(torch.tensor(np.array(self.visual_session.run(None, {"input": images_onnx}))))
+        outputs = torch.squeeze(torch.tensor(np.array(self.visual_session.run(None, onnx_input_image))))
 
         if normalize:
             _shape_before = outputs.shape
@@ -256,12 +272,9 @@ class CLIP_ONNX(object):
     def load_onnx(self):
         self.visual_file = self.download_model(self.model_info["repo_id"], self.model_info["visual_file"])
         self.textual_file = self.download_model(self.model_info["repo_id"], self.model_info["textual_file"])
-        opts = ort.SessionOptions()
-        opts.intra_op_num_threads = 1
-        self.visual_session = ort.InferenceSession(self.visual_file, opts, providers=self.provider)
-        self.textual_session = ort.InferenceSession(self.textual_file, opts, providers=self.provider)
-        self.visual_session.disable_fallback()
-        self.textual_session.disable_fallback()
+        self.visual_session = ort.InferenceSession(self.visual_file, providers=self.provider)
+        self.textual_session = ort.InferenceSession(self.textual_file, providers=self.provider)
+
 
     @staticmethod
     def download_model(repo_id:str, filename:str, cache_folder:str = None) -> str:
@@ -278,123 +291,3 @@ class CLIP_ONNX(object):
 
 
 
-# class ONNX_CLIP_16(ONNX_CLIP):
-#     def __init__(self, model_name, device="cpu", embedding_dim: int = None, truncate: bool = True,
-#                  load=True, **kwargs):
-#
-#         self.model_name = model_name
-#         self.clip_name = model_name.split("onnx16/")[1]
-#         self.clip_model = None
-#         self.clip_preprocess = None
-#         self.device = device
-#         self.image_onnx = None
-#         self.text_onnx = None
-#         self.visual_path = "onnx-" + self.clip_name.replace("/", "-") + "-visual"
-#         self.textual_path = "onnx-" + self.clip_name.replace("/", "-") + "-textual"
-#         self.onnx_model = None
-#         self.truncate = truncate
-#         self.providers = ["CPUExecutionProvider", ]
-#         self.tokenize = None
-#         if self.device == "cuda":
-#             self.providers = ['CUDAExecutionProvider',] + self.providers
-#         self.visual_path_fp16 = "onnx16-" + self.clip_name.replace("/", "-") + "-visual"
-#         self.textual_path_fp16 = "onnx16-" + self.clip_name.replace("/", "-") + "-textual"
-#
-#
-#     def clip_load(self):
-#         if self.clip_model is None or self.clip_preprocess is None or self.tokenize is None:
-#             self.clip_model, _, self.clip_preprocess = open_clip.create_model_and_transforms('ViT-L-14', pretrained='openai')
-#             self.tokenize = open_clip.get_tokenizer('ViT-L-14')
-#
-#     def onnx_converter(self):
-#         self.clip_load()
-#         if self.image_onnx is None or self.text_onnx is None:
-#             dummy_input = np.random.rand(1000, 1000, 3) * 255
-#             dummy_input = dummy_input.astype("uint8")
-#
-#             image = self.clip_preprocess(Image.fromarray(dummy_input).convert("RGB")).unsqueeze(0).cpu()
-#
-#             text = self.tokenize(["a diagram", "a dog", "a cat"]).cpu()
-#
-#             self.onnx_model = clip_onnx(self.clip_model, visual_path=self.visual_path,
-#                                         textual_path=self.textual_path)
-#             self.onnx_model.convert2onnx(image, text, verbose=True)
-#
-#
-#             print("Start float16-onnx Conversion")
-#             self.visual_model_fp16 = float16_converter.convert_float_to_float16_model_path(self.visual_path)
-#             self.textual_model_fp16 = float16_converter.convert_float_to_float16_model_path(self.textual_path)
-#
-#             onnx.save_model(self.visual_model_fp16, self.visual_path_fp16)
-#             onnx.save_model(self.textual_model_fp16, self.textual_path_fp16)
-#
-#             self.load_onnx()
-#
-#
-#     def load_onnx(self):
-#         self.clip_load()
-#         print("Loading visual_session and textual_session for onnx-float16")
-#         self.visual_session = onnxruntime.InferenceSession(self.visual_path_fp16,
-#                                                           providers=["CUDAExecutionProvider", "CPUExecutionProvider"])
-#         self.textual_session = onnxruntime.InferenceSession(self.textual_path_fp16,
-#                                                             providers=["CUDAExecutionProvider", "CPUExecutionProvider"])
-#
-#     def encode_text(self, sentence, normalize=True):
-#         sentence = self.tokenize(sentence).cpu()
-#         sentence_onnx = sentence.detach().cpu().numpy().astype(np.int64)
-#         outputs = torch.tensor(self.textual_session.run(None, {"input":sentence_onnx})).to(self.device)[0]
-#
-#         if normalize:
-#             _shape_before = outputs.shape
-#             outputs /= self.normalize(outputs)
-#             assert outputs.shape == _shape_before
-#         return self._convert_output(outputs)
-#
-#     def encode_image(self, images, normalize=True):
-#         if isinstance(images, list):
-#             image_input = format_and_load_CLIP_images(images)
-#         else:
-#             image_input = [format_and_load_CLIP_image(images)]
-#
-#
-#         start1 = timer()
-#         self.image_input_processed = torch.stack([self.clip_preprocess(_img).to(self.device) for _img in image_input])
-#         self.images_onnx = self.image_input_processed.detach().cpu().numpy().astype(np.float16)
-#         end1  = timer()
-#
-#         start2 = timer()
-#         outputs = torch.tensor(self.visual_session.run(None, {"input":self.images_onnx})).to(self.device)[0]
-#
-#         if normalize:
-#             _shape_before = outputs.shape
-#             outputs /= self.normalize(outputs)
-#             assert outputs.shape == _shape_before
-#         if self.device.startswith("cuda"):
-#             torch.cuda.synchronize(device=None)
-#         end2 = timer()
-#
-#         print(f"preprocessing time {round((end1-start1)*1000)}ms, encoding time {round((end2 - start2)*1000)}ms")
-#         return self._convert_output(outputs)
-#
-#     def encode(self, inputs: Union[str, ImageType, List[Union[str, ImageType]]],
-#                default: str = 'text', normalize=True, **kwargs) -> FloatTensor:
-#
-#         infer = kwargs.pop('infer', True)
-#
-#         if infer and _is_image(inputs):
-#             is_image = True
-#         else:
-#             is_image = False
-#             if default == 'text':
-#                 is_image = False
-#             elif default == 'image':
-#                 is_image = True
-#             else:
-#                 raise ValueError(f"expected default='image' or default='text' but received {default}")
-#
-#         if is_image:
-#             logger.debug('image')
-#             return self.encode_image(inputs, normalize=True)
-#         else:
-#             logger.debug('text')
-#             return self.encode_text(inputs, normalize=True)
