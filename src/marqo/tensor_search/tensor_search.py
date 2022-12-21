@@ -296,23 +296,23 @@ def _batch_request(config: Config, index_name: str, dataset: List[dict],
 
     batched = functools.reduce(lambda x, y: batch_requests(x, y), deeper, [])
 
-        def verbosely_add_docs(i, docs):
-            t0 = timer()
+    def verbosely_add_docs(i, docs):
+        t0 = timer()
 
-            logger.info(f"    batch {i}: beginning ingestion. ")
-            res = add_documents(
-                config=config, index_name=index_name,
-                docs=docs, auto_refresh=False, device=device,
-                update_mode=update_mode, non_tensor_fields=non_tensor_fields
-            )
-            total_batch_time = timer() - t0
-            num_docs = len(docs)
+        logger.info(f"    batch {i}: beginning ingestion. ")
+        res = add_documents(
+            config=config, index_name=index_name,
+            docs=docs, auto_refresh=False, device=device,
+            update_mode=update_mode, non_tensor_fields=non_tensor_fields
+        )
+        total_batch_time = timer() - t0
+        num_docs = len(docs)
 
-            logger.info(f"    batch {i}: ingested {num_docs} docs. Time taken: {(total_batch_time):.3f}. "
-                        f"Average time per doc {(total_batch_time/num_docs):.3f}")
-            if verbose:
-                logger.info(f"        results from indexing batch {i}: {res}")
-            return res
+        logger.info(f"    batch {i}: ingested {num_docs} docs. Time taken: {(total_batch_time):.3f}. "
+                    f"Average time per doc {(total_batch_time/num_docs):.3f}")
+        if verbose:
+            logger.info(f"        results from indexing batch {i}: {res}")
+        return res
 
     results = [verbosely_add_docs(i, docs) for i, docs in enumerate(batched)]
     logger.info('completed batch ingestion.')
