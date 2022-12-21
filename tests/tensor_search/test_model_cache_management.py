@@ -126,10 +126,6 @@ class TestModelCacheManagement(MarqoTestCase):
         for i in range(test_iterations):
             eject_model(self.MODEL_1, "cpu")
             load_model(self.MODEL_1, "cpu")
-
-            for id in range(torch.cuda.device_count()):
-                # cuda usage
-                assert torch.cuda.memory_allocated(id) < torch.cuda.get_device_properties(id).total_memory
             # cpu usage
             assert psutil.cpu_percent(1) < 100.0
             # memory usage
