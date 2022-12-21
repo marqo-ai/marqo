@@ -296,7 +296,6 @@ def _batch_request(config: Config, index_name: str, dataset: List[dict],
 
     batched = functools.reduce(lambda x, y: batch_requests(x, y), deeper, [])
 
-<<<<<<< HEAD
         def verbosely_add_docs(i, docs):
             t0 = timer()
 
@@ -314,23 +313,6 @@ def _batch_request(config: Config, index_name: str, dataset: List[dict],
             if verbose:
                 logger.info(f"        results from indexing batch {i}: {res}")
             return res
-=======
-    def verbosely_add_docs(i, docs):
-        t0 = datetime.datetime.now()
-        res = add_documents(
-            config=config, index_name=index_name,
-            docs=docs, auto_refresh=False, device=device,
-            update_mode=update_mode, non_tensor_fields=non_tensor_fields
-        )
-        total_batch_time = datetime.datetime.now() - t0
-        num_docs = len(docs)
-
-        logger.info(f"    batch {i}: ingested {num_docs} docs. Time taken: {total_batch_time}. "
-                    f"Average timer per doc {total_batch_time / num_docs}")
-        if verbose:
-            logger.info(f"        results from indexing batch {i}: {res}")
-        return res
->>>>>>> f1d15e9167c15791330d9cf15d9319da22b49abd
 
     results = [verbosely_add_docs(i, docs) for i, docs in enumerate(batched)]
     logger.info('completed batch ingestion.')
@@ -503,22 +485,17 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                 try:
                     # in the future, if we have different underlying vectorising methods, make sure we catch possible
                     # errors of different types generated here, too.
-<<<<<<< HEAD
 
                     # ADD DOCS TIMER-LOGGER (4)
                     start_time = timer()
-                    vector_chunks = s2_inference.vectorise(model_name=index_info.model_name, content=content_chunks,
-                                                           device=selected_device, normalize_embeddings=normalize_embeddings,
-                                                           infer=infer_if_image)
+                    vector_chunks = s2_inference.vectorise(model_name=index_info.model_name, model_properties=_get_model_properties(index_info), content=content_chunks,
+                        device=selected_device, normalize_embeddings=normalize_embeddings,
+                        infer=infer_if_image)
 
                     end_time = timer()
                     single_vectorise_call = end_time - start_time
                     total_vectorise_time += single_vectorise_call
                     logger.debug(f"(4) TIME for single vectorise call: {(single_vectorise_call):.3f}s.")
-=======
-                    vector_chunks = s2_inference.vectorise(model_name=index_info.model_name, model_properties=_get_model_properties(index_info), content=content_chunks,
-                        device=selected_device, normalize_embeddings=normalize_embeddings,
-                        infer=infer_if_image)
                 except (s2_inference_errors.UnknownModelError,
                         s2_inference_errors.InvalidModelPropertiesError,
                         s2_inference_errors.ModelLoadError) as model_error:
@@ -526,7 +503,6 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                         message=f'Problem vectorising query. Reason: {str(model_error)}',
                         link="https://marqo.pages.dev/latest/Models-Reference/dense_retrieval/"
                     )
->>>>>>> f1d15e9167c15791330d9cf15d9319da22b49abd
                 except s2_inference_errors.S2InferenceError:
                     document_is_valid = False
                     image_err = errors.InvalidArgError(message=f'Could not process given image: {field_content}')
@@ -633,15 +609,10 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
         # the HttpRequest wrapper handles error logic
         update_mapping_response = backend.add_customer_field_properties(
             config=config, index_name=index_name, customer_field_names=new_fields,
-<<<<<<< HEAD
-            model_properties=s2_inference.get_model_properties(model_name=index_info.model_name))
+            model_properties=_get_model_properties(index_info))
         
         # ADD DOCS TIMER-LOGGER (5)
         start_time_5 = timer()
-=======
-            model_properties=_get_model_properties(index_info))
-
->>>>>>> f1d15e9167c15791330d9cf15d9319da22b49abd
         index_parent_response = HttpRequests(config).post(
             path="_bulk", body=utils.dicts_to_jsonl(bulk_parent_dicts))
         end_time_5 = timer()
@@ -868,26 +839,19 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
     logger.info("reranking using {}".format(reranker))
 
     if reranker is not None:
-<<<<<<< HEAD
-        # SEARCH TIMER-LOGGER (reranking)
-        start_rerank_time = timer()
-        rerank.rerank_search_results(search_result=search_result, query=text, 
-                    model_name=reranker, device=config.indexing_device, 
-                searchable_attributes=searchable_attributes, num_highlights=1 if simplified_format else num_highlights)
-        end_rerank_time = timer()
-        total_rerank_time = end_rerank_time - start_rerank_time
-        logger.info(f"search ({search_method.lower()}) reranking: took {(total_rerank_time):.3f}s to rerank results.")
-=======
-        logger.info("reranking using {}".format(reranker))
         if searchable_attributes is None:
             raise errors.InvalidArgError(f"searchable_attributes cannot be None when re-ranking. Specify which fields to search and rerank over.")
         try:
+            # SEARCH TIMER-LOGGER (reranking)
+            start_rerank_time = timer()
             rerank.rerank_search_results(search_result=search_result, query=text,
                 model_name=reranker, device=config.indexing_device if device is None else device,
                 searchable_attributes=searchable_attributes, num_highlights=1 if simplified_format else num_highlights)
+            end_rerank_time = timer()
+            total_rerank_time = end_rerank_time - start_rerank_time
+            logger.info(f"search ({search_method.lower()}) reranking using {reranker}: took {(total_rerank_time):.3f}s to rerank results.")
         except Exception as e:
             raise errors.BadRequestError(f"reranking failure due to {str(e)}")
->>>>>>> f1d15e9167c15791330d9cf15d9319da22b49abd
 
     
     search_result["query"] = text
@@ -1149,7 +1113,6 @@ def _vector_text_search(
         # empty body means that there are no vector fields associated with the index.
         # This probably means the index is emtpy
         return {"hits": []}
-<<<<<<< HEAD
     
     end_preprocess_time = timer()
     total_preprocess_time = end_preprocess_time - start_preprocess_time
@@ -1165,14 +1128,6 @@ def _vector_text_search(
     num_responses = len(response["responses"])
     logger.info(f"search (tensor) roundtrip: took {(total_search_http_time):.3f}s to send {num_responses} search queries (roundtrip) to Marqo-os.")
     
-=======
-
-    response = HttpRequests(config).get(path=F"{index_name}/_msearch", body=utils.dicts_to_jsonl(body))
-
-    if verbose:
-        logger.info(f'Opensearch reported {response["took"]}ms search latency')
-
->>>>>>> f1d15e9167c15791330d9cf15d9319da22b49abd
     try:
         responses = [r['hits']['hits'] for r in response["responses"]]
 
@@ -1197,7 +1152,7 @@ def _vector_text_search(
         except (KeyError, IndexError) as e2:
             raise e
 
-    logger.info(f"  search (tensor) Marqo-os processing time: took {(total_os_process_time):.3f}s for Marqo-os to execute all searches.")
+    logger.info(f"  search (tensor) Marqo-os processing time: took {(total_os_process_time):.3f}s for Marqo-os to execute the search.")
 
     # SEARCH TIMER-LOGGER (post-processing)
     start_postprocess_time = timer()
