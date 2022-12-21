@@ -92,7 +92,7 @@ class TestModelCacheManagement(MarqoTestCase):
                 # cuda usage
                 assert torch.cuda.memory_allocated(id) < torch.cuda.get_device_properties(id).total_memory
             # cpu usage
-            assert psutil.cpu_percent(1) < 100.0
+            assert psutil.cpu_percent(1) > 100.0
             # memory usage
             assert psutil.virtual_memory()[2]< 100.0
 
