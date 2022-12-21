@@ -1260,9 +1260,9 @@ def eject_model(model_name: str, device: str) -> dict:
 
 def get_cpu_info() -> dict:
     return {
-        "CPU usage (last 5 seconds)": f"{psutil.cpu_percent(4)} %",
-        "RAM memory % used": f"{psutil.virtual_memory()[2]} %",
-        "RAM Used (GB)": f"{psutil.virtual_memory()[3]/1000000000}",
+        "CPU usage": f"{psutil.cpu_percent(1)} %", # The number 1 is a time interval for CPU usage calculation.
+        "RAM memory % used": f"{psutil.virtual_memory()[2]} %",  # The number 2 is just a index number to get the expected results
+        "RAM Used (GB)": f"{round(psutil.virtual_memory()[3]/1000000000,1)}", # The number 3 is just a index number to get the expected results
     }
 
 
