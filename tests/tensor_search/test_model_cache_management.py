@@ -41,7 +41,7 @@ class TestModelCacheManagement(MarqoTestCase):
 
         for model_name in self.MODEL_LIST:
             eject_model(model_name, "cpu")
-            if (model_name, "cpu") not in available_models:
+            if (model_name, "cpu") in available_models:
                 raise AssertionError(f"Model= {model_name} device = cpu is not deleted from cache")
 
 
