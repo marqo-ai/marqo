@@ -32,6 +32,7 @@ class TestModelCacheManagement(MarqoTestCase):
 
         assert len(available_models) == 6
 
+
     def test_eject_model(self):
         # check if we can eject the models
         for model_name in self.MODEL_LIST:
