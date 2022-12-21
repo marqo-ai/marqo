@@ -1086,13 +1086,17 @@ def _vector_text_search(
     total_search_http_time = end_search_http_time - start_search_http_time
     total_os_process_time = response["took"] * 0.001
     num_responses = len(response["responses"])
-    logger.info(f"search (tensor) roundtrip: took {(total_search_http_time):.3f}s to send search query (roundtrip) to Marqo-os and received {num_responses} responses.")
-    logger.info(f"  search (tensor) Marqo-os processing time: took {(total_os_process_time):.3f}s for Marqo-os to execute the search.")
-
-    # SEARCH TIMER-LOGGER (post-processing)
-    start_postprocess_time = timer()
+    logger.info(f"search (tensor) roundtrip: took {(total_search_http_time):.3f}s to send {num_responses} search queries (roundtrip) to Marqo-os.")
+    
     try:
         responses = [r['hits']['hits'] for r in response["responses"]]
+
+        # SEARCH TIMER-LOGGER (Log number of results and time for each search in multisearch)
+        for i in range(len(vector_properties_to_search)):
+            indiv_responses = response["responses"][i]['hits']['hits']
+            indiv_query_time = response["responses"][i]["took"] * 0.001
+            logger.info(f"  search (tensor) Marqo-os processing time (search field = {list(vector_properties_to_search)[i]}): took {(indiv_query_time):.3f}s and received {len(indiv_responses)} hits.")
+
     except KeyError as e:
         # KeyError indicates we have received a non-successful result
         try:
@@ -1108,6 +1112,10 @@ def _vector_text_search(
         except (KeyError, IndexError) as e2:
             raise e
 
+    logger.info(f"  search (tensor) Marqo-os processing time: took {(total_os_process_time):.3f}s for Marqo-os to execute all searches.")
+
+    # SEARCH TIMER-LOGGER (post-processing)
+    start_postprocess_time = timer()
     gathered_docs = dict()
 
     if verbose:
