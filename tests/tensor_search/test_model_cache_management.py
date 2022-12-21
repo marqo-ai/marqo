@@ -1,15 +1,10 @@
-import json
-import pprint
-import time
-from marqo.errors import IndexNotFoundError, MarqoError
-from marqo.tensor_search import tensor_search, constants, index_meta_cache
-import unittest
-import copy
+import torch.cuda
 from tests.marqo_test import MarqoTestCase
 from marqo.s2_inference.s2_inference import _validate_model_properties,\
     _create_model_cache_key, _update_available_models, available_models
 from marqo.tensor_search.tensor_search import eject_model, get_cuda_info, get_loaded_models
 from marqo.errors import ModelNotInCache, HardwareCompatabilityError
+import psutil
 
 
 
@@ -33,17 +28,16 @@ class TestModelCacheManagement(MarqoTestCase):
         for model_name in self.MODEL_LIST:
             load_model(model_name, "cuda")
             load_model(model_name, "cpu")
-        print(available_models)
-        # We will load 6 models (3 in cuda, 3 in cpu) as initial setup
+        # We loaded 6 models (3 in cuda, 3 in cpu) as initial setup
+
+        assert len(available_models) == 6
 
     def test_eject_model(self):
-        print(available_models)
-
+        # check if we can eject the models
         for model_name in self.MODEL_LIST:
             eject_model(model_name, "cpu")
             if (model_name, "cpu") in available_models:
                 raise AssertionError(f"Model= {model_name} device = cpu is not deleted from cache")
-
 
             eject_model(model_name,"cuda")
             if (model_name, "cuda") in available_models:
@@ -78,11 +72,25 @@ class TestModelCacheManagement(MarqoTestCase):
         except HardwareCompatabilityError:
             pass
 
-    def test_loaded_models(self) -> dict:
+    def test_loaded_models(self):
 
         loaded_models = get_loaded_models()["models"]
         loaded_models_list = [tuple(dic.values()) for dic in loaded_models]
         assert loaded_models_list==list(available_models.keys())
+
+    def edge_case(self):
+        test_iterations = 50
+        for i in range(test_iterations):
+            eject_model(self.MODEL_1, "cuda")
+            load_model(self.MODEL_1, "cuda")
+
+            for id in range(torch.cuda.device_count()):
+                # cuda usage
+                assert torch.cuda.memory_allocated(id) < torch.cuda.get_device_properties(id).total_memory
+            # cpu usage
+            assert psutil.cpu_percent(1) < 100.0
+            # memory usage
+            assert psutil.virtual_memory()[2]< 100.0
 
 
 
