@@ -8,8 +8,8 @@ import copy
 from tests.marqo_test import MarqoTestCase
 from marqo.s2_inference.s2_inference import _validate_model_properties,\
     _create_model_cache_key, _update_available_models, available_models
-from marqo.tensor_search.tensor_search import eject_model
-from marqo.errors import ModelNotInCache
+from marqo.tensor_search.tensor_search import eject_model, get_cuda_info
+from marqo.errors import ModelNotInCache, HardwareCompatabilityError
 
 
 
@@ -41,8 +41,8 @@ class TestModelCacheManagement(MarqoTestCase):
 
         for model_name in self.MODEL_LIST:
             eject_model(model_name, "cpu")
-            if (model_name, "cpu") in available_models:
-                raise AssertionError
+            if (model_name, "cpu") not in available_models:
+                raise AssertionError(f"Model= {model_name} device = cpu is not deleted from cache")
 
 
             eject_model(model_name,"cuda")
@@ -71,6 +71,15 @@ class TestModelCacheManagement(MarqoTestCase):
             eject_model(my_test_model_2, "cpu")
         except ModelNotInCache:
             pass
+
+    def test_cuda_info(self):
+        try:
+            get_cuda_info()
+        except HardwareCompatabilityError:
+            pass
+
+
+
 
 
 
