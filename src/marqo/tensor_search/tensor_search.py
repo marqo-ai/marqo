@@ -55,7 +55,7 @@ from marqo.s2_inference.clip_utils import _is_image
 from marqo.s2_inference.reranking import rerank
 from marqo.s2_inference import s2_inference
 import torch.cuda
-
+import psutil
 # We depend on _httprequests.py for now, but this may be replaced in the future, as
 # _httprequests.py is designed for the client
 from marqo._httprequests import HttpRequests
@@ -1256,6 +1256,14 @@ def eject_model(model_name: str, device: str) -> dict:
     except s2_inference_errors.ModelNotInCache as e:
         raise errors.ModelNotInCache(message=str(e))
     return result
+
+
+def get_cpu_info() -> dict:
+    return {
+        "CPU usage (last 5 seconds)" :f"{psutil.cpu_percent(4)} %",
+        "RAM memory % used": f"{psutil.virtual_memory()[2]} %",
+        "RAM Used (GB)" : f"{psutil.virtual_memory()[3]/1000000000}",
+    }
 
 
 def get_cuda_info() -> dict:
