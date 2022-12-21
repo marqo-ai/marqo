@@ -67,6 +67,10 @@ class TestModelCacheManagement(MarqoTestCase):
         except ModelNotInCache:
             pass
 
-        eject_model(my_test_model_2, "cpu")
+        try:
+            eject_model(my_test_model_2, "cpu")
+        except ModelNotInCache:
+            pass
+
 
 
