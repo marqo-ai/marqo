@@ -1268,7 +1268,7 @@ def get_cpu_info() -> dict:
 
 def get_cuda_info() -> dict:
     if torch.cuda.is_available():
-        return {"cuda_usage_info":[{"device_id" : id, "device_name" : torch.cuda.get_device_name(id),
+        return {"cuda_devices:": [{"device_id" : id, "device_name" : torch.cuda.get_device_name(id),
                 "memory_used":f"{round(torch.cuda.memory_allocated(id) / 1024**3, 1)} GiB",
                 "total_memory": f"{round(torch.cuda.get_device_properties(id).total_memory/ 1024**3, 1)} GiB"}
                 for id in range(torch.cuda.device_count())]}
