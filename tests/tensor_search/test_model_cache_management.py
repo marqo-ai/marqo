@@ -83,10 +83,24 @@ class TestModelCacheManagement(MarqoTestCase):
 
 
     def test_edge_case(self):
-        test_iterations = 50
+        test_iterations = 10
+
         for i in range(test_iterations):
             eject_model(self.MODEL_1, "cuda")
             load_model(self.MODEL_1, "cuda")
+
+            for id in range(torch.cuda.device_count()):
+                # cuda usage
+                assert torch.cuda.memory_allocated(id) < torch.cuda.get_device_properties(id).total_memory
+            # cpu usage
+            assert psutil.cpu_percent(1) < 100.0
+            # memory usage
+            assert psutil.virtual_memory()[2]< 100.0
+
+
+        for i in range(test_iterations):
+            eject_model(self.MODEL_1, "cpu")
+            load_model(self.MODEL_1, "cpu")
 
             for id in range(torch.cuda.device_count()):
                 # cuda usage
