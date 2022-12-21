@@ -95,7 +95,7 @@ def add_customer_field_properties(config: Config, index_name: str,
                             "engine": engine,
                             "parameters": {
                                 "ef_construction": 128,
-                                "m": 24
+                                "m": 16
                             }
                         }
                     } for field_name in customer_field_names
