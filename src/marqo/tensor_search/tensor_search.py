@@ -1255,6 +1255,7 @@ def eject_model(model_name: str, device: str) -> dict:
         raise errors.ModelNotInCache(message=str(e))
     return result
 def get_cuda_info(device: int = 0) -> dict:
-    return {"device": "cuda",
-            "memory_usage": f"{round(torch.cuda.memory_allocated() / 1024**3, 1)} GiB",
-            "total_device_memory": f"{round(torch.cuda.get_device_properties(device).total_memory/ 1024**3, 1)} GiB"}
+    return {"cuda_usage_info":[{"device_id" : id, "device_name" : torch.cuda.get_device_name(id),
+            "memory_used":f"{round(torch.cuda.memory_allocated(id) / 1024**3, 1)} GiB",
+            "total_memory": f"{round(torch.cuda.get_device_properties(id).total_memory/ 1024**3, 1)} GiB"}
+            for id in range(torch.cuda.device_count())]}
