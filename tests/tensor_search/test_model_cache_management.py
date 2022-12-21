@@ -66,17 +66,20 @@ class TestModelCacheManagement(MarqoTestCase):
         except ModelNotInCache:
             pass
 
+
     def test_cuda_info(self):
         try:
             get_cuda_info()
         except HardwareCompatabilityError:
             pass
 
+
     def test_loaded_models(self):
 
         loaded_models = get_loaded_models()["models"]
         loaded_models_list = [tuple(dic.values()) for dic in loaded_models]
         assert loaded_models_list==list(available_models.keys())
+
 
     def edge_case(self):
         test_iterations = 50
