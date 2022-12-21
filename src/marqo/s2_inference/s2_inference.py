@@ -297,7 +297,7 @@ def eject_model(model_name:str,device:str):
             torch.cuda.empty_cache()
         return {"message":f"eject SUCCESS, eject model_name={model_name} from device={device}"}
     else:
-        raise ModelNotInCache(f"The model_name={model_name} device={device} is not loaded")
+        raise ModelNotInCache(f"The model_name={model_name} device={device} is not cached")
 
 # def normalize(inputs):
 
