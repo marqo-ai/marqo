@@ -82,7 +82,7 @@ class TestModelCacheManagement(MarqoTestCase):
 
         loaded_models = get_loaded_models()["models"]
         loaded_models_list = [tuple(dic.values()) for dic in loaded_models]
-        assert loaded_models_list==available_models.keys()
+        assert loaded_models_list==list(available_models.keys())
 
 
 
