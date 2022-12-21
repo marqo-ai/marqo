@@ -305,6 +305,11 @@ curl -XPOST  http://localhost:8882/indexes/my-irst-ix/documents/delete-batch -H 
 curl -XDELETE http://localhost:8882/indexes/my-irst-ix
 """
 
+# check cpu info
+"""
+curl -XGET http://localhost:8882/device/cpu
+"""
+
 # check cuda info
 """
 curl -XGET http://localhost:8882/device/cuda
