@@ -596,7 +596,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
         logger.info(f"      add_documents roundtrip: took {(total_http_time):.3f}s to send {batch_size} docs (roundtrip) to Marqo-os, " 
                     f"for an average of {(total_http_time / batch_size):.3f}s per doc.")
         
-        logger.info(f"      add_documents Marqo-os index: took {(total_index_time):.3f}s for Marqo-os to index {batch_size} docs, "
+        logger.info(f"          add_documents Marqo-os index: took {(total_index_time):.3f}s for Marqo-os to index {batch_size} docs, "
                     f"for an average of {(total_index_time / batch_size):.3f}s per doc.")
     else:
         index_parent_response = None
@@ -820,14 +820,17 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
         total_rerank_time = end_rerank_time - start_rerank_time
         logger.info(f"search ({search_method.lower()}) reranking: took {(total_rerank_time):.3f}s to rerank results.")
 
-    time_taken = timer() - t0
-    search_result["processingTimeMs"] = round(time_taken * 1000)
+    
     search_result["query"] = text
     search_result["limit"] = result_count
 
     if not highlights:
         for hit in search_result["hits"]:
             del hit["_highlights"]
+    
+    time_taken = timer() - t0
+    search_result["processingTimeMs"] = round(time_taken * 1000)
+    logger.info(f"search ({search_method.lower()}) completed with total processing time: {(time_taken):.3f}s.")
 
     return search_result
 
@@ -853,6 +856,7 @@ def _lexical_search(
     Notes:
         Should not be directly called by client - the search() method should
         be called. The search() method adds syncing
+        Uses normal search (not multiple search).
     TODO:
         - Test raise_for_searchable_attribute=False
     """
@@ -905,8 +909,10 @@ def _lexical_search(
 
     end_search_http_time = timer()
     total_search_http_time = end_search_http_time - start_search_http_time
+    total_os_process_time = search_res["took"] * 0.001
     num_results = len(search_res['hits']['hits'])
     logger.info(f"search (lexical) roundtrip: took {(total_search_http_time):.3f}s to send search query (roundtrip) to Marqo-os and received {num_results} results.")
+    logger.info(f"  search (lexical) Marqo-os processing time: took {(total_os_process_time):.3f}s for Marqo-os to execute the search.")
 
     # SEARCH TIMER-LOGGER (post-processing)
     start_postprocess_time = timer()
@@ -951,7 +957,7 @@ def _vector_text_search(
     Returns:
 
     Note:
-        - looks for k results in each attribute. Not that much of a concern unless you have a
+        - uses multisearch, which returns k results in each attribute. Not that much of a concern unless you have a
         ridiculous number of attributes
         - Should not be directly called by client - the search() method should
         be called. The search() method adds syncing
@@ -1078,9 +1084,10 @@ def _vector_text_search(
 
     end_search_http_time = timer()
     total_search_http_time = end_search_http_time - start_search_http_time
-    
-    num_responses = len(response["responses"])     # TODO JOSHUA find num_results
+    total_os_process_time = response["took"] * 0.001
+    num_responses = len(response["responses"])
     logger.info(f"search (tensor) roundtrip: took {(total_search_http_time):.3f}s to send search query (roundtrip) to Marqo-os and received {num_responses} responses.")
+    logger.info(f"  search (tensor) Marqo-os processing time: took {(total_os_process_time):.3f}s for Marqo-os to execute the search.")
 
     # SEARCH TIMER-LOGGER (post-processing)
     start_postprocess_time = timer()
