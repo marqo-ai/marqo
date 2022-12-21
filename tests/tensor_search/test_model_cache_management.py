@@ -33,9 +33,11 @@ class TestModelCacheManagement(MarqoTestCase):
         for model_name in self.MODEL_LIST:
             load_model(model_name, "cuda")
             load_model(model_name, "cpu")
+        print(available_models)
         # We will load 6 models (3 in cuda, 3 in cpu) as initial setup
 
     def test_eject_model(self):
+        print(available_models)
 
         for model_name in self.MODEL_LIST:
             eject_model(model_name, "cpu")
