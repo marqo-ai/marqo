@@ -8,7 +8,7 @@ import copy
 from tests.marqo_test import MarqoTestCase
 from marqo.s2_inference.s2_inference import _validate_model_properties,\
     _create_model_cache_key, _update_available_models, available_models
-from marqo.tensor_search.tensor_search import eject_model, get_cuda_info
+from marqo.tensor_search.tensor_search import eject_model, get_cuda_info, get_loaded_models
 from marqo.errors import ModelNotInCache, HardwareCompatabilityError
 
 
@@ -77,6 +77,16 @@ class TestModelCacheManagement(MarqoTestCase):
             get_cuda_info()
         except HardwareCompatabilityError:
             pass
+
+    def test_loaded_models(self) -> dict:
+
+        loaded_models = get_loaded_models()["models"]
+        loaded_models_list = [list(i) for i in loaded_models]
+        assert loaded_models_list==available_models
+
+
+
+
 
 
 
