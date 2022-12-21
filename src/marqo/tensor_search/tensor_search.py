@@ -836,9 +836,8 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
     else:
         raise errors.InvalidArgError(f"Search called with unknown search method: {search_method}")
 
-    logger.info("reranking using {}".format(reranker))
-
     if reranker is not None:
+        logger.info("reranking using {}".format(reranker))
         if searchable_attributes is None:
             raise errors.InvalidArgError(f"searchable_attributes cannot be None when re-ranking. Specify which fields to search and rerank over.")
         try:
