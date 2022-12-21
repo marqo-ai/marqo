@@ -23,7 +23,7 @@ class TestModelCacheManagement(MarqoTestCase):
 
     def setUp(self) -> None:
         # We pre-define 3 dummy models for testing purpose
-        self.MODEL_1 = "ViT/L-14"
+        self.MODEL_1 = "ViT-L/14"
         self.MODEL_2 = "open_clip/ViT-L-14/laion400m_e31"
         self.MODEL_3 = "hf/all-MiniLM-L6-v2"
         self.MODEL_LIST = [self.MODEL_1, self.MODEL_2, self.MODEL_3]
