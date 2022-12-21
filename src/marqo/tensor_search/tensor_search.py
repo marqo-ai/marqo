@@ -1248,12 +1248,16 @@ def get_loaded_models() -> dict:
         ]
     }
     return message
+
+
 def eject_model(model_name: str, device: str) -> dict:
     try:
        result = s2_inference.eject_model(model_name, device)
     except s2_inference_errors.ModelNotInCache as e:
         raise errors.ModelNotInCache(message=str(e))
     return result
+
+
 def get_cuda_info() -> dict:
     return {"cuda_usage_info":[{"device_id" : id, "device_name" : torch.cuda.get_device_name(id),
             "memory_used":f"{round(torch.cuda.memory_allocated(id) / 1024**3, 1)} GiB",
