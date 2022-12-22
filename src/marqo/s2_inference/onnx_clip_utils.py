@@ -25,16 +25,16 @@ _HF_MODEL_DOWNLOAD = {
     '''
     "onnx32/openai/ViT-L/14":
         {
-            "repo_id": "Marqo/onnx32-openai-ViT-L-14",
+            "repo_id": "Marqo/onnx-openai-ViT-L-14",
             "visual_file": "onnx32-openai-ViT-L-14-visual.onnx",
             "textual_file": "onnx32-openai-ViT-L-14-textual.onnx",
             "token": None
         },
     "onnx16/openai/ViT-L/14":
         {
-            "repo_id": "Marqo/onnx16-openai-ViT-L-14",
+            "repo_id": "Marqo/onnx-openai-ViT-L-14",
             "visual_file": "onnx16-openai-ViT-L-14-visual.onnx",
-            "textual_file": "onnx16-openai-ViT-L-14-textual.onnx",
+            "textual_file": "onnx32-openai-ViT-L-14-textual.onnx",
             "token": None
 
         }
