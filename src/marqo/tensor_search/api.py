@@ -13,6 +13,7 @@ from marqo.tensor_search.web import api_validation, api_utils
 from marqo.tensor_search import utils
 from marqo.tensor_search.on_start_script import on_start
 from marqo import version
+from marqo.tensor_search.backend import get_index_info
 
 def replace_host_localhosts(OPENSEARCH_IS_INTERNAL: str, OS_URL: str):
     """Replaces a host's localhost URL with one that can be referenced from
@@ -211,6 +212,12 @@ def check_health(marqo_config: config.Config = Depends(generate_config)):
 @app.get("/indexes")
 def get_indexes(marqo_config: config.Config = Depends(generate_config)):
     return tensor_search.get_indexes(config=marqo_config)
+
+
+@app.get("/indexes/{index_name}/settings")
+def get_settings(index_name: str, marqo_config: config.Config = Depends(generate_config)):
+    return get_index_info(config=marqo_config, index_name=index_name)
+
 
 # try these curl commands:
 
