@@ -14,9 +14,12 @@ from marqo.s2_inference.types import *
 from marqo.s2_inference.logger import get_logger
 import onnxruntime as ort
 
+# Loading shared functions from clip_utils.py. This part should be decoupled from models in the future
+from clip_utils import get_allowed_image_types, format_and_load_CLIP_image, format_and_load_CLIP_images, load_image_from_path,_is_image
+
 logger = get_logger(__name__)
 
-_HF_MODE_DOWNLOAD = {
+_HF_MODEL_DOWNLOAD = {
     '''
     Please check the link https://huggingface.co/Marqo for available models.
     '''
@@ -38,123 +41,6 @@ _HF_MODE_DOWNLOAD = {
 }
 
 
-
-def get_allowed_image_types():
-    return set(('.jpg', '.png', '.bmp', '.jpeg'))
-
-
-def format_and_load_CLIP_images(images: List[Union[str, ndarray, ImageType]]) -> List[ImageType]:
-    """takes in a list of strings, arrays or urls and either loads and/or converts to PIL
-        for the clip model
-    Args:
-        images (List[Union[str, np.ndarray, ImageType]]): list of file locations or arrays (can be mixed)
-    Raises:
-        TypeError: _description_
-    Returns:
-        List[ImageType]: list of PIL images
-    """
-    if not isinstance(images, list):
-        raise TypeError(f"expected list but received {type(images)}")
-
-    results = []
-    for image in images:
-        results.append(format_and_load_CLIP_image(image))
-
-    return results
-
-
-def _load_image_from_path(image: str) -> ImageType:
-    """loads an image into PIL from a string path that is
-    either local or a url
-    Args:
-        image (str): _description_
-    Raises:
-        ValueError: _description_
-    Returns:
-        ImageType: _description_
-    """
-
-    if os.path.isfile(image):
-        img = Image.open(image)
-    elif validators.url(image):
-        img = Image.open(requests.get(image, stream=True).raw)
-    else:
-        raise ValueError(f"input str of {image} is not a local file or a valid url")
-
-    return img
-
-
-def format_and_load_CLIP_image(image: Union[str, ndarray, ImageType]) -> ImageType:
-    """standardizes the input to be a PIL image
-    Args:
-        image (Union[str, np.ndarray, ImageType]): can be a local file, url or array
-    Raises:
-        ValueError: _description_
-        TypeError: _description_
-    Returns:
-        ImageType: PIL image
-    """
-    # check for the input type
-    if isinstance(image, str):
-        img = _load_image_from_path(image)
-    elif isinstance(image, np.ndarray):
-        img = Image.fromarray(image.astype('uint8'), 'RGB')
-
-    elif isinstance(image, ImageType):
-        img = image
-    else:
-        raise TypeError(f"input of type {type(image)} did not match allowed types of str, np.ndarray, ImageType")
-
-    return img
-
-
-def _is_image(inputs: Union[str, List[Union[str, ImageType, ndarray]]]) -> bool:
-    # some logic to determine if something is an image or not
-    # assume the batch is the same type
-    # maybe we use something like this https://github.com/ahupp/python-magic
-
-    _allowed = get_allowed_image_types()
-
-    # we assume the batch is this way if a list
-    # otherwise apply over each element
-    if isinstance(inputs, list):
-
-        if len(inputs) == 0:
-            raise TypeError("received empty list, expected at least one element.")
-
-        thing = inputs[0]
-    else:
-        thing = inputs
-
-    # if it is a string, determine if it is a local file or url
-    if isinstance(thing, str):
-        name, extension = os.path.splitext(thing.lower())
-
-        # if it has the correct extension, asssume yes
-        if extension in _allowed:
-            return True
-
-        # if it is a local file without extension, then raise an error
-        if os.path.isfile(thing):
-            # we could also read the first part of the file and infer
-            raise TypeError(
-                f"local file [{thing}] extension {extension} does not match allowed file types of {_allowed}")
-        else:
-            # if it is not a local file and does not have an extension
-            # check if url
-            if validators.url(thing):
-                return True
-            else:
-                False
-                # raise ValueError(f"{thing} cannot be identified as a local file, url or image")
-
-    # if it is an array, then it is an image
-    elif isinstance(thing, (ImageType, ndarray)):
-        return True
-    else:
-        raise TypeError(f"expected type Image or str for inputs but received type {type(thing)}")
-
-
 class CLIP_ONNX(object):
     """
     Load a clip model and convert it to onnx version for faster inference
@@ -169,7 +55,7 @@ class CLIP_ONNX(object):
         self.provider = ['CUDAExecutionProvider', "CPUExecutionProvider"] if self.device.startswith("cuda") else ["CPUExecutionProvider"]
         self.visual_session = None
         self.textual_session = None
-        self.model_info = _HF_MODE_DOWNLOAD[self.model_name]
+        self.model_info = _HF_MODEL_DOWNLOAD[self.model_name]
 
         if self.onnx_type == "onnx16":
             self.visual_type = np.float16
