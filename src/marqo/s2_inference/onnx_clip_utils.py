@@ -15,14 +15,15 @@ from marqo.s2_inference.logger import get_logger
 import onnxruntime as ort
 
 # Loading shared functions from clip_utils.py. This part should be decoupled from models in the future
-from clip_utils import get_allowed_image_types, format_and_load_CLIP_image, format_and_load_CLIP_images, load_image_from_path,_is_image
+from marqo.s2_inference.clip_utils import get_allowed_image_types, format_and_load_CLIP_image, format_and_load_CLIP_images, load_image_from_path,_is_image
 
 logger = get_logger(__name__)
 
 _HF_MODEL_DOWNLOAD = {
-    '''
-    Please check the link https://huggingface.co/Marqo for available models.
-    '''
+
+    #Please check the link https://huggingface.co/Marqo for available models.
+
+    
     "onnx32/openai/ViT-L/14":
         {
             "repo_id": "Marqo/onnx-openai-ViT-L-14",
@@ -30,6 +31,7 @@ _HF_MODEL_DOWNLOAD = {
             "textual_file": "onnx32-openai-ViT-L-14-textual.onnx",
             "token": None
         },
+
     "onnx16/openai/ViT-L/14":
         {
             "repo_id": "Marqo/onnx-openai-ViT-L-14",
@@ -60,7 +62,7 @@ class CLIP_ONNX(object):
         if self.onnx_type == "onnx16":
             self.visual_type = np.float16
         elif self.onnx_type == "onnx32":
-            self.visual_type == np.float32
+            self.visual_type = np.float32
 
     def load(self):
         self.load_clip()
@@ -107,7 +109,7 @@ class CLIP_ONNX(object):
         else:
             image_input = [format_and_load_CLIP_image(images)]
 
-        image_input_processed = torch.stack([self.clip_preprocess(_img).to(self.device) for _img in image_input])
+        image_input_processed = torch.stack([self.clip_preprocess(_img) for _img in image_input])
         images_onnx = image_input_processed.detach().cpu().numpy().astype(self.visual_type)
 
         onnx_input_image = {self.visual_session.get_inputs()[0].name: images_onnx}
