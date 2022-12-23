@@ -63,6 +63,9 @@ def _create_model_cache_key(model_name: str, device: str, model_properties: dict
     """
     # Changing the format of model cache key will also need to change eject_model api
 
+    if model_properties is None:
+        model_properties = dict()
+
     model_cache_key = (model_name + "||" +
                        model_properties.get('name', '') + "||" +
                        str(model_properties.get('dimensions', '')) + "||" +
@@ -91,7 +94,7 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
                 f"and the model has valid access permission. ")
 
 
-def _validate_model_properties(model_name: str, model_properties: dict) -> dict:
+def _validate_model_properties(model_name: str, model_properties: dict = None) -> dict:
     """validate model_properties, if not given then return model_registry properties
     """
     if model_properties is not None:
