@@ -61,7 +61,14 @@ def _create_model_cache_key(model_name: str, device: str, model_properties: dict
     Returns:
         str: _description_
     """
-    model_cache_key = (model_name, device)
+    # Changing the format of model cache key will also need to change eject_model api
+
+    model_cache_key = (model_name + "||" +
+                       + model_properties.get('name', '') + "||" +
+                       + str(model_properties.get('dimensions', '')) + "||" +
+                       + model_properties.get('type', '') + "||" +
+                       + str(model_properties.get('tokens', '')) + "||" +
+                       + device)
 
     return model_cache_key
 
@@ -289,7 +296,7 @@ def get_available_models():
     return available_models
 
 
-def eject_model(model_name:str,device:str):
+def eject_model(model_name:str, device:str):
     model_cache_key = _create_model_cache_key(model_name, device)
     if model_cache_key in available_models:
         del available_models[model_cache_key]

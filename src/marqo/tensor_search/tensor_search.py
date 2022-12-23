@@ -1244,7 +1244,7 @@ def get_loaded_models() -> dict:
     available_models = s2_inference.get_available_models()
     message = {
         'models' : [
-            {"model_name": ix[0], "model_device": ix[1]} for ix in available_models
+            {"model_name": ix.split("||")[0], "model_device": ix.split("||")[-1]} for ix in available_models
         ]
     }
     return message
