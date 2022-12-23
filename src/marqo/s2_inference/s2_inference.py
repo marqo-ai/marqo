@@ -305,9 +305,13 @@ def eject_model(model_name:str, device:str):
 
     model_cache_key = None
 
+    # we can't handle the situation where there are two models with the same name and device
+    # but different properties.
     for key in model_cache_keys:
         if key.startswith(model_name) and key.endswith(device):
             model_cache_key = key
+            break
+
     if model_cache_key is None:
         raise ModelNotInCache(f"The model_name \`{model_name}\` device \`{device}\` is not cached or found")
 
