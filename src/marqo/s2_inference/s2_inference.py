@@ -297,7 +297,7 @@ def get_available_models():
 
 
 def eject_model(model_name:str, device:str):
-    model_cache_key = _create_model_cache_key(model_name, device)
+    model_cache_key = _create_model_cache_key(model_name, device, _validate_model_properties(model_name))
     if model_cache_key in available_models:
         del available_models[model_cache_key]
         if device.startswith("cuda"):
