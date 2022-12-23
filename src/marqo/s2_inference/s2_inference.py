@@ -91,7 +91,7 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
                 f"and the model has valid access permission. ")
 
 
-def _validate_model_properties(model_name: str, model_properties: dict = None) -> dict:
+def _validate_model_properties(model_name: str, model_properties: dict) -> dict:
     """validate model_properties, if not given then return model_registry properties
     """
     if model_properties is not None:
@@ -297,10 +297,17 @@ def get_available_models():
 
 
 def eject_model(model_name:str, device:str):
-    try:
-        model_cache_key = _create_model_cache_key(model_name, device, _validate_model_properties(model_name, None))
-    except UnknownModelError:
+
+    model_cache_keys = available_models.keys()
+
+    model_cache_key = None
+
+    for key in model_cache_keys:
+        if key.startswith(model_name) and key.endswith(device):
+            model_cache_key = key
+    if model_cache_key is None:
         raise ModelNotInCache(f"The model_name \`{model_name}\` device \`{device}\` is not cached or found")
+
     if model_cache_key in available_models:
         del available_models[model_cache_key]
         if device.startswith("cuda"):
