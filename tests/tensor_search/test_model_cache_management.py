@@ -95,8 +95,9 @@ class TestModelCacheManagement(MarqoTestCase):
     def test_loaded_models(self):
 
         loaded_models = get_loaded_models()["models"]
-        loaded_models_list = [tuple(dic.values()) for dic in loaded_models]
-        assert loaded_models_list==list(available_models.keys())
+        loaded_models_keys = [_create_model_cache_key(dic["model_name"], dic["device"],
+                                _validate_model_properties(dic["model_name"])) for dic in loaded_models]
+        assert loaded_models_keys==list(available_models.keys())
 
 
     def test_edge_case_cuda(self):
