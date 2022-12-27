@@ -8,6 +8,7 @@ from marqo.s2_inference.model_registry import load_model_properties
 from marqo.s2_inference.configs import get_default_device, get_default_normalization, get_default_seq_length
 from marqo.s2_inference.types import *
 from marqo.s2_inference.logger import get_logger
+from timeit import default_timer as timer
 
 logger = get_logger(__name__)
 
@@ -36,6 +37,8 @@ def vectorise(model_name: str, content: Union[str, List[str]], model_properties:
         VectoriseError: if the content can't be vectorised, for some reason.
     """
 
+    start = timer()
+
     validated_model_properties = _validate_model_properties(model_name, model_properties)
     model_cache_key = _create_model_cache_key(model_name, device, validated_model_properties)
 
@@ -45,6 +48,9 @@ def vectorise(model_name: str, content: Union[str, List[str]], model_properties:
         vectorised = available_models[model_cache_key].encode(content, normalize=normalize_embeddings, **kwargs)
     except UnidentifiedImageError as e:
         raise VectoriseError from e
+
+    end = timer()
+    logger.info(f"Received Batch size: {len(content)}. Total Vectorise Time: {(end - start):.3f}. Ave Vectorise Time: {((end - start)/len(content)):.3f.} ")
 
     return _convert_vectorized_output(vectorised)
 
