@@ -782,3 +782,197 @@ class TestVectorSearch(MarqoTestCase):
                     return True
 
                 assert run()
+
+    def test_pagination_single_field(self):
+        vocab_source = "https://www.mit.edu/~ecprice/wordlist.10000"
+
+        vocab = requests.get(vocab_source).text.splitlines()
+        num_docs = 100
+        
+        random.seed(2020)
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1,
+            docs=[{"Title": "a " + (" ".join(random.choices(population=vocab, k=25))),
+                    "_id": str(i)
+                    }
+                  for i in range(num_docs)], auto_refresh=False
+        )
+        tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
+
+        # for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
+        # TODO, move this back 1 indent
+        search_method = SearchMethod.TENSOR
+
+        full_search_results = tensor_search.search(
+                                search_method=search_method,
+                                config=self.config, index_name=self.index_name_1, text='a', result_count=num_docs)
+        full_id_only = [(hit["_id"], hit["_score"]) for hit in full_search_results["hits"]]
+        
+        
+        
+        # scale up to 2k (tests pass up to 100)
+        for page_size in [1]:
+            print("========================================================")
+            print(f"{search_method}: Results for page_size = {page_size}")
+            print(f"FULL: (length = {len(full_search_results['hits'])})")
+            print(full_id_only)
+
+            paginated_search_results = {"hits": []}
+            page_id_only = []
+            for page_num in range(math.ceil(num_docs / page_size)):
+                lim = page_size
+                off = page_num * page_size
+                # print(f"Now testing: limit={lim}, offset={off}")
+                page_res = tensor_search.search(
+                                search_method=search_method,
+                                config=self.config, index_name=self.index_name_1, text='a', 
+                                result_count=lim, offset=off)
+                single_page_id_only = [(hit["_id"], hit["_score"]) for hit in page_res["hits"]]
+                
+                paginated_search_results["hits"].extend(page_res["hits"])
+                print("========================================================")
+                print(f"Query for page num : {page_num}")
+                print(f"lim: {page_res['limit']}, off: {page_res['offset']}")
+                print(f"Result for page num : {page_num}")
+                print(single_page_id_only)
+
+                # DEBUG FULL SNAPSHOT
+                debug_res = tensor_search.search(
+                                search_method=search_method,
+                                config=self.config, index_name=self.index_name_1, text='a', 
+                                result_count=num_docs)
+                debug_res_id_only = [(hit["_id"], hit["_score"]) for hit in debug_res["hits"]]
+                print(f"Full result snapshot for page num : {page_num}. Is it the same as full results?")
+                print(debug_res_id_only)
+            
+            page_id_only = [(hit["_id"], hit["_score"]) for hit in paginated_search_results["hits"]]
+            
+            #if full_search_results["hits"] != paginated_search_results["hits"]:
+                # print difference to check
+                #print(f"FULL: length is {len(full_search_results['hits'])}")
+                #pprint.pprint(full_id_only["hits"])
+                #print("========================================================")
+                #print(f"PAGINATED: length is {len(paginated_search_results['hits'])}")
+                #pprint.pprint(page_id_only["hits"])
+                # shared_results = set(full_search_results["hits"]).intersection(set(paginated_search_results["hits"]))
+                #print("Results in full but not in paginated: ")
+                #pprint.pprint(set(full_search_results["hits"]) - shared_results)
+                #print("Results in paginated but not in full: ")
+                #pprint.pprint(set(paginated_search_results["hits"]) - shared_results)
+            
+            print("========================================================")
+            print(f"PAGINATED: (length = {len(paginated_search_results['hits'])})")
+            print(page_id_only)
+
+            # assert full_id_only == page_id_only
+            assert full_search_results["hits"] == paginated_search_results["hits"]
+
+    
+    def test_pagination_break_limitations(self):
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
+        # Negative offset
+        for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
+            for lim in [1, 10, 1000]:
+                for off in [-1, -10, -1000]:
+                    try:
+                        tensor_search.search(text=" ",
+                                            index_name=self.index_name_1, 
+                                            config=self.config, 
+                                            result_count=lim,
+                                            offset=off,
+                                            search_method=search_method)
+                        raise AssertionError
+                    except IllegalRequestedDocCount:
+                        pass
+        
+        # Negative limit
+        for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
+            for lim in [0, -1, -10, -1000]:
+                for off in [1, 10, 1000]:
+                    try:
+                        tensor_search.search(text=" ",
+                                            index_name=self.index_name_1, 
+                                            config=self.config, 
+                                            result_count=lim,
+                                            offset=off,
+                                            search_method=search_method)
+                        raise AssertionError
+                    except IllegalRequestedDocCount:
+                        pass
+
+        # Going over 10,000 for offset + limit
+        mock_environ = {EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: "10000"}
+        @mock.patch("os.environ", mock_environ)
+        def run():
+            for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
+                try:
+                    tensor_search.search(search_method=search_method,
+                                        config=self.config, index_name=self.index_name_1, text=' ', 
+                                        result_count=10000,
+                                        offset=1)
+                    raise AssertionError
+                except IllegalRequestedDocCount:
+                    pass
+            
+            return True
+
+        assert run()
+
+    
+    def test_pagination_multi_field_error(self):
+        # Try pagination with 0, 2, and 3 fields
+        # To be removed when multi-field pagination is added.
+        docs = [
+            {
+                "field_a": 0,
+                "field_b": 0, 
+                "field_c": 0
+            },
+            {
+                "field_a": 1,
+                "field_b": 1, 
+                "field_c": 1
+            }
+        ]
+
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1,
+            docs=docs, auto_refresh=False
+        )
+
+        tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
+
+        for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
+            try:
+                tensor_search.search(text=" ",
+                                    index_name=self.index_name_1, 
+                                    config=self.config, 
+                                    offset=1,
+                                    searchable_attributes=["field_a", "field_b"],
+                                    search_method=search_method)
+                raise AssertionError
+            except InvalidArgError:
+                pass
+        
+            try:
+                tensor_search.search(text=" ",
+                                    index_name=self.index_name_1, 
+                                    config=self.config, 
+                                    offset=1,
+                                    search_method=search_method)
+                raise AssertionError
+            except InvalidArgError:
+                pass
+            
+            try:
+                tensor_search.search(text=" ",
+                                    index_name=self.index_name_1, 
+                                    config=self.config, 
+                                    offset=1,
+                                    searchable_attributes=[],
+                                    search_method=search_method)
+                raise AssertionError
+            except InvalidArgError:
+                pass
+    
+    
