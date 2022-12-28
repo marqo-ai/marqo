@@ -11,6 +11,7 @@ import open_clip
 
 from marqo.s2_inference.types import *
 from marqo.s2_inference.logger import get_logger
+from timeit import default_timer as timer
 logger = get_logger(__name__)
 
 
@@ -176,11 +177,19 @@ class CLIP:
         
         if self.model is None:
             self.load()
-        
+        start = timer()
         text = self.tokenizer(sentence, truncate=self.truncate).to(self.device)
+        end = timer()
+        time_logging("  Data(Text) preprocess", start, end, len(sentence))
 
+
+        start = timer()
         with torch.no_grad():
-            outputs =  self.model.encode_text(text)
+            outputs = self.model.encode_text(text)
+        if self.device.startswith("cuda"):
+            torch.cuda.synchronize()
+        end = timer()
+        time_logging("  Data(Text) encode", start, end, len(text))
 
         if normalize:
             _shape_before = outputs.shape
@@ -195,16 +204,28 @@ class CLIP:
         if self.model is None:
             self.load()
 
+        start = timer()
         # default to batch encoding
         if isinstance(images, list):
             image_input = format_and_load_CLIP_images(images)
         else:
             image_input = [format_and_load_CLIP_image(images)]
+        end = timer()
+        time_logging("  Data(Image) download", start, end, len(images))
 
+        start = timer()
         self.image_input_processed = torch.stack([self.preprocess(_img).to(self.device) for _img in image_input])
-    
+        end = timer()
+        time_logging("  Data(Image) preprocess", start, end, len(image_input))
+
+        start = timer()
         with torch.no_grad():
             outputs = self.model.encode_image(self.image_input_processed)
+
+        if self.device.startswith("cuda"):
+            torch.cuda.synchronize()
+        end = timer()
+        time_logging("  Data(Image) encode", start, end, len(self.image_input_processed))
 
         if normalize:
             _shape_before = outputs.shape
@@ -268,3 +289,5 @@ class OPEN_CLIP(CLIP):
 
 
         
+def time_logging(process_name:str, start:float, end:float, batch_size:int) -> None:
+    logger.info(f"{process_name} complete. Batch size: {batch_size}. Total time {(start-end):.3f}. Average time{((start - end)/ batch_size):.3f}.")
