@@ -95,11 +95,14 @@ class CLIP_ONNX(object):
 
         onnx_input_text = {self.textual_session.get_inputs()[0].name: text_onnx}
         # The onnx output has the shape [1,1,768], we need to squeeze the dimension
-        outputs = torch.squeeze(torch.tensor(np.array(self.textual_session.run(None, onnx_input_text))))
+        outputs = torch.squeeze(torch.tensor(np.array(self.textual_session.run(None, onnx_input_text)))).to(torch.float32)
 
         if normalize:
+            print("we are normalizing")
             _shape_before = outputs.shape
+            print(torch.linalg.norm(outputs))
             outputs /= self.normalize(outputs)
+            print(torch.linalg.norm(outputs))
             assert outputs.shape == _shape_before
         return self._convert_output(outputs)
 
@@ -114,7 +117,7 @@ class CLIP_ONNX(object):
 
         onnx_input_image = {self.visual_session.get_inputs()[0].name: images_onnx}
         # The onnx output has the shape [1,1,768], we need to squeeze the dimension
-        outputs = torch.squeeze(torch.tensor(np.array(self.visual_session.run(None, onnx_input_image))))
+        outputs = torch.squeeze(torch.tensor(np.array(self.visual_session.run(None, onnx_input_image)))).to(torch.float32)
 
         if normalize:
             _shape_before = outputs.shape
