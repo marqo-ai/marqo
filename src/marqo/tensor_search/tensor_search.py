@@ -872,8 +872,7 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, of
     
     time_taken = timer() - t0
     search_result["processingTimeMs"] = round(time_taken * 1000)
-    if verbose:
-        logger.info(f"search ({search_method.lower()}) completed with total processing time: {(time_taken):.3f}s.")
+    logger.info(f"search ({search_method.lower()}) completed with total processing time: {(time_taken):.3f}s.")
 
     return search_result
 
@@ -950,8 +949,7 @@ def _lexical_search(
     
     end_preprocess_time = timer()
     total_preprocess_time = end_preprocess_time - start_preprocess_time
-    if verbose:
-        logger.info(f"search (lexical) pre-processing: took {(total_preprocess_time):.3f}s to process query.")
+    logger.info(f"search (lexical) pre-processing: took {(total_preprocess_time):.3f}s to process query.")
     
     # SEARCH TIMER-LOGGER (roundtrip)
     start_search_http_time = timer()
@@ -961,9 +959,8 @@ def _lexical_search(
     total_search_http_time = end_search_http_time - start_search_http_time
     total_os_process_time = search_res["took"] * 0.001
     num_results = len(search_res['hits']['hits'])
-    if verbose:
-        logger.info(f"search (lexical) roundtrip: took {(total_search_http_time):.3f}s to send search query (roundtrip) to Marqo-os and received {num_results} results.")
-        logger.info(f"  search (lexical) Marqo-os processing time: took {(total_os_process_time):.3f}s for Marqo-os to execute the search.")
+    logger.info(f"search (lexical) roundtrip: took {(total_search_http_time):.3f}s to send search query (roundtrip) to Marqo-os and received {num_results} results.")
+    logger.info(f"  search (lexical) Marqo-os processing time: took {(total_os_process_time):.3f}s for Marqo-os to execute the search.")
 
     # SEARCH TIMER-LOGGER (post-processing)
     start_postprocess_time = timer()
@@ -978,8 +975,7 @@ def _lexical_search(
     
     end_postprocess_time = timer()
     total_postprocess_time = end_postprocess_time - start_postprocess_time
-    if verbose:
-        logger.info(f"search (lexical) post-processing: took {(total_postprocess_time):.3f}s to format {len(res_list)} results.")
+    logger.info(f"search (lexical) post-processing: took {(total_postprocess_time):.3f}s to format {len(res_list)} results.")
     
     return {'hits': res_list}
 
@@ -1142,8 +1138,7 @@ def _vector_text_search(
     
     end_preprocess_time = timer()
     total_preprocess_time = end_preprocess_time - start_preprocess_time
-    if verbose:
-        logger.info(f"search (tensor) pre-processing: took {(total_preprocess_time):.3f}s to vectorize and process query.")
+    logger.info(f"search (tensor) pre-processing: took {(total_preprocess_time):.3f}s to vectorize and process query.")
 
     # SEARCH TIMER-LOGGER (roundtrip)
     start_search_http_time = timer()
@@ -1153,8 +1148,7 @@ def _vector_text_search(
     total_search_http_time = end_search_http_time - start_search_http_time
     total_os_process_time = response["took"] * 0.001
     num_responses = len(response["responses"])
-    if verbose:
-        logger.info(f"search (tensor) roundtrip: took {(total_search_http_time):.3f}s to send {num_responses} search queries (roundtrip) to Marqo-os.")
+    logger.info(f"search (tensor) roundtrip: took {(total_search_http_time):.3f}s to send {num_responses} search queries (roundtrip) to Marqo-os.")
     
     try:
         responses = [r['hits']['hits'] for r in response["responses"]]
@@ -1163,8 +1157,7 @@ def _vector_text_search(
         for i in range(len(vector_properties_to_search)):
             indiv_responses = response["responses"][i]['hits']['hits']
             indiv_query_time = response["responses"][i]["took"] * 0.001
-            if verbose:
-                logger.info(f"  search (tensor) Marqo-os processing time (search field = {list(vector_properties_to_search)[i]}): took {(indiv_query_time):.3f}s and received {len(indiv_responses)} hits.")
+            logger.info(f"  search (tensor) Marqo-os processing time (search field = {list(vector_properties_to_search)[i]}): took {(indiv_query_time):.3f}s and received {len(indiv_responses)} hits.")
 
     except KeyError as e:
         # KeyError indicates we have received a non-successful result
@@ -1181,8 +1174,7 @@ def _vector_text_search(
         except (KeyError, IndexError) as e2:
             raise e
 
-    if verbose:
-        logger.info(f"  search (tensor) Marqo-os processing time: took {(total_os_process_time):.3f}s for Marqo-os to execute the search.")
+    logger.info(f"  search (tensor) Marqo-os processing time: took {(total_os_process_time):.3f}s for Marqo-os to execute the search.")
 
     # SEARCH TIMER-LOGGER (post-processing)
     start_postprocess_time = timer()
@@ -1279,8 +1271,7 @@ def _vector_text_search(
 
     end_postprocess_time = timer()
     total_postprocess_time = end_postprocess_time - start_postprocess_time
-    if verbose:
-        logger.info(f"search (tensor) post-processing: took {(total_postprocess_time):.3f}s to sort and format {len(completely_sorted)} results from Marqo-os.")
+    logger.info(f"search (tensor) post-processing: took {(total_postprocess_time):.3f}s to sort and format {len(completely_sorted)} results from Marqo-os.")
     return res
 
 def check_health(config: Config):
