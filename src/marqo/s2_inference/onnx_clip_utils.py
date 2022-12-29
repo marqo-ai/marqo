@@ -98,11 +98,8 @@ class CLIP_ONNX(object):
         outputs = torch.squeeze(torch.tensor(np.array(self.textual_session.run(None, onnx_input_text)))).to(torch.float32)
 
         if normalize:
-            print("we are normalizing")
             _shape_before = outputs.shape
-            print(torch.linalg.norm(outputs))
             outputs /= self.normalize(outputs)
-            print(torch.linalg.norm(outputs))
             assert outputs.shape == _shape_before
         return self._convert_output(outputs)
 
