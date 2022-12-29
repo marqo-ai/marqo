@@ -169,10 +169,11 @@ class TestModelCacheManagement(MarqoTestCase):
             if model_cache_key not in available_models:
                 raise AssertionError
 
-            # the res is a list of dict with {"model_name", "device"}
+            # the res is a list of dict with {"model_name" : model_name, "model_device" : device}
             # since we only have one model, we only test index 0.
             res = get_loaded_models()["models"][0]
-            assert res[model_name] == "cpu"
+            assert res["model_name"] == model_name
+            assert res["model_device"] == "cpu"
 
             eject_model(model_name, "cpu")
 
@@ -189,7 +190,8 @@ class TestModelCacheManagement(MarqoTestCase):
                     raise AssertionError
 
                 res = get_loaded_models()["models"][0]
-                assert res[model_name] == "cuda"
+                assert res["model_name"] == model_name
+                assert res["model_device"] == "cuda"
 
                 eject_model(model_name, "cuda")
 
