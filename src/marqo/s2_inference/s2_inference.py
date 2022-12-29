@@ -2,7 +2,7 @@
 The functions defined here would have endpoints, later on.
 """
 import numpy as np
-from marqo.s2_inference.errors import VectoriseError, InvalidModelPropertiesError, ModelLoadError, UnknownModelError, ModelNotInCache
+from marqo.s2_inference.errors import VectoriseError, InvalidModelPropertiesError, ModelLoadError, UnknownModelError
 from PIL import UnidentifiedImageError
 from marqo.s2_inference.model_registry import load_model_properties
 from marqo.s2_inference.configs import get_default_device, get_default_normalization, get_default_seq_length
@@ -10,6 +10,7 @@ from marqo.s2_inference.types import *
 from marqo.s2_inference.logger import get_logger
 from timeit import default_timer as timer
 import torch
+from timeit import default_timer as timer
 
 logger = get_logger(__name__)
 
@@ -43,12 +44,10 @@ def vectorise(model_name: str, content: Union[str, List[str]], model_properties:
 
     _update_available_models(model_cache_key, model_name, validated_model_properties, device, normalize_embeddings)
 
-
     try:
         vectorised = available_models[model_cache_key].encode(content, normalize=normalize_embeddings, **kwargs)
     except UnidentifiedImageError as e:
         raise VectoriseError from e
-
 
     return _convert_vectorized_output(vectorised)
 
