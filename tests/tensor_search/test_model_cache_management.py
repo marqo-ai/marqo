@@ -35,9 +35,9 @@ class TestModelCacheManagement(MarqoTestCase):
 
         # We loaded 6 models (3 in cuda, 3 in cpu) as initial setup
         if self.CUDA_FLAG:
-            assert len(available_models) >= 6
+            assert len(available_models) >= 4
         else:
-            assert len(available_models) >= 3
+            assert len(available_models) >= 2
 
     def tearDown(self) -> None:
         clear_loaded_models()
