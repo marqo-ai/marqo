@@ -44,5 +44,5 @@ class RerankerNameError(S2InferenceError):
     pass
 
 
-class ModelNotInCache(S2InferenceError):
+class ModelNotInCacheError(S2InferenceError):
     pass

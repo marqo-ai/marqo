@@ -1345,8 +1345,8 @@ def get_loaded_models() -> dict:
 def eject_model(model_name: str, device: str) -> dict:
     try:
        result = s2_inference.eject_model(model_name, device)
-    except s2_inference_errors.ModelNotInCache as e:
-        raise errors.ModelNotInCache(message=str(e))
+    except s2_inference_errors.ModelNotInCacheError as e:
+        raise errors.ModelNotInCacheError(message=str(e))
     return result
 
 

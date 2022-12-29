@@ -2,7 +2,7 @@
 The functions defined here would have endpoints, later on.
 """
 import numpy as np
-from marqo.s2_inference.errors import VectoriseError, InvalidModelPropertiesError, ModelLoadError, UnknownModelError
+from marqo.s2_inference.errors import VectoriseError, InvalidModelPropertiesError, ModelLoadError, UnknownModelError, ModelNotInCacheError
 from PIL import UnidentifiedImageError
 from marqo.s2_inference.model_registry import load_model_properties
 from marqo.s2_inference.configs import get_default_device, get_default_normalization, get_default_seq_length
@@ -313,7 +313,7 @@ def eject_model(model_name:str, device:str):
             break
 
     if model_cache_key is None:
-        raise ModelNotInCache(f"The model_name \`{model_name}\` device \`{device}\` is not cached or found")
+        raise ModelNotInCacheError(f"The model_name \`{model_name}\` device \`{device}\` is not cached or found")
 
     if model_cache_key in available_models:
         del available_models[model_cache_key]
@@ -321,7 +321,7 @@ def eject_model(model_name:str, device:str):
             torch.cuda.empty_cache()
         return {"result": "success", "message": f"successfully eject model_name \`{model_name}\` from device \`{device}\`"}
     else:
-        raise ModelNotInCache(f"The model_name \`{model_name}\` device \`{device}\` is not cached or found")
+        raise ModelNotInCacheError(f"The model_name \`{model_name}\` device \`{device}\` is not cached or found")
 
 # def normalize(inputs):
 

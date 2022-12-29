@@ -177,7 +177,7 @@ class IndexMaxFieldsError(__InvalidRequestError):
     status_code = HTTPStatus.BAD_REQUEST
 
 
-class ModelNotInCache(__InvalidRequestError):
+class ModelNotInCacheError(__InvalidRequestError):
     code = "model_not_in_cache"
     status_code = HTTPStatus.NOT_FOUND
 
