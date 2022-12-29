@@ -1268,10 +1268,10 @@ def get_cpu_info() -> dict:
 
 def get_cuda_info() -> dict:
     if torch.cuda.is_available():
-        return {"cuda_devices": [{"device_id" : id, "device_name" : torch.cuda.get_device_name(id),
-                "memory_used":f"{round(torch.cuda.memory_allocated(id) / 1024**3, 1)} GiB",
-                "total_memory": f"{round(torch.cuda.get_device_properties(id).total_memory/ 1024**3, 1)} GiB"}
-                for id in range(torch.cuda.device_count())]}
+        return {"cuda_devices": [{"device_id" : _device_id, "device_name" : torch.cuda.get_device_name(_device_id),
+                "memory_used":f"{round(torch.cuda.memory_allocated(_device_id) / 1024**3, 1)} GiB",
+                "total_memory": f"{round(torch.cuda.get_device_properties(_device_id).total_memory/ 1024**3, 1)} GiB"}
+                for _device_id in range(torch.cuda.device_count())]}
 
     else:
         raise errors.HardwareCompatabilityError(message=str(
