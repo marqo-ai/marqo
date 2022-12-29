@@ -57,13 +57,13 @@ class TestModelCacheManagement(MarqoTestCase):
         try:
             eject_model(my_test_model_1, "cpu")
             raise AssertionError
-        except ModelNotInCache:
+        except ModelNotInCacheError:
             pass
 
         try:
             eject_model(my_test_model_2, "cpu")
             raise AssertionError
-        except ModelNotInCache:
+        except ModelNotInCacheError:
             pass
 
 
@@ -79,12 +79,12 @@ class TestModelCacheManagement(MarqoTestCase):
 
             try:
                 eject_model(my_test_model_1, "cuda")
-            except ModelNotInCache:
+            except ModelNotInCacheError:
                 pass
 
             try:
                 eject_model(my_test_model_2, "cuda")
-            except ModelNotInCache:
+            except ModelNotInCacheError:
                 pass
         else:
             pass
@@ -169,7 +169,9 @@ class TestModelCacheManagement(MarqoTestCase):
             if model_cache_key not in available_models:
                 raise AssertionError
 
-            res = get_loaded_models()["models"]
+            # the res is a list of dict with {"model_name", "device"}
+            # since we only have one model, we only test index 0.
+            res = get_loaded_models()["models"][0]
             assert res[model_name] == "cpu"
 
             eject_model(model_name, "cpu")
@@ -186,7 +188,7 @@ class TestModelCacheManagement(MarqoTestCase):
                 if model_cache_key not in available_models:
                     raise AssertionError
 
-                res = get_loaded_models()["models"]
+                res = get_loaded_models()["models"][0]
                 assert res[model_name] == "cuda"
 
                 eject_model(model_name, "cuda")
