@@ -8,6 +8,7 @@ from marqo.s2_inference.model_registry import load_model_properties
 from marqo.s2_inference.configs import get_default_device, get_default_normalization, get_default_seq_length
 from marqo.s2_inference.types import *
 from marqo.s2_inference.logger import get_logger
+from timeit import default_timer as timer
 import torch
 
 logger = get_logger(__name__)
@@ -42,10 +43,12 @@ def vectorise(model_name: str, content: Union[str, List[str]], model_properties:
 
     _update_available_models(model_cache_key, model_name, validated_model_properties, device, normalize_embeddings)
 
+
     try:
         vectorised = available_models[model_cache_key].encode(content, normalize=normalize_embeddings, **kwargs)
     except UnidentifiedImageError as e:
         raise VectoriseError from e
+
 
     return _convert_vectorized_output(vectorised)
 
@@ -94,7 +97,7 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
                 f"and the model has valid access permission. ")
 
 
-def _validate_model_properties(model_name: str, model_properties: dict = None) -> dict:
+def _validate_model_properties(model_name: str, model_properties: dict) -> dict:
     """validate model_properties, if not given then return model_registry properties
     """
     if model_properties is not None:
