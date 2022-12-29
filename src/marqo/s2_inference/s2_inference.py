@@ -8,9 +8,7 @@ from marqo.s2_inference.model_registry import load_model_properties
 from marqo.s2_inference.configs import get_default_device, get_default_normalization, get_default_seq_length
 from marqo.s2_inference.types import *
 from marqo.s2_inference.logger import get_logger
-from timeit import default_timer as timer
 import torch
-from timeit import default_timer as timer
 
 logger = get_logger(__name__)
 
