@@ -2,7 +2,7 @@ import torch.cuda
 from tests.marqo_test import MarqoTestCase
 from marqo.s2_inference.s2_inference import _validate_model_properties,\
     _create_model_cache_key, _update_available_models, available_models, clear_loaded_models
-from marqo.tensor_search.tensor_search import eject_model, get_cuda_info, get_loaded_models
+from marqo.tensor_search.tensor_search import eject_model, get_cuda_info, get_loaded_models, get_cpu_info
 from marqo.errors import ModelNotInCache, HardwareCompatabilityError
 import psutil
 
@@ -43,6 +43,8 @@ class TestModelCacheManagement(MarqoTestCase):
     def tearDown(self) -> None:
         clear_loaded_models()
 
+
+
     def test_eject_model_cpu(self):
         for model_name in self.MODEL_LIST:
             eject_model(model_name, "cpu")
@@ -55,11 +57,13 @@ class TestModelCacheManagement(MarqoTestCase):
 
         try:
             eject_model(my_test_model_1, "cpu")
+            raise AssertionError
         except ModelNotInCache:
             pass
 
         try:
             eject_model(my_test_model_2, "cpu")
+            raise AssertionError
         except ModelNotInCache:
             pass
 
@@ -88,10 +92,28 @@ class TestModelCacheManagement(MarqoTestCase):
 
 
     def test_cuda_info(self):
-        try:
-            get_cuda_info()
-        except HardwareCompatabilityError:
-            pass
+        if self.CUDA_FLAG is True:
+            res = get_cuda_info()
+            if "cuda_devices" not in res:
+                raise AssertionError
+        else:
+            try:
+                get_cuda_info()
+            except HardwareCompatabilityError:
+                pass
+
+
+    def test_get_cpu_info(self) -> None:
+        res = get_cpu_info()
+
+        if "cpu_usage_percent" not in res:
+            raise AssertionError
+
+        if "memory_used_percent" not in res:
+            raise AssertionError
+
+        if "memory_used_gb" not in res:
+            raise AssertionError
 
 
     def test_loaded_models(self):
@@ -134,6 +156,44 @@ class TestModelCacheManagement(MarqoTestCase):
             # memory usage
             assert psutil.virtual_memory()[2]< 100.0
 
+
+    def test_overall_eject_and_load_model(self):
+        clear_loaded_models()
+        if len(available_models) != 0:
+            raise AssertionError
+
+        for model_name in self.MODEL_LIST:
+            validated_model_properties = _validate_model_properties(model_name, None)
+            model_cache_key = _create_model_cache_key(model_name, "cpu", validated_model_properties)
+            _update_available_models(model_cache_key, model_name, validated_model_properties, "cpu", True)
+
+            if model_cache_key not in available_models:
+                raise AssertionError
+
+            res = get_loaded_models()["models"]
+            assert res[model_name] == "cpu"
+
+            eject_model(model_name, "cpu")
+
+            if model_cache_key in available_models:
+                raise AssertionError
+
+        if self.CUDA_FLAG is True:
+            for model_name in self.MODEL_LIST:
+                validated_model_properties = _validate_model_properties(model_name, None)
+                model_cache_key = _create_model_cache_key(model_name, "cuda", validated_model_properties)
+                _update_available_models(model_cache_key, model_name, validated_model_properties, "cuda", True)
+
+                if model_cache_key not in available_models:
+                    raise AssertionError
+
+                res = get_loaded_models()["models"]
+                assert res[model_name] == "cuda"
+
+                eject_model(model_name, "cuda")
+
+                if model_cache_key in available_models:
+                    raise AssertionError
 
 
 
