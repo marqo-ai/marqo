@@ -16,8 +16,12 @@ import onnxruntime as ort
 
 # Loading shared functions from clip_utils.py. This part should be decoupled from models in the future
 from marqo.s2_inference.clip_utils import get_allowed_image_types, format_and_load_CLIP_image, format_and_load_CLIP_images, load_image_from_path,_is_image
+from model_registry import _get_onnx_clip_properties
 
 logger = get_logger(__name__)
+
+
+ONNX_CLIP_PROPERTIES = _get_onnx_clip_properties()
 
 _HF_MODEL_DOWNLOAD = {
 
