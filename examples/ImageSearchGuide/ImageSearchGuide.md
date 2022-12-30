@@ -3,7 +3,7 @@
 *A step-to-step guide on how to search images with text (Text-to-Image Search) using [Marqo](https://www.marqo.ai/).*
 
 <p align = "center">
-<img src = "asset/example.png">
+<img src = "asset/example2.png">
 </p>
 
 [Marqo](https://www.marqo.ai/) is an open-source tensor-based search engine that supports multi-modal search. In this article, we will
