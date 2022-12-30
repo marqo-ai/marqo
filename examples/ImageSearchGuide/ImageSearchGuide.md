@@ -1,14 +1,12 @@
-# Search Image with Text Using Marqo
+# How to implement text-to-image search on Marqo - in 5 lines of code
 
-*A step-to-step guide on how to search image with text (Text-to-Image Search) using [Marqo](https://www.marqo.ai/).*
+*A step-to-step guide on how to search images with text (Text-to-Image Search) using [Marqo](https://www.marqo.ai/).*
 
-<p align="center">
- <img src="asset/example.png">
-</p>
+![An example to show how to search image using text.](asset/example.png)
 
-[Marqo](https://www.marqo.ai/) is a tensor-based search and analytics engine that supports multi-modal search. It can be seamlessly 
-integrates with your applications, websites, and workflows. In this article, we will
-introduce how to set up your own Text-to-Image search engine using marqo. All the codes are available at on our [Github](imagesearchguide.ipynb).
+
+[Marqo](https://www.marqo.ai/) is an open-source tensor-based search engine that supports multi-modal search. In this article, we will
+introduce how to set up your own text-to-image search engine using marqo. The full code is available on Marqo's github [Github](imagesearchguide.ipynb).
 
 ## Set up
 
@@ -27,8 +25,8 @@ please check [here](https://github.com/marqo-ai/marqo#m-series-mac-users).
 
 ```
 docker rm -f marqo
-docker pull marqoai/marqo:latest
-docker run --name marqo -it --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:latest
+docker pull marqoai/marqo:0.0.10
+docker run --name marqo -it --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:0.0.10
 ```
 
 Now, we can create a new environment and install the Marqo client by:
