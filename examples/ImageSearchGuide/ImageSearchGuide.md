@@ -10,6 +10,8 @@ integrates with your applications, websites, and workflows. In this article, we 
 introduce how to set up your own Text-to-Image search engine using marqo. All the codes are available at on our [Github](imagesearchguide.ipynb).
 
 ## Set up
+
+### Install marqo
 In this article, we select 5 images from the [coco dataset](https://cocodataset.org/#home) as examples.
 <p float="left">
   <img src="./data/image3.jpg" width="80" />
@@ -48,12 +50,20 @@ and you should have the output as:
 ```
 By the time this article is written, we are using marqo with version 0.0.10.
 
+### Download images
+
 Now, you can download our examples images from [Github](./data). You should have the following directory diagram:
-![directory_diagram](./asset/directory_diagram.png)
+
+<p align="center">
+ <img src ="./asset/directory_diagram.png"/>
+</p>
+
 
 Done, you have finished all the set-up, let do the real search!
 
 ## Search with marqo
+
+### Create index
 
 First, we need to create a marqo index that provides you the access to all the necessary operations, e.g., indexing, searching. We also provide
 necessary settings based on hardware devices.
@@ -68,21 +78,26 @@ settings = {
 
 mq.create_index(index_name, **settings)
 ```
-__Note__: We __MUST__ set `"treat_urls_and_pointers_as_imges": True` to enable the multi-modal search feature. As for the model, we need to 
-select a model from CLIP families to 
+__Note__: To accomplish this multi-modal search task, we __MUST__ set `"treat_urls_and_pointers_as_imges": True` to enable the multi-modal search feature. As for the `model`, we need to 
+select a model from [__CLIP families__](https://docs.marqo.ai/0.0.10/Models-Reference/dense_retrieval/) (`"ViT-L/14"` in this case).
+
+### Add images into index
+Now, we need to add the images to the created index, which is a little tricky. Marqo is running in the docker, so it will not be able to access
+the local images.
+One solution is to upload all the images to Github and access them through urls. This is OK in this case as we only have 5 images. However, if we think,
+are you really going to upload and download 1 million images for a larger dataset? I guess the answer is NO, so here is the solution.
 
 
 
 
 
 
-Now, we need to add the images to the created index, which is a little tricky. 
 
 
 
 
 
-
+### Conduct searching
 Finally, we can do the search and see the returned the results:
 
 
