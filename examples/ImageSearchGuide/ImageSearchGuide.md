@@ -65,7 +65,8 @@ Done, you have finished all the set-up, let do the real search!
 
 ### Create index
 
-First, we need to create a marqo index that provides you the access to all the necessary operations, e.g., indexing, searching. You can choose different models and other parameters.
+First, we need to create a marqo index that provides you the access to all the necessary operations, e.g., indexing, searching. You can choose different models and parameters here.
+In this case, we just use a very basic setting by specifying the model ,enabling image search, and leaving others as default.
 
 ```python
 index_name = 'image-search-guide'
