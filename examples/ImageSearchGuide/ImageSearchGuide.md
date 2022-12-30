@@ -87,7 +87,7 @@ the local images.
 One solution is to upload all the images to Github and access them through urls. This is OK in this case as we only have 5 images. However, if we think big,
 are you really going to upload and download 1 million images with a larger dataset? I guess the answer is __NO__, so here is the solution.
 
-We can put the local images in a local server for easier access from marqo in dock by
+We can put the local images in a docker server for easier access from marqo in dock by
 ```python
 import subprocess
 local_dir = "./data"
@@ -117,7 +117,7 @@ output:
  'http://host.docker.internal:8222/image2.jpg']
 ```
 
-All the local image are on a local server for marqo to access now.
+All the local image are on a docker server for marqo to access now.
 
 ### Add images to index
 
@@ -137,7 +137,7 @@ output:
  {'image_docker': 'http://host.docker.internal:8222/image2.jpg', '_id': '4'}]
 ```
 
-Adding the documents into the previously created index using function `add_documents()`
+Add the documents into the previously created index using function `add_documents()`
 ```python
 mq.index(index_name).add_documents(documents, device="cpu", processes=1, client_batch_size= 1)
 ```
