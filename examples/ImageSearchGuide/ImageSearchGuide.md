@@ -102,18 +102,18 @@ import os
 locators = glob.glob(local_dir + '*.jpg')
 
 # Generate docker path for local images
-docker_path = "http://localhost:8222/"
+docker_path = "http://host.docker.internal:8222/"
 image_docker = [docker_path + os.path.basename(f) for f in locators]
 
 print(image_docker)
 ```
 ```python
 output:
-['http://localhost:8222/image4.jpg',
- 'http://localhost:8222/image1.jpg',
- 'http://localhost:8222/image3.jpg',
- 'http://localhost:8222/image5.jpg',
- 'http://localhost:8222/image2.jpg']
+['http://host.docker.internal:8222/image4.jpg',
+ 'http://host.docker.internal:8222/image1.jpg',
+ 'http://host.docker.internal:8222/image3.jpg',
+ 'http://host.docker.internal:8222/image0.jpg',
+ 'http://host.docker.internal:8222/image2.jpg']
 ```
 
 All the local image are on a local server for marqo to access now.
@@ -129,28 +129,90 @@ print(documents)
 ```
 ```python
 output:
-[{'image_docker': 'http://localhost:8222/image4.jpg', '_id': 0},
- {'image_docker': 'http://localhost:8222/image1.jpg', '_id': 1},
- {'image_docker': 'http://localhost:8222/image3.jpg', '_id': 2},
- {'image_docker': 'http://localhost:8222/image5.jpg', '_id': 3},
- {'image_docker': 'http://localhost:8222/image2.jpg', '_id': 4}]
+[{'image_docker': 'http://host.docker.internal:8222/image4.jpg', '_id': '0'},
+ {'image_docker': 'http://host.docker.internal:8222/image1.jpg', '_id': '1'},
+ {'image_docker': 'http://host.docker.internal:8222/image3.jpg', '_id': '2'},
+ {'image_docker': 'http://host.docker.internal:8222/image0.jpg', '_id': '3'},
+ {'image_docker': 'http://host.docker.internal:8222/image2.jpg', '_id': '4'}]
 ```
 
+Adding the documents into the previously created index using function `add_documents()`
+```python
+mq.index(index_name).add_documents(documents, device="cpu", processes=1, client_batch_size= 1)
+```
+```python
+outputs:
+2022-12-30 04:27:45,846 logger:'marqo' INFO add_documents pre-processing: took 0.000s for 5 docs, for an average of 0.000s per doc.
+2022-12-30 04:27:45,848 logger:'marqo' INFO starting batch ingestion with batch size 1
+2022-12-30 04:27:47,130 logger:'marqo' INFO    add_documents batch 0 roundtrip: took 1.281s to add 1 docs, for an average of 1.281s per doc.
+2022-12-30 04:27:47,131 logger:'marqo' INFO    add_documents batch 0 Marqo processing: took 1.275s for Marqo to process & index 1 docs (server unbatched), for an average of 1.275s per doc.
+2022-12-30 04:27:48,182 logger:'marqo' INFO    add_documents batch 1 roundtrip: took 1.050s to add 1 docs, for an average of 1.050s per doc.
+2022-12-30 04:27:48,183 logger:'marqo' INFO    add_documents batch 1 Marqo processing: took 1.045s for Marqo to process & index 1 docs (server unbatched), for an average of 1.045s per doc.
+2022-12-30 04:27:49,255 logger:'marqo' INFO    add_documents batch 2 roundtrip: took 1.070s to add 1 docs, for an average of 1.070s per doc.
+2022-12-30 04:27:49,256 logger:'marqo' INFO    add_documents batch 2 Marqo processing: took 1.064s for Marqo to process & index 1 docs (server unbatched), for an average of 1.064s per doc.
+2022-12-30 04:27:50,386 logger:'marqo' INFO    add_documents batch 3 roundtrip: took 1.129s to add 1 docs, for an average of 1.129s per doc.
+2022-12-30 04:27:50,388 logger:'marqo' INFO    add_documents batch 3 Marqo processing: took 1.117s for Marqo to process & index 1 docs (server unbatched), for an average of 1.117s per doc.
+2022-12-30 04:27:51,462 logger:'marqo' INFO    add_documents batch 4 roundtrip: took 1.073s to add 1 docs, for an average of 1.073s per doc.
+2022-12-30 04:27:51,463 logger:'marqo' INFO    add_documents batch 4 Marqo processing: took 1.067s for Marqo to process & index 1 docs (server unbatched), for an average of 1.067s per doc.
+2022-12-30 04:27:51,573 logger:'marqo' INFO completed batch ingestion.
+2022-12-30 04:27:51,575 logger:'marqo' INFO add_documents completed. total time taken: 5.729s.
+```
+Yes, it is just this simple one line of code. And you can check the outputs for the indexing time. Also, you can set `device = "cuda"` if available.
 
-
-
-
-
-
+Done, all the images are in the marqo and we can do the search.
 
 
 ### Search
-Finally, we can do the search and see the returned the results:
+Finally, let us do the search and see the returned the results.
 
+Let's say we want to get the image "*A rider on a horse jumping over the barrier*". Here is the code.
+```python
+search_results =  mq.index(index_name).search("A rider on a horse jumping over the barrier", 
+                        searchable_attributes=['image_docker'], limit = 1,
+                        device='cpu')
+```
+```python
+output:
+2022-12-30 04:28:56,472 logger:'marqo' INFO search (tensor): took 0.364s to send query and received 1 results from Marqo (roundtrip). Marqo itself took 0.358s to execute the search.
+```
+Done, we just get the result in 0.36s without the help of GPU! So what does the results look like then?
+```python
+print(search_results)
+```
+```python
+output:
+{'hits': [{'image_docker': 'http://host.docker.internal:8222/image1.jpg',
+   '_id': '1',
+   '_highlights': {'image_docker': 'http://host.docker.internal:8222/image1.jpg'},
+   '_score': 0.6133688}],
+ 'processingTimeMs': 358,
+ 'query': 'A rider on a horse jumping over the barrier',
+ 'limit': 1}
+```
+Well, very hard to understand? Don't worry, let's plot it and verify it by your eyes:
+```python
+import requests
+from PIL import Image
 
+fig_path = search_results["hits"][0]["image_docker"].replace(docker_path, local_dir)
+display(Image.open(fig_path))
+```
+output:
+<p align="center">
+    <img src = "./asset/result.png">
+</p>
 
+Isn't this the image you are look for, "*A rider on a horse jumping over the barrier*"? Searching image using text is just so simple.
+You must be thinking this is 5 images. What will happen in a larger dataset?
+Why not try it yourself, you can easily __change the parameters in the code__, __add more images into the directory__, and __test your searching results__.
+You can also check other advanced usages in our [Github](https://github.com/marqo-ai/marqo).
 
+## Take aways
 
+It is really easy to use marqo to achieve multi-modal searching, e.g., image-to-text, text-to-image, image-to-image, with the following steps:
 
+1. Environment setup. 
+2. Create index. 
+3. Add images into the index.
+4. Search.
 
-## Final word
