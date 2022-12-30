@@ -37,7 +37,7 @@ conda activate marqo-client
 
 pip install marqo matplotlib
 ```
-Now, open your python and check the installation is successful by:
+Open your python and check the installation is successful by:
 ```python
 import marqo
 mq = marqo.Client("http://localhost:8882")
