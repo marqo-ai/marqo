@@ -13,11 +13,11 @@ introduce how to set up your own text-to-image search engine using marqo. The fu
 ### Install marqo
 In this article, we select 5 images from the [coco dataset](https://cocodataset.org/#home) as examples.
 <p align="center">
-  <img src="./data/image3.jpg" width="150" />
-  <img src="./data/image2.jpg" width="150" /> 
-  <img src="./data/image1.jpg" width="110" />
-  <img src="./data/image4.jpg" width="100" /> 
-  <img src="./data/image5.jpg" width="150" />
+  <img src="data/image2.jpg" width="150" />
+  <img src="data/image1.jpg" width="150" /> 
+  <img src="data/image0.jpg" width="110" />
+  <img src="data/image3.jpg" width="100" /> 
+  <img src="data/image4.jpg" width="150" />
 </p>
 
 First, we need to run marqo in docker using the following command. This test is done on a x64 linux machine, for Mac users with M-series chips
@@ -108,6 +108,7 @@ image_docker = [docker_path + os.path.basename(f) for f in locators]
 print(image_docker)
 ```
 ```python
+output:
 ['http://localhost:8222/image4.jpg',
  'http://localhost:8222/image1.jpg',
  'http://localhost:8222/image3.jpg',
@@ -115,10 +116,25 @@ print(image_docker)
  'http://localhost:8222/image2.jpg']
 ```
 
-All the local image are on a local server now.
+All the local image are on a local server for marqo to access now.
 
 ### Add images to index
 
+Marqo requires the input (which we call `documents`) as a `list` of `dictionary`, we can convert the images into the required format
+
+```python
+documents = [{"image_docker" : image, "_id" : idx} for idx, image in enumerate(image_docker)]
+
+print(documents)
+```
+```python
+output:
+[{'image_docker': 'http://localhost:8222/image4.jpg', '_id': 0},
+ {'image_docker': 'http://localhost:8222/image1.jpg', '_id': 1},
+ {'image_docker': 'http://localhost:8222/image3.jpg', '_id': 2},
+ {'image_docker': 'http://localhost:8222/image5.jpg', '_id': 3},
+ {'image_docker': 'http://localhost:8222/image2.jpg', '_id': 4}]
+```
 
 
 
@@ -128,9 +144,7 @@ All the local image are on a local server now.
 
 
 
-
-
-### Conduct searching
+### Search
 Finally, we can do the search and see the returned the results:
 
 
