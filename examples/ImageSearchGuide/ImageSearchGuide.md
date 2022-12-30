@@ -13,12 +13,12 @@ introduce how to set up your own Text-to-Image search engine using marqo. All th
 
 ### Install marqo
 In this article, we select 5 images from the [coco dataset](https://cocodataset.org/#home) as examples.
-<p float="left">
-  <img src="./data/image3.jpg" width="80" />
-  <img src="./data/image2.jpg" width="80" /> 
-  <img src="./data/image1.jpg" width="50" />
-  <img src="./data/image4.jpg" width="50" /> 
-  <img src="./data/image5.jpg" width="80" />
+<p float="center">
+  <img src="./data/image3.jpg" width="150" />
+  <img src="./data/image2.jpg" width="150" /> 
+  <img src="./data/image1.jpg" width="110" />
+  <img src="./data/image4.jpg" width="100" /> 
+  <img src="./data/image5.jpg" width="150" />
 </p>
 
 First, we need to run marqo in docker using the following command. This test is done on a x64 linux machine, for Mac users with M-series chips
