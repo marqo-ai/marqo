@@ -2,8 +2,9 @@
 
 *A step-to-step guide on how to search image with text (Text-to-Image Search) using [Marqo](https://www.marqo.ai/).*
 
-![An example to show how to search image using text.](asset/example.png)
-
+<p align="center">
+ <img src="asset/example.png">
+</p>
 
 [Marqo](https://www.marqo.ai/) is a tensor-based search and analytics engine that supports multi-modal search. It can be seamlessly 
 integrates with your applications, websites, and workflows. In this article, we will
