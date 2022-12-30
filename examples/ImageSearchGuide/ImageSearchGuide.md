@@ -214,6 +214,6 @@ It is really easy to use marqo to achieve multi-modal searching, e.g., image-to-
 
 1. Environment setup. 
 2. Create index. 
-3. Add images into the index.
+3. Add documents into the index.
 4. Search.
 
