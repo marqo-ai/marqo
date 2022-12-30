@@ -13,7 +13,7 @@ introduce how to set up your own Text-to-Image search engine using marqo. All th
 
 ### Install marqo
 In this article, we select 5 images from the [coco dataset](https://cocodataset.org/#home) as examples.
-<p float="center">
+<p align="center">
   <img src="./data/image3.jpg" width="150" />
   <img src="./data/image2.jpg" width="150" /> 
   <img src="./data/image1.jpg" width="110" />
