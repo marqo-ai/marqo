@@ -13,60 +13,54 @@ from huggingface_hub import hf_hub_download
 from marqo.s2_inference.types import *
 from marqo.s2_inference.logger import get_logger
 import onnxruntime as ort
+from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize
+import marqo.s2_inference.model_registry as model_registry
 
 # Loading shared functions from clip_utils.py. This part should be decoupled from models in the future
-from marqo.s2_inference.clip_utils import get_allowed_image_types, format_and_load_CLIP_image, format_and_load_CLIP_images, load_image_from_path,_is_image
-from model_registry import _get_onnx_clip_properties
+from marqo.s2_inference.clip_utils import get_allowed_image_types, format_and_load_CLIP_image, \
+    format_and_load_CLIP_images, load_image_from_path, _is_image
 
 logger = get_logger(__name__)
 
+try:
+    from torchvision.transforms import InterpolationMode
+    BICUBIC = InterpolationMode.BICUBIC
+except ImportError:
+    BICUBIC = Image.BICUBIC
 
-ONNX_CLIP_PROPERTIES = _get_onnx_clip_properties()
+def _convert_image_to_rgb(image):
+    return image.convert("RGB")
 
-_HF_MODEL_DOWNLOAD = {
-
-    #Please check the link https://huggingface.co/Marqo for available models.
-
-    
-    "onnx32/openai/ViT-L/14":
-        {
-            "repo_id": "Marqo/onnx-openai-ViT-L-14",
-            "visual_file": "onnx32-openai-ViT-L-14-visual.onnx",
-            "textual_file": "onnx32-openai-ViT-L-14-textual.onnx",
-            "token": None
-        },
-
-    "onnx16/openai/ViT-L/14":
-        {
-            "repo_id": "Marqo/onnx-openai-ViT-L-14",
-            "visual_file": "onnx16-openai-ViT-L-14-visual.onnx",
-            "textual_file": "onnx16-openai-ViT-L-14-textual.onnx",
-            "token": None
-
-        }
-}
-
+def _get_transform(n_px):
+    return Compose([
+        Resize(n_px, interpolation=BICUBIC),
+        CenterCrop(n_px),
+        _convert_image_to_rgb,
+        ToTensor(),
+        Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711)),
+    ])
 
 class CLIP_ONNX(object):
     """
     Load a clip model and convert it to onnx version for faster inference
     """
 
-    def __init__(self, model_name = "onnx32/openai/ViT-L/14", device = "cpu", embedding_dim: int = None, truncate: bool = True,
+    def __init__(self, model_name="onnx32/openai/ViT-L/14", device="cpu", embedding_dim: int = None,
+                 truncate: bool = True,
                  load=True, **kwargs):
         self.model_name = model_name
         self.onnx_type, self.source, self.clip_model = self.model_name.split("/", 2)
         self.device = device
         self.truncate = truncate
-        self.provider = ['CUDAExecutionProvider', "CPUExecutionProvider"] if self.device.startswith("cuda") else ["CPUExecutionProvider"]
+        self.provider = ['CUDAExecutionProvider', "CPUExecutionProvider"] if self.device.startswith("cuda") else [
+            "CPUExecutionProvider"]
         self.visual_session = None
         self.textual_session = None
-        self.model_info = _HF_MODEL_DOWNLOAD[self.model_name]
+        self.model_info = model_registry._get_onnx_clip_properties()[self.model_name]
 
-        if self.onnx_type == "onnx16":
-            self.visual_type = np.float16
-        elif self.onnx_type == "onnx32":
-            self.visual_type = np.float32
+        self.visual_type = np.float16 if self.onnx_type == "onnx16" else np.float32
+        self.textual_type = np.int64 if self.source == "open_clip" else np.int32
+        self.n_px = self.model_info["resolution"]
 
     def load(self):
         self.load_clip()
@@ -84,14 +78,13 @@ class CLIP_ONNX(object):
 
     def load_clip(self):
         if self.source == "openai":
-            clip_model, self.clip_preprocess = clip.load(self.clip_model, device="cpu", jit=False)
+            self.clip_preprocess = _get_transform(self.n_px)
             self.tokenizer = clip.tokenize
-            del clip_model
-        elif self.source =="open_clip":
-            clip_name, pre_trained = self.clip_model.split("/", 2)
-            clip_model, _, self.clip_preprocess = open_clip.create_model_and_transforms(clip_name, pre_trained, device="cpu")
+
+        elif self.source == "open_clip":
+            clip_name, _ = self.clip_model.split("/", 2)
+            self.clip_preprocess = _get_transform(self.n_px)
             self.tokenizer = open_clip.get_tokenizer(clip_name)
-            del clip_model
 
     def encode_text(self, sentence, normalize=True):
         text = clip.tokenize(sentence, truncate=self.truncate).cpu()
@@ -99,7 +92,8 @@ class CLIP_ONNX(object):
 
         onnx_input_text = {self.textual_session.get_inputs()[0].name: text_onnx}
         # The onnx output has the shape [1,1,768], we need to squeeze the dimension
-        outputs = torch.squeeze(torch.tensor(np.array(self.textual_session.run(None, onnx_input_text)))).to(torch.float32)
+        outputs = torch.squeeze(torch.tensor(np.array(self.textual_session.run(None, onnx_input_text)))).to(
+            torch.float32)
 
         if normalize:
             _shape_before = outputs.shape
@@ -118,7 +112,8 @@ class CLIP_ONNX(object):
 
         onnx_input_image = {self.visual_session.get_inputs()[0].name: images_onnx}
         # The onnx output has the shape [1,1,768], we need to squeeze the dimension
-        outputs = torch.squeeze(torch.tensor(np.array(self.visual_session.run(None, onnx_input_image)))).to(torch.float32)
+        outputs = torch.squeeze(torch.tensor(np.array(self.visual_session.run(None, onnx_input_image)))).to(
+            torch.float32)
 
         if normalize:
             _shape_before = outputs.shape
@@ -162,17 +157,7 @@ class CLIP_ONNX(object):
         self.textual_session = ort.InferenceSession(self.textual_file, providers=self.provider)
 
     @staticmethod
-    def download_model(repo_id:str, filename:str, cache_folder:str = None) -> str:
+    def download_model(repo_id: str, filename: str, cache_folder: str = None) -> str:
         file_path = hf_hub_download(repo_id=repo_id, filename=filename,
-                                 cache_dir=cache_folder)
+                                    cache_dir=cache_folder)
         return file_path
-
-
-
-
-
-
-
-
-
-

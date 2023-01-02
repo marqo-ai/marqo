@@ -519,15 +519,52 @@ def _get_onnx_clip_properties() -> Dict:
                 "name":"onnx32/openai/ViT-L/14",
                 "dimensions" : 768,
                 "type":"clip_onnx",
-                "note":"the onnx float32 version of openai ViT-L/14"
+                "note":"the onnx float32 version of openai ViT-L/14",
+                "repo_id": "Marqo/onnx-openai-ViT-L-14",
+                "visual_file": "onnx32-openai-ViT-L-14-visual.onnx",
+                "textual_file": "onnx32-openai-ViT-L-14-textual.onnx",
+                "token": None,
+                "resolution" : 224,
             },
         "onnx16/openai/ViT-L/14":
             {
                 "name": "onnx16/openai/ViT-L/14",
                 "dimensions": 768,
                 "type": "clip_onnx",
-                "note": "the onnx float16 version of openai ViT-L/14"
+                "note": "the onnx float16 version of openai ViT-L/14",
+                "repo_id": "Marqo/onnx-openai-ViT-L-14",
+                "visual_file": "onnx16-openai-ViT-L-14-visual.onnx",
+                "textual_file": "onnx16-openai-ViT-L-14-textual.onnx",
+                "token": None,
+                "resolution" : 224,
             },
+
+        "onnx32/open_clip/ViT-L-14/laion400m_e32":
+            {
+                "name" : "onnx32/open_clip/ViT-L-14/laion400m_e32",
+                "dimensions" : 768,
+                "type" : "clip_onnx",
+                "note": "the onnx float32 version of open_clip ViT-L-14/lainon400m_e32",
+                "repo_id" : "Marqo/onnx-open_clip-ViT-L-14",
+                "visual_file" : "onnx32-open_clip-ViT-L-14-laion400m_e32-visual.onnx",
+                "textual_file" : "onnx32-open_clip-ViT-L-14-laion400m_e32-textual.onnx",
+                "token" : None,
+                "resolution" : 224,
+            },
+
+        "onnx16/open_clip/ViT-L-14/laion400m_e32":
+            {
+                "name": "onnx16/open_clip/ViT-L-14/laion400m_e32",
+                "dimensions": 768,
+                "type": "clip_onnx",
+                "note": "the onnx float16 version of open_clip ViT-L-14/lainon400m_e32",
+                "repo_id": "Marqo/onnx-open_clip-ViT-L-14",
+                "visual_file": "onnx32-open_clip-ViT-L-14-laion400m_e16-visual.onnx",
+                "textual_file": "onnx32-open_clip-ViT-L-14-laion400m_e16-textual.onnx",
+                "token": None,
+                "resolution": 224,
+            },
+
     }
     return ONNX_CLIP_MODEL_PROPERTIES
 
