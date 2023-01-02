@@ -558,8 +558,8 @@ def _get_onnx_clip_properties() -> Dict:
                 "type": "clip_onnx",
                 "note": "the onnx float16 version of open_clip ViT-L-14/lainon400m_e32",
                 "repo_id": "Marqo/onnx-open_clip-ViT-L-14",
-                "visual_file": "onnx32-open_clip-ViT-L-14-laion400m_e16-visual.onnx",
-                "textual_file": "onnx32-open_clip-ViT-L-14-laion400m_e16-textual.onnx",
+                "visual_file": "onnx16-open_clip-ViT-L-14-laion400m_e32-visual.onnx",
+                "textual_file": "onnx16-open_clip-ViT-L-14-laion400m_e32-textual.onnx",
                 "token": None,
                 "resolution": 224,
                 "pretrained": "laion400m_e32"

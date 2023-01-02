@@ -63,7 +63,7 @@ class CLIP_ONNX(object):
         self.n_px = self.model_info["resolution"]
 
     def load(self):
-        self.load_clip()
+        self.load_tokenizer_and_transform()
         self.load_onnx()
 
     @staticmethod
@@ -76,7 +76,7 @@ class CLIP_ONNX(object):
         elif self.device.startswith('cuda'):
             return output.cpu().numpy()
 
-    def load_clip(self):
+    def load_tokenizer_and_transform(self):
         if self.source == "openai":
             self.clip_preprocess = _get_transform(self.n_px)
             self.tokenizer = clip.tokenize
@@ -88,7 +88,7 @@ class CLIP_ONNX(object):
 
     def encode_text(self, sentence, normalize=True):
         text = clip.tokenize(sentence, truncate=self.truncate).cpu()
-        text_onnx = text.detach().cpu().numpy().astype(np.int32)
+        text_onnx = text.detach().cpu().numpy().astype(self.textual_type)
 
         onnx_input_text = {self.textual_session.get_inputs()[0].name: text_onnx}
         # The onnx output has the shape [1,1,768], we need to squeeze the dimension
@@ -155,6 +155,10 @@ class CLIP_ONNX(object):
         self.textual_file = self.download_model(self.model_info["repo_id"], self.model_info["textual_file"])
         self.visual_session = ort.InferenceSession(self.visual_file, providers=self.provider)
         self.textual_session = ort.InferenceSession(self.textual_file, providers=self.provider)
+
+        # The error will be caught and return a marqo.s2_inference.errors.ModelLoadError
+        assert self.visual_session.get_inputs()[0].shape[-1] == self.n_px, \
+            f"The provided resolution {self.n_px} should be the same as onnx input shape {self.visual_session.get_inputs()[0].shape}"
 
     @staticmethod
     def download_model(repo_id: str, filename: str, cache_folder: str = None) -> str:
