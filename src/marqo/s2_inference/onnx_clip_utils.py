@@ -60,11 +60,10 @@ class CLIP_ONNX(object):
 
         self.visual_type = np.float16 if self.onnx_type == "onnx16" else np.float32
         self.textual_type = np.int64 if self.source == "open_clip" else np.int32
-        self.n_px = self.model_info["resolution"]
 
     def load(self):
-        self.load_tokenizer_and_transform()
         self.load_onnx()
+        self.load_tokenizer_and_transform()
 
     @staticmethod
     def normalize(outputs):
@@ -77,6 +76,9 @@ class CLIP_ONNX(object):
             return output.cpu().numpy()
 
     def load_tokenizer_and_transform(self):
+
+        self.n_px = self.model_info["resolution"] or self.visual_session.get_inputs()[0].shape[-1]
+
         if self.source == "openai":
             self.clip_preprocess = _get_transform(self.n_px)
             self.tokenizer = clip.tokenize
@@ -157,8 +159,6 @@ class CLIP_ONNX(object):
         self.textual_session = ort.InferenceSession(self.textual_file, providers=self.provider)
 
         # The error will be caught and return a marqo.s2_inference.errors.ModelLoadError
-        assert self.visual_session.get_inputs()[0].shape[-1] == self.n_px, \
-            f"The provided resolution {self.n_px} should be the same as onnx input shape {self.visual_session.get_inputs()[0].shape}"
 
     @staticmethod
     def download_model(repo_id: str, filename: str, cache_folder: str = None) -> str:
