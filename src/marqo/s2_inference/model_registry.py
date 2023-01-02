@@ -538,7 +538,6 @@ def _get_onnx_clip_properties() -> Dict:
                 "token": None,
                 "resolution" : 224,
             },
-
         "onnx32/open_clip/ViT-L-14/laion400m_e32":
             {
                 "name" : "onnx32/open_clip/ViT-L-14/laion400m_e32",
@@ -551,7 +550,6 @@ def _get_onnx_clip_properties() -> Dict:
                 "token" : None,
                 "resolution" : 224,
             },
-
         "onnx16/open_clip/ViT-L-14/laion400m_e32":
             {
                 "name": "onnx16/open_clip/ViT-L-14/laion400m_e32",
