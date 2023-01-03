@@ -577,7 +577,7 @@ def _get_onnx_clip_properties() -> Dict:
                 "resolution": 224,
                 "pretrained": "laionb_s32b_b82k"
             },
-        "onnx16/open_clip/ViT-L-14/laion400m_e32":
+        "onnx16/open_clip/ViT-L-14/laionb_s32b_b82k":
             {
                 "name": "onnx16/open_clip/ViT-L-14/laionb_s32b_b82k",
                 "dimensions": 768,
