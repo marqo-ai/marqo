@@ -595,6 +595,40 @@ def _get_onnx_clip_properties() -> Dict:
                 "image_mean": (0.5, 0.5, 0.5),
                  "image_std": (0.5, 0.5, 0.5),
             },
+        "onnx32/open_clip/ViT-L-14-336/openai":
+            {
+                "name": "onnx32/open_clip/ViT-L-14-336/openai",
+                "dimensions": 768,
+                "type": "clip_onnx",
+                "note": "the onnx float32 version of open_clip ViT-L-14-336/openai",
+                "repo_id": "Marqo/onnx-open_clip-ViT-L-14-336",
+                "visual_file": "onnx32-open_clip-ViT-L-14-336-openai-visual.onnx",
+                "textual_file": "onnx32-open_clip-ViT-L-14-336-openai-textual.onnx",
+                "token": None,
+                "resolution": 336,
+                "pretrained": "openai",
+                "image_mean": None,
+                "image_std": None,
+
+            },
+        "onnx16/open_clip/ViT-L-14-336/openai":
+            {
+                "name": "onnx16/open_clip/ViT-L-14-336/openai",
+                "dimensions": 768,
+                "type": "clip_onnx",
+                "note": "the onnx float16 version of open_clip ViT-L-14-336/openai",
+                "repo_id": "Marqo/onnx-open_clip-ViT-L-14-336",
+                "visual_file": "onnx16-open_clip-ViT-L-14-336-openai-visual.onnx",
+                "textual_file": "onnx16-open_clip-ViT-L-14-336-openai-textual.onnx",
+                "token": None,
+                "resolution": 336,
+                "pretrained": "openai",
+                "image_mean": None,
+                "image_std": None,
+
+            },
+
+
 
 
 
