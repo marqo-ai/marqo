@@ -272,6 +272,10 @@ curl -XGET http://localhost:8882/indexes/my-irst-ix/documents/honey_facts_119
 curl -XGET http://localhost:8882/indexes/my-irst-ix/stats
 """
 
+# GET index settings
+"""
+curl -XGET http://localhost:8882/indexes/my-irst-ix/settings
+"""
 # POST refresh index
 """
 curl -XPOST  http://localhost:8882/indexes/my-irst-ix/refresh
