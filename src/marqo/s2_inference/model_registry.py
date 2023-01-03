@@ -575,7 +575,10 @@ def _get_onnx_clip_properties() -> Dict:
                 "textual_file": "onnx32-open_clip-ViT-L-14-laion2b_s32b_b82k-textual.onnx",
                 "token": None,
                 "resolution": 224,
-                "pretrained": "laionb_s32b_b82k"
+                "pretrained": "laionb_s32b_b82k",
+                "image_mean" : (0.5, 0.5, 0.5),
+                "image_std" : (0.5, 0.5, 0.5),
+
             },
         "onnx16/open_clip/ViT-L-14/laion2b_s32b_b82k":
             {
@@ -588,7 +591,9 @@ def _get_onnx_clip_properties() -> Dict:
                 "textual_file": "onnx16-open_clip-ViT-L-14-laion2b_s32b_b82k-textual.onnx",
                 "token": None,
                 "resolution": 224,
-                "pretrained": "laionb_s32b_b82k"
+                "pretrained": "laionb_s32b_b82k",
+                "image_mean": (0.5, 0.5, 0.5),
+                 "image_std": (0.5, 0.5, 0.5),
             },
 
 

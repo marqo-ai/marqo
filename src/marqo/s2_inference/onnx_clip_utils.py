@@ -22,6 +22,9 @@ from marqo.s2_inference.clip_utils import get_allowed_image_types, format_and_lo
 
 logger = get_logger(__name__)
 
+OPENAI_DATASET_MEAN = (0.48145466, 0.4578275, 0.40821073)
+OPENAI_DATASET_STD = (0.26862954, 0.26130258, 0.27577711)
+
 try:
     from torchvision.transforms import InterpolationMode
     BICUBIC = InterpolationMode.BICUBIC
@@ -31,13 +34,18 @@ except ImportError:
 def _convert_image_to_rgb(image):
     return image.convert("RGB")
 
-def _get_transform(n_px):
+
+
+
+def _get_transform(n_px: int, image_mean:List[float] = None, image_std:List[float] = None):
+    img_mean = image_mean or OPENAI_DATASET_MEAN
+    img_std = image_std or OPENAI_DATASET_STD
     return Compose([
         Resize(n_px, interpolation=BICUBIC),
         CenterCrop(n_px),
         _convert_image_to_rgb,
         ToTensor(),
-        Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711)),
+        Normalize(img_mean, img_std),
     ])
 
 class CLIP_ONNX(object):
@@ -80,13 +88,13 @@ class CLIP_ONNX(object):
         self.n_px = self.model_info["resolution"] or self.visual_session.get_inputs()[0].shape[-1]
 
         if self.source == "openai":
-            self.clip_preprocess = _get_transform(self.n_px)
+            self.clip_preprocess = _get_transform(self.n_px, None, None)
             self.tokenizer = clip.tokenize
 
         elif self.source == "open_clip":
             clip_name, _ = self.clip_model.split("/", 2)
             self.clip_preprocess = _get_transform(self.n_px)
-            self.tokenizer = open_clip.get_tokenizer(clip_name)
+            self.tokenizer = open_clip.get_tokenizer(clip_name, self.model_info.get("image_mean", None), self.model_info.get("image_std", None))
 
     def encode_text(self, sentence, normalize=True):
         text = clip.tokenize(sentence, truncate=self.truncate).cpu()
