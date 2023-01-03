@@ -93,8 +93,8 @@ class CLIP_ONNX(object):
 
         elif self.source == "open_clip":
             clip_name, _ = self.clip_model.split("/", 2)
-            self.clip_preprocess = _get_transform(self.n_px)
-            self.tokenizer = open_clip.get_tokenizer(clip_name, self.model_info.get("image_mean", None), self.model_info.get("image_std", None))
+            self.clip_preprocess = _get_transform(self.n_px, self.model_info.get("image_mean", None), self.model_info.get("image_std", None))
+            self.tokenizer = open_clip.get_tokenizer(clip_name)
 
     def encode_text(self, sentence, normalize=True):
         text = clip.tokenize(sentence, truncate=self.truncate).cpu()
