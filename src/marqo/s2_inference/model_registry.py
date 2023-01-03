@@ -691,6 +691,70 @@ def _get_onnx_clip_properties() -> Dict:
                 "image_std": None,
             },
 
+        "onnx32/open_clip/ViT-B-32/laion400m_e32":
+            {
+                "name": "onnx32/open_clip/ViT-B-32/laion400m_e32",
+                "dimensions": 512,
+                "type": "clip_onnx",
+                "note": "the onnx float32 version of open_clip ViT-B-32/laion400m_e32",
+                "repo_id": "Marqo/onnx-open_clip-ViT-B-32",
+                "visual_file": "onnx32-open_clip-ViT-B-32-laion400m_e32-visual.onnx",
+                "textual_file": "onnx32-open_clip-ViT-B-32-laion400m_e32-textual.onnx",
+                "token": None,
+                "resolution": 224,
+                "pretrained": "laion400m_e32",
+                "image_mean": None,
+                "image_std": None,
+            },
+        "onnx16/open_clip/ViT-B-32/laion400m_e32":
+            {
+                "name": "onnx16/open_clip/ViT-B-32/laion400m_e32",
+                "dimensions": 512,
+                "type": "clip_onnx",
+                "note": "the onnx float16 version of open_clip ViT-B-32/laion400m_e32",
+                "repo_id": "Marqo/onnx-open_clip-ViT-B-32",
+                "visual_file": "onnx16-open_clip-ViT-B-32-laion400m_e32-visual.onnx",
+                "textual_file": "onnx16-open_clip-ViT-B-32-laion400m_e32-textual.onnx",
+                "token": None,
+                "resolution": 224,
+                "pretrained": "laion400m_e32",
+                "image_mean": None,
+                "image_std": None,
+            },
+
+        "onnx32/open_clip/ViT-B-32/laion2b_e16":
+            {
+                "name": "onnx32/open_clip/ViT-B-32/laion2b_e16",
+                "dimensions": 512,
+                "type": "clip_onnx",
+                "note": "the onnx float32 version of open_clip ViT-B-32/laion2b_e16",
+                "repo_id": "Marqo/onnx-open_clip-ViT-B-32",
+                "visual_file": "onnx32-open_clip-ViT-B-32-laion2b_e16-visual.onnx",
+                "textual_file": "onnx32-open_clip-ViT-B-32-laion2b_e16-textual.onnx",
+                "token": None,
+                "resolution": 224,
+                "pretrained": "laion2b_e16",
+                "image_mean": None,
+                "image_std": None,
+            },
+
+        "onnx16/open_clip/ViT-B-32/laion2b_e16":
+            {
+                "name": "onnx16/open_clip/ViT-B-32/laion2b_e16",
+                "dimensions": 512,
+                "type": "clip_onnx",
+                "note": "the onnx float16 version of open_clip ViT-B-32/laion2b_e16",
+                "repo_id": "Marqo/onnx-open_clip-ViT-B-32",
+                "visual_file": "onnx16-open_clip-ViT-B-32-laion2b_e16-visual.onnx",
+                "textual_file": "onnx16-open_clip-ViT-B-32-laion2b_e16-textual.onnx",
+                "token": None,
+                "resolution": 224,
+                "pretrained": "laion2b_e16",
+                "image_mean": None,
+                "image_std": None,
+            },
+
+
 
 
 
