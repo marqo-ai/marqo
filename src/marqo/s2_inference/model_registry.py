@@ -783,6 +783,38 @@ def _get_onnx_clip_properties() -> Dict:
                'pretrained': 'openai',
                'image_mean': None,
                'image_std': None
+            },
+
+        'onnx32/open_clip/ViT-B-32-quickgelu/laion400m_e31':
+            {
+            'name': 'onnx32/open_clip/ViT-B-32-quickgelu/laion400m_e31',
+                'dimensions': 512,
+                'type': 'clip_onnx',
+            'note': 'the onnx float32 version of open_clip ViT-B-32-quickgelu/laion400m_e31',
+            'repo_id': 'Marqo/onnx-open_clip-ViT-B-32-quickgelu',
+            'visual_file': 'onnx32-open_clip-ViT-B-32-quickgelu-laion400m_e31-visual.onnx',
+            'textual_file': 'onnx32-open_clip-ViT-B-32-quickgelu-laion400m_e31-textual.onnx',
+                'token': None,
+            'resolution': 224,
+                'pretrained': 'laion400m_e31',
+                'image_mean': None,
+                'image_std': None
+            },
+
+        'onnx16/open_clip/ViT-B-32-quickgelu/laion400m_e31':
+            {
+            'name': 'onnx16/open_clip/ViT-B-32-quickgelu/laion400m_e31',
+                'dimensions': 512,
+                'type': 'clip_onnx',
+            'note': 'the onnx float16 version of open_clip ViT-B-32-quickgelu/laion400m_e31',
+            'repo_id': 'Marqo/onnx-open_clip-ViT-B-32-quickgelu',
+            'visual_file': 'onnx16-open_clip-ViT-B-32-quickgelu-laion400m_e31-visual.onnx',
+            'textual_file': 'onnx16-open_clip-ViT-B-32-quickgelu-laion400m_e31-textual.onnx',
+                'token': None,
+            'resolution': 224,
+                'pretrained': 'laion400m_e31',
+                'image_mean': None,
+                'image_std': None
             }
 
 
