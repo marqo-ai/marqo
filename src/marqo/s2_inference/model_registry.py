@@ -566,7 +566,7 @@ def _get_onnx_clip_properties() -> Dict:
             },
         "onnx32/open_clip/ViT-L-14/laion2b_s32b_b82k":
             {
-                "name": "onnx32/open_clip/ViT-L-14/laionb_s32b_b82k",
+                "name": "onnx32/open_clip/ViT-L-14/laion2b_s32b_b82k",
                 "dimensions": 768,
                 "type": "clip_onnx",
                 "note": "the onnx float32 version of open_clip ViT-L-14/laion2b_s32b_b82k",
@@ -579,7 +579,7 @@ def _get_onnx_clip_properties() -> Dict:
             },
         "onnx16/open_clip/ViT-L-14/laion2b_s32b_b82k":
             {
-                "name": "onnx16/open_clip/ViT-L-14/laionb_s32b_b82k",
+                "name": "onnx16/open_clip/ViT-L-14/laion2b_s32b_b82k",
                 "dimensions": 768,
                 "type": "clip_onnx",
                 "note": "the onnx float16 version of open_clip ViT-L-14/laion2b_s32b_b82k",
