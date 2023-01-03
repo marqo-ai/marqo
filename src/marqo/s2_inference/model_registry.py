@@ -625,7 +625,6 @@ def _get_onnx_clip_properties() -> Dict:
                 "pretrained": "openai",
                 "image_mean": None,
                 "image_std": None,
-
             },
 
 
