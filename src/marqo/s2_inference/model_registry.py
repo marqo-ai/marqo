@@ -1037,7 +1037,37 @@ def _get_onnx_clip_properties() -> Dict:
                 'pretrained': 'laion2b_s32b_b79k',
                 'image_mean': None,
                 'image_std': None
-            }
+            },
+
+        'onnx16/open_clip/ViT-g-14/laion2b_s12b_b42k':
+            {'name': 'onnx16/open_clip/ViT-g-14/laion2b_s12b_b42k',
+             'dimensions': 1024,
+             'type': 'clip_onnx',
+             'note': 'the onnx float16 version of open_clip ViT-g-14/laion2b_s12b_b42k',
+             'repo_id': 'Marqo/onnx-open_clip-ViT-g-14',
+             'visual_file': 'onnx16-open_clip-ViT-g-14-visual.onnx',
+             'textual_file': 'onnx16-open_clip-ViT-g-14-textual.onnx',
+             'token': None,
+             'resolution': 224,
+             'pretrained': 'laion2b_s12b_b42k',
+             'image_mean': None,
+             'image_std': None
+             },
+
+        'onnx32/open_clip/ViT-g-14/laion2b_s12b_b42k':
+            {'name': 'onnx32/open_clip/ViT-g-14/laion2b_s12b_b42k',
+             'dimensions': 1024,
+             'type': 'clip_onnx',
+             'note': 'the onnx float32 version of open_clip ViT-g-14/laion2b_s12b_b42k',
+             'repo_id': 'Marqo/onnx-open_clip-ViT-g-14',
+             'visual_file': 'onnx32-open_clip-ViT-g-14-visual.zip',
+             'textual_file': 'onnx32-open_clip-ViT-g-14-textual.onnx',
+             'token': None,
+             'resolution': 224,
+             'pretrained': 'laion2b_s12b_b42k',
+             'image_mean': None,
+             'image_std': None
+             }
 
 
 
