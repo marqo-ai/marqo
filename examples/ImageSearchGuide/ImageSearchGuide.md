@@ -21,7 +21,7 @@ In this article, we select 5 images from the [coco dataset](https://cocodataset.
   <img src="data/image4.jpg" width="150" />
 </p>
 
-First, we need to run marqo in docker using the following command. This test is done on a x64 linux machine, for Mac users with M-series chips
+First, we need to run marqo in Docker using the following command. This test is done on a x64 linux machine, for Mac users with M-series chips
 please check [here](https://github.com/marqo-ai/marqo#m-series-mac-users).
 
 ```
@@ -37,7 +37,7 @@ conda activate marqo-client
 
 pip install marqo matplotlib
 ```
-Open your python and check the installation is successful by:
+Open Python and check the installation is successful by:
 ```python
 import marqo
 mq = marqo.Client("http://localhost:8882")
@@ -48,7 +48,7 @@ and you should have the output as:
 ```python
 {'message': 'Welcome to Marqo', 'version': '0.0.10'}
 ```
-By the time this article is written, we are using marqo with version 0.0.10.
+At the time this article is written, we are using marqo with version 0.0.10.
 
 ### Download images
 
@@ -59,7 +59,7 @@ Now, you can download our examples images from [Github](./data). You should have
 </p>
 
 
-Done, you have finished all the set-up, let do the real search!
+Done, you have finished all the set-up, let's do the real search!
 
 ## Search with marqo
 
@@ -158,13 +158,13 @@ outputs:
 2022-12-30 04:27:51,573 logger:'marqo' INFO completed batch ingestion.
 2022-12-30 04:27:51,575 logger:'marqo' INFO add_documents completed. total time taken: 5.729s.
 ```
-Yes, it is just this simple one line of code. And you can check the outputs for the indexing time. Also, you can set `device = "cuda"` if available.
+Yes, it is just this simple one line of code. And you can check the outputs for the indexing time. If you have CUDA GPU available, and want to speed up indexing, follow [this guide](https://docs.marqo.ai/0.0.10/using_marqo_with_a_gpu/) to enable CUDA on Marqo, and set `device="cuda"` in the `add_documents` call.  
 
-Done, all the images are in the marqo and we can do the search.
+Done, all the images are in Marqo and now we can search.
 
 
 ### Search
-Finally, let us do the search and see the returned the results.
+Finally, let us search and see the returned the results.
 
 Let's say we want to get the image "*A rider on a horse jumping over the barrier*". Here is the code.
 ```python
@@ -176,7 +176,7 @@ search_results =  mq.index(index_name).search("A rider on a horse jumping over t
 output:
 2022-12-30 04:28:56,472 logger:'marqo' INFO search (tensor): took 0.364s to send query and received 1 results from Marqo (roundtrip). Marqo itself took 0.358s to execute the search.
 ```
-Done, we just get the result in 0.36s without the help of GPU! So what does the results look like then?
+Done, we get the result in just 0.36s without the help of GPU! So what do the results look like, then?
 ```python
 print(search_results)
 ```
@@ -190,7 +190,7 @@ output:
  'query': 'A rider on a horse jumping over the barrier',
  'limit': 1}
 ```
-Well, very hard to understand? Don't worry, let's plot it and verify it by your eyes:
+Well, very hard to understand? Don't worry, let's plot it and verify it with your eyes:
 ```python
 import requests
 from PIL import Image
