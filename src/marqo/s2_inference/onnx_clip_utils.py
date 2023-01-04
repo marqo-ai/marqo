@@ -15,7 +15,7 @@ from marqo.s2_inference.logger import get_logger
 import onnxruntime as ort
 from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize
 import marqo.s2_inference.model_registry as model_registry
-import shutil
+from zipfile import ZipFile
 
 # Loading shared functions from clip_utils.py. This part should be decoupled from models in the future
 from marqo.s2_inference.clip_utils import get_allowed_image_types, format_and_load_CLIP_image, \
@@ -176,7 +176,9 @@ class CLIP_ONNX(object):
                                     cache_dir=cache_dir)
         if file_path.endswith(".zip") and (not os.path.isfile(file_path.replace(".zip", ".onnx"))):
             logger.info(f"Unzip onnx model = {file_path}")
-            shutil.unpack_archive(filename, os.path.dirname(file_path))
+            with ZipFile(file_path, 'r') as zipobj:
+                zipobj.extractall()
+                #shutil.unpack_archive(filename, os.path.dirname(file_path))
             file_path = file_path.replace(".zip", ".onnx")
         return file_path
 
