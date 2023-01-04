@@ -175,13 +175,12 @@ class CLIP_ONNX(object):
         file_path = hf_hub_download(repo_id=repo_id, filename=filename,
                                     cache_dir=cache_dir)
         if file_path.endswith(".zip"):
-            file_path = file_path.replace(".zip", ".onnx")
-
             if not os.path.isfile(file_path.replace(".zip", ".onnx")):
                 logger.info(f"Unzip onnx model = {file_path}")
                 with ZipFile(file_path) as zipobj:
                     zipobj.extractall(os.path.dirname(file_path))
                     #shutil.unpack_archive(filename, os.path.dirname(file_path))
+            file_path = file_path.replace(".zip", ".onnx")
 
         return file_path
 
