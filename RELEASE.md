@@ -1,3 +1,33 @@
+# Release 0.0.10
+
+## New features 
+- Generic model support (https://github.com/marqo-ai/marqo/pull/179). Create an index with your favourite SBERT-type models from HuggingFace! Read about usage [here](https://marqo.pages.dev/0.0.10/Models-Reference/dense_retrieval/#generic-models)
+- Visual search update 2. (https://github.com/marqo-ai/marqo/pull/214). Search-time image reranking and open-vocabulary localization, based on users' queries, is now available with the Owl-ViT model. **Locate the part of the image corresponding to your query!** Read about usage [here](https://docs.marqo.ai/0.0.10/Models-Reference/reranking/) 
+- Visual search update 1. (https://github.com/marqo-ai/marqo/pull/214). Better image patching. In addition to faster-rcnn, you can now use yolox or attention based (DINO) region proposal as a patching method at indexing time. This allows localization as the sub patches of the image can be searched. Read about usage [here](https://docs.marqo.ai/0.0.10/Preprocessing/Images/). 
+
+Check out [this article](https://medium.com/@jesse_894/image-search-with-localization-and-open-vocabulary-reranking-using-marqo-yolox-clip-and-owl-vit-9c636350bf66) about how this update makes image search awesome.
+
+## Bug fixes
+- Fixed imports and outdated Python client usage in Wikipedia demo (https://github.com/marqo-ai/marqo/pull/216) 
+
+## Contributor shout-outs
+- Thank you to [@georgewritescode](https://github.com/georgewritescode) for debugging and updating the Wikipedia demo
+- Thank you to our 1.8k stargazers and 60+ forkers!
+
+
+# Release 0.0.9
+## Optimisations 
+- Set k to limit to for Marqo-os search queries (https://github.com/marqo-ai/marqo/pull/219)
+- Reduced the amount of metadata returned from Marqo-os, on searches (https://github.com/marqo-ai/marqo/pull/218)
+
+## Non-breaking data model changes
+- Set default kNN m value to 16 (https://github.com/marqo-ai/marqo/pull/222)
+
+## Bug fixes
+- Better error messages when downloading an image fails (https://github.com/marqo-ai/marqo/pull/198)
+- Bug where filtering wouldn't work on fields with spaces (https://github.com/marqo-ai/marqo/pull/213), resolving https://github.com/marqo-ai/marqo/issues/115
+
+
 # Release 0.0.8
 
 ## New features

@@ -5,7 +5,8 @@ from marqo.s2_inference.s2_inference import (
     _convert_vectorized_output, 
     available_models,
     clear_loaded_models,
-    _load_model
+    _load_model,
+    get_model_properties_from_registry
     )
 
 from torch import FloatTensor
@@ -24,8 +25,8 @@ class TestTestModelOutputs(unittest.TestCase):
         texts = ['hello', 'big', 'asasasasaaaaaaaaaaaa', '', 'a word. another one!?. #$#.']
         
         for name in names:
-        
-            model = _load_model(name, device=device)
+            model_properties = get_model_properties_from_registry('test')
+            model = _load_model(model_properties['name'], model_properties=model_properties, device=device)
             
             for text in texts:
                 assert abs(model.encode(text) - model.encode([text])).sum() < eps
@@ -34,7 +35,8 @@ class TestTestModelOutputs(unittest.TestCase):
 
     def test_check_output(self):
         texts = ['a', ['a'], ['a', 'b', 'longer text. with more stuff']]
-        model = _load_model('test')
+        model_properties = get_model_properties_from_registry('test')
+        model = _load_model(model_properties['name'], model_properties=model_properties)
 
         for text in texts:
             output = model.encode(text)

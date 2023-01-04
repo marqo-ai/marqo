@@ -12,5 +12,33 @@ class ChunkerError(S2InferenceError):
     pass
 
 
+class ChunkerMethodProcessError(S2InferenceError):
+    pass
+
+
 class VectoriseError(S2InferenceError):
+    pass
+
+
+class InvalidModelPropertiesError(S2InferenceError):
+    pass
+
+
+class UnknownModelError(S2InferenceError):
+    pass
+
+
+class ModelLoadError(S2InferenceError):
+    pass
+
+
+class RerankerError(S2InferenceError):
+    pass
+
+
+class RerankerImageError(S2InferenceError):
+    pass
+
+
+class RerankerNameError(S2InferenceError):
     pass

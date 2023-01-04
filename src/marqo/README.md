@@ -37,7 +37,7 @@ __Notes__:
 - This is for marqo-os (Marqo OpenSearch) running locally. You can alternatively set
 `OPENSEARCH_URL` to  a remote Marqo OpenSearch cluster 
 - To find the absolute path to the `marqo/src` directory, `cd` into the `marqo/src` directory and run `pwd` in your terminal.
-- If python library errors occur, try `root/.../marqo/src` instead of `~/.../marqo/src`
+- If python library errors occur, you might be using $HOME instead of your absolute path. try `/.../marqo/src` instead of `~/.../marqo/src`
 
 
 ### Option B. Build and run the Marqo as a Docker container, that creates and manages its own internal Marqo-OS 
@@ -198,3 +198,11 @@ To check your driver and maximum CUDA version supported, type the following into
 nvidia-smi
 ```
 Pytorch comes with its own bundled CUDA which allows many different CUDA versions to be used. Follow the [getting started](https://pytorch.org/get-started/locally/) to see how to install different versions of pytorch and CUDA.
+
+## Extracting `openapi.json` (swagger API spec)
+To get just the json, run this command (if Marqo is running locally)
+```
+curl http://localhost:8882/openapi.json
+```
+To get the human readable spec, visit `http://localhost:8882/docs`
+

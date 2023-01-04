@@ -11,7 +11,7 @@
 <p align="center">
 <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg"></a>
 <a href="https://pypi.org/project/marqo/"><img src="https://img.shields.io/pypi/v/marqo?label=PyPI"></a>
-<a href="https://github.com/marqo-ai/marqo/actions/workflows/CI.yml"><img src="https://img.shields.io/github/workflow/status/marqo-ai/marqo/CI?label=CI"></a>
+<a href="https://github.com/marqo-ai/marqo/actions/workflows/unit_test_CI.yml"><img src="https://img.shields.io/github/actions/workflow/status/marqo-ai/marqo/unit_test_CI.yml?branch=mainline"></a>
 <a href="https://pepy.tech/project/marqo"><img alt="PyPI - Downloads from pepy" src="https://static.pepy.tech/personalized-badge/marqo?period=month&units=international_system&left_color=grey&right_color=blue&left_text=downloads/month"></a>
 <a align="center" href="https://join.slack.com/t/marqo-community/shared_invite/zt-1d737l76e-u~b3Rvey2IN2nGM4wyr44w"><img src="https://img.shields.io/badge/Slack-blueviolet?logo=slack&amp;logoColor=white"></a>
 </p>
@@ -40,8 +40,8 @@ Tensor search involves transforming documents, images and other data into collec
 1. Marqo requires docker. To install Docker go to the [Docker Official website.](https://docs.docker.com/get-docker/)
 2. Use docker to run Marqo (Mac users with M-series chips will need to [go here](#m-series-mac-users)):
 ```bash
-docker rm -f marqo;
-docker pull marqoai/marqo:latest;
+docker rm -f marqo
+docker pull marqoai/marqo:latest
 docker run --name marqo -it --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:latest
 ```
 3. Install the Marqo client:
@@ -238,7 +238,7 @@ Marqo is a community project with the goal of making tensor search accessible to
 
 ## Dev set up
 1. Create a virtual env ```python -m venv ./venv```
-2. Activate the virtual environment ```source ./venv/bin/activate```
+2. Activate the virtual environment ```source ./venv/bin/activate``` (on Linux or Mac) or ```./venv/Scripts/activate``` (on Windows)
 3. Install requirements from the requirements file: ```pip install -r requirements.txt```
 4. Run tests by running the tox file. CD into this dir and then run "tox"
 5. If you update dependencies, make sure to delete the .tox dir and rerun

@@ -4,9 +4,10 @@ from marqo.s2_inference.sbert_utils import SBERT, TEST
 from marqo.s2_inference.random_utils import Random
 from marqo.s2_inference.clip_utils import CLIP, OPEN_CLIP
 from marqo.s2_inference.types import Any, Dict, List, Optional, Union, FloatTensor
+from marqo.s2_inference.onnx_clip_utils import CLIP_ONNX
 
 # we need to keep track of the embed dim and model load functions/classes
-# we can use this as a registry 
+# we can use this as a registry
 def _get_clip_properties() -> Dict:
     CLIP_MODEL_PROPERTIES = {
             'RN50':
@@ -26,7 +27,7 @@ def _get_clip_properties() -> Dict:
                 "dimensions": 640,
                 "notes": "CLIP resnet50x4",
                 "type": "clip",
-                },              
+                },
             'RN50x16':
                 {"name": "RN50x16",
                 "dimensions": 768,
@@ -290,25 +291,25 @@ def _get_open_clip_properties() -> Dict:
 
 def _get_sbert_properties() -> Dict:
     SBERT_MODEL_PROPERTIES = {
-            "sentence-transformers/all-MiniLM-L6-v1": 
+            "sentence-transformers/all-MiniLM-L6-v1":
                 {"name": "sentence-transformers/all-MiniLM-L6-v1",
                 "dimensions": 384,
                 "tokens":128,
                 "type":"sbert",
                 "notes": ""},
-            "sentence-transformers/all-MiniLM-L6-v2": 
+            "sentence-transformers/all-MiniLM-L6-v2":
                 {"name": "sentence-transformers/all-MiniLM-L6-v2",
                 "dimensions": 384,
                 "tokens":256,
                 "type":"sbert",
                 "notes": ""},
-            "sentence-transformers/all-mpnet-base-v1": 
+            "sentence-transformers/all-mpnet-base-v1":
                 {"name": "sentence-transformers/all-mpnet-base-v1",
                 "dimensions": 768,
                 "tokens":128,
                 "type":"sbert",
                 "notes": ""},
-            "sentence-transformers/all-mpnet-base-v2": 
+            "sentence-transformers/all-mpnet-base-v2":
                 {"name": "sentence-transformers/all-mpnet-base-v2",
                 "dimensions": 768,
                 "tokens":128,
@@ -320,38 +321,38 @@ def _get_sbert_properties() -> Dict:
                  "tokens": 128,
                  "type": "sbert",
                  "notes": ""},
-            "flax-sentence-embeddings/all_datasets_v3_MiniLM-L12": 
+            "flax-sentence-embeddings/all_datasets_v3_MiniLM-L12":
                 {"name": "flax-sentence-embeddings/all_datasets_v3_MiniLM-L12",
                 "dimensions": 384,
                 "tokens":128,
                 "type":"sbert",
                 "notes": ""},
-            "flax-sentence-embeddings/all_datasets_v3_MiniLM-L6": 
+            "flax-sentence-embeddings/all_datasets_v3_MiniLM-L6":
                 {"name": "flax-sentence-embeddings/all_datasets_v3_MiniLM-L6",
                 "dimensions": 384,
                 "tokens":128,
                 "type":"sbert",
                 "notes": ""},
-            "flax-sentence-embeddings/all_datasets_v4_MiniLM-L12": 
+            "flax-sentence-embeddings/all_datasets_v4_MiniLM-L12":
                 {"name": "flax-sentence-embeddings/all_datasets_v4_MiniLM-L12",
                 "dimensions": 384,
                 "tokens":128,
                 "type":"sbert",
                 "notes": ""},
-            "flax-sentence-embeddings/all_datasets_v4_MiniLM-L6": 
+            "flax-sentence-embeddings/all_datasets_v4_MiniLM-L6":
                 {"name": "flax-sentence-embeddings/all_datasets_v4_MiniLM-L6",
                 "dimensions": 384,
                 "tokens":128,
                 "type":"sbert",
                 "notes": ""},
 
-            "flax-sentence-embeddings/all_datasets_v3_mpnet-base": 
+            "flax-sentence-embeddings/all_datasets_v3_mpnet-base":
                 {"name": "flax-sentence-embeddings/all_datasets_v3_mpnet-base",
                 "dimensions": 768,
                 "tokens":128,
                 "type":"sbert",
                 "notes": ""},
-            "flax-sentence-embeddings/all_datasets_v4_mpnet-base": 
+            "flax-sentence-embeddings/all_datasets_v4_mpnet-base":
                 {"name": "flax-sentence-embeddings/all_datasets_v4_mpnet-base",
                 "dimensions": 768,
                 "tokens":128,
@@ -362,63 +363,63 @@ def _get_sbert_properties() -> Dict:
 
 def _get_hf_properties() -> Dict:
     HF_MODEL_PROPERTIES = {
-            "hf/all-MiniLM-L6-v1": 
+            "hf/all-MiniLM-L6-v1":
                 {"name": "sentence-transformers/all-MiniLM-L6-v1",
                 "dimensions": 384,
                 "tokens":128,
                 "type":"hf",
                 "notes": ""},
-            "hf/all-MiniLM-L6-v2": 
+            "hf/all-MiniLM-L6-v2":
                 {"name": "sentence-transformers/all-MiniLM-L6-v2",
                 "dimensions": 384,
                 "tokens":256,
                 "type":"hf",
                 "notes": ""},
-            "hf/all-mpnet-base-v1": 
+            "hf/all-mpnet-base-v1":
                 {"name": "sentence-transformers/all-mpnet-base-v1",
                 "dimensions": 768,
                 "tokens":128,
                 "type":"hf",
                 "notes": ""},
-            "hf/all-mpnet-base-v2": 
+            "hf/all-mpnet-base-v2":
                 {"name": "sentence-transformers/all-mpnet-base-v2",
                 "dimensions": 768,
                 "tokens":128,
                 "type":"hf",
                 "notes": ""},
 
-            "hf/all_datasets_v3_MiniLM-L12": 
+            "hf/all_datasets_v3_MiniLM-L12":
                 {"name": "flax-sentence-embeddings/all_datasets_v3_MiniLM-L12",
                 "dimensions": 384,
                 "tokens":128,
                 "type":"hf",
                 "notes": ""},
-            "hf/all_datasets_v3_MiniLM-L6": 
+            "hf/all_datasets_v3_MiniLM-L6":
                 {"name": "flax-sentence-embeddings/all_datasets_v3_MiniLM-L6",
                 "dimensions": 384,
                 "tokens":128,
                 "type":"hf",
                 "notes": ""},
-            "hf/all_datasets_v4_MiniLM-L12": 
+            "hf/all_datasets_v4_MiniLM-L12":
                 {"name": "flax-sentence-embeddings/all_datasets_v4_MiniLM-L12",
                 "dimensions": 384,
                 "tokens":128,
                 "type":"hf",
                 "notes": ""},
-            "hf/all_datasets_v4_MiniLM-L6": 
+            "hf/all_datasets_v4_MiniLM-L6":
                 {"name": "flax-sentence-embeddings/all_datasets_v4_MiniLM-L6",
                 "dimensions": 384,
                 "tokens":128,
                 "type":"hf",
                 "notes": ""},
 
-            "hf/all_datasets_v3_mpnet-base": 
+            "hf/all_datasets_v3_mpnet-base":
                 {"name": "flax-sentence-embeddings/all_datasets_v3_mpnet-base",
                 "dimensions": 768,
                 "tokens":128,
                 "type":"hf",
                 "notes": ""},
-            "hf/all_datasets_v4_mpnet-base": 
+            "hf/all_datasets_v4_mpnet-base":
                 {"name": "flax-sentence-embeddings/all_datasets_v4_mpnet-base",
                 "dimensions": 768,
                 "tokens":128,
@@ -429,63 +430,63 @@ def _get_hf_properties() -> Dict:
 
 def _get_sbert_onnx_properties() -> Dict:
     SBERT_ONNX_MODEL_PROPERTIES = {
-            "onnx/all-MiniLM-L6-v1": 
+            "onnx/all-MiniLM-L6-v1":
                 {"name": "sentence-transformers/all-MiniLM-L6-v1",
                 "dimensions": 384,
                 "tokens":128,
                 "type":"sbert_onnx",
                 "notes": ""},
-            "onnx/all-MiniLM-L6-v2": 
+            "onnx/all-MiniLM-L6-v2":
                 {"name": "sentence-transformers/all-MiniLM-L6-v2",
                 "dimensions": 384,
                 "tokens":256,
                 "type":"sbert_onnx",
                 "notes": ""},
-            "onnx/all-mpnet-base-v1": 
+            "onnx/all-mpnet-base-v1":
                 {"name": "sentence-transformers/all-mpnet-base-v1",
                 "dimensions": 768,
                 "tokens":128,
                 "type":"sbert_onnx",
                 "notes": ""},
-            "onnx/all-mpnet-base-v2": 
+            "onnx/all-mpnet-base-v2":
                 {"name": "sentence-transformers/all-mpnet-base-v2",
                 "dimensions": 768,
                 "tokens":128,
                 "type":"sbert_onnx",
                 "notes": ""},
 
-            "onnx/all_datasets_v3_MiniLM-L12": 
+            "onnx/all_datasets_v3_MiniLM-L12":
                 {"name": "flax-sentence-embeddings/all_datasets_v3_MiniLM-L12",
                 "dimensions": 384,
                 "tokens":128,
                 "type":"sbert_onnx",
                 "notes": ""},
-            "onnx/all_datasets_v3_MiniLM-L6": 
+            "onnx/all_datasets_v3_MiniLM-L6":
                 {"name": "flax-sentence-embeddings/all_datasets_v3_MiniLM-L6",
                 "dimensions": 384,
                 "tokens":128,
                 "type":"sbert_onnx",
                 "notes": ""},
-            "onnx/all_datasets_v4_MiniLM-L12": 
+            "onnx/all_datasets_v4_MiniLM-L12":
                 {"name": "flax-sentence-embeddings/all_datasets_v4_MiniLM-L12",
                 "dimensions": 384,
                 "tokens":128,
                 "type":"sbert_onnx",
                 "notes": ""},
-            "onnx/all_datasets_v4_MiniLM-L6": 
+            "onnx/all_datasets_v4_MiniLM-L6":
                 {"name": "flax-sentence-embeddings/all_datasets_v4_MiniLM-L6",
                 "dimensions": 384,
                 "tokens":128,
                 "type":"sbert_onnx",
                 "notes": ""},
 
-            "onnx/all_datasets_v3_mpnet-base": 
+            "onnx/all_datasets_v3_mpnet-base":
                 {"name": "flax-sentence-embeddings/all_datasets_v3_mpnet-base",
                 "dimensions": 768,
                 "tokens":128,
                 "type":"sbert_onnx",
                 "notes": ""},
-            "onnx/all_datasets_v4_mpnet-base": 
+            "onnx/all_datasets_v4_mpnet-base":
                 {"name": "flax-sentence-embeddings/all_datasets_v4_mpnet-base",
                 "dimensions": 768,
                 "tokens":128,
@@ -496,13 +497,13 @@ def _get_sbert_onnx_properties() -> Dict:
 
 def _get_sbert_test_properties() -> Dict:
     TEST_MODEL_PROPERTIES = {
-            "sentence-transformers/test": 
+            "sentence-transformers/test":
                 {"name": "sentence-transformers/all-MiniLM-L6-v1",
                 "dimensions": 16,
                 "tokens":128,
                 "type":"test",
                 "notes": ""},
-            "test": 
+            "test":
                 {"name": "sentence-transformers/all-MiniLM-L6-v1",
                 "dimensions": 16,
                 "tokens":128,
@@ -511,27 +512,46 @@ def _get_sbert_test_properties() -> Dict:
     }
     return TEST_MODEL_PROPERTIES
 
+def _get_onnx_clip_properties() -> Dict:
+    ONNX_CLIP_MODEL_PROPERTIES = {
+        "onnx32/openai/ViT-L/14":
+            {
+                "name":"onnx32/openai/ViT-L/14",
+                "dimensions" : 768,
+                "type":"clip_onnx",
+                "note":"the onnx float32 version of openai ViT-L/14"
+            },
+        "onnx16/openai/ViT-L/14":
+            {
+                "name": "onnx16/openai/ViT-L/14",
+                "dimensions": 768,
+                "type": "clip_onnx",
+                "note": "the onnx float16 version of openai ViT-L/14"
+            },
+    }
+    return ONNX_CLIP_MODEL_PROPERTIES
+
 def _get_random_properties() -> Dict:
     RANDOM_MODEL_PROPERTIES = {
-            "random": 
+            "random":
                 {"name": "random",
                 "dimensions": 384,
                 "tokens":128,
                 "type":"random",
                 "notes": ""},
-            "random/large": 
+            "random/large":
                 {"name": "random/large",
                 "dimensions": 768,
                 "tokens":128,
                 "type":"random",
                 "notes": ""},
-            "random/small": 
+            "random/small":
                 {"name": "random/small",
                 "dimensions": 32,
                 "tokens":128,
                 "type":"random",
                 "notes": ""},
-            "random/medium": 
+            "random/medium":
                 {"name": "random/medium",
                 "dimensions": 128,
                 "tokens":128,
@@ -547,7 +567,8 @@ def _get_model_load_mappings() -> Dict:
             'sbert':SBERT, 
             'test':TEST, 
             'sbert_onnx':SBERT_ONNX,
-            'random':Random, 
+            'clip_onnx': CLIP_ONNX,
+            'random':Random,
             'hf':HF_MODEL}
 
 def load_model_properties() -> Dict:
@@ -562,6 +583,7 @@ def load_model_properties() -> Dict:
     random_model_properties = _get_random_properties()
     hf_model_properties = _get_hf_properties()
     open_clip_model_properties = _get_open_clip_properties()
+    onnx_clip_model_properties = _get_onnx_clip_properties()
 
     # combine the above dicts
     model_properties = dict(clip_model_properties.items())
@@ -571,6 +593,7 @@ def load_model_properties() -> Dict:
     model_properties.update(random_model_properties)
     model_properties.update(hf_model_properties)
     model_properties.update(open_clip_model_properties)
+    model_properties.update(onnx_clip_model_properties)
 
     all_properties = dict()
     all_properties['models'] = model_properties
@@ -580,4 +603,3 @@ def load_model_properties() -> Dict:
         all_properties['loaders'][key] = val
 
     return all_properties
-
