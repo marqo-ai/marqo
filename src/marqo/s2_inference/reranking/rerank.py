@@ -1,16 +1,19 @@
 # use this as the entry point for reranking
 from marqo.s2_inference.reranking.enums import ResultsFields
 from marqo.s2_inference.reranking.cross_encoders import ReRankerText, ReRankerOwl
-from marqo.s2_inference.types import Dict, List
+from marqo.s2_inference.reranking.openai.gpt3 import GptQuestionAnswering
+from marqo.s2_inference.types import Dict, List, Optional
 from marqo.s2_inference.errors import RerankerError, RerankerNameError
 from PIL import UnidentifiedImageError
 from marqo.s2_inference.logger import get_logger
 
 logger = get_logger(__name__)
 
-def rerank_search_results(search_result: Dict, query: str, model_name: str, device: str, 
-                searchable_attributes: List[str] = None, num_highlights: int = 1, 
-                overwrite_original_scores_highlights: bool = True) -> None:
+def rerank_search_results(
+        search_result: Dict, query: str, model_name: str, device: str,
+        searchable_attributes: List[str] = None, num_highlights: int = 1,
+        overwrite_original_scores_highlights: bool = True, reranker_properties: Optional[Dict] = None
+    ) -> None:
     """the parent function to handle calling the rerankers. the results are modified in place
 
     Args:
@@ -21,6 +24,7 @@ def rerank_search_results(search_result: Dict, query: str, model_name: str, devi
         searchable_attributes (List[str], optional): _description_. Defaults to None.
         num_highlights (int, optional): _description_. Defaults to 1.
         overwrite_original_scores_highlights (bool, optional): _description_. Defaults to True.
+        reranker_properties: a reranker-specific dictionary of properties
     """
 
     # check the search_results have the searchable attribute before proceeding
@@ -42,7 +46,12 @@ def rerank_search_results(search_result: Dict, query: str, model_name: str, devi
             reranker.rerank(query=query, results=search_result, image_attributes=searchable_attributes)
         except (UnidentifiedImageError, RerankerNameError) as e:
             raise RerankerError(message=str(e)) from e
-
+    elif 'openai/gpt3-qa' in model_name.lower():
+        try:
+            reranker = GptQuestionAnswering(api_key=reranker_properties['api_key'])
+        except KeyError:
+            raise RerankerError("OpenAI API Key not found in reranker properties")
+        reranker.rerank(query=query, search_result=search_result, searchable_attributes=searchable_attributes)
     else:
         try:
             reranker = ReRankerText(model_name=model_name, device=device, num_highlights=num_highlights)

@@ -729,8 +729,8 @@ def refresh_index(config: Config, index_name: str):
 def search(config: Config, index_name: str, text: str, result_count: int = 3, highlights=True, return_doc_ids=True,
            search_method: Union[str, SearchMethod, None] = SearchMethod.TENSOR,
            searchable_attributes: Iterable[str] = None, verbose: int = 0, num_highlights: int = 3,
-           reranker: Union[str, Dict] = None, simplified_format: bool = True, filter: str = None,
-           attributes_to_retrieve: Optional[List[str]] = None,
+           reranker: Union[str, Dict] = None, reranker_properties: Optional[Dict] = None,
+           simplified_format: bool = True, filter: str = None, attributes_to_retrieve: Optional[List[str]] = None,
            device=None) -> Dict:
     """The root search method. Calls the specific search method
 
@@ -810,7 +810,9 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
         try:
             rerank.rerank_search_results(search_result=search_result, query=text,
                 model_name=reranker, device=config.indexing_device if device is None else device,
-                searchable_attributes=searchable_attributes, num_highlights=1 if simplified_format else num_highlights)
+                searchable_attributes=searchable_attributes, num_highlights=1 if simplified_format else num_highlights,
+                reranker_properties=reranker_properties
+            )
         except Exception as e:
             raise errors.BadRequestError(f"reranking failure due to {str(e)}")
 
