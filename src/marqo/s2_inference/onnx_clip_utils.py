@@ -15,6 +15,7 @@ from marqo.s2_inference.logger import get_logger
 import onnxruntime as ort
 from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize
 import marqo.s2_inference.model_registry as model_registry
+import shutil
 
 # Loading shared functions from clip_utils.py. This part should be decoupled from models in the future
 from marqo.s2_inference.clip_utils import get_allowed_image_types, format_and_load_CLIP_image, \
@@ -161,6 +162,12 @@ class CLIP_ONNX(object):
             return self.encode_text(inputs, normalize=True)
 
     def load_onnx(self):
+
+        # We may need to download the whole repo for certain onnx models
+        # since they need external data
+        if self.model_info.get("repo_download_flag", False) is True:
+            self.download_repo(self.model_info["repo_id"])
+
         self.visual_file = self.download_model(self.model_info["repo_id"], self.model_info["visual_file"])
         self.textual_file = self.download_model(self.model_info["repo_id"], self.model_info["textual_file"])
         self.visual_session = ort.InferenceSession(self.visual_file, providers=self.provider)
@@ -169,7 +176,14 @@ class CLIP_ONNX(object):
         # The error will be caught and return a marqo.s2_inference.errors.ModelLoadError
 
     @staticmethod
-    def download_model(repo_id: str, filename: str, cache_folder: str = None) -> str:
+    def download_model(repo_id: str, filename: str, cache_dir: str = None) -> str:
         file_path = hf_hub_download(repo_id=repo_id, filename=filename,
-                                    cache_dir=cache_folder)
+                                    cache_dir=cache_dir)
+        if file_path.endswith(".zip"):
+            shutil.unpack_archive(filename, os.path.dirname(file_path))
+            file_path = file_path.replace(".zip", ".onnx")
         return file_path
+
+    @staticmethod
+    def download_repo(repo_id:str, cache_dir: str = None) -> str:
+        repo_path = hf_hub_download(repo_id = repo_id, cache_dir = cache_dir)
