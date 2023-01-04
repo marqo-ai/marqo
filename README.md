@@ -191,12 +191,6 @@ response = mq.index("my-multimodal-index").add_documents([{
 
 ```
 
-You can then search using text as usual. Both text and image fields will be searched:
-```python
-
-results = mq.index("my-multimodal-index").search('animal')
-
-```
  Setting `searchable_attributes` to the image field `['My Image'] ` ensures only images are searched in this index:
 
 ```python
