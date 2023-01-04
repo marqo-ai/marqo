@@ -179,6 +179,6 @@ class CLIP_ONNX(object):
             with ZipFile(file_path) as zipobj:
                 zipobj.extractall(os.path.dirname(file_path))
                 #shutil.unpack_archive(filename, os.path.dirname(file_path))
-            file_path = file_path.replace(".zip", ".onnx")
+        file_path = file_path.replace(".zip", ".onnx")
         return file_path
 
