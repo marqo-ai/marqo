@@ -179,7 +179,7 @@ class CLIP_ONNX(object):
     def download_model(repo_id: str, filename: str, cache_dir: str = None) -> str:
         file_path = hf_hub_download(repo_id=repo_id, filename=filename,
                                     cache_dir=cache_dir)
-        if file_path.endswith(".zip"):
+        if file_path.endswith(".zip") and (not os.path.isfile(file_path.replace(".zip", ".onnx"))):
             shutil.unpack_archive(filename, os.path.dirname(file_path))
             file_path = file_path.replace(".zip", ".onnx")
         return file_path
