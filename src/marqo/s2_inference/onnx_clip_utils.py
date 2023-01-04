@@ -176,8 +176,8 @@ class CLIP_ONNX(object):
                                     cache_dir=cache_dir)
         if file_path.endswith(".zip") and (not os.path.isfile(file_path.replace(".zip", ".onnx"))):
             logger.info(f"Unzip onnx model = {file_path}")
-            with ZipFile(file_path, 'r') as zipobj:
-                zipobj.extractall()
+            with ZipFile(file_path) as zipobj:
+                zipobj.extractall(os.path.dirname(file_path))
                 #shutil.unpack_archive(filename, os.path.dirname(file_path))
             file_path = file_path.replace(".zip", ".onnx")
         return file_path
