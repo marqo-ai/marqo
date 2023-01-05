@@ -211,13 +211,6 @@ class TestModelCacheManagement(MarqoTestCase):
                 eject_model(generic_model["model_name"], device="cuda")
             assert len(available_models) == 0
 
-
-
-
-
-
-
-
     def test_overall_eject_and_load_model(self):
         clear_loaded_models()
         if len(available_models) != 0:
