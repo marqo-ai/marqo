@@ -192,7 +192,7 @@ class TestModelCacheManagement(MarqoTestCase):
         generic_model_list = [generic_model_1, generic_model_2, generic_model_3]
 
         for generic_model in generic_model_list:
-            load_model(generic_model["model_name"], generic_model["model_properties"], device="cpu")
+            load_model(generic_model["model_name"], model_properteis= generic_model["model_properties"], device="cpu")
 
         assert len(available_models) == 3
 
@@ -203,7 +203,7 @@ class TestModelCacheManagement(MarqoTestCase):
 
         if self.CUDA_FLAG == True:
             for generic_model in generic_model_list:
-                load_model(generic_model["model_name"], generic_model["model_properties"], device="cuda")
+                load_model(generic_model["model_name"], model_properteis = generic_model["model_properties"], device="cuda")
 
             assert len(available_models) == 3
 
