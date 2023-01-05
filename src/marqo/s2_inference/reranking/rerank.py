@@ -1,7 +1,7 @@
 # use this as the entry point for reranking
 from marqo.s2_inference.reranking.enums import ResultsFields
 from marqo.s2_inference.reranking.cross_encoders import ReRankerText, ReRankerOwl
-from marqo.s2_inference.reranking.openai.gpt3 import GptQuestionAnswering
+from marqo.s2_inference.reranking.openai import gpt3
 from marqo.s2_inference.types import Dict, List, Optional
 from marqo.s2_inference.errors import RerankerError, RerankerNameError
 from PIL import UnidentifiedImageError
@@ -32,7 +32,9 @@ def rerank_search_results(
     if not _check_searchable_fields_in_results(search_results=search_result, searchable_fields=searchable_attributes):
         return search_result
 
-    if 'owl' in model_name.lower():
+    lowered_model_name = model_name.lower()
+
+    if 'owl' in lowered_model_name:
         # owl needs the image location, while the text based ones can handle different number of fields but concat the text
         if searchable_attributes in (None, [], (), ''):
             raise RerankerError(f"found searchable_attributes={searchable_attributes} but expected list of strings for {model_name}")
@@ -46,11 +48,20 @@ def rerank_search_results(
             reranker.rerank(query=query, results=search_result, image_attributes=searchable_attributes)
         except (UnidentifiedImageError, RerankerNameError) as e:
             raise RerankerError(message=str(e)) from e
-    elif 'openai/gpt3-qa' in model_name.lower():
+    elif 'openai' in lowered_model_name:
+        tasks = {
+            gpt3.GptQuestionAnswering.task_name: gpt3.GptQuestionAnswering,
+            gpt3.GptFreeform.task_name: gpt3.GptFreeform,
+            gpt3.GptSummariser.task_name: gpt3.GptSummariser,
+            gpt3.GptReorder.task_name: gpt3.GptReorder
+        }
+        task_name = lowered_model_name.split("/")[-1]
         try:
-            reranker = GptQuestionAnswering(api_key=reranker_properties['api_key'])
+            reranker = tasks[task_name](reranker_properties=reranker_properties)
         except KeyError:
-            raise RerankerError("OpenAI API Key not found in reranker properties")
+            raise RerankerError(
+                f"Encountered unknown OpenAI task: `{model_name}`. Please check our documentation for available "
+                f"OpenAI tasks: https://docs.marqo.ai/latest")
         reranker.rerank(query=query, search_result=search_result, searchable_attributes=searchable_attributes)
     else:
         try:
