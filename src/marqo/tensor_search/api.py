@@ -228,7 +228,6 @@ def get_cpu_info():
     return tensor_search.get_cpu_info()
 
 
-
 @app.get("/device/cuda")
 def get_cuda_info():
     return tensor_search.get_cuda_info()
