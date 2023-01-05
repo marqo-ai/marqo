@@ -163,7 +163,7 @@ class TestModelCacheManagement(MarqoTestCase):
             "model_name" : "sentence-transformers/multi-qa-MiniLM-L6-cos-v1",
             "model_properties":{
                 "name" : "sentence-transformers/multi-qa-MiniLM-L6-cos-v1",
-                "dimension" : 384,
+                "dimensions" : 384,
                 "tokens": 128,
                 "type" : "sbert",
             }
@@ -173,7 +173,7 @@ class TestModelCacheManagement(MarqoTestCase):
             "model_name" : "sentence-transformers/multi-qa-distilbert-cos-v1",
             "model_properties":{
                 "name" : "sentence-transformers/multi-qa-distilbert-cos-v1",
-                "dimension" : 768,
+                "dimensions" : 768,
                 "tokens": 512,
                 "type" : "sbert",
             }
@@ -183,7 +183,7 @@ class TestModelCacheManagement(MarqoTestCase):
             "model_name" : "sentence-transformers/paraphrase-MiniLM-L3-v2",
             "model_properties":{
                 "name" : "sentence-transformers/paraphrase-MiniLM-L3-v2 ",
-                "dimension" : 384,
+                "dimensions" : 384,
                 "tokens": 128,
                 "type" : "sbert",
             }
