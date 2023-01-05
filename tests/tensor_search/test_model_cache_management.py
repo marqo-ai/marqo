@@ -158,7 +158,7 @@ class TestModelCacheManagement(MarqoTestCase):
 
     def test_generic_model(self):
         clear_loaded_models()
-        assert len(available_models()) == 0
+        assert len(available_models) == 0
         generic_model_1 = {
             "model_name" : "sentence-transformers/multi-qa-MiniLM-L6-cos-v1",
             "model_properties":{
