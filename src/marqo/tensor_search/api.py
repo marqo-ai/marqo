@@ -218,7 +218,7 @@ def get_indexes(marqo_config: config.Config = Depends(generate_config)):
 @app.get("/indexes/{index_name}/settings")
 def get_settings(index_name: str, marqo_config: config.Config = Depends(generate_config)):
     index_info = get_index_info(config=marqo_config, index_name=index_name)
-    return list(index_info)
+    return index_info.index_settings
 
 
 # try these curl commands:
