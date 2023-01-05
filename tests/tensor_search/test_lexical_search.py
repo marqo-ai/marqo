@@ -315,7 +315,7 @@ class TestLexicalSearch(MarqoTestCase):
     def test_lexical_search_query_string(self):
         """Tests query string functionalities. Ensures AND, OR, (), and double quotes all work as intended. """
 
-        num_docs = 200  # TODO, increase number if needed
+        num_docs = 200
         vocab = ["alpha", "bravo", "charlie", "delta", "echo"]
 
         docs = [{"Field 1": (" ".join(random.choices(population=vocab, k=5))),
