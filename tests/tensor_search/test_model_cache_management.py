@@ -43,7 +43,6 @@ class TestModelCacheManagement(MarqoTestCase):
         clear_loaded_models()
 
 
-
     def test_eject_model_cpu(self):
         for model_name in self.MODEL_LIST:
             eject_model(model_name, "cpu")
@@ -210,6 +209,7 @@ class TestModelCacheManagement(MarqoTestCase):
             for generic_model in generic_model_list:
                 eject_model(generic_model["model_name"], device="cuda")
             assert len(available_models) == 0
+
 
     def test_overall_eject_and_load_model(self):
         clear_loaded_models()
