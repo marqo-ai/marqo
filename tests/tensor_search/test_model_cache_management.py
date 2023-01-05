@@ -8,8 +8,8 @@ import psutil
 
 
 
-def load_model(model_name: str, device: str) -> None:
-    validated_model_properties = _validate_model_properties(model_name, None)
+def load_model(model_name: str, model_properteis: dict = None, device: str = "cpu") -> None:
+    validated_model_properties = _validate_model_properties(model_name, model_properteis)
     model_cache_key = _create_model_cache_key(model_name, device, validated_model_properties)
     _update_available_models(model_cache_key, model_name, validated_model_properties, device, True)
 
@@ -154,6 +154,68 @@ class TestModelCacheManagement(MarqoTestCase):
             assert psutil.cpu_percent(1) < 100.0
             # memory usage
             assert psutil.virtual_memory()[2]< 100.0
+
+
+    def test_generic_model(self):
+        clear_loaded_models()
+        assert len(available_models()) == 0
+        generic_model_1 = {
+            "model_name" : "sentence-transformers/multi-qa-MiniLM-L6-cos-v1",
+            "model_properties":{
+                "name" : "sentence-transformers/multi-qa-MiniLM-L6-cos-v1",
+                "dimension" : 384,
+                "tokens": 128,
+                "type" : "sbert",
+            }
+        }
+
+        generic_model_2 = {
+            "model_name" : "sentence-transformers/multi-qa-distilbert-cos-v1",
+            "model_properties":{
+                "name" : "sentence-transformers/multi-qa-distilbert-cos-v1",
+                "dimension" : 768,
+                "tokens": 512,
+                "type" : "sbert",
+            }
+        }
+
+        generic_model_3 = {
+            "model_name" : "sentence-transformers/paraphrase-MiniLM-L3-v2",
+            "model_properties":{
+                "name" : "sentence-transformers/paraphrase-MiniLM-L3-v2 ",
+                "dimension" : 384,
+                "tokens": 128,
+                "type" : "sbert",
+            }
+        }
+
+        generic_model_list = [generic_model_1, generic_model_2, generic_model_3]
+
+        for generic_model in generic_model_list:
+            load_model(generic_model["model_name"], generic_model["model_properties"], device="cpu")
+
+        assert len(available_models) == 3
+
+        for generic_model in generic_model_list:
+            eject_model(generic_model["model_name"], device="cpu")
+        assert len(available_models) == 0
+
+
+        if self.CUDA_FLAG == True:
+            for generic_model in generic_model_list:
+                load_model(generic_model["model_name"], generic_model["model_properties"], device="cuda")
+
+            assert len(available_models) == 3
+
+            for generic_model in generic_model_list:
+                eject_model(generic_model["model_name"], device="cuda")
+            assert len(available_models) == 0
+
+
+
+
+
+
 
 
     def test_overall_eject_and_load_model(self):
