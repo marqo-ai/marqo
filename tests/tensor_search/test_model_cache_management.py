@@ -182,7 +182,7 @@ class TestModelCacheManagement(MarqoTestCase):
         generic_model_3 = {
             "model_name" : "sentence-transformers/paraphrase-MiniLM-L3-v2",
             "model_properties":{
-                "name" : "sentence-transformers/paraphrase-MiniLM-L3-v2 ",
+                "name" : "sentence-transformers/paraphrase-MiniLM-L3-v2",
                 "dimensions" : 384,
                 "tokens": 128,
                 "type" : "sbert",
