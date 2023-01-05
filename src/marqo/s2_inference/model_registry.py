@@ -1007,6 +1007,10 @@ def _get_onnx_clip_properties() -> Dict:
                 'image_std': None
             },
 
+
+
+
+
         'onnx16/open_clip/ViT-H-14/laion2b_s32b_b79k':
             {
                 'name': 'onnx16/open_clip/ViT-H-14/laion2b_s32b_b79k',
@@ -1014,8 +1018,8 @@ def _get_onnx_clip_properties() -> Dict:
                 'type': 'clip_onnx',
                 'note': 'the onnx float16 version of open_clip ViT-H-14/laion2b_s32b_b79k',
                 'repo_id': 'Marqo/onnx-open_clip-ViT-H-14',
-                'visual_file': 'onnx16-open_clip-ViT-H-14-visual.onnx',
-                'textual_file': 'onnx16-open_clip-ViT-H-14-textual.onnx',
+                'visual_file': 'onnx16-open_clip-ViT-H-14-laion2b_s32b_b79k-visual.onnx',
+                'textual_file': 'onnx16-open_clip-ViT-H-14-laion2b_s32b_b79k-textual.onnx',
                 'token': None,
                 'resolution': 224,
                 'pretrained': 'laion2b_s32b_b79k',
@@ -1030,8 +1034,8 @@ def _get_onnx_clip_properties() -> Dict:
                 'type': 'clip_onnx',
                 'note': 'the onnx float32 version of open_clip ViT-H-14/laion2b_s32b_b79k',
                 'repo_id': 'Marqo/onnx-open_clip-ViT-H-14',
-                'visual_file': 'onnx32-open_clip-ViT-H-14-visual.zip',
-                'textual_file': 'onnx32-open_clip-ViT-H-14-textual.onnx',
+                'visual_file': 'onnx32-open_clip-ViT-H-14-laion2b_s32b_b79k-visual.zip',
+                'textual_file': 'onnx32-open_clip-ViT-H-14-laion2b_s32b_b79k-textual.onnx',
                 'token': None,
                 'resolution': 224,
                 'pretrained': 'laion2b_s32b_b79k',
@@ -1040,41 +1044,451 @@ def _get_onnx_clip_properties() -> Dict:
             },
 
         'onnx16/open_clip/ViT-g-14/laion2b_s12b_b42k':
-            {'name': 'onnx16/open_clip/ViT-g-14/laion2b_s12b_b42k',
-             'dimensions': 1024,
+            {
+                'name': 'onnx16/open_clip/ViT-g-14/laion2b_s12b_b42k',
+                'dimensions': 1024,
+                'type': 'clip_onnx',
+                'note': 'the onnx float16 version of open_clip ViT-g-14/laion2b_s12b_b42k',
+                'repo_id': 'Marqo/onnx-open_clip-ViT-g-14',
+                'visual_file': 'onnx16-open_clip-ViT-g-14-laion2b_s12b_b42k-visual.onnx',
+                'textual_file': 'onnx16-open_clip-ViT-g-14-laion2b_s12b_b42k-textual.onnx',
+                'token': None,
+                'resolution': 224,
+                'pretrained': 'laion2b_s12b_b42k',
+                'image_mean': None,
+                'image_std': None
+            },
+
+        'onnx32/open_clip/ViT-g-14/laion2b_s12b_b42k':
+            {
+                'name': 'onnx32/open_clip/ViT-g-14/laion2b_s12b_b42k',
+                'dimensions': 1024,
+                'type': 'clip_onnx',
+                'note': 'the onnx float32 version of open_clip ViT-g-14/laion2b_s12b_b42k',
+                'repo_id': 'Marqo/onnx-open_clip-ViT-g-14',
+                'visual_file': 'onnx32-open_clip-ViT-g-14-laion2b_s12b_b42k-visual.zip',
+                'textual_file': 'onnx32-open_clip-ViT-g-14-laion2b_s12b_b42k-textual.onnx',
+                'token': None,
+                'resolution': 224,
+                'pretrained': 'laion2b_s12b_b42k',
+                'image_mean': None,
+                'image_std': None
+            },
+
+        'onnx16/open_clip/RN50/openai':
+            {
+                'name': 'onnx16/open_clip/RN50/openai',
+                'dimensions': 1024,
+                'type': 'clip_onnx',
+                'note': 'the onnx float16 version of open_clip RN50/openai',
+                'repo_id': 'Marqo/onnx-open_clip-RN50',
+                'visual_file': 'onnx16-open_clip-RN50-openai-visual.onnx',
+                'textual_file': 'onnx16-open_clip-RN50-openai-textual.onnx',
+                'token': None,
+                'resolution': 224,
+                'pretrained': 'openai',
+                'image_mean': None,
+                'image_std': None
+            },
+
+        'onnx32/open_clip/RN50/openai':
+            {
+                'name': 'onnx32/open_clip/RN50/openai',
+                'dimensions': 1024,
+                'type': 'clip_onnx',
+                'note': 'the onnx float32 version of open_clip RN50/openai',
+                'repo_id': 'Marqo/onnx-open_clip-RN50',
+                'visual_file': 'onnx32-open_clip-RN50-openai-visual.onnx',
+                'textual_file': 'onnx32-open_clip-RN50-openai-textual.onnx',
+                'token': None,
+                'resolution': 224,
+                'pretrained': 'openai',
+                'image_mean': None,
+                'image_std': None
+            },
+
+        'onnx16/open_clip/RN50/yfcc15m':
+            {
+                'name': 'onnx16/open_clip/RN50/yfcc15m',
+                'dimensions': 1024,
+                'type': 'clip_onnx',
+                'note': 'the onnx float16 version of open_clip RN50/yfcc15m',
+                'repo_id': 'Marqo/onnx-open_clip-RN50',
+                'visual_file': 'onnx16-open_clip-RN50-yfcc15m-visual.onnx',
+                'textual_file': 'onnx16-open_clip-RN50-yfcc15m-textual.onnx',
+                'token': None,
+                'resolution': 224,
+                'pretrained': 'yfcc15m',
+                'image_mean': None,
+                'image_std': None
+            },
+
+        'onnx32/open_clip/RN50/yfcc15m':
+            {
+                'name': 'onnx32/open_clip/RN50/yfcc15m',
+                'dimensions': 1024,
+                'type': 'clip_onnx',
+                'note': 'the onnx float32 version of open_clip RN50/yfcc15m',
+                'repo_id': 'Marqo/onnx-open_clip-RN50',
+                'visual_file': 'onnx32-open_clip-RN50-yfcc15m-visual.onnx',
+                'textual_file': 'onnx32-open_clip-RN50-yfcc15m-textual.onnx',
+                'token': None,
+                'resolution': 224,
+                'pretrained': 'yfcc15m',
+                'image_mean': None,
+                'image_std': None
+            },
+
+        'onnx16/open_clip/RN50/cc12m':
+            {
+                'name': 'onnx16/open_clip/RN50/cc12m',
+                'dimensions': 1024,
+                'type': 'clip_onnx',
+                'note': 'the onnx float16 version of open_clip RN50/cc12m',
+                'repo_id': 'Marqo/onnx-open_clip-RN50',
+                'visual_file': 'onnx16-open_clip-RN50-cc12m-visual.onnx',
+                'textual_file': 'onnx16-open_clip-RN50-cc12m-textual.onnx',
+                'token': None,
+                'resolution': 224,
+                'pretrained': 'cc12m',
+                'image_mean': None,
+                'image_std': None
+            },
+
+        'onnx32/open_clip/RN50/cc12m':
+            {
+                'name': 'onnx32/open_clip/RN50/cc12m',
+                'dimensions': 1024,
+                'type': 'clip_onnx',
+                'note': 'the onnx float32 version of open_clip RN50/cc12m',
+                'repo_id': 'Marqo/onnx-open_clip-RN50',
+                'visual_file': 'onnx32-open_clip-RN50-cc12m-visual.onnx',
+                'textual_file': 'onnx32-open_clip-RN50-cc12m-textual.onnx',
+                'token': None,
+                'resolution': 224,
+                'pretrained': 'cc12m',
+                'image_mean': None,
+                'image_std': None
+            },
+
+        'onnx16/open_clip/RN50-quickgelu/openai':
+            {
+                'name': 'onnx16/open_clip/RN50-quickgelu/openai',
+                'dimensions': 1024,
+                'type': 'clip_onnx',
+                'note': 'the onnx float16 version of open_clip RN50-quickgelu/openai',
+                'repo_id': 'Marqo/onnx-open_clip-RN50-quickgelu',
+                'visual_file': 'onnx16-open_clip-RN50-quickgelu-openai-visual.onnx',
+                'textual_file': 'onnx16-open_clip-RN50-quickgelu-openai-textual.onnx',
+                'token': None,
+                'resolution': 224,
+                'pretrained': 'openai',
+                'image_mean': None,
+                'image_std': None
+            },
+
+        'onnx32/open_clip/RN50-quickgelu/openai':
+            {
+                'name': 'onnx32/open_clip/RN50-quickgelu/openai',
+                'dimensions': 1024,
+                'type': 'clip_onnx',
+                'note': 'the onnx float32 version of open_clip RN50-quickgelu/openai',
+                'repo_id': 'Marqo/onnx-open_clip-RN50-quickgelu',
+                'visual_file': 'onnx32-open_clip-RN50-quickgelu-openai-visual.onnx',
+                'textual_file': 'onnx32-open_clip-RN50-quickgelu-openai-textual.onnx',
+                'token': None,
+                'resolution': 224,
+                'pretrained': 'openai',
+                'image_mean': None,
+                'image_std': None
+            },
+
+        'onnx16/open_clip/RN50-quickgelu/yfcc15m':
+            {
+                'name': 'onnx16/open_clip/RN50-quickgelu/yfcc15m',
+                'dimensions': 1024,
+                'type': 'clip_onnx',
+                'note': 'the onnx float16 version of open_clip RN50-quickgelu/yfcc15m',
+                'repo_id': 'Marqo/onnx-open_clip-RN50-quickgelu',
+                'visual_file': 'onnx16-open_clip-RN50-quickgelu-yfcc15m-visual.onnx',
+                'textual_file': 'onnx16-open_clip-RN50-quickgelu-yfcc15m-textual.onnx',
+                'token': None,
+                'resolution': 224,
+                'pretrained': 'yfcc15m',
+                'image_mean': None,
+                'image_std': None
+            },
+
+        'onnx32/open_clip/RN50-quickgelu/yfcc15m':
+            {
+                'name': 'onnx32/open_clip/RN50-quickgelu/yfcc15m',
+                'dimensions': 1024,
+                'type': 'clip_onnx',
+                'note': 'the onnx float32 version of open_clip RN50-quickgelu/yfcc15m',
+                'repo_id': 'Marqo/onnx-open_clip-RN50-quickgelu',
+                'visual_file': 'onnx32-open_clip-RN50-quickgelu-yfcc15m-visual.onnx',
+                'textual_file': 'onnx32-open_clip-RN50-quickgelu-yfcc15m-textual.onnx',
+                'token': None,
+                'resolution': 224,
+                'pretrained': 'yfcc15m',
+                'image_mean': None,
+                'image_std': None
+            },
+
+        'onnx16/open_clip/RN50-quickgelu/cc12m':
+            {
+                'name': 'onnx16/open_clip/RN50-quickgelu/cc12m',
+                'dimensions': 1024,
+                'type': 'clip_onnx',
+                'note': 'the onnx float16 version of open_clip RN50-quickgelu/cc12m',
+                'repo_id': 'Marqo/onnx-open_clip-RN50-quickgelu',
+                'visual_file': 'onnx16-open_clip-RN50-quickgelu-cc12m-visual.onnx',
+                'textual_file': 'onnx16-open_clip-RN50-quickgelu-cc12m-textual.onnx',
+                'token': None,
+                'resolution': 224,
+                'pretrained': 'cc12m',
+                'image_mean': None,
+                'image_std': None
+            },
+
+        'onnx32/open_clip/RN50-quickgelu/cc12m':
+            {
+                'name': 'onnx32/open_clip/RN50-quickgelu/cc12m',
+                'dimensions': 1024,
+                'type': 'clip_onnx',
+                'note': 'the onnx float32 version of open_clip RN50-quickgelu/cc12m',
+                'repo_id': 'Marqo/onnx-open_clip-RN50-quickgelu',
+                'visual_file': 'onnx32-open_clip-RN50-quickgelu-cc12m-visual.onnx',
+                'textual_file': 'onnx32-open_clip-RN50-quickgelu-cc12m-textual.onnx',
+                'token': None,
+                'resolution': 224,
+                'pretrained': 'cc12m',
+                'image_mean': None,
+                'image_std': None
+            },
+
+        'onnx16/open_clip/RN101/openai':
+            {
+                'name': 'onnx16/open_clip/RN101/openai',
+                'dimensions': 512,
+                'type': 'clip_onnx',
+                'note': 'the onnx float16 version of open_clip RN101/openai',
+                'repo_id': 'Marqo/onnx-open_clip-RN101',
+                'visual_file': 'onnx16-open_clip-RN101-openai-visual.onnx',
+                'textual_file': 'onnx16-open_clip-RN101-openai-textual.onnx',
+                'token': None,
+                'resolution': 224,
+                'pretrained': 'openai',
+                'image_mean': None,
+                'image_std': None
+            },
+
+        'onnx32/open_clip/RN101/openai':
+            {
+                'name': 'onnx32/open_clip/RN101/openai',
+                'dimensions': 512,
+                'type': 'clip_onnx',
+                'note': 'the onnx float32 version of open_clip RN101/openai',
+                'repo_id': 'Marqo/onnx-open_clip-RN101',
+                'visual_file': 'onnx32-open_clip-RN101-openai-visual.onnx',
+                'textual_file': 'onnx32-open_clip-RN101-openai-textual.onnx',
+                'token': None,
+                'resolution': 224,
+                'pretrained': 'openai',
+                'image_mean': None,
+                'image_std': None,
+            },
+
+        'onnx16/open_clip/RN101/yfcc15m':
+            {
+                'name': 'onnx16/open_clip/RN101/yfcc15m',
+                'dimensions': 512,
+                'type': 'clip_onnx',
+                'note': 'the onnx float16 version of open_clip RN101/yfcc15m',
+                'repo_id': 'Marqo/onnx-open_clip-RN101',
+                'visual_file': 'onnx16-open_clip-RN101-yfcc15m-visual.onnx',
+                'textual_file': 'onnx16-open_clip-RN101-yfcc15m-textual.onnx',
+                'token': None,
+                'resolution': 224,
+                'pretrained': 'yfcc15m',
+                'image_mean': None,
+                'image_std': None,
+            },
+
+        'onnx32/open_clip/RN101/yfcc15m':
+            {
+                'name': 'onnx32/open_clip/RN101/yfcc15m',
+                'dimensions': 512,
+                'type': 'clip_onnx',
+                'note': 'the onnx float32 version of open_clip RN101/yfcc15m',
+                'repo_id': 'Marqo/onnx-open_clip-RN101',
+                'visual_file': 'onnx32-open_clip-RN101-yfcc15m-visual.onnx',
+                'textual_file': 'onnx32-open_clip-RN101-yfcc15m-textual.onnx',
+                'token': None,
+                'resolution': 224,
+                'pretrained': 'yfcc15m',
+                'image_mean': None,
+                'image_std': None
+            },
+
+        'onnx16/open_clip/RN101-quickgelu/openai':
+            {
+                'name': 'onnx16/open_clip/RN101-quickgelu/openai',
+                'dimensions': 512,
+                'type': 'clip_onnx',
+                'note': 'the onnx float16 version of open_clip RN101-quickgelu/openai',
+                'repo_id': 'Marqo/onnx-open_clip-RN101-quickgelu',
+                'visual_file': 'onnx16-open_clip-RN101-quickgelu-openai-visual.onnx',
+                'textual_file': 'onnx16-open_clip-RN101-quickgelu-openai-textual.onnx',
+                'token': None,
+                'resolution': 224,
+                'pretrained': 'openai',
+                'image_mean': None,
+                'image_std': None
+            },
+
+        'onnx32/open_clip/RN101-quickgelu/openai':
+            {
+                'name': 'onnx32/open_clip/RN101-quickgelu/openai',
+                'dimensions': 512,
+                'type': 'clip_onnx',
+                'note': 'the onnx float32 version of open_clip RN101-quickgelu/openai',
+                'repo_id': 'Marqo/onnx-open_clip-RN101-quickgelu',
+                'visual_file': 'onnx32-open_clip-RN101-quickgelu-openai-visual.onnx',
+                'textual_file': 'onnx32-open_clip-RN101-quickgelu-openai-textual.onnx',
+                'token': None,
+                'resolution': 224,
+                'pretrained': 'openai',
+                'image_mean': None,
+                'image_std': None
+            },
+
+        'onnx16/open_clip/RN101-quickgelu/yfcc15m':
+            {'name': 'onnx16/open_clip/RN101-quickgelu/yfcc15m',
+             'dimensions': 512,
              'type': 'clip_onnx',
-             'note': 'the onnx float16 version of open_clip ViT-g-14/laion2b_s12b_b42k',
-             'repo_id': 'Marqo/onnx-open_clip-ViT-g-14',
-             'visual_file': 'onnx16-open_clip-ViT-g-14-visual.onnx',
-             'textual_file': 'onnx16-open_clip-ViT-g-14-textual.onnx',
+             'note': 'the onnx float16 version of open_clip RN101-quickgelu/yfcc15m',
+             'repo_id': 'Marqo/onnx-open_clip-RN101-quickgelu',
+             'visual_file': 'onnx16-open_clip-RN101-quickgelu-yfcc15m-visual.onnx',
+             'textual_file': 'onnx16-open_clip-RN101-quickgelu-yfcc15m-textual.onnx',
              'token': None,
              'resolution': 224,
-             'pretrained': 'laion2b_s12b_b42k',
+             'pretrained': 'yfcc15m',
              'image_mean': None,
              'image_std': None
              },
 
-        'onnx32/open_clip/ViT-g-14/laion2b_s12b_b42k':
-            {'name': 'onnx32/open_clip/ViT-g-14/laion2b_s12b_b42k',
-             'dimensions': 1024,
-             'type': 'clip_onnx',
-             'note': 'the onnx float32 version of open_clip ViT-g-14/laion2b_s12b_b42k',
-             'repo_id': 'Marqo/onnx-open_clip-ViT-g-14',
-             'visual_file': 'onnx32-open_clip-ViT-g-14-visual.zip',
-             'textual_file': 'onnx32-open_clip-ViT-g-14-textual.onnx',
-             'token': None,
-             'resolution': 224,
-             'pretrained': 'laion2b_s12b_b42k',
-             'image_mean': None,
-             'image_std': None
-             }
+        'onnx32/open_clip/RN101-quickgelu/yfcc15m':
+            {
+                'name': 'onnx32/open_clip/RN101-quickgelu/yfcc15m',
+                'dimensions': 512,
+                'type': 'clip_onnx',
+                'note': 'the onnx float32 version of open_clip RN101-quickgelu/yfcc15m',
+                'repo_id': 'Marqo/onnx-open_clip-RN101-quickgelu',
+                'visual_file': 'onnx32-open_clip-RN101-quickgelu-yfcc15m-visual.onnx',
+                'textual_file': 'onnx32-open_clip-RN101-quickgelu-yfcc15m-textual.onnx',
+                'token': None,
+                'resolution': 224,
+                'pretrained': 'yfcc15m',
+                'image_mean': None,
+                'image_std': None
+            },
 
+        'onnx16/open_clip/RN50x4/openai':
+            {
+                'name': 'onnx16/open_clip/RN50x4/openai',
+                'dimensions': 640,
+                'type': 'clip_onnx',
+                'note': 'the onnx float16 version of open_clip RN50x4/openai',
+                'repo_id': 'Marqo/onnx-open_clip-RN50x4',
+                'visual_file': 'onnx16-open_clip-RN50x4-openai-visual.onnx',
+                'textual_file': 'onnx16-open_clip-RN50x4-openai-textual.onnx',
+                'token': None,
+                'resolution': 288,
+                'pretrained': 'openai',
+                'image_mean': None,
+                'image_std': None
+            },
 
+        'onnx32/open_clip/RN50x4/openai':
+            {
+                'name': 'onnx32/open_clip/RN50x4/openai',
+                'dimensions': 640,
+                'type': 'clip_onnx',
+                'note': 'the onnx float32 version of open_clip RN50x4/openai',
+                'repo_id': 'Marqo/onnx-open_clip-RN50x4',
+                'visual_file': 'onnx32-open_clip-RN50x4-openai-visual.onnx',
+                'textual_file': 'onnx32-open_clip-RN50x4-openai-textual.onnx',
+                'token': None,
+                'resolution': 288,
+                'pretrained': 'openai',
+                'image_mean': None,
+                'image_std': None
+            },
 
+        'onnx16/open_clip/RN50x16/openai':
+            {
+                'name': 'onnx16/open_clip/RN50x16/openai',
+                'dimensions': 768,
+                'type': 'clip_onnx',
+                'note': 'the onnx float16 version of open_clip RN50x16/openai',
+                'repo_id': 'Marqo/onnx-open_clip-RN50x16',
+                'visual_file': 'onnx16-open_clip-RN50x16-openai-visual.onnx',
+                'textual_file': 'onnx16-open_clip-RN50x16-openai-textual.onnx',
+                'token': None,
+                'resolution': 384,
+                'pretrained': 'openai',
+                'image_mean': None,
+                'image_std': None
+            },
 
+        'onnx32/open_clip/RN50x16/openai':
+            {
+                'name': 'onnx32/open_clip/RN50x16/openai',
+                'dimensions': 768,
+                'type': 'clip_onnx',
+                'note': 'the onnx float32 version of open_clip RN50x16/openai',
+                'repo_id': 'Marqo/onnx-open_clip-RN50x16',
+                'visual_file': 'onnx32-open_clip-RN50x16-openai-visual.onnx',
+                'textual_file': 'onnx32-open_clip-RN50x16-openai-textual.onnx',
+                'token': None,
+                'resolution': 384,
+                'pretrained': 'openai',
+                'image_mean': None,
+                'image_std': None
+            },
 
+        'onnx16/open_clip/RN50x64/openai':
+            {
+                'name': 'onnx16/open_clip/RN50x64/openai',
+                'dimensions': 1024,
+                'type': 'clip_onnx',
+                'note': 'the onnx float16 version of open_clip RN50x64/openai',
+                'repo_id': 'Marqo/onnx-open_clip-RN50x64',
+                'visual_file': 'onnx16-open_clip-RN50x64-openai-visual.onnx',
+                'textual_file': 'onnx16-open_clip-RN50x64-openai-textual.onnx',
+                'token': None,
+                'resolution': 448,
+                'pretrained': 'openai',
+                'image_mean': None,
+                'image_std': None
+            },
 
-
+        'onnx32/open_clip/RN50x64/openai':
+            {
+                'name': 'onnx32/open_clip/RN50x64/openai',
+                'dimensions': 1024,
+                'type': 'clip_onnx',
+                'note': 'the onnx float32 version of open_clip RN50x64/openai',
+                'repo_id': 'Marqo/onnx-open_clip-RN50x64',
+                'visual_file': 'onnx32-open_clip-RN50x64-openai-visual.onnx',
+                'textual_file': 'onnx32-open_clip-RN50x64-openai-textual.onnx',
+                'token': None,
+                'resolution': 448,
+                'pretrained': 'openai',
+                'image_mean': None,
+                'image_std': None
+            },
     }
     return ONNX_CLIP_MODEL_PROPERTIES
 
@@ -1111,8 +1525,8 @@ def _get_random_properties() -> Dict:
 def _get_model_load_mappings() -> Dict:
     return {'clip':CLIP,
             'open_clip': OPEN_CLIP,
-            'sbert':SBERT, 
-            'test':TEST, 
+            'sbert':SBERT,
+            'test':TEST,
             'sbert_onnx':SBERT_ONNX,
             'clip_onnx': CLIP_ONNX,
             'random':Random,
