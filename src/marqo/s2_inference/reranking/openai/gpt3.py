@@ -29,7 +29,7 @@ def prompt_to_essay(prompt: str, openai_key: str):
 
 
 class GptReranker:
-
+    """Base class for GPT rerankers"""
     task_name = None
 
     def __init__(self, reranker_properties: dict):

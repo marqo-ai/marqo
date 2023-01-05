@@ -18,6 +18,7 @@ class SearchQuery(BaseModel):
     limit: int = 10
     showHighlights: bool = True
     reRanker: str = None
+    reRankerProperties: dict = None
     filter: str = None
     attributesToRetrieve: List[str] = None
 
