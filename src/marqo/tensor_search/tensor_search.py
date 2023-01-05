@@ -951,6 +951,9 @@ def _lexical_search(
     total_preprocess_time = end_preprocess_time - start_preprocess_time
     logger.info(f"search (lexical) pre-processing: took {(total_preprocess_time):.3f}s to process query.")
     
+    #print("========================")
+    #print("Debug: Query sent")
+    #pprint.pprint(body)
     # SEARCH TIMER-LOGGER (roundtrip)
     start_search_http_time = timer()
     search_res = HttpRequests(config).get(path=f"{index_name}/_search", body=body)
