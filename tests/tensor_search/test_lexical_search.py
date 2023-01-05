@@ -343,7 +343,6 @@ class TestLexicalSearch(MarqoTestCase):
         res = tensor_search._lexical_search(
             config=self.config, index_name=self.index_name_1, text='charlie OR delta',
             return_doc_ids=True, searchable_attributes=["Field 1", "Field 2"], result_count=num_docs)
-
         for hit in res["hits"]:
             assert (("charlie" in hit["Field 1"]) or ("delta" in hit["Field 1"])) \
             or (("charlie" in hit["Field 2"]) or ("delta" in hit["Field 2"]))
@@ -356,7 +355,6 @@ class TestLexicalSearch(MarqoTestCase):
         for hit in res["hits"]:
             assert ("alpha echo delta" in hit["Field 1"]) \
             or ("alpha echo delta" in hit["Field 2"])
-
 
         # COMPLEX TEST
         res = tensor_search._lexical_search(
