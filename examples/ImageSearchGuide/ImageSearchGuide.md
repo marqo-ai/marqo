@@ -212,8 +212,8 @@ You can also check other advanced usages in our [Github](https://github.com/marq
 
 It is really easy to use marqo to achieve multi-modal searching, e.g., image-to-text, text-to-image, image-to-image, with the following steps:
 
-1. Environment setup. 
-2. Create index. 
-3. Add documents into the index.
-4. Search.
+1. Environment setup: `conda`, `pip`
+2. Create index: `create_index()`
+3. Add documents into the index: `add_documents()`
+4. Search: `index().search()`
 
