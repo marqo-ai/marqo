@@ -8,7 +8,7 @@ import psutil
 
 
 
-def load_model(model_name: str, model_properteis: dict = None, device: str = "cpu") -> None:
+def load_model(model_name: str, device: str, model_properteis: dict = None) -> None:
     validated_model_properties = _validate_model_properties(model_name, model_properteis)
     model_cache_key = _create_model_cache_key(model_name, device, validated_model_properties)
     _update_available_models(model_cache_key, model_name, validated_model_properties, device, True)
