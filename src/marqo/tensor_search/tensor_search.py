@@ -32,6 +32,7 @@ Notes on search behaviour with caching and searchable attributes:
 """
 import copy
 import datetime
+from timeit import default_timer as timer
 import functools
 import pprint
 import typing
@@ -54,7 +55,8 @@ from marqo.s2_inference.processing import image as image_processor
 from marqo.s2_inference.clip_utils import _is_image
 from marqo.s2_inference.reranking import rerank
 from marqo.s2_inference import s2_inference
-
+import torch.cuda
+import psutil
 # We depend on _httprequests.py for now, but this may be replaced in the future, as
 # _httprequests.py is designed for the client
 from marqo._httprequests import HttpRequests
@@ -296,17 +298,19 @@ def _batch_request(config: Config, index_name: str, dataset: List[dict],
     batched = functools.reduce(lambda x, y: batch_requests(x, y), deeper, [])
 
     def verbosely_add_docs(i, docs):
-        t0 = datetime.datetime.now()
+        t0 = timer()
+
+        logger.info(f"    batch {i}: beginning ingestion. ")
         res = add_documents(
             config=config, index_name=index_name,
             docs=docs, auto_refresh=False, device=device,
             update_mode=update_mode, non_tensor_fields=non_tensor_fields
         )
-        total_batch_time = datetime.datetime.now() - t0
+        total_batch_time = timer() - t0
         num_docs = len(docs)
 
-        logger.info(f"    batch {i}: ingested {num_docs} docs. Time taken: {total_batch_time}. "
-                    f"Average timer per doc {total_batch_time / num_docs}")
+        logger.info(f"    batch {i}: ingested {num_docs} docs. Time taken: {(total_batch_time):.3f}. "
+                    f"Average time per doc {(total_batch_time/num_docs):.3f}")
         if verbose:
             logger.info(f"        results from indexing batch {i}: {res}")
         return res
@@ -349,10 +353,13 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
     Returns:
 
     """
+    # ADD DOCS TIMER-LOGGER (3)
+    start_time_3 = timer()
+
     if non_tensor_fields is None:
         non_tensor_fields = []
 
-    t0 = datetime.datetime.now()
+    t0 = timer()
     bulk_parent_dicts = []
 
     try:
@@ -375,6 +382,8 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
     selected_device = config.indexing_device if device is None else device
 
     unsuccessful_docs = []
+    total_vectorise_time = 0
+    batch_size = len(docs)
 
     for i, doc in enumerate(docs):
 
@@ -477,9 +486,17 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                 try:
                     # in the future, if we have different underlying vectorising methods, make sure we catch possible
                     # errors of different types generated here, too.
+
+                    # ADD DOCS TIMER-LOGGER (4)
+                    start_time = timer()
                     vector_chunks = s2_inference.vectorise(model_name=index_info.model_name, model_properties=_get_model_properties(index_info), content=content_chunks,
                         device=selected_device, normalize_embeddings=normalize_embeddings,
                         infer=infer_if_image)
+
+                    end_time = timer()
+                    single_vectorise_call = end_time - start_time
+                    total_vectorise_time += single_vectorise_call
+                    logger.debug(f"(4) TIME for single vectorise call: {(single_vectorise_call):.3f}s.")
                 except (s2_inference_errors.UnknownModelError,
                         s2_inference_errors.InvalidModelPropertiesError,
                         s2_inference_errors.ModelLoadError) as model_error:
@@ -581,23 +598,41 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                     }
                 })
 
+    end_time_3 = timer()
+    total_preproc_time = end_time_3 - start_time_3
+    logger.info(f"      add_documents pre-processing: took {(total_preproc_time):.3f}s total for {batch_size} docs, "
+                f"for an average of {(total_preproc_time / batch_size):.3f}s per doc.")
+
+    logger.info(f"          add_documents vectorise: took {(total_vectorise_time):.3f}s for {batch_size} docs, " 
+                f"for an average of {(total_vectorise_time / batch_size):.3f}s per doc.")
+
     if bulk_parent_dicts:
         # the HttpRequest wrapper handles error logic
         update_mapping_response = backend.add_customer_field_properties(
             config=config, index_name=index_name, customer_field_names=new_fields,
             model_properties=_get_model_properties(index_info))
 
+        # ADD DOCS TIMER-LOGGER (5)
+        start_time_5 = timer()
         index_parent_response = HttpRequests(config).post(
             path="_bulk", body=utils.dicts_to_jsonl(bulk_parent_dicts))
+        end_time_5 = timer()
+        total_http_time = end_time_5 - start_time_5
+        total_index_time = index_parent_response["took"] * 0.001
+        logger.info(f"      add_documents roundtrip: took {(total_http_time):.3f}s to send {batch_size} docs (roundtrip) to Marqo-os, " 
+                    f"for an average of {(total_http_time / batch_size):.3f}s per doc.")
+
+        logger.info(f"          add_documents Marqo-os index: took {(total_index_time):.3f}s for Marqo-os to index {batch_size} docs, "
+                    f"for an average of {(total_index_time / batch_size):.3f}s per doc.")
     else:
         index_parent_response = None
 
     if auto_refresh:
         refresh_response = HttpRequests(config).post(path=F"{index_name}/_refresh")
 
-    t1 = datetime.datetime.now()
+    t1 = timer()
 
-    def translate_add_doc_response(response: Optional[dict], time_diff: datetime.timedelta) -> dict:
+    def translate_add_doc_response(response: Optional[dict], time_diff: float) -> dict:
         """translates OpenSearch response dict into Marqo dict"""
         item_fields_to_remove = ['_index', '_primary_term', '_seq_no', '_shards', '_version']
         result_dict = {}
@@ -621,7 +656,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
         for loc, error_info in unsuccessful_docs:
             new_items.insert(loc, error_info)
 
-        result_dict["processingTimeMs"] = time_diff.total_seconds() * 1000
+        result_dict["processingTimeMs"] = time_diff * 1000
         result_dict["index_name"] = index_name
         result_dict["items"] = new_items
         return result_dict
@@ -696,6 +731,7 @@ def delete_documents(config: Config, index_name: str, doc_ids: List[str], auto_r
     for _id in doc_ids:
         validation.validate_id(_id)
 
+    # TODO: change to timer()
     t0 = datetime.datetime.utcnow()
     delete_res_backend = HttpRequests(config=config).post(
         path=f"{index_name}/_delete_by_query", body={
@@ -726,7 +762,7 @@ def refresh_index(config: Config, index_name: str):
     return HttpRequests(config).post(path=F"{index_name}/_refresh")
 
 
-def search(config: Config, index_name: str, text: str, result_count: int = 3, highlights=True, return_doc_ids=True,
+def search(config: Config, index_name: str, text: str, result_count: int = 3, offset: int = 0, highlights=True, return_doc_ids=True,
            search_method: Union[str, SearchMethod, None] = SearchMethod.TENSOR,
            searchable_attributes: Iterable[str] = None, verbose: int = 0, num_highlights: int = 3,
            reranker: Union[str, Dict] = None, reranker_properties: Optional[Dict] = None,
@@ -746,6 +782,7 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
         index_name:
         text:
         result_count:
+        offset:
         return_doc_ids:
         search_method:
         searchable_attributes:
@@ -755,17 +792,25 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
     Returns:
 
     """
+    # Validation for: result_count (limit) & offset
+    # Validate neither is negative
+    if result_count <= 0:
+        raise errors.IllegalRequestedDocCount("search result limit must be greater than 0!")
+    if offset < 0:
+        raise errors.IllegalRequestedDocCount("search result offset cannot be less than 0!")
+
+    # Validate result_count + offset <= int(max_docs_limit)
     max_docs_limit = utils.read_env_vars_and_defaults(EnvVars.MARQO_MAX_RETRIEVABLE_DOCS)
-    check_upper = True if max_docs_limit is None else result_count <= int(max_docs_limit)
-    if not(check_upper and result_count > 0):
-        upper_bound_explanation = ("The search result limit must be greater than 0 and less than or equal to the"
+    check_upper = True if max_docs_limit is None else result_count + offset <= int(max_docs_limit)
+    if not check_upper:
+        upper_bound_explanation = ("The search result limit + offset must be less than or equal to the "
                                   f"MARQO_MAX_RETRIEVABLE_DOCS limit of [{max_docs_limit}]. ")
 
-        above_zero_explanation = "The search result limit must be greater than 0."
-        explanation = upper_bound_explanation if max_docs_limit is not None else above_zero_explanation
-        raise errors.IllegalRequestedDocCount(f"{explanation} Marqo received search result limit of `{result_count}`.")
+        raise errors.IllegalRequestedDocCount(f"{upper_bound_explanation} Marqo received search result limit of `{result_count}` "
+                                            f"and offset of `{offset}`.")
 
-    t0 = datetime.datetime.now()
+
+    t0 = timer()
 
     if searchable_attributes is not None:
         [validation.validate_field_name(attribute) for attribute in searchable_attributes]
@@ -787,50 +832,59 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
 
     if search_method.upper() == SearchMethod.TENSOR:
         search_result = _vector_text_search(
-            config=config, index_name=index_name, text=text, result_count=result_count,
-            return_doc_ids=return_doc_ids, searchable_attributes=searchable_attributes,
+            config=config, index_name=index_name, text=text, result_count=result_count, offset=offset,
+            return_doc_ids=return_doc_ids, searchable_attributes=searchable_attributes, verbose=verbose,
             number_of_highlights=num_highlights, simplified_format=simplified_format,
             filter_string=filter, device=device, attributes_to_retrieve=attributes_to_retrieve
         )
     elif search_method.upper() == SearchMethod.LEXICAL:
         search_result = _lexical_search(
-            config=config, index_name=index_name, text=text, result_count=result_count,
-            return_doc_ids=return_doc_ids, searchable_attributes=searchable_attributes,
+            config=config, index_name=index_name, text=text, result_count=result_count, offset=offset,
+            return_doc_ids=return_doc_ids, searchable_attributes=searchable_attributes, verbose=verbose,
             filter_string=filter, attributes_to_retrieve=attributes_to_retrieve
         )
     else:
         raise errors.InvalidArgError(f"Search called with unknown search method: {search_method}")
-
-    logger.info("reranking using {}".format(reranker))
 
     if reranker is not None:
         logger.info("reranking using {}".format(reranker))
         if searchable_attributes is None:
             raise errors.InvalidArgError(f"searchable_attributes cannot be None when re-ranking. Specify which fields to search and rerank over.")
         try:
+            # SEARCH TIMER-LOGGER (reranking)
+            start_rerank_time = timer()
             rerank.rerank_search_results(search_result=search_result, query=text,
                 model_name=reranker, device=config.indexing_device if device is None else device,
                 searchable_attributes=searchable_attributes, num_highlights=1 if simplified_format else num_highlights,
                 reranker_properties=reranker_properties
             )
+
+            end_rerank_time = timer()
+            total_rerank_time = end_rerank_time - start_rerank_time
+            logger.info(f"search ({search_method.lower()}) reranking using {reranker}: took {(total_rerank_time):.3f}s to rerank results.")
+
         except Exception as e:
             raise errors.BadRequestError(f"reranking failure due to {str(e)}")
 
-    time_taken = datetime.datetime.now() - t0
-    search_result["processingTimeMs"] = round(time_taken.total_seconds() * 1000)
+
     search_result["query"] = text
     search_result["limit"] = result_count
+    search_result["offset"] = offset
 
     if not highlights:
         for hit in search_result["hits"]:
             del hit["_highlights"]
 
+    time_taken = timer() - t0
+    search_result["processingTimeMs"] = round(time_taken * 1000)
+    logger.info(f"search ({search_method.lower()}) completed with total processing time: {(time_taken):.3f}s.")
+
     return search_result
 
 
 def _lexical_search(
-        config: Config, index_name: str, text: str, result_count: int = 3, return_doc_ids=True,
-        searchable_attributes: Sequence[str] = None, filter_string: str = None,
+        config: Config, index_name: str, text: str, result_count: int = 3, offset: int = 0, return_doc_ids=True,
+        searchable_attributes: Sequence[str] = None, verbose: int = 0, filter_string: str = None,
         attributes_to_retrieve: Optional[List[str]] = None, expose_facets: bool = False):
     """
 
@@ -839,6 +893,7 @@ def _lexical_search(
         index_name:
         text:
         result_count:
+        offset:
         return_doc_ids:
         searchable_attributes:
         number_of_highlights:
@@ -849,6 +904,7 @@ def _lexical_search(
     Notes:
         Should not be directly called by client - the search() method should
         be called. The search() method adds syncing
+        Uses a single search with many terms rather than a multi-search.
     TODO:
         - Test raise_for_searchable_attribute=False
     """
@@ -857,12 +913,18 @@ def _lexical_search(
             f"Query arg must be of type str! text arg is of type {type(text)}. "
             f"Query arg: {text}")
 
+    # SEARCH TIMER-LOGGER (pre-processing)
+    start_preprocess_time = timer()
     if searchable_attributes is not None and searchable_attributes:
         fields_to_search = searchable_attributes
     else:
         fields_to_search = index_meta_cache.get_index_info(
             config=config, index_name=index_name
         ).get_true_text_properties()
+
+    # Validation for offset (pagination is single field)
+    if len(fields_to_search) != 1 and offset > 0:
+        raise errors.InvalidArgError(f"Pagination (offset > 0) is only supported for single field searches! Your search currently has {len(fields_to_search)} fields: {fields_to_search}")
 
     body = {
         "query": {
@@ -877,6 +939,7 @@ def _lexical_search(
             }
         },
         "size": result_count,
+        "from": offset
     }
     if filter_string is not None:
         body["query"]["bool"]["filter"] = [{
@@ -888,7 +951,24 @@ def _lexical_search(
             body["_source"] = dict()
         if body["_source"] is not False:
             body["_source"]["exclude"] = [f"*{TensorField.vector_prefix}*"]
+
+    end_preprocess_time = timer()
+    total_preprocess_time = end_preprocess_time - start_preprocess_time
+    logger.info(f"search (lexical) pre-processing: took {(total_preprocess_time):.3f}s to process query.")
+
+    # SEARCH TIMER-LOGGER (roundtrip)
+    start_search_http_time = timer()
     search_res = HttpRequests(config).get(path=f"{index_name}/_search", body=body)
+
+    end_search_http_time = timer()
+    total_search_http_time = end_search_http_time - start_search_http_time
+    total_os_process_time = search_res["took"] * 0.001
+    num_results = len(search_res['hits']['hits'])
+    logger.info(f"search (lexical) roundtrip: took {(total_search_http_time):.3f}s to send search query (roundtrip) to Marqo-os and received {num_results} results.")
+    logger.info(f"  search (lexical) Marqo-os processing time: took {(total_os_process_time):.3f}s for Marqo-os to execute the search.")
+
+    # SEARCH TIMER-LOGGER (post-processing)
+    start_postprocess_time = timer()
 
     res_list = []
     for doc in search_res['hits']['hits']:
@@ -897,11 +977,16 @@ def _lexical_search(
             just_doc["_id"] = doc["_id"]
             just_doc["_score"] = doc["_score"]
         res_list.append({**just_doc, "_highlights": []})
+
+    end_postprocess_time = timer()
+    total_postprocess_time = end_postprocess_time - start_postprocess_time
+    logger.info(f"search (lexical) post-processing: took {(total_postprocess_time):.3f}s to format {len(res_list)} results.")
+
     return {'hits': res_list}
 
 
 def _vector_text_search(
-        config: Config, index_name: str, text: str, result_count: int = 5, return_doc_ids=False,
+        config: Config, index_name: str, text: str, result_count: int = 5, offset: int = 0, return_doc_ids=False,
         searchable_attributes: Iterable[str] = None, number_of_highlights=3,
         verbose=0, raise_on_searchable_attribs=False, hide_vectors=True, k=500,
         simplified_format=True, filter_string: str = None, device=None,
@@ -912,6 +997,7 @@ def _vector_text_search(
         index_name:
         text:
         result_count:
+        offset:
         return_doc_ids: if True adds doc _id to the docs. Otherwise just returns the docs as-is
         searchable_attributes: Iterable of field names to search. If left as None, then all will
             be searched
@@ -923,7 +1009,7 @@ def _vector_text_search(
     Returns:
 
     Note:
-        - looks for k results in each attribute. Not that much of a concern unless you have a
+        - uses multisearch, which returns k results in each attribute. Not that much of a concern unless you have a
         ridiculous number of attributes
         - Should not be directly called by client - the search() method should
         be called. The search() method adds syncing
@@ -946,6 +1032,8 @@ def _vector_text_search(
             "filtering not yet implemented for S2Search cloud!"
         )
 
+    # SEARCH TIMER-LOGGER (pre-processing)
+    start_preprocess_time = timer()
     try:
         index_info = get_index_info(config=config, index_name=index_name)
     except KeyError as e:
@@ -986,6 +1074,11 @@ def _vector_text_search(
             vector_properties_to_search = searchable_attributes_as_vectors.intersection(
                 index_info.get_vector_properties().keys())
 
+    # Validation for offset (pagination is single field)
+    if len(vector_properties_to_search) != 1 and offset > 0:
+        human_readable_vector_properties = [v.replace(TensorField.vector_prefix, "") for v in list(vector_properties_to_search)]
+        raise errors.InvalidArgError(f"Pagination (offset > 0) is only supported for single field searches! Your search currently has {len(vector_properties_to_search)} vectorisable fields: {human_readable_vector_properties}")
+
     if filter_string is not None:
         contextualised_filter = utils.contextualise_filter(
             filter_string=filter_string,
@@ -996,6 +1089,7 @@ def _vector_text_search(
     for vector_field in vector_properties_to_search:
         search_query = {
             "size": result_count,
+            "from": offset,
             "query": {
                 "nested": {
                     "path": TensorField.chunks,
@@ -1008,11 +1102,11 @@ def _vector_text_search(
                         "knn": {
                             f"{TensorField.chunks}.{vector_field}": {
                                 "vector": vectorised_text,
-                                "k": result_count
+                                "k": result_count + offset
                             }
                         }
                     },
-                    "score_mode": "max",
+                    "score_mode": "max"
                 }
             }
         }
@@ -1047,13 +1141,29 @@ def _vector_text_search(
         # This probably means the index is emtpy
         return {"hits": []}
 
+    end_preprocess_time = timer()
+    total_preprocess_time = end_preprocess_time - start_preprocess_time
+    logger.info(f"search (tensor) pre-processing: took {(total_preprocess_time):.3f}s to vectorize and process query.")
+
+    # SEARCH TIMER-LOGGER (roundtrip)
+    start_search_http_time = timer()
     response = HttpRequests(config).get(path=F"{index_name}/_msearch", body=utils.dicts_to_jsonl(body))
 
-    if verbose:
-        logger.info(f'Opensearch reported {response["took"]}ms search latency')
+    end_search_http_time = timer()
+    total_search_http_time = end_search_http_time - start_search_http_time
+    total_os_process_time = response["took"] * 0.001
+    num_responses = len(response["responses"])
+    logger.info(f"search (tensor) roundtrip: took {(total_search_http_time):.3f}s to send {num_responses} search queries (roundtrip) to Marqo-os.")
 
     try:
         responses = [r['hits']['hits'] for r in response["responses"]]
+
+        # SEARCH TIMER-LOGGER (Log number of results and time for each search in multisearch)
+        for i in range(len(vector_properties_to_search)):
+            indiv_responses = response["responses"][i]['hits']['hits']
+            indiv_query_time = response["responses"][i]["took"] * 0.001
+            logger.info(f"  search (tensor) Marqo-os processing time (search field = {list(vector_properties_to_search)[i]}): took {(indiv_query_time):.3f}s and received {len(indiv_responses)} hits.")
+
     except KeyError as e:
         # KeyError indicates we have received a non-successful result
         try:
@@ -1069,6 +1179,10 @@ def _vector_text_search(
         except (KeyError, IndexError) as e2:
             raise e
 
+    logger.info(f"  search (tensor) Marqo-os processing time: took {(total_os_process_time):.3f}s for Marqo-os to execute the search.")
+
+    # SEARCH TIMER-LOGGER (post-processing)
+    start_postprocess_time = timer()
     gathered_docs = dict()
 
     if verbose:
@@ -1156,10 +1270,14 @@ def _vector_text_search(
         return {"hits": simple_results[:result_count]}
 
     if simplified_format:
-        return format_ordered_docs_simple(ordered_docs_w_chunks=completely_sorted)
+        res = format_ordered_docs_simple(ordered_docs_w_chunks=completely_sorted)
     else:
-        return format_ordered_docs_preserving(ordered_docs_w_chunks=completely_sorted, num_highlights=number_of_highlights)
+        res = format_ordered_docs_preserving(ordered_docs_w_chunks=completely_sorted, num_highlights=number_of_highlights)
 
+    end_postprocess_time = timer()
+    total_postprocess_time = end_postprocess_time - start_postprocess_time
+    logger.info(f"search (tensor) post-processing: took {(total_postprocess_time):.3f}s to sort and format {len(completely_sorted)} results from Marqo-os.")
+    return res
 
 def check_health(config: Config):
     TIMEOUT = 3
@@ -1240,3 +1358,41 @@ def _get_model_properties(index_info):
                 f"Please provide model_properties if the model is a custom model and is not supported by default")
 
     return model_properties
+
+def get_loaded_models() -> dict:
+    available_models = s2_inference.get_available_models()
+    message = {
+        'models' : [
+            {"model_name": ix.split("||")[0], "model_device": ix.split("||")[-1]} for ix in available_models.keys()
+        ]
+    }
+    return message
+
+
+def eject_model(model_name: str, device: str) -> dict:
+    try:
+       result = s2_inference.eject_model(model_name, device)
+    except s2_inference_errors.ModelNotInCacheError as e:
+        raise errors.ModelNotInCacheError(message=str(e))
+    return result
+
+
+def get_cpu_info() -> dict:
+    return {
+        "cpu_usage_percent": f"{psutil.cpu_percent(1)} %", # The number 1 is a time interval for CPU usage calculation.
+        "memory_used_percent": f"{psutil.virtual_memory()[2]} %",  # The number 2 is just a index number to get the expected results
+        "memory_used_gb": f"{round(psutil.virtual_memory()[3]/1000000000,1)}", # The number 3 is just a index number to get the expected results
+    }
+
+
+def get_cuda_info() -> dict:
+    if torch.cuda.is_available():
+        return {"cuda_devices": [{"device_id" : _device_id, "device_name" : torch.cuda.get_device_name(_device_id),
+                "memory_used":f"{round(torch.cuda.memory_allocated(_device_id) / 1024**3, 1)} GiB",
+                "total_memory": f"{round(torch.cuda.get_device_properties(_device_id).total_memory/ 1024**3, 1)} GiB"}
+                for _device_id in range(torch.cuda.device_count())]}
+
+    else:
+        raise errors.HardwareCompatabilityError(message=str(
+            "ERROR: cuda is not supported in your machine!!"
+        ))

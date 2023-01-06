@@ -16,6 +16,7 @@ class SearchQuery(BaseModel):
     searchableAttributes: Union[None, List[str]] = None
     searchMethod: Union[None, str] = "TENSOR"
     limit: int = 10
+    offset: int = 0
     showHighlights: bool = True
     reRanker: str = None
     reRankerProperties: dict = None

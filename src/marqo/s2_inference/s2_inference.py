@@ -2,12 +2,13 @@
 The functions defined here would have endpoints, later on.
 """
 import numpy as np
-from marqo.s2_inference.errors import VectoriseError, InvalidModelPropertiesError, ModelLoadError, UnknownModelError
+from marqo.s2_inference.errors import VectoriseError, InvalidModelPropertiesError, ModelLoadError, UnknownModelError, ModelNotInCacheError
 from PIL import UnidentifiedImageError
 from marqo.s2_inference.model_registry import load_model_properties
 from marqo.s2_inference.configs import get_default_device, get_default_normalization, get_default_seq_length
 from marqo.s2_inference.types import *
 from marqo.s2_inference.logger import get_logger
+import torch
 
 logger = get_logger(__name__)
 
@@ -60,15 +61,17 @@ def _create_model_cache_key(model_name: str, device: str, model_properties: dict
     Returns:
         str: _description_
     """
+    # Changing the format of model cache key will also need to change eject_model api
+
     if model_properties is None:
         model_properties = dict()
 
-    model_cache_key = (model_name
-                       + model_properties.get('name', '')
-                       + str(model_properties.get('dimensions', ''))
-                       + model_properties.get('type', '')
-                       + str(model_properties.get('tokens', ''))
-                       + device)
+    model_cache_key = (model_name + "||" +
+                       model_properties.get('name', '') + "||" +
+                       str(model_properties.get('dimensions', '')) + "||" +
+                       model_properties.get('type', '') + "||" +
+                       str(model_properties.get('tokens', '')) + "||" +
+                       device)
 
     return model_cache_key
 
@@ -290,6 +293,35 @@ def _load_model(model_name: str, model_properties: dict, device: str = get_defau
     model.load()
 
     return model
+
+
+def get_available_models():
+    return available_models
+
+
+def eject_model(model_name:str, device:str):
+
+    model_cache_keys = available_models.keys()
+
+    model_cache_key = None
+
+    # we can't handle the situation where there are two models with the same name and device
+    # but different properties.
+    for key in model_cache_keys:
+        if key.startswith(model_name) and key.endswith(device):
+            model_cache_key = key
+            break
+
+    if model_cache_key is None:
+        raise ModelNotInCacheError(f"The model_name \`{model_name}\` device \`{device}\` is not cached or found")
+
+    if model_cache_key in available_models:
+        del available_models[model_cache_key]
+        if device.startswith("cuda"):
+            torch.cuda.empty_cache()
+        return {"result": "success", "message": f"successfully eject model_name \`{model_name}\` from device \`{device}\`"}
+    else:
+        raise ModelNotInCacheError(f"The model_name \`{model_name}\` device \`{device}\` is not cached or found")
 
 # def normalize(inputs):
 
