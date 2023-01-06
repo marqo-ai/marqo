@@ -32,6 +32,10 @@ class ModelLoadError(S2InferenceError):
     pass
 
 
+class ModelDownloadError(S2InferenceError):
+    pass
+
+
 class RerankerError(S2InferenceError):
     pass
 
