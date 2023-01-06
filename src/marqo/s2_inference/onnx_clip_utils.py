@@ -32,10 +32,9 @@ try:
 except ImportError:
     BICUBIC = Image.BICUBIC
 
+
 def _convert_image_to_rgb(image):
     return image.convert("RGB")
-
-
 
 
 def _get_transform(n_px: int, image_mean:List[float] = None, image_std:List[float] = None):
@@ -48,6 +47,7 @@ def _get_transform(n_px: int, image_mean:List[float] = None, image_std:List[floa
         ToTensor(),
         Normalize(img_mean, img_std),
     ])
+
 
 class CLIP_ONNX(object):
     """
@@ -70,19 +70,23 @@ class CLIP_ONNX(object):
         self.visual_type = np.float16 if self.onnx_type == "onnx16" else np.float32
         self.textual_type = np.int64 if self.source == "open_clip" else np.int32
 
+
     def load(self):
         self.load_onnx()
         self.load_tokenizer_and_transform()
 
+
     @staticmethod
     def normalize(outputs):
         return outputs.norm(dim=-1, keepdim=True)
+
 
     def _convert_output(self, output):
         if self.device == 'cpu':
             return output.numpy()
         elif self.device.startswith('cuda'):
             return output.cpu().numpy()
+
 
     def load_tokenizer_and_transform(self):
 
@@ -96,6 +100,7 @@ class CLIP_ONNX(object):
             clip_name, _ = self.clip_model.split("/", 2)
             self.clip_preprocess = _get_transform(self.n_px, self.model_info.get("image_mean", None), self.model_info.get("image_std", None))
             self.tokenizer = open_clip.get_tokenizer(clip_name)
+
 
     def encode_text(self, sentence, normalize=True):
         text = clip.tokenize(sentence, truncate=self.truncate).cpu()
@@ -111,6 +116,7 @@ class CLIP_ONNX(object):
             outputs /= self.normalize(outputs)
             assert outputs.shape == _shape_before
         return self._convert_output(outputs)
+
 
     def encode_image(self, images, normalize=True):
         if isinstance(images, list):
@@ -132,6 +138,7 @@ class CLIP_ONNX(object):
             assert outputs.shape == _shape_before
 
         return self._convert_output(outputs)
+
 
     def encode(self, inputs: Union[str, ImageType, List[Union[str, ImageType]]],
                default: str = 'text', normalize=True, **kwargs) -> FloatTensor:
@@ -161,6 +168,7 @@ class CLIP_ONNX(object):
             logger.debug('text')
             return self.encode_text(inputs, normalize=True)
 
+
     def load_onnx(self):
 
         self.visual_file = self.download_model(self.model_info["repo_id"], self.model_info["visual_file"])
@@ -168,7 +176,6 @@ class CLIP_ONNX(object):
         self.visual_session = ort.InferenceSession(self.visual_file, providers=self.provider)
         self.textual_session = ort.InferenceSession(self.textual_file, providers=self.provider)
 
-        # The error will be caught and return a marqo.s2_inference.errors.ModelLoadError
 
     @staticmethod
     def download_model(repo_id: str, filename: str, cache_dir: str = None) -> str:
@@ -179,7 +186,6 @@ class CLIP_ONNX(object):
                 logger.info(f"Unzip onnx model = {file_path}")
                 with ZipFile(file_path) as zipobj:
                     zipobj.extractall(os.path.dirname(file_path))
-                    #shutil.unpack_archive(filename, os.path.dirname(file_path))
             file_path = file_path.replace(".zip", ".onnx")
 
         return file_path
