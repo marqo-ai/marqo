@@ -94,6 +94,7 @@ class TestReranking(MarqoTestCase):
             searchable_attributes=["Summary", "Title"],
             reranker_properties={
                 "api_key": self.openai_api_key,
+                "max_tokens": 1000
             }
         )
         pprint.pprint(search_res)
