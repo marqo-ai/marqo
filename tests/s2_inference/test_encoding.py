@@ -65,6 +65,7 @@ class TestEncoding(unittest.TestCase):
 
             clear_loaded_models()
 
+
     def test_load_sbert_text_model(self):
         names = ["all-MiniLM-L6-v1", "all_datasets_v4_MiniLM-L6"]
         device = 'cpu'
@@ -76,6 +77,7 @@ class TestEncoding(unittest.TestCase):
             assert abs(model.encode('hello') - model.encode(['hello'])).sum() < eps
 
             clear_loaded_models()
+
 
     def test_load_hf_text_model(self):
         names = ["hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6"]
@@ -89,6 +91,7 @@ class TestEncoding(unittest.TestCase):
 
             clear_loaded_models()
 
+
     def test_load_onnx_sbert_text_model(self):
         names = ["onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]
         device = 'cpu'
@@ -100,6 +103,7 @@ class TestEncoding(unittest.TestCase):
             assert abs(model.encode('hello') - model.encode(['hello'])).sum() < eps
 
             clear_loaded_models()
+
 
     def test_compare_onnx_sbert_text_models(self):
         names_sbert_onnx = [("all-MiniLM-L6-v1", "onnx/all-MiniLM-L6-v1"),
@@ -120,10 +124,11 @@ class TestEncoding(unittest.TestCase):
 
             clear_loaded_models()
 
+
     def test_model_outputs(self):
         names = ["onnx16/open_clip/ViT-B-32/laion400m_e32", 'onnx32/open_clip/ViT-B-32-quickgelu/laion400m_e32',
                  'onnx32/open_clip/ViT-g-14/laion2b_s12b_b42k', "onnx32/openai/ViT-L/14", "onnx16/openai/ViT-L/14",
-            'open_clip/ViT-B-32/laion400m_e32', "all-MiniLM-L6-v1",
+                'open_clip/ViT-B-32/laion400m_e32', "all-MiniLM-L6-v1",
                  "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1",
                  "hf/all_datasets_v4_MiniLM-L6", "onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]
         sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
@@ -138,6 +143,7 @@ class TestEncoding(unittest.TestCase):
                 assert _check_output_type(_convert_vectorized_output(output))
 
             clear_loaded_models()
+
 
     def test_model_normalization(self):
         names = ["onnx16/open_clip/ViT-B-32/laion400m_e32", 'onnx32/open_clip/ViT-B-32-quickgelu/laion400m_e32',
@@ -163,6 +169,7 @@ class TestEncoding(unittest.TestCase):
                 assert abs(min_output_norm - 1) < eps, f"{name}, {sentence}"
 
             clear_loaded_models()
+
 
     def test_model_un_normalization(self):
         # note: sbert native seems to provide normalized embeddings even with = False, needs more investigation
@@ -212,6 +219,7 @@ class TestEncoding(unittest.TestCase):
 
             clear_loaded_models()
 
+
     def test_open_clip_embedding_size(self):
 
         # This is a full test as the list includes all the models. Note that the training dataset does not affect the
@@ -233,6 +241,7 @@ class TestEncoding(unittest.TestCase):
                 assert registered_dimension == output_dimension
 
             clear_loaded_models()
+
 
     def test_onnx_clip_vectorise(self):
 
