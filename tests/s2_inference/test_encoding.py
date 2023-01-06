@@ -44,7 +44,7 @@ class TestEncoding(unittest.TestCase):
 
                 assert abs(torch.FloatTensor(output_m) - torch.FloatTensor(output_v)).sum() < eps
 
-             clear_loaded_models()
+            clear_loaded_models()
 
 
     def test_load_clip_text_model(self):
