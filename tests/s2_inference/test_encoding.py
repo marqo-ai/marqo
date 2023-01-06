@@ -24,7 +24,8 @@ class TestEncoding(unittest.TestCase):
 
     def test_vectorize(self):
 
-        names = ["all-MiniLM-L6-v1", "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6",
+        names = ["onnx16/open_clip/ViT-B-32/laion400m_e32", 'onnx32/open_clip/ViT-B-32-quickgelu/laion400m_e32',
+                 'onnx32/open_clip/ViT-g-14/laion2b_s12b_b42k',"all-MiniLM-L6-v1", "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6",
                  "onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]
         sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
         device = 'cpu'
@@ -44,7 +45,8 @@ class TestEncoding(unittest.TestCase):
                 assert abs(torch.FloatTensor(output_m) - torch.FloatTensor(output_v)).sum() < eps
 
     def test_load_clip_text_model(self):
-        names = ['RN50', "ViT-B/16"]
+        names = ["onnx16/open_clip/ViT-B-32/laion400m_e32", 'onnx32/open_clip/ViT-B-32-quickgelu/laion400m_e32',
+                 'onnx32/open_clip/ViT-g-14/laion2b_s12b_b42k', 'RN50', "ViT-B/16"]
         device = 'cpu'
         eps = 1e-9
         texts = ['hello', 'big', 'asasasasaaaaaaaaaaaa', '', 'a word. another one!?. #$#.']
@@ -106,7 +108,8 @@ class TestEncoding(unittest.TestCase):
                 assert abs(model_onnx.encode(sentence) - model_sbert.encode(sentence)).sum() < eps
 
     def test_model_outputs(self):
-        names = ["onnx32/openai/ViT-L/14", "onnx16/openai/ViT-L/14",
+        names = ["onnx16/open_clip/ViT-B-32/laion400m_e32", 'onnx32/open_clip/ViT-B-32-quickgelu/laion400m_e32',
+                 'onnx32/open_clip/ViT-g-14/laion2b_s12b_b42k', "onnx32/openai/ViT-L/14", "onnx16/openai/ViT-L/14",
             'open_clip/ViT-B-32/laion400m_e32', "all-MiniLM-L6-v1",
                  "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1",
                  "hf/all_datasets_v4_MiniLM-L6", "onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]
@@ -122,7 +125,8 @@ class TestEncoding(unittest.TestCase):
                 assert _check_output_type(_convert_vectorized_output(output))
 
     def test_model_normalization(self):
-        names = ["onnx32/openai/ViT-L/14", "onnx16/openai/ViT-L/14",
+        names = ["onnx16/open_clip/ViT-B-32/laion400m_e32", 'onnx32/open_clip/ViT-B-32-quickgelu/laion400m_e32',
+                 'onnx32/open_clip/ViT-g-14/laion2b_s12b_b42k', "onnx32/openai/ViT-L/14", "onnx16/openai/ViT-L/14",
                  'open_clip/ViT-B-32/laion400m_e32', 'RN50', "ViT-B/16", "all-MiniLM-L6-v1",
                  "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6",
                  "onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]
@@ -208,7 +212,8 @@ class TestEncoding(unittest.TestCase):
 
     def test_onnx_clip_vectorise(self):
 
-        names = ["onnx32/openai/ViT-L/14", "onnx16/openai/ViT-L/14"]
+        names = ["onnx16/open_clip/ViT-B-32/laion400m_e32", 'onnx32/open_clip/ViT-B-32-quickgelu/laion400m_e32',
+                 'onnx32/open_clip/ViT-g-14/laion2b_s12b_b42k', "onnx32/openai/ViT-L/14", "onnx16/openai/ViT-L/14"]
 
         sentences = ['hello', 'this is a test sentence. so is this.',
                      ['hello', 'this is a test sentence. so is this.']]
