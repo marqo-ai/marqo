@@ -45,7 +45,8 @@ class TestModelCacheManagement(MarqoTestCase):
 
     def test_eject_model_cpu(self):
         for model_name in self.MODEL_LIST:
-            eject_model(model_name, "cpu")
+            res = eject_model(model_name, "cpu")
+            assert res["message"] == f"successfully eject model_name `{model_name}` from device `cpu`"
             if (model_name, "cpu") in available_models:
                 raise AssertionError
 
@@ -70,7 +71,8 @@ class TestModelCacheManagement(MarqoTestCase):
         if self.CUDA_FLAG:
         # check if we can eject the models
             for model_name in self.MODEL_LIST:
-                eject_model(model_name,"cuda")
+                res = eject_model(model_name,"cuda")
+                assert res["message"] ==  f"successfully eject model_name `{model_name}` from device `cuda`"
                 if (model_name, "cuda") in available_models:
                     raise AssertionError
             my_test_model_1 = "test-model-1"
@@ -78,11 +80,13 @@ class TestModelCacheManagement(MarqoTestCase):
 
             try:
                 eject_model(my_test_model_1, "cuda")
+
             except ModelNotInCacheError:
                 pass
 
             try:
                 eject_model(my_test_model_2, "cuda")
+                raise AssertionError
             except ModelNotInCacheError:
                 pass
         else:
