@@ -75,12 +75,13 @@ class TestModelCacheManagement(MarqoTestCase):
                 assert res["message"] ==  f"successfully eject model_name `{model_name}` from device `cuda`"
                 if (model_name, "cuda") in available_models:
                     raise AssertionError
+
             my_test_model_1 = "test-model-1"
             my_test_model_2 = "test-model-2"
 
             try:
                 eject_model(my_test_model_1, "cuda")
-
+                raise AssertionError
             except ModelNotInCacheError:
                 pass
 
