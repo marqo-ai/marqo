@@ -313,15 +313,15 @@ def eject_model(model_name:str, device:str):
             break
 
     if model_cache_key is None:
-        raise ModelNotInCacheError(f"The model_name \`{model_name}\` device \`{device}\` is not cached or found")
+        raise ModelNotInCacheError(f"The model_name `{model_name}` device `{device}` is not cached or found")
 
     if model_cache_key in available_models:
         del available_models[model_cache_key]
         if device.startswith("cuda"):
             torch.cuda.empty_cache()
-        return {"result": "success", "message": f"successfully eject model_name \`{model_name}\` from device \`{device}\`"}
+        return {"result": "success", "message": f"successfully eject model_name `{model_name}` from device `{device}`"}
     else:
-        raise ModelNotInCacheError(f"The model_name \`{model_name}\` device \`{device}\` is not cached or found")
+        raise ModelNotInCacheError(f"The model_name `{model_name}` device `{device}` is not cached or found")
 
 # def normalize(inputs):
 
