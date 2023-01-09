@@ -20,6 +20,7 @@ class TestReranking(MarqoTestCase):
         self._delete_test_indices()
 
         def ADD_API_KEY():
+
             raise Exception("REPLACE THIS WITH YOUR OPENAI API KEY")
 
         self.openai_api_key = ADD_API_KEY()
@@ -52,7 +53,8 @@ class TestReranking(MarqoTestCase):
             return_doc_ids=True, result_count=10, reranker="openai/gpt3-qa",
             searchable_attributes=["Summary", "Title"],
             reranker_properties={
-                "api_key": self.openai_api_key
+                "api_key": self.openai_api_key,
+                "pre_summarise": True
             }
         )
         pprint.pprint(search_res)
@@ -94,7 +96,8 @@ class TestReranking(MarqoTestCase):
             searchable_attributes=["Summary", "Title"],
             reranker_properties={
                 "api_key": self.openai_api_key,
-                "max_tokens": 1000
+                "max_tokens": 1000,
+                "pre_summarise": True
             }
         )
         pprint.pprint(search_res)
@@ -114,6 +117,7 @@ class TestReranking(MarqoTestCase):
             searchable_attributes=["Summary", "Title"],
             reranker_properties={
                 "api_key": self.openai_api_key,
+                "pre_summarise": True
             }
         )
         pprint.pprint(search_res)

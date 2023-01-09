@@ -1,12 +1,11 @@
 # use this as the entry point for reranking
 from marqo.s2_inference.reranking.enums import ResultsFields
 from marqo.s2_inference.reranking.cross_encoders import ReRankerText, ReRankerOwl
-from marqo.s2_inference.reranking.openai import gpt3
 from marqo.s2_inference.types import Dict, List, Optional
 from marqo.s2_inference.errors import RerankerError, RerankerNameError
 from PIL import UnidentifiedImageError
 from marqo.s2_inference.logger import get_logger
-
+from marqo.s2_inference.reranking.openai_ import entrypoint as gpt_entrypoint
 logger = get_logger(__name__)
 
 def rerank_search_results(
@@ -49,20 +48,11 @@ def rerank_search_results(
         except (UnidentifiedImageError, RerankerNameError) as e:
             raise RerankerError(message=str(e)) from e
     elif 'openai' in lowered_model_name:
-        tasks = {
-            gpt3.GptQuestionAnswering.task_name: gpt3.GptQuestionAnswering,
-            gpt3.GptFreeform.task_name: gpt3.GptFreeform,
-            gpt3.GptSummariser.task_name: gpt3.GptSummariser,
-            gpt3.GptReorder.task_name: gpt3.GptReorder
-        }
-        task_name = lowered_model_name.split("/")[-1]
-        try:
-            reranker = tasks[task_name](reranker_properties=reranker_properties)
-        except KeyError:
-            raise RerankerError(
-                f"Encountered unknown OpenAI task: `{model_name}`. Please check our documentation for available "
-                f"OpenAI tasks: https://docs.marqo.ai/latest")
-        reranker.rerank(query=query, search_result=search_result, searchable_attributes=searchable_attributes)
+        essay = gpt_entrypoint.gpt_entrypoint(
+            model_name=model_name, reranker_properties=reranker_properties, search_result=search_result,
+            query=query, searchable_attributes=searchable_attributes
+        )
+        search_result["reranker_output"] = essay
     else:
         try:
             reranker = ReRankerText(model_name=model_name, device=device, num_highlights=num_highlights)
@@ -111,3 +101,5 @@ def cleanup_final_reranked_results(reranked_results: Dict) -> None:
         # remove our own internal id from the reranking process
         if ResultsFields.reranked_id in result:
             del result[ResultsFields.reranked_id]
+
+

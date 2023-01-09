@@ -1,27 +1,7 @@
-import pprint
-
-from marqo.s2_inference.types import Dict, List, Optional
-import openai
+from marqo.s2_inference.reranking.openai_.gpt3_utils import construct_context, prompt_to_essay
+from marqo.s2_inference.types import Dict, List
 from typing import NamedTuple
-from marqo.s2_inference.reranking.enums import Columns, ResultsFields
-from marqo.s2_inference.errors import RerankerError, RerankerNameError
-
-
-def construct_context(results: dict, searchable_attributes: List, content_separator: str) -> str:
-    """Generates the context string to be consumed by the prompt templates"""
-    context = ""
-    for i, result in enumerate(results[ResultsFields.hits]):
-        content = content_separator.join([result[attrib] for attrib in searchable_attributes if attrib in result])
-        context += f"Source {i}): {content}\n"
-    return context
-
-
-def prompt_to_essay(prompt: str, openai_args: dict):
-    """ Process GPT-3 prompt and clean string . """
-    response = openai.Completion.create(
-        **openai_args, prompt=prompt
-    )
-    return response['choices'][0]['text'].strip()#.replace('\n', ' ')
+from marqo.s2_inference.errors import RerankerError
 
 
 class GptArgs(NamedTuple):
@@ -36,11 +16,13 @@ class GptArgs(NamedTuple):
     presence_penalty: float = 0.0
     # Marqo params
     instruction: str = None
+    pre_summarise: dict = None
 
     def open_ai_args(self) -> dict:
         """Returns only the args that will be consumed by OpenAI API"""
         params = self._asdict()
         del params['instruction']
+        del params['pre_summarise']
         return params
 
 
@@ -72,7 +54,7 @@ class GptQuestionAnswering(GptReranker):
             self.prompt_template_question_answer(question=query, context=context),
             openai_args=self.reranker_properties.open_ai_args()
         )
-        search_result['reranker_output'] = essay
+        return essay
 
 
 class GptFreeform(GptReranker):
@@ -94,7 +76,7 @@ class GptFreeform(GptReranker):
             self.prompt_template_freeform(context=context, your_text_here=self.reranker_properties.instruction),
             openai_args=self.reranker_properties.open_ai_args()
         )
-        search_result['reranker_output'] = essay
+        return essay
 
 
 class GptSummariser(GptReranker):
@@ -117,7 +99,7 @@ class GptSummariser(GptReranker):
             self.prompt_template_summary(context=context),
             openai_args=self.reranker_properties.open_ai_args()
         )
-        search_result['reranker_output'] = essay
+        return essay
 
 
 class GptReorder(GptReranker):
@@ -140,4 +122,4 @@ class GptReorder(GptReranker):
             self.prompt_template_reorder(query=query, context=context),
             openai_args=self.reranker_properties.open_ai_args()
         )
-        search_result['reranker_output'] = essay
+        return essay
