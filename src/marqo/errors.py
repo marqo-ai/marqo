@@ -176,6 +176,11 @@ class IndexMaxFieldsError(__InvalidRequestError):
     code = "index_max_fields_error"
     status_code = HTTPStatus.BAD_REQUEST
 
+
+class ModelNotInCacheError(__InvalidRequestError):
+    code = "model_not_in_cache"
+    status_code = HTTPStatus.NOT_FOUND
+
 # ---MARQO INTERNAL ERROR---
 
 

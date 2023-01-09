@@ -8,7 +8,7 @@ from marqo.errors import InvalidArgError, IndexNotFoundError
 from tests.marqo_test import MarqoTestCase
 
 
-class TestlexicalSearch(MarqoTestCase):
+class TestLexicalSearch(MarqoTestCase):
 
     def setUp(self) -> None:
         self.generic_header = {"Content-type": "application/json"}
@@ -223,6 +223,7 @@ class TestlexicalSearch(MarqoTestCase):
         del res_search_entry_point_no_processing_time ['processingTimeMs']
         del res_search_entry_point_no_processing_time ['query']
         del res_search_entry_point_no_processing_time ['limit']
+        del res_search_entry_point_no_processing_time ['offset']
         assert len(res_lexical_search['hits']) > 0
         assert res_search_entry_point_no_processing_time == res_lexical_search
 

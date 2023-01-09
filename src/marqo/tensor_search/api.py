@@ -115,7 +115,8 @@ def search(search_query: SearchQuery, index_name: str, device: str = Depends(api
         index_name=index_name, highlights=search_query.showHighlights,
         searchable_attributes=search_query.searchableAttributes,
         search_method=search_query.searchMethod,
-        result_count=search_query.limit, reranker=search_query.reRanker,
+        result_count=search_query.limit, offset=search_query.offset,
+        reranker=search_query.reRanker, 
         filter=search_query.filter, device=device,
         attributes_to_retrieve=search_query.attributesToRetrieve
     )
@@ -212,6 +213,28 @@ def check_health(marqo_config: config.Config = Depends(generate_config)):
 def get_indexes(marqo_config: config.Config = Depends(generate_config)):
     return tensor_search.get_indexes(config=marqo_config)
 
+
+@app.get("/models")
+def get_loaded_models():
+    return tensor_search.get_loaded_models()
+
+
+@app.delete("/models")
+def eject_model(model_name:str, model_device:str):
+    return tensor_search.eject_model(model_name = model_name, device = model_device)
+
+
+@app.get("/device/cpu")
+def get_cpu_info():
+    return tensor_search.get_cpu_info()
+
+
+@app.get("/device/cuda")
+def get_cuda_info():
+    return tensor_search.get_cuda_info()
+
+
+
 # try these curl commands:
 
 # ADD DOCS:
@@ -282,3 +305,25 @@ curl -XPOST  http://localhost:8882/indexes/my-irst-ix/documents/delete-batch -H 
 curl -XDELETE http://localhost:8882/indexes/my-irst-ix
 """
 
+# check cpu info
+"""
+curl -XGET http://localhost:8882/device/cpu
+"""
+
+# check cuda info
+"""
+curl -XGET http://localhost:8882/device/cuda
+"""
+
+# check the loaded models
+"""
+curl -XGET http://localhost:8882/models
+"""
+
+# eject a model
+"""
+curl -X DELETE 'http://localhost:8882/models?model_name=ViT-L/14&model_device=cuda'
+curl -X DELETE 'http://localhost:8882/models?model_name=ViT-L/14&model_device=cpu'
+curl -X DELETE 'http://localhost:8882/models?model_name=hf/all_datasets_v4_MiniLM-L6&model_device=cuda' 
+curl -X DELETE 'http://localhost:8882/models?model_name=hf/all_datasets_v4_MiniLM-L6&model_device=cpu' 
+"""

@@ -55,7 +55,8 @@ from marqo.s2_inference.processing import image as image_processor
 from marqo.s2_inference.clip_utils import _is_image
 from marqo.s2_inference.reranking import rerank
 from marqo.s2_inference import s2_inference
-
+import torch.cuda
+import psutil
 # We depend on _httprequests.py for now, but this may be replaced in the future, as
 # _httprequests.py is designed for the client
 from marqo._httprequests import HttpRequests
@@ -761,7 +762,7 @@ def refresh_index(config: Config, index_name: str):
     return HttpRequests(config).post(path=F"{index_name}/_refresh")
 
 
-def search(config: Config, index_name: str, text: str, result_count: int = 3, highlights=True, return_doc_ids=True,
+def search(config: Config, index_name: str, text: str, result_count: int = 3, offset: int = 0, highlights=True, return_doc_ids=True,
            search_method: Union[str, SearchMethod, None] = SearchMethod.TENSOR,
            searchable_attributes: Iterable[str] = None, verbose: int = 0, num_highlights: int = 3,
            reranker: Union[str, Dict] = None, simplified_format: bool = True, filter: str = None,
@@ -781,6 +782,7 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
         index_name:
         text:
         result_count:
+        offset:
         return_doc_ids:
         search_method:
         searchable_attributes:
@@ -790,15 +792,23 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
     Returns:
 
     """
+    # Validation for: result_count (limit) & offset
+    # Validate neither is negative
+    if result_count <= 0:
+        raise errors.IllegalRequestedDocCount("search result limit must be greater than 0!")
+    if offset < 0:
+        raise errors.IllegalRequestedDocCount("search result offset cannot be less than 0!")   
+
+    # Validate result_count + offset <= int(max_docs_limit)
     max_docs_limit = utils.read_env_vars_and_defaults(EnvVars.MARQO_MAX_RETRIEVABLE_DOCS)
-    check_upper = True if max_docs_limit is None else result_count <= int(max_docs_limit)
-    if not(check_upper and result_count > 0):
-        upper_bound_explanation = ("The search result limit must be greater than 0 and less than or equal to the"
+    check_upper = True if max_docs_limit is None else result_count + offset <= int(max_docs_limit)
+    if not check_upper:
+        upper_bound_explanation = ("The search result limit + offset must be less than or equal to the "
                                   f"MARQO_MAX_RETRIEVABLE_DOCS limit of [{max_docs_limit}]. ")
 
-        above_zero_explanation = "The search result limit must be greater than 0."
-        explanation = upper_bound_explanation if max_docs_limit is not None else above_zero_explanation
-        raise errors.IllegalRequestedDocCount(f"{explanation} Marqo received search result limit of `{result_count}`.")
+        raise errors.IllegalRequestedDocCount(f"{upper_bound_explanation} Marqo received search result limit of `{result_count}` "
+                                            f"and offset of `{offset}`.")
+    
 
     t0 = timer()
 
@@ -822,15 +832,15 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
 
     if search_method.upper() == SearchMethod.TENSOR:
         search_result = _vector_text_search(
-            config=config, index_name=index_name, text=text, result_count=result_count,
-            return_doc_ids=return_doc_ids, searchable_attributes=searchable_attributes,
+            config=config, index_name=index_name, text=text, result_count=result_count, offset=offset,
+            return_doc_ids=return_doc_ids, searchable_attributes=searchable_attributes, verbose=verbose,
             number_of_highlights=num_highlights, simplified_format=simplified_format,
             filter_string=filter, device=device, attributes_to_retrieve=attributes_to_retrieve
         )
     elif search_method.upper() == SearchMethod.LEXICAL:
         search_result = _lexical_search(
-            config=config, index_name=index_name, text=text, result_count=result_count,
-            return_doc_ids=return_doc_ids, searchable_attributes=searchable_attributes,
+            config=config, index_name=index_name, text=text, result_count=result_count, offset=offset,
+            return_doc_ids=return_doc_ids, searchable_attributes=searchable_attributes, verbose=verbose,
             filter_string=filter, attributes_to_retrieve=attributes_to_retrieve
         )
     else:
@@ -855,6 +865,7 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
     
     search_result["query"] = text
     search_result["limit"] = result_count
+    search_result["offset"] = offset
 
     if not highlights:
         for hit in search_result["hits"]:
@@ -868,8 +879,8 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, hi
 
 
 def _lexical_search(
-        config: Config, index_name: str, text: str, result_count: int = 3, return_doc_ids=True,
-        searchable_attributes: Sequence[str] = None, filter_string: str = None,
+        config: Config, index_name: str, text: str, result_count: int = 3, offset: int = 0, return_doc_ids=True,
+        searchable_attributes: Sequence[str] = None, verbose: int = 0, filter_string: str = None,
         attributes_to_retrieve: Optional[List[str]] = None, expose_facets: bool = False):
     """
 
@@ -878,6 +889,7 @@ def _lexical_search(
         index_name:
         text:
         result_count:
+        offset:
         return_doc_ids:
         searchable_attributes:
         number_of_highlights:
@@ -905,7 +917,11 @@ def _lexical_search(
         fields_to_search = index_meta_cache.get_index_info(
             config=config, index_name=index_name
         ).get_true_text_properties()
-
+    
+    # Validation for offset (pagination is single field)
+    if len(fields_to_search) != 1 and offset > 0:
+        raise errors.InvalidArgError(f"Pagination (offset > 0) is only supported for single field searches! Your search currently has {len(fields_to_search)} fields: {fields_to_search}")
+        
     body = {
         "query": {
             "bool": {
@@ -918,7 +934,8 @@ def _lexical_search(
                 ],
             }
         },
-        "size": result_count
+        "size": result_count,
+        "from": offset
     }
     if filter_string is not None:
         body["query"]["bool"]["filter"] = [{
@@ -965,7 +982,7 @@ def _lexical_search(
 
 
 def _vector_text_search(
-        config: Config, index_name: str, text: str, result_count: int = 5, return_doc_ids=False,
+        config: Config, index_name: str, text: str, result_count: int = 5, offset: int = 0, return_doc_ids=False,
         searchable_attributes: Iterable[str] = None, number_of_highlights=3,
         verbose=0, raise_on_searchable_attribs=False, hide_vectors=True, k=500,
         simplified_format=True, filter_string: str = None, device=None,
@@ -976,6 +993,7 @@ def _vector_text_search(
         index_name:
         text:
         result_count:
+        offset:
         return_doc_ids: if True adds doc _id to the docs. Otherwise just returns the docs as-is
         searchable_attributes: Iterable of field names to search. If left as None, then all will
             be searched
@@ -1009,7 +1027,7 @@ def _vector_text_search(
         raise errors.InvalidArgError(
             "filtering not yet implemented for S2Search cloud!"
         )
-
+    
     # SEARCH TIMER-LOGGER (pre-processing)
     start_preprocess_time = timer()
     try:
@@ -1052,6 +1070,11 @@ def _vector_text_search(
             vector_properties_to_search = searchable_attributes_as_vectors.intersection(
                 index_info.get_vector_properties().keys())
 
+    # Validation for offset (pagination is single field)
+    if len(vector_properties_to_search) != 1 and offset > 0:
+        human_readable_vector_properties = [v.replace(TensorField.vector_prefix, "") for v in list(vector_properties_to_search)]
+        raise errors.InvalidArgError(f"Pagination (offset > 0) is only supported for single field searches! Your search currently has {len(vector_properties_to_search)} vectorisable fields: {human_readable_vector_properties}")
+
     if filter_string is not None:
         contextualised_filter = utils.contextualise_filter(
             filter_string=filter_string,
@@ -1062,6 +1085,7 @@ def _vector_text_search(
     for vector_field in vector_properties_to_search:
         search_query = {
             "size": result_count,
+            "from": offset,
             "query": {
                 "nested": {
                     "path": TensorField.chunks,
@@ -1074,11 +1098,11 @@ def _vector_text_search(
                         "knn": {
                             f"{TensorField.chunks}.{vector_field}": {
                                 "vector": vectorised_text,
-                                "k": result_count
+                                "k": result_count + offset
                             }
                         }
                     },
-                    "score_mode": "max",
+                    "score_mode": "max"
                 }
             }
         }
@@ -1172,7 +1196,7 @@ def _vector_text_search(
                     "doc": doc,
                     "chunks": doc_chunks
                 }
-
+    
     # Filter out docs with no inner hits:
 
     for doc_id in list(gathered_docs.keys()):
@@ -1330,3 +1354,41 @@ def _get_model_properties(index_info):
                 f"Please provide model_properties if the model is a custom model and is not supported by default")
 
     return model_properties
+
+def get_loaded_models() -> dict:
+    available_models = s2_inference.get_available_models()
+    message = {
+        'models' : [
+            {"model_name": ix.split("||")[0], "model_device": ix.split("||")[-1]} for ix in available_models.keys()
+        ]
+    }
+    return message
+
+
+def eject_model(model_name: str, device: str) -> dict:
+    try:
+       result = s2_inference.eject_model(model_name, device)
+    except s2_inference_errors.ModelNotInCacheError as e:
+        raise errors.ModelNotInCacheError(message=str(e))
+    return result
+
+
+def get_cpu_info() -> dict:
+    return {
+        "cpu_usage_percent": f"{psutil.cpu_percent(1)} %", # The number 1 is a time interval for CPU usage calculation.
+        "memory_used_percent": f"{psutil.virtual_memory()[2]} %",  # The number 2 is just a index number to get the expected results
+        "memory_used_gb": f"{round(psutil.virtual_memory()[3]/1000000000,1)}", # The number 3 is just a index number to get the expected results
+    }
+
+
+def get_cuda_info() -> dict:
+    if torch.cuda.is_available():
+        return {"cuda_devices": [{"device_id" : _device_id, "device_name" : torch.cuda.get_device_name(_device_id),
+                "memory_used":f"{round(torch.cuda.memory_allocated(_device_id) / 1024**3, 1)} GiB",
+                "total_memory": f"{round(torch.cuda.get_device_properties(_device_id).total_memory/ 1024**3, 1)} GiB"}
+                for _device_id in range(torch.cuda.device_count())]}
+
+    else:
+        raise errors.HardwareCompatabilityError(message=str(
+            "ERROR: cuda is not supported in your machine!!"
+        ))
