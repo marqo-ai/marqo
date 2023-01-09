@@ -90,7 +90,8 @@ jobs:
       - name: Run Integration Tests - ARM64 local_os
         run: |
           export MQ_API_TEST_BRANCH="${GITHUB_REF##*/}"
-          export MQ_API_TEST_IMG="${{ github.event.inputs.image_to_test }}"
+          CUSTOM_TEST_IMG="${{ github.event.inputs.image_to_test }}"
+          export MQ_API_TEST_IMG=${CUSTOM_TEST_IMG:-"marqo_docker_0"}
           tox -e py3-arm64_local_os
   
   Stop-Runner:

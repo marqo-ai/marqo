@@ -55,7 +55,8 @@ from marqo.s2_inference.processing import image as image_processor
 from marqo.s2_inference.clip_utils import _is_image
 from marqo.s2_inference.reranking import rerank
 from marqo.s2_inference import s2_inference
-
+import torch.cuda
+import psutil
 # We depend on _httprequests.py for now, but this may be replaced in the future, as
 # _httprequests.py is designed for the client
 from marqo._httprequests import HttpRequests
@@ -1353,3 +1354,41 @@ def _get_model_properties(index_info):
                 f"Please provide model_properties if the model is a custom model and is not supported by default")
 
     return model_properties
+
+def get_loaded_models() -> dict:
+    available_models = s2_inference.get_available_models()
+    message = {
+        "models" : [
+            {"model_name": ix.split("||")[0], "model_device": ix.split("||")[-1]} for ix in available_models.keys()
+        ]
+    }
+    return message
+
+
+def eject_model(model_name: str, device: str) -> dict:
+    try:
+       result = s2_inference.eject_model(model_name, device)
+    except s2_inference_errors.ModelNotInCacheError as e:
+        raise errors.ModelNotInCacheError(message=str(e))
+    return result
+
+
+def get_cpu_info() -> dict:
+    return {
+        "cpu_usage_percent": f"{psutil.cpu_percent(1)} %", # The number 1 is a time interval for CPU usage calculation.
+        "memory_used_percent": f"{psutil.virtual_memory()[2]} %",  # The number 2 is just a index number to get the expected results
+        "memory_used_gb": f"{round(psutil.virtual_memory()[3]/1000000000,1)}", # The number 3 is just a index number to get the expected results
+    }
+
+
+def get_cuda_info() -> dict:
+    if torch.cuda.is_available():
+        return {"cuda_devices": [{"device_id" : _device_id, "device_name" : torch.cuda.get_device_name(_device_id),
+                "memory_used":f"{round(torch.cuda.memory_allocated(_device_id) / 1024**3, 1)} GiB",
+                "total_memory": f"{round(torch.cuda.get_device_properties(_device_id).total_memory/ 1024**3, 1)} GiB"}
+                for _device_id in range(torch.cuda.device_count())]}
+
+    else:
+        raise errors.HardwareCompatabilityError(message=str(
+            "ERROR: cuda is not supported in your machine!!"
+        ))
