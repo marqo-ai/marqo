@@ -497,6 +497,8 @@ def _get_sbert_onnx_properties() -> Dict:
 
 
 def _get_multilingual_clip_properties() -> Dict:
+    # Models are from github repo
+    # https://github.com/FreddeFrallan/Multilingual-CLIP
     MULTILINGUAL_CLIP_PROPERTIES = {
         "multilingual-clip/XLM-Roberta-Large-Vit-L-14":
             {
