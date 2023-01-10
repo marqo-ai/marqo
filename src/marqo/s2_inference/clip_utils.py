@@ -280,6 +280,8 @@ class MULTILINGUAL_CLIP(CLIP):
         self.visual_name = self.model_info["visual_model"]
         self.textual_name = self.model_info["textual_model"]
         self.device = device
+        self.tokenizer = None
+        self.preprocess = None
 
 
     def load(self) -> None:
