@@ -829,8 +829,6 @@ class TestVectorSearch(MarqoTestCase):
                     # TODO: re-add this assert when KNN incosistency bug is fixed
                     # assert full_search_results["hits"] == paginated_search_results["hits"]
                     
-
-    
     def test_pagination_break_limitations(self):
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
         # Negative offset
@@ -881,7 +879,6 @@ class TestVectorSearch(MarqoTestCase):
 
         assert run()
 
-    
     def test_pagination_multi_field_error(self):
         # Try pagination with 0, 2, and 3 fields
         # To be removed when multi-field pagination is added.
