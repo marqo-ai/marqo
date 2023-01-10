@@ -298,3 +298,5 @@ class TestEncoding(unittest.TestCase):
             similarity_score = (text_feature @ image_feature.T).flatten()
 
             assert np.abs(np.max(similarity_score) - np.min(similarity_score)) < e
+
+            clear_loaded_models()
