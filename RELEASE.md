@@ -1,3 +1,10 @@
+# Release 0.0.11
+
+## New features 
+- Pagination (https://github.com/marqo-ai/marqo/pull/251). Scroll through pages of results. See usage [here](https://docs.marqo.ai/0.0.11/API-Reference/search/#search-result-pagination) 
+- 
+
+
 # Release 0.0.10
 
 ## New features 
