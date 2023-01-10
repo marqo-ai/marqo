@@ -280,7 +280,7 @@ class TestEncoding(unittest.TestCase):
 
         names = ["multilingual-clip/XLM-Roberta-Large-Vit-L-14", "multilingual-clip/XLM-R Large Vit-B/16+",
                  "multilingual-clip/XLM-Roberta-Large-Vit-B-32", "multilingual-clip/LABSE-Vit-L-14"]
-        device = 'cuda'
+        device = 'cpu'
         texts = [
             "skiing person",
             "滑雪的人",
@@ -291,11 +291,11 @@ class TestEncoding(unittest.TestCase):
         e = 0.1
         for name in names:
             text_feature = np.array(vectorise(model_name=name, content=texts, normalize_embeddings=True, device=device))
-
             image_feature = np.array(vectorise(model_name=name, content=image, normalize_embeddings=True, device=device))
 
+            clear_loaded_models()
             similarity_score = (text_feature @ image_feature.T).flatten()
 
             assert np.abs(np.max(similarity_score) - np.min(similarity_score)) < e
 
-            clear_loaded_models()
+            del similarity_score
