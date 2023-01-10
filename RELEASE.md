@@ -4,7 +4,9 @@
 - Pagination (https://github.com/marqo-ai/marqo/pull/251). Scroll through pages of results. See usage [here](https://docs.marqo.ai/0.0.11/API-Reference/search/#search-result-pagination) 
 - The `/models` endpoint (https://github.com/marqo-ai/marqo/pull/239). View what models loaded, and on what device (CUDA vs CPU). See usage [here](https://docs.marqo.ai/0.0.11/API-Reference/models/)
 - The `/device` endpoint (https://github.com/marqo-ai/marqo/pull/239). See resource usage on the machine Marqo is running on. See usage [here](https://docs.marqo.ai/0.0.11/API-Reference/device/)
-
+- Latency log outputs (https://github.com/marqo-ai/marqo/pull/242). Marqo admins have better logging records of latencies for each step of the Marqo indexing and search pipelines
+- ONNX CLIP models are now avaialble (https://github.com/marqo-ai/marqo/pull/245). Index and search Marqo with our CLIP models in the faster, and open, ONNX format. These ONNX clip models give up to a 35% speedup over standard CLIP models while mapping to the same space. These ONNX CLIP models are open sourced by Marqo for use in other projects. Read about usage [here](https://docs.marqo.ai/0.0.11/Models-Reference/dense_retrieval/#onnx-clip).
+- New simple [image search](https://github.com/marqo-ai/marqo/blob/mainline/examples/ImageSearchGuide/ImageSearchGuide.md) guide (https://github.com/marqo-ai/marqo/pull/253, https://github.com/marqo-ai/marqo/pull/263). 
 
 # Release 0.0.10
 
