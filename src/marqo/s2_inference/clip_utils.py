@@ -267,4 +267,12 @@ class OPEN_CLIP(CLIP):
         return self._convert_output(outputs)
 
 
-        
+class MULTILINGUAL_CLIP(CLIP):
+    def __init__(self, model_type: str = "multilingual-clip/ViT-L/14", device: str = 'cpu',  embedding_dim: int = None,
+                            truncate: bool = True, **kwargs) -> None:
+
+
+
+
+
+

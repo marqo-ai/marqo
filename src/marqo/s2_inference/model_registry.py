@@ -495,6 +495,21 @@ def _get_sbert_onnx_properties() -> Dict:
     }
     return SBERT_ONNX_MODEL_PROPERTIES
 
+
+def _get_multilingual_clip_properties() -> Dict:
+    MULTILINGUAL_CLIP_PROPERTIES = {
+        "multilingual-clip/ViT-L/14" :
+        {
+            "model_name" : "multilingual-clip/ViT-L/14",
+            "visual_name" : "openai/ViT-L/14",
+            "textual_name" : 'M-CLIP/XLM-Roberta-Large-Vit-L-14',
+            "dimensions" : 768,
+            "type": "multilingual-clip",
+        },
+    }
+
+    return MULTILINGUAL_CLIP_PROPERTIES
+
 def _get_sbert_test_properties() -> Dict:
     TEST_MODEL_PROPERTIES = {
             "sentence-transformers/test":
