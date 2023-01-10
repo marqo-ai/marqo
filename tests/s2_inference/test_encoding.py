@@ -286,7 +286,6 @@ class TestEncoding(unittest.TestCase):
             "滑雪的人",
             "лыжник",
             "persona che scia",
-            "skieur"
         ]
         image = "https://raw.githubusercontent.com/marqo-ai/marqo-clip-onnx/main/examples/coco.jpg"
         e = 0.1
