@@ -2,7 +2,8 @@
 
 ## New features 
 - Pagination (https://github.com/marqo-ai/marqo/pull/251). Scroll through pages of results. See usage [here](https://docs.marqo.ai/0.0.11/API-Reference/search/#search-result-pagination) 
-- 
+- The `/models` endpoint (https://github.com/marqo-ai/marqo/pull/239). View what models loaded, and on what device (CUDA vs CPU). See usage [here](https://docs.marqo.ai/0.0.11/API-Reference/models/)
+- The `/device` endpoint (https://github.com/marqo-ai/marqo/pull/239). See resource usage on the machine Marqo is running on. See usage [here](https://docs.marqo.ai/0.0.11/API-Reference/device/)
 
 
 # Release 0.0.10
