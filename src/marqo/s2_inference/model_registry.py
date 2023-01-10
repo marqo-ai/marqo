@@ -498,22 +498,24 @@ def _get_sbert_onnx_properties() -> Dict:
 
 def _get_multilingual_clip_properties() -> Dict:
     MULTILINGUAL_CLIP_PROPERTIES = {
-        "multilingual-clip/XLM-Roberta-Large-Vit-L-14" :
-        {
-            "name" : "multilingual-clip/XLM-Roberta-Large-Vit-L-14",
-            "visual_model" : "openai/ViT-L/14",
-            "textual_model" : 'M-CLIP/XLM-Roberta-Large-Vit-L-14',
-            "dimensions" : 768,
-            "type": "multilingual_clip",
-        },
+        "multilingual-clip/XLM-Roberta-Large-Vit-L-14":
+            {
+                "name": "multilingual-clip/XLM-Roberta-Large-Vit-L-14",
+                "visual_model": "openai/ViT-L/14",
+                "textual_model": 'M-CLIP/XLM-Roberta-Large-Vit-L-14',
+                "dimensions": 768,
+                "type": "multilingual_clip",
+            },
+
         "multilingual-clip/XLM-R Large Vit-B/16+":
             {
-            "name": "multilingual-clip/XLM-R Large Vit-B/16+",
-            "visual_model": "open_clip/ViT-B-16-plus-240/laion400m_e32",
-            "textual_model": 'M-CLIP/XLM-Roberta-Large-Vit-B-16Plus',
-            "dimensions": 640,
-            "type": "multilingual_clip",
+                "name": "multilingual-clip/XLM-R Large Vit-B/16+",
+                "visual_model": "open_clip/ViT-B-16-plus-240/laion400m_e32",
+                "textual_model": 'M-CLIP/XLM-Roberta-Large-Vit-B-16Plus',
+                "dimensions": 640,
+                "type": "multilingual_clip",
             },
+
         "multilingual-clip/XLM-Roberta-Large-Vit-B-32":
             {
                 "name": "multilingual-clip/XLM-Roberta-Large-Vit-B-32",
@@ -522,16 +524,15 @@ def _get_multilingual_clip_properties() -> Dict:
                 "dimensions": 512,
                 "type": "multilingual_clip",
             },
+
         "multilingual-clip/LABSE-Vit-L-14":
-        {
+            {
                 "name": "multilingual-clip/LABSE-Vit-L-14",
                 "visual_model": "openai/ViT-L/14",
                 "textual_model": 'M-CLIP/LABSE-Vit-L-14',
                 "dimensions": 768,
                 "type": "multilingual_clip",
-
             }
-
     }
 
     return MULTILINGUAL_CLIP_PROPERTIES
@@ -1047,10 +1048,6 @@ def _get_onnx_clip_properties() -> Dict:
                 'image_mean': None,
                 'image_std': None
             },
-
-
-
-
 
         'onnx16/open_clip/ViT-H-14/laion2b_s32b_b79k':
             {
