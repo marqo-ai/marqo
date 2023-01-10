@@ -280,7 +280,7 @@ class TestEncoding(unittest.TestCase):
 
         names = ["multilingual-clip/XLM-Roberta-Large-Vit-L-14", "multilingual-clip/XLM-R Large Vit-B/16+",
                  "multilingual-clip/XLM-Roberta-Large-Vit-B-32", "multilingual-clip/LABSE-Vit-L-14"]
-        device = 'cpu'
+        device = 'cuda'
         texts = [
             "skiing person",
             "滑雪的人",
