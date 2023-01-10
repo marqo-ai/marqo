@@ -1,3 +1,18 @@
+# Release 0.0.11
+
+## New features 
+- Pagination (https://github.com/marqo-ai/marqo/pull/251). Navigate through pages of results. Provide an extensive end-user search experience without having to keep results in memory! See usage [here](https://docs.marqo.ai/0.0.11/API-Reference/search/#search-result-pagination) 
+- The `/models` endpoint (https://github.com/marqo-ai/marqo/pull/239). View what models are loaded, and on what device. This lets Marqo admins examine loaded models and prune unneeded ones. See usage [here](https://docs.marqo.ai/0.0.11/API-Reference/models/)
+- The `/device` endpoint (https://github.com/marqo-ai/marqo/pull/239). See resource usage for the machine Marqo is running on. This helps Marqo admins manage resources on remote Marqo instances. See usage [here](https://docs.marqo.ai/0.0.11/API-Reference/device/)
+- The index settings endpoint (`/indexes/{index_name}/settings`)(https://github.com/marqo-ai/marqo/pull/248). See the model and parameters used by each index. See usage [here](https://docs.marqo.ai/0.0.11/API-Reference/settings/). 
+- Latency log outputs (https://github.com/marqo-ai/marqo/pull/242). Marqo admins have better transparency about the latencies for each step of the Marqo indexing and search request pipeline
+- ONNX CLIP models are now available (https://github.com/marqo-ai/marqo/pull/245). Index and search images in Marqo with CLIP models in the faster, and open, ONNX format - created by Marqo's machine learning team. These ONNX CLIP models give Marqo up to a 35% speedup over standard CLIP models. These ONNX CLIP models are open sourced by Marqo. Read about usage [here](https://docs.marqo.ai/0.0.11/Models-Reference/dense_retrieval/#onnx-clip).
+- New simple [image search](https://github.com/marqo-ai/marqo/blob/mainline/examples/ImageSearchGuide/ImageSearchGuide.md) guide (https://github.com/marqo-ai/marqo/pull/253, https://github.com/marqo-ai/marqo/pull/263). 
+
+
+## Contributor shout-outs
+- ⭐️ We've just hit over 2.1k GitHub stars! ⭐️ So an extra special thanks to our stargazers and contributors who make Marqo possible. 
+
 # Release 0.0.10
 
 ## New features 
