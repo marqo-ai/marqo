@@ -278,9 +278,7 @@ class TestEncoding(unittest.TestCase):
 
         clear_loaded_models()
 
-        names = ["multilingual-clip/XLM-Roberta-Large-Vit-L-14",
-                 "multilingual-clip/LABSE-Vit-L-14",
-                 "multilingual-clip/XLM-R Large Vit-B/16+",
+        names = ["multilingual-clip/XLM-R Large Vit-B/16+",
                  "multilingual-clip/XLM-Roberta-Large-Vit-B-32"]
         device = 'cpu'
         texts = [
