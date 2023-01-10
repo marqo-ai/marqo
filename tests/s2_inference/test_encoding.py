@@ -290,11 +290,9 @@ class TestEncoding(unittest.TestCase):
         image = "https://raw.githubusercontent.com/marqo-ai/marqo-clip-onnx/main/examples/coco.jpg"
         e = 0.1
         for name in names:
-            text = vectorise(model_name=name, content=texts, normalize_embeddings=True, device=device)
-            image = vectorise(model_name=name, content=image, normalize_embeddings=True, device=device)
+            text_feature = np.array(vectorise(model_name=name, content=texts, normalize_embeddings=True, device=device))
 
-            text_feature = np.array(text)
-            image_feature = np.array(image)
+            image_feature = np.array(vectorise(model_name=name, content=image, normalize_embeddings=True, device=device))
 
             similarity_score = (text_feature @ image_feature.T).flatten()
 
