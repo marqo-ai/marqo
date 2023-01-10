@@ -246,7 +246,7 @@ class OPEN_CLIP(CLIP):
     def load(self) -> None:
         # https://github.com/mlfoundations/open_clip
         self.model, _, self.preprocess = open_clip.create_model_and_transforms(self.model_name, pretrained = self.pretrained, device=self.device, jit=False)
-        self.tokenizer = open_clip.tokenize
+        self.tokenizer = open_clip.get_tokenizer(self.model_name)
         self.model.eval()
 
     def encode_text(self, sentence: Union[str, List[str]], normalize=True) -> FloatTensor:
