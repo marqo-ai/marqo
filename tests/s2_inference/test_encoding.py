@@ -290,7 +290,7 @@ class TestEncoding(unittest.TestCase):
         e = 0.1
         for name in names:
             text = vectorise(model_name=name, content=texts, normalize_embeddings=True)
-            image = vectorise(model_name=name, content="coco.jpg", normalize_embeddings=True)
+            image = vectorise(model_name=name, content=image, normalize_embeddings=True)
 
             text_feature = np.array(text)
             image_feature = np.array(image)
