@@ -5,6 +5,7 @@ import torch
 from marqo.s2_inference.types import FloatTensor
 from marqo.s2_inference.s2_inference import clear_loaded_models, get_model_properties_from_registry
 from marqo.s2_inference.model_registry import load_model_properties, _get_open_clip_properties
+import numpy as np
 
 from marqo.s2_inference.s2_inference import (
     _load_model,
@@ -24,7 +25,8 @@ class TestEncoding(unittest.TestCase):
 
     def test_vectorize(self):
 
-        names = ["onnx16/open_clip/ViT-B-32/laion400m_e32", 'onnx32/open_clip/ViT-B-32-quickgelu/laion400m_e32',
+        names = ["multilingual-clip/XLM-Roberta-Large-Vit-L-14", "multilingual-clip/XLM-R Large Vit-B/16+",
+                 "onnx16/open_clip/ViT-B-32/laion400m_e32", 'onnx32/open_clip/ViT-B-32-quickgelu/laion400m_e32',
                  'onnx32/open_clip/ViT-g-14/laion2b_s12b_b42k',"all-MiniLM-L6-v1", "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6",
                  "onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]
         sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
@@ -48,7 +50,8 @@ class TestEncoding(unittest.TestCase):
 
 
     def test_load_clip_text_model(self):
-        names = ["onnx16/open_clip/ViT-B-32/laion400m_e32", 'onnx32/open_clip/ViT-B-32-quickgelu/laion400m_e32',
+        names = ["multilingual-clip/XLM-Roberta-Large-Vit-L-14", "multilingual-clip/XLM-R Large Vit-B/16+",
+                 "onnx16/open_clip/ViT-B-32/laion400m_e32", 'onnx32/open_clip/ViT-B-32-quickgelu/laion400m_e32',
                  'onnx32/open_clip/ViT-g-14/laion2b_s12b_b42k', 'RN50', "ViT-B/16"]
         device = 'cpu'
         eps = 1e-9
@@ -126,7 +129,8 @@ class TestEncoding(unittest.TestCase):
 
 
     def test_model_outputs(self):
-        names = ["onnx16/open_clip/ViT-B-32/laion400m_e32", 'onnx32/open_clip/ViT-B-32-quickgelu/laion400m_e32',
+        names = ["multilingual-clip/XLM-Roberta-Large-Vit-L-14", "multilingual-clip/XLM-R Large Vit-B/16+",
+                "onnx16/open_clip/ViT-B-32/laion400m_e32", 'onnx32/open_clip/ViT-B-32-quickgelu/laion400m_e32',
                  'onnx32/open_clip/ViT-g-14/laion2b_s12b_b42k', "onnx32/openai/ViT-L/14", "onnx16/openai/ViT-L/14",
                 'open_clip/ViT-B-32/laion400m_e32', "all-MiniLM-L6-v1",
                  "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1",
@@ -146,7 +150,8 @@ class TestEncoding(unittest.TestCase):
 
 
     def test_model_normalization(self):
-        names = ["onnx16/open_clip/ViT-B-32/laion400m_e32", 'onnx32/open_clip/ViT-B-32-quickgelu/laion400m_e32',
+        names = ["multilingual-clip/XLM-Roberta-Large-Vit-L-14", "multilingual-clip/XLM-R Large Vit-B/16+",
+                 "onnx16/open_clip/ViT-B-32/laion400m_e32", 'onnx32/open_clip/ViT-B-32-quickgelu/laion400m_e32',
                  'onnx32/open_clip/ViT-g-14/laion2b_s12b_b42k', "onnx32/openai/ViT-L/14", "onnx16/openai/ViT-L/14",
                  'open_clip/ViT-B-32/laion400m_e32', 'RN50', "ViT-B/16", "all-MiniLM-L6-v1",
                  "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6",
@@ -268,3 +273,28 @@ class TestEncoding(unittest.TestCase):
 
             clear_loaded_models()
 
+
+    def test_multilingual_clip_performance(self):
+
+        names = ["multilingual-clip/XLM-Roberta-Large-Vit-L-14", "multilingual-clip/XLM-R Large Vit-B/16+",
+                 "multilingual-clip/XLM-Roberta-Large-Vit-B-32", "multilingual-clip/LABSE-Vit-L-14"]
+        device = 'cpu'
+        texts = [
+            "skiing person",
+            "滑雪的人",
+            "лыжник",
+            "persona che scia",
+            "skieur"
+        ]
+        image = "https://raw.githubusercontent.com/marqo-ai/marqo-clip-onnx/main/examples/coco.jpg"
+        e = 0.1
+        for name in names:
+            text = vectorise(model_name=name, content=texts, normalize_embeddings=True)
+            image = vectorise(model_name=name, content="coco.jpg", normalize_embeddings=True)
+
+            text_feature = np.array(text)
+            image_feature = np.array(image)
+
+            similarity_score = (text_feature @ image_feature.T).flatten()
+
+            assert np.abs(np.max(similarity_score) - np.min(similarity_score)) < e
