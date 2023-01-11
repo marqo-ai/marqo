@@ -24,3 +24,4 @@ pandas==1.5.1
 optimum==1.4.1
 opencv-python-headless==4.6.0.66
 psutil==5.9.4
+multilingual-clip==1.0.10
