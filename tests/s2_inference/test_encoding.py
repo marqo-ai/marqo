@@ -279,7 +279,7 @@ class TestEncoding(unittest.TestCase):
         clear_loaded_models()
 
         names = ["multilingual-clip/XLM-Roberta-Large-Vit-B-32"]
-        device = 'cuda'
+        device = 'cpu'
         texts = [
             "skiing person",
             "滑雪的人",
