@@ -332,7 +332,7 @@ class MULTILINGUAL_CLIP(CLIP):
         self.image_input_processed = torch.stack([self.preprocess(_img).to(self.device) for _img in image_input])
 
         with torch.no_grad():
-            outputs = self.visual_model.encode_image(self.image_input_processed)
+            outputs = self.visual_model.forward(self.image_input_processed)
 
         if normalize:
             _shape_before = outputs.shape
