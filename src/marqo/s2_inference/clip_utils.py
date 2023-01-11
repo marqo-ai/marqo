@@ -289,10 +289,12 @@ class MULTILINGUAL_CLIP(CLIP):
             clip_name = self.visual_name.replace("openai/", "")
             self.visual_model, self.preprocess = clip.load(name = clip_name, device = "cpu", jit = False)
             self.visual_model = self.visual_model.to(self.device)
+            self.visual_model = self.visual_model.visual
 
         elif self.visual_name.startswith("open_clip/"):
             clip_name = self.visual_name.replace("open_clip/", "")
             self.visual_model, _, self.preprocess = open_clip.create_model_and_transforms(model_name=clip_name.split("/")[0], pretrained= clip_name.split("/")[1], device = self.device)
+            self.visual_model = self.visual_model.visual
 
         self.textual_model = pt_multilingual_clip.MultilingualCLIP.from_pretrained(self.textual_name, self.device)
         self.tokenizer = transformers.AutoTokenizer.from_pretrained(self.textual_name)
