@@ -74,7 +74,7 @@ A tensor-based search and analytics engine that seamlessly integrates with your 
 | Making GPT a subject matter expert by using Marqo as a knowledge base|                                                                                                                                                                                                           
 | 🎨 [ Marqo for Creative AI](https://medium.com/@jesse_894/combining-stable-diffusion-with-semantic-search-generating-and-categorising-100k-hot-dogs-afeeddea9d81)                           
 | Combining stable diffusion with semantic search to generate and categorise 100k images of hotdogs |                                                                                                                                                 
-| 🦾 [Features](#Core-Features) | Marqo's core features   |                                                                                                                                                                                                                        
+| 🦾 [Features](#-Core-Features) | Marqo's core features   |                                                                                                                                                                                                                        
 
 ## Getting started
 
