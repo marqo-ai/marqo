@@ -17,10 +17,6 @@
 
 A tensor-based search and analytics engine that seamlessly integrates with your applications, websites, and workflow in 3 lines of code.
 
-
-<img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg">
-
-
 [![](https://i.imgur.com/spYHmPy.gif)](https://q78175g1wwa.typeform.com/to/d0PEuRPC)
 
 
