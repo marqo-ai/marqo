@@ -17,9 +17,7 @@
 
 A tensor-based search and analytics engine that seamlessly integrates with your applications, websites, and workflow in 3 lines of code.
 
-<p align="center">
-  <img src="https://i.imgur.com/spYHmPy.gif">
-</p>
+[![]([https://i.imgur.com/lGOKnVg.png](https://i.imgur.com/spYHmPy.gif))](https://q78175g1wwa.typeform.com/to/d0PEuRPC)
 
 <p align="center">
     <b>    
