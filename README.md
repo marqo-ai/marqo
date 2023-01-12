@@ -29,7 +29,11 @@ A tensor-based search and analytics engine that seamlessly integrates with your 
     </b>
 </p>
     
-<img src="https://i.imgur.com/lGOKnVg.png" width="600" height="150"/>
+<p align="center">
+    <a href="https://q78175g1wwa.typeform.com/to/d0PEuRPC"><img src="https://i.imgur.com/lGOKnVg.png" width="600" height="150"/></a>
+</p>
+
+
 
 
 ## ✨ Core Features
