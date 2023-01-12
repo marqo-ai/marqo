@@ -17,9 +17,7 @@
 
 A tensor-based search and analytics engine that seamlessly integrates with your applications, websites, and workflow in 3 lines of code.
 
-<p align="center">
-    <a href="https://github.com/marqo-ai/marqo/blob/readme-update/assets/demo.gif"><img src="https://demo.marqo.ai/"></a>
-</p>
+[![][assets/demo.gif](https://demo.marqo.ai/")
 
 <p align="center">
     <b>    
