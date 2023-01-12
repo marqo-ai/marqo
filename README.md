@@ -59,7 +59,7 @@ A tensor-based search and analytics engine that seamlessly integrates with your 
 
 ## Understand Marqo Better
 
-                                                                                                                                                           |     |      |                                                                     
+                                                                                                                                                           | hello   |  world    |                                                                     
 | --- | ---- |
 | 📗 [Quick start](#Getting-started)                                             | Build your first application with Marqo in under 5 minutes |                                                                                                                                                                                      
 | 🔍 [ What is tensor search?](https://medium.com/@jesse_894/introducing-marqo-build-cloud-native-tensor-search-applications-in-minutes-9cb9a05a1736) | A beginner's guide to the fundamentals of Marqo and tensor search  |                                                                                                                                                                                                                  
