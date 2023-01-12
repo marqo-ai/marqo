@@ -58,8 +58,10 @@ A tensor-based search and analytics engine that seamlessly integrates with your 
 
 
 ## Understand Marqo Better
-                                                                                  |                                                                                                                                                                                                                                            |
+                                                                                                                                                       
+|                                                                                               |                                                                                                                                                                                                                                                   |
 | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+
 | 📗 [Quick start](#Getting-started)                                           | Build your first application with Marqo in under 5 minutes                                                                                                                                                                                                 |
 | 🔍 [ What is tensor search?](https://medium.com/@jesse_894/introducing-marqo-build-cloud-native-tensor-search-applications-in-minutes-9cb9a05a1736)  | A beginner's guide to the fundamentals of Marqo and tensor search                                                                                                                                                                                                                           |
 | 🖼 [Marqo for image data](https://medium.com/@wanli19940222/how-to-implement-text-to-image-search-on-marqo-in-5-lines-of-code-448f75bed1da)     
@@ -72,6 +74,7 @@ A tensor-based search and analytics engine that seamlessly integrates with your 
 |  🎨 [ Marqo for Creative AI](https://medium.com/@jesse_894/combining-stable-diffusion-with-semantic-search-generating-and-categorising-100k-hot-dogs-afeeddea9d81)                           
 | Combining stable diffusion with semantic search to generate and categorise 100k images of hotdogs                                                                                                                                                                                                                     |
 | 🦾 [Features](#-Core-Features) | Marqo's core features                                                                                                                                                                                         |
+
 
 
 
