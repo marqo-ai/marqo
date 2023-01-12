@@ -30,7 +30,7 @@ A tensor-based search and analytics engine that seamlessly integrates with your 
 </p>
     
 <p align="center">
-    <a href="https://q78175g1wwa.typeform.com/to/d0PEuRPC"><img src="https://i.imgur.com/lGOKnVg.png" width="600" height="150"/></a>
+    <a href="https://q78175g1wwa.typeform.com/to/d0PEuRPC"><img src="https://i.imgur.com/lGOKnVg.png" width="500" height="125"/></a>
 </p>
 
 
