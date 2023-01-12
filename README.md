@@ -27,7 +27,7 @@ A tensor-based search and analytics engine that seamlessly integrates with your 
     </b>
 </p>
     
-<img src="https://i.imgur.com/lGOKnVg.png" width="250" height="250"/>
+<img src="https://i.imgur.com/lGOKnVg.png" width="750" height="250"/>
 
 
 ## ✨ Core Features
