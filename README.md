@@ -17,7 +17,7 @@
 
 A tensor-based search and analytics engine that seamlessly integrates with your applications, websites, and workflow in 3 lines of code.
 
-![ezgif-5-945079223d](https://user-images.githubusercontent.com/115690730/211955151-b08586e8-ba56-440e-ad54-79c8aa82bbf5.gif)
+![ezgif-5-945079223d](https://demo.marqo.ai/?q=smiling+with+glasses&index=boredapes)
 
 <p align="center">
     <b>    
