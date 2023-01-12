@@ -14,13 +14,10 @@
 <a href="https://pepy.tech/project/marqo"><img alt="PyPI - Downloads from pepy" src="https://static.pepy.tech/personalized-badge/marqo?period=month&units=international_system&left_color=grey&right_color=blue&left_text=downloads/month"></a>
 <a align="center" href="https://join.slack.com/t/marqo-community/shared_invite/zt-1d737l76e-u~b3Rvey2IN2nGM4wyr44w"><img src="https://img.shields.io/badge/Slack-blueviolet?logo=slack&amp;logoColor=white"></a>
 </p>
-<br>
+
 A tensor-based search and analytics engine that seamlessly integrates with your applications, websites, and workflow in 3 lines of code.
 
-<br>
-
 ![ezgif-5-945079223d](https://user-images.githubusercontent.com/115690730/211955151-b08586e8-ba56-440e-ad54-79c8aa82bbf5.gif)
-
 
 <p align="center">
     <b>    
