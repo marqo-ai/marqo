@@ -4,10 +4,13 @@ import functools
 import json
 import torch
 from marqo import errors
+from marqo.s2_inference import s2_inference, errors as s2_inference_errors
 from marqo.tensor_search import enums, configs
 from typing import List, Optional, Union, Callable, Iterable, Sequence, Dict
 import copy
 import datetime
+
+from marqo.tensor_search.enums import OpenSearchDataType, IndexSettingsField as NsField
 
 
 def dicts_to_jsonl(dicts: List[dict]) -> str:
@@ -183,4 +186,33 @@ def read_env_vars_and_defaults(var: str) -> Optional[str]:
             return None
 
 
+def infer_opensearch_data_type(
+        sample_field_content: typing.Any) -> Union[OpenSearchDataType, None]:
+    """
+    Raises:
+        Exception if sample_field_content list or dict
+    """
+    if isinstance(sample_field_content, dict):
+        raise errors.InvalidArgError("Field content can't be objects or lists!")
+    elif isinstance(sample_field_content, List):
+        raise errors.InvalidArgError("Field content can't be objects or lists!")
+    elif isinstance(sample_field_content, str):
+        return OpenSearchDataType.text
+    else:
+        return None
 
+
+def get_model_properties(index_info):
+    index_defaults = index_info.get_index_settings()["index_defaults"]
+    try:
+        model_properties = index_defaults[NsField.model_properties]
+    except KeyError:
+        try:
+            model_properties = s2_inference.get_model_properties_from_registry(index_info.model_name)
+        except s2_inference_errors.UnknownModelError:
+            raise s2_inference_errors.UnknownModelError(
+                f"Could not find model properties for model={index_info.model_name}. "
+                f"Please check that the model name is correct. "
+                f"Please provide model_properties if the model is a custom model and is not supported by default")
+
+    return model_properties

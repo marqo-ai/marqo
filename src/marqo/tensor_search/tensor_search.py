@@ -40,8 +40,7 @@ import uuid
 from typing import List, Optional, Union, Iterable, Sequence, Dict, Any
 from PIL import Image
 from marqo.tensor_search.enums import (
-    MediaType, MlModel, TensorField, SearchMethod, OpenSearchDataType,
-    EnvVars
+    MediaType, MlModel, TensorField, SearchMethod, EnvVars
 )
 from marqo.tensor_search.enums import IndexSettingsField as NsField
 from marqo.tensor_search import utils, backend, validation, configs, parallel
@@ -49,7 +48,6 @@ from marqo.tensor_search.formatting import _clean_doc
 from marqo.tensor_search.index_meta_cache import get_cache, get_index_info
 from marqo.tensor_search import index_meta_cache
 from marqo.tensor_search.models.index_info import IndexInfo
-from marqo.tensor_search import constants
 from marqo.s2_inference.processing import text as text_processor
 from marqo.s2_inference.processing import image as image_processor
 from marqo.s2_inference.clip_utils import _is_image
@@ -66,6 +64,7 @@ from marqo.s2_inference import errors as s2_inference_errors
 import threading
 
 from marqo.tensor_search.tensor_search_logging import get_logger
+from marqo.tensor_search.utils import infer_opensearch_data_type, get_model_properties
 
 logger = get_logger(__name__)
 
@@ -320,22 +319,6 @@ def _batch_request(config: Config, index_name: str, dataset: List[dict],
     return results
 
 
-def _infer_opensearch_data_type(
-        sample_field_content: typing.Any) -> Union[OpenSearchDataType, None]:
-    """
-    Raises:
-        Exception if sample_field_content list or dict
-    """
-    if isinstance(sample_field_content, dict):
-        raise errors.InvalidArgError("Field content can't be objects or lists!")
-    elif isinstance(sample_field_content, List):
-        raise errors.InvalidArgError("Field content can't be objects or lists!")
-    elif isinstance(sample_field_content, str):
-        return OpenSearchDataType.text
-    else:
-        return None
-
-
 def add_documents(config: Config, index_name: str, docs: List[dict], auto_refresh: bool,
                   non_tensor_fields=None, device=None, update_mode: str = "replace"):
     """
@@ -353,6 +336,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
     Returns:
 
     """
+    THREADS = 20
     # ADD DOCS TIMER-LOGGER (3)
     start_time_3 = timer()
 
@@ -431,7 +415,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                 break
 
             if field not in existing_fields:
-                new_fields_from_doc.add((field, _infer_opensearch_data_type(copied[field])))
+                new_fields_from_doc.add((field, infer_opensearch_data_type(copied[field])))
 
             # Don't process text/image fields when explicitly told not to.
             if field in non_tensor_fields:
@@ -489,9 +473,10 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
                     # ADD DOCS TIMER-LOGGER (4)
                     start_time = timer()
-                    vector_chunks = s2_inference.vectorise(model_name=index_info.model_name, model_properties=_get_model_properties(index_info), content=content_chunks,
-                        device=selected_device, normalize_embeddings=normalize_embeddings,
-                        infer=infer_if_image)
+                    vector_chunks = s2_inference.vectorise(model_name=index_info.model_name, model_properties=get_model_properties(
+                        index_info), content=content_chunks,
+                                                           device=selected_device, normalize_embeddings=normalize_embeddings,
+                                                           infer=infer_if_image)
 
                     end_time = timer()
                     single_vectorise_call = end_time - start_time
@@ -610,7 +595,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
         # the HttpRequest wrapper handles error logic
         update_mapping_response = backend.add_customer_field_properties(
             config=config, index_name=index_name, customer_field_names=new_fields,
-            model_properties=_get_model_properties(index_info))
+            model_properties=get_model_properties(index_info))
         
         # ADD DOCS TIMER-LOGGER (5)
         start_time_5 = timer()
@@ -1039,7 +1024,7 @@ def _vector_text_search(
     # TODO average over vectorized inputs with weights
     try:
         vectorised_text = s2_inference.vectorise(
-            model_name=index_info.model_name, model_properties=_get_model_properties(index_info), content=text,
+            model_name=index_info.model_name, model_properties=get_model_properties(index_info), content=text,
             device=selected_device,
             normalize_embeddings=index_info.index_settings['index_defaults']['normalize_embeddings'])[0]
     except (s2_inference_errors.UnknownModelError,
@@ -1339,21 +1324,6 @@ def _select_model_from_media_type(media_type: Union[MediaType, str]) -> Union[Ml
         raise ValueError("_select_model_from_media_type(): "
                          "Received unknown media type: {}".format(media_type))
 
-
-def _get_model_properties(index_info):
-    index_defaults = index_info.get_index_settings()["index_defaults"]
-    try:
-        model_properties = index_defaults[NsField.model_properties]
-    except KeyError:
-        try:
-            model_properties = s2_inference.get_model_properties_from_registry(index_info.model_name)
-        except s2_inference_errors.UnknownModelError:
-            raise s2_inference_errors.UnknownModelError(
-                f"Could not find model properties for model={index_info.model_name}. "
-                f"Please check that the model name is correct. "
-                f"Please provide model_properties if the model is a custom model and is not supported by default")
-
-    return model_properties
 
 def get_loaded_models() -> dict:
     available_models = s2_inference.get_available_models()
