@@ -1,7 +1,9 @@
 <p align="center">
 <a href=""><img src="https://uploads-ssl.webflow.com/62dfa8e3960a6e2b47dc7fae/62fdf9cef684e6f16158b094_MARQO%20LOGO-UPDATED-GREEN.svg"></a>
+</p>
 
-<b>[Website]() | [Blog]() | [Documentation]() | [Demos]() | [Slack Community]()
+<p align="center">
+<b><a href="https://marqo.ai">Website</a> | <a href="https://docs.marqo.ai">Documentation</a> | <a href="https://demo.marqo.ai">Demos</a>  | <a href="https://join.slack.com/t/marqo-community/shared_invite/zt-1d737l76e-u~b3Rvey2IN2nGM4wyr44w">Slack Community</a>
 </b>
 </p>
 
