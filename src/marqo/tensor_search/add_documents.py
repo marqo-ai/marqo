@@ -24,32 +24,33 @@ from marqo.tensor_search.tensor_search_logging import get_logger
 logger = get_logger(__name__)
 
 
-class UnsuccessfulDoc(NamedTuple):
+class UnsuccessfulTensorise(NamedTuple):
     # refers to the position of the doc in the add_documents call
-    doc_pos: int
-    doc: dict
+    error_details: dict
 
 
-class SuccessfullyFormattedOutput(NamedTuple):
+class SuccessfulTensoriseOutput(NamedTuple):
     indexing_instruction: dict
+    index_ready_doc: dict
 
     def to_os_instructions(self) -> List[Dict]:
         """Returns a list of the indexing instruction followed by the content to be indexed"""
+        return [self.indexing_instruction, self.index_ready_doc]
 
 
-class FormattedDocOutput(NamedTuple):
-    vectorise_time: int
+class DocAsIndexingInstruction(NamedTuple):
+    vectorise_time: float
     new_fields: set
-    successfully_formatted_doc: dict = None
-    unsuccessful_doc: Optional[UnsuccessfulDoc] = None
+    doc_pos: int
+    tensorised_for_indexing: SuccessfulTensoriseOutput = None
+    failure_details: Optional[UnsuccessfulTensorise] = None
 
 
-
-def format_document_to_be_added(
+def doc_to_indexing_instructions(
         doc: dict, update_mode: str, index_name: str, doc_pos: int, existing_fields, non_tensor_fields: dict,
         index_info, selected_device
-    ) -> FormattedDocOutput:
-    """creates a document that will be added to Marqo-os
+    ) -> DocAsIndexingInstruction:
+    """From a customer-created doc
 
     Returns:
         Tuple of dicts:
@@ -59,6 +60,7 @@ def format_document_to_be_added(
 
     document_is_valid = True
     new_fields_from_doc = set()
+    doc_vectorise_time = 0
 
     doc_id = None
     try:
@@ -72,10 +74,14 @@ def format_document_to_be_added(
 
         [validation.validate_field_name(field) for field in copied]
     except errors.__InvalidRequestError as err:
-        return FormattedDocOutput(
+        return DocAsIndexingInstruction(
             doc_pos=doc_pos,
-            UnsuccessfulDoc={'_id': doc_id if doc_id is not None else '',
-                             'error': err.message, 'status': int(err.status_code), 'code': err.code})
+            new_fields=set(),
+            failure_details=UnsuccessfulTensorise(
+                error_details={'_id': doc_id if doc_id is not None else '',
+                             'error': err.message, 'status': int(err.status_code), 'code': err.code}
+                ),
+            )
 
     if update_mode == "replace":
         indexing_instructions["index"]["_id"] = doc_id
@@ -90,10 +96,16 @@ def format_document_to_be_added(
             field_content = validation.validate_field_content(copied[field])
         except errors.InvalidArgError as err:
             document_is_valid = False
-            return FormattedDocOutput(
+            return DocAsIndexingInstruction(
                 doc_pos=doc_pos,
-                UnsuccessfulDoc={'_id': doc_id, 'error': err.message, 'status': int(err.status_code),
-                     'code': err.code})
+                new_fields=set(),
+                vectorise_time=doc_vectorise_time,
+                failure_details=UnsuccessfulTensorise(
+                    error_details={
+                        '_id': doc_id, 'error': err.message, 'status': int(err.status_code),
+                        'code': err.code}
+                )
+            )
 
         if field not in existing_fields:
             new_fields_from_doc.add((field, utils.infer_opensearch_data_type(copied[field])))
@@ -138,7 +150,7 @@ def format_document_to_be_added(
                 except s2_inference_errors.S2InferenceError:
                     document_is_valid = False
                     image_err = errors.InvalidArgError(message=f'Could not process given image: {field_content}')
-                    return FormattedDocOutput(
+                    return DocAsIndexingInstruction(
                         doc_pos=doc_pos,
                         UnsuccessfulDoc={
                             '_id': doc_id, 'error': image_err.message, 'status': int(image_err.status_code),
@@ -165,7 +177,7 @@ def format_document_to_be_added(
                 end_time = timer()
                 single_vectorise_call = end_time - start_time
                 # TODO TODO TODO return single vectorise call, to be added in the calling function
-                # total_vectorise_time += single_vectorise_call
+                doc_vectorise_time += single_vectorise_call
                 logger.debug(f"(4) TIME for single vectorise call: {(single_vectorise_call):.3f}s.")
             except (s2_inference_errors.UnknownModelError,
                     s2_inference_errors.InvalidModelPropertiesError,
@@ -177,7 +189,7 @@ def format_document_to_be_added(
             except s2_inference_errors.S2InferenceError:
                 document_is_valid = False
                 image_err = errors.InvalidArgError(message=f'Could not process given image: {field_content}')
-                return FormattedDocOutput(
+                return DocAsIndexingInstruction(
                     doc_pos=doc_pos,
                     UnsuccessfulDoc={
                         '_id': doc_id, 'error': image_err.message, 'status': int(image_err.status_code),
@@ -204,16 +216,24 @@ def format_document_to_be_added(
                     **chunk_values_for_filtering
                 })
     if document_is_valid:
-        new_fields = new_fields.union(new_fields_from_doc)
+        # TODO TODO TODO this must be added to the parent function
+        # new_fields = new_fields.union(new_fields_from_doc)
+
         if update_mode == 'replace':
             copied[TensorField.chunks] = chunks
-            bulk_parent_dicts.append(indexing_instructions)
-            bulk_parent_dicts.append(copied)
+
+            formatted = SuccessfulTensoriseOutput(indexing_instruction=indexing_instructions, index_ready_doc=copied)
+            return DocAsIndexingInstruction(
+                vectorise_time=doc_vectorise_time,
+                doc_pos=doc_pos,
+                tensorised_for_indexing=formatted,
+                new_fields=new_fields_from_doc,
+            )
         else:
             to_upsert = copied.copy()
             to_upsert[TensorField.chunks] = chunks
-            bulk_parent_dicts.append(indexing_instructions)
-            bulk_parent_dicts.append({
+
+            doc_for_upserting = {
                 "upsert": to_upsert,
                 "script": {
                     "lang": "painless",
@@ -266,4 +286,12 @@ def format_document_to_be_added(
                         "non_tensor_fields": non_tensor_fields
                     },
                 }
-            })
+            }
+            formatted = SuccessfulTensoriseOutput(indexing_instruction=indexing_instructions,
+                                                  index_ready_doc=doc_for_upserting)
+            return DocAsIndexingInstruction(
+                vectorise_time=doc_vectorise_time,
+                doc_pos=doc_pos,
+                tensorised_for_indexing=formatted,
+                new_fields=new_fields_from_doc,
+            )
