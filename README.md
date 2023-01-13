@@ -16,7 +16,7 @@
 </p>
 
 <p align="center">
-A tensor-based search and analytics engine that seamlessly integrates with your applications and website. Marqo allows developers to integrate and deploy the latest machine learning models for search in 3 lines of code.
+A tensor-based search and analytics engine that seamlessly integrates with your applications and websites. Marqo allows developers to integrate and deploy the latest machine learning models for search in 3 lines of code.
 </p>
     
 <p align="center">
