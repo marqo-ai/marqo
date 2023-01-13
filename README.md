@@ -34,7 +34,7 @@ A tensor-based search and analytics engine that seamlessly integrates with your 
 
 
 ## ✨ Core Features
-**⚡ Performant**
+**⚡ Performance**
 - Scale to million document indexes with horizontal index sharding.
 - Async and non-blocking data upload and search.
 - Supports lexical and tensor search in one place.
