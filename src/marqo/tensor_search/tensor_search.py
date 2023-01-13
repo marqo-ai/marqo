@@ -348,7 +348,6 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
         non_tensor_fields = []
 
     t0 = timer()
-    bulk_parent_dicts = []
 
     try:
         index_info = backend.get_index_info(config=config, index_name=index_name)
@@ -369,25 +368,31 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
     selected_device = config.indexing_device if device is None else device
 
-    unsuccessful_docs = []
+
     total_vectorise_time = 0
     batch_size = len(docs)
 
+    unsuccessful_docs = []
+    # Will be turned into bulk parent dict:
+    to_be_indexed = [None, ] * len(docs)
+    vectorise_times = [0, ] * len(docs)
     for i, doc in enumerate(docs):
         indexing_instructions = doc_to_indexing_instructions(
             doc_pos=i, doc=doc, update_mode=update_mode, index_name=index_name, existing_fields=existing_fields,
             non_tensor_fields=non_tensor_fields, index_info=index_info, selected_device=selected_device
         )
-        total_vectorise_time += indexing_instructions.vectorise_time
+        vectorise_times[i] = indexing_instructions.vectorise_time
+        # TODO: add locking around new_fields
         new_fields = new_fields.union(indexing_instructions.new_fields)
         if indexing_instructions.failure_details is not None:
             unsuccessful_docs.append(
                 (indexing_instructions.doc_pos, indexing_instructions.failure_details.error_details))
         else:
             # no failures encountered
-            bulk_parent_dicts.extend(
-                indexing_instructions.tensorised_for_indexing.to_os_instructions()
-            )
+            to_be_indexed[i] = indexing_instructions.tensorised_for_indexing.to_os_instructions()
+
+    total_vectorise_time += sum(vectorise_times)
+    bulk_parent_dicts = functools.reduce(lambda x, y: x + y, to_be_indexed, [])
     end_time_3 = timer()
     total_preproc_time = end_time_3 - start_time_3
     logger.info(f"      add_documents pre-processing: took {(total_preproc_time):.3f}s total for {batch_size} docs, "
