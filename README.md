@@ -36,7 +36,7 @@ A tensor-based search and analytics engine that seamlessly integrates with your 
 ## ✨ Core Features
 **⚡ Performance**
 - Embeddings stored in in-memory HNSW indexes, achieving cutting edge search speeds.
-- Scale to million document indexes with horizontal index sharding.
+- Scale to hundred-million document indexes with horizontal index sharding.
 - Async and non-blocking data upload and search.
 
 **🤖 Machine Learning**
@@ -47,7 +47,7 @@ A tensor-based search and analytics engine that seamlessly integrates with your 
 
 **☁️ Cloud-native**
 - Fast deployment using Docker.
-- Run multi-az and high availability.
+- Run Marqo multi-az and high availability.
 
 **🌌 End-to-end**
 - Build search and analytics on multiple unstructured data types such as text, image, code, video.
