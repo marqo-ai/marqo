@@ -60,7 +60,7 @@ A tensor-based search and analytics engine that seamlessly integrates with your 
 - Marqo cloud ☁️ is in beta. If you’re interested, [apply here](https://q78175g1wwa.typeform.com/to/d0PEuRPC).
 
 <p align="center">
-    <a href="https://q78175g1wwa.typeform.com/to/d0PEuRPC"><img src="assets/join-the-cloud-beta.png" width="80%" height="20%"/></a>
+    <a href="https://q78175g1wwa.typeform.com/to/d0PEuRPC"><img src="assets/join-the-cloud-beta.png" width="90%" height="20%"/></a>
 </p>
 
 ## Learn more about Marqo
