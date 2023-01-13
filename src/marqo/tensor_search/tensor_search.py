@@ -389,7 +389,8 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                 (indexing_instructions.doc_pos, indexing_instructions.failure_details.error_details))
         else:
             # no failures encountered
-            to_be_indexed[i] = indexing_instructions.tensorised_for_indexing.to_os_instructions()
+            if indexing_instructions.tensorised_for_indexing is not None:
+                to_be_indexed[i] = indexing_instructions.tensorised_for_indexing.to_os_instructions()
 
     total_vectorise_time += sum(vectorise_times)
     bulk_parent_dicts = functools.reduce(lambda x, y: x + y, to_be_indexed, [])
