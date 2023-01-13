@@ -374,7 +374,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
     unsuccessful_docs = []
     # Will be turned into bulk parent dict:
-    to_be_indexed = [None, ] * len(docs)
+    to_be_indexed = [[], ] * len(docs)
     vectorise_times = [0, ] * len(docs)
     for i, doc in enumerate(docs):
         indexing_instructions = doc_to_indexing_instructions(
