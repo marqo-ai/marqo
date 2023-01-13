@@ -393,6 +393,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                 to_be_indexed[i] = indexing_instructions.tensorised_for_indexing.to_os_instructions()
 
     total_vectorise_time += sum(vectorise_times)
+    print("to_be_indexed",to_be_indexed)
     bulk_parent_dicts = functools.reduce(lambda x, y: x + y, to_be_indexed, [])
     end_time_3 = timer()
     total_preproc_time = end_time_3 - start_time_3
