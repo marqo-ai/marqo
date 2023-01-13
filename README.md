@@ -26,10 +26,7 @@ A tensor-based search and analytics engine that seamlessly integrates with your 
     <a href="https://demo.marqo.ai">Try the demo</a> | <a href="https://github.com/marqo-ai/marqo-demo">View the code</a>
     </b>
 </p>
-    
-<p align="center">
-    <a href="https://q78175g1wwa.typeform.com/to/d0PEuRPC"><img src="https://user-images.githubusercontent.com/115690730/212216040-312c2285-2ab0-4700-b0c0-eb9644d0b046.svg" width="50%" height="20%"/></a>
-</p>
+
 
 
 
@@ -54,6 +51,9 @@ A tensor-based search and analytics engine that seamlessly integrates with your 
 - Multi-az, accelerated inference.
 - Marqo cloud ☁️ is in beta. If you’re interested, [apply here](https://q78175g1wwa.typeform.com/to/d0PEuRPC).
 
+<p align="center">
+    <a href="https://q78175g1wwa.typeform.com/to/d0PEuRPC"><img src="https://user-images.githubusercontent.com/115690730/212216040-312c2285-2ab0-4700-b0c0-eb9644d0b046.svg" width="50%" height="20%"/></a>
+</p>
 
 ## Learn more about Marqo
                                                                                                                                                        
