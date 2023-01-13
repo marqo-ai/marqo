@@ -39,6 +39,12 @@ A tensor-based search and analytics engine that seamlessly integrates with your 
 - Async and non-blocking data upload and search.
 - Supports lexical and tensor search in one place.
 
+**🤖 Machine Learning**
+- Use the latest machine learning models from PyTorch, Huggingface, OpenAI and more. 
+- Start with a pre-configured model or bring your own.
+- Built in ONNX support and conversion for faster inference and higher throughput.
+- CPU and GPU support.
+
 **☁️ Cloud-native**
 - Fast deployment using Docker.
 - Run multi-az and high availability.
