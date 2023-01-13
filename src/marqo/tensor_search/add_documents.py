@@ -13,7 +13,6 @@ from marqo.tensor_search import utils, backend, validation, configs, parallel
 from marqo.s2_inference.processing import text as text_processor
 from marqo.s2_inference.processing import image as image_processor
 from marqo.s2_inference.clip_utils import _is_image
-from marqo.s2_inference.reranking import rerank
 from marqo.s2_inference import s2_inference
 from marqo import errors
 from marqo.s2_inference import errors as s2_inference_errors
@@ -76,7 +75,8 @@ def doc_to_indexing_instructions(
     except errors.__InvalidRequestError as err:
         return DocAsIndexingInstruction(
             doc_pos=doc_pos,
-            new_fields=set(),
+            new_fields=new_fields_from_doc,
+            vectorise_time=doc_vectorise_time,
             failure_details=UnsuccessfulTensorise(
                 error_details={'_id': doc_id if doc_id is not None else '',
                              'error': err.message, 'status': int(err.status_code), 'code': err.code}
@@ -151,10 +151,13 @@ def doc_to_indexing_instructions(
                     document_is_valid = False
                     image_err = errors.InvalidArgError(message=f'Could not process given image: {field_content}')
                     return DocAsIndexingInstruction(
+                        vectorise_time=doc_vectorise_time,
                         doc_pos=doc_pos,
-                        UnsuccessfulDoc={
+                        new_fields=new_fields_from_doc,
+                        failure_details=UnsuccessfulTensorise(error_details={
                             '_id': doc_id, 'error': image_err.message, 'status': int(image_err.status_code),
                             'code': image_err.code})
+                    )
 
             normalize_embeddings = index_info.index_settings[NsField.index_defaults][
                 NsField.normalize_embeddings]
@@ -190,10 +193,13 @@ def doc_to_indexing_instructions(
                 document_is_valid = False
                 image_err = errors.InvalidArgError(message=f'Could not process given image: {field_content}')
                 return DocAsIndexingInstruction(
+                    vectorise_time=doc_vectorise_time,
+                    new_fields=new_fields_from_doc,
                     doc_pos=doc_pos,
-                    UnsuccessfulDoc={
+                    failure_details=UnsuccessfulTensorise(error_details={
                         '_id': doc_id, 'error': image_err.message, 'status': int(image_err.status_code),
                          'code': image_err.code})
+                )
 
             if (len(vector_chunks) != len(text_chunks)):
                 raise RuntimeError(
