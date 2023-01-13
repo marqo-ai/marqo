@@ -23,9 +23,7 @@ A tensor-based search and analytics engine that seamlessly integrates with your 
  
 <p align="center">
     <b>    
-    <a href="https://demo.marqo.ai">Try the demo!</a>
-    </b> | <b>
-    <a href="https://github.com/marqo-ai/marqo-demo">Get the code!</a>
+    <a href="https://demo.marqo.ai">Try the demo</a> | <a href="https://github.com/marqo-ai/marqo-demo">See the code</a>
     </b>
 </p>
     
