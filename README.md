@@ -23,9 +23,9 @@ A tensor-based search and analytics engine that seamlessly integrates with your 
  
 <p align="center">
     <b>    
-    <a href="https://demo.marqo.ai">Try the demo</a>
+    <a href="https://demo.marqo.ai">Try the demo!</a>
     </b> | <b>
-    <a href="https://github.com/marqo-ai/marqo-demo">Check the code</a>
+    <a href="https://github.com/marqo-ai/marqo-demo">Get the code!</a>
     </b>
 </p>
     
@@ -44,7 +44,7 @@ A tensor-based search and analytics engine that seamlessly integrates with your 
 
 **☁️ Cloud-native**
 - Fast deployment using Docker.
-- Run multi-az and high availability
+- Run multi-az and high availability.
 
 **🌌 End-to-end**
 - Build search and analytics on multiple unstructured data types such as text, image, code, video.
@@ -52,8 +52,8 @@ A tensor-based search and analytics engine that seamlessly integrates with your 
 - Store unstructred data and semi-structured metadata together in documents, using a range of supported datatypes like bools, ints and keywords.
 
 **🍱 Managed cloud**
-- Scale marqo at the click of a button and Marqo at million document scale with high performace, including performant management of in-memory HNSW indexes
-- Multi-az, accelorated inference
+- Scale marqo at the click of a button and Marqo at million document scale with high performace, including performant management of in-memory HNSW indexes.
+- Multi-az, accelerated inference.
 - Marqo cloud ☁️ is in beta. If you’re interested, [apply here](https://q78175g1wwa.typeform.com/to/d0PEuRPC).
 
 
@@ -61,13 +61,13 @@ A tensor-based search and analytics engine that seamlessly integrates with your 
                                                                                                                                                        
 |                                                                                               |                                                                                                                                                                                                                                                   |
 | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 📗 [Quick start](#Getting-started)                                             | Build your first application with Marqo in under 5 minutes                                                                                                                                                                                                 |
-| 🔍 [ What is tensor search?](https://medium.com/@jesse_894/introducing-marqo-build-cloud-native-tensor-search-applications-in-minutes-9cb9a05a1736) | A beginner's guide to the fundamentals of Marqo and tensor search                                                                                                                                                                                                                          |
-| 🖼 [Marqo for image data](https://medium.com/@wanli19940222/how-to-implement-text-to-image-search-on-marqo-in-5-lines-of-code-448f75bed1da)      | Building text-to-image search in Marqo in 5 lines of code                                                                                                                                                                                              |
-| 📚 [Marqo for text](https://medium.com/@pandu_95301/how-i-used-marqo-to-create-a-multilingual-legal-database-in-5-key-lines-of-code-42ba49fd0caa)           | Building a multilingual database in Marqo                                                                                                                                                                                  |
-| 🔮 [Integrating Marqo with GPT](https://medium.com/creator-fund/building-search-engines-that-think-like-humans-e019e6fb6389)             | Making GPT a subject matter expert by using Marqo as a knowledge base                                                                                                                                                                                                                    |
-| 🎨 [ Marqo for Creative AI](https://medium.com/@jesse_894/combining-stable-diffusion-with-semantic-search-generating-and-categorising-100k-hot-dogs-afeeddea9d81)                             | Combining stable diffusion with semantic search to generate and categorise 100k images of hotdogs                                                                                                                                                                                         |
-| 🦾 [Features](#-Core-Features)                           | Marqo's core features                                                                                                                                                                                                                     |
+| 📗 [Quick start](#Getting-started)                                             | Build your first application with Marqo in under 5 minutes.                                                                                                                                                                                                 |
+| 🔍 [ What is tensor search?](https://medium.com/@jesse_894/introducing-marqo-build-cloud-native-tensor-search-applications-in-minutes-9cb9a05a1736) | A beginner's guide to the fundamentals of Marqo and tensor search.                                                                                                                                                                                                                          |
+| 🖼 [Marqo for image data](https://medium.com/@wanli19940222/how-to-implement-text-to-image-search-on-marqo-in-5-lines-of-code-448f75bed1da)      | Building text-to-image search in Marqo in 5 lines of code.                                                                                                                                                                                              |
+| 📚 [Marqo for text](https://medium.com/@pandu_95301/how-i-used-marqo-to-create-a-multilingual-legal-database-in-5-key-lines-of-code-42ba49fd0caa)           | Building a multilingual database in Marqo.                                                                                                                                                                                  |
+| 🔮 [Integrating Marqo with GPT](https://medium.com/creator-fund/building-search-engines-that-think-like-humans-e019e6fb6389)             | Making GPT a subject matter expert by using Marqo as a knowledge base.                                                                                                                                                                                                                    |
+| 🎨 [ Marqo for Creative AI](https://medium.com/@jesse_894/combining-stable-diffusion-with-semantic-search-generating-and-categorising-100k-hot-dogs-afeeddea9d81)                             | Combining stable diffusion with semantic search to generate and categorise 100k images of hotdogs.                                                                                                                                                                                         |
+| 🦾 [Features](#-Core-Features)                           | Marqo's core features.                                                                                                                                                                                                                     |
 
 
 
@@ -77,140 +77,94 @@ A tensor-based search and analytics engine that seamlessly integrates with your 
 
 ## Getting started
 
-1. Marqo requires docker. To install Docker go to the [Docker Official website.]([https://docs.docker.com/get-docker/](https://docs.docker.com/get-docker/)). Ensure that docker has at least 8gb memory and 50gb storage.
+1. Marqo requires docker. To install Docker go to the [Docker Official website.]([https://docs.docker.com/get-docker/](https://docs.docker.com/get-docker/)). Ensure that docker has at least 8GB memory and 50GB storage.
 
 2. Use docker to run Marqo (Mac users with M-series chips will need to [go here](#m-series-mac-users)):
 
 ```bash
 
-docker rm -f marqo;
-
-docker pull marqoai/marqo:0.0.6;
-
-docker run --name marqo -it --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:0.0.6
+docker rm -f marqo
+docker pull marqoai/marqo:latest
+docker run --name marqo -it --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:latest
 
 ```
 
 3. Install the Marqo client:
 
 ```bash
-
 pip install marqo
-
 ```
 
 4. Start indexing and searching! Let's look at a simple example below:
 
 ```python
-
 import marqo
 
 mq = marqo.Client(url='http://localhost:8882')
 
 mq.index("my-first-index").add_documents([
-
-{
-
-"Title": "The Travels of Marco Polo",
-
-"Description": "A 13th-century travelogue describing Polo's travels"
-
-},
-
-{
-
-"Title": "Extravehicular Mobility Unit (EMU)",
-
-"Description": "The EMU is a spacesuit that provides environmental protection, "
-
-"mobility, life support, and communications for astronauts",
-
-"_id": "article_591"
-
-}]
-
+    {
+        "Title": "The Travels of Marco Polo",
+        "Description": "A 13th-century travelogue describing Polo's travels"
+    }, 
+    {
+        "Title": "Extravehicular Mobility Unit (EMU)",
+        "Description": "The EMU is a spacesuit that provides environmental protection, "
+                       "mobility, life support, and communications for astronauts",
+        "_id": "article_591"
+    }]
 )
 
 results = mq.index("my-first-index").search(
-
-q="What is the best outfit to wear on the moon?"
-
+    q="What is the best outfit to wear on the moon?"
 )
 
 ```
 
 - `mq` is the client that wraps the `marqo` API
-- `add_documents()` takes a list of documents, represented as python dicts, for indexing
-- `add_documents()` creates an index with default settings, if one does not already exist
+- `add_documents()` takes a list of documents, represented as python dicts for indexing.
+- `add_documents()` creates an index with default settings, if one does not already exist.
 - You can optionally set a document's ID with the special `_id` field. Otherwise, Marqo will generate one.
 - If the index doesn't exist, Marqo will create it. If it exists then Marqo will add the documents to the index.
 
 Let's have a look at the results:
 
 ```python
-
 # let's print out the results:
-
 import pprint
-
 pprint.pprint(results)
 
 {
-
-'hits': [
-
-{
-
-'Title': 'Extravehicular Mobility Unit (EMU)',
-
-'Description': 'The EMU is a spacesuit that provides environmental protection, mobility, life support, and'
-
-'communications for astronauts',
-
-'_highlights': {
-
-'Description': 'The EMU is a spacesuit that provides environmental protection, '
-
-'mobility, life support, and communications for astronauts'
-
-},
-
-'_id': 'article_591',
-
-'_score': 0.61938936
-
-},
-
-{
-
-'Title': 'The Travels of Marco Polo',
-
-'Description': "A 13th-century travelogue describing Polo's travels",
-
-'_highlights': {'Title': 'The Travels of Marco Polo'},
-
-'_id': 'e00d1a8d-894c-41a1-8e3b-d8b2a8fce12a',
-
-'_score': 0.60237324
-
+    'hits': [
+        {   
+            'Title': 'Extravehicular Mobility Unit (EMU)',
+            'Description': 'The EMU is a spacesuit that provides environmental protection, mobility, life support, and' 
+                           'communications for astronauts',
+            '_highlights': {
+                'Description': 'The EMU is a spacesuit that provides environmental protection, '
+                               'mobility, life support, and communications for astronauts'
+            },
+            '_id': 'article_591',
+            '_score': 0.61938936
+        }, 
+        {   
+            'Title': 'The Travels of Marco Polo',
+            'Description': "A 13th-century travelogue describing Polo's travels",
+            '_highlights': {'Title': 'The Travels of Marco Polo'},
+            '_id': 'e00d1a8d-894c-41a1-8e3b-d8b2a8fce12a',
+            '_score': 0.60237324
+        }
+    ],
+    'limit': 10,
+    'processingTimeMs': 49,
+    'query': 'What is the best outfit to wear on the moon?'
 }
-
-],
-
-'limit': 10,
-
-'processingTimeMs': 49,
-
-'query': 'What is the best outfit to wear on the moon?'
-
-}
-
 ```
 
-- Each hit corresponds to a document that matched the search query
-- They are ordered from most to least matching
-- `limit` is the maximum number of hits to be returned. This can be set as a parameter during search
-- Each hit has a `_highlights` field. This was the part of the document that matched the query the best
+- Each hit corresponds to a document that matched the search query.
+- They are ordered from most to least matching.
+- `limit` is the maximum number of hits to be returned. This can be set as a parameter during search.
+- Each hit has a `_highlights` field. This was the part of the document that matched the query the best.
 
 ## Other basic operations
 
@@ -248,7 +202,7 @@ result = mq.index("my-first-index").search('marco polo', search_method=marqo.Sea
 
 ### Search specific fields
 
-Using the default tensor search method
+Using the default tensor search method.
 
 ```python
 
@@ -283,13 +237,9 @@ To power image and text search, Marqo allows users to plug and play with CLIP mo
 ```python
 
 settings = {
-
-"treat_urls_and_pointers_as_images":True, # allows us to find an image file and index it
-
-"model":"ViT-L/14"
-
+  "treat_urls_and_pointers_as_images":True,   # allows us to find an image file and index it 
+  "model":"ViT-L/14"
 }
-
 response = mq.create_index("my-multimodal-index", **settings)
 
 ```
@@ -299,16 +249,21 @@ Images can then be added within documents as follows. You can use urls from the 
 ```python
 
 response = mq.index("my-multimodal-index").add_documents([{
-
-"My Image": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f2/Portrait_Hippopotamus_in_the_water.jpg/440px-Portrait_Hippopotamus_in_the_water.jpg",
-
-"Description": "The hippopotamus, also called the common hippopotamus or river hippopotamus, is a large semiaquatic mammal native to sub-Saharan Africa",
-
-"_id": "hippo-facts"
-
+    "My Image": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f2/Portrait_Hippopotamus_in_the_water.jpg/440px-Portrait_Hippopotamus_in_the_water.jpg",
+    "Description": "The hippopotamus, also called the common hippopotamus or river hippopotamus, is a large semiaquatic mammal native to sub-Saharan Africa",
+    "_id": "hippo-facts"
 }])
 
 ```
+
+ Setting `searchable_attributes` to the image field `['My Image'] ` ensures only images are searched in this index:
+
+```python
+
+results = mq.index("my-multimodal-index").search('animal',  searchable_attributes=['My Image'])
+
+```
+
 
 You can then search using text as usual. Both text and image fields will be searched:
 
@@ -353,39 +308,34 @@ To run Marqo on an M series Mac, follow the next steps.
 1. In one terminal run the following command to start opensearch:
 
 ```shell
-
-docker rm -f marqo-os; docker run -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" marqoai/marqo-os:0.0.2-arm
-
+docker rm -f marqo-os; docker run -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" marqoai/marqo-os:0.0.3-arm
 ```
 
 2. In another terminal run the following command to launch Marqo:
 
 ```shell
-
 docker rm -f marqo; docker run --name marqo --privileged \
-
-- p 8882:8882 --add-host host.docker.internal:host-gateway \
-- e "OPENSEARCH_URL=https://localhost:9200" \
-
-marqoai/marqo:0.0.6
-
+    -p 8882:8882 --add-host host.docker.internal:host-gateway \
+    -e "OPENSEARCH_URL=https://localhost:9200" \
+    marqoai/marqo:latest
 ```
+
 
 ## Contributors
 
-Marqo is a community project with the goal of making tensor search accessible to the wider developer community. We are glad that you are interested in helping out! Please read [this](./CONTRIBUTING.md) to get started
+Marqo is a community project with the goal of making tensor search accessible to the wider developer community. We are glad that you are interested in helping out! Please read [this](./CONTRIBUTING.md) to get started.
 
 ## Dev set up
 
-1. Create a virtual env ```python -m venv ./venv```
+1. Create a virtual env ```python -m venv ./venv```.
 
-2. Activate the virtual environment ```source ./venv/bin/activate```
+2. Activate the virtual environment ```source ./venv/bin/activate```.
 
-3. Install requirements from the requirements file: ```pip install -r requirements.txt```
+3. Install requirements from the requirements file: ```pip install -r requirements.txt```.
 
-4. Run tests by running the tox file. CD into this dir and then run "tox"
+4. Run tests by running the tox file. CD into this dir and then run "tox".
 
-5. If you update dependencies, make sure to delete the .tox dir and rerun
+5. If you update dependencies, make sure to delete the .tox dir and rerun.
 
 ## Merge instructions:
 
@@ -396,15 +346,15 @@ Marqo is a community project with the goal of making tensor search accessible to
 ## Support
 
 - Join our [Slack community](https://join.slack.com/t/marqo-community/shared_invite/zt-1d737l76e-u~b3Rvey2IN2nGM4wyr44w) and chat with other community members about ideas.
-- Marqo community meetings (coming soon!)
+- Marqo community meetings (coming soon!).
 
 ### Stargazers
 
-[![Stargazers repo roster for @marqo-ai/marqo](https://reporoster.com/stars/marqo-ai/marqo)](https://github.com/marqo-ai/marqo/stargazers)
+[![Stargazers repo roster for @marqo-ai/marqo](https://reporoster.com/stars/marqo-ai/marqo)](https://github.com/marqo-ai/marqo/stargazers).
 
 ### Forkers
 
-[![Forkers repo roster for @marqo-ai/marqo](https://reporoster.com/forks/marqo-ai/marqo)](https://github.com/marqo-ai/marqo/network/members)
+[![Forkers repo roster for @marqo-ai/marqo](https://reporoster.com/forks/marqo-ai/marqo)](https://github.com/marqo-ai/marqo/network/members).
 
 ## Translations
 
@@ -416,4 +366,3 @@ This readme is available in the following translations:
 - [Polski](README-translated/README-Polish.md)🇵🇱
 - [Українська](README-translated/README-Ukrainian.md)🇺🇦
 
-text filtering
