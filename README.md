@@ -15,8 +15,10 @@
 <a align="center" href="https://join.slack.com/t/marqo-community/shared_invite/zt-1d737l76e-u~b3Rvey2IN2nGM4wyr44w"><img src="https://img.shields.io/badge/Slack-blueviolet?logo=slack&amp;logoColor=white"></a>
 </p>
 
-A tensor-based search and analytics engine that seamlessly integrates with your applications, websites, and workflow in 3 lines of code.
-
+<p align="center">
+A tensor-based search and analytics engine that seamlessly integrates with your applications and website. Marqo allows developers to integrate and deploy the latest machine learning models for search in 3 lines of code.
+</p>
+    
 <p align="center">
     <a href="https://demo.marqo.ai/?q=smiling+with+glasses&index=boredapes"><img src="assets/demo-short.gif"></a>
 </p>
