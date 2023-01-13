@@ -394,7 +394,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
             "new_fields_lock": new_fields_lock, "new_fields": new_fields,
             "unsuccessful_docs": unsuccessful_docs, "to_be_indexed": to_be_indexed
         }
-    ) for i in range(max(THREAD_COUNT, len(docs)))]
+    ) for i in range(min(THREAD_COUNT, len(docs)))]
 
     for th in threads:
         th.start()
