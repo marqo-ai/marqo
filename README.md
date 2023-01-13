@@ -71,13 +71,8 @@ A tensor-based search and analytics engine that seamlessly integrates with your 
 
 
 
-
-
 ## Getting started
 
-<p align="center">
-    <img src="assets/tutorial-full.gif">
-</p>
 
 1. Marqo requires docker. To install Docker go to the [Docker Official website.]([https://docs.docker.com/get-docker/](https://docs.docker.com/get-docker/)). Ensure that docker has at least 8GB memory and 50GB storage.
 
