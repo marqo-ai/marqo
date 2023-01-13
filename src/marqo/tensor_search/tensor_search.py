@@ -32,6 +32,7 @@ Notes on search behaviour with caching and searchable attributes:
 """
 import copy
 import datetime
+import math
 from timeit import default_timer as timer
 import functools
 import pprint
@@ -45,7 +46,7 @@ from marqo.tensor_search.enums import (
 from marqo.tensor_search.enums import IndexSettingsField as NsField
 from marqo.tensor_search import utils, backend, validation, configs, parallel
 from marqo.tensor_search.add_documents import (
-    doc_to_indexing_instructions,
+    doc_to_indexing_instructions, threaded_docs_to_instructions,
     UnsuccessfulTensorise, SuccessfulTensoriseOutput, DocAsIndexingInstruction
 )
 from marqo.tensor_search.formatting import _clean_doc
@@ -340,7 +341,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
     Returns:
 
     """
-    THREADS = 20
+    THREAD_COUNT = 20
     # ADD DOCS TIMER-LOGGER (3)
     start_time_3 = timer()
 
@@ -376,21 +377,29 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
     # Will be turned into bulk parent dict:
     to_be_indexed = [[], ] * len(docs)
     vectorise_times = [0, ] * len(docs)
-    for i, doc in enumerate(docs):
-        indexing_instructions = doc_to_indexing_instructions(
-            doc_pos=i, doc=doc, update_mode=update_mode, index_name=index_name, existing_fields=existing_fields,
-            non_tensor_fields=non_tensor_fields, index_info=index_info, selected_device=selected_device
-        )
-        vectorise_times[i] = indexing_instructions.vectorise_time
-        # TODO: add locking around new_fields
-        new_fields = new_fields.union(indexing_instructions.new_fields)
-        if indexing_instructions.failure_details is not None:
-            unsuccessful_docs.append(
-                (indexing_instructions.doc_pos, indexing_instructions.failure_details.error_details))
-        else:
-            # no failures encountered
-            if indexing_instructions.tensorised_for_indexing is not None:
-                to_be_indexed[i] = indexing_instructions.tensorised_for_indexing.to_os_instructions()
+
+    indexed_docs = list(enumerate(docs))
+
+    new_fields_lock = threading.Lock()
+    step = math.ceil(len(indexed_docs)/THREAD_COUNT)
+    docs_by_threads = [indexed_docs[i + 1: step] for i in range(len(indexed_docs))[::step]]
+
+    threads = [threading.Thread(
+        target=threaded_docs_to_instructions,
+        kwargs={
+            "enumerated_docs": docs_by_threads[i], "update_mode": update_mode,
+            "index_name": index_name, "existing_fields": existing_fields,
+            "non_tensor_fields": non_tensor_fields, "index_info": index_info,
+            "selected_device": selected_device, "vectorise_times": vectorise_times,
+            "new_fields_lock": new_fields_lock, "new_fields": new_fields,
+            "unsuccessful_docs": unsuccessful_docs, "to_be_indexed": to_be_indexed
+        }
+    ) for i in range(THREAD_COUNT)]
+
+    for th in threads:
+        th.start()
+    for th in threads:
+        th.join()
 
     total_vectorise_time += sum(vectorise_times)
     print("to_be_indexed",to_be_indexed)

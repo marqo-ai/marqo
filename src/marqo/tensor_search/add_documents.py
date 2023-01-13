@@ -17,7 +17,7 @@ from marqo.s2_inference import s2_inference
 from marqo import errors
 from marqo.s2_inference import errors as s2_inference_errors
 import threading
-from typing import NamedTuple
+from typing import NamedTuple, Tuple
 from marqo.tensor_search.tensor_search_logging import get_logger
 
 logger = get_logger(__name__)
@@ -43,6 +43,48 @@ class DocAsIndexingInstruction(NamedTuple):
     doc_pos: int
     tensorised_for_indexing: SuccessfulTensoriseOutput = None
     failure_details: Optional[UnsuccessfulTensorise] = None
+
+
+def threaded_docs_to_instructions(
+        enumerated_docs: List[Tuple[int, dict]], update_mode: str, index_name: str, existing_fields,
+        non_tensor_fields: dict, index_info, selected_device,
+
+        vectorise_times: list, new_fields_lock: threading.Lock, new_fields: set,
+        unsuccessful_docs: list, to_be_indexed: list
+    ) -> None:
+    """"""
+    for doc_pos, doc in enumerated_docs:
+        threaded_doc_to_instructions(
+            doc_pos=doc_pos, doc=doc, update_mode=update_mode, index_name=index_name,
+            existing_fields=existing_fields, non_tensor_fields=non_tensor_fields, index_info=index_info,
+            selected_device=selected_device, vectorise_times=vectorise_times, new_fields_lock=new_fields_lock,
+            new_fields=new_fields, unsuccessful_docs=unsuccessful_docs, to_be_indexed=to_be_indexed
+        )
+
+
+def threaded_doc_to_instructions(
+        doc: dict, update_mode: str, index_name: str, doc_pos: int, existing_fields,
+        non_tensor_fields: dict, index_info, selected_device,
+
+        vectorise_times: list, new_fields_lock: threading.Lock, new_fields: set,
+        unsuccessful_docs: list, to_be_indexed: list
+    ) -> None:
+    indexing_instructions = doc_to_indexing_instructions(
+        doc_pos=doc_pos, doc=doc, update_mode=update_mode, index_name=index_name,
+        existing_fields=existing_fields,
+        non_tensor_fields=non_tensor_fields, index_info=index_info, selected_device=selected_device
+    )
+    vectorise_times[doc_pos] = indexing_instructions.vectorise_time
+    # TODO: add locking around new_fields
+    with new_fields_lock:
+        new_fields = new_fields.union(indexing_instructions.new_fields)
+    if indexing_instructions.failure_details is not None:
+        unsuccessful_docs.append(
+            (indexing_instructions.doc_pos, indexing_instructions.failure_details.error_details))
+    else:
+        # no failures encountered
+        if indexing_instructions.tensorised_for_indexing is not None:
+            to_be_indexed[doc_pos] = indexing_instructions.tensorised_for_indexing.to_os_instructions()
 
 
 def doc_to_indexing_instructions(
