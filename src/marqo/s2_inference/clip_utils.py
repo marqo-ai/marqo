@@ -8,13 +8,9 @@ import clip
 import torch
 from PIL import Image, UnidentifiedImageError
 import open_clip
-from multilingual_clip import pt_multilingual_clip
-import transformers
 
 from marqo.s2_inference.types import *
 from marqo.s2_inference.logger import get_logger
-import marqo.s2_inference.model_registry as model_registry
-
 logger = get_logger(__name__)
 
 
@@ -43,6 +39,7 @@ def format_and_load_CLIP_images(images: List[Union[str, ndarray, ImageType]]) ->
         results.append(format_and_load_CLIP_image(image))
     
     return results
+
 
 def load_image_from_path(image_path: str) -> ImageType:
     """Loads an image into PIL from a string path that is either local or a url
@@ -271,80 +268,4 @@ class OPEN_CLIP(CLIP):
         return self._convert_output(outputs)
 
 
-class MULTILINGUAL_CLIP(CLIP):
-    def __init__(self, model_type: str = "multilingual-clip/ViT-L/14", device: str = 'cpu',  embedding_dim: int = None,
-                            truncate: bool = True, **kwargs) -> None:
-
-        self.model_name = model_type
-        self.model_info = model_registry._get_multilingual_clip_properties()[self.model_name]
-        self.visual_name = self.model_info["visual_model"]
-        self.textual_name = self.model_info["textual_model"]
-        self.device = device
-        self.tokenizer = None
-        self.preprocess = None
-
-
-    def load(self) -> None:
-        if self.visual_name.startswith("openai/"):
-            clip_name = self.visual_name.replace("openai/", "")
-            self.visual_model, self.preprocess = clip.load(name = clip_name, device = "cpu", jit = False)
-            self.visual_model = self.visual_model.to(self.device)
-            self.visual_model = self.visual_model.visual
-
-        elif self.visual_name.startswith("open_clip/"):
-            clip_name = self.visual_name.replace("open_clip/", "")
-            self.visual_model, _, self.preprocess = open_clip.create_model_and_transforms(model_name=clip_name.split("/")[0], pretrained= clip_name.split("/")[1], device = self.device)
-            self.visual_model = self.visual_model.visual
-
-        self.textual_model = pt_multilingual_clip.MultilingualCLIP.from_pretrained(self.textual_name, self.device)
-        self.tokenizer = transformers.AutoTokenizer.from_pretrained(self.textual_name)
-
-        self.textual_model.eval()
-        self.visual_model.eval()
-
-    def encode_text(self, sentence: Union[str, List[str]], normalize=True) -> FloatTensor:
-
-        if self.textual_model is None:
-            self.load()
-
-        with torch.no_grad():
-            outputs = self.textual_model.forward(sentence, self.tokenizer)
-
-        if normalize:
-            _shape_before = outputs.shape
-            outputs /= self.normalize(outputs)
-            assert outputs.shape == _shape_before
-
-        return self._convert_output(outputs)
-
-    def encode_image(self, images: Union[str, ImageType, List[Union[str, ImageType]]],
-                     normalize=True) -> FloatTensor:
-
-        if self.visual_model is None:
-            self.load()
-
-        # default to batch encoding
-        if isinstance(images, list):
-            image_input = format_and_load_CLIP_images(images)
-        else:
-            image_input = [format_and_load_CLIP_image(images)]
-
-        self.image_input_processed = torch.stack([self.preprocess(_img).to(self.device) for _img in image_input])
-
-        with torch.no_grad():
-            outputs = self.visual_model.forward(self.image_input_processed)
-
-        if normalize:
-            _shape_before = outputs.shape
-            outputs /= self.normalize(outputs)
-            assert outputs.shape == _shape_before
-        return self._convert_output(outputs)
-
-
-
-
-
-
-
-
-
+        

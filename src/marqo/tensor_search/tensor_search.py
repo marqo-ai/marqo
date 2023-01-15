@@ -44,7 +44,7 @@ from marqo.tensor_search.enums import (
     EnvVars
 )
 from marqo.tensor_search.enums import IndexSettingsField as NsField
-from marqo.tensor_search import utils, backend, validation, configs, parallel
+from marqo.tensor_search import utils, backend, validation, configs, parallel, add_docs
 from marqo.tensor_search.formatting import _clean_doc
 from marqo.tensor_search.index_meta_cache import get_cache, get_index_info
 from marqo.tensor_search import index_meta_cache
@@ -384,6 +384,9 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
     unsuccessful_docs = []
     total_vectorise_time = 0
     batch_size = len(docs)
+
+    if index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]:
+        add_docs.download_images(docs=docs, thread_count=20)
 
     for i, doc in enumerate(docs):
 

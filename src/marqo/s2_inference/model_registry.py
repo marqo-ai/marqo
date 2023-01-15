@@ -2,7 +2,7 @@ from marqo.s2_inference.hf_utils import HF_MODEL
 from marqo.s2_inference.sbert_onnx_utils import SBERT_ONNX
 from marqo.s2_inference.sbert_utils import SBERT, TEST
 from marqo.s2_inference.random_utils import Random
-from marqo.s2_inference.clip_utils import CLIP, OPEN_CLIP, MULTILINGUAL_CLIP
+from marqo.s2_inference.clip_utils import CLIP, OPEN_CLIP
 from marqo.s2_inference.types import Any, Dict, List, Optional, Union, FloatTensor
 from marqo.s2_inference.onnx_clip_utils import CLIP_ONNX
 
@@ -494,50 +494,6 @@ def _get_sbert_onnx_properties() -> Dict:
                 "notes": ""},
     }
     return SBERT_ONNX_MODEL_PROPERTIES
-
-
-def _get_multilingual_clip_properties() -> Dict:
-    # Models are from github repo
-    # https://github.com/FreddeFrallan/Multilingual-CLIP
-    MULTILINGUAL_CLIP_PROPERTIES = {
-        "multilingual-clip/XLM-Roberta-Large-Vit-L-14":
-            {
-                "name": "multilingual-clip/XLM-Roberta-Large-Vit-L-14",
-                "visual_model": "openai/ViT-L/14",
-                "textual_model": 'M-CLIP/XLM-Roberta-Large-Vit-L-14',
-                "dimensions": 768,
-                "type": "multilingual_clip",
-            },
-
-        "multilingual-clip/XLM-R Large Vit-B/16+":
-            {
-                "name": "multilingual-clip/XLM-R Large Vit-B/16+",
-                "visual_model": "open_clip/ViT-B-16-plus-240/laion400m_e32",
-                "textual_model": 'M-CLIP/XLM-Roberta-Large-Vit-B-16Plus',
-                "dimensions": 640,
-                "type": "multilingual_clip",
-            },
-
-        "multilingual-clip/XLM-Roberta-Large-Vit-B-32":
-            {
-                "name": "multilingual-clip/XLM-Roberta-Large-Vit-B-32",
-                "visual_model": "openai/ViT-B/32",
-                "textual_model": 'M-CLIP/XLM-Roberta-Large-Vit-B-32',
-                "dimensions": 512,
-                "type": "multilingual_clip",
-            },
-
-        "multilingual-clip/LABSE-Vit-L-14":
-            {
-                "name": "multilingual-clip/LABSE-Vit-L-14",
-                "visual_model": "openai/ViT-L/14",
-                "textual_model": 'M-CLIP/LABSE-Vit-L-14',
-                "dimensions": 768,
-                "type": "multilingual_clip",
-            }
-    }
-
-    return MULTILINGUAL_CLIP_PROPERTIES
 
 def _get_sbert_test_properties() -> Dict:
     TEST_MODEL_PROPERTIES = {
@@ -1050,6 +1006,10 @@ def _get_onnx_clip_properties() -> Dict:
                 'image_mean': None,
                 'image_std': None
             },
+
+
+
+
 
         'onnx16/open_clip/ViT-H-14/laion2b_s32b_b79k':
             {
@@ -1569,7 +1529,6 @@ def _get_model_load_mappings() -> Dict:
             'test':TEST,
             'sbert_onnx':SBERT_ONNX,
             'clip_onnx': CLIP_ONNX,
-            "multilingual_clip" : MULTILINGUAL_CLIP,
             'random':Random,
             'hf':HF_MODEL}
 
@@ -1586,7 +1545,6 @@ def load_model_properties() -> Dict:
     hf_model_properties = _get_hf_properties()
     open_clip_model_properties = _get_open_clip_properties()
     onnx_clip_model_properties = _get_onnx_clip_properties()
-    multilingual_clip_model_properties = _get_multilingual_clip_properties()
 
     # combine the above dicts
     model_properties = dict(clip_model_properties.items())
@@ -1597,7 +1555,6 @@ def load_model_properties() -> Dict:
     model_properties.update(hf_model_properties)
     model_properties.update(open_clip_model_properties)
     model_properties.update(onnx_clip_model_properties)
-    model_properties.update(multilingual_clip_model_properties)
 
     all_properties = dict()
     all_properties['models'] = model_properties
