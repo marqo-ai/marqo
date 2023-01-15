@@ -29,7 +29,7 @@ def download_images(docs: List[dict], thread_count: int) -> List[dict]:
     copied = copy.deepcopy(docs)
     thread_allocated_docs = [copied[i: i + docs_per_thread] for i in range(docs_per_thread)[::docs_per_thread]]
     warnings.warn("thread_allocated_docs"+ str (thread_allocated_docs))
-    threads = [threading.Thread(target=thread_allocated_docs, args=(thread_allocated_docs[i], ))
+    threads = [threading.Thread(target=threaded_download_images, args=(thread_allocated_docs[i], ))
                for i in range(docs_per_thread)]
     for th in threads:
         th.start()
