@@ -5,6 +5,9 @@ import math
 import threading
 import warnings
 from typing import List
+
+import PIL
+
 from marqo.s2_inference.clip_utils import _is_image, load_image_from_path
 
 
@@ -16,11 +19,14 @@ def threaded_download_images(allocated_docs: List[dict]) -> None:
     for doc in allocated_docs:
         for field in list(doc):
             if isinstance(doc[field], str) and _is_image(doc[field]):
-                doc[field] = load_image_from_path(doc[field])
+                try:
+                    doc[field] = load_image_from_path(doc[field])
+                except PIL.UnidentifiedImageError:
+                    continue
 
 
 def download_images(docs: List[dict], thread_count: int) -> List[dict]:
-    """Concurrently downloads images from each doc
+    """Concurrently downloads images from each doc.
 
     This should be called only if treat URLs as images is True
     """
