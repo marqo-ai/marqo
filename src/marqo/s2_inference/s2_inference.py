@@ -17,7 +17,7 @@ MODEL_PROPERTIES = load_model_properties()
 
 
 def vectorise(model_name: str, content: Union[str, List[str]], model_properties: dict = None,
-              device: str = get_default_device(), normalize_embeddings: bool = get_default_normalization(),
+              device: str = get_default_device(), normalize_embeddings: bool = get_default_normalization(),use_server: bool = True,
               **kwargs) -> List[List[float]]:
     """vectorizes the content by model name
 
@@ -43,7 +43,7 @@ def vectorise(model_name: str, content: Union[str, List[str]], model_properties:
     _update_available_models(model_cache_key, model_name, validated_model_properties, device, normalize_embeddings)
 
     try:
-        vectorised = available_models[model_cache_key].encode(content, normalize=normalize_embeddings, **kwargs)
+        vectorised = available_models[model_cache_key].encode(content, use_server, normalize=normalize_embeddings, **kwargs)
     except UnidentifiedImageError as e:
         raise VectoriseError from e
 

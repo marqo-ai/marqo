@@ -58,7 +58,7 @@ class CLIP_ONNX(object):
     """
 
     def __init__(self, model_name="onnx32/openai/ViT-L/14", device="cpu", embedding_dim: int = None,
-                 truncate: bool = True,
+                 truncate: bool = True, use_server: bool = True,
                  load=True, **kwargs):
         self.model_name = model_name
         self.onnx_type, self.source, self.clip_model = self.model_name.split("/", 2)
@@ -72,6 +72,8 @@ class CLIP_ONNX(object):
 
         self.IMAGE_SERVICE_URL = "http://localhost:3000/encode_image"
         self.TEXT_SERVICE_URL = "http://localhost:3000/encode_text"
+
+        self.use_server = use_server
 
         self.visual_type = np.float16 if self.onnx_type == "onnx16" else np.float32
         self.textual_type = np.int64 if self.source == "open_clip" else np.int32
@@ -136,20 +138,23 @@ class CLIP_ONNX(object):
         image_input_processed = torch.stack([self.clip_preprocess(_img) for _img in image_input])
         images_onnx = image_input_processed.detach().cpu().numpy().astype(self.visual_type)
 
-        # onnx_input_image = {self.visual_session.get_inputs()[0].name: images_onnx}
-        # # The onnx output has the shape [1,1,768], we need to squeeze the dimension
-        # outputs = torch.squeeze(torch.tensor(np.array(self.visual_session.run(None, onnx_input_image)))).to(
-        #     torch.float32)
 
+        if self.use_server is False:
+            logger.info("Inference locally")
+            onnx_input_image = {self.visual_session.get_inputs()[0].name: images_onnx}
+            # The onnx output has the shape [1,1,768], we need to squeeze the dimension
+            outputs = torch.squeeze(torch.tensor(np.array(self.visual_session.run(None, onnx_input_image)))).to(
+                torch.float32)
 
-        logger.info("sending the request to bentoml server")
-        serialized_image = json.dumps(images_onnx.tolist())
-        image_features = np.array(json.loads(requests.post(
-            self.IMAGE_SERVICE_URL,
-            headers={"content-type": "application/json"},
-            data=serialized_image,
-        ).text))
-        outputs = torch.tensor(image_features).to(torch.float32)
+        elif self.use_server is True:
+            logger.info("sending the request to bentoml server")
+            serialized_image = json.dumps(images_onnx.tolist())
+            image_features = np.array(json.loads(requests.post(
+                self.IMAGE_SERVICE_URL,
+                headers={"content-type": "application/json"},
+                data=serialized_image,
+            ).text))
+            outputs = torch.tensor(image_features).to(torch.float32)
 
 
 
