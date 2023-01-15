@@ -141,6 +141,8 @@ class CLIP_ONNX(object):
         # outputs = torch.squeeze(torch.tensor(np.array(self.visual_session.run(None, onnx_input_image)))).to(
         #     torch.float32)
 
+
+        logger.info("sending the request to bentoml server")
         serialized_image = json.dumps(images_onnx.tolist())
         image_features = np.array(json.loads(requests.post(
             self.IMAGE_SERVICE_URL,
