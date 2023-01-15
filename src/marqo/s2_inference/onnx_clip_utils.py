@@ -18,6 +18,7 @@ import marqo.s2_inference.model_registry as model_registry
 from zipfile import ZipFile
 from huggingface_hub.utils import RevisionNotFoundError,RepositoryNotFoundError, EntryNotFoundError, LocalEntryNotFoundError
 from marqo.s2_inference.errors import ModelDownloadError
+import json
 
 # Loading shared functions from clip_utils.py. This part should be decoupled from models in the future
 from marqo.s2_inference.clip_utils import get_allowed_image_types, format_and_load_CLIP_image, \
@@ -69,6 +70,9 @@ class CLIP_ONNX(object):
         self.textual_session = None
         self.model_info = model_registry._get_onnx_clip_properties()[self.model_name]
 
+        self.IMAGE_SERVICE_URL = "http://localhost:3000/encode_image"
+        self.TEXT_SERVICE_URL = "http://localhost:3000/encode_text"
+
         self.visual_type = np.float16 if self.onnx_type == "onnx16" else np.float32
         self.textual_type = np.int64 if self.source == "open_clip" else np.int32
 
@@ -108,10 +112,13 @@ class CLIP_ONNX(object):
         text = clip.tokenize(sentence, truncate=self.truncate).cpu()
         text_onnx = text.detach().cpu().numpy().astype(self.textual_type)
 
-        onnx_input_text = {self.textual_session.get_inputs()[0].name: text_onnx}
-        # The onnx output has the shape [1,1,768], we need to squeeze the dimension
-        outputs = torch.squeeze(torch.tensor(np.array(self.textual_session.run(None, onnx_input_text)))).to(
-            torch.float32)
+        serialized_text = json.dumps(text_onnx.tolist())
+        text_features = np.array(json.loads(requests.post(
+            self.IMAGE_SERVICE_URL,
+            headers={"content-type": "application/json"},
+            data=serialized_text,
+        ).text))
+        outputs = torch.tensor(text_features).to(torch.float32)
 
         if normalize:
             _shape_before = outputs.shape
@@ -129,10 +136,21 @@ class CLIP_ONNX(object):
         image_input_processed = torch.stack([self.clip_preprocess(_img) for _img in image_input])
         images_onnx = image_input_processed.detach().cpu().numpy().astype(self.visual_type)
 
-        onnx_input_image = {self.visual_session.get_inputs()[0].name: images_onnx}
-        # The onnx output has the shape [1,1,768], we need to squeeze the dimension
-        outputs = torch.squeeze(torch.tensor(np.array(self.visual_session.run(None, onnx_input_image)))).to(
-            torch.float32)
+        # onnx_input_image = {self.visual_session.get_inputs()[0].name: images_onnx}
+        # # The onnx output has the shape [1,1,768], we need to squeeze the dimension
+        # outputs = torch.squeeze(torch.tensor(np.array(self.visual_session.run(None, onnx_input_image)))).to(
+        #     torch.float32)
+
+        serialized_image = json.dumps(images_onnx.tolist())
+        image_features = np.array(json.loads(requests.post(
+            self.IMAGE_SERVICE_URL,
+            headers={"content-type": "application/json"},
+            data=serialized_image,
+        ).text))
+        outputs = torch.tensor(image_features).to(torch.float32)
+
+
+
 
         if normalize:
             _shape_before = outputs.shape
