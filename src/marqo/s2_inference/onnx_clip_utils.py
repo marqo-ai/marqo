@@ -138,8 +138,6 @@ class CLIP_ONNX(object):
         image_input_processed = torch.stack([self.clip_preprocess(_img) for _img in image_input])
         images_onnx = image_input_processed.detach().cpu().numpy().astype(self.visual_type)
 
-        print(self.use_server)
-
         if self.use_server is False:
             onnx_input_image = {self.visual_session.get_inputs()[0].name: images_onnx}
             # The onnx output has the shape [1,1,768], we need to squeeze the dimension
