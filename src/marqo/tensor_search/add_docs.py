@@ -51,8 +51,8 @@ def download_images(docs: List[dict], thread_count: int) -> List[dict]:
     copied = copy.deepcopy(docs)
     thread_allocated_docs = [copied[i: i + docs_per_thread] for i in range(len(copied))[::docs_per_thread]]
     warnings.warn("DELETEME thread_allocated_docs" + str(thread_allocated_docs))
-    threads = [threading.Thread(target=threaded_download_images, args=(thread_allocated_docs[i], ))
-               for i in range(thread_count)]
+    threads = [threading.Thread(target=threaded_download_images, args=(allocation, ))
+               for allocation in thread_allocated_docs]
     for th in threads:
         th.start()
 
