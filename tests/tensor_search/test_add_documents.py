@@ -436,6 +436,8 @@ class TestAddDocuments(MarqoTestCase):
                     update_mode=update_mode
                 )
                 assert len(add_res['items']) == len(expected_results)
+                print("DELETEME aDdd res addres add res:")
+                pprint.pprint(add_res)
                 for i, res_dict in enumerate(add_res['items']):
                     # if the expected id is None, then it assumed the id is
                     # generated and can't be asserted against
