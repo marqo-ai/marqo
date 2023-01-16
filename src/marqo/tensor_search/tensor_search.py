@@ -473,8 +473,9 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                         # in the future, if we have different chunking methods, make sure we catch possible
                         # errors of different types generated here, too.
                         if isinstance(field_content, str):
-                            # TODO: perhaps catch image_repo[field_content] = None here - otherwise it might be already caught
                             image_data = image_repo[field_content]
+                            if image_data is None:
+                                raise s2_inference_errors.S2InferenceError(f"Could not find image found at `{field_content}`")
                         else:
                             image_data = field_content
                         content_chunks, text_chunks = image_processor.chunk_image(
