@@ -138,16 +138,15 @@ class CLIP_ONNX(object):
         image_input_processed = torch.stack([self.clip_preprocess(_img) for _img in image_input])
         images_onnx = image_input_processed.detach().cpu().numpy().astype(self.visual_type)
 
+        print(self.use_server)
 
         if self.use_server is False:
-            logger.info("Inference locally")
             onnx_input_image = {self.visual_session.get_inputs()[0].name: images_onnx}
             # The onnx output has the shape [1,1,768], we need to squeeze the dimension
             outputs = torch.squeeze(torch.tensor(np.array(self.visual_session.run(None, onnx_input_image)))).to(
                 torch.float32)
 
         elif self.use_server is True:
-            logger.info("sending the request to bentoml server")
             serialized_image = json.dumps(images_onnx.tolist())
             image_features = np.array(json.loads(requests.post(
                 self.IMAGE_SERVICE_URL,
