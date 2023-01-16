@@ -387,7 +387,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
     if index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]:
         print(f"DELETEME docs before download: {docs}")
-        docs = add_docs.download_images(docs=docs, thread_count=20)
+        image_repo = add_docs.download_images(docs=docs, thread_count=20)
         print(f"DELETEME docs after download: {docs}")
 
     for i, doc in enumerate(docs):
@@ -455,7 +455,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                 # 6. if chunking -> then add the extra chunker
 
                 if isinstance(field_content, str) and not _is_image(field_content):
-
+                    # text processing pipeline:
                     split_by = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][
                         NsField.split_method]
                     split_length = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][
@@ -472,8 +472,13 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                     try:
                         # in the future, if we have different chunking methods, make sure we catch possible
                         # errors of different types generated here, too.
+                        if isinstance(field_content, str):
+                            # TODO: perhaps catch image_repo[field_content] = None here - otherwise it might be already caught
+                            image_data = image_repo[field_content]
+                        else:
+                            image_data = field_content
                         content_chunks, text_chunks = image_processor.chunk_image(
-                            field_content, device=selected_device, method=image_method)
+                            image_data, device=selected_device, method=image_method)
                     except s2_inference_errors.S2InferenceError:
                         document_is_valid = False
                         image_err = errors.InvalidArgError(message=f'Could not process given image: {field_content}')
