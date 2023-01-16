@@ -14,6 +14,7 @@ def threaded_download_images(allocated_docs: List[dict]) -> None:
 
     This should be called only if treat URLs as images is True
     """
+    print(f"a thread is downloading image. Allocated_Docs: {allocated_docs}")
     for doc in allocated_docs:
         for field in list(doc):
             if isinstance(doc[field], str) and _is_image(doc[field]):
