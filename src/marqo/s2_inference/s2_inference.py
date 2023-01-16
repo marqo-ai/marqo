@@ -38,12 +38,12 @@ def vectorise(model_name: str, content: Union[str, List[str]], model_properties:
     """
 
     validated_model_properties = _validate_model_properties(model_name, model_properties)
-    model_cache_key = _create_model_cache_key(model_name, device, validated_model_properties)
+    model_cache_key = _create_model_cache_key(model_name, device, validated_model_properties, use_server)
 
     _update_available_models(model_cache_key, model_name, validated_model_properties, device, normalize_embeddings)
 
     try:
-        vectorised = available_models[model_cache_key].encode(content, use_server, normalize=normalize_embeddings, **kwargs)
+        vectorised = available_models[model_cache_key].encode(content, normalize=normalize_embeddings, **kwargs)
     except UnidentifiedImageError as e:
         raise VectoriseError from e
 
