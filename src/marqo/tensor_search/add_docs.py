@@ -5,9 +5,7 @@ import math
 import threading
 import warnings
 from typing import List
-
 import PIL
-
 from marqo.s2_inference.clip_utils import _is_image, load_image_from_path
 
 
@@ -30,6 +28,9 @@ def download_images(docs: List[dict], thread_count: int) -> List[dict]:
 
     This should be called only if treat URLs as images is True
 
+    Returns a copy of docs, where image pointers have been replaced by the actual
+    image.
+
     Note: double retrieving of ungettable images:
         Images that can't be found are ignored and not recorded. This assumes that
         a later function will process images again, and again attempt to get these
@@ -40,11 +41,12 @@ def download_images(docs: List[dict], thread_count: int) -> List[dict]:
         the image URL with some other content - like None - that the next function
         needs to be aware of. In other words, starting to define an interface,
         coupling the functions together.
+
     """
 
     docs_per_thread = math.ceil(len(docs)/thread_count)
     copied = copy.deepcopy(docs)
-    thread_allocated_docs = [copied[i: i + docs_per_thread] for i in range(docs_per_thread)[::docs_per_thread]]
+    thread_allocated_docs = [copied[i: i + docs_per_thread] for i in range(len(copied))[::docs_per_thread]]
     warnings.warn("thread_allocated_docs" + str(thread_allocated_docs))
     threads = [threading.Thread(target=threaded_download_images, args=(thread_allocated_docs[i], ))
                for i in range(docs_per_thread)]
