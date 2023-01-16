@@ -20,7 +20,9 @@ def threaded_download_images(allocated_docs: List[dict]) -> None:
             if isinstance(doc[field], str) and _is_image(doc[field]):
                 try:
                     doc[field] = load_image_from_path(doc[field])
+                    print(f"a thread loaded an image ")
                 except PIL.UnidentifiedImageError:
+                    print(f"a thread couldn't find image and is skipping it")
                     continue
 
 
