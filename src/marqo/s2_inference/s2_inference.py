@@ -38,9 +38,9 @@ def vectorise(model_name: str, content: Union[str, List[str]], model_properties:
     """
 
     validated_model_properties = _validate_model_properties(model_name, model_properties)
-    model_cache_key = _create_model_cache_key(model_name, device, validated_model_properties, use_server)
+    model_cache_key = _create_model_cache_key(model_name, device, validated_model_properties)
 
-    _update_available_models(model_cache_key, model_name, validated_model_properties, device, normalize_embeddings)
+    _update_available_models(model_cache_key, model_name, validated_model_properties, device, normalize_embeddings, use_server)
 
     try:
         vectorised = available_models[model_cache_key].encode(content, normalize=normalize_embeddings, **kwargs)
@@ -78,13 +78,13 @@ def _create_model_cache_key(model_name: str, device: str, model_properties: dict
 
 def _update_available_models(model_cache_key: str, model_name: str, validated_model_properties: dict,
                              device: str,
-                             normalize_embeddings: bool) -> None:
+                             normalize_embeddings: bool, use_server: bool = False) -> None:
     """loads the model if it is not already loaded
     """
     if model_cache_key not in available_models:
         try:
             available_models[model_cache_key] = _load_model(model_name,
-                                                            validated_model_properties, device=device)
+                                                            validated_model_properties, device=device, use_server=use_server)
             logger.info(f'loaded {model_name} on device {device} with normalization={normalize_embeddings}')
         except:
             raise ModelLoadError(
@@ -271,7 +271,7 @@ def _get_model_loader(model_name: str, model_properties: dict) -> Any:
     return MODEL_PROPERTIES['loaders'][model_type]
 
 
-def _load_model(model_name: str, model_properties: dict, device: str = get_default_device()) -> Any:
+def _load_model(model_name: str, model_properties: dict, device: str = get_default_device(), use_server:bool = False) -> Any:
     """_summary_
 
     Args:
@@ -288,7 +288,7 @@ def _load_model(model_name: str, model_properties: dict, device: str = get_defau
     max_sequence_length = model_properties.get('tokens', get_default_seq_length())
 
     model = loader(model_properties['name'], device=device, embedding_dim=model_properties['dimensions'],
-                   max_seq_length=max_sequence_length)
+                   max_seq_length=max_sequence_length, use_server = use_server)
 
     model.load()
 
