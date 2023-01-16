@@ -383,6 +383,9 @@ class TestAddDocuments(MarqoTestCase):
             ]
             for docs, expected_results in docs_results:
                 add_res = tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs, auto_refresh=True)
+                print('add_resadd_resadd_resadd_res')
+                pprint.pprint(add_res)
+                print ('expected_resultsexpected_results', expected_results)
                 assert len(add_res['items']) == len(expected_results)
                 for i, res_dict in enumerate(add_res['items']):
                     assert res_dict["_id"] == expected_results[i][0]
@@ -436,8 +439,6 @@ class TestAddDocuments(MarqoTestCase):
                     update_mode=update_mode
                 )
                 assert len(add_res['items']) == len(expected_results)
-                print("DELETEME aDdd res addres add res:")
-                pprint.pprint(add_res)
                 for i, res_dict in enumerate(add_res['items']):
                     # if the expected id is None, then it assumed the id is
                     # generated and can't be asserted against
