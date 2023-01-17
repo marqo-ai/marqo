@@ -209,7 +209,9 @@ class CLIP:
     
         with torch.no_grad(), torch.cuda.amp.autocast():
             outputs = self.model.encode_image(self.image_input_processed)
-        logger.info(outputs.dtype)
+
+        if np.random.rand() > 0.95:
+            logger.info(outputs.dtype)
 
         if normalize:
             _shape_before = outputs.shape
