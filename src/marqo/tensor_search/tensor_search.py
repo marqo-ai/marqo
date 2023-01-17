@@ -1243,10 +1243,11 @@ def _vector_text_search(
         ]) for doc in ordered_docs_w_chunks][:result_count]}
 
     # format output:
-    def format_ordered_docs_simple(ordered_docs_w_chunks: List[dict]) -> dict:
-        """Only one highlight is returned
+    def format_ordered_docs_simple(ordered_docs_w_chunks: List[dict], num_highlights: Optional[int]) -> dict:
+        """Formats docs into a simplified form
         Args:
             ordered_docs_w_chunks:
+            num_highlights: number of highlights to return.
         Returns:
         """
         simple_results = []
@@ -1257,16 +1258,25 @@ def _vector_text_search(
             else:
                 cleaned = _clean_doc(dict(), doc_id=d['_id'])
 
-            cleaned["_highlights"] = {
-                d["chunks"][0]["_source"][TensorField.field_name]: d["chunks"][0]["_source"][
-                    TensorField.field_content]
-            }
+            if num_highlights > 1:
+                # cleaned["_highlights"] -> List[dict]
+                cleaned["_highlights"] = [{
+                    the_chunk["_source"][TensorField.field_name]: the_chunk["_source"][
+                        TensorField.field_content]
+                } for the_chunk in d["chunks"]][:num_highlights]
+            else:
+                # cleaned["_highlights"] -> dict
+                cleaned["_highlights"] = {
+                    d["chunks"][0]["_source"][TensorField.field_name]: d["chunks"][0]["_source"][
+                        TensorField.field_content]
+                }
+
             cleaned["_score"] = d["chunks"][0]["_score"]
             simple_results.append(cleaned)
         return {"hits": simple_results[:result_count]}
 
     if simplified_format:
-        res = format_ordered_docs_simple(ordered_docs_w_chunks=completely_sorted)
+        res = format_ordered_docs_simple(ordered_docs_w_chunks=completely_sorted, num_highlights=number_of_highlights)
     else:
         res = format_ordered_docs_preserving(ordered_docs_w_chunks=completely_sorted, num_highlights=number_of_highlights)
 
