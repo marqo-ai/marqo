@@ -207,7 +207,7 @@ class CLIP:
 
         self.image_input_processed = torch.stack([self.preprocess(_img).to(self.device) for _img in image_input])
     
-        with torch.no_grad(), torch.cuda.amp.autocast():
+        with torch.no_grad(), torch.cuda.amp.autocast(enabled=(self.device == "cuda")):
             outputs = self.model.encode_image(self.image_input_processed)
 
         if np.random.rand() > 0.95:
