@@ -209,7 +209,7 @@ class CLIP:
     
         with torch.no_grad(), torch.cuda.amp.autocast():
             outputs = self.model.encode_image(self.image_input_processed)
-        if np.random.rand() > 0.99: logger.info(outputs.dtype)
+        if np.random.rand() > 0.999: logger.info(outputs.dtype)
 
         if normalize:
             _shape_before = outputs.shape
@@ -261,7 +261,7 @@ class OPEN_CLIP(CLIP):
 
         text = self.tokenizer(sentence).to(self.device)
 
-        with torch.no_grad():
+        with torch.no_grad(),torch.cuda.amp.autocast():
             outputs = self.model.encode_text(text)
 
         if normalize:
