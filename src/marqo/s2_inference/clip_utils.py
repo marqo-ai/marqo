@@ -209,6 +209,7 @@ class CLIP:
     
         with torch.no_grad(), torch.cuda.amp.autocast():
             outputs = self.model.encode_image(self.image_input_processed)
+        print(outputs.dtype)
 
         if normalize:
             _shape_before = outputs.shape
