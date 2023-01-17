@@ -91,6 +91,18 @@ def create_vector_index(
                 "knn.algo_param.ef_search": 100,
                 "refresh_interval": refresh_interval
             },
+            "analysis": {
+                "analyzer": {
+                    "default": {
+                        "tokenizer": "lexical_tokenizer"
+                    }
+                },
+                "tokenizer": {
+                    "lexical_tokenizer": {
+                        "type": "uax_url_email"
+                    }
+                }
+            },
             "number_of_shards": the_index_settings[NsField.number_of_shards],
 
         },
@@ -931,7 +943,8 @@ def _lexical_search(
                 "must_not": [
                     {"exists": {"field": TensorField.field_name}}
                 ],
-            }
+            },
+            
         },
         "size": result_count,
         "from": offset

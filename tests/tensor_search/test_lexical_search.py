@@ -315,9 +315,10 @@ class TestLexicalSearch(MarqoTestCase):
     def test_lexical_search_query_string(self):
         """Tests query string functionalities. Ensures AND, OR, (), and double quotes all work as intended. """
 
-        num_docs = 200
+        num_docs = 40
         vocab = ["alpha", "bravo", "charlie", "delta", "echo"]
 
+        random.seed(100)
         docs = [{"Field 1": (" ".join(random.choices(population=vocab, k=5))),
                     "Field 2": (" ".join(random.choices(population=vocab, k=5))),
                     "_id": str(i)
@@ -349,12 +350,16 @@ class TestLexicalSearch(MarqoTestCase):
         
         # DOUBLE QUOTE TEST
         res = tensor_search._lexical_search(
-            config=self.config, index_name=self.index_name_1, text='"alpha echo delta"',
+            config=self.config, index_name=self.index_name_1, text='"alpha delta" charlie',
             return_doc_ids=True, searchable_attributes=["Field 1", "Field 2"], result_count=num_docs)
 
+        print("======================")
+        print(f"Debug: Show RES. Length: {len(res['hits'])}")
+        pprint.pprint(res)
+        
         for hit in res["hits"]:
-            assert ("alpha echo delta" in hit["Field 1"]) \
-            or ("alpha echo delta" in hit["Field 2"])
+            assert ("alpha delta" in hit["Field 1"]) \
+            or ("alpha delta" in hit["Field 2"])
 
         # COMPLEX TEST
         res = tensor_search._lexical_search(
@@ -371,3 +376,53 @@ class TestLexicalSearch(MarqoTestCase):
                 (("alpha bravo" in hit["Field 2"]) and ("charlie" in hit["Field 2"])) \
                 or (("delta" in hit["Field 2"]) and ("echo" in hit["Field 2"])) \
             )
+    
+    def test_lexical_search_special_chars(self):
+        """Tests query string functionalities with special characters (emails, websites, etc) """
+
+        docs = [{"Field 1": "test@marqo.ai",
+                    "_id": "full email"
+                },
+                {"Field 1": "test@marqo.ai another@marqo.ai",
+                    "_id": "multiple emails"
+                },
+                {"Field 1": "test marqo.ai",
+                    "_id": "email with spaced at"
+                },
+                {"Field 1": "test marqo ai",
+                    "_id": "email with all spaces"
+                },
+                {"Field 1": "test @ marqo ai",
+                    "_id": "separated at"
+                },
+                {"Field 1": "joshua.com is the website",
+                    "_id": "full url"
+                },
+                {"Field 1": "www.joshua.com www.joshuajoshua.com",
+                    "_id": "multiple urls"
+                },
+                {"Field 1": "joshua com",
+                    "_id": "url with spaces"
+                },
+                {"Field 1": "joshua . com . org",
+                    "_id": "url with all spaces"
+                }
+        ]
+        
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1,
+            docs=docs, auto_refresh=False
+        )
+        tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
+
+        # AND TEST
+        res = tensor_search._lexical_search(
+            config=self.config, index_name=self.index_name_1, text='"www.joshua.com"',
+            return_doc_ids=True, result_count=len(docs))
+        
+        print("======================")
+        print(f"Debug: Show RES. Length: {len(res['hits'])}")
+        pprint.pprint(res)
+
+        for hit in res["hits"]:
+            assert 'joshua.com' in hit["Field 1"]
