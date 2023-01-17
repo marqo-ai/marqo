@@ -21,6 +21,7 @@ class SearchQuery(BaseModel):
     reRanker: str = None
     filter: str = None
     attributesToRetrieve: List[str] = None
+    num_highlights: int = 1
 
     @pydantic.validator('searchMethod')
     def validate_search_method(cls, value):
