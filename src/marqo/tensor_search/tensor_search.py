@@ -386,9 +386,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
     batch_size = len(docs)
 
     if index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]:
-        print(f"DELETEME docs before download: {docs}")
         image_repo = add_docs.download_images(docs=docs, thread_count=20)
-        print(f"DELETEME docs after download: {docs}")
 
     for i, doc in enumerate(docs):
 

@@ -59,6 +59,7 @@ def load_image_from_path(image_path: str) -> ImageType:
         img = Image.open(image_path)
     elif validators.url(image_path):
         resp = requests.get(image_path, stream=True)
+        print("jknadfrjhb: getting an image")
         if not resp.ok:
             raise UnidentifiedImageError(f"image url {image_path} returned a {resp.status_code}. Reason {resp.reason}")
         img = Image.open(resp.raw)
