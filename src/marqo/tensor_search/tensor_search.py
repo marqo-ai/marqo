@@ -472,7 +472,8 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                     try:
                         # in the future, if we have different chunking methods, make sure we catch possible
                         # errors of different types generated here, too.
-                        if isinstance(field_content, str):
+                        if isinstance(field_content, str) and index_info.index_settings[NsField.index_defaults][
+                                NsField.treat_urls_and_pointers_as_images]:
                             image_data = image_repo[field_content]
                             if image_data is None:
                                 raise s2_inference_errors.S2InferenceError(f"Could not find image found at `{field_content}`")
