@@ -23,29 +23,24 @@ git clone https://github.com/marqo-ai/marqo.git
 cd marqo
 pip install -r requirements.txt
 ```
-
-4. `cd` into `src/marqo/tensor_search`
-5. Run the following command:
+4. Run the following command:
 ```bash
 # if you are running Marqo-OS locally: 
-export OPENSEARCH_URL="https://localhost:9200" && 
-    export PYTHONPATH="${PYTHONPATH}:<YOUR ABSOLUTE PATH TO>/marqo/src" &&
-    uvicorn api:app --host 0.0.0.0 --port 8882 --reload
+export OPENSEARCH_URL="https://localhost:9200" 
+export PYTHONPATH="${PYTHONPATH}:$(pwd)/src"
+cd src/marqo/tensor_search && uvicorn api:app --host 0.0.0.0 --port 8882 --reload
 ```
 __Notes__:
 
 - This is for marqo-os (Marqo OpenSearch) running locally. You can alternatively set
 `OPENSEARCH_URL` to  a remote Marqo OpenSearch cluster 
-- To find the absolute path to the `marqo/src` directory, `cd` into the `marqo/src` directory and run `pwd` in your terminal.
-- If python library errors occur, you might be using $HOME instead of your absolute path. try `/.../marqo/src` instead of `~/.../marqo/src`
-
 
 ### Option B. Build and run the Marqo as a Docker container, that creates and manages its own internal Marqo-OS 
 1. `cd` into the marqo root directory
 2. Run the following command:
 ```bash
 docker rm -f marqo &&
-     DOCKER_BUILDKIT=1 docker build . -t marqo_docker_0 && 
+     DOCKER_BUILDKIT=1 docker build . -t marqo_docker_0 
      docker run --name marqo --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqo_docker_0
 ```
 
