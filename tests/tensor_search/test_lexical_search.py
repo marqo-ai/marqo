@@ -6,7 +6,7 @@ import unittest
 import copy
 from marqo.errors import InvalidArgError, IndexNotFoundError
 from tests.marqo_test import MarqoTestCase
-
+import random
 
 class TestLexicalSearch(MarqoTestCase):
 
@@ -311,3 +311,63 @@ class TestLexicalSearch(MarqoTestCase):
         assert len(res["hits"]) == 2
         assert (res["hits"][0]["_id"] == "alpha alpha") or (res["hits"][0]["_id"] == "Jupyter_12")
         assert (res["hits"][0]["_id"] != "abcdef") and (res["hits"][0]["_id"] != "abcdef")
+
+    def test_lexical_search_query_string(self):
+        """Tests query string functionalities. Ensures AND, OR, (), and double quotes all work as intended. """
+
+        num_docs = 200
+        vocab = ["alpha", "bravo", "charlie", "delta", "echo"]
+
+        docs = [{"Field 1": (" ".join(random.choices(population=vocab, k=5))),
+                    "Field 2": (" ".join(random.choices(population=vocab, k=5))),
+                    "_id": str(i)
+                    }
+                  for i in range(num_docs)]
+        
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1,
+            docs=docs, auto_refresh=False
+        )
+        tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
+
+        # AND TEST
+        res = tensor_search._lexical_search(
+            config=self.config, index_name=self.index_name_1, text='alpha AND bravo',
+            return_doc_ids=True, searchable_attributes=["Field 1", "Field 2"], result_count=num_docs)
+
+        for hit in res["hits"]:
+            assert (("alpha" in hit["Field 1"]) and ("bravo" in hit["Field 1"])) \
+            or (("alpha" in hit["Field 2"]) and ("bravo" in hit["Field 2"]))
+
+        # OR TEST
+        res = tensor_search._lexical_search(
+            config=self.config, index_name=self.index_name_1, text='charlie OR delta',
+            return_doc_ids=True, searchable_attributes=["Field 1", "Field 2"], result_count=num_docs)
+        for hit in res["hits"]:
+            assert (("charlie" in hit["Field 1"]) or ("delta" in hit["Field 1"])) \
+            or (("charlie" in hit["Field 2"]) or ("delta" in hit["Field 2"]))
+        
+        # DOUBLE QUOTE TEST
+        res = tensor_search._lexical_search(
+            config=self.config, index_name=self.index_name_1, text='"alpha echo delta"',
+            return_doc_ids=True, searchable_attributes=["Field 1", "Field 2"], result_count=num_docs)
+
+        for hit in res["hits"]:
+            assert ("alpha echo delta" in hit["Field 1"]) \
+            or ("alpha echo delta" in hit["Field 2"])
+
+        # COMPLEX TEST
+        res = tensor_search._lexical_search(
+            config=self.config, index_name=self.index_name_1, text='("alpha bravo" AND charlie) OR (delta AND echo)',
+            return_doc_ids=True, searchable_attributes=["Field 1", "Field 2"], result_count=num_docs)
+
+        for hit in res["hits"]:
+            assert \
+            (   \
+                (("alpha bravo" in hit["Field 1"]) and ("charlie" in hit["Field 1"])) \
+                or (("delta" in hit["Field 1"]) and ("echo" in hit["Field 1"])) \
+            )   \
+            or (    \
+                (("alpha bravo" in hit["Field 2"]) and ("charlie" in hit["Field 2"])) \
+                or (("delta" in hit["Field 2"]) and ("echo" in hit["Field 2"])) \
+            )
