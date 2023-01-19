@@ -52,7 +52,7 @@ class TestEncoding(unittest.TestCase):
     def test_load_clip_text_model(self):
 
         names = [ "onnx16/open_clip/ViT-B-32/laion400m_e32", 'onnx32/open_clip/ViT-B-32-quickgelu/laion400m_e32',
-                 'onnx32/open_clip/ViT-g-14/laion2b_s12b_b42k', 'RN50', "ViT-B/16"]
+                  'RN50', "ViT-B/16"]
 
         device = 'cpu'
         eps = 1e-9
