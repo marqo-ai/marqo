@@ -33,7 +33,7 @@ class TestAddDocuments(MarqoTestCase):
             pass
 
 
-    def _match_all(self, index_name, verbose=True):
+    def _match_all(self, index_name, verbose=False):
         """Helper function"""
         res = requests.get(
             F"{self.endpoint}/{index_name}/_search",
