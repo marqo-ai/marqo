@@ -75,9 +75,10 @@ def threaded_doc_to_instructions(
         non_tensor_fields=non_tensor_fields, index_info=index_info, selected_device=selected_device
     )
     vectorise_times[doc_pos] = indexing_instructions.vectorise_time
-    # TODO: add locking around new_fields
     with new_fields_lock:
-        new_fields = new_fields.union(indexing_instructions.new_fields)
+        for f in indexing_instructions.new_fields:
+            new_fields.add(f)
+
     if indexing_instructions.failure_details is not None:
         unsuccessful_docs.append(
             (indexing_instructions.doc_pos, indexing_instructions.failure_details.error_details))
