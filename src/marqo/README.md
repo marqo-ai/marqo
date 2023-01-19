@@ -28,8 +28,7 @@ pip install -r requirements.txt
 # if you are running Marqo-OS locally: 
 export OPENSEARCH_URL="https://localhost:9200" 
 export PYTHONPATH="${PYTHONPATH}:$(pwd)/src"
-cd src/marqo/tensor_search
-uvicorn api:app --host 0.0.0.0 --port 8882 --reload
+cd src/marqo/tensor_search && uvicorn api:app --host 0.0.0.0 --port 8882 --reload
 ```
 __Notes__:
 
