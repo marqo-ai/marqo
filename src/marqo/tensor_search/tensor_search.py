@@ -384,34 +384,34 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
     docs_per_thread = math.ceil(len(indexed_docs)/THREAD_COUNT)
     thread_allocated_docs = [indexed_docs[i: i + docs_per_thread] for i in range(len(indexed_docs))[::docs_per_thread]]
 
-    # threads = [threading.Thread(
-    #     target=threaded_docs_to_instructions,
-    #     kwargs={
-    #         "enumerated_docs": docs_by_threads[i], "update_mode": update_mode,
-    #         "index_name": index_name, "existing_fields": existing_fields,
-    #         "non_tensor_fields": non_tensor_fields, "index_info": index_info,
-    #         "selected_device": selected_device, "vectorise_times": vectorise_times,
-    #         "new_fields_lock": new_fields_lock, "new_fields": new_fields,
-    #         "unsuccessful_docs": unsuccessful_docs, "to_be_indexed": to_be_indexed
-    #     }
-    # ) for i in range(min(THREAD_COUNT, len(docs)))]
-    #
-    # for th in threads:
-    #     th.start()
-    # for th in threads:
-    #     th.join()
-
-
-    resses = [threaded_docs_to_instructions(**{
+    threads = [threading.Thread(
+        target=threaded_docs_to_instructions,
+        kwargs={
             "enumerated_docs": thread_allocated_docs[i], "update_mode": update_mode,
             "index_name": index_name, "existing_fields": existing_fields,
             "non_tensor_fields": non_tensor_fields, "index_info": index_info,
             "selected_device": selected_device, "vectorise_times": vectorise_times,
             "new_fields_lock": new_fields_lock, "new_fields": new_fields,
             "unsuccessful_docs": unsuccessful_docs, "to_be_indexed": to_be_indexed
-        }) for i in range(min(THREAD_COUNT, len(thread_allocated_docs)))]
+        }
+    ) for i in range(min(THREAD_COUNT, len(thread_allocated_docs)))]
+
+    for th in threads:
+        th.start()
+    for th in threads:
+        th.join()
 
 
+    # resses = [threaded_docs_to_instructions(**{
+    #         "enumerated_docs": thread_allocated_docs[i], "update_mode": update_mode,
+    #         "index_name": index_name, "existing_fields": existing_fields,
+    #         "non_tensor_fields": non_tensor_fields, "index_info": index_info,
+    #         "selected_device": selected_device, "vectorise_times": vectorise_times,
+    #         "new_fields_lock": new_fields_lock, "new_fields": new_fields,
+    #         "unsuccessful_docs": unsuccessful_docs, "to_be_indexed": to_be_indexed
+    #     }) for i in range(min(THREAD_COUNT, len(thread_allocated_docs)))]
+
+    unsuccessful_docs.sort(key=lambda error_doc: error_doc[0])
     total_vectorise_time += sum(vectorise_times)
     bulk_parent_dicts = functools.reduce(lambda x, y: x + y, to_be_indexed, [])
     end_time_3 = timer()
