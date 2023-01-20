@@ -90,7 +90,9 @@ def create_vector_index(
             "index": {
                 "knn": True,
                 "knn.algo_param.ef_search": 100,
-                "refresh_interval": refresh_interval
+                "refresh_interval": refresh_interval,
+                "store.hybrid.mmap.extensions": ["nvd", "dvd", "tim", "tip", "dim", "kdd", "kdi", "cfs", "doc", "vec",
+                                                 "vex"]
             },
             "number_of_shards": the_index_settings[NsField.number_of_shards],
 
