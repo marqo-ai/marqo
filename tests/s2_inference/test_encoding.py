@@ -24,10 +24,10 @@ class TestEncoding(unittest.TestCase):
         clear_loaded_models()
 
     def test_vectorize(self):
-
         names = ["onnx16/open_clip/ViT-B-32/laion400m_e32", 'onnx32/open_clip/ViT-B-32-quickgelu/laion400m_e32',
                  "all-MiniLM-L6-v1", "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6",
                  "onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]
+                 
         sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
         device = 'cpu'
         eps = 1e-9
@@ -49,7 +49,6 @@ class TestEncoding(unittest.TestCase):
 
 
     def test_load_clip_text_model(self):
-
         names = [ "onnx16/open_clip/ViT-B-32/laion400m_e32", 'onnx32/open_clip/ViT-B-32-quickgelu/laion400m_e32',
                   'RN50', "ViT-B/16"]
 
@@ -129,11 +128,11 @@ class TestEncoding(unittest.TestCase):
 
 
     def test_model_outputs(self):
-
         names = ["onnx16/open_clip/ViT-B-32/laion400m_e32", 'onnx32/open_clip/ViT-B-32-quickgelu/laion400m_e32',
                  'open_clip/ViT-B-32/laion400m_e32', "all-MiniLM-L6-v1",
                  "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1",
                  "hf/all_datasets_v4_MiniLM-L6", "onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]
+                 
         sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
         device = 'cpu'
 
@@ -149,11 +148,11 @@ class TestEncoding(unittest.TestCase):
 
 
     def test_model_normalization(self):
-
         names = ["onnx16/open_clip/ViT-B-32/laion400m_e32", 'onnx32/open_clip/ViT-B-32-quickgelu/laion400m_e32',
                  'open_clip/ViT-B-32/laion400m_e32', 'RN50', "ViT-B/16", "all-MiniLM-L6-v1",
                  "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6",
                  "onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]
+                 
         sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
         device = 'cpu'
         eps = 1e-6
@@ -200,7 +199,6 @@ class TestEncoding(unittest.TestCase):
 
 
     def test_open_clip_vectorize(self):
-
         names = ['open_clip/ViT-B-32/laion400m_e32', 'open_clip/RN50/openai']
 
         sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
@@ -224,9 +222,6 @@ class TestEncoding(unittest.TestCase):
 
 
     def test_open_clip_embedding_size(self):
-
-        # This is a full test as the list includes all the models. Note that the training dataset does not affect the
-        # embedding size.
         names = ['open_clip/ViT-B-32/laion400m_e32', 'open_clip/RN50/openai']
 
         device = "cpu"
@@ -247,7 +242,6 @@ class TestEncoding(unittest.TestCase):
 
 
     def test_onnx_clip_vectorise(self):
-
         names = ["onnx16/open_clip/ViT-B-32/laion400m_e32", 'onnx32/open_clip/ViT-B-32-quickgelu/laion400m_e32']
 
         sentences = ['hello', 'this is a test sentence. so is this.',
