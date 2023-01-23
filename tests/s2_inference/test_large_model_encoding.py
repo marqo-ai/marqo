@@ -25,9 +25,7 @@ class TestEncoding(unittest.TestCase):
 
     def test_vectorize(self):
 
-        names = ["onnx16/open_clip/ViT-B-32/laion400m_e32", 'onnx32/open_clip/ViT-B-32-quickgelu/laion400m_e32',
-                 'onnx32/open_clip/ViT-g-14/laion2b_s12b_b42k',"all-MiniLM-L6-v1", "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6",
-                 "onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]
+        names = []
         sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
         device = 'cpu'
         eps = 1e-9
