@@ -14,7 +14,12 @@ from marqo.s2_inference.s2_inference import (
     _convert_vectorized_output,
 )
 
-@pytest.mark.skip(reason= "This is for large scale model test")
+@pytest.fixture(scope="session")
+def enable_flag(pytestconfig):
+    return pytestconfig.getoption("largemodel")
+
+
+@pytest.mark.skipif(enable_flag is False, reason="We skip the large model test")
 class TestLargeModelEncoding(unittest.TestCase):
 
     def setUp(self) -> None:
