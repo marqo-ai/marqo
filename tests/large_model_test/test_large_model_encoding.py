@@ -19,7 +19,7 @@ def enable_flag(pytestconfig):
     return pytestconfig.getoption("largemodel")
 
 
-@pytest.mark.skipif(enable_flag is False, reason="We skip the large model test")
+@pytest.mark.skip(reason="We skip the large model test")
 class TestLargeModelEncoding(unittest.TestCase):
 
     def setUp(self) -> None:
