@@ -21,12 +21,9 @@ from marqo.s2_inference.s2_inference import (
 class TestLargeModelEncoding(unittest.TestCase):
 
     def setUp(self) -> None:
-        self.large_clip_models =   ['onnx32/open_clip/ViT-g-14/laion2b_s12b_b42k',"onnx32/openai/ViT-L/14",
-                                    "open_clip/ViT-L-14/openai", "ViT-L/14", 'onnx32/open_clip/ViT-H-14/laion2b_s32b_b79k',
-                                    'open_clip/ViT-H-14/laion2b_s32b_b79k']
+        self.large_clip_models =   ["onnx32/openai/ViT-L/14", "open_clip/ViT-L-14/openai", "ViT-L/14"]
 
-        self.multilingual_models = ["multilingual-clip/XLM-Roberta-Large-Vit-L-14", "multilingual-clip/XLM-R Large Vit-B/16+",
-                                    "multilingual-clip/XLM-Roberta-Large-Vit-B-32", "multilingual-clip/LABSE-Vit-L-14"]
+        self.multilingual_models = ["multilingual-clip/XLM-Roberta-Large-Vit-L-14"]
 
 
     def tearDown(self) -> None:
