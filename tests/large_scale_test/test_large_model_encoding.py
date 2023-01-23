@@ -14,13 +14,10 @@ from marqo.s2_inference.s2_inference import (
     _convert_vectorized_output,
 )
 
-@pytest.fixture(scope="module")
-def enable_flag(pytestconfig):
-    return pytestconfig.getoption("largemodel")
 
 
-@pytest.mark.skipif(enable_flag is False, reason="We skip the large model test by default")
-#@pytest.mark.skipif(torch.cuda.is_available() is False, reason="We skip the large model test if we don't have cuda support")
+@pytest.mark.largemodel
+@pytest.mark.skipif(torch.cuda.is_available() is False, reason="We skip the large model test if we don't have cuda support")
 class TestLargeModelEncoding(unittest.TestCase):
 
     def setUp(self) -> None:
