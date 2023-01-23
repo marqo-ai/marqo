@@ -14,7 +14,7 @@ from marqo.s2_inference.s2_inference import (
     _convert_vectorized_output,
 )
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def enable_flag(pytestconfig):
     return pytestconfig.getoption("largemodel")
 
