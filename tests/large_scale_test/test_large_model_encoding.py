@@ -20,7 +20,7 @@ def enable_flag(pytestconfig):
 
 
 @pytest.mark.skipif(enable_flag is False, reason="We skip the large model test by default")
-@pytest.mark.skipif(torch.cuda.is_available() is False, reason="We skip the large model test if we don't have cuda support")
+#@pytest.mark.skipif(torch.cuda.is_available() is False, reason="We skip the large model test if we don't have cuda support")
 class TestLargeModelEncoding(unittest.TestCase):
 
     def setUp(self) -> None:
