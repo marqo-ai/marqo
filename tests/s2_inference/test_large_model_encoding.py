@@ -19,7 +19,8 @@ def enable_flag(pytestconfig):
     return pytestconfig.getoption("largemodel")
 
 
-@pytest.mark.skipif(enable_flag is False, reason="We skip the large model test")
+@pytest.mark.skipif(enable_flag is False, reason="We skip the large model test by default")
+@pytest.mark.skipif(torch.cuda.is_available() is False, reason="We skip the large model test if we don't have cuda support")
 class TestLargeModelEncoding(unittest.TestCase):
 
     def setUp(self) -> None:
@@ -38,7 +39,7 @@ class TestLargeModelEncoding(unittest.TestCase):
     def test_vectorize(self):
         names = self.large_clip_models
         sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
-        device = 'cpu'
+        device = "cuda"
         eps = 1e-9
 
         for name in names:
@@ -59,7 +60,7 @@ class TestLargeModelEncoding(unittest.TestCase):
 
     def test_load_clip_text_model(self):
         names = self.large_clip_models
-        device = 'cpu'
+        device = "cuda"
         eps = 1e-9
         texts = ['hello', 'big', 'asasasasaaaaaaaaaaaa', '', 'a word. another one!?. #$#.']
 
@@ -78,7 +79,7 @@ class TestLargeModelEncoding(unittest.TestCase):
     def test_model_outputs(self):
         names = ["onnx16/open_clip/ViT-B-32/laion400m_e32"]
         sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
-        device = 'cpu'
+        device = "cuda"
 
         for name in names:
             model_properties = get_model_properties_from_registry(name)
@@ -94,7 +95,7 @@ class TestLargeModelEncoding(unittest.TestCase):
     def test_model_normalization(self):
         names = self.large_clip_models
         sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
-        device = 'cpu'
+        device = "cuda"
         eps = 1e-6
 
         for name in names:
@@ -118,7 +119,7 @@ class TestLargeModelEncoding(unittest.TestCase):
         clear_loaded_models()
 
         names = self.multilingual_models
-        device = 'cpu'
+        device = "cuda"
         texts = [
             "skiing person",
             "滑雪的人",
