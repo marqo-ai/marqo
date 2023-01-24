@@ -1536,7 +1536,7 @@ def _get_onnx_clip_properties() -> Dict:
 def _get_fp16_clip_properties() -> Dict:
     FP16_CLIP_MODEL_PROPERTIES = {
         "fp16/ViT-L/14": {
-            "name": "fP16/ViT-L/14",
+            "name": "fp16/ViT-L/14",
             "dimensions": 768,
             "type": "fp16clip",
             "notes": "The faster version (fp16, load from `cuda`) of openai clip model"

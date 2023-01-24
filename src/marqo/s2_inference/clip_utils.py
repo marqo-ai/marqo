@@ -247,7 +247,7 @@ class FP16_CLIP(CLIP):
         super().__init__(model_type, device, embedding_dim, truncate, **kwargs)
 
         if not self.device.startswith("cuda"):
-            raise InvalidModelDeviceError(f"Fast clip model `{self.model_type}` is only available with device `cuda`.")
+            raise InvalidModelDeviceError(f"FP16 clip model `{self.model_type}` is only available with device `cuda`.")
 
         self.model_name = self.model_type.replace("fp16/", "")
 
