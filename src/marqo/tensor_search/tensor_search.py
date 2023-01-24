@@ -922,14 +922,31 @@ def _lexical_search(
     
     # Validation for offset (pagination is single field)
     if len(fields_to_search) != 1 and offset > 0:
-        raise errors.InvalidArgError(f"Pagination (offset > 0) is only supported for single field searches! Your search currently has {len(fields_to_search)} fields: {fields_to_search}")
-        
+        raise errors.InvalidArgError(f"Pagination (offset > 0) is only supported for single field searches! Your search currently has {len(fields_to_search)} fields: {fields_to_search}")              
+    
+    # Parse text into required and optional terms.
+    (required_terms, optional_blob) = utils.parse_lexical_query(text)
+    
     body = {
         "query": {
             "bool": {
+                # Optional blob terms SHOULD be in results.
                 "should": [
-                    {"query_string": {"query": text, "fields": [field]}}
+                    {"match": {field: optional_blob}}
                     for field in fields_to_search
+                ],
+                # Required terms MUST be in results.
+                "must": [
+                    {
+                        # Nested bool, since required term can be in ANY field.
+                        "bool": {
+                            "should": [
+                                {"match_phrase": {field: term}}
+                                for field in fields_to_search
+                            ]
+                        }
+                    } 
+                    for term in required_terms
                 ],
                 "must_not": [
                     {"exists": {"field": TensorField.field_name}}

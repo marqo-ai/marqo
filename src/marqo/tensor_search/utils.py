@@ -183,4 +183,58 @@ def read_env_vars_and_defaults(var: str) -> Optional[str]:
             return None
 
 
+def parse_lexical_query(text: str):
+    """
+    Find required terms enclosed in opening/closing double quotes. 
+    All other terms go into optional_blob, separated by whitespace.
 
+    Double quote can be either opening, closing, or escaped.
+    Escaped double quotes are interpreted literally.
+    If any double quotes exist that are neither opening, closing, nor escaped, interpret entire string literally instead.
+
+    Users need to escape the backslash itself. (Single \ get ignored) -> q='dwayne \\"the rock\\" johnson'
+    """
+    required_terms = []
+    optional_blob = ""
+    opening_quote_idx = None
+
+    for i in range(len(text)):
+        # Add all characters to blob initially
+        optional_blob += text[i]
+
+        if text[i] == '"':
+            # Check if ESCAPED
+            if i > 0 and text[i-1] == '\\':
+                # Read quote literally. Backslash should be ignored (both blob and required)
+                pass
+            
+            # Check if CLOSING QUOTE
+            # Closing " must have space on the right (or is last character) while opening exists.
+            elif (opening_quote_idx is not None) and (i == len(text) - 1 or text[i+1] == " "):
+
+                    # Add everything in between the quotes as a required term
+                    new_required_term = text[opening_quote_idx+1:i]
+                    required_terms.append(new_required_term)
+
+                    # Remove this required term from the optional blob
+                    optional_blob = optional_blob[:-(len(new_required_term)+2)]
+                    opening_quote_idx = None
+
+            # Check if OPENING QUOTE
+            # Opening " must have space on the left (or is first character).
+            elif i == 0 or text[i-1] == " ":
+                opening_quote_idx = i
+
+            # None of the above: Syntax error. Interpret text literally instead.
+            else:
+                return([], text)
+                
+            
+    # Remove double/leading white spaces
+    optional_blob = " ".join(optional_blob.split())
+
+    # Remove escape character. `\"` becomes just `"`
+    required_terms = [term.replace('\\"', '"') for term in required_terms]
+    optional_blob = optional_blob.replace('\\"', '"')
+
+    return (required_terms, optional_blob)
