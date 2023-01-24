@@ -14,6 +14,7 @@ import transformers
 from marqo.s2_inference.types import *
 from marqo.s2_inference.logger import get_logger
 import marqo.s2_inference.model_registry as model_registry
+from marqo.s2_inference.errors import InvalidModelDeviceError
 
 logger = get_logger(__name__)
 
@@ -238,6 +239,31 @@ class CLIP:
         else:
             logger.debug('text')
             return self.encode_text(inputs, normalize=normalize)
+
+
+class FAST_CLIP(CLIP):
+    def __init__(self, model_type: str = "fast/ViT-B/32", device: str = 'cuda',  embedding_dim: int = None,
+                            truncate: bool = True, **kwargs) -> None:
+        super.__init__(model_type, device, embedding_dim, truncate, **kwargs)
+
+        if not self.device.startswith("cuda"):
+            raise InvalidModelDeviceError(f"Fast clip model `{self.model_type}` is only available with device `cuda`.")
+
+        self.model_name = self.model_type.replace("fast/", "")
+
+
+    def load(self) -> None:
+
+        # https://github.com/openai/CLIP/issues/30
+        self.model, self.preprocess = clip.load(self.model_name, device='cuda', jit=False)
+        self.model = self.model.to(self.device)
+        self.tokenizer = clip.tokenize
+        self.model.eval()
+
+
+
+
+
 
 class OPEN_CLIP(CLIP):
     def __init__(self, model_type: str = "open_clip/ViT-B-32-quickgelu/laion400m_e32", device: str = 'cpu',  embedding_dim: int = None,

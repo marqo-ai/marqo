@@ -50,3 +50,8 @@ class RerankerNameError(S2InferenceError):
 
 class ModelNotInCacheError(S2InferenceError):
     pass
+
+# Raise an ERROR if the model is only available with "cpu" or "cuda" but
+# the other one is provided
+class InvalidModelDeviceError(S2InferenceError):
+    pass
