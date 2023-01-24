@@ -1538,7 +1538,7 @@ def _get_fp16_clip_properties() -> Dict:
         "fp16/ViT-L/14":{
             "name":"fP16/ViT-L/14",
             "dimension" : 768,
-            "tupe": "fp16clip",
+            "type": "fp16clip",
             "notes" : "The faster version (fp16, load from `cuda`) of openai clip model"
         },
     }
@@ -1583,6 +1583,7 @@ def _get_model_load_mappings() -> Dict:
             'sbert_onnx':SBERT_ONNX,
             'clip_onnx': CLIP_ONNX,
             "multilingual_clip" : MULTILINGUAL_CLIP,
+            "fp16clip": FP16_CLIP,
             'random':Random,
             'hf':HF_MODEL}
 
