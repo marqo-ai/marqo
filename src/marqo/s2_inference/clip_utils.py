@@ -241,15 +241,15 @@ class CLIP:
             return self.encode_text(inputs, normalize=normalize)
 
 
-class FAST_CLIP(CLIP):
-    def __init__(self, model_type: str = "fast/ViT-B/32", device: str = 'cuda',  embedding_dim: int = None,
+class Fp16_CLIP(CLIP):
+    def __init__(self, model_type: str = "fp16/ViT-B/32", device: str = 'cuda',  embedding_dim: int = None,
                             truncate: bool = True, **kwargs) -> None:
         super.__init__(model_type, device, embedding_dim, truncate, **kwargs)
 
         if not self.device.startswith("cuda"):
             raise InvalidModelDeviceError(f"Fast clip model `{self.model_type}` is only available with device `cuda`.")
 
-        self.model_name = self.model_type.replace("fast/", "")
+        self.model_name = self.model_type.replace("fp16/", "")
 
 
     def load(self) -> None:
