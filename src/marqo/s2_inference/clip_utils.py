@@ -10,17 +10,44 @@ from PIL import Image, UnidentifiedImageError
 import open_clip
 from multilingual_clip import pt_multilingual_clip
 import transformers
+from clip.model import build_model
 
 from marqo.s2_inference.types import *
 from marqo.s2_inference.logger import get_logger
 import marqo.s2_inference.model_registry as model_registry
-from marqo.s2_inference.errors import InvalidModelDeviceError
+from marqo.s2_inference.errors import InvalidModelDeviceError, InvalidModelPropertiesError
+from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize
 
 logger = get_logger(__name__)
 
+OPENAI_DATASET_MEAN = (0.48145466, 0.4578275, 0.40821073)
+OPENAI_DATASET_STD = (0.26862954, 0.26130258, 0.27577711)
 
 def get_allowed_image_types():
     return set(('.jpg', '.png', '.bmp', '.jpeg'))
+
+try:
+    from torchvision.transforms import InterpolationMode
+    BICUBIC = InterpolationMode.BICUBIC
+except ImportError:
+    BICUBIC = Image.BICUBIC
+
+
+def _convert_image_to_rgb(image):
+    return image.convert("RGB")
+
+
+def _get_transform(n_px: int, image_mean:List[float] = None, image_std:List[float] = None):
+    img_mean = image_mean or OPENAI_DATASET_MEAN
+    img_std = image_std or OPENAI_DATASET_STD
+    return Compose([
+        Resize(n_px, interpolation=BICUBIC),
+        CenterCrop(n_px),
+        _convert_image_to_rgb,
+        ToTensor(),
+        Normalize(img_mean, img_std),
+    ])
+
 
 
 def format_and_load_CLIP_images(images: List[Union[str, ndarray, ImageType]]) -> List[ImageType]:
@@ -157,14 +184,77 @@ class CLIP:
         self.processor = None
         self.embedding_dimension = embedding_dim
         self.truncate = truncate
+        self.model_properties = kwargs["model_properties"]
 
     def load(self) -> None:
 
-        # https://github.com/openai/CLIP/issues/30
-        self.model, self.preprocess = clip.load(self.model_type, device='cpu', jit=False)
-        self.model = self.model.to(self.device)
+        try:
+            # The original method to load the openai clip model
+            # https://github.com/openai/CLIP/issues/30
+            self.model, self.preprocess = clip.load(self.model_type, device='cpu', jit=False)
+            self.model = self.model.to(self.device)
+            self.tokenizer = clip.tokenize
+
+
+        except RuntimeError:
+            self.jit = self.model_properties.get("jit", False)
+            self.model_path = self.model_properties["localpath"]
+            self.device = self.model_properties.get("device", "cpu")
+            self.mean = self.model_properties.get("mean", None)
+            self.std = self.model_properties.get("std", None)
+
+            logger.info("Can not load clip model. Try custom clip model loading.")
+            # Loading code from openai clip repo
+            # Check https://github.com/openai/CLIP/blob/3702849800aa56e2223035bccd1c6ef91c704ca8/clip/clip.py#L126-L142
+
+            try:
+                # Try to load the script model using openai loading method
+                logger.info("Try generic clip model openai clip loading")
+                with open(self.model_path, 'rb') as opened_file:
+                    try:
+                        # loading JIT archive
+                        self.model = torch.jit.load(opened_file, map_location=self.device if self.jit else "cpu").eval()
+                        state_dict = None
+                    except RuntimeError:
+                        # loading saved state dict
+                        if self.jit:
+                            self.jit = False
+                        state_dict = torch.load(opened_file, map_location="cpu")
+
+                    if not self.jit:
+                        self.model = build_model(state_dict or self.model.state_dict()).to(self.device)
+                        if str(self.device) == "cpu":
+                            self.model.float()
+
+            except EOFError:
+                logger.info("Try generic clip model open_clip loading")
+                try:
+                    # loading JIT archive
+                    self.model = torch.jit.load(self.model_path, map_location=self.device if self.jit else "cpu").eval()
+                    state_dict = None
+                except RuntimeError:
+                    # loading saved state dict
+                    if self.jit:
+                        self.jit = False
+                    state_dict = torch.load(self.model_path, map_location="cpu")
+
+                if not self.jit:
+                    try:
+                        self.model = build_model(state_dict or self.model.state_dict()).to(self.device)
+                    except KeyError:
+                        sd = {k[7:]: v for k, v in state_dict["state_dict"].items()}
+                        self.model = build_model(sd).to(self.device)
+
+                    if str(self.device) == "cpu":
+                        self.model.float()
+
+        # We use simple clip tokenizer.
+        # TODO Support custom tokenizer (huggingface based)
+        self.preprocess = _get_transform(self.model.visual.input_resolution, self.mean, self.std)
         self.tokenizer = clip.tokenize
         self.model.eval()
+
+
     
     def _convert_output(self, output):
 
@@ -181,8 +271,11 @@ class CLIP:
         
         if self.model is None:
             self.load()
-        
-        text = self.tokenizer(sentence, truncate=self.truncate).to(self.device)
+        try:
+            text = self.tokenizer(sentence, truncate=self.truncate).to(self.device)
+        except Exception:
+            text = self.tokenizer(sentence).to(self.device)
+
 
         with torch.no_grad():
             outputs =  self.model.encode_text(text)

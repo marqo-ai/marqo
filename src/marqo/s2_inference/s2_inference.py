@@ -288,7 +288,7 @@ def _load_model(model_name: str, model_properties: dict, device: str = get_defau
     max_sequence_length = model_properties.get('tokens', get_default_seq_length())
 
     model = loader(model_properties['name'], device=device, embedding_dim=model_properties['dimensions'],
-                   max_seq_length=max_sequence_length)
+                   max_seq_length=max_sequence_length, model_properties = model_properties)
 
     model.load()
 
