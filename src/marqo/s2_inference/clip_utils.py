@@ -241,7 +241,7 @@ class CLIP:
             return self.encode_text(inputs, normalize=normalize)
 
 
-class Fp16_CLIP(CLIP):
+class FP16_CLIP(CLIP):
     def __init__(self, model_type: str = "fp16/ViT-B/32", device: str = 'cuda',  embedding_dim: int = None,
                             truncate: bool = True, **kwargs) -> None:
         super.__init__(model_type, device, embedding_dim, truncate, **kwargs)
@@ -259,11 +259,6 @@ class Fp16_CLIP(CLIP):
         self.model = self.model.to(self.device)
         self.tokenizer = clip.tokenize
         self.model.eval()
-
-
-
-
-
 
 class OPEN_CLIP(CLIP):
     def __init__(self, model_type: str = "open_clip/ViT-B-32-quickgelu/laion400m_e32", device: str = 'cpu',  embedding_dim: int = None,
