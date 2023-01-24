@@ -1541,9 +1541,22 @@ def _get_fp16_clip_properties() -> Dict:
             "type": "fp16clip",
             "notes": "The faster version (fp16, load from `cuda`) of openai clip model"
         },
+        'fp16/ViT-B/32':
+            {"name": "fp16/ViT-B/32",
+             "dimensions": 512,
+             "notes": "The faster version (fp16, load from `cuda`) of openai clip model",
+             "type": "fp16clip",
+             },
+        'fp16/ViT-B/16':
+            {"name": "fp16/ViT-B/16",
+             "dimensions": 512,
+             "notes": "The faster version (fp16, load from `cuda`) of openai clip model",
+             "type": "fp16clip",
+             },
     }
 
     return FP16_CLIP_MODEL_PROPERTIES
+
 
 def _get_random_properties() -> Dict:
     RANDOM_MODEL_PROPERTIES = {
