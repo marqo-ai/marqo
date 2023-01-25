@@ -170,6 +170,9 @@ class TestUtils(unittest.TestCase):
             ('just a "string"', (["string"], 'just a')),
             ('just "a" string', (["a"], 'just string')),
             ('"just" a string', (["just"], 'a string')),
+            ('just "a long long " string', (["a long long "], 'just string')),
+            ('"required 1 " not required " required2" again', (["required 1 ", " required2"], 'not required again')),
+            ('"just" "just" "" a string', (["just", "just", ""], 'a string')),
 
             ('朋友你好', ([], '朋友你好')),
             ('朋友 "你好"', (["你好"], '朋友')),

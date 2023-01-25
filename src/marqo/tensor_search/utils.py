@@ -102,7 +102,7 @@ def contextualise_filter(filter_string: str, simple_properties: typing.Iterable)
     contextualised_filter = filter_string
     for field in simple_properties:
         if ' ' in field:
-            field_with_escaped_space = field.replace(' ', '\ ')
+            field_with_escaped_space = field.replace(' ', r'\ ') # monitor this: fixed the invalid escape sequence (Deprecation warning).
             contextualised_filter = contextualised_filter.replace(f'{field_with_escaped_space}:', f'{enums.TensorField.chunks}.{field_with_escaped_space}:')
         else:
             contextualised_filter = contextualised_filter.replace(f'{field}:', f'{enums.TensorField.chunks}.{field}:')
