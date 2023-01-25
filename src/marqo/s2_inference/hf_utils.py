@@ -5,7 +5,6 @@ import numpy as np
 
 from marqo.s2_inference.sbert_utils import Model
 from marqo.s2_inference.types import Union, FloatTensor, List
-
 from marqo.s2_inference.logger import get_logger
 logger = get_logger(__name__)
 
@@ -77,3 +76,9 @@ class AutoModelForSentenceEmbedding(nn.Module):
 
     def cls_pooling(self, model_output, attention_mask):
         return model_output[0][:,0]
+
+
+def whitespace_clean(text):
+    text = re.sub(r'\s+', ' ', text)
+    text = text.strip()
+    return text
