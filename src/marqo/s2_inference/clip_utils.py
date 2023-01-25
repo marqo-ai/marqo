@@ -13,7 +13,6 @@ import open_clip
 from multilingual_clip import pt_multilingual_clip
 import transformers
 from clip.model import build_model
-
 from marqo.s2_inference.types import *
 from marqo.s2_inference.logger import get_logger
 import marqo.s2_inference.model_registry as model_registry
