@@ -49,7 +49,7 @@ def _get_transform(n_px: int, image_mean:List[float] = None, image_std: List[flo
         image_std: the std of the image used for normalization
 
     Returns:
-        the processed image tensor wit shape (3, n_px, n_px)
+        the processed image tensor with shape (3, n_px, n_px)
 
     '''
     img_mean = image_mean or OPENAI_DATASET_MEAN
