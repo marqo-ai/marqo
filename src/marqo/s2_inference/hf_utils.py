@@ -76,9 +76,3 @@ class AutoModelForSentenceEmbedding(nn.Module):
 
     def cls_pooling(self, model_output, attention_mask):
         return model_output[0][:,0]
-
-
-def whitespace_clean(text):
-    text = re.sub(r'\s+', ' ', text)
-    text = text.strip()
-    return text

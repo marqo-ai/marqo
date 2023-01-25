@@ -189,21 +189,17 @@ class CLIP:
 
     def load(self) -> None:
 
-        try:
+        path = self.model_properties.get("localpath", None) or self.model_properties.get("url", None)
+
+        if path is None:
             # The original method to load the openai clip model
             # https://github.com/openai/CLIP/issues/30
             self.model, self.preprocess = clip.load(self.model_type, device='cpu', jit=False)
             self.model = self.model.to(self.device)
             self.tokenizer = clip.tokenize
-
-
-        except RuntimeError:
-            logger.info("Can not load clip model. Try custom clip model loading.")
-
-            path = self.model_properties.get("localpath", None) or self.model_properties.get("url", None)
-            if path is None:
-                raise InvalidModelPropertiesError("Model path `url` or `localpath` is not provided. Can not load generic model.")
-            elif os.path.isfile(path):
+        else:
+            logger.info("Detecting custom clip model path. We use generic model loading.")
+            if os.path.isfile(path):
                 self.model_path = path
             elif validators.url(path):
                 self.model_path = download_pretrained_from_url(path)
@@ -214,89 +210,13 @@ class CLIP:
             self.std = self.model_properties.get("std", None)
 
 
-            try:
-                self.model, self.preprocess = self.openai_clip_load()
-                self.model.eval()
-            except EOFError:
-                self.model, self.preprocess = self.open_clip_load()
-                self.model.eval()
+            self.model, self.preprocess = self.custom_clip_load()
+            self.model.eval()
 
             self.tokenizer = self.load_tokenizer()
 
 
-    def openai_clip_load(self):
-        with open(self.model_path, 'rb') as opened_file:
-            try:
-                # loading JIT archive
-                model = torch.jit.load(opened_file, map_location=self.device if self.jit else "cpu").eval()
-                state_dict = None
-            except RuntimeError:
-                # loading saved state dict
-                if self.jit:
-                    logger.info(f"File {self.model_path} is not a JIT archive. Loading as a state dict instead")
-                    self.jit = False
-                state_dict = torch.load(opened_file, map_location="cpu")
-
-        if not self.jit:
-            model = build_model(state_dict or model.state_dict()).to(self.device)
-            if str(self.device) == "cpu":
-                model.float()
-            return model, _get_transform(model.visual.input_resolution, self.mean, self.std)
-
-        # patch the device names
-        device_holder = torch.jit.trace(lambda: torch.ones([]).to(torch.device(self.device)), example_inputs=[])
-        device_node = [n for n in device_holder.graph.findAllNodes("prim::Constant") if "Device" in repr(n)][-1]
-
-        def patch_device(module):
-            try:
-                graphs = [module.graph] if hasattr(module, "graph") else []
-            except RuntimeError:
-                graphs = []
-
-            if hasattr(module, "forward1"):
-                graphs.append(module.forward1.graph)
-
-            for graph in graphs:
-                for node in graph.findAllNodes("prim::Constant"):
-                    if "value" in node.attributeNames() and str(node["value"]).startswith("cuda"):
-                        node.copyAttributes(device_node)
-
-        model.apply(patch_device)
-        patch_device(model.encode_image)
-        patch_device(model.encode_text)
-
-        # patch dtype to float32 on CPU
-        if str(self.device) == "cpu":
-            float_holder = torch.jit.trace(lambda: torch.ones([]).float(), example_inputs=[])
-            float_input = list(float_holder.graph.findNode("aten::to").inputs())[1]
-            float_node = float_input.node()
-
-            def patch_float(module):
-                try:
-                    graphs = [module.graph] if hasattr(module, "graph") else []
-                except RuntimeError:
-                    graphs = []
-
-                if hasattr(module, "forward1"):
-                    graphs.append(module.forward1.graph)
-
-                for graph in graphs:
-                    for node in graph.findAllNodes("aten::to"):
-                        inputs = list(node.inputs())
-                        for i in [1, 2]:  # dtype can be the second or third argument to aten::to()
-                            if inputs[i].node()["value"] == 5:
-                                inputs[i].node().copyAttributes(float_node)
-
-            model.apply(patch_float)
-            patch_float(model.encode_image)
-            patch_float(model.encode_text)
-
-            model.float()
-
-        return model, _get_transform(model.visual.input_resolution, self.mean, self.std)
-
-
-    def open_clip_load(self):
+    def custom_clip_load(self):
         # loading the open clip model
         # Check https://github.com/mlfoundations/open_clip/blob/db7504f070b4e76e6c8578ee7b73596267083a19/src/clip/openai_clip.py#L121-L189
         try:
