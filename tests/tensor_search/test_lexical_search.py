@@ -312,62 +312,116 @@ class TestLexicalSearch(MarqoTestCase):
         assert (res["hits"][0]["_id"] == "alpha alpha") or (res["hits"][0]["_id"] == "Jupyter_12")
         assert (res["hits"][0]["_id"] != "abcdef") and (res["hits"][0]["_id"] != "abcdef")
 
-    def test_lexical_search_query_string(self):
-        """Tests query string functionalities. Ensures AND, OR, (), and double quotes all work as intended. """
+    def test_lexical_search_double_quotes(self):
+        # 2-tuples of input text, and required terms expected to be in the results.
+        docs = [
+            {
+                "Field 1": "gender is male. gang is cyberpunk. accessory is none.",
+                "Field 2": "",
+                "Field 3": "",
+                "_id": "0"
+            },
+            {
+                "Field 1": "gender is male. gang is cyberpunk. accessory is necklace.",
+                "Field 2": "",
+                "Field 3": "",
+                "_id": "1"
+            },
+            {
+                "Field 1": "gender is male. gang is random. accessory is none.",
+                "Field 2": "",
+                "Field 3": "",
+                "_id": "2"
+            },
+            {
+                "Field 1": "gender is male. gang is random. accessory is necklace.",
+                "Field 2": "",
+                "Field 3": "",
+                "_id": "3"
+            },
+            {
+                "Field 1": "gender is female. gang is cyberpunk. accessory is none.",
+                "Field 2": "",
+                "Field 3": "",
+                "_id": "4"
+            },
+            {
+                "Field 1": "gender is female. gang is cyberpunk. accessory is necklace.",
+                "Field 2": "",
+                "Field 3": "accessory is none.",
+                "_id": "5"
+            },
+            {
+                "Field 1": "gender is female. gang is random. accessory is none.",
+                "Field 2": "",
+                "Field 3": "",
+                "_id": "6"
+            },
+            {
+                "Field 1": "gender is female. gang is random. accessory is necklace.",
+                "Field 2": "accessory is none.",
+                "Field 3": "",
+                "_id": "7"
+            },
+        ]
+        fields = ["Field 1", "Field 2", "Field 3"]
 
-        num_docs = 200
-        vocab = ["alpha", "bravo", "charlie", "delta", "echo"]
-
-        docs = [{"Field 1": (" ".join(random.choices(population=vocab, k=5))),
-                    "Field 2": (" ".join(random.choices(population=vocab, k=5))),
-                    "_id": str(i)
-                    }
-                  for i in range(num_docs)]
-        
         tensor_search.add_documents(
             config=self.config, index_name=self.index_name_1,
             docs=docs, auto_refresh=False
         )
         tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
 
-        # AND TEST
-        res = tensor_search._lexical_search(
-            config=self.config, index_name=self.index_name_1, text='alpha AND bravo',
-            return_doc_ids=True, searchable_attributes=["Field 1", "Field 2"], result_count=num_docs)
+        cases = [
+            {"input": '"gender is female"', "required_terms": ["gender is female"]},
+            {"input": '"gender is female" "random"', "required_terms": ["gender is female", "random"]},
+            {"input": 'male cyberpunk none "accessory is necklace"', 
+                "required_terms": ["accessory is necklace"],
+                "first_n_results_ordered": ['5', '1', '3', '7']},
+            {"input": '"cyberpunk1234" necklace', "no_results": True},
+            {"input": 'cyberpunk1234 necklace',
+                "first_n_results_unordered": ['7', '1', '3', '5']},
+            {"input": '"accessory is none"', "required_terms": ["accessory is none"]}, # Multi-field testing
 
-        for hit in res["hits"]:
-            assert (("alpha" in hit["Field 1"]) and ("bravo" in hit["Field 1"])) \
-            or (("alpha" in hit["Field 2"]) and ("bravo" in hit["Field 2"]))
+            # Escaped quotes
+            {"input": '\\"fake term\\" not required, this should yield results male',
+                "first_n_results_unordered": ['3', '0', '2', '1']},
+            {"input": '"fake term" is required, this should yield no results', "no_results": True},
 
-        # OR TEST
-        res = tensor_search._lexical_search(
-            config=self.config, index_name=self.index_name_1, text='charlie OR delta',
-            return_doc_ids=True, searchable_attributes=["Field 1", "Field 2"], result_count=num_docs)
-        for hit in res["hits"]:
-            assert (("charlie" in hit["Field 1"]) or ("delta" in hit["Field 1"])) \
-            or (("charlie" in hit["Field 2"]) or ("delta" in hit["Field 2"]))
-        
-        # DOUBLE QUOTE TEST
-        res = tensor_search._lexical_search(
-            config=self.config, index_name=self.index_name_1, text='"alpha echo delta"',
-            return_doc_ids=True, searchable_attributes=["Field 1", "Field 2"], result_count=num_docs)
+            # Syntax errors (should not return errors)
+            {"input": '"gender is fe"male male"',
+                "first_n_results_unordered": ['3', '0', '2', '1']},
+            {"input": '"""', "no_results": True},
+            {"input": '"term1 " term2 "', "no_results": True},
+            {"input": '"AND OR &*) ((', "no_results": True}
+        ]
 
-        for hit in res["hits"]:
-            assert ("alpha echo delta" in hit["Field 1"]) \
-            or ("alpha echo delta" in hit["Field 2"])
+        for case in cases:
+            res = tensor_search._lexical_search(
+                config=self.config, index_name=self.index_name_1, text=case['input'],
+                return_doc_ids=True, searchable_attributes=fields, result_count=8)
 
-        # COMPLEX TEST
-        res = tensor_search._lexical_search(
-            config=self.config, index_name=self.index_name_1, text='("alpha bravo" AND charlie) OR (delta AND echo)',
-            return_doc_ids=True, searchable_attributes=["Field 1", "Field 2"], result_count=num_docs)
+            id_only_hits = [hit["_id"] for hit in res["hits"]]
 
-        for hit in res["hits"]:
-            assert \
-            (   \
-                (("alpha bravo" in hit["Field 1"]) and ("charlie" in hit["Field 1"])) \
-                or (("delta" in hit["Field 1"]) and ("echo" in hit["Field 1"])) \
-            )   \
-            or (    \
-                (("alpha bravo" in hit["Field 2"]) and ("charlie" in hit["Field 2"])) \
-                or (("delta" in hit["Field 2"]) and ("echo" in hit["Field 2"])) \
-            )
+            if "required_terms" in case:
+                for hit in res["hits"]:
+                    for term in case["required_terms"]:
+                        term_found = False
+
+                        for field in fields:
+                            if term in hit[field]:
+                                term_found = True
+                                break
+                        
+                        assert term_found
+            
+            if "first_n_results_unordered" in case:
+                n = len(case["first_n_results_unordered"])
+                assert set(id_only_hits[:n]) == set(case["first_n_results_unordered"]) 
+            
+            if "first_n_results_ordered" in case:
+                n = len(case["first_n_results_ordered"])
+                assert id_only_hits[:n] == case["first_n_results_ordered"]
+            
+            if "no_results" in case:
+                assert len(id_only_hits) == 0

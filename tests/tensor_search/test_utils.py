@@ -162,3 +162,59 @@ class TestUtils(unittest.TestCase):
                 assert expected == utils.read_env_vars_and_defaults(var=key)
                 return True
             assert run()
+
+    def test_parse_lexical_query(self):
+        # 2-tuples of input text, and expected parse_lexical_query() output
+        cases = [
+            ('just a string', ([], 'just a string')),
+            ('just a "string"', (["string"], 'just a')),
+            ('just "a" string', (["a"], 'just string')),
+            ('"just" a string', (["just"], 'a string')),
+            ('just "a long long " string', (["a long long "], 'just string')),
+            ('"required 1 " not required " required2" again', (["required 1 ", " required2"], 'not required again')),
+            ('"just" "just" "" a string', (["just", "just", ""], 'a string')),
+
+            ('朋友你好', ([], '朋友你好')),
+            ('朋友 "你好"', (["你好"], '朋友')),
+            # spaces get introduced, even though Chinese doesn't use them:
+            ('你好 "老" 朋友', (["老"], '你好 朋友')),
+            ('"朋友" 你好', (["朋友"], '你好')),
+
+            ('', ([], '')),
+            ('"cookie"', (["cookie"], '')),
+            ('"朋友"', (["朋友"], '')),
+            ('"', ([], '"')),
+            ('"""hello', ([], '"""hello')),
+            ('""" python docstring appeared"""', ([], '""" python docstring appeared"""')),
+            ('""', ([''], '')),
+            ('what about backticks `?', ([], 'what about backticks `?')),
+            ('\\" escaped quotes\\"  what happens here?', ([], '" escaped quotes" what happens here?')),
+            ('\\"朋友\\"', ([], '"朋友"')),
+            ('double  spaces  get  removed', ([], 'double spaces get removed')),
+            ('"go"od"', ([], '"go"od"')),
+            ('"ter"m1" term2', ([], '"ter"m1" term2')),
+            ('"term1" "term2" "term3', ([], '"term1" "term2" "term3')),
+            ('"good', ([], '"good')),
+            ('"朋友', ([], '"朋友')),
+
+            # on Lucene, these unusual structures seem to get passed straight through as well.
+            # The quotes seem to be completely ignored (with and without quotes yields identical results,
+            # including scores):
+            ('"go"od" a"', ([], '"go"od" a"')),
+            ('"sam"a', ([], '"sam"a')),
+            ('"sam"?', ([], '"sam"?')),
+            ('"朋友"你好', ([], '"朋友"你好')),
+
+        ]
+        for input, expected_output in cases:
+            assert utils.parse_lexical_query(input) == expected_output
+
+    def test_parse_lexical_query_non_string(self):
+        non_strings = [124, None, 1.4, False, dict(), [1, 2]]
+
+        for ns in non_strings:
+            try:
+                utils.parse_lexical_query(ns)
+                raise AssertionError
+            except TypeError as e:
+                assert "string as input" in str(e)
