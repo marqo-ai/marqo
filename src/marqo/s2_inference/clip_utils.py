@@ -19,6 +19,7 @@ import marqo.s2_inference.model_registry as model_registry
 from marqo.s2_inference.errors import InvalidModelDeviceError, InvalidModelPropertiesError
 from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize
 from marqo.s2_inference.processing.custom_clip_utils import HFTokenizer, download_pretrained_from_url
+from clip import load as openai_clip_load
 
 logger = get_logger(__name__)
 
@@ -227,12 +228,13 @@ class CLIP:
 
 
             self.model, self.preprocess = self.custom_clip_load()
-            self.model.eval()
-
             self.tokenizer = self.load_tokenizer()
+
+            self.model.eval()
 
 
     def custom_clip_load(self):
+        # TODO Figure how to get the same results as open_clip package
         # This function can load both openai clip and open_clip models
         # Check https://github.com/mlfoundations/open_clip/blob/db7504f070b4e76e6c8578ee7b73596267083a19/src/clip/openai_clip.py#L121-L189
         try:

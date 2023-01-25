@@ -245,12 +245,11 @@ class TestGenericModelSupport(MarqoTestCase):
         self.assertRaises(UnknownModelError, _validate_model_properties, model_name, model_properties)
 
 
-    def test_vectorise_custom_clip_encode_results(self):
+    def test_vectorise_custom_openai_clip_encode_image_results(self):
 
         epsilon = 1e-7
 
         image = "https://raw.githubusercontent.com/marqo-ai/marqo-clip-onnx/main/examples/coco.jpg"
-        text = "this is a test to test the custom clip output results"
 
         model_name = "test-model"
         model_properties = {
@@ -265,8 +264,63 @@ class TestGenericModelSupport(MarqoTestCase):
 
         assert np.abs(np.array(a) - np.array(b)).sum() < epsilon
 
+
+    def test_vectorise_custom_openai_clip_encode_text_results(self):
+
+        epsilon = 1e-7
+        text = "this is a test to test the custom clip output results"
+
+        model_name = "test-model"
+        model_properties = {
+                            "name": "openai custom model",
+                            "dimensions": 512,
+                            "url": "https://openaipublic.azureedge.net/clip/models/40d365715913c9da98579312b702a82c18be219cc2a73407c4526f58eba950af/ViT-B-32.pt",
+                            "type": "clip",
+                            }
+
         a = vectorise(model_name, content=text, model_properties=model_properties)
         b = vectorise("ViT-B/32", content=text)
 
         assert np.abs(np.array(a) - np.array(b)).sum() < epsilon
+
+    def test_vectorise_custom_open_clip_encode_image_results(self):
+
+        epsilon = 1e-7
+
+        image = "https://raw.githubusercontent.com/marqo-ai/marqo-clip-onnx/main/examples/coco.jpg"
+
+        model_name = "test-model"
+        model_properties = {
+                            "name": "open_clip custom model",
+                            "dimensions": 512,
+                            "url": "https://github.com/mlfoundations/open_clip/releases/download/v0.2-weights/vit_b_32-quickgelu-laion400m_e31-d867053b.pt",
+                            "type": "clip",
+                            "jit" : False
+                            }
+
+        a = vectorise(model_name, content = image, model_properties = model_properties)
+        b = vectorise("open_clip/ViT-B-32-quickgelu/laion400m_e31", content = image)
+
+        assert np.abs(np.array(a) - np.array(b)).sum() < epsilon
+
+
+    def test_vectorise_custom_open_clip_encode_text_results(self):
+        epsilon = 1e-7
+        text = "this is a test to test the custom clip output results"
+
+        model_name = "test-model"
+        model_properties = {
+            "name": "open_clip custom model",
+            "dimensions": 512,
+            "url": "https://github.com/mlfoundations/open_clip/releases/download/v0.2-weights/vit_b_32-quickgelu-laion400m_e31-d867053b.pt",
+            "type": "clip",
+            "jit": False
+        }
+
+
+        a = vectorise(model_name, content=text, model_properties=model_properties)
+        b = vectorise("open_clip/ViT-B-32-quickgelu/laion400m_e31", content=text)
+
+        assert np.abs(np.array(a) - np.array(b)).sum() < epsilon
+
 
