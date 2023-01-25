@@ -212,7 +212,7 @@ class CLIP:
             self.model = self.model.to(self.device)
             self.tokenizer = clip.tokenize
         else:
-            logger.info("Detecting custom clip model path. We use generic model loading.")
+            logger.info("Detecting custom clip model path. We use generic clip model loading.")
             if os.path.isfile(path):
                 self.model_path = path
             elif validators.url(path):
