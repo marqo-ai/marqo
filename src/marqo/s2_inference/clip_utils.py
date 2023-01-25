@@ -13,7 +13,6 @@ import transformers
 
 from marqo.s2_inference.types import *
 from marqo.s2_inference.logger import get_logger
-import marqo.s2_inference.model_registry as model_registry
 
 logger = get_logger(__name__)
 
@@ -276,7 +275,7 @@ class MULTILINGUAL_CLIP(CLIP):
                             truncate: bool = True, **kwargs) -> None:
 
         self.model_name = model_type
-        self.model_info = model_registry._get_multilingual_clip_properties()[self.model_name]
+        self.model_info = get_multilingual_clip_properties()[self.model_name]
         self.visual_name = self.model_info["visual_model"]
         self.textual_name = self.model_info["textual_model"]
         self.device = device
@@ -341,10 +340,48 @@ class MULTILINGUAL_CLIP(CLIP):
         return self._convert_output(outputs)
 
 
+def get_multilingual_clip_properties() -> Dict:
+    """This is moved here from the model registry to avoid a circular import"""
+    # Models are from github repo
+    # https://github.com/FreddeFrallan/Multilingual-CLIP
+    MULTILINGUAL_CLIP_PROPERTIES = {
+        "multilingual-clip/XLM-Roberta-Large-Vit-L-14":
+            {
+                "name": "multilingual-clip/XLM-Roberta-Large-Vit-L-14",
+                "visual_model": "openai/ViT-L/14",
+                "textual_model": 'M-CLIP/XLM-Roberta-Large-Vit-L-14',
+                "dimensions": 768,
+                "type": "multilingual_clip",
+            },
 
+        "multilingual-clip/XLM-R Large Vit-B/16+":
+            {
+                "name": "multilingual-clip/XLM-R Large Vit-B/16+",
+                "visual_model": "open_clip/ViT-B-16-plus-240/laion400m_e32",
+                "textual_model": 'M-CLIP/XLM-Roberta-Large-Vit-B-16Plus',
+                "dimensions": 640,
+                "type": "multilingual_clip",
+            },
 
+        "multilingual-clip/XLM-Roberta-Large-Vit-B-32":
+            {
+                "name": "multilingual-clip/XLM-Roberta-Large-Vit-B-32",
+                "visual_model": "openai/ViT-B/32",
+                "textual_model": 'M-CLIP/XLM-Roberta-Large-Vit-B-32',
+                "dimensions": 512,
+                "type": "multilingual_clip",
+            },
 
-
+        "multilingual-clip/LABSE-Vit-L-14":
+            {
+                "name": "multilingual-clip/LABSE-Vit-L-14",
+                "visual_model": "openai/ViT-L/14",
+                "textual_model": 'M-CLIP/LABSE-Vit-L-14',
+                "dimensions": 768,
+                "type": "multilingual_clip",
+            }
+    }
+    return MULTILINGUAL_CLIP_PROPERTIES
 
 
 
