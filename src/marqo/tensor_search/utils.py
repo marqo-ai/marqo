@@ -5,7 +5,9 @@ import json
 import torch
 from marqo import errors
 from marqo.tensor_search import enums, configs
-from typing import List, Optional, Union, Callable, Iterable, Sequence, Dict
+from typing import (
+    List, Optional, Union, Callable, Iterable, Sequence, Dict, Tuple
+)
 import copy
 import datetime
 
@@ -183,20 +185,31 @@ def read_env_vars_and_defaults(var: str) -> Optional[str]:
             return None
 
 
-def parse_lexical_query(text: str):
-    """
-    Find required terms enclosed in opening/closing double quotes. 
+def parse_lexical_query(text: str) -> Tuple[List[str], str]:
+    """Find required terms enclosed within double quotes.
+
     All other terms go into optional_blob, separated by whitespace.
 
-    Double quote can be either opening, closing, or escaped.
-    Escaped double quotes are interpreted literally.
-    If any double quotes exist that are neither opening, closing, nor escaped, interpret entire string literally instead.
+    Syntax:
+        Required strings must be enclosed by quotes
+
+    Notes:
+        Double quote can be either opening, closing, or escaped.
+        Escaped double quotes are interpreted literally.
+        If any double quotes exist that are neither opening, closing, nor escaped,
+        interpret entire string literally instead.
 
     Users need to escape the backslash itself. (Single \ get ignored) -> q='dwayne \\"the rock\\" johnson'
+
+    Return:
+        2-tuple of <required terms> (for "must" clause) <optional blob> (for "should" clause)
     """
     required_terms = []
     optional_blob = ""
     opening_quote_idx = None
+
+    if not isinstance(text, str):
+        raise TypeError("parse_lexical_query must have string as input")
 
     for i in range(len(text)):
         # Add all characters to blob initially
@@ -211,7 +224,6 @@ def parse_lexical_query(text: str):
             # Check if CLOSING QUOTE
             # Closing " must have space on the right (or is last character) while opening exists.
             elif (opening_quote_idx is not None) and (i == len(text) - 1 or text[i+1] == " "):
-
                     # Add everything in between the quotes as a required term
                     new_required_term = text[opening_quote_idx+1:i]
                     required_terms.append(new_required_term)
@@ -228,8 +240,11 @@ def parse_lexical_query(text: str):
             # None of the above: Syntax error. Interpret text literally instead.
             else:
                 return([], text)
-                
-            
+
+    if opening_quote_idx is not None:
+        # string parsing finished with a quote still open: syntax error.
+        return ([], text)
+
     # Remove double/leading white spaces
     optional_blob = " ".join(optional_blob.split())
 
