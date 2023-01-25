@@ -191,7 +191,8 @@ def parse_lexical_query(text: str) -> Tuple[List[str], str]:
     All other terms go into optional_blob, separated by whitespace.
 
     Syntax:
-        Required strings must be enclosed by quotes
+        Required strings must be enclosed by quotes. These quotes must be enclosed by spaces or the start
+        or end of the text
 
     Notes:
         Double quote can be either opening, closing, or escaped.
