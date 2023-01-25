@@ -3,6 +3,9 @@ from typing import Union, List
 import torch
 import ftfy
 import html
+import os
+import urllib
+from tqdm import tqdm
 
 def whitespace_clean(text):
     text = re.sub(r'\s+', ' ', text)
@@ -30,3 +33,30 @@ class HFTokenizer:
         texts = [whitespace_clean(basic_clean(text)) for text in texts]
         input_ids = self.tokenizer(texts, return_tensors='pt', max_length=context_length, padding='max_length', truncation=True).input_ids
         return input_ids
+
+
+def download_pretrained_from_url(
+        url: str,
+        cache_dir: Union[str, None] = None,
+):
+    if not cache_dir:
+        cache_dir = os.path.expanduser("~/.cache/clip")
+    os.makedirs(cache_dir, exist_ok=True)
+    filename = os.path.basename(url)
+
+    download_target = os.path.join(cache_dir, filename)
+
+    if os.path.isfile(download_target):
+        return download_target
+
+    with urllib.request.urlopen(url) as source, open(download_target, "wb") as output:
+        with tqdm(total=int(source.headers.get("Content-Length")), ncols=80, unit='iB', unit_scale=True) as loop:
+            while True:
+                buffer = source.read(8192)
+                if not buffer:
+                    break
+
+                output.write(buffer)
+                loop.update(len(buffer))
+
+    return download_target
