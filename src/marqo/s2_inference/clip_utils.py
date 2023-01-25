@@ -1,6 +1,8 @@
 # from torch import FloatTensor
 # from typing import Any, Dict, List, Optional, Union
 import os
+
+import PIL.Image
 import validators
 import requests
 import numpy as np
@@ -34,11 +36,23 @@ except ImportError:
     BICUBIC = Image.BICUBIC
 
 
-def _convert_image_to_rgb(image):
+def _convert_image_to_rgb(image: ImageType) -> ImageType:
+    # Take a PIL.Image.Image and return its RGB version
     return image.convert("RGB")
 
 
-def _get_transform(n_px: int, image_mean:List[float] = None, image_std:List[float] = None):
+def _get_transform(n_px: int, image_mean:List[float] = None, image_std: List[float] = None) -> torch.Tensor:
+    '''
+
+    Args:
+        n_px: the size of the processed image
+        image_mean: the mean of the image used for normalization
+        image_std: the std of the image used for normalization
+
+    Returns:
+        the processed image tensor wit shape (3, n_px, n_px)
+
+    '''
     img_mean = image_mean or OPENAI_DATASET_MEAN
     img_std = image_std or OPENAI_DATASET_STD
     return Compose([
@@ -124,6 +138,7 @@ def format_and_load_CLIP_image(image: Union[str, ndarray, ImageType]) -> ImageTy
         raise UnidentifiedImageError(f"input of type {type(image)} did not match allowed types of str, np.ndarray, ImageType")
 
     return img
+
 
 def _is_image(inputs: Union[str, List[Union[str, ImageType, ndarray]]]) -> bool:
     # some logic to determine if something is an image or not
@@ -217,7 +232,7 @@ class CLIP:
 
 
     def custom_clip_load(self):
-        # loading the open clip model
+        # This function can load both openai clip and open_clip models
         # Check https://github.com/mlfoundations/open_clip/blob/db7504f070b4e76e6c8578ee7b73596267083a19/src/clip/openai_clip.py#L121-L189
         try:
             # loading JIT archive
