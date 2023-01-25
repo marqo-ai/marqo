@@ -217,6 +217,8 @@ class CLIP:
                 self.model_path = path
             elif validators.url(path):
                 self.model_path = download_pretrained_from_url(path)
+            else:
+                raise InvalidModelPropertiesError(f"The provided model path {path} is neither a local file nor a valid url.")
 
             self.jit = self.model_properties.get("jit", False)
             self.device = self.model_properties.get("device", "cpu")
