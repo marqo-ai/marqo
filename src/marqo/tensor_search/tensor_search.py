@@ -616,16 +616,16 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
     total_preproc_time = end_time_3 - start_time_3
     logger.info(f"      add_documents pre-processing: took {(total_preproc_time):.3f}s total for {batch_size} docs, "
                 f"for an average of {(total_preproc_time / batch_size):.3f}s per doc.")
-
+    
     logger.info(f"          add_documents vectorise: took {(total_vectorise_time):.3f}s for {batch_size} docs, " 
                 f"for an average of {(total_vectorise_time / batch_size):.3f}s per doc.")
-
+    
     if bulk_parent_dicts:
         # the HttpRequest wrapper handles error logic
         update_mapping_response = backend.add_customer_field_properties(
             config=config, index_name=index_name, customer_field_names=new_fields,
             model_properties=_get_model_properties(index_info))
-
+        
         # ADD DOCS TIMER-LOGGER (5)
         start_time_5 = timer()
         index_parent_response = HttpRequests(config).post(
@@ -635,7 +635,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
         total_index_time = index_parent_response["took"] * 0.001
         logger.info(f"      add_documents roundtrip: took {(total_http_time):.3f}s to send {batch_size} docs (roundtrip) to Marqo-os, " 
                     f"for an average of {(total_http_time / batch_size):.3f}s per doc.")
-
+        
         logger.info(f"          add_documents Marqo-os index: took {(total_index_time):.3f}s for Marqo-os to index {batch_size} docs, "
                     f"for an average of {(total_index_time / batch_size):.3f}s per doc.")
     else:
@@ -811,7 +811,7 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, of
     if result_count <= 0:
         raise errors.IllegalRequestedDocCount("search result limit must be greater than 0!")
     if offset < 0:
-        raise errors.IllegalRequestedDocCount("search result offset cannot be less than 0!")
+        raise errors.IllegalRequestedDocCount("search result offset cannot be less than 0!")   
 
     # Validate result_count + offset <= int(max_docs_limit)
     max_docs_limit = utils.read_env_vars_and_defaults(EnvVars.MARQO_MAX_RETRIEVABLE_DOCS)
@@ -822,7 +822,7 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, of
 
         raise errors.IllegalRequestedDocCount(f"{upper_bound_explanation} Marqo received search result limit of `{result_count}` "
                                             f"and offset of `{offset}`.")
-
+    
 
     t0 = timer()
 
@@ -876,7 +876,7 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, of
         except Exception as e:
             raise errors.BadRequestError(f"reranking failure due to {str(e)}")
 
-
+    
     search_result["query"] = text
     search_result["limit"] = result_count
     search_result["offset"] = offset
@@ -884,7 +884,7 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, of
     if not highlights:
         for hit in search_result["hits"]:
             del hit["_highlights"]
-
+    
     time_taken = timer() - t0
     search_result["processingTimeMs"] = round(time_taken * 1000)
     logger.info(f"search ({search_method.lower()}) completed with total processing time: {(time_taken):.3f}s.")
@@ -931,17 +931,34 @@ def _lexical_search(
         fields_to_search = index_meta_cache.get_index_info(
             config=config, index_name=index_name
         ).get_true_text_properties()
-
+    
     # Validation for offset (pagination is single field)
     if len(fields_to_search) != 1 and offset > 0:
         raise errors.InvalidArgError(f"Pagination (offset > 0) is only supported for single field searches! Your search currently has {len(fields_to_search)} fields: {fields_to_search}")
 
+    # Parse text into required and optional terms.
+    (required_terms, optional_blob) = utils.parse_lexical_query(text)
+
     body = {
         "query": {
             "bool": {
+                # Optional blob terms SHOULD be in results.
                 "should": [
-                    {"query_string": {"query": text, "fields": [field]}}
+                    {"match": {field: optional_blob}}
                     for field in fields_to_search
+                ],
+                # Required terms MUST be in results.
+                "must": [
+                    {
+                        # Nested bool, since required term can be in ANY field.
+                        "bool": {
+                            "should": [
+                                {"match_phrase": {field: term}}
+                                for field in fields_to_search
+                            ]
+                        }
+                    }
+                    for term in required_terms
                 ],
                 "must_not": [
                     {"exists": {"field": TensorField.field_name}}
@@ -961,11 +978,11 @@ def _lexical_search(
             body["_source"] = dict()
         if body["_source"] is not False:
             body["_source"]["exclude"] = [f"*{TensorField.vector_prefix}*"]
-
+    
     end_preprocess_time = timer()
     total_preprocess_time = end_preprocess_time - start_preprocess_time
     logger.info(f"search (lexical) pre-processing: took {(total_preprocess_time):.3f}s to process query.")
-
+    
     start_search_http_time = timer()
     search_res = HttpRequests(config).get(path=f"{index_name}/_search", body=body)
 
@@ -986,11 +1003,11 @@ def _lexical_search(
             just_doc["_id"] = doc["_id"]
             just_doc["_score"] = doc["_score"]
         res_list.append({**just_doc, "_highlights": []})
-
+    
     end_postprocess_time = timer()
     total_postprocess_time = end_postprocess_time - start_postprocess_time
     logger.info(f"search (lexical) post-processing: took {(total_postprocess_time):.3f}s to format {len(res_list)} results.")
-
+    
     return {'hits': res_list}
 
 
@@ -1040,7 +1057,7 @@ def _vector_text_search(
         raise errors.InvalidArgError(
             "filtering not yet implemented for S2Search cloud!"
         )
-
+    
     # SEARCH TIMER-LOGGER (pre-processing)
     start_preprocess_time = timer()
     try:
@@ -1149,7 +1166,7 @@ def _vector_text_search(
         # empty body means that there are no vector fields associated with the index.
         # This probably means the index is emtpy
         return {"hits": []}
-
+    
     end_preprocess_time = timer()
     total_preprocess_time = end_preprocess_time - start_preprocess_time
     logger.info(f"search (tensor) pre-processing: took {(total_preprocess_time):.3f}s to vectorize and process query.")
@@ -1163,7 +1180,7 @@ def _vector_text_search(
     total_os_process_time = response["took"] * 0.001
     num_responses = len(response["responses"])
     logger.info(f"search (tensor) roundtrip: took {(total_search_http_time):.3f}s to send {num_responses} search queries (roundtrip) to Marqo-os.")
-
+    
     try:
         responses = [r['hits']['hits'] for r in response["responses"]]
 
@@ -1209,7 +1226,7 @@ def _vector_text_search(
                     "doc": doc,
                     "chunks": doc_chunks
                 }
-
+    
     # Filter out docs with no inner hits:
 
     for doc_id in list(gathered_docs.keys()):
@@ -1287,6 +1304,7 @@ def _vector_text_search(
     total_postprocess_time = end_postprocess_time - start_postprocess_time
     logger.info(f"search (tensor) post-processing: took {(total_postprocess_time):.3f}s to sort and format {len(completely_sorted)} results from Marqo-os.")
     return res
+
 
 def check_health(config: Config):
     TIMEOUT = 3
