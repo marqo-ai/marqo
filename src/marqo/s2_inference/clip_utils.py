@@ -231,12 +231,10 @@ class CLIP:
             self.mean = self.model_properties.get("mean", None)
             self.std = self.model_properties.get("std", None)
 
-
             self.model, self.preprocess = self.custom_clip_load()
             self.tokenizer = self.load_tokenizer()
 
             self.model.eval()
-
 
 
     def custom_clip_load(self):
