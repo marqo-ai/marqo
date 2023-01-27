@@ -100,17 +100,24 @@ def _validate_model_properties(model_name: str, model_properties: dict) -> dict:
     if model_properties is not None:
         """checks model dict to see if all required keys are present
         """
-        required_keys = ["name", "dimensions"]
-        for key in required_keys:
-            if key not in model_properties:
-                raise InvalidModelPropertiesError(f"model_properties has missing key '{key}'. ")
+        if model_properties.get("type", None) is None or "sbert":
+            required_keys = ["name", "dimensions"]
+            for key in required_keys:
+                if key not in model_properties:
+                    raise InvalidModelPropertiesError(f"model_properties has missing key '{key}'. ")
 
-        """updates model dict with default values if optional keys are missing
-        """
-        optional_keys_values = [("type", "sbert"), ("tokens", get_default_seq_length())]
-        for key, value in optional_keys_values:
-            if key not in model_properties:
-                model_properties[key] = value
+            """updates model dict with default values if optional keys are missing
+            """
+            optional_keys_values = [("type", "sbert"), ("tokens", get_default_seq_length())]
+            for key, value in optional_keys_values:
+                if key not in model_properties:
+                    model_properties[key] = value
+
+        elif model_properties("type", None) is "clip":
+            required_keys = ["name", "dimensions"]
+            for key in required_keys:
+                if key not in model_properties:
+                    raise InvalidModelPropertiesError(f"model_properties has missing key '{key}'. ")
 
     else:
         model_properties = get_model_properties_from_registry(model_name)
