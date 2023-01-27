@@ -5,7 +5,7 @@
 - Exact text matching (https://github.com/marqo-ai/marqo/pull/243, https://github.com/marqo-ai/marqo/pull/288). Search for specific words and phrases using double quotes (`" "`) in lexical search. See usage [here](https://docs.marqo.ai/0.0.12/API-Reference/search/#lexical-search-exact-matches).  
 
 ## Optimisations 
-- Search speed-up(https://github.com/marqo-ai/marqo/pull/278). Reconfigured Marqo-os indexes to reduce latency. 
+- Search speed-up (https://github.com/marqo-ai/marqo/pull/278). Latency reduction from Marqo-os indexes reconfigurations. 
 
 ## Contributor shout-outs
 Thank you to our 2.2k stargazers and 80+ forkers!
