@@ -7,6 +7,9 @@
 ## Optimisations 
 - Search speed-up(https://github.com/marqo-ai/marqo/pull/278). Reconfigured Marqo-os indexes to reduce latency. 
 
+## Contributor shout-outs
+Thank you to our 2.2k stargazers and 80+ forkers!
+
 # Release 0.0.11
 
 ## New features 
