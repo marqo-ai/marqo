@@ -935,4 +935,34 @@ class TestVectorSearch(MarqoTestCase):
             except InvalidArgError:
                 pass
     
-    
+    def test_image_search_highlights(self):
+        """does the URL get returned as the highlight? (it should - because no rerankers are being used)"""
+        settings = {
+            "index_defaults": {
+                "treat_urls_and_pointers_as_images": True,
+                "model": "ViT-B/32",
+            }}
+        tensor_search.create_vector_index(
+            index_name=self.index_name_1, index_settings=settings, config=self.config
+        )
+        url_1 = "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png"
+        url_2 = "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png"
+        docs = [
+            {"_id": "123",
+             "image_field": url_1,
+             "text_field": "some words here"
+             },
+            {"_id": "789",
+             "image_field": url_2},
+        ]
+        tensor_search.add_documents(
+            config=self.config, auto_refresh=True, index_name=self.index_name_1, docs=docs
+        )
+        res = tensor_search.search(
+            config=self.config, index_name=self.index_name_1, text="some text", result_count=3,
+            searchable_attributes=['image_field']
+        )
+        assert len(res['hits']) == 2
+        assert {hit['image_field'] for hit in res['hits']} == {url_2, url_1}
+        # print([hit['_highlights']['image_field'] for hit in res['hits']])
+        assert {hit['_highlights']['image_field'] for hit in res['hits']} == {url_2, url_1}

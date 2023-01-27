@@ -339,7 +339,8 @@ def _infer_opensearch_data_type(
 
 
 def add_documents(config: Config, index_name: str, docs: List[dict], auto_refresh: bool,
-                  non_tensor_fields=None, device=None, update_mode: str = "replace"):
+                  non_tensor_fields=None, device=None, update_mode: str = "replace",
+                  image_download_thread_count: int = 20):
     """
 
     Args:
@@ -351,7 +352,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
           make tensors for all fields.
         device: Device used to carry out the document update.
         update_mode: {'replace' | 'update'}. If set to replace (default) just
-
+        image_download_thread_count: number of threads used to concurrently download images
     Returns:
 
     """
@@ -390,7 +391,8 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
     if index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]:
         ti_0 = timer()
         image_repo = add_docs.download_images(docs=docs, thread_count=20)
-        print("download image time: ", timer() - ti_0)
+        logger.info(f"          add_documents image download: took {(timer() - ti_0):.3f}s to concurrently download "
+                    f"images for {batch_size} docs using {image_download_thread_count} threads ")
 
     for i, doc in enumerate(docs):
 
@@ -481,8 +483,12 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                                 raise s2_inference_errors.S2InferenceError(f"Could not find image found at `{field_content}`")
                         else:
                             image_data = field_content
-                        content_chunks, text_chunks = image_processor.chunk_image(
-                            image_data, device=selected_device, method=image_method)
+                        if image_method not in [None, 'none', '', "None", ' ']:
+                            content_chunks, text_chunks = image_processor.chunk_image(
+                                image_data, device=selected_device, method=image_method)
+                        else:
+                            # if we are not chunking, then we set both chunks to the image URL
+                            content_chunks, text_chunks = [field_content], [field_content]
                     except s2_inference_errors.S2InferenceError:
                         document_is_valid = False
                         image_err = errors.InvalidArgError(message=f'Could not process given image: {field_content}')
