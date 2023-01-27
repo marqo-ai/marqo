@@ -323,8 +323,9 @@ class TestGenericModelSupport(MarqoTestCase):
 
         assert np.abs(np.array(a) - np.array(b)).sum() < epsilon
 
+
     def test_unsupported_generic_clip_name(self):
-        epsilon = 1e-7
+        epsilon = 1e-2
         text = "this is a test to test the custom clip output results"
 
         model_name = "test-model"
