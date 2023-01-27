@@ -323,4 +323,22 @@ class TestGenericModelSupport(MarqoTestCase):
 
         assert np.abs(np.array(a) - np.array(b)).sum() < epsilon
 
+    def test_unsupported_generic_clip_name(self):
+        epsilon = 1e-7
+        text = "this is a test to test the custom clip output results"
+
+        model_name = "test-model"
+        model_properties = {
+            "name": "this is a test name",
+            "dimensions": 512,
+            "url": "https://github.com/mlfoundations/open_clip/releases/download/v0.2-weights/vit_b_32-quickgelu-laion400m_e31-d867053b.pt",
+            "type": "clip",
+            "jit": False
+        }
+
+        a = vectorise(model_name, content=text, model_properties=model_properties)
+        b = vectorise("open_clip/ViT-B-32-quickgelu/laion400m_e31", content=text)
+
+        assert np.abs(np.array(a) - np.array(b)).sum() < epsilon
+
 

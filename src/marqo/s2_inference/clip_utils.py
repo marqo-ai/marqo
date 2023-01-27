@@ -27,8 +27,10 @@ logger = get_logger(__name__)
 OPENAI_DATASET_MEAN = (0.48145466, 0.4578275, 0.40821073)
 OPENAI_DATASET_STD = (0.26862954, 0.26130258, 0.27577711)
 
+
 def get_allowed_image_types():
     return set(('.jpg', '.png', '.bmp', '.jpeg'))
+
 
 try:
     from torchvision.transforms import InterpolationMode
@@ -65,7 +67,6 @@ def _get_transform(n_px: int, image_mean:List[float] = None, image_std: List[flo
     ])
 
 
-
 def format_and_load_CLIP_images(images: List[Union[str, ndarray, ImageType]]) -> List[ImageType]:
     """takes in a list of strings, arrays or urls and either loads and/or converts to PIL
         for the clip model
@@ -87,6 +88,7 @@ def format_and_load_CLIP_images(images: List[Union[str, ndarray, ImageType]]) ->
         results.append(format_and_load_CLIP_image(image))
     
     return results
+
 
 def load_image_from_path(image_path: str) -> ImageType:
     """Loads an image into PIL from a string path that is either local or a url
@@ -113,6 +115,7 @@ def load_image_from_path(image_path: str) -> ImageType:
         raise UnidentifiedImageError(f"input str of {image_path} is not a local file or a valid url")
 
     return img
+
 
 def format_and_load_CLIP_image(image: Union[str, ndarray, ImageType]) -> ImageType:
     """standardizes the input to be a PIL image
@@ -184,6 +187,7 @@ def _is_image(inputs: Union[str, List[Union[str, ImageType, ndarray]]]) -> bool:
         return True
     else:
         raise UnidentifiedImageError(f"expected type Image or str for inputs but received type {type(thing)}")
+
 
 class CLIP:
     
