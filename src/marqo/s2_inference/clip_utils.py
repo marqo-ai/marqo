@@ -19,6 +19,7 @@ import marqo.s2_inference.model_registry as model_registry
 from marqo.s2_inference.errors import InvalidModelDeviceError, InvalidModelPropertiesError
 from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize
 from marqo.s2_inference.processing.custom_clip_utils import HFTokenizer, download_pretrained_from_url
+from open_clip.pretrained import _PRETRAINED
 from clip import load as openai_clip_load
 
 logger = get_logger(__name__)
@@ -233,74 +234,84 @@ class CLIP:
             self.model.eval()
 
 
+
     def custom_clip_load(self):
-        # TODO Figure how to get the same results as open_clip package
-        # This function can load both openai clip and open_clip models
-        # Check https://github.com/mlfoundations/open_clip/blob/db7504f070b4e76e6c8578ee7b73596267083a19/src/clip/openai_clip.py#L121-L189
-        try:
-            # loading JIT archive
-            model = torch.jit.load(self.model_path, map_location=self.device if self.jit else "cpu").eval()
-            state_dict = None
-        except RuntimeError:
-            # loading saved state dict
-            if self.jit:
-                self.jit = False
-            state_dict = torch.load(self.model_path, map_location="cpu")
+        self.model_name = self.model_properties.get("name", None)
 
-        if not self.jit:
+        if self.model_name in _PRETRAINED:
+            logger.info(f"The name of the custom clip model is {self.model_name}.")
+            model, _, preprocess = open_clip.create_model_and_transforms(model_name=self.model_name, pretrained=self.model_path)
+            return model, preprocess
+
+        else:
+            # This step can load both openai clip and open_clip models by the script file.
+            # Check https://github.com/mlfoundations/open_clip/blob/db7504f070b4e76e6c8578ee7b73596267083a19/src/clip/openai_clip.py#L121-L189
+
+            logger.info(f"The provided name `{self.model_name}` is not supported. We try to load from script file directly.")
             try:
-                model = build_model(state_dict or model.state_dict()).to(self.device)
-            except KeyError:
-                sd = {k[7:]: v for k, v in state_dict["state_dict"].items()}
-                model = build_model(sd).to(self.device)
+                # loading JIT archive
+                model = torch.jit.load(self.model_path, map_location=self.device if self.jit else "cpu").eval()
+                state_dict = None
+            except RuntimeError:
+                # loading saved state dict
+                if self.jit:
+                    self.jit = False
+                state_dict = torch.load(self.model_path, map_location="cpu")
 
-            if str(self.device) == "cpu":
-                model.float()
-            return model, _get_transform(model.visual.input_resolution, self.mean, self.std)
+            if not self.jit:
+                try:
+                    model = build_model(state_dict or model.state_dict()).to(self.device)
+                except KeyError:
+                    sd = {k[7:]: v for k, v in state_dict["state_dict"].items()}
+                    model = build_model(sd).to(self.device)
 
-        # patch the device names
-        device_holder = torch.jit.trace(lambda: torch.ones([]).to(torch.device(self.device)), example_inputs=[])
-        device_node = [n for n in device_holder.graph.findAllNodes("prim::Constant") if "Device" in repr(n)][-1]
+                if str(self.device) == "cpu":
+                    model.float()
+                return model, _get_transform(model.visual.input_resolution, self.mean, self.std)
 
-        def patch_device(module):
-            graphs = [module.graph] if hasattr(module, "graph") else []
-            if hasattr(module, "forward1"):
-                graphs.append(module.forward1.graph)
+            # patch the device names
+            device_holder = torch.jit.trace(lambda: torch.ones([]).to(torch.device(self.device)), example_inputs=[])
+            device_node = [n for n in device_holder.graph.findAllNodes("prim::Constant") if "Device" in repr(n)][-1]
 
-            for graph in graphs:
-                for node in graph.findAllNodes("prim::Constant"):
-                    if "value" in node.attributeNames() and str(node["value"]).startswith("cuda"):
-                        node.copyAttributes(device_node)
-
-        model.apply(patch_device)
-        patch_device(model.encode_image)
-        patch_device(model.encode_text)
-
-        # patch dtype to float32 on CPU
-        if str(self.device) == "cpu":
-            float_holder = torch.jit.trace(lambda: torch.ones([]).float(), example_inputs=[])
-            float_input = list(float_holder.graph.findNode("aten::to").inputs())[1]
-            float_node = float_input.node()
-
-            def patch_float(module):
+            def patch_device(module):
                 graphs = [module.graph] if hasattr(module, "graph") else []
                 if hasattr(module, "forward1"):
                     graphs.append(module.forward1.graph)
 
                 for graph in graphs:
-                    for node in graph.findAllNodes("aten::to"):
-                        inputs = list(node.inputs())
-                        for i in [1, 2]:  # dtype can be the second or third argument to aten::to()
-                            if inputs[i].node()["value"] == 5:
-                                inputs[i].node().copyAttributes(float_node)
+                    for node in graph.findAllNodes("prim::Constant"):
+                        if "value" in node.attributeNames() and str(node["value"]).startswith("cuda"):
+                            node.copyAttributes(device_node)
 
-            model.apply(patch_float)
-            patch_float(model.encode_image)
-            patch_float(model.encode_text)
+            model.apply(patch_device)
+            patch_device(model.encode_image)
+            patch_device(model.encode_text)
 
-            model.float()
+            # patch dtype to float32 on CPU
+            if str(self.device) == "cpu":
+                float_holder = torch.jit.trace(lambda: torch.ones([]).float(), example_inputs=[])
+                float_input = list(float_holder.graph.findNode("aten::to").inputs())[1]
+                float_node = float_input.node()
 
-        return model, _get_transform(model.visual.input_resolution, self.mean, self.std)
+                def patch_float(module):
+                    graphs = [module.graph] if hasattr(module, "graph") else []
+                    if hasattr(module, "forward1"):
+                        graphs.append(module.forward1.graph)
+
+                    for graph in graphs:
+                        for node in graph.findAllNodes("aten::to"):
+                            inputs = list(node.inputs())
+                            for i in [1, 2]:  # dtype can be the second or third argument to aten::to()
+                                if inputs[i].node()["value"] == 5:
+                                    inputs[i].node().copyAttributes(float_node)
+
+                model.apply(patch_float)
+                patch_float(model.encode_image)
+                patch_float(model.encode_text)
+
+                model.float()
+
+            return model, _get_transform(model.visual.input_resolution, self.mean, self.std)
 
 
     def load_tokenizer(self):
@@ -309,6 +320,7 @@ class CLIP:
         if tokenizer_name == "clip":
             return clip.tokenize
         else:
+            logger.info(f"Custom HFTokenizer is provided. Loading...")
             return HFTokenizer(tokenizer_name)
 
 

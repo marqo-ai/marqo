@@ -310,7 +310,7 @@ class TestGenericModelSupport(MarqoTestCase):
 
         model_name = "test-model"
         model_properties = {
-            "name": "open_clip custom model",
+            "name": "ViT-B-32-quickgelu",
             "dimensions": 512,
             "url": "https://github.com/mlfoundations/open_clip/releases/download/v0.2-weights/vit_b_32-quickgelu-laion400m_e31-d867053b.pt",
             "type": "clip",
