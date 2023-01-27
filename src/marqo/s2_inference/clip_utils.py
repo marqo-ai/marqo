@@ -241,7 +241,8 @@ class CLIP:
 
         if self.model_name in _PRETRAINED:
             logger.info(f"The name of the custom clip model is {self.model_name}.")
-            model, _, preprocess = open_clip.create_model_and_transforms(model_name=self.model_name, pretrained=self.model_path)
+            model, _, preprocess = open_clip.create_model_and_transforms(model_name=self.model_name, pretrained=self.model_path,
+                                                                         image_mean=self.mean, image_std=self.std)
             return model, preprocess
 
         else:
