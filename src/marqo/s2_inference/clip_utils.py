@@ -251,7 +251,7 @@ class CLIP:
             # This step can load both openai clip and open_clip models by the script file.
             # Check https://github.com/mlfoundations/open_clip/blob/db7504f070b4e76e6c8578ee7b73596267083a19/src/clip/openai_clip.py#L121-L189
 
-            logger.info(f"The provided name `{self.model_name}` is not supported. We try to load from script file directly.")
+            logger.info(f"The provided name `{self.model_name}` is not supported. Marqo try to load from script file directly.")
             try:
                 # loading JIT archive
                 model = torch.jit.load(self.model_path, map_location=self.device if self.jit else "cpu").eval()
