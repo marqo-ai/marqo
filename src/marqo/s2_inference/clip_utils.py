@@ -340,6 +340,7 @@ class CLIP:
     def normalize(outputs):
         return outputs.norm(dim=-1, keepdim=True)
 
+
     def encode_text(self, sentence: Union[str, List[str]], normalize = True) -> FloatTensor:
         
         if self.model is None:
@@ -419,7 +420,6 @@ class FP16_CLIP(CLIP):
 
 
     def load(self) -> None:
-
         # https://github.com/openai/CLIP/issues/30
         self.model, self.preprocess = clip.load(self.model_name, device='cuda', jit=False)
         self.model = self.model.to(self.device)
@@ -439,6 +439,7 @@ class OPEN_CLIP(CLIP):
         self.model, _, self.preprocess = open_clip.create_model_and_transforms(self.model_name, pretrained = self.pretrained, device=self.device, jit=False)
         self.tokenizer = open_clip.get_tokenizer(self.model_name)
         self.model.eval()
+
 
     def encode_text(self, sentence: Union[str, List[str]], normalize=True) -> FloatTensor:
 
@@ -489,6 +490,7 @@ class MULTILINGUAL_CLIP(CLIP):
         self.textual_model.eval()
         self.visual_model.eval()
 
+
     def encode_text(self, sentence: Union[str, List[str]], normalize=True) -> FloatTensor:
 
         if self.textual_model is None:
@@ -503,6 +505,7 @@ class MULTILINGUAL_CLIP(CLIP):
             assert outputs.shape == _shape_before
 
         return self._convert_output(outputs)
+
 
     def encode_image(self, images: Union[str, ImageType, List[Union[str, ImageType]]],
                      normalize=True) -> FloatTensor:
