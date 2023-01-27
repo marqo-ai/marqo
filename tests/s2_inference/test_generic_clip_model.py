@@ -37,7 +37,7 @@ class TestGenericModelSupport(MarqoTestCase):
             pass
 
 
-    def test_create_index_with_custom_open_clip_model_properties_url(self):
+    def test_create_index_with_generic_open_clip_model_properties_url(self):
         """index should get created with custom model_properties
         """
         model_name = 'test-model-1'
@@ -57,7 +57,7 @@ class TestGenericModelSupport(MarqoTestCase):
         )
 
 
-    def test_create_index_with_custom_openai_clip_model_properties_url(self):
+    def test_create_index_with_generic_openai_clip_model_properties_url(self):
         model_name = 'test-model-2'
         model_properties = {"name": "openai custom model",
                             "dimensions": 512,
@@ -76,7 +76,7 @@ class TestGenericModelSupport(MarqoTestCase):
         )
 
 
-    def test_create_index_with_custom_open_clip_model_properties_localpath(self):
+    def test_create_index_with_generic_open_clip_model_properties_localpath(self):
         """index should get created with custom model_properties
         """
         url = "https://github.com/mlfoundations/open_clip/releases/download/v0.2-weights/vit_b_32-quickgelu-laion400m_avg-8a00ab3c.pt"
@@ -98,7 +98,7 @@ class TestGenericModelSupport(MarqoTestCase):
             }
         )
 
-    def test_vectorise_with_custom_open_clip_model_properties_invalid_localpath(self):
+    def test_vectorise_with_generic_open_clip_model_properties_invalid_localpath(self):
         """index should get created with custom model_properties
         """
         content = ["testtest"]
@@ -114,7 +114,7 @@ class TestGenericModelSupport(MarqoTestCase):
         self.assertRaises(ModelLoadError, vectorise, model_name, content, model_properties)
 
 
-    def test_vectorise_with_custom_open_clip_model_properties_invalid_url(self):
+    def test_vectorise_with_generic_open_clip_model_properties_invalid_url(self):
         """index should get created with custom model_properties
         """
         content = ["testtest"]
@@ -187,7 +187,7 @@ class TestGenericModelSupport(MarqoTestCase):
         tensor_search.add_documents(config=config, index_name=index_name, docs=docs, auto_refresh=auto_refresh)
 
 
-    def test_load_custom_clip_without_url_or_localpath(self):
+    def test_load_generic_clip_without_url_or_localpath(self):
         """vectorise should throw an exception if url or localpath are not given.
         """
         content = ["test test"]
@@ -245,7 +245,7 @@ class TestGenericModelSupport(MarqoTestCase):
         self.assertRaises(UnknownModelError, _validate_model_properties, model_name, model_properties)
 
 
-    def test_vectorise_custom_openai_clip_encode_image_results(self):
+    def test_vectorise_generic_openai_clip_encode_image_results(self):
 
         epsilon = 1e-7
 
@@ -265,14 +265,14 @@ class TestGenericModelSupport(MarqoTestCase):
         assert np.abs(np.array(a) - np.array(b)).sum() < epsilon
 
 
-    def test_vectorise_custom_openai_clip_encode_text_results(self):
+    def test_vectorise_generic_openai_clip_encode_text_results(self):
 
         epsilon = 1e-7
         text = "this is a test to test the custom clip output results"
 
         model_name = "test-model"
         model_properties = {
-                            "name": "openai custom model",
+                            "name": "ViT-L/14",
                             "dimensions": 512,
                             "url": "https://openaipublic.azureedge.net/clip/models/40d365715913c9da98579312b702a82c18be219cc2a73407c4526f58eba950af/ViT-B-32.pt",
                             "type": "clip",
@@ -283,7 +283,8 @@ class TestGenericModelSupport(MarqoTestCase):
 
         assert np.abs(np.array(a) - np.array(b)).sum() < epsilon
 
-    def test_vectorise_custom_open_clip_encode_image_results(self):
+
+    def test_vectorise_generic_open_clip_encode_image_results(self):
 
         epsilon = 1e-7
 
@@ -304,7 +305,7 @@ class TestGenericModelSupport(MarqoTestCase):
         assert np.abs(np.array(a) - np.array(b)).sum() < epsilon
 
 
-    def test_vectorise_custom_open_clip_encode_text_results(self):
+    def test_vectorise_generic_open_clip_encode_text_results(self):
         epsilon = 1e-7
         text = "this is a test to test the custom clip output results"
 
