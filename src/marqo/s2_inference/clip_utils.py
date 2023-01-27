@@ -227,7 +227,6 @@ class CLIP:
                 raise InvalidModelPropertiesError(f"The provided model path {path} is neither a local file nor a valid url.")
 
             self.jit = self.model_properties.get("jit", False)
-            self.device = self.model_properties.get("device", "cpu")
             self.mean = self.model_properties.get("mean", None)
             self.std = self.model_properties.get("std", None)
 
