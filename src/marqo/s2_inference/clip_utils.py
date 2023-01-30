@@ -204,7 +204,7 @@ class CLIP:
         self.processor = None
         self.embedding_dimension = embedding_dim
         self.truncate = truncate
-        self.model_properties = kwargs.get("model_properties", None)
+        self.model_properties = kwargs.get("model_properties", dict())
 
     def load(self) -> None:
 
