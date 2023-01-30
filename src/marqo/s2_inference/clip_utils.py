@@ -19,8 +19,7 @@ import marqo.s2_inference.model_registry as model_registry
 from marqo.s2_inference.errors import InvalidModelDeviceError, InvalidModelPropertiesError
 from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize
 from marqo.s2_inference.processing.custom_clip_utils import HFTokenizer, download_pretrained_from_url
-from open_clip.pretrained import _PRETRAINED
-from clip import load as openai_clip_load
+from open_clip.pretrained import _PRETRAINED as OPEN_CLIP_PRETRAINED
 
 logger = get_logger(__name__)
 
@@ -226,6 +225,7 @@ class CLIP:
             else:
                 raise InvalidModelPropertiesError(f"The provided model path {path} is neither a local file nor a valid url.")
 
+            self.precision = self.model_properties.get("precision", "fp32")
             self.jit = self.model_properties.get("jit", False)
             self.mean = self.model_properties.get("mean", None)
             self.std = self.model_properties.get("std", None)
@@ -239,10 +239,17 @@ class CLIP:
     def custom_clip_load(self):
         self.model_name = self.model_properties.get("name", None)
 
-        if self.model_name in _PRETRAINED:
-            logger.info(f"The name of the custom clip model is {self.model_name}.")
-            model, _, preprocess = open_clip.create_model_and_transforms(model_name=self.model_name, jit = self.jit, pretrained=self.model_path,
-                                                                         image_mean=self.mean, image_std=self.std)
+        if self.model_name in OPEN_CLIP_PRETRAINED:
+            logger.info(f"The name of the custom clip model is {self.model_name}. We use open_clip load")
+            model, _, preprocess = open_clip.create_model_and_transforms(model_name=self.model_name, jit = self.jit, pretrained=self.model_path, precision = self.precision,
+                                                                         image_mean=self.mean, image_std=self.std, device = self.device)
+            return model, preprocess
+
+        elif self.model_name in clip.available_models():
+            logger.info(f"The name of the custom clip model is {self.model_name}. We use openai clip load")
+            print(self.device)
+            model, preprocess = clip.load(name=self.model_path, device="cpu", jit = self.jit)
+            model = model.to(self.device)
             return model, preprocess
 
         else:
@@ -343,11 +350,8 @@ class CLIP:
         
         if self.model is None:
             self.load()
-        try:
-            text = self.tokenizer(sentence, truncate=self.truncate).to(self.device)
-        except Exception:
-            text = self.tokenizer(sentence).to(self.device)
 
+        text = self.tokenizer(sentence, truncate=self.truncate).to(self.device)
 
         with torch.no_grad():
             outputs =  self.model.encode_text(text)
