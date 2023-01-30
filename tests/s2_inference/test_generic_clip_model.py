@@ -41,10 +41,10 @@ class TestGenericModelSupport(MarqoTestCase):
         """index should get created with custom model_properties
         """
         model_name = 'test-model-1'
-        model_properties = {"name": "open_clip custom model",
+        model_properties = {"name": "ViT-B-32-quickgelu",
                             "dimensions": 512,
                             "url": "https://github.com/mlfoundations/open_clip/releases/download/v0.2-weights/vit_b_32-quickgelu-laion400m_avg-8a00ab3c.pt",
-                            "type": "clip",
+                            "type": "open_clip",
                             }
         tensor_search.create_vector_index(
             index_name=self.index_name_1, config=self.config,
@@ -59,7 +59,7 @@ class TestGenericModelSupport(MarqoTestCase):
 
     def test_create_index_with_generic_openai_clip_model_properties_url(self):
         model_name = 'test-model-2'
-        model_properties = {"name": "openai custom model",
+        model_properties = {"name": "ViT-B/32",
                             "dimensions": 512,
                             "url": "https://openaipublic.azureedge.net/clip/models/40d365715913c9da98579312b702a82c18be219cc2a73407c4526f58eba950af/ViT-B-32.pt",
                             "type": "clip",
@@ -83,10 +83,10 @@ class TestGenericModelSupport(MarqoTestCase):
         target_model = download_pretrained_from_url(url)
 
         model_name = 'test-model-1'
-        model_properties = {"name": "open_clip custom model",
+        model_properties = {"name": "ViT-B-32-quickgelu",
                             "dimensions": 512,
                             "localpath": target_model,
-                            "type": "clip",
+                            "type": "open_clip",
                             }
         tensor_search.create_vector_index(
             index_name=self.index_name_1, config=self.config,
@@ -121,7 +121,7 @@ class TestGenericModelSupport(MarqoTestCase):
         invalid_url = "http://test/test/test/testmodel.pt"
 
         model_name = 'test-model-1'
-        model_properties = {"name": "open_clip custom model",
+        model_properties = {"name": "test test void model",
                             "dimensions": 512,
                             "url": invalid_url,
                             "type": "clip",
@@ -135,7 +135,7 @@ class TestGenericModelSupport(MarqoTestCase):
             create_vector_index should throw an error
             if model_properties are given without model_name
         """
-        model_properties = {"name": "openai custom model",
+        model_properties = {"name": "ViT-B-32",
                             "dimensions": 512,
                             "url": "https://openaipublic.azureedge.net/clip/models/40d365715913c9da98579312b702a82c18be219cc2a73407c4526f58eba950af/ViT-B-32.pt",
                             "type": "clip",
@@ -212,7 +212,7 @@ class TestGenericModelSupport(MarqoTestCase):
         content = ["test test"]
         model_name = "test-model"
         model_properties = {
-                           "name": "openai custom model",
+                           "name": "ViT-B-32",
                            "dimensions": 512,
                             "url": "https://openaipublic.azureedge.net/clip/models/40d365715913c9da98579312b702a82c18be219cc2a73407c4526f58eba950af/ViT-B-32.pt",
                             #"type": "clip",
@@ -253,7 +253,7 @@ class TestGenericModelSupport(MarqoTestCase):
 
         model_name = "test-model"
         model_properties = {
-                            "name": "openai custom model",
+                            "name": "ViT-B/32",
                             "dimensions": 512,
                             "url": "https://openaipublic.azureedge.net/clip/models/40d365715913c9da98579312b702a82c18be219cc2a73407c4526f58eba950af/ViT-B-32.pt",
                             "type": "clip",
@@ -272,7 +272,7 @@ class TestGenericModelSupport(MarqoTestCase):
 
         model_name = "test-model"
         model_properties = {
-                            "name": "ViT-L/14",
+                            "name": "ViT-B/32",
                             "dimensions": 512,
                             "url": "https://openaipublic.azureedge.net/clip/models/40d365715913c9da98579312b702a82c18be219cc2a73407c4526f58eba950af/ViT-B-32.pt",
                             "type": "clip",
@@ -295,7 +295,7 @@ class TestGenericModelSupport(MarqoTestCase):
                             "name": "ViT-B-32-quickgelu",
                             "dimensions": 512,
                             "url": "https://github.com/mlfoundations/open_clip/releases/download/v0.2-weights/vit_b_32-quickgelu-laion400m_e31-d867053b.pt",
-                            "type": "clip",
+                            "type": "open_clip",
                             "jit" : False
                             }
 
@@ -314,7 +314,7 @@ class TestGenericModelSupport(MarqoTestCase):
             "name": "ViT-B-32-quickgelu",
             "dimensions": 512,
             "url": "https://github.com/mlfoundations/open_clip/releases/download/v0.2-weights/vit_b_32-quickgelu-laion400m_e31-d867053b.pt",
-            "type": "clip",
+            "type": "open_clip",
             "jit": False
         }
 
@@ -324,24 +324,5 @@ class TestGenericModelSupport(MarqoTestCase):
 
         assert np.abs(np.array(a) - np.array(b)).sum() < epsilon
 
-
-    def test_unsupported_generic_clip_name(self):
-        epsilon = 1e-2
-        text = "this is a test to test the custom clip output results"
-
-
-        model_name = "test-model"
-        model_properties = {
-            "name": "this is a test name",
-            "dimensions": 512,
-            "url": "https://github.com/mlfoundations/open_clip/releases/download/v0.2-weights/vit_b_32-quickgelu-laion400m_e31-d867053b.pt",
-            "type": "clip",
-            "jit": False
-        }
-
-        a = vectorise(model_name, content=text, model_properties=model_properties)
-        b = vectorise("open_clip/ViT-B-32-quickgelu/laion400m_e31", content=text)
-
-        assert np.abs(np.array(a) - np.array(b)).sum() < epsilon
 
 

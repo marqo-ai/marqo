@@ -204,7 +204,7 @@ class CLIP:
         self.processor = None
         self.embedding_dimension = embedding_dim
         self.truncate = truncate
-        self.model_properties = kwargs["model_properties"]
+        self.model_properties = kwargs.get("model_properties", None)
 
     def load(self) -> None:
 
@@ -225,13 +225,9 @@ class CLIP:
             else:
                 raise InvalidModelPropertiesError(f"The provided model path {path} is neither a local file nor a valid url.")
 
-            self.precision = self.model_properties.get("precision", "fp32")
             self.jit = self.model_properties.get("jit", False)
-            self.mean = self.model_properties.get("mean", None)
-            self.std = self.model_properties.get("std", None)
-
             self.model, self.preprocess = self.custom_clip_load()
-            self.tokenizer = self.load_tokenizer()
+            self.tokenizer = clip.tokenize
 
             self.model.eval()
 
@@ -239,99 +235,10 @@ class CLIP:
     def custom_clip_load(self):
         self.model_name = self.model_properties.get("name", None)
 
-        if self.model_name in OPEN_CLIP_PRETRAINED:
-            logger.info(f"The name of the custom clip model is {self.model_name}. We use open_clip load")
-            model, _, preprocess = open_clip.create_model_and_transforms(model_name=self.model_name, jit = self.jit, pretrained=self.model_path, precision = self.precision,
-                                                                         image_mean=self.mean, image_std=self.std, device = self.device)
-            return model, preprocess
-
-        elif self.model_name in clip.available_models():
-            logger.info(f"The name of the custom clip model is {self.model_name}. We use openai clip load")
-            print(self.device)
-            model, preprocess = clip.load(name=self.model_path, device="cpu", jit = self.jit)
-            model = model.to(self.device)
-            return model, preprocess
-
-        else:
-            # This step can load both openai clip and open_clip models by the script file.
-            # Check https://github.com/mlfoundations/open_clip/blob/db7504f070b4e76e6c8578ee7b73596267083a19/src/clip/openai_clip.py#L121-L189
-
-            logger.warning(f"The provided name `{self.model_name}` is not supported. Marqo try to load from script file directly."
-                           f"This is highly NOT RECOMMENDED as it may lead to inaccurate results.")
-            try:
-                # loading JIT archive
-                model = torch.jit.load(self.model_path, map_location=self.device if self.jit else "cpu").eval()
-                state_dict = None
-            except RuntimeError:
-                # loading saved state dict
-                if self.jit:
-                    self.jit = False
-                state_dict = torch.load(self.model_path, map_location="cpu")
-
-            if not self.jit:
-                try:
-                    model = build_model(state_dict or model.state_dict()).to(self.device)
-                except KeyError:
-                    sd = {k[7:]: v for k, v in state_dict["state_dict"].items()}
-                    model = build_model(sd).to(self.device)
-
-                if str(self.device) == "cpu":
-                    model.float()
-                return model, _get_transform(model.visual.input_resolution, self.mean, self.std)
-
-            # patch the device names
-            device_holder = torch.jit.trace(lambda: torch.ones([]).to(torch.device(self.device)), example_inputs=[])
-            device_node = [n for n in device_holder.graph.findAllNodes("prim::Constant") if "Device" in repr(n)][-1]
-
-            def patch_device(module):
-                graphs = [module.graph] if hasattr(module, "graph") else []
-                if hasattr(module, "forward1"):
-                    graphs.append(module.forward1.graph)
-
-                for graph in graphs:
-                    for node in graph.findAllNodes("prim::Constant"):
-                        if "value" in node.attributeNames() and str(node["value"]).startswith("cuda"):
-                            node.copyAttributes(device_node)
-
-            model.apply(patch_device)
-            patch_device(model.encode_image)
-            patch_device(model.encode_text)
-
-            # patch dtype to float32 on CPU
-            if str(self.device) == "cpu":
-                float_holder = torch.jit.trace(lambda: torch.ones([]).float(), example_inputs=[])
-                float_input = list(float_holder.graph.findNode("aten::to").inputs())[1]
-                float_node = float_input.node()
-
-                def patch_float(module):
-                    graphs = [module.graph] if hasattr(module, "graph") else []
-                    if hasattr(module, "forward1"):
-                        graphs.append(module.forward1.graph)
-
-                    for graph in graphs:
-                        for node in graph.findAllNodes("aten::to"):
-                            inputs = list(node.inputs())
-                            for i in [1, 2]:  # dtype can be the second or third argument to aten::to()
-                                if inputs[i].node()["value"] == 5:
-                                    inputs[i].node().copyAttributes(float_node)
-
-                model.apply(patch_float)
-                patch_float(model.encode_image)
-                patch_float(model.encode_text)
-
-                model.float()
-
-            return model, _get_transform(model.visual.input_resolution, self.mean, self.std)
-
-
-    def load_tokenizer(self):
-        tokenizer_name = self.model_properties.get("tokenizer", "clip")
-
-        if tokenizer_name == "clip":
-            return clip.tokenize
-        else:
-            logger.info(f"Custom HFTokenizer is provided. Loading...")
-            return HFTokenizer(tokenizer_name)
+        logger.info(f"The name of the custom clip model is {self.model_name}. We use openai clip load")
+        model, preprocess = clip.load(name=self.model_path, device="cpu", jit= self.jit)
+        model = model.to(self.device)
+        return model, preprocess
 
 
     def _convert_output(self, output):
@@ -419,7 +326,7 @@ class FP16_CLIP(CLIP):
         '''
 
         if not self.device.startswith("cuda"):
-            raise InvalidModelDeviceError(f"FP16 clip model `{self.model_type}` is only available with device `cuda`.")
+            raise InvalidModelDeviceError(f"FP16 clip model `{self.model_type}` is only ava ilable with device `cuda`.")
 
         self.model_name = self.model_type.replace("fp16/", "")
 
@@ -435,16 +342,60 @@ class OPEN_CLIP(CLIP):
     def __init__(self, model_type: str = "open_clip/ViT-B-32-quickgelu/laion400m_e32", device: str = 'cpu',  embedding_dim: int = None,
                             truncate: bool = True, **kwargs) -> None:
         super().__init__(model_type, device,  embedding_dim, truncate , **kwargs)
-        self.model_name = model_type.split("/", 3)[1]
-        self.pretrained = model_type.split("/", 3)[2]
+        self.model_name = model_type.split("/", 3)[1] if model_type.startswith("open_clip/") else model_type
+        self.pretrained = model_type.split("/", 3)[2] if model_type.startswith("open_clip/") else model_type
 
 
     def load(self) -> None:
         # https://github.com/mlfoundations/open_clip
-        self.model, _, self.preprocess = open_clip.create_model_and_transforms(self.model_name, pretrained = self.pretrained, device=self.device, jit=False)
-        self.tokenizer = open_clip.get_tokenizer(self.model_name)
-        self.model.eval()
+        path = self.model_properties.get("localpath", None) or self.model_properties.get("url", None)
 
+        if path is None:
+            self.model, _, self.preprocess = open_clip.create_model_and_transforms(self.model_name,
+                                                                                   pretrained=self.pretrained,
+                                                                                   device=self.device, jit=False)
+            self.tokenizer = open_clip.get_tokenizer(self.model_name)
+            self.model.eval()
+        else:
+            logger.info("Detecting custom clip model path. We use generic clip model loading.")
+            if os.path.isfile(path):
+                self.model_path = path
+            elif validators.url(path):
+                self.model_path = download_pretrained_from_url(path)
+            else:
+                raise InvalidModelPropertiesError(
+                    f"The provided model path {path} is neither a local file nor a valid url.")
+
+            self.precision = self.model_properties.get("precision", "fp32")
+            self.jit = self.model_properties.get("jit", False)
+            self.mean = self.model_properties.get("mean", None)
+            self.std = self.model_properties.get("std", None)
+
+            self.model, self.preprocess = self.custom_clip_load()
+            self.tokenizer = self.load_tokenizer()
+
+            self.model.eval()
+
+
+    def custom_clip_load(self):
+        self.model_name = self.model_properties.get("name", None)
+
+
+        logger.info(f"The name of the custom clip model is {self.model_name}. We use open_clip load")
+        model, _, preprocess = open_clip.create_model_and_transforms(model_name=self.model_name, jit = self.jit, pretrained=self.model_path, precision = self.precision,
+                                                                     image_mean=self.mean, image_std=self.std, device = self.device)
+
+        return model, preprocess
+
+
+    def load_tokenizer(self):
+        tokenizer_name = self.model_properties.get("tokenizer", "clip")
+
+        if tokenizer_name == "clip":
+            return clip.tokenize
+        else:
+            logger.info(f"Custom HFTokenizer is provided. Loading...")
+            return HFTokenizer(tokenizer_name)
 
     def encode_text(self, sentence: Union[str, List[str]], normalize=True) -> FloatTensor:
 
