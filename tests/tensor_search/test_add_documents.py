@@ -1,6 +1,8 @@
 import copy
 import fileinput
+import functools
 import json
+import math
 import pprint
 from unittest import mock
 import marqo.tensor_search.utils as marqo_utils
@@ -1029,3 +1031,129 @@ class TestAddDocuments(MarqoTestCase):
         assert 'myfield' not in doc_w_facets[TensorField.tensor_facets][0]
         assert 'myfield' in doc_w_facets
         assert 'myfield2' in doc_w_facets
+
+    def test_various_image_count(self):
+        hippo_url = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
+
+        def _check_get_docs(doc_count, some_field_value):
+            approx_half = math.floor(doc_count/2)
+            get_res = tensor_search.get_documents_by_ids(
+                config=self.config, index_name=self.index_name_1,
+                document_ids=[str(n) for n in (0, approx_half, doc_count - 1)],
+                show_vectors=True
+            )
+            for d in get_res['results']:
+                assert d['_found'] is True
+                assert d['some_field'] == some_field_value
+                assert d['location'] == hippo_url
+                assert {'_embedding', 'location', 'some_field'} == functools.reduce(lambda x, y: x.union(y),
+                                        [list(facet.keys()) for facet in d['_tensor_facets']], set())
+                for facet in d['_tensor_facets']:
+                    if 'location' in facet:
+                        assert facet['location'] == hippo_url
+                    elif 'some_field':
+                        assert facet['some_field'] == some_field_value
+                    assert isinstance(facet['_embedding'], list)
+                    assert len(facet['_embedding']) > 0
+            return True
+
+        doc_counts = 1, 2, 3, 10, 20, 100
+        for update_mode in ('replace', 'update'):
+            for c in doc_counts:
+                try:
+                    tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+                except IndexNotFoundError as s:
+                    pass
+                tensor_search.create_vector_index(
+                    config=self.config, index_name=self.index_name_1,
+                    index_settings={
+                        IndexSettingsField.index_defaults: {
+                            IndexSettingsField.model: "random",
+                            IndexSettingsField.treat_urls_and_pointers_as_images: True
+                        }
+                    }
+                )
+                res1 = tensor_search.add_documents(
+                    self.config,
+                    docs=[{"_id": str(doc_num),
+                           "location": hippo_url,
+                           "some_field": "blah"} for doc_num in range(c)],
+                    auto_refresh=True, index_name=self.index_name_1,
+                    update_mode=update_mode
+                )
+                assert c == tensor_search.get_stats(self.config,
+                                                    index_name=self.index_name_1)['numberOfDocuments']
+                assert not res1['errors']
+                assert _check_get_docs(doc_count=c, some_field_value='blah')
+                res2 = tensor_search.add_documents(
+                    self.config,
+                    docs=[{"_id": str(doc_num),
+                           "location": hippo_url,
+                           "some_field": "blah2"} for doc_num in range(c)],
+                    auto_refresh=True, index_name=self.index_name_1,
+                    non_tensor_fields=["myfield"], update_mode=update_mode
+                )
+                assert not res2['errors']
+                assert c == tensor_search.get_stats(self.config,
+                                                    index_name=self.index_name_1)['numberOfDocuments']
+                assert _check_get_docs(doc_count=c, some_field_value='blah2')
+
+    def test_images_non_tensor_fields_count(self):
+        hippo_url = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
+
+        def _check_get_docs(doc_count, some_field_value):
+            approx_half = math.floor(doc_count/2)
+            get_res = tensor_search.get_documents_by_ids(
+                config=self.config, index_name=self.index_name_1,
+                document_ids=[str(n) for n in (0, approx_half, doc_count - 1)],
+                show_vectors=True
+            )
+            for d in get_res['results']:
+                assert d['_found'] is True
+                assert d['some_field'] == some_field_value
+                assert d['location'] == hippo_url
+                # location is not present:
+                assert {'_embedding', 'some_field'} == functools.reduce(lambda x, y: x.union(y),
+                                        [list(facet.keys()) for facet in d['_tensor_facets']], set())
+            return True
+
+        doc_counts = 1, 20, 23
+        for update_mode in ('replace', 'update'):
+            for c in doc_counts:
+                try:
+                    tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+                except IndexNotFoundError as s:
+                    pass
+                tensor_search.create_vector_index(
+                    config=self.config, index_name=self.index_name_1,
+                    index_settings={
+                        IndexSettingsField.index_defaults: {
+                            IndexSettingsField.model: "random",
+                            IndexSettingsField.treat_urls_and_pointers_as_images: True
+                        }
+                    }
+                )
+                res1 = tensor_search.add_documents(
+                    self.config,
+                    docs=[{"_id": str(doc_num),
+                           "location": hippo_url,
+                           "some_field": "blah"} for doc_num in range(c)],
+                    auto_refresh=True, index_name=self.index_name_1,
+                    non_tensor_fields=["location"], update_mode=update_mode
+                )
+                assert c == tensor_search.get_stats(self.config,
+                                                    index_name=self.index_name_1)['numberOfDocuments']
+                assert not res1['errors']
+                assert _check_get_docs(doc_count=c, some_field_value='blah')
+                res2 = tensor_search.add_documents(
+                    self.config,
+                    docs=[{"_id": str(doc_num),
+                           "location": hippo_url,
+                           "some_field": "blah2"} for doc_num in range(c)],
+                    auto_refresh=True, index_name=self.index_name_1,
+                    non_tensor_fields=["location"], update_mode=update_mode
+                )
+                assert not res2['errors']
+                assert c == tensor_search.get_stats(self.config,
+                                                    index_name=self.index_name_1)['numberOfDocuments']
+                assert _check_get_docs(doc_count=c, some_field_value='blah2')
