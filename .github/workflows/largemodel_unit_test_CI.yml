@@ -1,8 +1,7 @@
 name: unit_test_CI
 # runs unit tests on AMD64 machine
 
-on:
-  workflow_dispatch:
+on: workflow_dispatch
 
 permissions:
   contents: read
