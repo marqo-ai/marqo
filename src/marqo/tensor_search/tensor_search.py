@@ -80,7 +80,8 @@ def create_vector_index(
     validation.validate_index_name(index_name)
 
     if index_settings is not None:
-        _check_model_name(index_settings)
+        if NsField.index_defaults in index_settings:
+            _check_model_name(index_settings)
         the_index_settings = _autofill_index_settings(index_settings=index_settings)
     else:
         the_index_settings = configs.get_default_index_settings()
@@ -145,7 +146,7 @@ def create_vector_index(
 
 
 def _check_model_name(index_settings):
-    """Checks if model_properties is given then model_name is given as well
+    """Ensures that if model_properties is given, then model_name is given as well
     """
     model_name = index_settings[NsField.index_defaults].get(NsField.model)
     model_properties = index_settings[NsField.index_defaults].get(NsField.model_properties)
