@@ -1,3 +1,15 @@
+# Release 0.0.12
+
+## New features
+- Multilingual CLIP (https://github.com/marqo-ai/marqo/pull/267). Search images in the language you want! Marqo now incorporates [open source multilingual CLIP models](https://github.com/FreddeFrallan/Multilingual-CLIP). A list of available multilingual CLIP models are available [here](https://docs.marqo.ai/0.0.12/Models-Reference/dense_retrieval/#multilingual-clip). 
+- Exact text matching (https://github.com/marqo-ai/marqo/pull/243, https://github.com/marqo-ai/marqo/pull/288). Search for specific words and phrases using double quotes (`" "`) in lexical search. See usage [here](https://docs.marqo.ai/0.0.12/API-Reference/search/#lexical-search-exact-matches).  
+
+## Optimisations 
+- Search speed-up (https://github.com/marqo-ai/marqo/pull/278). Latency reduction from Marqo-os indexes reconfigurations. 
+
+## Contributor shout-outs
+Thank you to our 2.2k stargazers and 80+ forkers!
+
 # Release 0.0.11
 
 ## New features 
