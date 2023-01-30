@@ -3,11 +3,6 @@ name: unit_test_CI
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      mainline
-    paths-ignore:
-      - '**.md'
 
 permissions:
   contents: read
