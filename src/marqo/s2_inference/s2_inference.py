@@ -113,7 +113,7 @@ def _validate_model_properties(model_name: str, model_properties: dict) -> dict:
                 if key not in model_properties:
                     model_properties[key] = value
 
-        elif model_properties("type", None) is "clip":
+        elif model_properties("type", None) in ("clip", "open_clip"):
             required_keys = ["name", "dimensions"]
             for key in required_keys:
                 if key not in model_properties:
