@@ -209,7 +209,7 @@ class CLIP:
 
     def load(self) -> None:
 
-        path = self.model_properties.get("localpath", None) or self.model_properties.get("url", None)
+        path = self.model_properties.get("localpath", None) or self.model_properties.get("url",None)
 
         if path is None:
             # The original method to load the openai clip model
@@ -241,7 +241,7 @@ class CLIP:
 
         if self.model_name in _PRETRAINED:
             logger.info(f"The name of the custom clip model is {self.model_name}.")
-            model, _, preprocess = open_clip.create_model_and_transforms(model_name=self.model_name, pretrained=self.model_path,
+            model, _, preprocess = open_clip.create_model_and_transforms(model_name=self.model_name, jit = self.jit, pretrained=self.model_path,
                                                                          image_mean=self.mean, image_std=self.std)
             return model, preprocess
 
