@@ -496,9 +496,6 @@ def _get_sbert_onnx_properties() -> Dict:
     return SBERT_ONNX_MODEL_PROPERTIES
 
 
-def _get_multilingual_clip_properties() -> Dict:
-    return get_multilingual_clip_properties()
-
 def _get_sbert_test_properties() -> Dict:
     TEST_MODEL_PROPERTIES = {
             "sentence-transformers/test":
@@ -1546,7 +1543,7 @@ def load_model_properties() -> Dict:
     hf_model_properties = _get_hf_properties()
     open_clip_model_properties = _get_open_clip_properties()
     onnx_clip_model_properties = _get_onnx_clip_properties()
-    multilingual_clip_model_properties = _get_multilingual_clip_properties()
+    multilingual_clip_model_properties = get_multilingual_clip_properties()
 
     # combine the above dicts
     model_properties = dict(clip_model_properties.items())
