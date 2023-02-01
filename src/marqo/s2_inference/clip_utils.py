@@ -223,7 +223,9 @@ class CLIP:
             elif validators.url(path):
                 self.model_path = download_pretrained_from_url(path)
             else:
-                raise InvalidModelPropertiesError(f"The provided model path {path} is neither a local file nor a valid url.")
+                raise InvalidModelPropertiesError(f"Marqo can not load the custom clip model."
+                                                  f"The provided model path `{path}` is neither a local file nor a valid url."
+                                                  f"Please check your provided model url and retry.")
 
             self.jit = self.model_properties.get("jit", False)
             self.model, self.preprocess = self.custom_clip_load()
@@ -326,7 +328,9 @@ class FP16_CLIP(CLIP):
         '''
 
         if not self.device.startswith("cuda"):
-            raise InvalidModelDeviceError(f"FP16 clip model `{self.model_type}` is only ava ilable with device `cuda`.")
+            raise InvalidModelDeviceError(f"Marqo can not load the provided model `{self.model_type}`"
+                                          f"FP16 clip model `{self.model_type}` is only available with device `cuda`."
+                                          f"Please check you cuda availability or try the fp32 version `{self.model_type.replace('fp16/','')}`")
 
         self.model_name = self.model_type.replace("fp16/", "")
 
@@ -363,8 +367,9 @@ class OPEN_CLIP(CLIP):
             elif validators.url(path):
                 self.model_path = download_pretrained_from_url(path)
             else:
-                raise InvalidModelPropertiesError(
-                    f"The provided model path {path} is neither a local file nor a valid url.")
+                raise InvalidModelPropertiesError(f"Marqo can not load the custom clip model."
+                                                  f"The provided model path `{path}` is neither a local file nor a valid url."
+                                                  f"Please check your provided model url and retry.")
 
             self.precision = self.model_properties.get("precision", "fp32")
             self.jit = self.model_properties.get("jit", False)
