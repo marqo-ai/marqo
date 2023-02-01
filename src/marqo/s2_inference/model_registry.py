@@ -286,12 +286,14 @@ def _get_open_clip_properties() -> Dict:
              'type': 'open_clip',
              'pretrained': 'laion2b_s12b_b42k'},
 
-        'open_clip/convnext_base/laion400m_s13b_b51k':
-            {'name': 'open_clip/convnext_base/laion400m_s13b_b51k',
-             'dimensions': 512,
-             'note': 'clip model from open_clip implementation',
-             'type': 'open_clip',
-             'pretrained': 'laion400m_s13b_b51k'},
+        # This model is not ready in open_clip yet.
+        # I will add this later
+        # 'open_clip/convnext_base/laion400m_s13b_b51k':
+        #     {'name': 'open_clip/convnext_base/laion400m_s13b_b51k',
+        #      'dimensions': 512,
+        #      'note': 'clip model from open_clip implementation',
+        #      'type': 'open_clip',
+        #      'pretrained': 'laion400m_s13b_b51k'},
 
         'open_clip/convnext_base_w/laion2b_s13b_b82k': {
             'name': 'open_clip/convnext_base_w/laion2b_s13b_b82k',

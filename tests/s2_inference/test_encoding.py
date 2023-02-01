@@ -24,7 +24,7 @@ class TestEncoding(unittest.TestCase):
         clear_loaded_models()
 
     def test_vectorize(self):
-        names = ["open_clip/convnext_base/laion400m_s13b_b51k","open_clip/convnext_base_w/laion2b_s13b_b82k",
+        names = ["open_clip/convnext_base_w/laion2b_s13b_b82k",
                  "open_clip/convnext_base_w_320/laion_aesthetic_s13b_b82k_augreg",
                  "onnx16/open_clip/ViT-B-32/laion400m_e32", 'onnx32/open_clip/ViT-B-32-quickgelu/laion400m_e32',
                  "all-MiniLM-L6-v1", "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6",
@@ -52,7 +52,7 @@ class TestEncoding(unittest.TestCase):
 
     def test_load_clip_text_model(self):
         names = [ "onnx16/open_clip/ViT-B-32/laion400m_e32", 'onnx32/open_clip/ViT-B-32-quickgelu/laion400m_e32',
-                  'RN50', "ViT-B/16", "open_clip/convnext_base/laion400m_s13b_b51k","open_clip/convnext_base_w/laion2b_s13b_b82k",
+                  'RN50', "ViT-B/16", "open_clip/convnext_base_w/laion2b_s13b_b82k",
                  "open_clip/convnext_base_w_320/laion_aesthetic_s13b_b82k_augreg",]
 
         device = 'cpu'
@@ -131,7 +131,7 @@ class TestEncoding(unittest.TestCase):
 
 
     def test_model_outputs(self):
-        names = ["open_clip/convnext_base/laion400m_s13b_b51k","open_clip/convnext_base_w/laion2b_s13b_b82k",
+        names = ["open_clip/convnext_base_w/laion2b_s13b_b82k",
                  "open_clip/convnext_base_w_320/laion_aesthetic_s13b_b82k_augreg",
                  "onnx16/open_clip/ViT-B-32/laion400m_e32", 'onnx32/open_clip/ViT-B-32-quickgelu/laion400m_e32',
                  'open_clip/ViT-B-32/laion400m_e32', "all-MiniLM-L6-v1",
@@ -204,7 +204,7 @@ class TestEncoding(unittest.TestCase):
 
 
     def test_open_clip_vectorize(self):
-        names = ["open_clip/convnext_base/laion400m_s13b_b51k","open_clip/convnext_base_w/laion2b_s13b_b82k",
+        names = ["open_clip/convnext_base_w/laion2b_s13b_b82k",
                  "open_clip/convnext_base_w_320/laion_aesthetic_s13b_b82k_augreg",
                  'open_clip/ViT-B-32/laion400m_e32', 'open_clip/RN50/openai']
 
@@ -229,7 +229,7 @@ class TestEncoding(unittest.TestCase):
 
 
     def test_open_clip_embedding_size(self):
-        names = ["open_clip/convnext_base/laion400m_s13b_b51k","open_clip/convnext_base_w/laion2b_s13b_b82k",
+        names = ["open_clip/convnext_base_w/laion2b_s13b_b82k",
                  "open_clip/convnext_base_w_320/laion_aesthetic_s13b_b82k_augreg",'open_clip/ViT-B-32/laion400m_e32', 'open_clip/RN50/openai']
 
         device = "cpu"
