@@ -53,5 +53,5 @@ class ModelNotInCacheError(S2InferenceError):
 
 # Raise an ERROR if the model is only available with "cpu" or "cuda" but
 # the other one is provided
-class InvalidModelDeviceError(S2InferenceError):
+class IncompatibleModelDeviceError(S2InferenceError):
     pass

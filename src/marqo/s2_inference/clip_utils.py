@@ -16,26 +16,20 @@ from clip.model import build_model
 from marqo.s2_inference.types import *
 from marqo.s2_inference.logger import get_logger
 import marqo.s2_inference.model_registry as model_registry
-from marqo.s2_inference.errors import InvalidModelDeviceError, InvalidModelPropertiesError
+from marqo.s2_inference.errors import IncompatibleModelDeviceError, InvalidModelPropertiesError
 from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize
 from marqo.s2_inference.processing.custom_clip_utils import HFTokenizer, download_pretrained_from_url
-from open_clip.pretrained import _PRETRAINED as OPEN_CLIP_PRETRAINED
+from torchvision.transforms import InterpolationMode
 
 logger = get_logger(__name__)
 
 OPENAI_DATASET_MEAN = (0.48145466, 0.4578275, 0.40821073)
 OPENAI_DATASET_STD = (0.26862954, 0.26130258, 0.27577711)
+BICUBIC = InterpolationMode.BICUBIC
 
 
 def get_allowed_image_types():
     return set(('.jpg', '.png', '.bmp', '.jpeg'))
-
-
-try:
-    from torchvision.transforms import InterpolationMode
-    BICUBIC = InterpolationMode.BICUBIC
-except ImportError:
-    BICUBIC = Image.BICUBIC
 
 
 def _convert_image_to_rgb(image: ImageType) -> ImageType:
@@ -44,8 +38,8 @@ def _convert_image_to_rgb(image: ImageType) -> ImageType:
 
 
 def _get_transform(n_px: int, image_mean:List[float] = None, image_std: List[float] = None) -> torch.Tensor:
-    '''
-
+    '''This function returns a transform to preprocess the image. The processed image will be passed into
+    clip model for inference.
     Args:
         n_px: the size of the processed image
         image_mean: the mean of the image used for normalization
@@ -53,7 +47,6 @@ def _get_transform(n_px: int, image_mean:List[float] = None, image_std: List[flo
 
     Returns:
         the processed image tensor with shape (3, n_px, n_px)
-
     '''
     img_mean = image_mean or OPENAI_DATASET_MEAN
     img_std = image_std or OPENAI_DATASET_STD
@@ -329,7 +322,7 @@ class FP16_CLIP(CLIP):
         '''
 
         if not self.device.startswith("cuda"):
-            raise InvalidModelDeviceError(f"Marqo can not load the provided model `{self.model_type}`"
+            raise IncompatibleModelDeviceError(f"Marqo can not load the provided model `{self.model_type}`"
                                           f"FP16 clip model `{self.model_type}` is only available with device `cuda`."
                                           f"Please check you cuda availability or try the fp32 version `{self.model_type.replace('fp16/','')}`"
                                           f"Check `https://docs.marqo.ai/0.0.13/Models-Reference/dense_retrieval/#generic-clip-models` for more info.")

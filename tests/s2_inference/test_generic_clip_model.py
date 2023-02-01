@@ -4,6 +4,7 @@ from marqo.errors import IndexNotFoundError
 from marqo.s2_inference.errors import InvalidModelPropertiesError, UnknownModelError, ModelLoadError
 from marqo.tensor_search import tensor_search
 from marqo.s2_inference.processing.custom_clip_utils import download_pretrained_from_url
+from marqo.s2_inference.s2_inference import clear_loaded_models
 
 from marqo.s2_inference.s2_inference import (
     available_models,
@@ -35,11 +36,13 @@ class TestGenericModelSupport(MarqoTestCase):
             tensor_search.delete_index(config=self.config, index_name=self.index_name_2)
         except IndexNotFoundError as e:
             pass
+        clear_loaded_models()
 
 
-    def test_create_index_with_generic_open_clip_model_properties_url(self):
+    def test_create_index_and_add_documents_with_generic_open_clip_model_properties_url(self):
         """index should get created with custom model_properties
         """
+        # Step1 - Create Index
         model_name = 'test-model-1'
         model_properties = {"name": "ViT-B-32-quickgelu",
                             "dimensions": 512,
@@ -55,9 +58,21 @@ class TestGenericModelSupport(MarqoTestCase):
                 }
             }
         )
+        # Step2 - Add documents
+        docs = [
+            {
+                "_id": "123",
+                "title 1": "content 1",
+                "desc 2": "content 2. blah blah blah"
+            }]
 
+        auto_refresh = True
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs, auto_refresh=auto_refresh)
 
-    def test_create_index_with_generic_openai_clip_model_properties_url(self):
+        # Step3 - Search
+        results = tensor_search.search(config=self.config, index_name=self.index_name_1, text = "test-test")
+
+    def test_pipeline_with_generic_openai_clip_model_properties_url(self):
         model_name = 'test-model-2'
         model_properties = {"name": "ViT-B/32",
                             "dimensions": 512,
@@ -75,8 +90,20 @@ class TestGenericModelSupport(MarqoTestCase):
             }
         )
 
+        docs = [
+            {
+                "_id": "123",
+                "title 1": "content 1",
+                "desc 2": "content 2. blah blah blah"
+            }]
 
-    def test_create_index_with_generic_open_clip_model_properties_localpath(self):
+        auto_refresh = True
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_2, docs=docs, auto_refresh=auto_refresh)
+
+        results = tensor_search.search(config=self.config, index_name=self.index_name_2, text = "test-test")
+
+
+    def test_pipeline_with_generic_open_clip_model_properties_localpath(self):
         """index should get created with custom model_properties
         """
         url = "https://github.com/mlfoundations/open_clip/releases/download/v0.2-weights/vit_b_32-quickgelu-laion400m_avg-8a00ab3c.pt"
@@ -97,6 +124,19 @@ class TestGenericModelSupport(MarqoTestCase):
                 }
             }
         )
+
+        docs = [
+            {
+                "_id": "123",
+                "title 1": "content 1",
+                "desc 2": "content 2. blah blah blah"
+            }]
+
+        auto_refresh = True
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs,
+                                    auto_refresh=auto_refresh)
+
+        results = tensor_search.search(config=self.config, index_name=self.index_name_1, text="test-test")
 
     def test_vectorise_with_generic_open_clip_model_properties_invalid_localpath(self):
         """index should get created with custom model_properties
@@ -324,5 +364,24 @@ class TestGenericModelSupport(MarqoTestCase):
 
         assert np.abs(np.array(a) - np.array(b)).sum() < epsilon
 
+
+    def test_incorrect_vectorise_generic_open_clip_encode_text_results(self):
+        epsilon = 1e-3
+        text = "this is a test to test the custom clip output results"
+
+        model_name = "test-model"
+        model_properties = {
+            "name": "ViT-B-32-quickgelu",
+            "dimensions": 512,
+            "url": "https://github.com/mlfoundations/open_clip/releases/download/v0.2-weights/vit_b_32-quickgelu-laion400m_e31-d867053b.pt",
+            "type": "open_clip",
+            "jit": False
+        }
+
+
+        a = vectorise(model_name, content=text, model_properties=model_properties)
+        b = vectorise("open_clip/ViT-B-32-quickgelu/laion400m_e32", content=text)
+
+        assert np.abs(np.array(a) - np.array(b)).sum() > epsilon
 
 

@@ -100,7 +100,7 @@ def _validate_model_properties(model_name: str, model_properties: dict) -> dict:
     if model_properties is not None:
         """checks model dict to see if all required keys are present
         """
-        if model_properties.get("type", None) is None or "sbert":
+        if model_properties.get("type", None) in (None, "sbert"):
             required_keys = ["name", "dimensions"]
             for key in required_keys:
                 if key not in model_properties:

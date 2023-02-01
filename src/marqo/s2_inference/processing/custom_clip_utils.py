@@ -39,6 +39,16 @@ def download_pretrained_from_url(
         url: str,
         cache_dir: Union[str, None] = None,
 ):
+    '''
+    This function takes a clip model checkpoint url as input, downloads the model, and returns the local
+    path of the downloaded file.
+    Args:
+        url: a valid string of the url address.
+        cache_dir: the directory to store the file
+    Returns:
+        download_target: the local path of the downloaded file.
+    '''
+    buffer_size = 8192
     if not cache_dir:
         cache_dir = os.path.expanduser("~/.cache/clip")
     os.makedirs(cache_dir, exist_ok=True)
@@ -52,7 +62,7 @@ def download_pretrained_from_url(
     with urllib.request.urlopen(url) as source, open(download_target, "wb") as output:
         with tqdm(total=int(source.headers.get("Content-Length")), ncols=80, unit='iB', unit_scale=True) as loop:
             while True:
-                buffer = source.read(8192)
+                buffer = source.read(buffer_size)
                 if not buffer:
                     break
 
