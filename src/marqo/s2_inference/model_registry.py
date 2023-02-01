@@ -286,6 +286,7 @@ def _get_open_clip_properties() -> Dict:
              'type': 'open_clip',
              'pretrained': 'laion2b_s12b_b42k'},
 
+        # TODO Uncomment this model in the next open_clip release
         # There is a typo in the current release of open_clip.
         # We will add this model once in the next open_clip release.
         # 'open_clip/convnext_base/laion400m_s13b_b51k':
