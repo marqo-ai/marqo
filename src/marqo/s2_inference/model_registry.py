@@ -332,8 +332,6 @@ def _get_open_clip_properties() -> Dict:
             'pretrained': 'laion_aesthetic_s13b_b82k_augreg'},
 }
 
-
-
     return OPEN_CLIP_MODEL_PROPERTIES
 
 
