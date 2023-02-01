@@ -119,7 +119,7 @@ def search(search_query: SearchQuery, index_name: str, device: str = Depends(api
         result_count=search_query.limit, offset=search_query.offset,
         reranker=search_query.reRanker, 
         filter=search_query.filter, device=device,
-        attributes_to_retrieve=search_query.attributesToRetrieve
+        attributes_to_retrieve=search_query.attributesToRetrieve, boost=search_query.boost
     )
 
 
