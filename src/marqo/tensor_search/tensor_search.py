@@ -1213,6 +1213,8 @@ def _vector_text_search(
             boosters: {'field_to_be_boosted': (int, int)}
         """
         to_be_boosted = docs.copy()
+        boosted_fields = set()
+
         for doc_id in list(to_be_boosted.keys()):
             for chunk in to_be_boosted[doc_id]["chunks"]:
                 field_name = chunk['_source']['__field_name']
@@ -1220,8 +1222,13 @@ def _vector_text_search(
                     booster = boosters[field_name]
                     chunk['_score'] = chunk['_score'] * booster[0] + booster[1]
 
-        return to_be_boosted
+                    boosted_fields.add(field_name)
 
+        if set(boosters.keys()) != boosted_fields:
+            raise errors.InvalidArgError(f"Could not boost field(s): {set(boosters.keys()) - boosted_fields}. "
+                                         f"Please check if the indexed documents contain the specified field(s).")
+
+        return to_be_boosted
 
     # SORT THE DOCS HERE
     def sort_chunks(docs: dict) -> dict:
