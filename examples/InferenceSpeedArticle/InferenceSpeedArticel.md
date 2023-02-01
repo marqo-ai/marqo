@@ -42,8 +42,8 @@ preprocess**, and **choose the right model** to boost your index speed.
 Concurrent image downloading can improve the image fetching speed by an order of magnitude compared with sequential downloading.
 In Marqo's recent [release 0.0.12](https://github.com/marqo-ai/marqo/releases/tag/0.0.12), we added this feature. 
 The table below looks at the time that different numbers of workers take to download and CLIP preprocess 128 images.
-The average time it takes for each image is reduced by more than 10 times. In Marqo, we choose the number of works based on
-the hardware specification, and we see a **4 times** throughput increase with concurrent image downloading.
+The average time it takes for each image is reduced by more than 10 times. In Marqo, we choose the number of workers as 20
+, and we see a **4 times** throughput increase with concurrent image downloading.
 
 | number of workers | average time per image(s) | total time(s) |
 |-------------------|---------------------------|---------------|
