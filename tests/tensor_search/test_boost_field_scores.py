@@ -1,15 +1,5 @@
-import numpy as np
-
-from marqo.errors import IndexNotFoundError
-from marqo.s2_inference.errors import InvalidModelPropertiesError, UnknownModelError, ModelLoadError
+from marqo.errors import IndexNotFoundError, InvalidArgError
 from marqo.tensor_search import tensor_search
-
-from marqo.s2_inference.s2_inference import (
-    available_models,
-    vectorise,
-    _validate_model_properties,
-    _update_available_models
-)
 
 from tests.marqo_test import MarqoTestCase
 
@@ -60,6 +50,8 @@ class TestBoostFieldScores(MarqoTestCase):
         self.assertGreater(score_boosted, score)
 
     def test_boost_empty_dict(self):
+        """Passing an empty dict in the boost argument should not affect the score.
+        """
         q = "What is the best outfit to wear on the moon?"
 
         res = tensor_search.search(
@@ -75,18 +67,29 @@ class TestBoostFieldScores(MarqoTestCase):
         self.assertEqual(score_boosted, score)
 
     def test_different_attributes_searched_and_boosted(self):
+        """An error should be raised if the user tries to
+        boost a field which is not being searched.
+        """
         q = "What is the best outfit to wear on the moon?"
 
-        res = tensor_search.search(
-            config=self.config, index_name=self.index_name_1, text=q,
-            searchable_attributes=['Description'],
-        )
-        res_boosted = tensor_search.search(
-            config=self.config, index_name=self.index_name_1, text=q,
-            searchable_attributes=['Description'], boost={'Title': (5, 1)}
-        )
+        with self.assertRaises(InvalidArgError) as ctx:
+            res_boosted = tensor_search.search(
+                config=self.config, index_name=self.index_name_1, text=q,
+                searchable_attributes=['Description'], boost={'Title': (0.5, 1)}
+            )
 
-        score = res['hits'][0]['_score']
-        score_boosted = res_boosted['hits'][0]['_score']
+        self.assertTrue('Title' in str(ctx.exception))
 
-        self.assertEqual(score_boosted, score)
+    def test_boost_invalid_fields(self):
+        """An error should be raised if the user tries to boost a non-existent field.
+        The error message should tell the user which field(s) were unable to be boosted.
+        """
+        q = "What is the best outfit to wear on the moon?"
+
+        with self.assertRaises(InvalidArgError) as ctx:
+            res_boosted = tensor_search.search(
+                config=self.config, index_name=self.index_name_1, text=q,
+                boost={'Title': (0.2, 1), 'invalid_field_name': (0.5, 1)}
+            )
+
+        self.assertTrue('invalid_field_name' in str(ctx.exception))
