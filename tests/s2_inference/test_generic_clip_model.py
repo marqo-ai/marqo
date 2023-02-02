@@ -43,6 +43,7 @@ class TestGenericModelSupport(MarqoTestCase):
         """index should get created with custom model_properties
         """
         # Step1 - Create Index
+        score_threshold = 0.6
         model_name = 'test-model-1'
         model_properties = {"name": "ViT-B-32-quickgelu",
                             "dimensions": 512,
@@ -101,12 +102,13 @@ class TestGenericModelSupport(MarqoTestCase):
         # Step3 - Search
         search_res = tensor_search.search(config=self.config, index_name=self.index_name_1, text = "content 2. blah blah blah", result_count=1)
         assert len(search_res['hits']) == 1
-        assert search_res["hits"][0]["_score"] > 0.6
+        assert search_res["hits"][0]["_score"] > score_threshold
 
 
 
 
     def test_pipeline_with_generic_openai_clip_model_properties_url(self):
+        score_threshold = 0.6
         model_name = 'test-model-2'
         model_properties = {"name": "ViT-B/32",
                             "dimensions": 512,
@@ -163,12 +165,13 @@ class TestGenericModelSupport(MarqoTestCase):
         search_res = tensor_search.search(config=self.config, index_name=self.index_name_2,
                                           text="content 2. blah blah blah", result_count=1)
         assert len(search_res['hits']) == 1
-        assert search_res["hits"][0]["_score"] > 0.6
+        assert search_res["hits"][0]["_score"] > score_threshold
 
 
     def test_pipeline_with_generic_open_clip_model_properties_localpath(self):
         """index should get created with custom model_properties
         """
+        score_threshold = 0.6
         url = "https://github.com/mlfoundations/open_clip/releases/download/v0.2-weights/vit_b_32-quickgelu-laion400m_avg-8a00ab3c.pt"
         target_model = download_pretrained_from_url(url)
 
@@ -228,7 +231,7 @@ class TestGenericModelSupport(MarqoTestCase):
         # Step3 - Search
         search_res = tensor_search.search(config=self.config, index_name=self.index_name_1, text = "content 2. blah blah blah", result_count=1)
         assert len(search_res['hits']) == 1
-        assert search_res["hits"][0]["_score"] > 0.6
+        assert search_res["hits"][0]["_score"] > score_threshold
 
 
     def test_vectorise_with_generic_open_clip_model_properties_invalid_localpath(self):
