@@ -78,6 +78,26 @@ class TestGenericModelSupport(MarqoTestCase):
                 "desc 2": "content 2. blah blah blah"
             }
 
+        # test another document
+        docs2 = [
+            {
+                "_id": "321",
+                "title 1": "test test test",
+                "desc 2": "test again test again test again"
+            }]
+
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs2,
+                                    auto_refresh=auto_refresh)
+
+        assert tensor_search.get_document_by_id(
+            config=self.config, index_name=self.index_name_1,
+            document_id="321") == {
+                "_id": "321",
+                "title 1": "test test test",
+                "desc 2": "test again test again test again"
+               }
+
+
         # Step3 - Search
         search_res = tensor_search.search(config=self.config, index_name=self.index_name_1, text = "content 2. blah blah blah")
         assert len(search_res['hits']) == 1
@@ -120,6 +140,24 @@ class TestGenericModelSupport(MarqoTestCase):
                    "_id": "123",
                    "title 1": "content 1",
                    "desc 2": "content 2. blah blah blah"
+               }
+
+        docs2 = [
+            {
+                "_id": "321",
+                "title 1": "test test test",
+                "desc 2": "test again test again test again"
+            }]
+
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_2, docs=docs2,
+                                    auto_refresh=auto_refresh)
+
+        assert tensor_search.get_document_by_id(
+            config=self.config, index_name=self.index_name_2,
+            document_id="321") == {
+                "_id": "321",
+                "title 1": "test test test",
+                "desc 2": "test again test again test again"
                }
 
         search_res = tensor_search.search(config=self.config, index_name=self.index_name_2,
@@ -168,6 +206,24 @@ class TestGenericModelSupport(MarqoTestCase):
                 "title 1": "content 1",
                 "desc 2": "content 2. blah blah blah"
             }
+
+        docs2 = [
+            {
+                "_id": "321",
+                "title 1": "test test test",
+                "desc 2": "test again test again test again"
+            }]
+
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs2,
+                                    auto_refresh=auto_refresh)
+
+        assert tensor_search.get_document_by_id(
+            config=self.config, index_name=self.index_name_1,
+            document_id="321") == {
+                "_id": "321",
+                "title 1": "test test test",
+                "desc 2": "test again test again test again"
+               }
 
         # Step3 - Search
         search_res = tensor_search.search(config=self.config, index_name=self.index_name_1, text = "content 2. blah blah blah")
