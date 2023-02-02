@@ -69,8 +69,22 @@ class TestGenericModelSupport(MarqoTestCase):
         auto_refresh = True
         tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs, auto_refresh=auto_refresh)
 
+        # test if we can get the document by _id
+        assert tensor_search.get_document_by_id(
+            config=self.config, index_name=self.index_name_1,
+            document_id="123") == {
+                "_id": "123",
+                "title 1": "content 1",
+                "desc 2": "content 2. blah blah blah"
+            }
+
         # Step3 - Search
-        results = tensor_search.search(config=self.config, index_name=self.index_name_1, text = "test-test")
+        search_res = tensor_search.search(config=self.config, index_name=self.index_name_1, text = "content 2. blah blah blah")
+        assert len(search_res['hits']) == 1
+        assert search_res["hits"][0]["_score"] > 0.6
+
+
+
 
     def test_pipeline_with_generic_openai_clip_model_properties_url(self):
         model_name = 'test-model-2'
@@ -100,7 +114,18 @@ class TestGenericModelSupport(MarqoTestCase):
         auto_refresh = True
         tensor_search.add_documents(config=self.config, index_name=self.index_name_2, docs=docs, auto_refresh=auto_refresh)
 
-        results = tensor_search.search(config=self.config, index_name=self.index_name_2, text = "test-test")
+        assert tensor_search.get_document_by_id(
+            config=self.config, index_name=self.index_name_2,
+            document_id="123") == {
+                   "_id": "123",
+                   "title 1": "content 1",
+                   "desc 2": "content 2. blah blah blah"
+               }
+
+        search_res = tensor_search.search(config=self.config, index_name=self.index_name_2,
+                                          text="content 2. blah blah blah")
+        assert len(search_res['hits']) == 1
+        assert search_res["hits"][0]["_score"] > 0.6
 
 
     def test_pipeline_with_generic_open_clip_model_properties_localpath(self):
@@ -136,7 +161,19 @@ class TestGenericModelSupport(MarqoTestCase):
         tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs,
                                     auto_refresh=auto_refresh)
 
-        results = tensor_search.search(config=self.config, index_name=self.index_name_1, text="test-test")
+        assert tensor_search.get_document_by_id(
+            config=self.config, index_name=self.index_name_1,
+            document_id="123") == {
+                "_id": "123",
+                "title 1": "content 1",
+                "desc 2": "content 2. blah blah blah"
+            }
+
+        # Step3 - Search
+        search_res = tensor_search.search(config=self.config, index_name=self.index_name_1, text = "content 2. blah blah blah")
+        assert len(search_res['hits']) == 1
+        assert search_res["hits"][0]["_score"] > 0.6
+
 
     def test_vectorise_with_generic_open_clip_model_properties_invalid_localpath(self):
         """index should get created with custom model_properties
