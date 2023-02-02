@@ -1041,12 +1041,6 @@ def _vector_text_search(
         - max result count should be in a config somewhere
         - searching a non existent index should return a HTTP-type error
     """
-
-    if config.cluster_is_s2search and filter_string is not None:
-        raise errors.InvalidArgError(
-            "filtering not yet implemented for S2Search cloud!"
-        )
-    
     # SEARCH TIMER-LOGGER (pre-processing)
     start_preprocess_time = timer()
     try:
