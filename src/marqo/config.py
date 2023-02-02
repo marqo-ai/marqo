@@ -17,7 +17,6 @@ class Config:
             The url to the S2Search API (ex: http://localhost:9200)
         """
         self.cluster_is_remote = False
-        self.cluster_is_s2search = False
         self.url = self.set_url(url)
         self.timeout = timeout
         default_device = enums.Device.cpu
@@ -33,7 +32,5 @@ class Config:
             self.cluster_is_remote = False
         else:
             self.cluster_is_remote = True
-            if "s2search.io" in lowered_url:
-                self.cluster_is_s2search = True
         self.url = url
         return self.url

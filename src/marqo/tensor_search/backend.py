@@ -75,10 +75,7 @@ def add_customer_field_properties(config: Config, index_name: str,
     Returns:
         HTTP Response
     """
-    if config.cluster_is_s2search:
-        engine = "nmslib"
-    else:
-        engine = "lucene"
+    engine = "lucene"
 
     body = {
         "properties": {
