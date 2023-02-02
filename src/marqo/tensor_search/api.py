@@ -16,7 +16,6 @@ from marqo import version
 from marqo.tensor_search.backend import get_index_info
 from marqo.tensor_search.enums import RequestType
 from marqo.tensor_search.throttling.redis_throttle import throttle
-from marqo.connections import redis_driver
 
 def replace_host_localhosts(OPENSEARCH_IS_INTERNAL: str, OS_URL: str):
     """Replaces a host's localhost URL with one that can be referenced from

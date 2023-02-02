@@ -57,6 +57,9 @@ class RedisDriver:
         if not self.driver:
             return self.connect()
         return self.driver
+    
+    def get_lua_shas(self):
+        return self.lua_shas
 
 # Starts up redis driver
 redis_driver = RedisDriver()

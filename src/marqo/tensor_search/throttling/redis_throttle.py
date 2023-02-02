@@ -1,14 +1,21 @@
 from marqo.tensor_search.enums import ThrottleType
 from marqo.connections import redis_driver
+from marqo.tensor_search.enums import RequestType, EnvVars
+from marqo.tensor_search import utils
+from functools import wraps
+import uuid
 
 def throttle(request_type: str):
     """
     Decorator that checks if a user has exceeded their throttling limits.
     """
     def decorator(function):
+        
+        @wraps(function)        # needed to preserve function metadata, or else FastAPI throws a 422.
         def wrapper(*args, **kwargs):
             print(f"Beginning throttling process. Your request is {request_type}")
             redis = redis_driver.get_db()  # redis instance
+            lua_shas = redis_driver.get_lua_shas()
 
             # Define maximum thread counts
             throttling_max_threads = {
@@ -22,7 +29,7 @@ def throttle(request_type: str):
             print(f"ABOUT TO CHECK REDIS FOR {set_key} WITH THREAD NAME {thread_name}")
             # Check current thread count / increment using LUA script
             check_result = redis.evalsha(
-                redis.lua_sha["check_and_increment"], 
+                lua_shas["check_and_increment"], 
                 1,          
                 set_key,                                 # sorted set key (by request type)
                 thread_name,                             # name of member for the thread
@@ -42,7 +49,7 @@ def throttle(request_type: str):
                     print(f"THREAD CREATED IN SET {set_key} WITH NAME {thread_name}")
                     result = function(*args, **kwargs)
                     return result
-                except Exception and e:
+                except Exception as e:
                     # TODO: maybe do something more robust here
                     pass
                 
