@@ -1,4 +1,6 @@
 import redis
+import os
+from marqo import errors
 
 """
 Drivers for connecting to other applications should be put here.
@@ -18,7 +20,7 @@ class RedisDriver:
         self.scripts = [
             {
                 "name": "check_and_increment",
-                "path": "tensor_search/throttling/check_and_increment.lua"
+                "path": "throttling/check_and_increment.lua"
             },
             # No need for exit script, as it's only 1 line
             #{
@@ -35,27 +37,21 @@ class RedisDriver:
         self.driver.flushdb()
 
     def connect(self, host, port) -> redis.Redis:
-        try:
-            self.driver = redis.Redis(
-                host=host,
-                port=port,
-            )
-            return self.driver
-        except Exception as ex:
-            logging.info("Error connecting to redis: ", str(ex))
+        self.driver = redis.Redis(
+            host=host,
+            port=port,
+        )
+        return self.driver
     
     def load_lua_scripts(self) -> dict:
-        try:
-            self.lua_shas = dict()
-            for script in self.scripts:
-                script_file = open(script["path"], "r")
-                script_text = script_file.read()
-                self.lua_shas[script["name"]] = redis.script_load(script_text)
-                script_file.close()
-            return self.lua_shas()
+        self.lua_shas = dict()
+        for script in self.scripts:
+            script_file = open(script["path"], "r")
+            script_text = script_file.read()
 
-        except Exception as ex:
-            logging.info("Error loading LUA scripts: ", str(ex))
+            self.lua_shas[script["name"]] = self.driver.script_load(script_text)
+            script_file.close()
+        return self.lua_shas
 
     def get_db(self):
         if not self.driver:
