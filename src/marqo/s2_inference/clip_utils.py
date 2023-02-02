@@ -12,7 +12,6 @@ from PIL import Image, UnidentifiedImageError
 import open_clip
 from multilingual_clip import pt_multilingual_clip
 import transformers
-from clip.model import build_model
 from marqo.s2_inference.types import *
 from marqo.s2_inference.logger import get_logger
 import marqo.s2_inference.model_registry as model_registry
@@ -20,6 +19,7 @@ from marqo.s2_inference.errors import IncompatibleModelDeviceError, InvalidModel
 from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize
 from marqo.s2_inference.processing.custom_clip_utils import HFTokenizer, download_pretrained_from_url
 from torchvision.transforms import InterpolationMode
+from marqo.s2_inference.configs import ModelCache
 
 logger = get_logger(__name__)
 
@@ -206,7 +206,7 @@ class CLIP:
         if path is None:
             # The original method to load the openai clip model
             # https://github.com/openai/CLIP/issues/30
-            self.model, self.preprocess = clip.load(self.model_type, device='cpu', jit=False)
+            self.model, self.preprocess = clip.load(self.model_type, device='cpu', jit=False, download_root=ModelCache.clip_cache_path)
             self.model = self.model.to(self.device)
             self.tokenizer = clip.tokenize
         else:
@@ -232,7 +232,7 @@ class CLIP:
         self.model_name = self.model_properties.get("name", None)
 
         logger.info(f"The name of the custom clip model is {self.model_name}. We use openai clip load")
-        model, preprocess = clip.load(name=self.model_path, device="cpu", jit= self.jit)
+        model, preprocess = clip.load(name=self.model_path, device="cpu", jit= self.jit, download_root=ModelCache.clip_cache_path)
         model = model.to(self.device)
         return model, preprocess
 
@@ -332,7 +332,7 @@ class FP16_CLIP(CLIP):
 
     def load(self) -> None:
         # https://github.com/openai/CLIP/issues/30
-        self.model, self.preprocess = clip.load(self.model_name, device='cuda', jit=False)
+        self.model, self.preprocess = clip.load(self.model_name, device='cuda', jit=False, download_root=ModelCache.clip_cache_path)
         self.model = self.model.to(self.device)
         self.tokenizer = clip.tokenize
         self.model.eval()
@@ -352,7 +352,7 @@ class OPEN_CLIP(CLIP):
         if path is None:
             self.model, _, self.preprocess = open_clip.create_model_and_transforms(self.model_name,
                                                                                    pretrained=self.pretrained,
-                                                                                   device=self.device, jit=False)
+                                                                                   device=self.device, jit=False, cache_dir=ModelCache.clip_cache_path)
             self.tokenizer = open_clip.get_tokenizer(self.model_name)
             self.model.eval()
         else:
@@ -384,7 +384,7 @@ class OPEN_CLIP(CLIP):
 
         logger.info(f"The name of the custom clip model is {self.model_name}. We use open_clip load")
         model, _, preprocess = open_clip.create_model_and_transforms(model_name=self.model_name, jit = self.jit, pretrained=self.model_path, precision = self.precision,
-                                                                     image_mean=self.mean, image_std=self.std, device = self.device)
+                                                                     image_mean=self.mean, image_std=self.std, device = self.device, cache_dir=ModelCache.clip_cache_path)
 
         return model, preprocess
 
@@ -432,7 +432,7 @@ class MULTILINGUAL_CLIP(CLIP):
     def load(self) -> None:
         if self.visual_name.startswith("openai/"):
             clip_name = self.visual_name.replace("openai/", "")
-            self.visual_model, self.preprocess = clip.load(name = clip_name, device = "cpu", jit = False)
+            self.visual_model, self.preprocess = clip.load(name = clip_name, device = "cpu", jit = False, download_root=ModelCache.clip_cache_path)
             self.visual_model = self.visual_model.to(self.device)
             self.visual_model = self.visual_model.visual
 

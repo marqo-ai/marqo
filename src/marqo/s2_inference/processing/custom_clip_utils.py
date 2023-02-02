@@ -6,7 +6,7 @@ import html
 import os
 import urllib
 from tqdm import tqdm
-
+from src.marqo.s2_inference.configs import ModelCache
 def whitespace_clean(text):
     text = re.sub(r'\s+', ' ', text)
     text = text.strip()
@@ -50,7 +50,7 @@ def download_pretrained_from_url(
     '''
     buffer_size = 8192
     if not cache_dir:
-        cache_dir = os.path.expanduser("~/.cache/clip")
+        cache_dir = os.path.expanduser(ModelCache.clip_cache_path)
     os.makedirs(cache_dir, exist_ok=True)
     filename = os.path.basename(url)
 
