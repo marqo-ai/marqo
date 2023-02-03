@@ -2,6 +2,24 @@ import redis
 import os
 from marqo import errors
 
+# for logging
+import datetime
+import time
+import os
+import logging
+
+def get_logger(name):
+    test_throttle_timing_file = 'test_throttle_timing.txt'
+    throttle_handler = logging.FileHandler(filename=test_throttle_timing_file)
+    throttle_handler.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(levelname)s \n%(message)s"))
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.INFO)
+    logger.addHandler(throttle_handler)
+
+    return logger
+
+logger = get_logger(__name__)
+
 """
 Drivers for connecting to other applications should be put here.
 """
@@ -30,11 +48,17 @@ class RedisDriver:
         ]  
 
     def init_from_app(self, host, port):
+
+        t0 = time.time()
+
         self.connect(host, port)
         self.load_lua_scripts()
         
         # remove any info from last Marqo instance
         self.driver.flushdb()
+
+        t1 = time.time()
+        logger.info(f"Took {((t1-t0)*1000):.3f}ms to connect to redis and load scripts.\n")
 
     def connect(self, host, port) -> redis.Redis:
         self.driver = redis.Redis(

@@ -2,8 +2,28 @@ from marqo.tensor_search.enums import ThrottleType
 from marqo.connections import redis_driver
 from marqo.tensor_search.enums import RequestType, EnvVars
 from marqo.tensor_search import utils
+from marqo.errors import TooManyRequestsError
 from functools import wraps
 import uuid
+
+# for logging
+import datetime
+import time
+import os
+import logging
+
+def get_logger(name):
+    test_throttle_timing_file = 'test_throttle_timing.txt'
+    throttle_handler = logging.FileHandler(filename=test_throttle_timing_file)
+    throttle_handler.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(levelname)s \n%(message)s"))
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.INFO)
+    logger.addHandler(throttle_handler)
+
+    return logger
+
+logger = get_logger(__name__)
+
 
 def throttle(request_type: str):
     """
@@ -26,7 +46,8 @@ def throttle(request_type: str):
             set_key = f"set:{request_type}"
             thread_name = f"thread:{uuid.uuid4()}"
 
-            print(f"ABOUT TO CHECK REDIS FOR {set_key} WITH THREAD NAME {thread_name}")
+            t0 = time.time()
+
             # Check current thread count / increment using LUA script
             check_result = redis.evalsha(
                 lua_shas["check_and_increment"], 
@@ -37,16 +58,27 @@ def throttle(request_type: str):
                 utils.read_env_vars_and_defaults(EnvVars.MARQO_THREAD_EXPIRY_TIME)  # expire_time
             )
 
+            # put entire verbose log here.
+            t1 = time.time()
+            log_msg = f"THROTTLING CHECK\n"
+            log_msg += f"Thread Name: {thread_name}\n"
+            log_msg += f"Redis Check Time: {((t1 - t0)*1000):.3f}ms\n" 
+            result_word = "PASSED" if check_result != 0 else "FAILED"
+            log_msg += f"Result: {result_word} \n"
+            log_msg += f"Set Key: {set_key}\n"
+            log_msg += f"Max Threads: {throttling_max_threads[request_type]}\n"
+            log_msg += f"Expiry Time: {utils.read_env_vars_and_defaults(EnvVars.MARQO_THREAD_EXPIRY_TIME)}\n\n"
+
+            logger.info(msg=log_msg)
+
             # Thread limit exceeded, throw 429
             if check_result == 0:
-                throttling_message = f"Throttled because maximum thread count ({throttling_max_threads[request_type]}) for request type '{request_type}' "
-                f"has been exceeded. Try your request again later."
+                throttling_message = f"Throttled because maximum thread count ({throttling_max_threads[request_type]}) for request type '{request_type}' has been exceeded. Try your request again later."
                 raise TooManyRequestsError(message=throttling_message)
 
             else:
                 # Execute function
                 try:
-                    print(f"THREAD CREATED IN SET {set_key} WITH NAME {thread_name}")
                     result = function(*args, **kwargs)
                     return result
                 except Exception as e:
@@ -55,9 +87,18 @@ def throttle(request_type: str):
                 
                 # Delete thread key whether function succeeds or fails
                 finally:
-                    print(f"THREAD WITH NAME {thread_name} FINISHED. REMOVING FROM SET {set_key}")
+                    
+                    t0 = time.time()
                     # Remove key from sorted set
                     redis.zrem(set_key, thread_name)
+
+                    # put entire verbose log here.
+                    t1 = time.time()
+                    log_msg = f"THREAD FINISHED. DELETING REDIS SET ELEMENT\n"
+                    log_msg += f"Thread Name: {thread_name}\n"
+                    log_msg += f"Redis Delete Time: {((t1 - t0)*1000):.3f}ms\n" 
+                    log_msg += f"Set Key: {set_key}\n"
+                    logger.info(msg=log_msg)
 
         return wrapper
     return decorator
