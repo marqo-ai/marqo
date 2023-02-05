@@ -31,7 +31,7 @@ class SBERT_ONNX(object):
                  enable_overwrite: Optional[bool] = False,
                  max_seq_length: int = 128,
                  lower_case: bool = True,
-                 ):
+                 **kwargs):
        
 
         self.device = device

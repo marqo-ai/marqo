@@ -2,7 +2,7 @@ from marqo.s2_inference.hf_utils import HF_MODEL
 from marqo.s2_inference.sbert_onnx_utils import SBERT_ONNX
 from marqo.s2_inference.sbert_utils import SBERT, TEST
 from marqo.s2_inference.random_utils import Random
-from marqo.s2_inference.clip_utils import CLIP, OPEN_CLIP, MULTILINGUAL_CLIP
+from marqo.s2_inference.clip_utils import CLIP, OPEN_CLIP, MULTILINGUAL_CLIP, FP16_CLIP
 from marqo.s2_inference.types import Any, Dict, List, Optional, Union, FloatTensor
 from marqo.s2_inference.onnx_clip_utils import CLIP_ONNX
 
@@ -1578,6 +1578,32 @@ def _get_onnx_clip_properties() -> Dict:
     }
     return ONNX_CLIP_MODEL_PROPERTIES
 
+
+def _get_fp16_clip_properties() -> Dict:
+    FP16_CLIP_MODEL_PROPERTIES = {
+        "fp16/ViT-L/14": {
+            "name": "fp16/ViT-L/14",
+            "dimensions": 768,
+            "type": "fp16_clip",
+            "notes": "The faster version (fp16, load from `cuda`) of openai clip model"
+        },
+        'fp16/ViT-B/32':
+            {"name": "fp16/ViT-B/32",
+             "dimensions": 512,
+             "notes": "The faster version (fp16, load from `cuda`) of openai clip model",
+             "type": "fp16_clip",
+             },
+        'fp16/ViT-B/16':
+            {"name": "fp16/ViT-B/16",
+             "dimensions": 512,
+             "notes": "The faster version (fp16, load from `cuda`) of openai clip model",
+             "type": "fp16_clip",
+             },
+    }
+
+    return FP16_CLIP_MODEL_PROPERTIES
+
+
 def _get_random_properties() -> Dict:
     RANDOM_MODEL_PROPERTIES = {
             "random":
@@ -1616,6 +1642,7 @@ def _get_model_load_mappings() -> Dict:
             'sbert_onnx':SBERT_ONNX,
             'clip_onnx': CLIP_ONNX,
             "multilingual_clip" : MULTILINGUAL_CLIP,
+            "fp16_clip": FP16_CLIP,
             'random':Random,
             'hf':HF_MODEL}
 
@@ -1633,6 +1660,7 @@ def load_model_properties() -> Dict:
     open_clip_model_properties = _get_open_clip_properties()
     onnx_clip_model_properties = _get_onnx_clip_properties()
     multilingual_clip_model_properties = _get_multilingual_clip_properties()
+    fp16_clip_model_properties = _get_fp16_clip_properties()
 
     # combine the above dicts
     model_properties = dict(clip_model_properties.items())
@@ -1644,6 +1672,7 @@ def load_model_properties() -> Dict:
     model_properties.update(open_clip_model_properties)
     model_properties.update(onnx_clip_model_properties)
     model_properties.update(multilingual_clip_model_properties)
+    model_properties.update(fp16_clip_model_properties)
 
     all_properties = dict()
     all_properties['models'] = model_properties
