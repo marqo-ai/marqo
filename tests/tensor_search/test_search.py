@@ -46,7 +46,7 @@ class TestVectorSearch(MarqoTestCase):
                  "_id": "1234", "finally": "Random text here efgh "},
             ], auto_refresh=True)
         search_res = tensor_search._vector_text_search(
-            config=self.config, index_name=self.index_name_1, text=" efgh ",
+            config=self.config, index_name=self.index_name_1, query=" efgh ",
             return_doc_ids=True, number_of_highlights=2, result_count=10
         )
         assert len(search_res['hits']) == 2
@@ -55,14 +55,14 @@ class TestVectorSearch(MarqoTestCase):
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
         search_res = tensor_search._vector_text_search(
                 config=self.config, index_name=self.index_name_1,
-                result_count=5, text="some text...")
+                result_count=5, query="some text...")
         assert {'hits': []} == search_res
 
     def test_vector_search_against_non_existent_index(self):
         try:
             tensor_search._vector_text_search(
                 config=self.config, index_name="some-non-existent-index",
-                result_count=5, text="some text...")
+                result_count=5, query="some text...")
         except IndexNotFoundError as s:
             pass
 
@@ -77,7 +77,7 @@ class TestVectorSearch(MarqoTestCase):
                  "Steps": "1. Cook meat. 2: Dice Onions. 3: Serve."},
             ], auto_refresh=True)
         search_res = tensor_search._vector_text_search(
-            config=self.config, index_name=self.index_name_1, text=query_text,
+            config=self.config, index_name=self.index_name_1, query=query_text,
             return_doc_ids=True
         )
 
@@ -90,7 +90,7 @@ class TestVectorSearch(MarqoTestCase):
                  "_id": "1234", "finally": "Random text here efgh "},
             ], auto_refresh=True)
         search_res = tensor_search._vector_text_search(
-            config=self.config, index_name=self.index_name_1, text=" efgh ",
+            config=self.config, index_name=self.index_name_1, query=" efgh ",
             return_doc_ids=True, number_of_highlights=None, simplified_format=False
         )
         for res in search_res['hits']:
@@ -105,7 +105,7 @@ class TestVectorSearch(MarqoTestCase):
                  "_id": "1234", "finally": "Random text here efgh "},
             ], auto_refresh=True)
         search_res = tensor_search._vector_text_search(
-            config=self.config, index_name=self.index_name_1, text=" efgh ",
+            config=self.config, index_name=self.index_name_1, query=" efgh ",
             return_doc_ids=True, number_of_highlights=2, simplified_format=False
         )
         for res in search_res['hits']:
@@ -472,7 +472,7 @@ class TestVectorSearch(MarqoTestCase):
 
             )
             assert "hits" in tensor_search._vector_text_search(
-                text=str(to_search), config=self.config, index_name=self.index_name_1
+                query=str(to_search), config=self.config, index_name=self.index_name_1
             )
 
     def test_search_other_types_top_search(self):

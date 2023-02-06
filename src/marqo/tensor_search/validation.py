@@ -3,15 +3,41 @@ import pprint
 import typing
 from marqo.tensor_search import constants
 from marqo.tensor_search import enums, utils
-from typing import Iterable, Container
+from typing import Iterable, Container, Union
 from marqo.errors import (
     MarqoError, InvalidFieldNameError, InvalidArgError, InternalError,
     InvalidDocumentIdError, DocTooLargeError, InvalidIndexNameError)
-from marqo.tensor_search.enums import TensorField
+from marqo.tensor_search.enums import TensorField, SearchMethod
 from marqo.tensor_search import constants
 from typing import Any, Type
 import inspect
 from enum import Enum
+
+
+def validate_query(q: Union[dict, str], search_method: Union[str, SearchMethod]):
+    """
+    Returns q if an error is not raised"""
+    if isinstance(q, dict):
+        if search_method.upper() != SearchMethod.TENSOR:
+            raise ValueError(
+                "Multi-query search is currently only supported for search_method=TENSOR! "
+                f"\nReceived search_method `{search_method}`")
+        for k, v in q.items():
+            base_invalid_kv_message = (
+                "Multi queries dictionaries must be <string>:<float> pairs. See usage here: "
+                ""  # FIXME: add link
+            )
+            if not isinstance(k, str):
+                raise ValueError(f"{base_invalid_kv_message}\n"
+                                 f"    Found key of type `{type(k)}` instead of string. Key=`{k}`")
+            if not isinstance(v, str):
+                raise ValueError(f"{base_invalid_kv_message}\n"
+                                 f"    Found value of type `{type(v)}` instead of float. Value=`{v}`")
+    elif not isinstance(q, str):
+        raise ValueError(
+            f"q must be a string or dict! Received q of type `{type(q)}`. "
+            f"\nq=`{q}`")
+    return q
 
 
 def validate_str_against_enum(value: Any, enum_class: Type[Enum], case_sensitive: bool = True):
