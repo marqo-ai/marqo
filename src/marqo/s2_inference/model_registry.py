@@ -72,7 +72,6 @@ def _get_clip_properties() -> Dict:
 def _get_open_clip_properties() -> Dict:
     # use this link to find all the model_configs
     # https://github.com/mlfoundations/open_clip/tree/main/src/open_clip/model_configs
-
     OPEN_CLIP_MODEL_PROPERTIES = {
         'open_clip/RN101-quickgelu/openai': {'dimensions': 512,
                                              'name': 'open_clip/RN101-quickgelu/openai',
