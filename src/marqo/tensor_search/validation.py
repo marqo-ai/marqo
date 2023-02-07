@@ -20,7 +20,7 @@ def validate_query(q: Union[dict, str], search_method: Union[str, SearchMethod])
     if isinstance(q, dict):
         if search_method.upper() != SearchMethod.TENSOR:
             raise InvalidArgError(
-                "Multi-query search is currently only supported for search_method=TENSOR! "
+                'Multi-query search is currently only supported for search_method="TENSOR" '
                 f"\nReceived search_method `{search_method}`")
         if not len(q):
             raise InvalidArgError("Multi-query search requires at least one query! Received empty dictionary. ")

@@ -1023,10 +1023,32 @@ class TestVectorSearch(MarqoTestCase):
         )
         alright_queries = [{"v ": 1.2}, {"d ": 0}, {"vf": -1}]
         for q in alright_queries:
-            print('q',q)
             tensor_search.search(
                 text=q,
                 index_name=self.index_name_1,
                 result_count=5,
                 config=self.config,
                 search_method=SearchMethod.TENSOR)
+
+    def test_multi_search_images_lexical(self):
+        """Error if you try this"""
+        docs = [
+            {"loc": "124", "_id": 'realistic_hippo'},
+            {"field_a": "Some text about a weird forest",
+             "_id": 'artefact_hippo'}
+        ]
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1,
+            docs=docs, auto_refresh=True
+        )
+        for bad_method in [SearchMethod.LEXICAL, "kjrnkjrn", ""]:
+            try:
+                tensor_search.search(
+                    text={'something': 1},
+                    index_name=self.index_name_1,
+                    result_count=5,
+                    config=self.config,
+                    search_method=bad_method)
+                raise AssertionError
+            except InvalidArgError as e:
+                pass
