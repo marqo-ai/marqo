@@ -908,12 +908,15 @@ class TestVectorSearch(MarqoTestCase):
         docs = [
             {
                 "field_a": "Doberman, canines, golden retrievers are humanity's best friends",
+                "_id": 'dog_doc'
             },
             {
                 "field_a": "All things poodles! Poodles are great pets",
+                "_id": 'poodle_doc'
             },
             {
-                "field_a": "Tonka trucks."
+                "field_a": "Construction and scaffolding equipment",
+                "_id": 'irrelevant_doc'
             }
         ]
         tensor_search.add_documents(
@@ -923,12 +926,17 @@ class TestVectorSearch(MarqoTestCase):
         res = tensor_search.search(
             text={
                 "Dogs": 2.0,
-                "Poodles": -1,
+                "Poodles": -2,
             },
             index_name=self.index_name_1,
             result_count=5,
             config=self.config,
             search_method=SearchMethod.TENSOR, )
-        pprint.pprint(res)
+
+        # the poodle doc should be lower ranked than the irrelevant doc
+        expected_ordering = ['dog_doc', 'irrelevant_doc', 'poodle_doc']
+
+        for hit_position, _ in enumerate(res['hits']):
+            assert res['hits'][hit_position]['_id'] == expected_ordering[hit_position]
     
     
