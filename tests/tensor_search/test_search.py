@@ -903,5 +903,32 @@ class TestVectorSearch(MarqoTestCase):
                 raise AssertionError
             except InvalidArgError:
                 pass
+
+    def test_multi_search(self):
+        docs = [
+            {
+                "field_a": "Doberman, canines, golden retrievers are humanity's best friends",
+            },
+            {
+                "field_a": "All things poodles! Poodles are great pets",
+            },
+            {
+                "field_a": "Tonka trucks."
+            }
+        ]
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1,
+            docs=docs, auto_refresh=True
+        )
+        res = tensor_search.search(
+            text={
+                "Dogs": 2.0,
+                "Poodles": -1,
+            },
+            index_name=self.index_name_1,
+            result_count=5,
+            config=self.config,
+            search_method=SearchMethod.TENSOR, )
+        pprint.pprint(res)
     
     

@@ -30,7 +30,7 @@ def validate_query(q: Union[dict, str], search_method: Union[str, SearchMethod])
             if not isinstance(k, str):
                 raise ValueError(f"{base_invalid_kv_message}\n"
                                  f"    Found key of type `{type(k)}` instead of string. Key=`{k}`")
-            if not isinstance(v, str):
+            if not isinstance(v, (int, float)):
                 raise ValueError(f"{base_invalid_kv_message}\n"
                                  f"    Found value of type `{type(v)}` instead of float. Value=`{v}`")
     elif not isinstance(q, str):

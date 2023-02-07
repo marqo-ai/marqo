@@ -1068,14 +1068,16 @@ def _vector_text_search(
         vectorised_text = s2_inference.vectorise(
             model_name=index_info.model_name, model_properties=_get_model_properties(index_info),
             content=to_be_vectorised, device=selected_device,
-            normalize_embeddings=index_info.index_settings['index_defaults']['normalize_embeddings'])[0]
+            normalize_embeddings=index_info.index_settings['index_defaults']['normalize_embeddings'])
         if ordered_queries:
             # multiple queries. We have to weight and combine them:
-            weighted_vectors = [vec * weight for vec, weight in zip(vectorised_text, [w for _, w in ordered_queries])]
-            vectorised_text = functools.reduce(lambda x, y: x + y, weighted_vectors)/len(weighted_vectors)
+            weighted_vectors = [np.asarray(vec) * weight for vec, weight in zip(vectorised_text, [w for _, w in ordered_queries])]
+            vectorised_text = np.mean(weighted_vectors, axis=0)
             if index_info.index_settings['index_defaults']['normalize_embeddings']:
                 vectorised_text /= np.linalg.norm(vectorised_text, axis=-1, keepdims=True)
-
+            vectorised_text = list(vectorised_text)
+        else:
+            vectorised_text = vectorised_text[0]
     except (s2_inference_errors.UnknownModelError,
             s2_inference_errors.InvalidModelPropertiesError,
             s2_inference_errors.ModelLoadError) as model_error:
@@ -1203,9 +1205,10 @@ def _vector_text_search(
                     "Try reducing the query's limit parameter") from e
             elif 'parse_exception' in response["responses"][0]["error"]["root_cause"][0]["reason"]:
                 raise errors.InvalidArgError("Syntax error, could not parse filter string") from e
-            elif contextualised_filter in response["responses"][0]["error"]["root_cause"][0]["reason"]:
+            elif (contextualised_filter
+                  and contextualised_filter in response["responses"][0]["error"]["root_cause"][0]["reason"]):
                 raise errors.InvalidArgError("Syntax error, could not parse filter string") from e
-            raise e
+            raise errors.BackendCommunicationError(f"Error communicating with Marqo-OS backend:\n{response}")
         except (KeyError, IndexError) as e2:
             raise e
 
