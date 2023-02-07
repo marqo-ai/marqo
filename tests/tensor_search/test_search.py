@@ -296,7 +296,6 @@ class TestVectorSearch(MarqoTestCase):
         s_res = tensor_search.search(
             config=self.config, index_name=self.index_name_1, text="cool match",
             search_method=SearchMethod.LEXICAL)
-        pprint.pprint(s_res)
         assert len(s_res["hits"]) > 0
 
     def test_search_vector_int_field(self):
@@ -310,7 +309,6 @@ class TestVectorSearch(MarqoTestCase):
         s_res = tensor_search.search(
             config=self.config, index_name=self.index_name_1, text="88",
             search_method=SearchMethod.TENSOR)
-        pprint.pprint(s_res)
         assert len(s_res["hits"]) > 0
 
     def test_filtering(self):
@@ -676,7 +674,6 @@ class TestVectorSearch(MarqoTestCase):
         for method in ("TENSOR", "LEXICAL"):
             for bad_attr in ["jknjhc", "", dict(), 1234, 1.245]:
                 try:
-                    print("bad_attrbad_attrbad_attr",bad_attr)
                     tensor_search.search(
                         config=self.config, index_name=self.index_name_1, text="a",
                         attributes_to_retrieve=bad_attr, return_doc_ids=True, search_method=method,
@@ -957,10 +954,16 @@ class TestVectorSearch(MarqoTestCase):
         queries_expected_ordering = [
             ({"Nature photography": 2.0, "Artefact": -2}, ['realistic_hippo', 'artefact_hippo']),
             ({"Nature photography": -1.0, "Artefact": 1.0}, ['artefact_hippo', 'realistic_hippo']),
+            ({"Nature photography": -1.5, "Artefact": 1.0, "hippo": 1.0}, ['artefact_hippo', 'realistic_hippo']),
             ({"https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png": -1.0,
               "blah": 1.0}, ['realistic_hippo', 'artefact_hippo']),
             ({"https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png": 2.0,
               "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png": -1.0},
+             ['artefact_hippo', 'realistic_hippo']),
+            ({"https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png": 2.0,
+              "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png": -1.0,
+              "artefact": 1.0, "photo realistic": -1,
+              },
              ['artefact_hippo', 'realistic_hippo']),
         ]
         for query, expected_ordering in queries_expected_ordering:
@@ -971,7 +974,6 @@ class TestVectorSearch(MarqoTestCase):
                 config=self.config,
                 search_method=SearchMethod.TENSOR)
             # the poodle doc should be lower ranked than the irrelevant doc
-            print(res)
             for hit_position, _ in enumerate(res['hits']):
                 assert res['hits'][hit_position]['_id'] == expected_ordering[hit_position]
 
