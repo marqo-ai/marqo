@@ -22,7 +22,18 @@ def get_logger(name):
 
     return logger
 
+def get_logger_parse(name):
+    test_throttle_timing_file = 'test_throttle_timing.csv'
+    throttle_handler = logging.FileHandler(filename=test_throttle_timing_file)
+    throttle_handler.setFormatter(logging.Formatter("%(message)s"))
+    logger = logging.getLogger(name + "_parsed")
+    logger.setLevel(logging.INFO)
+    logger.addHandler(throttle_handler)
+
+    return logger
+
 logger = get_logger(__name__)
+logger_parse = get_logger_parse(__name__)
 
 
 def throttle(request_type: str):
@@ -60,6 +71,8 @@ def throttle(request_type: str):
 
             # put entire verbose log here.
             t1 = time.time()
+            redis_time = (t1 - t0)*1000
+
             log_msg = f"THROTTLING CHECK\n"
             log_msg += f"Thread Name: {thread_name}\n"
             log_msg += f"Redis Check Time: {((t1 - t0)*1000):.3f}ms\n" 
@@ -69,7 +82,26 @@ def throttle(request_type: str):
             log_msg += f"Max Threads: {throttling_max_threads[request_type]}\n"
             log_msg += f"Expiry Time: {utils.read_env_vars_and_defaults(EnvVars.MARQO_THREAD_EXPIRY_TIME)}\n\n"
 
-            logger.info(msg=log_msg)
+            #logger.info(msg=log_msg)
+
+            # JSON test data log
+            json_msg = '{"timestamp": "' + time.asctime() + '",'
+            json_msg += '"action": "check",'
+            json_msg += '"thread_name": "' + thread_name + '",'
+            json_msg += '"result": "' + result_word + '",'
+            json_msg += '"max_threads": ' + str(throttling_max_threads[request_type]) + ','
+            json_msg += '"redis_time": ' + str(redis_time)
+            json_msg += '}'
+            #logger_parse.info(msg=json_msg)
+
+            check_test_data = {
+                "timestamp": time.asctime(),
+                "action": "check",
+                "thread_name": thread_name,
+                "result": result_word,
+                "max_threads": throttling_max_threads[request_type],
+                "redis_time": redis_time
+            }
 
             # Thread limit exceeded, throw 429
             if check_result == 0:
@@ -80,6 +112,7 @@ def throttle(request_type: str):
                 # Execute function
                 try:
                     result = function(*args, **kwargs)
+                    result["check_test_data"] = check_test_data
                     return result
                 except Exception as e:
                     # TODO: maybe do something more robust here
@@ -99,6 +132,7 @@ def throttle(request_type: str):
                     log_msg += f"Redis Delete Time: {((t1 - t0)*1000):.3f}ms\n" 
                     log_msg += f"Set Key: {set_key}\n"
                     logger.info(msg=log_msg)
+                    logger_parse.info(msg=f"delete,{thread_name},{((t1 - t0)*1000):.3f}")
 
         return wrapper
     return decorator

@@ -137,3 +137,7 @@ tests/cache/
 cache/
 
 __pycache__/
+
+# throttling error logs
+src/marqo/tensor_search/test_throttle_timing.txt
+src/marqo/tensor_search/test_throttle_timing.csv

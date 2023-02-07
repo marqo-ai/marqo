@@ -244,7 +244,10 @@ def get_cpu_info():
 def get_cuda_info():
     return tensor_search.get_cuda_info()
 
-
+@app.put("/max_index/{thread_count}")
+def set_max_concurrent_index(thread_count: str):
+    os.environ['MARQO_MAX_CONCURRENT_INDEX'] = thread_count
+    
 
 # try these curl commands:
 
