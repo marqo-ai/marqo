@@ -1059,16 +1059,23 @@ def _vector_text_search(
     ordered_queries = None
 
     if isinstance(query, str):
-        to_be_vectorised = query
+        to_be_vectorised = [query, ]
     else:  # is dict:
         ordered_queries = list(query.items())
-        to_be_vectorised = [k for k, _ in ordered_queries]
-
+        if index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]:
+            text_queries = [k for k, _ in ordered_queries if _is_image(k)]
+            image_queries = [k for k, _ in ordered_queries if not _is_image(k)]
+            to_be_vectorised = [batch for batch in [text_queries, image_queries] if batch]
+        else:
+            to_be_vectorised = [[k for k, _ in ordered_queries], ]
     try:
-        vectorised_text = s2_inference.vectorise(
-            model_name=index_info.model_name, model_properties=_get_model_properties(index_info),
-            content=to_be_vectorised, device=selected_device,
-            normalize_embeddings=index_info.index_settings['index_defaults']['normalize_embeddings'])
+        vectorised_text = functools.reduce(lambda x, y: x + y,
+            [ s2_inference.vectorise(
+                model_name=index_info.model_name, model_properties=_get_model_properties(index_info),
+                content=batch, device=selected_device,
+                normalize_embeddings=index_info.index_settings['index_defaults']['normalize_embeddings'])
+                for batch in to_be_vectorised]
+        )
         if ordered_queries:
             # multiple queries. We have to weight and combine them:
             weighted_vectors = [np.asarray(vec) * weight for vec, weight in zip(vectorised_text, [w for _, w in ordered_queries])]
