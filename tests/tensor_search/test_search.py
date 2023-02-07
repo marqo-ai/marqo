@@ -1,10 +1,10 @@
 import math
 import pprint
 from unittest import mock
-from marqo.tensor_search.enums import TensorField, SearchMethod, EnvVars
+from marqo.tensor_search.enums import TensorField, SearchMethod, EnvVars, IndexSettingsField
 from marqo.errors import (
     MarqoApiError, MarqoError, IndexNotFoundError, InvalidArgError,
-    InvalidFieldNameError, IllegalRequestedDocCount
+    InvalidFieldNameError, IllegalRequestedDocCount, BadRequestError
 )
 from marqo.tensor_search import tensor_search, constants, index_meta_cache
 import copy
@@ -906,37 +906,127 @@ class TestVectorSearch(MarqoTestCase):
 
     def test_multi_search(self):
         docs = [
-            {
-                "field_a": "Doberman, canines, golden retrievers are humanity's best friends",
-                "_id": 'dog_doc'
-            },
-            {
-                "field_a": "All things poodles! Poodles are great pets",
-                "_id": 'poodle_doc'
-            },
-            {
-                "field_a": "Construction and scaffolding equipment",
-                "_id": 'irrelevant_doc'
-            }
+            {"field_a": "Doberman, canines, golden retrievers are humanity's best friends",
+             "_id": 'dog_doc'},
+            {"field_a": "All things poodles! Poodles are great pets",
+             "_id": 'poodle_doc'},
+            {"field_a": "Construction and scaffolding equipment",
+             "_id": 'irrelevant_doc'}
         ]
         tensor_search.add_documents(
             config=self.config, index_name=self.index_name_1,
             docs=docs, auto_refresh=True
         )
-        res = tensor_search.search(
-            text={
-                "Dogs": 2.0,
-                "Poodles": -2,
-            },
-            index_name=self.index_name_1,
-            result_count=5,
-            config=self.config,
-            search_method=SearchMethod.TENSOR, )
+        queries_expected_ordering = [
+            ({"Dogs": 2.0, "Poodles": -2}, ['dog_doc', 'irrelevant_doc', 'poodle_doc']),
+            ("dogs", ['dog_doc', 'poodle_doc', 'irrelevant_doc']),
+            ({"dogs": 1}, ['dog_doc', 'poodle_doc', 'irrelevant_doc']),
+            ({"Dogs": -2.0, "Poodles": 2}, ['poodle_doc', 'irrelevant_doc', 'dog_doc']),
+        ]
+        for query, expected_ordering in queries_expected_ordering:
+            res = tensor_search.search(
+                text=query,
+                index_name=self.index_name_1,
+                result_count=5,
+                config=self.config,
+                search_method=SearchMethod.TENSOR, )
 
-        # the poodle doc should be lower ranked than the irrelevant doc
-        expected_ordering = ['dog_doc', 'irrelevant_doc', 'poodle_doc']
+            # the poodle doc should be lower ranked than the irrelevant doc
+            for hit_position, _ in enumerate(res['hits']):
+                assert res['hits'][hit_position]['_id'] == expected_ordering[hit_position]
 
-        for hit_position, _ in enumerate(res['hits']):
-            assert res['hits'][hit_position]['_id'] == expected_ordering[hit_position]
-    
-    
+    def test_multi_search_images(self):
+        docs = [
+            {"loc a": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+             "_id": 'realistic_hippo'},
+            {"loc b": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png",
+             "_id": 'artefact_hippo'}
+        ]
+        image_index_config = {
+            IndexSettingsField.index_defaults: {
+                IndexSettingsField.model: "ViT-B/16",
+                IndexSettingsField.treat_urls_and_pointers_as_images: True
+            }
+        }
+        tensor_search.create_vector_index(
+            config=self.config, index_name=self.index_name_1, index_settings=image_index_config)
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1,
+            docs=docs, auto_refresh=True
+        )
+        queries_expected_ordering = [
+            ({"Nature photography": 2.0, "Artefact": -2}, ['realistic_hippo', 'artefact_hippo']),
+            ({"Nature photography": -1.0, "Artefact": 1.0}, ['artefact_hippo', 'realistic_hippo']),
+        ]
+        for query, expected_ordering in queries_expected_ordering:
+            res = tensor_search.search(
+                text=query,
+                index_name=self.index_name_1,
+                result_count=5,
+                config=self.config,
+                search_method=SearchMethod.TENSOR)
+            # the poodle doc should be lower ranked than the irrelevant doc
+            for hit_position, _ in enumerate(res['hits']):
+                assert res['hits'][hit_position]['_id'] == expected_ordering[hit_position]
+
+    def test_multi_search_images_edge_cases(self):
+        docs = [
+            {"loc": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+             "_id": 'realistic_hippo'},
+            {"field_a": "Some text about a weird forest",
+             "_id": 'artefact_hippo'}
+        ]
+        image_index_config = {
+            IndexSettingsField.index_defaults: {
+                IndexSettingsField.model: "ViT-B/16",
+                IndexSettingsField.treat_urls_and_pointers_as_images: True
+            }
+        }
+        tensor_search.create_vector_index(
+            config=self.config, index_name=self.index_name_1, index_settings=image_index_config)
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1,
+            docs=docs, auto_refresh=True
+        )
+        invalid_queries = [{}, None, {123: 123}, {'123': None},
+                           {"https://marqo_not_real.com/image_1.png": 3}, set()]
+        for q in invalid_queries:
+            try:
+                tensor_search.search(
+                    text=q,
+                    index_name=self.index_name_1,
+                    result_count=5,
+                    config=self.config,
+                    search_method=SearchMethod.TENSOR)
+                raise AssertionError
+            except (InvalidArgError, BadRequestError) as e:
+                pass
+
+    def test_multi_search_images_ok_edge_cases(self):
+        docs = [
+            {"loc": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+             "_id": 'realistic_hippo'},
+            {"field_a": "Some text about a weird forest",
+             "_id": 'artefact_hippo'}
+        ]
+        image_index_config = {
+            IndexSettingsField.index_defaults: {
+                IndexSettingsField.model: "ViT-B/16",
+                IndexSettingsField.treat_urls_and_pointers_as_images: True
+            }
+        }
+        tensor_search.create_vector_index(
+            config=self.config, index_name=self.index_name_1, index_settings=image_index_config)
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1,
+            docs=docs, auto_refresh=True
+        )
+        alright_queries = [{"v ": 1.2}, {"d ": 0}, {"vf": -1}]
+        for q in alright_queries:
+            print('q',q)
+            tensor_search.search(
+                text=q,
+                index_name=self.index_name_1,
+                result_count=5,
+                config=self.config,
+                search_method=SearchMethod.TENSOR)

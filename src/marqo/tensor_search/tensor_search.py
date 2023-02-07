@@ -1074,7 +1074,9 @@ def _vector_text_search(
             weighted_vectors = [np.asarray(vec) * weight for vec, weight in zip(vectorised_text, [w for _, w in ordered_queries])]
             vectorised_text = np.mean(weighted_vectors, axis=0)
             if index_info.index_settings['index_defaults']['normalize_embeddings']:
-                vectorised_text /= np.linalg.norm(vectorised_text, axis=-1, keepdims=True)
+                norm = np.linalg.norm(vectorised_text, axis=-1, keepdims=True)
+                if norm > 0:
+                    vectorised_text /= np.linalg.norm(vectorised_text, axis=-1, keepdims=True)
             vectorised_text = list(vectorised_text)
         else:
             vectorised_text = vectorised_text[0]
