@@ -1,3 +1,5 @@
+Original article [here](https://www.marqo.ai/blog/from-iron-manual-to-ironman-augmenting-gpt-with-marqo-for-fast-editable-memory-to-enable-context-aware-question-answering).
+
 # Prerequisites
 1. You will need an OpenAI API key.
 ```
