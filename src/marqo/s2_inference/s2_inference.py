@@ -66,7 +66,7 @@ def _create_model_cache_key(model_name: str, device: str, model_properties: dict
     if model_properties is None:
         model_properties = dict()
 
-    model_cache_key = (model_name + "||" +
+    model_cache_key =  (model_name + "||" +
                        model_properties.get('name', '') + "||" +
                        str(model_properties.get('dimensions', '')) + "||" +
                        model_properties.get('type', '') + "||" +
@@ -317,6 +317,7 @@ def eject_model(model_name:str, device:str):
 
     # we can't handle the situation where there are two models with the same name and device
     # but different properties.
+    logger.info(f"{model_cache_keys}")
     for key in model_cache_keys:
         if key.startswith(model_name) and key.endswith(device):
             model_cache_key = key
