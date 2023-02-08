@@ -4,7 +4,11 @@ from marqo.s2_inference.s2_inference import _validate_model_properties,\
     _create_model_cache_key, _update_available_models, available_models, clear_loaded_models
 from marqo.tensor_search.tensor_search import eject_model, get_cuda_info, get_loaded_models, get_cpu_info
 from marqo.errors import ModelNotInCacheError, HardwareCompatabilityError
+from marqo.s2_inference.reranking.cross_encoders import ReRankerText, ReRankerOwl
+from marqo.s2_inference.reranking.model_utils import load_owl_vit
+from marqo.s2_inference.reranking import rerank
 import psutil
+from marqo.tensor_search import tensor_search
 
 
 
@@ -20,8 +24,7 @@ class TestModelCacheManagement(MarqoTestCase):
         # We pre-define 3 dummy models for testing purpose
         self.MODEL_1 = "ViT-B/32"
         self.MODEL_2 = "hf/all-MiniLM-L6-v2"
-        self.rerank_model = 'google/owlvit-base-patch32'
-        self.MODEL_LIST = [self.MODEL_1, self.MODEL_2, self.rerank_model]
+        self.MODEL_LIST = [self.MODEL_1, self.MODEL_2]
         self.CUDA_FLAG = torch.cuda.is_available()
 
 
@@ -36,9 +39,9 @@ class TestModelCacheManagement(MarqoTestCase):
 
         # We loaded 6 models (3 in cuda, 3 in cpu) as initial setup
         if self.CUDA_FLAG:
-            assert len(available_models) >= 6
+            assert len(available_models) >= 4
         else:
-            assert len(available_models) >= 3
+            assert len(available_models) >= 2
 
     def tearDown(self) -> None:
         clear_loaded_models()
@@ -258,6 +261,22 @@ class TestModelCacheManagement(MarqoTestCase):
 
                 if model_cache_key in available_models:
                     raise AssertionError
+
+
+    def test_model_cache_management_with_text_reranker(self):
+        model_name = 'google/owlvit-base-patch32'
+
+        _ = load_owl_vit('google/owlvit-base-patch32', "cpu")
+        model_cache_key = _create_model_cache_key(model_name, "cpu", model_properties=None)
+
+        if model_cache_key not in available_models:
+            raise AssertionError
+
+        eject_model(model_name, "cpu")
+        if model_cache_key in available_models:
+            raise AssertionError
+
+
 
 
 
