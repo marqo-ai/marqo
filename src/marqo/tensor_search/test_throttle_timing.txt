@@ -1,6 +1,0 @@
-2023-02-08 00:10:03,914 - marqo.connections - INFO 
-Took 0.724ms to connect to redis and load scripts.
-
-2023-02-08 00:10:09,995 - marqo.connections - INFO 
-Took 0.605ms to connect to redis and load scripts.
-

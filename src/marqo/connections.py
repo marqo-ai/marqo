@@ -1,6 +1,7 @@
 import redis
 import os
 from marqo import errors
+from marqo.tensor_search.tensor_search_logging import get_logger
 
 # for logging
 import datetime
@@ -8,21 +9,11 @@ import time
 import os
 import logging
 
-def get_logger(name):
-    test_throttle_timing_file = 'test_throttle_timing.txt'
-    throttle_handler = logging.FileHandler(filename=test_throttle_timing_file)
-    throttle_handler.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(levelname)s \n%(message)s"))
-    logger = logging.getLogger(name)
-    logger.setLevel(logging.INFO)
-    logger.addHandler(throttle_handler)
-
-    return logger
-
-logger = get_logger(__name__)
-
 """
 Drivers for connecting to other applications should be put here.
 """
+
+logger = get_logger(__name__)
 
 class RedisDriver:
     """
