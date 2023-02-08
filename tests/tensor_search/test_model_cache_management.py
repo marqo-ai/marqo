@@ -19,7 +19,6 @@ def load_model(model_name: str, device: str, model_properteis: dict = None) -> N
 
 
 class TestModelCacheManagement(MarqoTestCase):
-
     def setUp(self) -> None:
         # We pre-define 3 dummy models for testing purpose
         self.MODEL_1 = "ViT-B/32"
