@@ -317,7 +317,6 @@ def eject_model(model_name:str, device:str):
 
     # we can't handle the situation where there are two models with the same name and device
     # but different properties.
-    logger.info(f"{model_cache_keys}")
     for key in model_cache_keys:
         if isinstance(key, str):
             if key.startswith(model_name) and key.endswith(device):
