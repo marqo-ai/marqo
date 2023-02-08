@@ -21,7 +21,7 @@ class TestModelCacheManagement(MarqoTestCase):
         self.MODEL_1 = "ViT-B/32"
         self.MODEL_2 = "hf/all-MiniLM-L6-v2"
         self.rerank_model = 'google/owlvit-base-patch32'
-        self.MODEL_LIST = [self.MODEL_1, self.MODEL_2]
+        self.MODEL_LIST = [self.MODEL_1, self.MODEL_2, self.rerank_model]
         self.CUDA_FLAG = torch.cuda.is_available()
 
 
@@ -36,9 +36,9 @@ class TestModelCacheManagement(MarqoTestCase):
 
         # We loaded 6 models (3 in cuda, 3 in cpu) as initial setup
         if self.CUDA_FLAG:
-            assert len(available_models) >= 4
+            assert len(available_models) >= 6
         else:
-            assert len(available_models) >= 2
+            assert len(available_models) >= 3
 
     def tearDown(self) -> None:
         clear_loaded_models()
