@@ -20,6 +20,7 @@ class TestModelCacheManagement(MarqoTestCase):
         # We pre-define 3 dummy models for testing purpose
         self.MODEL_1 = "ViT-B/32"
         self.MODEL_2 = "hf/all-MiniLM-L6-v2"
+        self.rerank_model =
         self.MODEL_LIST = [self.MODEL_1, self.MODEL_2]
         self.CUDA_FLAG = torch.cuda.is_available()
 
