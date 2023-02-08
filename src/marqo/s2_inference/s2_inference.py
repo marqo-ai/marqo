@@ -100,18 +100,28 @@ def _validate_model_properties(model_name: str, model_properties: dict) -> dict:
     if model_properties is not None:
         """checks model dict to see if all required keys are present
         """
-        required_keys = ["name", "dimensions"]
-        for key in required_keys:
-            if key not in model_properties:
-                raise InvalidModelPropertiesError(f"model_properties has missing key '{key}'. ")
+        if model_properties.get("type", None) in (None, "sbert"):
+            required_keys = ["name", "dimensions"]
+            for key in required_keys:
+                if key not in model_properties:
+                    raise InvalidModelPropertiesError(f"model_properties has missing key '{key}'."
+                                                      f"please update your model properties with required key `{key}`"
+                                                      f"check `https://docs.marqo.ai/0.0.12/Models-Reference/dense_retrieval/` for more info.")
 
-        """updates model dict with default values if optional keys are missing
-        """
-        optional_keys_values = [("type", "sbert"), ("tokens", get_default_seq_length())]
-        for key, value in optional_keys_values:
-            if key not in model_properties:
-                model_properties[key] = value
+            """updates model dict with default values if optional keys are missing
+            """
+            optional_keys_values = [("type", "sbert"), ("tokens", get_default_seq_length())]
+            for key, value in optional_keys_values:
+                if key not in model_properties:
+                    model_properties[key] = value
 
+        elif model_properties.get("type", None) in ("clip", "open_clip"):
+            required_keys = ["name", "dimensions"]
+            for key in required_keys:
+                if key not in model_properties:
+                    raise InvalidModelPropertiesError(f"model_properties has missing key '{key}'."
+                                                      f"please update your model properties with required key `{key}`"
+                                                      f"check `https://docs.marqo.ai/0.0.12/Models-Reference/dense_retrieval/` for more info.")
     else:
         model_properties = get_model_properties_from_registry(model_name)
 
@@ -288,7 +298,7 @@ def _load_model(model_name: str, model_properties: dict, device: str = get_defau
     max_sequence_length = model_properties.get('tokens', get_default_seq_length())
 
     model = loader(model_properties['name'], device=device, embedding_dim=model_properties['dimensions'],
-                   max_seq_length=max_sequence_length)
+                   max_seq_length=max_sequence_length, model_properties = model_properties)
 
     model.load()
 

@@ -53,28 +53,8 @@ class TestBackend(MarqoTestCase):
         assert isinstance(cluster_indices, set)
         assert self.index_name_1 in cluster_indices
 
-    def test_add_customer_field_properties_nmslib_for_s2search(self):
-        mock_config = copy.deepcopy(self.config)
-        mock_config.cluster_is_s2search = True
-        mock__put = mock.MagicMock()
-
-        tensor_search.create_vector_index(
-            config=mock_config, index_name=self.index_name_1)
-
-        @mock.patch("marqo._httprequests.HttpRequests.put", mock__put)
-        def run():
-            tensor_search.add_documents(config=mock_config, docs=[{"f1": "doc"}, {"f2":"C"}],
-                                        index_name=self.index_name_1, auto_refresh=True)
-            return True
-        assert run()
-        args, kwargs0 = mock__put.call_args_list[0]
-        sent_dict = json.loads(kwargs0["body"])
-        assert "nmslib" == sent_dict["properties"][enums.TensorField.chunks
-            ]["properties"][utils.generate_vector_name(field_name="f1")]["method"]["engine"]
-
     def test_add_customer_field_properties_defaults_lucene(self):
         mock_config = copy.deepcopy(self.config)
-        mock_config.cluster_is_s2search = False
         mock__put = mock.MagicMock()
 
         tensor_search.create_vector_index(

@@ -73,12 +73,3 @@ class TestConfig(MarqoTestCase):
             assert not c.cluster_is_remote
             return True
         assert run()
-
-
-    def test_url_is_s2search(self):
-        c = config.Config(url="https://s2search.io/abdcde:9200")
-        assert c.cluster_is_s2search
-
-    def test_url_is_not_s2search(self):
-        c = config.Config(url="https://som_random_cluster/abdcde:9200")
-        assert not c.cluster_is_s2search

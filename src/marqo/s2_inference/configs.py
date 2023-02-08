@@ -4,6 +4,7 @@ class ModelCache:
 
     onnx_cache_path = os.environ.get('ONNX_SAVE_PATH', './cache/models_onnx/')
     torch_cache_path = os.getenv('SENTENCE_TRANSFORMERS_HOME', './cache/models/')
+    clip_cache_path = os.getenv('CLIP_SAVE_PATH', './cache/clip/')
 
 class BaseTransformerModels:
 
