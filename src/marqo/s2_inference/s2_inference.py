@@ -319,9 +319,12 @@ def eject_model(model_name:str, device:str):
     # but different properties.
     logger.info(f"{model_cache_keys}")
     for key in model_cache_keys:
-        if key.startswith(model_name) and key.endswith(device):
-            model_cache_key = key
-            break
+        if isinstance(key, str):
+            if key.startswith(model_name) and key.endswith(device):
+                model_cache_key = key
+                break
+        else:
+            continue
 
     if model_cache_key is None:
         raise ModelNotInCacheError(f"The model_name `{model_name}` device `{device}` is not cached or found")
