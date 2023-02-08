@@ -176,7 +176,9 @@ class InitializeRedis:
         self.port = port
 
     def run(self):
-        redis_driver.init_from_app(self.host, self.port)
+        # Can be turned off with MARQO_ENABLE_THROTTLING = 'FALSE'
+        if utils.read_env_vars_and_defaults(EnvVars.MARQO_ENABLE_THROTTLING):
+            redis_driver.init_from_app(self.host, self.port)
 
 
 class DownloadStartText:

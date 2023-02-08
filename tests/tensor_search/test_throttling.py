@@ -8,6 +8,8 @@ from marqo.errors import (
     InvalidFieldNameError, IllegalRequestedDocCount
 )
 from marqo.tensor_search import tensor_search, constants, index_meta_cache
+from marqo.tensor_search.throttling.redis_throttle import throttle
+
 import copy
 from tests.marqo_test import MarqoTestCase
 import requests
@@ -33,43 +35,41 @@ class TestThrottling(MarqoTestCase):
     
     
     
-    def test_throttle_decrement_on_400_error(self):
+    def test_throttle_decrement_on_error(self):
+        
+        mock_redis_driver = mock.MagicMock()
+        db = mock.MagicMock()
 
-        mock_redis_driver = MagicMock()
-        db = MagicMock()
+        mock_redis_driver.get_db.return_value = db
         
         def increment_counter(*args, **kwargs):
             db.counter += 1
+            print(f"inc: db counter is {db.counter}")
         
         def decrement_counter(*args, **kwargs):
             db.counter -= 1
+            print(f"dec: db counter is {db.counter}")
 
+        def tester():
+            print(f"counter: {db.counter}")
         db.evalsha.side_effect = increment_counter
         db.zrem.side_effect = decrement_counter
         db.counter = 0
-        mock_redis_driver.get_db.return_value = db
 
+        @throttle("INDEX")
+        def func_that_dies():
+            raise Exception("Some Marqo error occured.")
+        
         @mock.patch("marqo.connections.redis_driver", mock_redis_driver)
         def run():
             try:
-                # Index with bad request
-                tensor_search.add_documents(config=self.config, index_name=self.index_name_1, 
-                    docs=[{"blah": "blah"}], batch_size=-1, auto_refresh=True)
-                raise AssertionError("Negative batch size should fail!")
-            
-            except:
-                # After 400 error, wait a second or so, check that count from redis driver is the same
+                func_that_dies()
+
+            except Exception as e:
+                # After error, wait a second or so, check that count from redis driver is the same
+                print(e)
                 assert db.counter == 0
+                return True
 
         assert run()
-    
-    def test_throttle_decrement_on_500_error(self):
-        # Empty redis
-        # Mock marqo-os doesn't exist
-        # Try to index something
-        # Note the thread name
-        # After 500 error, check that thread is deleted.
-        pass
-
-        
         

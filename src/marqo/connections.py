@@ -77,4 +77,6 @@ class RedisDriver:
         return self.lua_shas
 
 # Starts up redis driver
-redis_driver = RedisDriver()
+# Can be turned off with MARQO_ENABLE_THROTTLING = 'FALSE'
+if utils.read_env_vars_and_defaults(EnvVars.MARQO_ENABLE_THROTTLING):
+    redis_driver = RedisDriver()

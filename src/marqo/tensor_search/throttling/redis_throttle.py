@@ -21,10 +21,15 @@ def throttle(request_type: str):
         
         @wraps(function)        # needed to preserve function metadata, or else FastAPI throws a 422.
         def wrapper(*args, **kwargs):
+
+            # Can be turned off with MARQO_ENABLE_THROTTLING = 'FALSE'
+            if not utils.read_env_vars_and_defaults(EnvVars.MARQO_ENABLE_THROTTLING):
+                return function(*args, **kwargs)
+
             print(f"Beginning throttling process. Your request is {request_type}")
             redis = redis_driver.get_db()  # redis instance
             lua_shas = redis_driver.get_lua_shas()
-
+            # redis.tester()
             # Define maximum thread counts
             throttling_max_threads = {
                 RequestType.INDEX: utils.read_env_vars_and_defaults(EnvVars.MARQO_MAX_CONCURRENT_INDEX),
