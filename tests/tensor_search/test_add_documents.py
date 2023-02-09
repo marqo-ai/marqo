@@ -14,7 +14,7 @@ from marqo.errors import IndexNotFoundError, InvalidArgError, BadRequestError
 from marqo.tensor_search import tensor_search, index_meta_cache, backend
 from tests.marqo_test import MarqoTestCase
 import time
-
+from marqo.tensor_search import add_docs
 
 class TestAddDocuments(MarqoTestCase):
 
@@ -1157,3 +1157,39 @@ class TestAddDocuments(MarqoTestCase):
                 assert c == tensor_search.get_stats(self.config,
                                                     index_name=self.index_name_1)['numberOfDocuments']
                 assert _check_get_docs(doc_count=c, some_field_value='blah2')
+
+    def test_image_download_timeout(self):
+        mock_get = mock.MagicMock()
+        mock_get.return_value.raiseError.side_effect = requests.exceptions.RequestException()
+
+        @mock.patch('requests.get', mock_get)
+        def run():
+            image_repo = dict()
+            add_docs.threaded_download_images(
+                allocated_docs=[
+                    {"Title": "frog", "Desc": "blah"}, {"Title": "Dog", "Loc": "https://google.com/my_dog.png"}],
+                image_repo=image_repo
+            )
+            assert image_repo == {'https://google.com/my_dog.png': None}
+            return True
+
+        assert run()
+
+    def test_image_download(self):
+        image_repo = dict()
+        good_url ='https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
+        test_doc = {
+            'field_1': 'https://google.com/my_dog.png',  # error because such an image doesn't exist
+            'field_2': good_url
+        }
+
+        add_docs.threaded_download_images(
+            allocated_docs=[test_doc],
+            image_repo=image_repo
+        )
+        assert len(image_repo) == 2
+        assert image_repo['https://google.com/my_dog.png'] is None
+        assert image_repo[good_url].format
+
+    def test_image_download_very_low_timeout(self):
+        """FIXME"""

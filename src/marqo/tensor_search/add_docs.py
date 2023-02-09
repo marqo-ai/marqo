@@ -12,7 +12,19 @@ from marqo.s2_inference.clip_utils import _is_image, load_image_from_path
 def threaded_download_images(allocated_docs: List[dict], image_repo: dict) -> None:
     """A thread calls this function to download images for its allocated documents
 
-    This should be called only if treat URLs as images is True
+    This should be called only if treat URLs as images is True.
+
+    Side Effects:
+        Adds members to the image_repo dict. Each key is a string which is identified as a URL.
+        Each value is either a PIL image, or None, if there were any errors encountered retrieving
+        the image.
+        For example:
+        {
+            'https://google.com/my_dog.png': None, # error because such an image doesn't exist
+            'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png': <PIL image>
+        }
+    Returns:
+        None
     """
     TIMEOUT_SECONDS=3
     for doc in allocated_docs:
