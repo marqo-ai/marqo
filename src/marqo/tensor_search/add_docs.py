@@ -14,11 +14,12 @@ def threaded_download_images(allocated_docs: List[dict], image_repo: dict) -> No
 
     This should be called only if treat URLs as images is True
     """
+    TIMEOUT_SECONDS=3
     for doc in allocated_docs:
         for field in list(doc):
             if isinstance(doc[field], str) and _is_image(doc[field]):
                 try:
-                    image_repo[doc[field]] = load_image_from_path(doc[field])
+                    image_repo[doc[field]] = load_image_from_path(doc[field], timeout=TIMEOUT_SECONDS)
                 except PIL.UnidentifiedImageError:
                     image_repo[doc[field]] = None
                     continue
