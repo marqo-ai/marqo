@@ -7,6 +7,8 @@ import os
 import urllib
 from tqdm import tqdm
 from marqo.s2_inference.configs import ModelCache
+
+
 def whitespace_clean(text):
     text = re.sub(r'\s+', ' ', text)
     text = text.strip()

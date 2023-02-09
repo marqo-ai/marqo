@@ -45,7 +45,7 @@ def vectorise(model_name: str, content: Union[str, List[str]], model_properties:
     try:
         vectorised = available_models[model_cache_key].encode(content, normalize=normalize_embeddings, **kwargs)
     except UnidentifiedImageError as e:
-        raise VectoriseError from e
+        raise VectoriseError(str(e)) from e
 
     return _convert_vectorized_output(vectorised)
 
