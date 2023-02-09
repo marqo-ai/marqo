@@ -812,10 +812,9 @@ def search(config: Config, index_name: str, text: str, result_count: int = 3, of
 
         raise errors.IllegalRequestedDocCount(f"{upper_bound_explanation} Marqo received search result limit of `{result_count}` "
                                             f"and offset of `{offset}`.")
-    
 
     t0 = timer()
-
+    validation.validate_boost(boost=boost, search_method=search_method)
     if searchable_attributes is not None:
         [validation.validate_field_name(attribute) for attribute in searchable_attributes]
     if attributes_to_retrieve is not None:
@@ -1217,7 +1216,6 @@ def _vector_text_search(
         if not gathered_docs[doc_id]["chunks"]:
             del gathered_docs[doc_id]
 
-
     def boost_score(docs: dict, boosters: dict) -> dict:
         """ re-weighs the scores of individual fields
         Args:
@@ -1226,6 +1224,13 @@ def _vector_text_search(
         """
         to_be_boosted = docs.copy()
         boosted_fields = set()
+        if searchable_attributes and boosters:
+            if not set(boosters).issubset(set(searchable_attributes)):
+                raise errors.InvalidArgError(
+                    "Boost fieldnames must be a subset of searchable attributes. "
+                    f"\nSearchable attributes: {searchable_attributes}"
+                    f"\nBoost: {boosters}"
+                )
 
         for doc_id in list(to_be_boosted.keys()):
             for chunk in to_be_boosted[doc_id]["chunks"]:
@@ -1235,10 +1240,6 @@ def _vector_text_search(
                     chunk['_score'] = chunk['_score'] * booster[0] + booster[1]
 
                     boosted_fields.add(field_name)
-
-        if set(boosters.keys()) != boosted_fields:
-            raise errors.InvalidArgError(f"Could not boost field(s): {set(boosters.keys()) - boosted_fields}. "
-                                         f"Please check if the indexed documents contain the specified field(s).")
 
         return to_be_boosted
 

@@ -80,16 +80,3 @@ class TestBoostFieldScores(MarqoTestCase):
 
         self.assertTrue('Title' in str(ctx.exception))
 
-    def test_boost_invalid_fields(self):
-        """An error should be raised if the user tries to boost a non-existent field.
-        The error message should tell the user which field(s) were unable to be boosted.
-        """
-        q = "What is the best outfit to wear on the moon?"
-
-        with self.assertRaises(InvalidArgError) as ctx:
-            res_boosted = tensor_search.search(
-                config=self.config, index_name=self.index_name_1, text=q,
-                boost={'Title': (0.2, 1), 'invalid_field_name': (0.5, 1)}
-            )
-
-        self.assertTrue('invalid_field_name' in str(ctx.exception))

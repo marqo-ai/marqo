@@ -7,9 +7,11 @@ from typing import Iterable, Container
 from marqo.errors import (
     MarqoError, InvalidFieldNameError, InvalidArgError, InternalError,
     InvalidDocumentIdError, DocTooLargeError, InvalidIndexNameError)
-from marqo.tensor_search.enums import TensorField
+from marqo.tensor_search.enums import (
+    TensorField, SearchMethod
+)
 from marqo.tensor_search import constants
-from typing import Any, Type
+from typing import Any, Type, Sequence
 import inspect
 from enum import Enum
 
@@ -50,6 +52,56 @@ def validate_field_content(field_content: typing.Any) -> typing.Any:
             f"of type `{type(field_content).__name__}` is not of valid content type!"
             f"Allowed content types: {[ty.__name__ for ty in constants.ALLOWED_CUSTOMER_FIELD_TYPES]}"
         )
+
+
+def validate_boost(boost: dict, search_method: typing.Union[str, SearchMethod]):
+    if boost is not None:
+        further_info_message = ("\nRead about boost usage here: "
+                                "https://docs.marqo.ai/0.0.13/API-Reference/search/#boost")
+        for boost_attr in boost:
+            try:
+                validate_field_name(boost_attr)
+            except InvalidFieldNameError as e:
+                raise InvalidFieldNameError(f"Invalid boost dictionary. {e.message} {further_info_message}")
+        if search_method != SearchMethod.TENSOR:
+            # to be removed if boosting is implemented for lexical
+            raise InvalidArgError(
+                f'Boosting is only supported for search_method="TENSOR". '
+                f'Received search_method={search_method}'
+                f'{further_info_message}'
+            )
+        if not isinstance(boost, dict):
+            raise InvalidArgError(
+                f'Boost must be a dictionary. Instead received boost of value `{boost}`'
+                f'{further_info_message}'
+            )
+        for k, v in boost.items():
+            base_invalid_kv_message = (
+                "Boost dictionaries have structure <attribute (string)>: <[weight (float), bias (float)]>\n")
+            if not isinstance(k, str):
+                raise InvalidArgError(
+                    f'{base_invalid_kv_message}Found key of type `{type(k)}` instead of string. Key=`{k}`'
+                    f"{further_info_message}"
+                )
+            if not isinstance(v, Sequence):
+                raise InvalidArgError(
+                    f'{base_invalid_kv_message}Found value of type `{type(v)}` instead of Array. Value=`{v}`'
+                    f"{further_info_message}"
+                )
+            if len(v) not in [1, 2]:
+                raise InvalidArgError(
+                    f'{base_invalid_kv_message}An attribute boost must have a weight float and optional bias float. '
+                    f'Instead received invalid boost `{v}`'
+                    f"{further_info_message}"
+                )
+            for wb in v:
+                if not isinstance(wb, (int, float)):
+                    raise InvalidArgError(
+                        f'{base_invalid_kv_message}An attribute boost must have a weight float and optional bias float. '
+                        f'Instead received boost `{v}` with invalid member `{wb}` of type {type(wb)} '
+                        f"{further_info_message}"
+                    )
+    return boost
 
 
 def validate_field_name(field_name) -> str:
