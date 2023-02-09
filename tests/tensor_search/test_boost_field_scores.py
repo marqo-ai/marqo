@@ -21,8 +21,7 @@ class TestBoostFieldScores(MarqoTestCase):
                     "Title": "The Travels of Marco Polo",
                     "Description": "A 13th-century travelogue describing Polo's travels",
                     "_id": "article_590"
-                }
-                ,
+                },
                 {
                     "Title": "Extravehicular Mobility Unit (EMU)",
                     "Description": "The EMU is a spacesuit that provides environmental protection, "
@@ -31,9 +30,6 @@ class TestBoostFieldScores(MarqoTestCase):
                 }
             ], auto_refresh=True)
 
-    def tearDown(self) -> None:
-        pass
-
     def test_score_is_boosted(self):
         q = "What is the best outfit to wear on the moon?"
 
@@ -41,12 +37,10 @@ class TestBoostFieldScores(MarqoTestCase):
             config=self.config, index_name=self.index_name_1, text=q,
         )
         res_boosted = tensor_search.search(
-            config=self.config, index_name=self.index_name_1, text=q, boost={'Title': (5, 1)}
+            config=self.config, index_name=self.index_name_1, text=q, boost={'Title': [5, 1]}
         )
-
         score = res['hits'][0]['_score']
         score_boosted = res_boosted['hits'][0]['_score']
-
         self.assertGreater(score_boosted, score)
 
     def test_boost_empty_dict(self):
@@ -75,8 +69,64 @@ class TestBoostFieldScores(MarqoTestCase):
         with self.assertRaises(InvalidArgError) as ctx:
             res_boosted = tensor_search.search(
                 config=self.config, index_name=self.index_name_1, text=q,
-                searchable_attributes=['Description'], boost={'Title': (0.5, 1)}
+                searchable_attributes=['Description'], boost={'Title': [0.5, 1]}
             )
 
         self.assertTrue('Title' in str(ctx.exception))
 
+    def test_boost_boost_varieties(self):
+        q = "What is the best outfit to wear on the moon?"
+        boosts = [
+            {'Title': [5, 1], 'Description': [-1, -4]},
+            {'Title': [0, 0], 'Description': [0, 0]},
+            {'Title': [5, 1], 'Description': [-1, -4]},
+            {'Title': [5], 'Description': [-1, -4]},
+            {'Title': [5]},
+            {'Description': [-1, -4.4]},
+        ]
+        for boost in boosts:
+            res_boosted = tensor_search.search(
+                config=self.config, index_name=self.index_name_1, text=q, boost=boost
+            )
+
+
+class TestBoostFieldScoresComparison(MarqoTestCase):
+
+    def setUp(self):
+        self.index_name_1 = "my-test-index-1"
+        try:
+            tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+        except IndexNotFoundError as e:
+            pass
+
+    def test_boost_multiple_fields(self):
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
+            {
+                "Title": "A comparison of the best pets",
+                "Description": "Animals",
+                "_id": "d1"
+            },
+            {
+                "Title": "The history of dogs",
+                "Description": "A history of household pets",
+                "_id": "d2"
+            }
+        ], auto_refresh=True)
+
+        q = "What are the best pets"
+
+        res_boosted = tensor_search.search(
+            config=self.config, index_name=self.index_name_1, text=q, boost={
+                'Title': [5, 1], 'Description': [-1, -4]
+            }
+        )
+        for res in res_boosted['hits']:
+            assert list(res['_highlights'].keys())[0] == 'Title'
+
+        res_boosted_inverse = tensor_search.search(
+            config=self.config, index_name=self.index_name_1, text=q, boost={
+                'Title': [-1, -4], 'Description': [5, 1]
+            }
+        )
+        for res in res_boosted_inverse['hits']:
+            assert list(res['_highlights'].keys())[0] == 'Description'

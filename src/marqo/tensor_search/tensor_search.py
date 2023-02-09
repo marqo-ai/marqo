@@ -1117,6 +1117,9 @@ def _vector_text_search(
                     },
                     "score_mode": "max"
                 }
+            },
+            "_source": {
+                "exclude": ["__chunks.__vector_*"]
             }
         }
 
@@ -1237,10 +1240,13 @@ def _vector_text_search(
                 field_name = chunk['_source']['__field_name']
                 if field_name in boosters.keys():
                     booster = boosters[field_name]
-                    chunk['_score'] = chunk['_score'] * booster[0] + booster[1]
-
+                    if len(booster) == 2:
+                        chunk['_score'] = chunk['_score'] * booster[0] + booster[1]
+                    else:
+                        chunk['_score'] = chunk['_score'] * booster[0]
                     boosted_fields.add(field_name)
-
+        print("DELETNE to be bootsed")
+        pprint.pprint(to_be_boosted)
         return to_be_boosted
 
     # SORT THE DOCS HERE
