@@ -5,7 +5,6 @@ import numpy as np
 
 from marqo.s2_inference.sbert_utils import Model
 from marqo.s2_inference.types import Union, FloatTensor, List
-
 from marqo.s2_inference.logger import get_logger
 logger = get_logger(__name__)
 

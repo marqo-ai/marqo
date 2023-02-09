@@ -80,7 +80,8 @@ def create_vector_index(
     validation.validate_index_name(index_name)
 
     if index_settings is not None:
-        _check_model_name(index_settings)
+        if NsField.index_defaults in index_settings:
+            _check_model_name(index_settings)
         the_index_settings = _autofill_index_settings(index_settings=index_settings)
     else:
         the_index_settings = configs.get_default_index_settings()
@@ -145,7 +146,7 @@ def create_vector_index(
 
 
 def _check_model_name(index_settings):
-    """Checks if model_properties is given then model_name is given as well
+    """Ensures that if model_properties is given, then model_name is given as well
     """
     model_name = index_settings[NsField.index_defaults].get(NsField.model)
     model_properties = index_settings[NsField.index_defaults].get(NsField.model_properties)
@@ -923,14 +924,31 @@ def _lexical_search(
     
     # Validation for offset (pagination is single field)
     if len(fields_to_search) != 1 and offset > 0:
-        raise errors.InvalidArgError(f"Pagination (offset > 0) is only supported for single field searches! Your search currently has {len(fields_to_search)} fields: {fields_to_search}")
-        
+        raise errors.InvalidArgError(f"Pagination (offset > 0) is only supported for single field searches! Your search currently has {len(fields_to_search)} fields: {fields_to_search}")              
+    
+    # Parse text into required and optional terms.
+    (required_terms, optional_blob) = utils.parse_lexical_query(text)
+    
     body = {
         "query": {
             "bool": {
+                # Optional blob terms SHOULD be in results.
                 "should": [
-                    {"query_string": {"query": text, "fields": [field]}}
+                    {"match": {field: optional_blob}}
                     for field in fields_to_search
+                ],
+                # Required terms MUST be in results.
+                "must": [
+                    {
+                        # Nested bool, since required term can be in ANY field.
+                        "bool": {
+                            "should": [
+                                {"match_phrase": {field: term}}
+                                for field in fields_to_search
+                            ]
+                        }
+                    } 
+                    for term in required_terms
                 ],
                 "must_not": [
                     {"exists": {"field": TensorField.field_name}}
@@ -1024,12 +1042,6 @@ def _vector_text_search(
         - max result count should be in a config somewhere
         - searching a non existent index should return a HTTP-type error
     """
-
-    if config.cluster_is_s2search and filter_string is not None:
-        raise errors.InvalidArgError(
-            "filtering not yet implemented for S2Search cloud!"
-        )
-    
     # SEARCH TIMER-LOGGER (pre-processing)
     start_preprocess_time = timer()
     try:

@@ -542,37 +542,6 @@ class TestVectorSearch(MarqoTestCase):
                 assert 1 == len(check_res["hits"])
                 assert expected == check_res["hits"][0]["_id"]
 
-    def test_vector_search_error_if_tensor_search_against_s2search(self):
-        mock_config = copy.deepcopy(self.config)
-        mock_config.cluster_is_s2search = True
-
-        tensor_search.add_documents(
-            config=self.config, index_name=self.index_name_1, docs=[
-                {
-                    "doc title": "The captain bravely lead her followers into battle."
-                                 " She directed her soldiers to and fro.",
-                    "field X": "some text",
-                    "field1": "other things", "my_bool": True,
-                    "_id": "123456", "a_float": 0.61
-                },
-                {
-                    "_id": "other doc", "a_float": 0.66, "bfield": "some text too", "my_int": 5,
-                    "fake_int": "234", "fake_float": "1.23", "gapped field_name": "gap"
-                }
-            ], auto_refresh=True)
-
-        # Lexical filtering should work:
-        assert tensor_search.search(
-            config=mock_config, text=" ", filter="a_float:[0.62 TO 0.7]", index_name=self.index_name_1,
-            search_method=SearchMethod.LEXICAL)["hits"][0]["_id"] == "other doc"
-        try:
-            # Tensor search errors out:
-            tensor_search.search(config=mock_config, text=" ", filter="a_float:[0.5 TO 0.7]",
-                                 index_name=self.index_name_1, search_method=SearchMethod.TENSOR)
-            raise AssertionError
-        except InvalidArgError:
-            pass
-
     def test_attributes_to_retrieve_vector(self):
         docs = {
             "5678": {"abc": "Exact match hehehe", "other field": "baaadd",
