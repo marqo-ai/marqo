@@ -23,13 +23,18 @@ def throttle(request_type: str):
         def wrapper(*args, **kwargs):
 
             # Can be turned off with MARQO_ENABLE_THROTTLING = 'FALSE'
-            if not utils.read_env_vars_and_defaults(EnvVars.MARQO_ENABLE_THROTTLING):
+            if utils.read_env_vars_and_defaults(EnvVars.MARQO_ENABLE_THROTTLING) != "TRUE":
                 return function(*args, **kwargs)
 
-            print(f"Beginning throttling process. Your request is {request_type}")
             redis = redis_driver.get_db()  # redis instance
+            
+            # Escape throttle if redis connection is problematic
+            if not redis:
+                return function(*args, **kwargs)
+
+            print(f"Beginning throttling process. API request is of type {request_type}")
             lua_shas = redis_driver.get_lua_shas()
-            # redis.tester()
+
             # Define maximum thread counts
             throttling_max_threads = {
                 RequestType.INDEX: utils.read_env_vars_and_defaults(EnvVars.MARQO_MAX_CONCURRENT_INDEX),
@@ -42,6 +47,7 @@ def throttle(request_type: str):
             t0 = time.time()
 
             # Check current thread count / increment using LUA script
+            # try ping, except escape
             check_result = redis.evalsha(
                 lua_shas["check_and_increment"], 
                 1,          
@@ -66,8 +72,6 @@ def throttle(request_type: str):
             }
             """
 
-            # DEBUG
-            print(check_result)
             # Thread limit exceeded, throw 429
             if check_result == 0:
                 throttling_message = f"Throttled because maximum thread count ({throttling_max_threads[request_type]}) for request type '{request_type}' has been exceeded. Try your request again later."
@@ -77,18 +81,16 @@ def throttle(request_type: str):
                 # Execute function
                 try:
                     result = function(*args, **kwargs)
-                    
-                    # Send back test data if needed
-                    # result["check_test_data"] = check_test_data
                     return result
 
                 except Exception as e:
                     raise e
                 
-                # Delete thread key whether function succeeds or fails
+                # Delete thread key whether function succeeds or fails (async)
                 finally:
 
                     def remove_thread_from_set(key, name):
+                        # try ping, except escape
                         redis.zrem(key, name)
                     
                     # Remove key from sorted set (async)

@@ -86,6 +86,19 @@ fi
 
 export OPENSEARCH_URL
 export OPENSEARCH_IS_INTERNAL
+
+# Start up redis
+if [ -z "$MARQO_ENABLE_THROTTLING" ]; then
+    if [ "$MARQO_ENABLE_THROTTLING" != "FALSE" ]; then
+        systemctl redis-server restart
+        while true; do
+            redis-cli ping &> /dev/null
+            if [ $? -eq 0 ]; then
+                break
+            fi
+            sleep 0.1
+        done
+
 # Start the tensor search web app in the background
 cd /app/src/marqo/tensor_search || exit
 uvicorn api:app --host 0.0.0.0 --port 8882 --timeout-keep-alive 75 &
