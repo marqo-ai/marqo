@@ -13,7 +13,6 @@ from multilingual_clip import pt_multilingual_clip
 import transformers
 from marqo.s2_inference.types import *
 from marqo.s2_inference.logger import get_logger
-import marqo.s2_inference.model_registry as model_registry
 from marqo.s2_inference.errors import IncompatibleModelDeviceError, InvalidModelPropertiesError
 from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize
 from marqo.s2_inference.processing.custom_clip_utils import HFTokenizer, download_pretrained_from_url
@@ -225,7 +224,6 @@ class CLIP:
             self.tokenizer = clip.tokenize
 
             self.model.eval()
-
 
     def custom_clip_load(self):
         self.model_name = self.model_properties.get("name", None)
