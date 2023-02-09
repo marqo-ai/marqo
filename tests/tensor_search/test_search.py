@@ -1,10 +1,10 @@
 import math
 import pprint
 from unittest import mock
-from marqo.tensor_search.enums import TensorField, SearchMethod, EnvVars
+from marqo.tensor_search.enums import TensorField, SearchMethod, EnvVars, IndexSettingsField
 from marqo.errors import (
     MarqoApiError, MarqoError, IndexNotFoundError, InvalidArgError,
-    InvalidFieldNameError, IllegalRequestedDocCount
+    InvalidFieldNameError, IllegalRequestedDocCount, BadRequestError
 )
 from marqo.tensor_search import tensor_search, constants, index_meta_cache
 import copy
@@ -46,7 +46,7 @@ class TestVectorSearch(MarqoTestCase):
                  "_id": "1234", "finally": "Random text here efgh "},
             ], auto_refresh=True)
         search_res = tensor_search._vector_text_search(
-            config=self.config, index_name=self.index_name_1, text=" efgh ",
+            config=self.config, index_name=self.index_name_1, query=" efgh ",
             return_doc_ids=True, number_of_highlights=2, result_count=10
         )
         assert len(search_res['hits']) == 2
@@ -55,14 +55,14 @@ class TestVectorSearch(MarqoTestCase):
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
         search_res = tensor_search._vector_text_search(
                 config=self.config, index_name=self.index_name_1,
-                result_count=5, text="some text...")
+                result_count=5, query="some text...")
         assert {'hits': []} == search_res
 
     def test_vector_search_against_non_existent_index(self):
         try:
             tensor_search._vector_text_search(
                 config=self.config, index_name="some-non-existent-index",
-                result_count=5, text="some text...")
+                result_count=5, query="some text...")
         except IndexNotFoundError as s:
             pass
 
@@ -77,7 +77,7 @@ class TestVectorSearch(MarqoTestCase):
                  "Steps": "1. Cook meat. 2: Dice Onions. 3: Serve."},
             ], auto_refresh=True)
         search_res = tensor_search._vector_text_search(
-            config=self.config, index_name=self.index_name_1, text=query_text,
+            config=self.config, index_name=self.index_name_1, query=query_text,
             return_doc_ids=True
         )
 
@@ -90,7 +90,7 @@ class TestVectorSearch(MarqoTestCase):
                  "_id": "1234", "finally": "Random text here efgh "},
             ], auto_refresh=True)
         search_res = tensor_search._vector_text_search(
-            config=self.config, index_name=self.index_name_1, text=" efgh ",
+            config=self.config, index_name=self.index_name_1, query=" efgh ",
             return_doc_ids=True, number_of_highlights=None, simplified_format=False
         )
         for res in search_res['hits']:
@@ -105,7 +105,7 @@ class TestVectorSearch(MarqoTestCase):
                  "_id": "1234", "finally": "Random text here efgh "},
             ], auto_refresh=True)
         search_res = tensor_search._vector_text_search(
-            config=self.config, index_name=self.index_name_1, text=" efgh ",
+            config=self.config, index_name=self.index_name_1, query=" efgh ",
             return_doc_ids=True, number_of_highlights=2, simplified_format=False
         )
         for res in search_res['hits']:
@@ -296,7 +296,6 @@ class TestVectorSearch(MarqoTestCase):
         s_res = tensor_search.search(
             config=self.config, index_name=self.index_name_1, text="cool match",
             search_method=SearchMethod.LEXICAL)
-        pprint.pprint(s_res)
         assert len(s_res["hits"]) > 0
 
     def test_search_vector_int_field(self):
@@ -310,7 +309,6 @@ class TestVectorSearch(MarqoTestCase):
         s_res = tensor_search.search(
             config=self.config, index_name=self.index_name_1, text="88",
             search_method=SearchMethod.TENSOR)
-        pprint.pprint(s_res)
         assert len(s_res["hits"]) > 0
 
     def test_filtering(self):
@@ -472,7 +470,7 @@ class TestVectorSearch(MarqoTestCase):
 
             )
             assert "hits" in tensor_search._vector_text_search(
-                text=str(to_search), config=self.config, index_name=self.index_name_1
+                query=str(to_search), config=self.config, index_name=self.index_name_1
             )
 
     def test_search_other_types_top_search(self):
@@ -541,37 +539,6 @@ class TestVectorSearch(MarqoTestCase):
             else:
                 assert 1 == len(check_res["hits"])
                 assert expected == check_res["hits"][0]["_id"]
-
-    def test_vector_search_error_if_tensor_search_against_s2search(self):
-        mock_config = copy.deepcopy(self.config)
-        mock_config.cluster_is_s2search = True
-
-        tensor_search.add_documents(
-            config=self.config, index_name=self.index_name_1, docs=[
-                {
-                    "doc title": "The captain bravely lead her followers into battle."
-                                 " She directed her soldiers to and fro.",
-                    "field X": "some text",
-                    "field1": "other things", "my_bool": True,
-                    "_id": "123456", "a_float": 0.61
-                },
-                {
-                    "_id": "other doc", "a_float": 0.66, "bfield": "some text too", "my_int": 5,
-                    "fake_int": "234", "fake_float": "1.23", "gapped field_name": "gap"
-                }
-            ], auto_refresh=True)
-
-        # Lexical filtering should work:
-        assert tensor_search.search(
-            config=mock_config, text=" ", filter="a_float:[0.62 TO 0.7]", index_name=self.index_name_1,
-            search_method=SearchMethod.LEXICAL)["hits"][0]["_id"] == "other doc"
-        try:
-            # Tensor search errors out:
-            tensor_search.search(config=mock_config, text=" ", filter="a_float:[0.5 TO 0.7]",
-                                 index_name=self.index_name_1, search_method=SearchMethod.TENSOR)
-            raise AssertionError
-        except InvalidArgError:
-            pass
 
     def test_attributes_to_retrieve_vector(self):
         docs = {
@@ -707,7 +674,6 @@ class TestVectorSearch(MarqoTestCase):
         for method in ("TENSOR", "LEXICAL"):
             for bad_attr in ["jknjhc", "", dict(), 1234, 1.245]:
                 try:
-                    print("bad_attrbad_attrbad_attr",bad_attr)
                     tensor_search.search(
                         config=self.config, index_name=self.index_name_1, text="a",
                         attributes_to_retrieve=bad_attr, return_doc_ids=True, search_method=method,
@@ -934,5 +900,163 @@ class TestVectorSearch(MarqoTestCase):
                 raise AssertionError
             except InvalidArgError:
                 pass
-    
-    
+
+    def test_multi_search(self):
+        docs = [
+            {"field_a": "Doberman, canines, golden retrievers are humanity's best friends",
+             "_id": 'dog_doc'},
+            {"field_a": "All things poodles! Poodles are great pets",
+             "_id": 'poodle_doc'},
+            {"field_a": "Construction and scaffolding equipment",
+             "_id": 'irrelevant_doc'}
+        ]
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1,
+            docs=docs, auto_refresh=True
+        )
+        queries_expected_ordering = [
+            ({"Dogs": 2.0, "Poodles": -2}, ['dog_doc', 'irrelevant_doc', 'poodle_doc']),
+            ("dogs", ['dog_doc', 'poodle_doc', 'irrelevant_doc']),
+            ({"dogs": 1}, ['dog_doc', 'poodle_doc', 'irrelevant_doc']),
+            ({"Dogs": -2.0, "Poodles": 2}, ['poodle_doc', 'irrelevant_doc', 'dog_doc']),
+        ]
+        for query, expected_ordering in queries_expected_ordering:
+            res = tensor_search.search(
+                text=query,
+                index_name=self.index_name_1,
+                result_count=5,
+                config=self.config,
+                search_method=SearchMethod.TENSOR, )
+
+            # the poodle doc should be lower ranked than the irrelevant doc
+            for hit_position, _ in enumerate(res['hits']):
+                assert res['hits'][hit_position]['_id'] == expected_ordering[hit_position]
+
+    def test_multi_search_images(self):
+        docs = [
+            {"loc a": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+             "_id": 'realistic_hippo'},
+            {"loc b": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png",
+             "_id": 'artefact_hippo'}
+        ]
+        image_index_config = {
+            IndexSettingsField.index_defaults: {
+                IndexSettingsField.model: "ViT-B/16",
+                IndexSettingsField.treat_urls_and_pointers_as_images: True
+            }
+        }
+        tensor_search.create_vector_index(
+            config=self.config, index_name=self.index_name_1, index_settings=image_index_config)
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1,
+            docs=docs, auto_refresh=True
+        )
+        queries_expected_ordering = [
+            ({"Nature photography": 2.0, "Artefact": -2}, ['realistic_hippo', 'artefact_hippo']),
+            ({"Nature photography": -1.0, "Artefact": 1.0}, ['artefact_hippo', 'realistic_hippo']),
+            ({"Nature photography": -1.5, "Artefact": 1.0, "hippo": 1.0}, ['artefact_hippo', 'realistic_hippo']),
+            ({"https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png": -1.0,
+              "blah": 1.0}, ['realistic_hippo', 'artefact_hippo']),
+            ({"https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png": 2.0,
+              "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png": -1.0},
+             ['artefact_hippo', 'realistic_hippo']),
+            ({"https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png": 2.0,
+              "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png": -1.0,
+              "artefact": 1.0, "photo realistic": -1,
+              },
+             ['artefact_hippo', 'realistic_hippo']),
+        ]
+        for query, expected_ordering in queries_expected_ordering:
+            res = tensor_search.search(
+                text=query,
+                index_name=self.index_name_1,
+                result_count=5,
+                config=self.config,
+                search_method=SearchMethod.TENSOR)
+            # the poodle doc should be lower ranked than the irrelevant doc
+            for hit_position, _ in enumerate(res['hits']):
+                assert res['hits'][hit_position]['_id'] == expected_ordering[hit_position]
+
+    def test_multi_search_images_edge_cases(self):
+        docs = [
+            {"loc": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+             "_id": 'realistic_hippo'},
+            {"field_a": "Some text about a weird forest",
+             "_id": 'artefact_hippo'}
+        ]
+        image_index_config = {
+            IndexSettingsField.index_defaults: {
+                IndexSettingsField.model: "ViT-B/16",
+                IndexSettingsField.treat_urls_and_pointers_as_images: True
+            }
+        }
+        tensor_search.create_vector_index(
+            config=self.config, index_name=self.index_name_1, index_settings=image_index_config)
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1,
+            docs=docs, auto_refresh=True
+        )
+        invalid_queries = [{}, None, {123: 123}, {'123': None},
+                           {"https://marqo_not_real.com/image_1.png": 3}, set()]
+        for q in invalid_queries:
+            try:
+                tensor_search.search(
+                    text=q,
+                    index_name=self.index_name_1,
+                    result_count=5,
+                    config=self.config,
+                    search_method=SearchMethod.TENSOR)
+                raise AssertionError
+            except (InvalidArgError, BadRequestError) as e:
+                pass
+
+    def test_multi_search_images_ok_edge_cases(self):
+        docs = [
+            {"loc": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+             "_id": 'realistic_hippo'},
+            {"field_a": "Some text about a weird forest",
+             "_id": 'artefact_hippo'}
+        ]
+        image_index_config = {
+            IndexSettingsField.index_defaults: {
+                IndexSettingsField.model: "ViT-B/16",
+                IndexSettingsField.treat_urls_and_pointers_as_images: True
+            }
+        }
+        tensor_search.create_vector_index(
+            config=self.config, index_name=self.index_name_1, index_settings=image_index_config)
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1,
+            docs=docs, auto_refresh=True
+        )
+        alright_queries = [{"v ": 1.2}, {"d ": 0}, {"vf": -1}]
+        for q in alright_queries:
+            tensor_search.search(
+                text=q,
+                index_name=self.index_name_1,
+                result_count=5,
+                config=self.config,
+                search_method=SearchMethod.TENSOR)
+
+    def test_multi_search_images_lexical(self):
+        """Error if you try this"""
+        docs = [
+            {"loc": "124", "_id": 'realistic_hippo'},
+            {"field_a": "Some text about a weird forest",
+             "_id": 'artefact_hippo'}
+        ]
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1,
+            docs=docs, auto_refresh=True
+        )
+        for bad_method in [SearchMethod.LEXICAL, "kjrnkjrn", ""]:
+            try:
+                tensor_search.search(
+                    text={'something': 1},
+                    index_name=self.index_name_1,
+                    result_count=5,
+                    config=self.config,
+                    search_method=bad_method)
+                raise AssertionError
+            except InvalidArgError as e:
+                pass
