@@ -4,7 +4,11 @@ from marqo.s2_inference.s2_inference import _validate_model_properties,\
     _create_model_cache_key, _update_available_models, available_models, clear_loaded_models
 from marqo.tensor_search.tensor_search import eject_model, get_cuda_info, get_loaded_models, get_cpu_info
 from marqo.errors import ModelNotInCacheError, HardwareCompatabilityError
+from marqo.s2_inference.reranking.cross_encoders import ReRankerText, ReRankerOwl
+from marqo.s2_inference.reranking.model_utils import load_owl_vit
+from marqo.s2_inference.reranking import rerank
 import psutil
+from marqo.tensor_search import tensor_search
 
 
 
@@ -15,7 +19,6 @@ def load_model(model_name: str, device: str, model_properteis: dict = None) -> N
 
 
 class TestModelCacheManagement(MarqoTestCase):
-
     def setUp(self) -> None:
         # We pre-define 3 dummy models for testing purpose
         self.MODEL_1 = "ViT-B/32"
@@ -257,6 +260,22 @@ class TestModelCacheManagement(MarqoTestCase):
 
                 if model_cache_key in available_models:
                     raise AssertionError
+
+
+    def test_model_cache_management_with_text_reranker(self):
+        model_name = 'google/owlvit-base-patch32'
+
+        _ = load_owl_vit('google/owlvit-base-patch32', "cpu")
+        model_cache_key = _create_model_cache_key(model_name, "cpu", model_properties=None)
+
+        if model_cache_key not in available_models:
+            raise AssertionError
+
+        eject_model(model_name, "cpu")
+        if model_cache_key in available_models:
+            raise AssertionError
+
+
 
 
 
