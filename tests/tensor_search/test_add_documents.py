@@ -1170,7 +1170,8 @@ class TestAddDocuments(MarqoTestCase):
             add_docs.threaded_download_images(
                 allocated_docs=[
                     {"Title": "frog", "Desc": "blah"}, {"Title": "Dog", "Loc": "https://google.com/my_dog.png"}],
-                image_repo=image_repo
+                image_repo=image_repo,
+                non_tensor_fields=()
             )
             assert list(image_repo.keys()) == ['https://google.com/my_dog.png']
             assert isinstance(image_repo['https://google.com/my_dog.png'], PIL.UnidentifiedImageError)
@@ -1188,8 +1189,88 @@ class TestAddDocuments(MarqoTestCase):
 
         add_docs.threaded_download_images(
             allocated_docs=[test_doc],
-            image_repo=image_repo
+            image_repo=image_repo,
+            non_tensor_fields=()
         )
         assert len(image_repo) == 2
         assert isinstance(image_repo['https://google.com/my_dog.png'], PIL.UnidentifiedImageError)
         assert isinstance(image_repo[good_url], types.ImageType)
+
+    def test_threaded_download_images_non_tensor_field(self):
+        """Tests add_docs.threaded_download_images()"""
+        good_url ='https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
+        bad_url = 'https://google.com/my_dog.png'
+        examples = [
+            ([{
+                'field_1': bad_url,
+                'field_2': good_url
+            }], {
+                bad_url: PIL.UnidentifiedImageError,
+                good_url: types.ImageType
+            }),
+            ([{
+                'nt_1': bad_url,
+                'nt_2': good_url
+            }], {}),
+            ([{
+                'field_1': bad_url,
+                'nt_1': good_url
+            }], {
+                 bad_url: PIL.UnidentifiedImageError,
+             }),
+            ([{
+                'nt_2': bad_url,
+                'field_2': good_url
+            }], {
+                 good_url: types.ImageType
+             }),
+        ]
+        for docs, expected_repo_structure in examples:
+            image_repo = dict()
+            add_docs.threaded_download_images(
+                allocated_docs=docs,
+                image_repo=image_repo,
+                non_tensor_fields=('nt_1', 'nt_2')
+            )
+            assert len(expected_repo_structure) == len(image_repo)
+            for k in expected_repo_structure:
+                assert isinstance(image_repo[k],expected_repo_structure[k])
+
+    def test_download_images_non_tensor_field(self):
+        """tests add_docs.download_images() """
+        good_url ='https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
+        bad_url = 'https://google.com/my_dog.png'
+        examples = [
+            ([{
+                'field_1': bad_url,
+                'field_2': good_url
+            }], {
+                bad_url: PIL.UnidentifiedImageError,
+                good_url: types.ImageType
+            }),
+            ([{
+                'nt_1': bad_url,
+                'nt_2': good_url
+            }], {}),
+            ([{
+                'field_1': bad_url,
+                'nt_1': good_url
+            }], {
+                 bad_url: PIL.UnidentifiedImageError,
+             }),
+            ([{
+                'nt_2': bad_url,
+                'field_2': good_url
+            }], {
+                 good_url: types.ImageType
+             }),
+        ]
+        for docs, expected_repo_structure in examples:
+            image_repo = add_docs.download_images(
+                docs=docs,
+                thread_count=20,
+                non_tensor_fields=('nt_1', 'nt_2')
+            )
+            assert len(expected_repo_structure) == len(image_repo)
+            for k in expected_repo_structure:
+                assert isinstance(image_repo[k],expected_repo_structure[k])
