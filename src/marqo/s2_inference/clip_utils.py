@@ -1,7 +1,6 @@
 # from torch import FloatTensor
 # from typing import Any, Dict, List, Optional, Union
 import os
-
 import PIL.Image
 import validators
 import requests
@@ -14,7 +13,6 @@ from multilingual_clip import pt_multilingual_clip
 import transformers
 from marqo.s2_inference.types import *
 from marqo.s2_inference.logger import get_logger
-import marqo.s2_inference.model_registry as model_registry
 from marqo.s2_inference.errors import IncompatibleModelDeviceError, InvalidModelPropertiesError
 from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize
 from marqo.s2_inference.processing.custom_clip_utils import HFTokenizer, download_pretrained_from_url
@@ -82,12 +80,12 @@ def format_and_load_CLIP_images(images: List[Union[str, ndarray, ImageType]]) ->
     return results
 
 
-def load_image_from_path(image_path: str) -> ImageType:
+def load_image_from_path(image_path: str, timeout=3) -> ImageType:
     """Loads an image into PIL from a string path that is either local or a url
 
     Args:
         image_path (str): Local or remote path to image.
-
+        timeout (number): timeout (in seconds)
     Raises:
         ValueError: If the local path is invalid, and is not a url
         UnidentifiedImageError: If the image is irretrievable or unprocessable.
@@ -99,12 +97,18 @@ def load_image_from_path(image_path: str) -> ImageType:
     if os.path.isfile(image_path):
         img = Image.open(image_path)
     elif validators.url(image_path):
-        resp = requests.get(image_path, stream=True)
+        try:
+            resp = requests.get(image_path, stream=True, timeout=timeout)
+        except (requests.exceptions.ConnectTimeout, requests.exceptions.ConnectionError) as e:
+            raise UnidentifiedImageError(
+                f"image url `{image_path}` is unreachable, perhaps due to timeout. "
+                f"Timeout threshold is set to {timeout} seconds."
+                f"\nConnection error type: `{e.__class__.__name__}`")
         if not resp.ok:
-            raise UnidentifiedImageError(f"image url {image_path} returned a {resp.status_code}. Reason {resp.reason}")
+            raise UnidentifiedImageError(f"image url `{image_path}` returned {resp.status_code}. Reason: {resp.reason}")
         img = Image.open(resp.raw)
     else:
-        raise UnidentifiedImageError(f"input str of {image_path} is not a local file or a valid url")
+        raise UnidentifiedImageError(f"input str of `{image_path}` is not a local file or a valid url")
 
     return img
 
@@ -227,7 +231,6 @@ class CLIP:
 
             self.model.eval()
 
-
     def custom_clip_load(self):
         self.model_name = self.model_properties.get("name", None)
 
@@ -247,7 +250,6 @@ class CLIP:
     @staticmethod
     def normalize(outputs):
         return outputs.norm(dim=-1, keepdim=True)
-
 
     def encode_text(self, sentence: Union[str, List[str]], normalize = True) -> FloatTensor:
         
@@ -337,13 +339,13 @@ class FP16_CLIP(CLIP):
         self.tokenizer = clip.tokenize
         self.model.eval()
 
+
 class OPEN_CLIP(CLIP):
     def __init__(self, model_type: str = "open_clip/ViT-B-32-quickgelu/laion400m_e32", device: str = 'cpu',  embedding_dim: int = None,
                             truncate: bool = True, **kwargs) -> None:
         super().__init__(model_type, device,  embedding_dim, truncate , **kwargs)
         self.model_name = model_type.split("/", 3)[1] if model_type.startswith("open_clip/") else model_type
         self.pretrained = model_type.split("/", 3)[2] if model_type.startswith("open_clip/") else model_type
-
 
     def load(self) -> None:
         # https://github.com/mlfoundations/open_clip
@@ -388,7 +390,6 @@ class OPEN_CLIP(CLIP):
 
         return model, preprocess
 
-
     def load_tokenizer(self):
         tokenizer_name = self.model_properties.get("tokenizer", "clip")
 
@@ -421,7 +422,7 @@ class MULTILINGUAL_CLIP(CLIP):
                             truncate: bool = True, **kwargs) -> None:
 
         self.model_name = model_type
-        self.model_info = model_registry._get_multilingual_clip_properties()[self.model_name]
+        self.model_info = get_multilingual_clip_properties()[self.model_name]
         self.visual_name = self.model_info["visual_model"]
         self.textual_name = self.model_info["textual_model"]
         self.device = device
@@ -488,10 +489,48 @@ class MULTILINGUAL_CLIP(CLIP):
         return self._convert_output(outputs)
 
 
+def get_multilingual_clip_properties() -> Dict:
+    """This is moved here from the model registry to avoid a circular import"""
+    # Models are from github repo
+    # https://github.com/FreddeFrallan/Multilingual-CLIP
+    MULTILINGUAL_CLIP_PROPERTIES = {
+        "multilingual-clip/XLM-Roberta-Large-Vit-L-14":
+            {
+                "name": "multilingual-clip/XLM-Roberta-Large-Vit-L-14",
+                "visual_model": "openai/ViT-L/14",
+                "textual_model": 'M-CLIP/XLM-Roberta-Large-Vit-L-14',
+                "dimensions": 768,
+                "type": "multilingual_clip",
+            },
 
+        "multilingual-clip/XLM-R Large Vit-B/16+":
+            {
+                "name": "multilingual-clip/XLM-R Large Vit-B/16+",
+                "visual_model": "open_clip/ViT-B-16-plus-240/laion400m_e32",
+                "textual_model": 'M-CLIP/XLM-Roberta-Large-Vit-B-16Plus',
+                "dimensions": 640,
+                "type": "multilingual_clip",
+            },
 
+        "multilingual-clip/XLM-Roberta-Large-Vit-B-32":
+            {
+                "name": "multilingual-clip/XLM-Roberta-Large-Vit-B-32",
+                "visual_model": "openai/ViT-B/32",
+                "textual_model": 'M-CLIP/XLM-Roberta-Large-Vit-B-32',
+                "dimensions": 512,
+                "type": "multilingual_clip",
+            },
 
-
+        "multilingual-clip/LABSE-Vit-L-14":
+            {
+                "name": "multilingual-clip/LABSE-Vit-L-14",
+                "visual_model": "openai/ViT-L/14",
+                "textual_model": 'M-CLIP/LABSE-Vit-L-14',
+                "dimensions": 768,
+                "type": "multilingual_clip",
+            }
+    }
+    return MULTILINGUAL_CLIP_PROPERTIES
 
 
 
