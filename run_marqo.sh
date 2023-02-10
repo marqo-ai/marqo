@@ -87,18 +87,18 @@ export OPENSEARCH_URL
 export OPENSEARCH_IS_INTERNAL
 
 # Start up redis
-#if [ -z "$MARQO_ENABLE_THROTTLING" ]; then
-#    if [ "$MARQO_ENABLE_THROTTLING" != "FALSE" ]; then
-#        systemctl start redis-server
-#        while true; do
-#            redis-cli ping &> /dev/null
-#            if [ $? -eq 0 ]; then
-#                break
-#            fi
-#            sleep 0.1
-#        done
-#    fi
-#fi
+if [ -z "$MARQO_ENABLE_THROTTLING" ]; then
+    if [ "$MARQO_ENABLE_THROTTLING" != "FALSE" ]; then
+        redis-server /etc/redis/redis.conf
+        while true; do
+            redis-cli ping &> /dev/null
+            if [ $? -eq 0 ]; then
+                break
+            fi
+            sleep 0.1
+        done
+    fi
+fi
 
 # Start the tensor search web app in the background
 cd /app/src/marqo/tensor_search || exit
