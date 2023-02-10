@@ -62,7 +62,7 @@ def throttle(request_type: str):
 
             t1 = time.time()
             redis_time = (t1 - t0)*1000
-            
+            logger.info(f"Redis check and increment took {redis_time}ms.")
             """
             Only for testing
             check_test_data = {
