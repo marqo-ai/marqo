@@ -398,6 +398,31 @@ class OPEN_CLIP(CLIP):
             logger.info(f"Custom HFTokenizer is provided. Loading...")
             return HFTokenizer(tokenizer_name)
 
+
+    def encode_image(self, images: Union[str, ImageType, List[Union[str, ImageType]]],
+                     normalize=True) -> FloatTensor:
+
+        if self.model is None:
+            self.load()
+
+        # default to batch encoding
+        if isinstance(images, list):
+            image_input = format_and_load_CLIP_images(images)
+        else:
+            image_input = [format_and_load_CLIP_image(images)]
+
+        self.image_input_processed = torch.stack([self.preprocess(_img).to(self.device) for _img in image_input])
+
+        with torch.no_grad(), torch.cuda.amp.autocast():
+            outputs = self.model.encode_image(self.image_input_processed)
+
+        if normalize:
+            _shape_before = outputs.shape
+            outputs /= self.normalize(outputs)
+            assert outputs.shape == _shape_before
+        return self._convert_output(outputs)
+
+
     def encode_text(self, sentence: Union[str, List[str]], normalize=True) -> FloatTensor:
 
         if self.model is None:
@@ -405,7 +430,7 @@ class OPEN_CLIP(CLIP):
 
         text = self.tokenizer(sentence).to(self.device)
 
-        with torch.no_grad():
+        with torch.no_grad(), torch.cuda.amp.autocast():
             outputs = self.model.encode_text(text)
 
         if normalize:
