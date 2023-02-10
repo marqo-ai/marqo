@@ -89,7 +89,9 @@ export OPENSEARCH_IS_INTERNAL
 # Start up redis
 if [ -z "$MARQO_ENABLE_THROTTLING" ]; then
     if [ "$MARQO_ENABLE_THROTTLING" != "FALSE" ]; then
+        echo "Starting redis-server"
         redis-server /etc/redis/redis.conf
+        echo "Called redis-server command"
         while true; do
             redis-cli ping &> /dev/null
             if [ $? -eq 0 ]; then
@@ -97,6 +99,7 @@ if [ -z "$MARQO_ENABLE_THROTTLING" ]; then
             fi
             sleep 0.1
         done
+        echo "redis-server is now running
     fi
 fi
 
