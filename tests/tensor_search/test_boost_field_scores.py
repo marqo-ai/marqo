@@ -167,6 +167,13 @@ class TestBoostFieldScoresComparison(MarqoTestCase):
             }
         )
 
+        score = res['hits'][0]['_score']
+        score_boosted = res_boosted['hits'][0]['_score']
+        score_inverse = res_boosted_inverse['hits'][1]["_score"]
+
+        self.assertEqual(score * 5 + 1, score_boosted)
+        self.assertEqual(score * -1 - 4, score_inverse)
+
 
     def test_boost_equation_multiple_field(self):
         # add a test to check if the score is boosted as expected
@@ -198,4 +205,3 @@ class TestBoostFieldScoresComparison(MarqoTestCase):
         score_boosted = res_boosted['hits'][0]['_score']
 
         self.assertEqual(score * 5 + 1, score_boosted)
-
