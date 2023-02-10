@@ -1190,6 +1190,3 @@ class TestAddDocuments(MarqoTestCase):
         assert len(image_repo) == 2
         assert image_repo['https://google.com/my_dog.png'] is None
         assert image_repo[good_url].format
-
-    def test_image_download_very_low_timeout(self):
-        """FIXME"""
