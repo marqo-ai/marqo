@@ -12,7 +12,7 @@ from marqo.tensor_search import configs
 
 
 class SearchQuery(BaseModel):
-    q: str
+    q: Union[str, dict]
     searchableAttributes: Union[None, List[str]] = None
     searchMethod: Union[None, str] = "TENSOR"
     limit: int = 10

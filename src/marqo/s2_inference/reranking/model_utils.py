@@ -309,7 +309,7 @@ def load_owl_vit(model_name: str, device: str = 'cpu') -> Dict:
         Dict: _description_
     """
 
-    model_cache_key = (model_name, device)
+    model_cache_key = _create_model_cache_key(model_name, device)
 
     if model_cache_key in available_models:
         logger.info(f"loading {model_cache_key} from cache...")

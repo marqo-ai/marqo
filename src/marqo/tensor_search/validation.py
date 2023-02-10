@@ -3,17 +3,50 @@ import pprint
 import typing
 from marqo.tensor_search import constants
 from marqo.tensor_search import enums, utils
-from typing import Iterable, Container
+from typing import Iterable, Container, Union
 from marqo.errors import (
     MarqoError, InvalidFieldNameError, InvalidArgError, InternalError,
     InvalidDocumentIdError, DocTooLargeError, InvalidIndexNameError)
-from marqo.tensor_search.enums import (
-    TensorField, SearchMethod
-)
+from marqo.tensor_search.enums import TensorField, SearchMethod
 from marqo.tensor_search import constants
 from typing import Any, Type, Sequence
 import inspect
 from enum import Enum
+
+
+def validate_query(q: Union[dict, str], search_method: Union[str, SearchMethod]):
+    """
+    Returns q if an error is not raised"""
+    usage_ref = "\nSee query reference here: https://docs.marqo.ai/0.0.13/API-Reference/search/#query-q"
+    if isinstance(q, dict):
+        if search_method.upper() != SearchMethod.TENSOR:
+            raise InvalidArgError(
+                'Multi-query search is currently only supported for search_method="TENSOR" '
+                f"\nReceived search_method `{search_method}`. {usage_ref}")
+        if not len(q):
+            raise InvalidArgError(
+                "Multi-query search requires at least one query! Received empty dictionary. "
+                f"{usage_ref}"
+            )
+        for k, v in q.items():
+            base_invalid_kv_message = "Multi queries dictionaries must be <string>:<float> pairs. "
+            if not isinstance(k, str):
+                raise InvalidArgError(
+                    f"{base_invalid_kv_message}Found key of type `{type(k)}` instead of string. Key=`{k}`"
+                    f"{usage_ref}"
+                )
+            if not isinstance(v, (int, float)):
+                raise InvalidArgError(
+                    f"{base_invalid_kv_message}Found value of type `{type(v)}` instead of float. Value=`{v}`"
+                    f" {usage_ref}"
+                )
+    elif not isinstance(q, str):
+        raise InvalidArgError(
+            f"q must be a string or dict! Received q of type `{type(q)}`. "
+            f"\nq=`{q}`"
+            f"{usage_ref}"
+        )
+    return q
 
 
 def validate_str_against_enum(value: Any, enum_class: Type[Enum], case_sensitive: bool = True):
