@@ -481,7 +481,9 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                                 NsField.treat_urls_and_pointers_as_images]:
                             image_data = image_repo[field_content]
                             if image_data is None:
-                                raise s2_inference_errors.S2InferenceError(f"Could not find image found at `{field_content}`")
+                                raise s2_inference_errors.S2InferenceError(
+                                    f"Could not find image found at `{field_content}`"
+                                )
                         else:
                             image_data = field_content
                         if image_method not in [None, 'none', '', "None", ' ']:

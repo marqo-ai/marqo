@@ -13,7 +13,7 @@ class TestEncoding(unittest.TestCase):
         assert isinstance(img, types.ImageType)
         try:
             # should definitely timeout:
-            img = clip_utils.load_image_from_path(good_url, timeout=0.0000001)
+            clip_utils.load_image_from_path(good_url, timeout=0.0000001)
             raise AssertionError
         except PIL.UnidentifiedImageError:
             pass

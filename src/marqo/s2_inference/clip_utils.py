@@ -99,9 +99,11 @@ def load_image_from_path(image_path: str, timeout=3) -> ImageType:
     elif validators.url(image_path):
         try:
             resp = requests.get(image_path, stream=True, timeout=timeout)
-        except requests.exceptions.ConnectTimeout as e:
+        except (requests.exceptions.ConnectTimeout, requests.exceptions.ConnectionError) as e:
             raise UnidentifiedImageError(
-                f"image url {image_path} timed out. Timeout threshold is set to {timeout} seconds.")
+                f"image url {image_path} is unreachable, perhaps due to timeout. "
+                f"Timeout threshold is set to {timeout} seconds."
+                f"\nOriginal message: {str(e)}")
         if not resp.ok:
             raise UnidentifiedImageError(f"image url {image_path} returned a {resp.status_code}. Reason {resp.reason}")
         img = Image.open(resp.raw)
