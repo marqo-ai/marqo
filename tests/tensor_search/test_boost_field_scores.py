@@ -130,3 +130,46 @@ class TestBoostFieldScoresComparison(MarqoTestCase):
         )
         for res in res_boosted_inverse['hits']:
             assert list(res['_highlights'].keys())[0] == 'Description'
+
+    def test_boost_equation(self):
+        # add a test to check if the score is boosted as expected
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
+            {
+                "Title": "A comparison of the best pets",
+                "Description": "Animals",
+                "_id": "d1"
+            },
+            {
+                "Title": "The history of dogs",
+                "Description": "A history of household pets",
+                "_id": "d2"
+            }
+        ], auto_refresh=True)
+
+        q = "What are the best pets"
+
+
+        res_boosted = tensor_search.search(
+            config=self.config, index_name=self.index_name_1, text=q, searchable_attributes=['Title'], boost={
+                'Title': [5, 1]
+            }
+        )
+
+        res= tensor_search.search(
+            config=self.config, index_name=self.index_name_1, text=q, searchable_attributes=['Title']
+        )
+
+
+        res_boosted_inverse = tensor_search.search(
+            config=self.config, index_name=self.index_name_1, text=q, searchable_attributes=['Title'],
+            boost={
+                'Title': [-1, -4]
+            }
+        )
+
+        score = res['hits'][0]['_score']
+        score_boosted = res_boosted['hits'][0]['_score']
+        score_inverse = res_boosted_inverse['hits'][1]["_score"]
+
+        self.assertEqual(score * 5 + 1, score_boosted)
+        self.assertEqual(score * -1 - 4, score_inverse)
