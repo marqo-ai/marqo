@@ -1060,3 +1060,43 @@ class TestVectorSearch(MarqoTestCase):
                 raise AssertionError
             except InvalidArgError as e:
                 pass
+
+    def test_image_search(self):
+        """This test is to ensure image search works as expected
+        The code paths for image and search have diverged quite a bit
+        """
+        hippo_image = (
+            'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
+        )
+        doc_dict = {
+            'realistic_hippo': {"loc": hippo_image,
+             "_id": 'realistic_hippo'},
+            'artefact_hippo': {"field_a": "Some text about a weird forest",
+             "_id": 'artefact_hippo'}
+        }
+        docs = list(doc_dict.values())
+        image_index_config = {
+            IndexSettingsField.index_defaults: {
+                IndexSettingsField.model: "ViT-B/16",
+                IndexSettingsField.treat_urls_and_pointers_as_images: True
+            }
+        }
+        tensor_search.create_vector_index(
+            config=self.config, index_name=self.index_name_1, index_settings=image_index_config)
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1,
+            docs=docs, auto_refresh=True
+        )
+        res = tensor_search.search(
+            text=hippo_image,
+            index_name=self.index_name_1,
+            result_count=5,
+            config=self.config,
+            search_method=SearchMethod.TENSOR)
+        assert len(res['hits']) == 2
+        for hit in res['hits']:
+            original_doc = doc_dict[hit['_id']]
+            assert len(hit['_highlights']) == 1
+            highlight_field = list(hit['_highlights'].keys())[0]
+            assert highlight_field in original_doc
+            assert hit[highlight_field] == original_doc[highlight_field]
