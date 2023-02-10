@@ -99,7 +99,7 @@ if [ -z "$MARQO_ENABLE_THROTTLING" ]; then
             fi
             sleep 0.1
         done
-        echo "redis-server is now running
+        echo "redis-server is now running"
     fi
 fi
 
