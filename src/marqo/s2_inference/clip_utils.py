@@ -240,9 +240,9 @@ class CLIP:
     def _convert_output(self, output):
 
         if self.device == 'cpu':
-            return output.numpy()
+            return output.to(torch.float32).numpy()
         elif self.device.startswith('cuda'):
-            return output.cpu().numpy()
+            return output.cpu().to(torch.float32).numpy()
 
     @staticmethod
     def normalize(outputs):
