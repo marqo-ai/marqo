@@ -175,7 +175,7 @@ class TestBoostFieldScoresComparison(MarqoTestCase):
         self.assertEqual(score * -1 - 4, score_inverse)
 
 
-    def test_boost_equation_multiple_field(self):
+    def test_boost_equation_multiple_fields(self):
         # add a test to check if the score is boosted as expected
         tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
             {
@@ -205,3 +205,145 @@ class TestBoostFieldScoresComparison(MarqoTestCase):
         score_boosted = res_boosted['hits'][0]['_score']
 
         self.assertEqual(score * 5 + 1, score_boosted)
+
+    def test_boost_equation_with_multiple_docs(self):
+        # add a test to check if the score is boosted as expected
+        for num_of_doc in range(1,20):
+            tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
+                {
+                    "Title": "A comparison of the best pets",
+                    "Description": "Animals",
+                },
+            ] * num_of_doc, auto_refresh=True)
+
+            q = "What are the best pets"
+
+            res_boosted = tensor_search.search(
+                config=self.config, index_name=self.index_name_1, text=q, boost={
+                    'Title': [5, 1],
+                }
+            )
+
+            res = tensor_search.search(
+                config=self.config, index_name=self.index_name_1, text=q,
+            )
+
+            for regular, boosted in zip(res['hits'], res_boosted['hits']):
+                score = regular['_score']
+                boosted_score = boosted['_score']
+                self.assertEqual(score * 5 + 1, boosted_score)
+
+            try:
+                tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+            except IndexNotFoundError as e:
+                pass
+            finally:
+                tensor_search.create_vector_index(
+                    index_name=self.index_name_1, config=self.config)
+
+
+    def test_boost_equation_with_multiple_docs(self):
+        # add a test to check if the score is boosted as expected
+        for num_of_doc in range(1,20):
+            tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
+                {
+                    "Title": "A comparison of the best pets",
+                    "Description": "Animals",
+                },
+            ] * num_of_doc, auto_refresh=True)
+
+            q = "What are the best pets"
+
+            res_boosted = tensor_search.search(
+                config=self.config, index_name=self.index_name_1, text=q, boost={
+                    'Title': [5, 1],
+                }
+            )
+
+            res = tensor_search.search(
+                config=self.config, index_name=self.index_name_1, text=q,
+            )
+
+            for regular, boosted in zip(res['hits'], res_boosted['hits']):
+                score = regular['_score']
+                boosted_score = boosted['_score']
+                self.assertEqual(score * 5 + 1, boosted_score)
+
+            try:
+                tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+            except IndexNotFoundError as e:
+                pass
+            finally:
+                tensor_search.create_vector_index(
+                    index_name=self.index_name_1, config=self.config)
+
+
+    def test_boost_equation_with_pagination_docs(self):
+        # add a test to check if the score is boosted as expected
+        num_of_doc = 50
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
+            {
+                "Title": "A comparison of the best pets",
+                "Description": "Animals",
+            },
+        ] * num_of_doc, auto_refresh=True)
+
+        q = "What are the best pets"
+
+        res_boosted = tensor_search.search(
+            config=self.config, index_name=self.index_name_1, text=q, boost={
+                'Title': [5, 1],
+            }
+        )
+
+        res = tensor_search.search(
+            config=self.config, index_name=self.index_name_1, text=q, offset=20, searchable_attributes=["Title"],
+        )
+
+        for regular, boosted in zip(res['hits'], res_boosted['hits']):
+            score = regular['_score']
+            boosted_score = boosted['_score']
+            self.assertEqual(score * 5 + 1, boosted_score)
+
+
+    def test_boost_equation_with_different_fields(self):
+        # add a test to check if the score is boosted as expected
+        num_of_doc = 20
+        for num_of_fields in range(3,20):
+            basic_docs = {"Title": "A comparison of the best pets",
+                          "Description": "Animals",}
+            for i in range(1, num_of_fields):
+                docs = basic_docs[f"void_field_{i}"] = f"void_value_{i}"
+
+
+            tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
+                docs
+            ] * num_of_doc, auto_refresh=True)
+
+            q = "What are the best pets"
+
+            res_boosted = tensor_search.search(
+                config=self.config, index_name=self.index_name_1, text=q, boost={
+                    'Title': [5, 1],
+                }
+            )
+
+            res = tensor_search.search(
+                config=self.config, index_name=self.index_name_1, text=q,
+            )
+
+            for regular, boosted in zip(res['hits'], res_boosted['hits']):
+                score = regular['_score']
+                boosted_score = boosted['_score']
+                self.assertEqual(score * 5 + 1, boosted_score)
+
+            try:
+                tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+            except IndexNotFoundError as e:
+                pass
+            finally:
+                tensor_search.create_vector_index(
+                index_name=self.index_name_1, config=self.config)
+
+
+
