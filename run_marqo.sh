@@ -6,7 +6,6 @@ export LD_LIBRARY_PATH=${CUDA_HOME}/lib64
 export PATH=${CUDA_HOME}/bin:${PATH}
 
 trap "bash /app/scripts/shutdown.sh; exit" SIGTERM SIGINT
-echo "TEsting dafger"
 echo "Python packages:"
 pip freeze
 
@@ -90,7 +89,7 @@ export OPENSEARCH_IS_INTERNAL
 # Start up redis
 if [ -z "$MARQO_ENABLE_THROTTLING" ]; then
     if [ "$MARQO_ENABLE_THROTTLING" != "FALSE" ]; then
-        redis-server
+        systemctl start redis-server
         while true; do
             redis-cli ping &> /dev/null
             if [ $? -eq 0 ]; then
