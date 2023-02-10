@@ -1273,13 +1273,18 @@ def _vector_text_search(
                 field_name = chunk['_source']['__field_name']
                 if field_name in boosters.keys():
                     booster = boosters[field_name]
+                    print(field_name)
                     if len(booster) == 2:
+                        print(f"before boost:{chunk['_score']}")
                         chunk['_score'] = chunk['_score'] * booster[0] + booster[1]
+                        print(f"after boost:{chunk['_score']}")
                     else:
+                        print(f"before boost:{chunk['_score']}")
                         chunk['_score'] = chunk['_score'] * booster[0]
+                        print(f"after boost:{chunk['_score']}")
                     boosted_fields.add(field_name)
         print("DELETNE to be bootsed")
-        pprint.pprint(to_be_boosted)
+        #pprint.pprint(to_be_boosted)
         return to_be_boosted
 
     # SORT THE DOCS HERE
