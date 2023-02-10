@@ -794,7 +794,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
            searchable_attributes: Iterable[str] = None, verbose: int = 0, num_highlights: int = 3,
            reranker: Union[str, Dict] = None, simplified_format: bool = True, filter: str = None,
            attributes_to_retrieve: Optional[List[str]] = None,
-           device=None) -> Dict:
+           device=None, boost: Optional[Dict] = None) -> Dict:
     """The root search method. Calls the specific search method
 
     Validation should go here. Validations include:
@@ -815,6 +815,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
         searchable_attributes:
         verbose:
         num_highlights: number of highlights to return for each doc
+        boost: boosters to re-weight the scores of individual fields
 
     Returns:
 
@@ -838,10 +839,9 @@ def search(config: Config, index_name: str, text: Union[str, dict],
 
         raise errors.IllegalRequestedDocCount(f"{upper_bound_explanation} Marqo received search result limit of `{result_count}` "
                                             f"and offset of `{offset}`.")
-    
 
     t0 = timer()
-
+    validation.validate_boost(boost=boost, search_method=search_method)
     if searchable_attributes is not None:
         [validation.validate_field_name(attribute) for attribute in searchable_attributes]
     if attributes_to_retrieve is not None:
@@ -865,7 +865,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
             config=config, index_name=index_name, query=text, result_count=result_count, offset=offset,
             return_doc_ids=return_doc_ids, searchable_attributes=searchable_attributes, verbose=verbose,
             number_of_highlights=num_highlights, simplified_format=simplified_format,
-            filter_string=filter, device=device, attributes_to_retrieve=attributes_to_retrieve
+            filter_string=filter, device=device, attributes_to_retrieve=attributes_to_retrieve, boost=boost
         )
     elif search_method.upper() == SearchMethod.LEXICAL:
         search_result = _lexical_search(
@@ -1032,7 +1032,7 @@ def _vector_text_search(
         return_doc_ids=False, searchable_attributes: Iterable[str] = None, number_of_highlights=3,
         verbose=0, raise_on_searchable_attribs=False, hide_vectors=True, k=500,
         simplified_format=True, filter_string: str = None, device=None,
-        attributes_to_retrieve: Optional[List[str]] = None):
+        attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None):
     """
     Args:
         config:
@@ -1171,6 +1171,9 @@ def _vector_text_search(
                     },
                     "score_mode": "max"
                 }
+            },
+            "_source": {
+                "exclude": ["__chunks.__vector_*"]
             }
         }
 
@@ -1271,8 +1274,35 @@ def _vector_text_search(
         if not gathered_docs[doc_id]["chunks"]:
             del gathered_docs[doc_id]
 
-    # SORT THE DOCS HERE
+    def boost_score(docs: dict, boosters: dict) -> dict:
+        """ re-weighs the scores of individual fields
+        Args:
+            docs:
+            boosters: {'field_to_be_boosted': (int, int)}
+        """
+        to_be_boosted = docs.copy()
+        boosted_fields = set()
+        if searchable_attributes and boosters:
+            if not set(boosters).issubset(set(searchable_attributes)):
+                raise errors.InvalidArgError(
+                    "Boost fieldnames must be a subset of searchable attributes. "
+                    f"\nSearchable attributes: {searchable_attributes}"
+                    f"\nBoost: {boosters}"
+                )
 
+        for doc_id in list(to_be_boosted.keys()):
+            for chunk in to_be_boosted[doc_id]["chunks"]:
+                field_name = chunk['_source']['__field_name']
+                if field_name in boosters.keys():
+                    booster = boosters[field_name]
+                    if len(booster) == 2:
+                        chunk['_score'] = chunk['_score'] * booster[0] + booster[1]
+                    else:
+                        chunk['_score'] = chunk['_score'] * booster[0]
+                    boosted_fields.add(field_name)
+        return to_be_boosted
+
+    # SORT THE DOCS HERE
     def sort_chunks(docs: dict) -> dict:
         to_be_sorted = docs.copy()
         for doc_id in list(to_be_sorted.keys()):
@@ -1280,7 +1310,11 @@ def _vector_text_search(
                 to_be_sorted[doc_id]["chunks"], key=lambda x: x["_score"], reverse=True)
         return to_be_sorted
 
-    docs_chunks_sorted = sort_chunks(gathered_docs)
+    if boost is not None:
+        docs_chunk_boosted = boost_score(gathered_docs, boost)
+        docs_chunks_sorted = sort_chunks(docs_chunk_boosted)
+    else:
+        docs_chunks_sorted = sort_chunks(gathered_docs)
 
     def sort_docs(docs: dict) -> List[dict]:
         as_list = list(docs.values())
