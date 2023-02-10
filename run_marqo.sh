@@ -90,7 +90,7 @@ export OPENSEARCH_IS_INTERNAL
 # Start up redis
 if [ -z "$MARQO_ENABLE_THROTTLING" ]; then
     if [ "$MARQO_ENABLE_THROTTLING" != "FALSE" ]; then
-        systemctl redis-server restart
+        redis-server
         while true; do
             redis-cli ping &> /dev/null
             if [ $? -eq 0 ]; then

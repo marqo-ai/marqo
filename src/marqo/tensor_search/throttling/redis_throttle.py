@@ -2,6 +2,7 @@ from marqo.tensor_search.enums import ThrottleType
 from marqo.connections import redis_driver
 from marqo.tensor_search.enums import RequestType, EnvVars
 from marqo.tensor_search import utils
+from marqo.tensor_search.tensor_search_logging import get_logger
 from marqo.errors import TooManyRequestsError
 from functools import wraps
 from threading import Thread
@@ -12,6 +13,8 @@ import datetime
 import time
 import os
 import logging
+
+logger = get_logger(__name__)
 
 def throttle(request_type: str):
     """
@@ -27,12 +30,8 @@ def throttle(request_type: str):
                 return function(*args, **kwargs)
 
             redis = redis_driver.get_db()  # redis instance
-            
-            # Escape throttle if redis connection is problematic
-            if not redis:
-                return function(*args, **kwargs)
 
-            print(f"Beginning throttling process. API request is of type {request_type}")
+            logger.info(f"Beginning throttling check. API request is of type {request_type}")
             lua_shas = redis_driver.get_lua_shas()
 
             # Define maximum thread counts
@@ -47,15 +46,19 @@ def throttle(request_type: str):
             t0 = time.time()
 
             # Check current thread count / increment using LUA script
-            # try ping, except escape
-            check_result = redis.evalsha(
-                lua_shas["check_and_increment"], 
-                1,          
-                set_key,                                 # sorted set key (by request type)
-                thread_name,                             # name of member for the thread
-                throttling_max_threads[request_type],    # thread_limit
-                utils.read_env_vars_and_defaults(EnvVars.MARQO_THREAD_EXPIRY_TIME)  # expire_time
-            )
+            try:
+                check_result = redis.evalsha(
+                    lua_shas["check_and_increment"], 
+                    1,          
+                    set_key,                                 # sorted set key (by request type)
+                    thread_name,                             # name of member for the thread
+                    throttling_max_threads[request_type],    # thread_limit
+                    utils.read_env_vars_and_defaults(EnvVars.MARQO_THREAD_EXPIRY_TIME)  # expire_time
+                )
+            except Exception as e:
+                logger.warn(f"There is a problem with your redis instance. Skipping throttling check. Reason: {e}")
+                redis_driver.set_faulty(True)
+                return function(*args, **kwargs)
 
             t1 = time.time()
             redis_time = (t1 - t0)*1000
@@ -91,7 +94,11 @@ def throttle(request_type: str):
 
                     def remove_thread_from_set(key, name):
                         # try ping, except escape
-                        redis.zrem(key, name)
+                        try:
+                            redis.zrem(key, name)
+                        except Exception as e:
+                            logger.warn(f"There is a problem with your redis instance. Skipping throttling decrement. Reason: {e}")
+                            redis_driver.set_faulty(True)
                     
                     # Remove key from sorted set (async)
                     remove_thread = Thread(target = remove_thread_from_set, args = (set_key, thread_name))
