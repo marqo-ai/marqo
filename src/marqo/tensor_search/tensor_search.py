@@ -480,10 +480,12 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                         # errors of different types generated here, too.
                         if isinstance(field_content, str) and index_info.index_settings[NsField.index_defaults][
                                 NsField.treat_urls_and_pointers_as_images]:
-                            image_data = image_repo[field_content]
-                            if image_data is None:
+                            if not isinstance(image_repo[field_content], Exception):
+                                image_data = image_repo[field_content]
+                            else:
                                 raise s2_inference_errors.S2InferenceError(
-                                    f"Could not find image found at `{field_content}`"
+                                    f"Could not find image found at `{field_content}`. \n"
+                                    f"Reason: {str(image_repo[field_content])}"
                                 )
                         else:
                             image_data = field_content
@@ -493,12 +495,12 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                         else:
                             # if we are not chunking, then we set both chunks to the image URL
                             content_chunks, text_chunks = [field_content], [field_content]
-                    except s2_inference_errors.S2InferenceError:
+                    except s2_inference_errors.S2InferenceError as e:
                         document_is_valid = False
-                        image_err = errors.InvalidArgError(message=f'Could not process given image: {field_content}')
                         unsuccessful_docs.append(
-                            (i, {'_id': doc_id, 'error': image_err.message, 'status': int(image_err.status_code),
-                                 'code': image_err.code})
+                            (i, {'_id': doc_id, 'error': e.message,
+                                 'status': int(errors.InvalidArgError.status_code),
+                                 'code': errors.InvalidArgError.code})
                         )
                         break
 

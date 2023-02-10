@@ -5,6 +5,8 @@ import json
 import math
 import pprint
 from unittest import mock
+from marqo.s2_inference import types
+import PIL
 import marqo.tensor_search.utils as marqo_utils
 import numpy as np
 import requests
@@ -1170,7 +1172,8 @@ class TestAddDocuments(MarqoTestCase):
                     {"Title": "frog", "Desc": "blah"}, {"Title": "Dog", "Loc": "https://google.com/my_dog.png"}],
                 image_repo=image_repo
             )
-            assert image_repo == {'https://google.com/my_dog.png': None}
+            assert list(image_repo.keys()) == ['https://google.com/my_dog.png']
+            assert isinstance(image_repo['https://google.com/my_dog.png'], PIL.UnidentifiedImageError)
             return True
 
         assert run()
@@ -1188,5 +1191,5 @@ class TestAddDocuments(MarqoTestCase):
             image_repo=image_repo
         )
         assert len(image_repo) == 2
-        assert image_repo['https://google.com/my_dog.png'] is None
-        assert image_repo[good_url].format
+        assert isinstance(image_repo['https://google.com/my_dog.png'], PIL.UnidentifiedImageError)
+        assert isinstance(image_repo[good_url], types.ImageType)

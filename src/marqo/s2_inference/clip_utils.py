@@ -101,14 +101,14 @@ def load_image_from_path(image_path: str, timeout=3) -> ImageType:
             resp = requests.get(image_path, stream=True, timeout=timeout)
         except (requests.exceptions.ConnectTimeout, requests.exceptions.ConnectionError) as e:
             raise UnidentifiedImageError(
-                f"image url {image_path} is unreachable, perhaps due to timeout. "
+                f"image url `{image_path}` is unreachable, perhaps due to timeout. "
                 f"Timeout threshold is set to {timeout} seconds."
-                f"\nOriginal message: {str(e)}")
+                f"\nConnection error type: `{e.__class__.__name__}`")
         if not resp.ok:
-            raise UnidentifiedImageError(f"image url {image_path} returned a {resp.status_code}. Reason {resp.reason}")
+            raise UnidentifiedImageError(f"image url `{image_path}` returned {resp.status_code}. Reason: {resp.reason}")
         img = Image.open(resp.raw)
     else:
-        raise UnidentifiedImageError(f"input str of {image_path} is not a local file or a valid url")
+        raise UnidentifiedImageError(f"input str of `{image_path}` is not a local file or a valid url")
 
     return img
 

@@ -16,11 +16,11 @@ def threaded_download_images(allocated_docs: List[dict], image_repo: dict) -> No
 
     Side Effects:
         Adds members to the image_repo dict. Each key is a string which is identified as a URL.
-        Each value is either a PIL image, or None, if there were any errors encountered retrieving
+        Each value is either a PIL image, or UnidentifiedImageError, if there were any errors encountered retrieving
         the image.
         For example:
         {
-            'https://google.com/my_dog.png': None, # error because such an image doesn't exist
+            'https://google.com/my_dog.png': UnidentifiedImageError, # error because such an image doesn't exist
             'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png': <PIL image>
         }
     Returns:
@@ -32,8 +32,8 @@ def threaded_download_images(allocated_docs: List[dict], image_repo: dict) -> No
             if isinstance(doc[field], str) and _is_image(doc[field]):
                 try:
                     image_repo[doc[field]] = load_image_from_path(doc[field], timeout=TIMEOUT_SECONDS)
-                except PIL.UnidentifiedImageError:
-                    image_repo[doc[field]] = None
+                except PIL.UnidentifiedImageError as e:
+                    image_repo[doc[field]] = e
                     continue
 
 
