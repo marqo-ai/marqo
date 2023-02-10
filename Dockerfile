@@ -16,13 +16,13 @@ RUN apt-get install python3.8-distutils -y # python3-distutils
 RUN apt-get  install python3.8 python3-pip -y # pip is 276 MB!
 # opencv requirements
 RUN apt-get install ffmpeg libsm6 libxext6 -y
-# redis installation for throttling
-RUN bash scripts/install_redis.sh
 # TODO: up the RAM
 RUN echo Target platform is "$TARGETPLATFORM"
 COPY requirements.txt requirements.txt
 RUN pip3 install --no-cache-dir -r requirements.txt
 COPY scripts scripts
+# redis installation for throttling
+RUN bash scripts/install_redis.sh
 RUN bash scripts/install_onnx_gpu_for_amd.sh
 RUN bash scripts/install_torch_amd.sh
 COPY dind_setup dind_setup

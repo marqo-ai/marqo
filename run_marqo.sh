@@ -6,7 +6,7 @@ export LD_LIBRARY_PATH=${CUDA_HOME}/lib64
 export PATH=${CUDA_HOME}/bin:${PATH}
 
 trap "bash /app/scripts/shutdown.sh; exit" SIGTERM SIGINT
-
+echo "TEsting dafger"
 echo "Python packages:"
 pip freeze
 
@@ -98,6 +98,8 @@ if [ -z "$MARQO_ENABLE_THROTTLING" ]; then
             fi
             sleep 0.1
         done
+    fi
+fi
 
 # Start the tensor search web app in the background
 cd /app/src/marqo/tensor_search || exit
