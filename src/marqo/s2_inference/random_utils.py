@@ -1,14 +1,23 @@
 # implements a 'model' that returns a random vector, irrespective of 
 # input. does not require a model and is completely random
 # used for testing purposes
+import functools
 from marqo.s2_inference.sbert_utils import Model
-from marqo.s2_inference.types import Union, FloatTensor, List, ndarray
+from marqo.s2_inference.types import Union, FloatTensor, List, ndarray, ImageType
 
 import numpy as np
 import hashlib
 
 def sentence_to_hash(sentence):
-    return int(hashlib.sha256(sentence.encode('utf-8')).hexdigest(), 16) % 10**8
+    # for speed reasons we hash
+    if isinstance(sentence, ImageType):
+        pixel_data = list(sentence.getdata())
+        pixel_averages = [sum(channels)/len(channels) for channels in pixel_data]
+        image_average = functools.reduce(lambda x, y: x + y, pixel_averages)/len(pixel_data)
+        return int(hashlib.sha256(str(image_average).encode('utf-8')).hexdigest(), 16) % 10 ** 8
+    else:
+        return int(hashlib.sha256(sentence.encode('utf-8')).hexdigest(), 16) % 10**8
+
 
 class Random(Model):
 

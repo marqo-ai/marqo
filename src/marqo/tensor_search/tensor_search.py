@@ -493,8 +493,10 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                             content_chunks, text_chunks = image_processor.chunk_image(
                                 image_data, device=selected_device, method=image_method)
                         else:
-                            # if we are not chunking, then we set both chunks to the image URL
-                            content_chunks, text_chunks = [field_content], [field_content]
+                            # if we are not chunking, then we set the chunks as 1-len lists
+                            # content_chunk is the PIL image
+                            # text_chunk refers to URL
+                            content_chunks, text_chunks = [image_data], [field_content]
                     except s2_inference_errors.S2InferenceError as e:
                         document_is_valid = False
                         unsuccessful_docs.append(
@@ -515,7 +517,9 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
                     # ADD DOCS TIMER-LOGGER (4)
                     start_time = timer()
-                    vector_chunks = s2_inference.vectorise(model_name=index_info.model_name, model_properties=_get_model_properties(index_info), content=content_chunks,
+                    vector_chunks = s2_inference.vectorise(
+                        model_name=index_info.model_name,
+                        model_properties=_get_model_properties(index_info), content=content_chunks,
                         device=selected_device, normalize_embeddings=normalize_embeddings,
                         infer=infer_if_image)
 

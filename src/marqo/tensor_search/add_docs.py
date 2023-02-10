@@ -38,6 +38,8 @@ def threaded_download_images(allocated_docs: List[dict], image_repo: dict, non_t
             if field in non_tensor_fields:
                 continue
             if isinstance(doc[field], str) and _is_image(doc[field]):
+                if doc[field] in image_repo:
+                    continue
                 try:
                     image_repo[doc[field]] = load_image_from_path(doc[field], timeout=TIMEOUT_SECONDS)
                 except PIL.UnidentifiedImageError as e:

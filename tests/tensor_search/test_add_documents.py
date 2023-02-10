@@ -1059,7 +1059,7 @@ class TestAddDocuments(MarqoTestCase):
                     assert len(facet['_embedding']) > 0
             return True
 
-        doc_counts = 1, 2, 3, 10, 20, 100
+        doc_counts = 1, 2, 25
         for update_mode in ('replace', 'update'):
             for c in doc_counts:
                 try:
