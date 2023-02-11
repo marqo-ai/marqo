@@ -311,12 +311,38 @@ class TestVectorSearch(MarqoTestCase):
             search_method=SearchMethod.TENSOR)
         assert len(s_res["hits"]) > 0
 
+    def test_filtering_list_case(self):
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=[
+                {"abc": "some text", "other field": "baaadd", "_id": "5678", "my_string": "b"},
+                {"abc": "some text", "other field": "Close match hehehe", "_id": "1234", "an_int": 2},
+                {"abc": "some text", "_id": "1235",  "my_list": ["tag1", "tag2 some"]}
+            ], auto_refresh=True)
+
+        res_exists = tensor_search.search("", filter="my_list:tag1")
+
+        res_not_exists = tensor_search.search("", filter="my_list:tag55")
+
+        res_other = tensor_search.search("", filter="my_string:b")
+
+        res_should_only_match_keyword = tensor_search.search("", filter="my_list:tag2")
+
+        assert res_exists["hits"][0]["_id"] == "1235"
+        assert len(res_exists["hits"]) == 1
+
+        assert len(res_not_exists["hits"]) == 0
+
+        assert res_other["hits"][0]["_id"] == "5678"
+        assert len(res_not_exists["hits"]) == 1
+
+        assert len(res_should_only_match_keyword["hits"]) == 0
+
     def test_filtering(self):
         tensor_search.add_documents(
             config=self.config, index_name=self.index_name_1, docs=[
                 {"abc": "some text", "other field": "baaadd", "_id": "5678", "my_string": "b"},
                 {"abc": "some text", "other field": "Close match hehehe", "_id": "1234", "an_int": 2},
-                {"abc": "some text", "other field": "Close match hehehe", "_id": "1233", "my_bool": True},
+                {"abc": "some text", "other field": "Close match hehehe", "_id": "1233", "my_bool": True}
             ], auto_refresh=True)
 
         res_doesnt_exist = tensor_search.search(

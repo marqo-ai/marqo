@@ -72,6 +72,7 @@ class OpenSearchDataType:
     int = "int"
     float = "float"
     integer = "integer"
+    list = "list"
     to_be_defined = "to_be_defined"  # to be defined by OpenSearch
 
 

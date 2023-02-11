@@ -270,6 +270,48 @@ class TestAddDocuments(MarqoTestCase):
                 assert all(['result' in item
                             for item in add_res['items'] if item['_id'].startswith('to_pass')])
 
+    def test_add_documents_list_non_tensor_validation(self):
+        """This doc is valid but should return error because my_field is not marked non-tensor"""
+        bad_doc_args = [
+            [{"_id": "to_fail_123", "my_field": ["wow", "this", "is"]}],
+        ]
+        for update_mode in ('replace', 'update'):
+            for bad_doc_arg in bad_doc_args:
+                add_res = tensor_search.add_documents(
+                    config=self.config, index_name=self.index_name_1,
+                    docs=bad_doc_arg, auto_refresh=True, update_mode=update_mode)
+                assert add_res['errors'] is True
+                assert all(['error' in item for item in add_res['items'] if item['_id'].startswith('to_fail')])
+
+    def test_add_documents_list_success(self):
+        bad_doc_args = [
+            [{"_id": "to_fail_123", "my_field": ["wow", "this", "is"]}]
+        ]
+        for update_mode in ('replace', 'update'):
+            for bad_doc_arg in bad_doc_args:
+                add_res = tensor_search.add_documents(
+                    config=self.config, index_name=self.index_name_1,
+                    docs=bad_doc_arg, auto_refresh=True, update_mode=update_mode,
+                    non_tensor_fields=["my_field"])
+        assert add_res['errors'] is Truev
+        assert all(['error' in item for item in add_res['items'] if item['_id'].startswith('to_fail')])
+
+    def test_add_documents_list_data_type_validation(self):
+        """These bad docs should return errors"""
+        bad_doc_args = [
+            [{"_id": "to_fail_123", "my_field": ["wow", "this", False]}],
+            [{"_id": "to_fail_124", "my_field": [1, 2, 3]}],
+            [{"_id": "to_fail_125", "my_field": [{}]}]
+        ]
+        for update_mode in ('replace', 'update'):
+            for bad_doc_arg in bad_doc_args:
+                add_res = tensor_search.add_documents(
+                    config=self.config, index_name=self.index_name_1,
+                    docs=bad_doc_arg, auto_refresh=True, update_mode=update_mode,
+                    non_tensor_fields=["my_field"])
+        assert add_res['errors'] is True
+        assert all(['error' in item for item in add_res['items'] if item['_id'].startswith('to_fail')])
+
     def test_add_documents_set_device(self):
         """calling search with a specified device overrides device defined in config"""
         mock_config = copy.deepcopy(self.config)

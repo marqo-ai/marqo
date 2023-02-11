@@ -68,7 +68,28 @@ def validate_str_against_enum(value: Any, enum_class: Type[Enum], case_sensitive
     return value
 
 
-def validate_field_content(field_content: typing.Any) -> typing.Any:
+def list_contains_only_strings(field_content: typing.List) -> bool:
+    return all(isinstance(s, str) for s in field_content)
+
+
+def validate_list(field_content: typing.List, is_non_tensor_field: bool):
+    if type(field_content) is list and not list_contains_only_strings(field_content):
+        # if the field content is a list, it should only contain strings.
+        raise InvalidArgError(
+            f"Field content `{field_content}` \n"
+            f"of type `{type(field_content).__name__}` is not of valid content type!"
+            f"Lists can only contain strings."
+        )
+    if not is_non_tensor_field:
+        raise InvalidArgError(
+            f"Field content `{field_content}` \n"
+            f"of type `{type(field_content).__name__}` is not of valid content."
+            f"Lists can only be non_tensor fields."
+        )
+    return True
+
+
+def validate_field_content(field_content: typing.Any, is_non_tensor_field: bool) -> typing.Any:
     """
 
     Returns
@@ -78,6 +99,8 @@ def validate_field_content(field_content: typing.Any) -> typing.Any:
         InvalidArgError if field_content is not acceptable
     """
     if type(field_content) in constants.ALLOWED_CUSTOMER_FIELD_TYPES:
+        if type(field_content) is list:
+            validate_list(field_content, is_non_tensor_field)
         return field_content
     else:
         raise InvalidArgError(
