@@ -86,8 +86,9 @@ fi
 
 export OPENSEARCH_URL
 export OPENSEARCH_IS_INTERNAL
-# set the defaul value to info
+# set the defaul value to info and convert to lower case
 export MARQO_LOG_LEVEL=${MARQO_LOG_LEVEL:-info}
+MARQO_LOG_LEVEL=`echo "$MARQO_LOG_LEVEL" | tr '[:upper:]' '[:lower:]'`
 
 # Start the tensor search web app in the background
 cd /app/src/marqo/tensor_search || exit
