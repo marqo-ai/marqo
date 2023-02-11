@@ -86,7 +86,8 @@ fi
 
 export OPENSEARCH_URL
 export OPENSEARCH_IS_INTERNAL
-export MARQO_LOG_LEVEL=${MARQO_LOG_LEVEL:-warning}
+# set the defaul value to info
+export MARQO_LOG_LEVEL=${MARQO_LOG_LEVEL:-info}
 
 # Start the tensor search web app in the background
 cd /app/src/marqo/tensor_search || exit
