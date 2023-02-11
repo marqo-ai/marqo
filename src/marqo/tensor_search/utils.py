@@ -254,3 +254,4 @@ def parse_lexical_query(text: str) -> Tuple[List[str], str]:
     optional_blob = optional_blob.replace('\\"', '"')
 
     return (required_terms, optional_blob)
+
