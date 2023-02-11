@@ -15,8 +15,8 @@ def get_logger(name):
     elif log_level == "error":
         logger.setLevel(level=logging.ERROR)
     else:
-        raise EnvVarError(f"The provided {log_level} is not supported."
-                          f"The {log_level} should be one of `error`, `warning`, `info`, `debug`."
+        raise EnvVarError(f"The provided environment variable `MARQO_LOG_LEVEL` = `{log_level}` is not supported."
+                          f"The environment variable `MARQO_LOG_LEVEL` should be one of `error`, `warning`, `info`, `debug`."
                           f"Check https://docs.marqo.ai/0.0.13/Advanced-Usage/configuration/ for more info.")
 
     formatter = logging.Formatter(
