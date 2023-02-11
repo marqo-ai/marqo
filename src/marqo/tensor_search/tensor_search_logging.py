@@ -6,9 +6,9 @@ def get_logger(name):
 
     log_level = read_env_vars_and_defaults("MARQO_LOG_LEVEL")
     if log_level == "warning":
-        logging.basicConfig(level=logging.WARNING)
+        logger.setLevel(level=logging.WARNING)
     elif log_level == "info":
-        logging.basicConfig(level=logging.INFO)
+        logger.setLevel(level=logging.INFO)
 
     formatter = logging.Formatter(
         "{asctime} {threadName:>11} {levelname} {message}", style='{')
