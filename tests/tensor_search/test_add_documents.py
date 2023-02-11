@@ -36,8 +36,7 @@ class TestAddDocuments(MarqoTestCase):
         except IndexNotFoundError as s:
             pass
 
-
-    def _match_all(self, index_name, verbose=True):
+    def _match_all(self, index_name, verbose=False):
         """Helper function"""
         res = requests.get(
             F"{self.endpoint}/{index_name}/_search",
@@ -869,7 +868,7 @@ class TestAddDocuments(MarqoTestCase):
         docs_ = [{"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}]
         tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs_, auto_refresh=True, non_tensor_fields=["Title"])
         tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs_, auto_refresh=True)
-        resp = tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="789", show_vectors=True)        
+        resp = tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="789", show_vectors=True)
 
         assert len(resp[enums.TensorField.tensor_facets]) == 2
         assert enums.TensorField.embedding in resp[enums.TensorField.tensor_facets][0]
@@ -881,7 +880,7 @@ class TestAddDocuments(MarqoTestCase):
     def test_add_document_with_non_tensor_field(self):
         docs_ = [{"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}]
         tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs_, auto_refresh=True, non_tensor_fields=["Title"])
-        resp = tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="789", show_vectors=True)        
+        resp = tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="789", show_vectors=True)
 
         assert len(resp[enums.TensorField.tensor_facets]) == 1
         assert enums.TensorField.embedding in resp[enums.TensorField.tensor_facets][0]
@@ -1003,7 +1002,6 @@ class TestAddDocuments(MarqoTestCase):
                           ],
                     auto_refresh=True, update_mode='update')
                 items = update_res['items']
-                pprint.pprint(items)
                 assert not update_res['errors']
                 assert 'error' not in items[0]
                 assert items[0]['result'] in ['created', 'updated']

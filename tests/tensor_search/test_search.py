@@ -1,5 +1,4 @@
 import math
-import pprint
 from unittest import mock
 from marqo.tensor_search.enums import TensorField, SearchMethod, EnvVars, IndexSettingsField
 from marqo.errors import (
@@ -357,47 +356,47 @@ class TestVectorSearch(MarqoTestCase):
 
         res_doesnt_exist = tensor_search.search(
             config=self.config, index_name=self.index_name_1, text="some text", result_count=3,
-            filter="my_string:c", verbose=1
+            filter="my_string:c", verbose=0
         )
 
         res_exists_int = tensor_search.search(
             config=self.config, index_name=self.index_name_1, text="some text", result_count=3,
-            filter="an_int:2", verbose=1
+            filter="an_int:2", verbose=0
         )
 
         res_exists_string = tensor_search.search(
             config=self.config, index_name=self.index_name_1, text="some text", result_count=3,
-            filter="my_string:b", verbose=1
+            filter="my_string:b", verbose=0
         )
 
         res_field_doesnt_exist = tensor_search.search(
             config=self.config, index_name=self.index_name_1, text="some text", result_count=3,
-            filter="my_int_something:5", verbose=1
+            filter="my_int_something:5", verbose=0
         )
 
         res_range_doesnt_exist = tensor_search.search(
             config=self.config, index_name=self.index_name_1, text="some text", result_count=3,
-            filter="an_int:[5 TO 30]", verbose=1
+            filter="an_int:[5 TO 30]", verbose=0
         )
 
         res_range_exists = tensor_search.search(
             config=self.config, index_name=self.index_name_1, text="some text", result_count=3,
-            filter="an_int:[0 TO 30]", verbose=1
+            filter="an_int:[0 TO 30]", verbose=0
         )
 
         res_bool = tensor_search.search(
             config=self.config, index_name=self.index_name_1, text="some text", result_count=3,
-            filter="my_bool:true", verbose=1
+            filter="my_bool:true", verbose=0
         )
 
         res_multi = tensor_search.search(
             config=self.config, index_name=self.index_name_1, text="some text", result_count=3,
-            filter="an_int:[0 TO 30] OR my_bool:true", verbose=1
+            filter="an_int:[0 TO 30] OR my_bool:true", verbose=0
         )
 
         res_complex = tensor_search.search(
             config=self.config, index_name=self.index_name_1, text="some text", result_count=3,
-            filter="(an_int:[0 TO 30] and an_int:2) AND abc:(some text)", verbose=1
+            filter="(an_int:[0 TO 30] and an_int:2) AND abc:(some text)", verbose=0
         )
 
         assert res_exists_int["hits"][0]["_id"] == "1234"
@@ -422,7 +421,7 @@ class TestVectorSearch(MarqoTestCase):
 
         assert 3 == len(tensor_search.search(
             config=self.config, index_name=self.index_name_1, text="some text", result_count=4,
-            filter="*:*", verbose=1
+            filter="*:*", verbose=0
         )["hits"])
 
     def test_filter_spaced_fields(self):
@@ -464,7 +463,7 @@ class TestVectorSearch(MarqoTestCase):
         try:
             res_doesnt_exist = tensor_search.search(
                 config=self.config, index_name=self.index_name_1, text="some text", result_count=3,
-                filter="(other field):baaadd", verbose=1
+                filter="(other field):baaadd", verbose=0
             )
             raise AssertionError
         except InvalidArgError:
@@ -966,7 +965,6 @@ class TestVectorSearch(MarqoTestCase):
         )
         assert len(res['hits']) == 2
         assert {hit['image_field'] for hit in res['hits']} == {url_2, url_1}
-        # print([hit['_highlights']['image_field'] for hit in res['hits']])
         assert {hit['_highlights']['image_field'] for hit in res['hits']} == {url_2, url_1}
 
     def test_multi_search(self):
