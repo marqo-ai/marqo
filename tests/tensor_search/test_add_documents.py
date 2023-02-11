@@ -284,17 +284,16 @@ class TestAddDocuments(MarqoTestCase):
                 assert all(['error' in item for item in add_res['items'] if item['_id'].startswith('to_fail')])
 
     def test_add_documents_list_success(self):
-        bad_doc_args = [
+        good_docs = [
             [{"_id": "to_fail_123", "my_field": ["wow", "this", "is"]}]
         ]
         for update_mode in ('replace', 'update'):
-            for bad_doc_arg in bad_doc_args:
+            for bad_doc_arg in good_docs:
                 add_res = tensor_search.add_documents(
                     config=self.config, index_name=self.index_name_1,
                     docs=bad_doc_arg, auto_refresh=True, update_mode=update_mode,
                     non_tensor_fields=["my_field"])
-        assert add_res['errors'] is Truev
-        assert all(['error' in item for item in add_res['items'] if item['_id'].startswith('to_fail')])
+                assert add_res['errors'] is False
 
     def test_add_documents_list_data_type_validation(self):
         """These bad docs should return errors"""

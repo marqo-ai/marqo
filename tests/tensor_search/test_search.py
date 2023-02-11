@@ -317,15 +317,24 @@ class TestVectorSearch(MarqoTestCase):
                 {"abc": "some text", "other field": "baaadd", "_id": "5678", "my_string": "b"},
                 {"abc": "some text", "other field": "Close match hehehe", "_id": "1234", "an_int": 2},
                 {"abc": "some text", "_id": "1235",  "my_list": ["tag1", "tag2 some"]}
-            ], auto_refresh=True)
+            ], auto_refresh=True, non_tensor_fields=["my_list"])
 
-        res_exists = tensor_search.search("", filter="my_list:tag1")
+        res_exists = tensor_search.search(
+            index_name=self.index_name_1, config=self.config, text="", filter="my_list:tag1")
 
-        res_not_exists = tensor_search.search("", filter="my_list:tag55")
+        res_not_exists = tensor_search.search(
+            index_name=self.index_name_1, config=self.config, text="", filter="my_list:tag55")
 
-        res_other = tensor_search.search("", filter="my_string:b")
+        res_other = tensor_search.search(
+            index_name=self.index_name_1, config=self.config, text="", filter="my_string:b")
 
-        res_should_only_match_keyword = tensor_search.search("", filter="my_list:tag2")
+        # strings in lists are converted into keyword, which aren't filterable on a token basis.
+        # Because the list member is "tag2 some" we can only exact match (incl. the space).
+        # "tag2" by itself doesn't work, only "(tag2 some)"
+        res_should_only_match_keyword_bad = tensor_search.search(
+            index_name=self.index_name_1, config=self.config, text="", filter="my_list:tag2")
+        res_should_only_match_keyword_good = tensor_search.search(
+            index_name=self.index_name_1, config=self.config, text="", filter="my_list:(tag2 some)")
 
         assert res_exists["hits"][0]["_id"] == "1235"
         assert len(res_exists["hits"]) == 1
@@ -333,9 +342,10 @@ class TestVectorSearch(MarqoTestCase):
         assert len(res_not_exists["hits"]) == 0
 
         assert res_other["hits"][0]["_id"] == "5678"
-        assert len(res_not_exists["hits"]) == 1
+        assert len(res_other["hits"]) == 1
 
-        assert len(res_should_only_match_keyword["hits"]) == 0
+        assert len(res_should_only_match_keyword_bad["hits"]) == 0
+        assert len(res_should_only_match_keyword_good["hits"]) == 1
 
     def test_filtering(self):
         tensor_search.add_documents(
