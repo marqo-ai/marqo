@@ -19,13 +19,18 @@ logger = get_logger(__name__)
 def throttle(request_type: str):
     """
     Decorator that checks if a user has exceeded their throttling limits.
+    Throttling types:
+    Current: thread_count
+    For future implementation: data_size, per_user, etc.
+
+    Implemented in a failsafe manner. If redis cannot be connected to or causes an error for any reason, this function is escaped and marqo operation will proceed as normal.
+    Can be manually turned off with env var: $MARQO_ENABLE_THROTTLING='FALSE'
     """
     def decorator(function):
         
         @wraps(function)        # needed to preserve function metadata, or else FastAPI throws a 422.
         def wrapper(*args, **kwargs):
 
-            # Can be turned off with MARQO_ENABLE_THROTTLING = 'FALSE'
             if utils.read_env_vars_and_defaults(EnvVars.MARQO_ENABLE_THROTTLING) != "TRUE":
                 return function(*args, **kwargs)
 
@@ -45,6 +50,13 @@ def throttle(request_type: str):
 
             t0 = time.time()
 
+            def remove_thread_from_set(key, name):
+                try:
+                    redis.zrem(key, name)
+                except Exception as e:
+                    logger.warn(f"There is a problem with your redis instance. Skipping throttling decrement. Reason: {e}")
+                    redis_driver.set_faulty(True)
+
             # Check current thread count / increment using LUA script
             try:
                 check_result = redis.evalsha(
@@ -56,29 +68,15 @@ def throttle(request_type: str):
                     utils.read_env_vars_and_defaults(EnvVars.MARQO_THREAD_EXPIRY_TIME)  # expire_time
                 )
             except Exception as e:
-                logger.warn(f"There is a problem with your redis instance. Skipping throttling check. Reason: {e}")
+                logger.warn(f"Could not load throttling scripts onto Redis. There is likely a problem with your redis instance or connection. Skipping throttling check. Reason: {e}")
                 redis_driver.set_faulty(True)
                 return function(*args, **kwargs)
 
             t1 = time.time()
             redis_time = (t1 - t0)*1000
-            
-            """
-            Only for testing
-            logger.info(f"Redis check and increment took {redis_time}ms.")
-            check_test_data = {
-                "timestamp": time.asctime(),
-                "action": "check",
-                "thread_name": thread_name,
-                "result": result_word,
-                "max_threads": throttling_max_threads[request_type],
-                "redis_time": redis_time
-            }
-            logger.info(f"DEBUG: redis message {check_result}")
-            """
 
             # Thread limit exceeded, throw 429
-            if check_result == 0:
+            if check_result != 0:
                 throttling_message = f"Throttled because maximum thread count ({throttling_max_threads[request_type]}) for request type '{request_type}' has been exceeded. Try your request again later."
                 raise TooManyRequestsError(message=throttling_message)
 
@@ -93,15 +91,6 @@ def throttle(request_type: str):
                 
                 # Delete thread key whether function succeeds or fails (async)
                 finally:
-
-                    def remove_thread_from_set(key, name):
-                        # try ping, except escape
-                        try:
-                            redis.zrem(key, name)
-                        except Exception as e:
-                            logger.warn(f"There is a problem with your redis instance. Skipping throttling decrement. Reason: {e}")
-                            redis_driver.set_faulty(True)
-                    
                     # Remove key from sorted set (async)
                     remove_thread = Thread(target = remove_thread_from_set, args = (set_key, thread_name))
                     remove_thread.start()

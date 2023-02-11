@@ -36,11 +36,6 @@ class RedisDriver:
                 "name": "check_and_increment",
                 "path": "throttling/check_and_increment.lua"
             },
-            # No need for exit script, as it's only 1 line
-            #{
-            #    "name": "exit_thread",
-            #    "path": "tensor_search/throttling/exit_thread.lua"
-            #},
         ]  
 
     def init_from_app(self, host, port):

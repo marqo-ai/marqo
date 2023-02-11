@@ -92,12 +92,25 @@ if [ -z "$MARQO_ENABLE_THROTTLING" ]; then
         echo "Starting redis-server"
         redis-server /etc/redis/redis.conf
         echo "Called redis-server command"
+
+        start_time=$(($(date +%s%N)/1000000))
         while true; do
             redis-cli ping &> /dev/null
             if [ $? -eq 0 ]; then
                 break
             fi
-            sleep 0.1
+
+            current_time=$(($(date +%s%N)/1000000))
+            elapsed_time=$(expr $current_time - $start_time)
+            if [ $elapsed_time -ge 2000 ]; then
+                # Expected start time should be < 30ms in reality.
+                echo "redis-server failed to start within 2s. skipping."
+                break
+            fi
+
+            sleep 0.001
+
+            
         done
         echo "redis-server is now running"
     fi
