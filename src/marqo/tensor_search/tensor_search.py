@@ -254,6 +254,7 @@ def add_documents_orchestrator(
             device=device, update_mode=update_mode, non_tensor_fields=non_tensor_fields
         )
     elif processes is not None and processes > 1:
+
         # create beforehand or pull from the cache so it is upto date for the multi-processing
         _check_and_create_index_if_not_exist(config=config, index_name=index_name)
 
