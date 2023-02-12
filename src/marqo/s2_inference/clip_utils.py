@@ -334,7 +334,7 @@ class FP16_CLIP(CLIP):
 
     def load(self) -> None:
         # https://github.com/openai/CLIP/issues/30
-        self.model, self.preprocess = clip.load(self.model_name, device='cuda', jit=False, download_root=ModelCache.clip_cache_path)
+        self.model, self.preprocess = clip.load(self.model_name, device=self.device, jit=False, download_root=ModelCache.clip_cache_path)
         self.model = self.model.to(self.device)
         self.tokenizer = clip.tokenize
         self.model.eval()
