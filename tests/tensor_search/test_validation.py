@@ -182,7 +182,6 @@ class TestValidation(unittest.TestCase):
         ]
         for non_tensor_field in (True, False):
             for bad_content in bad_field_content:
-                print('bad_content',bad_content)
                 try:
                     validation.validate_field_content(bad_content, is_non_tensor_field=non_tensor_field)
                     raise AssertionError
