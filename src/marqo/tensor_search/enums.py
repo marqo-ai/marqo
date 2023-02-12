@@ -84,6 +84,7 @@ class EnvVars:
     MARQO_MAX_CONCURRENT_SEARCH = "MARQO_MAX_CONCURRENT_SEARCH"
     MARQO_THREAD_EXPIRY_TIME = "MARQO_THREAD_EXPIRY_TIME"
     MARQO_ENABLE_THROTTLING = "MARQO_ENABLE_THROTTLING"
+    MARQO_LOG_LEVEL = "MARQO_LOG_LEVEL"
 
 
 class RequestType:
@@ -96,6 +97,7 @@ class RequestType:
 class ThrottleType:
     thread_count = "thread_count"
     data_size = "data_size"
+    
 
 
 

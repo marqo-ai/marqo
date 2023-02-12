@@ -1,8 +1,12 @@
 import copy
 import fileinput
+import functools
 import json
+import math
 import pprint
 from unittest import mock
+from marqo.s2_inference import types
+import PIL
 import marqo.tensor_search.utils as marqo_utils
 import numpy as np
 import requests
@@ -12,7 +16,7 @@ from marqo.errors import IndexNotFoundError, InvalidArgError, BadRequestError
 from marqo.tensor_search import tensor_search, index_meta_cache, backend
 from tests.marqo_test import MarqoTestCase
 import time
-
+from marqo.tensor_search import add_docs
 
 class TestAddDocuments(MarqoTestCase):
 
@@ -1029,3 +1033,244 @@ class TestAddDocuments(MarqoTestCase):
         assert 'myfield' not in doc_w_facets[TensorField.tensor_facets][0]
         assert 'myfield' in doc_w_facets
         assert 'myfield2' in doc_w_facets
+
+    def test_various_image_count(self):
+        hippo_url = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
+
+        def _check_get_docs(doc_count, some_field_value):
+            approx_half = math.floor(doc_count/2)
+            get_res = tensor_search.get_documents_by_ids(
+                config=self.config, index_name=self.index_name_1,
+                document_ids=[str(n) for n in (0, approx_half, doc_count - 1)],
+                show_vectors=True
+            )
+            for d in get_res['results']:
+                assert d['_found'] is True
+                assert d['some_field'] == some_field_value
+                assert d['location'] == hippo_url
+                assert {'_embedding', 'location', 'some_field'} == functools.reduce(lambda x, y: x.union(y),
+                                        [list(facet.keys()) for facet in d['_tensor_facets']], set())
+                for facet in d['_tensor_facets']:
+                    if 'location' in facet:
+                        assert facet['location'] == hippo_url
+                    elif 'some_field':
+                        assert facet['some_field'] == some_field_value
+                    assert isinstance(facet['_embedding'], list)
+                    assert len(facet['_embedding']) > 0
+            return True
+
+        doc_counts = 1, 2, 25
+        for update_mode in ('replace', 'update'):
+            for c in doc_counts:
+                try:
+                    tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+                except IndexNotFoundError as s:
+                    pass
+                tensor_search.create_vector_index(
+                    config=self.config, index_name=self.index_name_1,
+                    index_settings={
+                        IndexSettingsField.index_defaults: {
+                            IndexSettingsField.model: "random",
+                            IndexSettingsField.treat_urls_and_pointers_as_images: True
+                        }
+                    }
+                )
+                res1 = tensor_search.add_documents(
+                    self.config,
+                    docs=[{"_id": str(doc_num),
+                           "location": hippo_url,
+                           "some_field": "blah"} for doc_num in range(c)],
+                    auto_refresh=True, index_name=self.index_name_1,
+                    update_mode=update_mode
+                )
+                assert c == tensor_search.get_stats(self.config,
+                                                    index_name=self.index_name_1)['numberOfDocuments']
+                assert not res1['errors']
+                assert _check_get_docs(doc_count=c, some_field_value='blah')
+                res2 = tensor_search.add_documents(
+                    self.config,
+                    docs=[{"_id": str(doc_num),
+                           "location": hippo_url,
+                           "some_field": "blah2"} for doc_num in range(c)],
+                    auto_refresh=True, index_name=self.index_name_1,
+                    non_tensor_fields=["myfield"], update_mode=update_mode
+                )
+                assert not res2['errors']
+                assert c == tensor_search.get_stats(self.config,
+                                                    index_name=self.index_name_1)['numberOfDocuments']
+                assert _check_get_docs(doc_count=c, some_field_value='blah2')
+
+    def test_images_non_tensor_fields_count(self):
+        hippo_url = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
+
+        def _check_get_docs(doc_count, some_field_value):
+            approx_half = math.floor(doc_count/2)
+            get_res = tensor_search.get_documents_by_ids(
+                config=self.config, index_name=self.index_name_1,
+                document_ids=[str(n) for n in (0, approx_half, doc_count - 1)],
+                show_vectors=True
+            )
+            for d in get_res['results']:
+                assert d['_found'] is True
+                assert d['some_field'] == some_field_value
+                assert d['location'] == hippo_url
+                # location is not present:
+                assert {'_embedding', 'some_field'} == functools.reduce(lambda x, y: x.union(y),
+                                        [list(facet.keys()) for facet in d['_tensor_facets']], set())
+            return True
+
+        doc_counts = 1, 20, 23
+        for update_mode in ('replace', 'update'):
+            for c in doc_counts:
+                try:
+                    tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+                except IndexNotFoundError as s:
+                    pass
+                tensor_search.create_vector_index(
+                    config=self.config, index_name=self.index_name_1,
+                    index_settings={
+                        IndexSettingsField.index_defaults: {
+                            IndexSettingsField.model: "random",
+                            IndexSettingsField.treat_urls_and_pointers_as_images: True
+                        }
+                    }
+                )
+                res1 = tensor_search.add_documents(
+                    self.config,
+                    docs=[{"_id": str(doc_num),
+                           "location": hippo_url,
+                           "some_field": "blah"} for doc_num in range(c)],
+                    auto_refresh=True, index_name=self.index_name_1,
+                    non_tensor_fields=["location"], update_mode=update_mode
+                )
+                assert c == tensor_search.get_stats(self.config,
+                                                    index_name=self.index_name_1)['numberOfDocuments']
+                assert not res1['errors']
+                assert _check_get_docs(doc_count=c, some_field_value='blah')
+                res2 = tensor_search.add_documents(
+                    self.config,
+                    docs=[{"_id": str(doc_num),
+                           "location": hippo_url,
+                           "some_field": "blah2"} for doc_num in range(c)],
+                    auto_refresh=True, index_name=self.index_name_1,
+                    non_tensor_fields=["location"], update_mode=update_mode
+                )
+                assert not res2['errors']
+                assert c == tensor_search.get_stats(self.config,
+                                                    index_name=self.index_name_1)['numberOfDocuments']
+                assert _check_get_docs(doc_count=c, some_field_value='blah2')
+
+    def test_image_download_timeout(self):
+        mock_get = mock.MagicMock()
+        mock_get.return_value.raiseError.side_effect = requests.exceptions.RequestException()
+
+        @mock.patch('requests.get', mock_get)
+        def run():
+            image_repo = dict()
+            add_docs.threaded_download_images(
+                allocated_docs=[
+                    {"Title": "frog", "Desc": "blah"}, {"Title": "Dog", "Loc": "https://google.com/my_dog.png"}],
+                image_repo=image_repo,
+                non_tensor_fields=()
+            )
+            assert list(image_repo.keys()) == ['https://google.com/my_dog.png']
+            assert isinstance(image_repo['https://google.com/my_dog.png'], PIL.UnidentifiedImageError)
+            return True
+
+        assert run()
+
+    def test_image_download(self):
+        image_repo = dict()
+        good_url ='https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
+        test_doc = {
+            'field_1': 'https://google.com/my_dog.png',  # error because such an image doesn't exist
+            'field_2': good_url
+        }
+
+        add_docs.threaded_download_images(
+            allocated_docs=[test_doc],
+            image_repo=image_repo,
+            non_tensor_fields=()
+        )
+        assert len(image_repo) == 2
+        assert isinstance(image_repo['https://google.com/my_dog.png'], PIL.UnidentifiedImageError)
+        assert isinstance(image_repo[good_url], types.ImageType)
+
+    def test_threaded_download_images_non_tensor_field(self):
+        """Tests add_docs.threaded_download_images()"""
+        good_url ='https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
+        bad_url = 'https://google.com/my_dog.png'
+        examples = [
+            ([{
+                'field_1': bad_url,
+                'field_2': good_url
+            }], {
+                bad_url: PIL.UnidentifiedImageError,
+                good_url: types.ImageType
+            }),
+            ([{
+                'nt_1': bad_url,
+                'nt_2': good_url
+            }], {}),
+            ([{
+                'field_1': bad_url,
+                'nt_1': good_url
+            }], {
+                 bad_url: PIL.UnidentifiedImageError,
+             }),
+            ([{
+                'nt_2': bad_url,
+                'field_2': good_url
+            }], {
+                 good_url: types.ImageType
+             }),
+        ]
+        for docs, expected_repo_structure in examples:
+            image_repo = dict()
+            add_docs.threaded_download_images(
+                allocated_docs=docs,
+                image_repo=image_repo,
+                non_tensor_fields=('nt_1', 'nt_2')
+            )
+            assert len(expected_repo_structure) == len(image_repo)
+            for k in expected_repo_structure:
+                assert isinstance(image_repo[k],expected_repo_structure[k])
+
+    def test_download_images_non_tensor_field(self):
+        """tests add_docs.download_images() """
+        good_url ='https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
+        bad_url = 'https://google.com/my_dog.png'
+        examples = [
+            ([{
+                'field_1': bad_url,
+                'field_2': good_url
+            }], {
+                bad_url: PIL.UnidentifiedImageError,
+                good_url: types.ImageType
+            }),
+            ([{
+                'nt_1': bad_url,
+                'nt_2': good_url
+            }], {}),
+            ([{
+                'field_1': bad_url,
+                'nt_1': good_url
+            }], {
+                 bad_url: PIL.UnidentifiedImageError,
+             }),
+            ([{
+                'nt_2': bad_url,
+                'field_2': good_url
+            }], {
+                 good_url: types.ImageType
+             }),
+        ]
+        for docs, expected_repo_structure in examples:
+            image_repo = add_docs.download_images(
+                docs=docs,
+                thread_count=20,
+                non_tensor_fields=('nt_1', 'nt_2')
+            )
+            assert len(expected_repo_structure) == len(image_repo)
+            for k in expected_repo_structure:
+                assert isinstance(image_repo[k],expected_repo_structure[k])

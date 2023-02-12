@@ -5,7 +5,7 @@ https://pydantic-docs.helpmanual.io/usage/types/#enums-and-choices
 """
 import pydantic
 from pydantic import BaseModel
-from typing import Union, List, Dict
+from typing import Union, List, Dict, Optional
 from marqo.tensor_search.enums import SearchMethod, Device
 from marqo.tensor_search import validation
 from marqo.tensor_search import configs
@@ -21,6 +21,7 @@ class SearchQuery(BaseModel):
     reRanker: str = None
     filter: str = None
     attributesToRetrieve: List[str] = None
+    boost: Optional[Dict] = None
 
     @pydantic.validator('searchMethod')
     def validate_search_method(cls, value):
