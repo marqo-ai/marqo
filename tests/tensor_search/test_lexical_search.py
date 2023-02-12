@@ -425,3 +425,58 @@ class TestLexicalSearch(MarqoTestCase):
             
             if "no_results" in case:
                 assert len(id_only_hits) == 0
+
+    def test_lexical_search_list(self):
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=[
+                {"abc": "some text", "other field": "baaadd", "_id": "5678", "my_string": "b"},
+                {"abc": "some text", "other field": "Close match hehehe", "_id": "1234", "an_int": 2},
+                {"abc": "some text", "_id": "1235",  "my_list": ["tag1", "tag2 some"]},
+                {"abc": "some text", "_id": "1001", "my_cool_list": ["b_1", "b2"], "fun list": ['truk', 'car']},
+            ], auto_refresh=True, non_tensor_fields=["my_list", "fun list", "my_cool_list"])
+        base_search_args = {
+            'index_name': self.index_name_1, "config": self.config,
+            "search_method": enums.SearchMethod.LEXICAL
+        }
+        res_exists = tensor_search.search(**{'text': "tag1", **base_search_args})
+        assert len(res_exists['hits']) == 1
+        assert res_exists['hits'][0]['_id'] == '1235'
+
+        res_not_exists = tensor_search.search(**{'text': "tag55", **base_search_args})
+        assert len(res_not_exists['hits']) == 0
+
+        res_filtered_other = tensor_search.search(
+            **{'text': "tag1", 'filter': 'abc:(some text)', **base_search_args})
+        # it will actually return the other docs, as they match the filter, but with scores of 0
+        assert res_filtered_other['hits'][0]['_id'] == '1235'
+
+        res_filtered_same = tensor_search.search(
+            **{'text': "tag1", 'filter': 'my_list:tag2', **base_search_args})
+        assert len(res_filtered_same['hits']) == 1
+        assert res_filtered_same['hits'][0]['_id'] == '1235'
+
+        res_filtered_other_list = tensor_search.search(
+            **{'text': "b_1", 'filter': 'fun\ list:truk', **base_search_args})
+        assert len(res_filtered_other_list['hits']) == 1
+        assert res_filtered_other_list['hits'][0]['_id'] == '1001'
+
+    def test_lexical_search_list_searchable_attr(self):
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=[
+                {"abc": "some text", "other field": "baaadd", "_id": "5678", "my_string": "b"},
+                {"abc": "some text", "other field": "Close match hehehe", "_id": "1234", "an_int": 2},
+                {"abc": "some text", "_id": "1235",  "my_list": ["tag1", "tag2 some"]},
+                {"abc": "some text", "_id": "1001", "my_cool_list": ["b_1", "b2"], "fun list": ['truk', 'car']},
+            ], auto_refresh=True, non_tensor_fields=["my_list", "fun list", "my_cool_list"])
+        base_search_args = {
+            'index_name': self.index_name_1, "config": self.config,
+            "search_method": enums.SearchMethod.LEXICAL, 'text': "tag1"
+        }
+        res_exists = tensor_search.search(
+            **{**base_search_args, "searchable_attributes": ["my_list"]})
+        assert len(res_exists['hits']) == 1
+        assert res_exists['hits'][0]['_id'] == '1235'
+
+        res_wrong_attr = tensor_search.search(
+            **{**base_search_args, "searchable_attributes": ["abc"]})
+        assert len(res_wrong_attr['hits']) == 0

@@ -1008,6 +1008,49 @@ class TestAddDocuments(MarqoTestCase):
                 return True
             assert run()
 
+    def test_non_tensor_field_list(self):
+        test_doc = {"_id": "123", "my_list": ["data1", "mydata"], "myfield2": "mydata2"}
+        tensor_search.add_documents(
+            self.config,
+            docs=[test_doc],
+            auto_refresh=True, index_name=self.index_name_1, non_tensor_fields=['my_list']
+        )
+        doc_w_facets = tensor_search.get_document_by_id(
+            self.config, index_name=self.index_name_1, document_id='123', show_vectors=True)
+
+        # check tensor facets:
+        assert len(doc_w_facets[TensorField.tensor_facets]) == 1
+        assert 'myfield2' in doc_w_facets[TensorField.tensor_facets][0]
+        assert doc_w_facets['my_list'] == test_doc['my_list']
+        assert doc_w_facets['myfield2'] == test_doc['myfield2']
+
+        assert 1 == len(doc_w_facets[TensorField.tensor_facets])
+        assert doc_w_facets[TensorField.tensor_facets][0]["myfield2"] == "mydata2"
+
+        # check OpenSearch, to ensure the list got added as a filter field
+        original_doc = requests.get(
+            url=F"{self.endpoint}/{self.index_name_1}/_doc/123",
+            verify=False
+        ).json()
+        assert len(original_doc['_source']['__chunks']) == 1
+        myfield2_chunk = original_doc['_source']['__chunks'][0]
+        #     check if the chunk represents the tensorsied "mydata2" field
+        assert myfield2_chunk['__field_name'] == 'myfield2'
+        assert myfield2_chunk['__field_content'] == 'mydata2'
+        assert isinstance(myfield2_chunk['__vector_myfield2'], list)
+        #      Check if all filter fields are  there (inc. the non tensorised my_list):
+        assert myfield2_chunk['my_list'] == ['data1', 'mydata']
+        assert myfield2_chunk['myfield2'] == 'mydata2'
+
+        # check index info. my_list needs to be keyword within each chunk
+        index_info = tensor_search.backend.get_index_info(config=self.config, index_name=self.index_name_1)
+        assert index_info.properties['my_list']['type'] == 'text'
+        assert index_info.properties['myfield2']['type'] == 'text'
+        assert index_info.properties['__chunks']['properties']['my_list']['type'] == 'keyword'
+        assert index_info.properties['__chunks']['properties']['myfield2']['type'] == 'keyword'
+        assert index_info.properties['__chunks']['properties']['__vector_myfield2']['type'] == 'knn_vector'
+
+
     def test_no_tensor_field_replace(self):
         # test replace and update workflows
         tensor_search.add_documents(
@@ -1236,7 +1279,7 @@ class TestAddDocuments(MarqoTestCase):
         assert isinstance(image_repo[good_url], types.ImageType)
 
     def test_threaded_download_images_non_tensor_field(self):
-        """Tests add_docs.threaded_download_images()"""
+        """Tests add_docs.threaded_download_images(). URLs in non_tensor_fields should not be downloaded """
         good_url ='https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
         bad_url = 'https://google.com/my_dog.png'
         examples = [
@@ -1276,7 +1319,7 @@ class TestAddDocuments(MarqoTestCase):
                 assert isinstance(image_repo[k],expected_repo_structure[k])
 
     def test_download_images_non_tensor_field(self):
-        """tests add_docs.download_images() """
+        """tests add_docs.download_images(). URLs in non_tensor_fields should not be downloaded """
         good_url ='https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
         bad_url = 'https://google.com/my_dog.png'
         examples = [
@@ -1312,4 +1355,4 @@ class TestAddDocuments(MarqoTestCase):
             )
             assert len(expected_repo_structure) == len(image_repo)
             for k in expected_repo_structure:
-                assert isinstance(image_repo[k],expected_repo_structure[k])
+                assert isinstance(image_repo[k], expected_repo_structure[k])
