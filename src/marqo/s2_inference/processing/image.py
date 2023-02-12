@@ -73,7 +73,7 @@ def chunk_image(image: Union[str, ImageType], device: str,
         else:
             raise TypeError(f'only pointers to an image or a PIL image are allowed. received {type(image)}')
     
-    # get the paramters from the method 'url'
+    # get the parameters from the method 'url'
     method, params = _process_patch_method(method)
     logger.debug(f"found method={method} and params={params}")
 
