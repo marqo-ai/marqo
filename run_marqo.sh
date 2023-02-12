@@ -87,33 +87,32 @@ export OPENSEARCH_URL
 export OPENSEARCH_IS_INTERNAL
 
 # Start up redis
-if [ -z "$MARQO_ENABLE_THROTTLING" ]; then
-    if [ "$MARQO_ENABLE_THROTTLING" != "FALSE" ]; then
-        echo "Starting redis-server"
-        redis-server /etc/redis/redis.conf
-        echo "Called redis-server command"
+if [ "$MARQO_ENABLE_THROTTLING" != "FALSE" ]; then
+    echo "Starting redis-server"
+    redis-server /etc/redis/redis.conf
+    echo "Called redis-server command"
 
-        start_time=$(($(date +%s%N)/1000000))
-        while true; do
-            redis-cli ping &> /dev/null
-            if [ $? -eq 0 ]; then
-                break
-            fi
+    start_time=$(($(date +%s%N)/1000000))
+    while true; do
+        redis-cli ping &> /dev/null
+        if [ $? -eq 0 ]; then
+            break
+        fi
 
-            current_time=$(($(date +%s%N)/1000000))
-            elapsed_time=$(expr $current_time - $start_time)
-            if [ $elapsed_time -ge 2000 ]; then
-                # Expected start time should be < 30ms in reality.
-                echo "redis-server failed to start within 2s. skipping."
-                break
-            fi
+        current_time=$(($(date +%s%N)/1000000))
+        elapsed_time=$(expr $current_time - $start_time)
+        if [ $elapsed_time -ge 2000 ]; then
+            # Expected start time should be < 30ms in reality.
+            echo "redis-server failed to start within 2s. skipping."
+            break
+        fi
+        sleep 0.1
+        
+    done
+    echo "redis-server is now running"
 
-            sleep 0.001
-
-            
-        done
-        echo "redis-server is now running"
-    fi
+else
+    echo "Throttling has been disabled. Skipping redis-server start."
 fi
 
 # Start the tensor search web app in the background
