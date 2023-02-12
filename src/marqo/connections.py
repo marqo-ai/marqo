@@ -56,7 +56,7 @@ class RedisDriver:
             logger.info(f"Took {((t1-t0)*1000):.3f}ms to connect to redis and load scripts.")
 
         except Exception as e:
-            logger.warn(f"There is a problem with your redis instance. Could not load scripts. Reason: {e}")
+            logger.warn(f"There is a problem with your redis instance. Could not load throttling scripts onto redis. Reason: {e}")
             self.faulty = True
 
     def connect(self) -> redis.Redis:
