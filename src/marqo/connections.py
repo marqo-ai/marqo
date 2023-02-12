@@ -99,6 +99,4 @@ class RedisDriver:
             return False
 
 # Starts up redis driver
-# Can be turned off with MARQO_ENABLE_THROTTLING = 'FALSE'
-if utils.read_env_vars_and_defaults(EnvVars.MARQO_ENABLE_THROTTLING) == "TRUE":
-    redis_driver = RedisDriver()
+redis_driver = RedisDriver()
