@@ -99,7 +99,7 @@ def validate_field_content(field_content: typing.Any, is_non_tensor_field: bool)
         InvalidArgError if field_content is not acceptable
     """
     if type(field_content) in constants.ALLOWED_CUSTOMER_FIELD_TYPES:
-        if type(field_content) is list:
+        if isinstance(field_content, list):
             validate_list(field_content, is_non_tensor_field)
         return field_content
     else:
