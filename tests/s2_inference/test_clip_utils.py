@@ -27,9 +27,10 @@ class TestEncoding(unittest.TestCase):
         # should be fine on regular timeout:
         clip_utils.load_image_from_path(good_url)
 
-        for err in [requests.exceptions.ReadTimeout(), requests.exceptions.HTTPError]:
+        for err in [requests.exceptions.ReadTimeout, requests.exceptions.HTTPError]:
             mock_get = mock.MagicMock()
-            mock_get.return_value.raiseError.side_effect = err
+            mock_get.side_effect = err
+
             @mock.patch('requests.get', mock_get)
             def run():
                 try:
