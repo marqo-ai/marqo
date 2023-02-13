@@ -177,21 +177,41 @@ class TestValidation(unittest.TestCase):
 
     def test_validate_field_content_bad(self):
         bad_field_content = [
-            {123}, [], None, {"abw": "cjnk"}
+            {123}, None, {"abw": "cjnk"}, ['not 100% strings', 134, 1.4, False],
+            ['not 100% strings', True]
         ]
-        for bad_content in bad_field_content:
-            try:
-                validation.validate_field_content(bad_content)
-                raise AssertionError
-            except InvalidArgError as e:
-                pass
+        for non_tensor_field in (True, False):
+            for bad_content in bad_field_content:
+                try:
+                    validation.validate_field_content(bad_content, is_non_tensor_field=non_tensor_field)
+                    raise AssertionError
+                except InvalidArgError as e:
+                    pass
 
     def test_validate_field_content_good(self):
         good_field_content = [
             123, "heehee", 12.4, False
         ]
+        for non_tensor_field in (True, False):
+            for good_content in good_field_content:
+                assert good_content == validation.validate_field_content(good_content, is_non_tensor_field=non_tensor_field)
+
+    def test_validate_field_content_list(self):
+        good_field_content = [
+            [], [''], ['abc', 'efg', '123'], ['', '']
+        ]
         for good_content in good_field_content:
-            assert good_content == validation.validate_field_content(good_content)
+            assert good_content == validation.validate_field_content(good_content, is_non_tensor_field=True)
+
+        for good_content in good_field_content:
+            # fails when non tensor field
+            try:
+                validation.validate_field_content(good_content, is_non_tensor_field=False)
+                raise AssertionError
+            except InvalidArgError:
+                pass
+
+
 
     def test_validate_id_good(self):
         bad_ids = [
