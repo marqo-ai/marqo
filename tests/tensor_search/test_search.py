@@ -1,5 +1,4 @@
 import math
-import pprint
 from unittest import mock
 from marqo.tensor_search.enums import TensorField, SearchMethod, EnvVars, IndexSettingsField
 from marqo.errors import (
@@ -311,57 +310,172 @@ class TestVectorSearch(MarqoTestCase):
             search_method=SearchMethod.TENSOR)
         assert len(s_res["hits"]) > 0
 
+    def test_filtering_list_case_tensor(self):
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=[
+                {"abc": "some text", "other field": "baaadd", "_id": "5678", "my_string": "b"},
+                {"abc": "some text", "other field": "Close match hehehe", "_id": "1234", "an_int": 2},
+                {"abc": "some text", "_id": "1235",  "my_list": ["tag1", "tag2 some"]}
+            ], auto_refresh=True, non_tensor_fields=["my_list"])
+
+        res_exists = tensor_search.search(
+            index_name=self.index_name_1, config=self.config, text="", filter="my_list:tag1")
+
+        res_not_exists = tensor_search.search(
+            index_name=self.index_name_1, config=self.config, text="", filter="my_list:tag55")
+
+        res_other = tensor_search.search(
+            index_name=self.index_name_1, config=self.config, text="", filter="my_string:b")
+
+        # strings in lists are converted into keyword, which aren't filterable on a token basis.
+        # Because the list member is "tag2 some" we can only exact match (incl. the space).
+        # "tag2" by itself doesn't work, only "(tag2 some)"
+        res_should_only_match_keyword_bad = tensor_search.search(
+            index_name=self.index_name_1, config=self.config, text="", filter="my_list:tag2")
+        res_should_only_match_keyword_good = tensor_search.search(
+            index_name=self.index_name_1, config=self.config, text="", filter="my_list:(tag2 some)")
+
+        assert res_exists["hits"][0]["_id"] == "1235"
+        assert res_exists["hits"][0]["_highlights"] == {"abc": "some text"}
+        assert len(res_exists["hits"]) == 1
+
+        assert len(res_not_exists["hits"]) == 0
+
+        assert res_other["hits"][0]["_id"] == "5678"
+        assert len(res_other["hits"]) == 1
+
+        assert len(res_should_only_match_keyword_bad["hits"]) == 0
+        assert len(res_should_only_match_keyword_good["hits"]) == 1
+
+    def test_filtering_list_case_lexical(self):
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=[
+                {"abc": "some text", "other field": "baaadd", "_id": "5678", "my_string": "b"},
+                {"abc": "some text", "other field": "Close match hehehe", "_id": "1234", "an_int": 2},
+                {"abc": "some text", "_id": "1235",  "my_list": ["tag1", "tag2 some"]}
+            ], auto_refresh=True, non_tensor_fields=["my_list"])
+        base_search_args = {
+            'index_name': self.index_name_1, "config": self.config, "text": "some",
+            "search_method": SearchMethod.LEXICAL
+        }
+        res_exists = tensor_search.search(**{'filter': "my_list:tag1", **base_search_args})
+
+        res_not_exists = tensor_search.search(**{'filter': "my_list:tag55", **base_search_args})
+
+        res_other = tensor_search.search(**{'filter': "my_string:b", **base_search_args})
+
+        # Because lexical search is over the original documents, the strings we are filtering over are texts,
+        # not keywords. This allows us to search at the token level. Compare this to test_filtering_list_case_tensor()
+        # where filtering is only possible for exact matches (including the space)
+        res_should_only_match_keyword_non_exact = tensor_search.search(
+            **{'filter': "my_list:tag2", **base_search_args})
+        res_should_only_match_keyword_good = tensor_search.search(
+            **{'filter': "my_list:(tag2 some)", **base_search_args})
+
+        assert res_exists["hits"][0]["_id"] == "1235"
+        assert len(res_exists["hits"]) == 1
+
+        assert len(res_not_exists["hits"]) == 0
+
+        assert res_other["hits"][0]["_id"] == "5678"
+        assert len(res_other["hits"]) == 1
+
+        assert len(res_should_only_match_keyword_non_exact["hits"]) == 1
+        assert len(res_should_only_match_keyword_good["hits"]) == 1
+
+    def test_filtering_list_case_image(self):
+        settings = {"index_defaults": {"treat_urls_and_pointers_as_images": True, "model": "ViT-B/32"}}
+        tensor_search.create_vector_index(index_name=self.index_name_1, index_settings=settings, config=self.config)
+        hippo_img = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=[
+                {"img": hippo_img, "abc": "some text", "other field": "baaadd", "_id": "5678", "my_string": "b"},
+                {"img": hippo_img, "abc": "some text", "other field": "Close match hehehe", "_id": "1234", "an_int": 2},
+                {"img": hippo_img, "abc": "some text", "_id": "1235", "my_list": ["tag1", "tag2 some"]}
+            ], auto_refresh=True, non_tensor_fields=["my_list"])
+        # TENSOR SEARCH:
+        tensor_search_base_args = {'index_name': self.index_name_1, "config": self.config, 'search_method': 'TENSOR'}
+
+        res_img_2_img = tensor_search.search(**{'filter': "my_list:tag1", 'text': hippo_img, **tensor_search_base_args})
+        assert res_img_2_img["hits"][0]["_id"] == "1235"
+        assert len(res_img_2_img["hits"]) == 1
+        assert res_img_2_img["hits"][0]["_highlights"] == {"img": hippo_img}
+
+        res_img_2_img_none = tensor_search.search(**{'filter': "my_list:not_exist", 'text': hippo_img,
+                                                     **tensor_search_base_args})
+        assert len(res_img_2_img_none["hits"]) == 0
+
+        res_txt_2_img = tensor_search.search(**{'filter': "my_list:tag1", 'text': "some", **tensor_search_base_args})
+        assert res_txt_2_img["hits"][0]["_id"] == "1235"
+        assert res_txt_2_img["hits"][0]["_highlights"] == {"abc": "some text"}
+        assert len(res_txt_2_img["hits"]) == 1
+
+        res_txt_2_img_none = tensor_search.search(**{'filter': "my_list:not_exist", 'text': "some",
+                                                     **tensor_search_base_args})
+        assert len(res_txt_2_img_none["hits"]) == 0
+        # LEXICAL SEARCH:
+        res_lex = tensor_search.search(
+            **{'filter': "my_list:tag1", 'text': "some", 'index_name': self.index_name_1,
+               "config": self.config, 'search_method': 'LEXICAL'})
+        assert res_lex["hits"][0]["_id"] == "1235"
+        assert len(res_lex["hits"]) == 1
+
+        res_lex_none = tensor_search.search(
+            **{'filter': "my_list:not_exist", 'text': "some", 'index_name': self.index_name_1,
+               "config": self.config, 'search_method': 'LEXICAL'})
+        assert len(res_lex_none["hits"]) == 0
+
     def test_filtering(self):
         tensor_search.add_documents(
             config=self.config, index_name=self.index_name_1, docs=[
                 {"abc": "some text", "other field": "baaadd", "_id": "5678", "my_string": "b"},
                 {"abc": "some text", "other field": "Close match hehehe", "_id": "1234", "an_int": 2},
-                {"abc": "some text", "other field": "Close match hehehe", "_id": "1233", "my_bool": True},
+                {"abc": "some text", "other field": "Close match hehehe", "_id": "1233", "my_bool": True}
             ], auto_refresh=True)
 
         res_doesnt_exist = tensor_search.search(
             config=self.config, index_name=self.index_name_1, text="some text", result_count=3,
-            filter="my_string:c", verbose=1
+            filter="my_string:c", verbose=0
         )
 
         res_exists_int = tensor_search.search(
             config=self.config, index_name=self.index_name_1, text="some text", result_count=3,
-            filter="an_int:2", verbose=1
+            filter="an_int:2", verbose=0
         )
 
         res_exists_string = tensor_search.search(
             config=self.config, index_name=self.index_name_1, text="some text", result_count=3,
-            filter="my_string:b", verbose=1
+            filter="my_string:b", verbose=0
         )
 
         res_field_doesnt_exist = tensor_search.search(
             config=self.config, index_name=self.index_name_1, text="some text", result_count=3,
-            filter="my_int_something:5", verbose=1
+            filter="my_int_something:5", verbose=0
         )
 
         res_range_doesnt_exist = tensor_search.search(
             config=self.config, index_name=self.index_name_1, text="some text", result_count=3,
-            filter="an_int:[5 TO 30]", verbose=1
+            filter="an_int:[5 TO 30]", verbose=0
         )
 
         res_range_exists = tensor_search.search(
             config=self.config, index_name=self.index_name_1, text="some text", result_count=3,
-            filter="an_int:[0 TO 30]", verbose=1
+            filter="an_int:[0 TO 30]", verbose=0
         )
 
         res_bool = tensor_search.search(
             config=self.config, index_name=self.index_name_1, text="some text", result_count=3,
-            filter="my_bool:true", verbose=1
+            filter="my_bool:true", verbose=0
         )
 
         res_multi = tensor_search.search(
             config=self.config, index_name=self.index_name_1, text="some text", result_count=3,
-            filter="an_int:[0 TO 30] OR my_bool:true", verbose=1
+            filter="an_int:[0 TO 30] OR my_bool:true", verbose=0
         )
 
         res_complex = tensor_search.search(
             config=self.config, index_name=self.index_name_1, text="some text", result_count=3,
-            filter="(an_int:[0 TO 30] and an_int:2) AND abc:(some text)", verbose=1
+            filter="(an_int:[0 TO 30] and an_int:2) AND abc:(some text)", verbose=0
         )
 
         assert res_exists_int["hits"][0]["_id"] == "1234"
@@ -386,7 +500,7 @@ class TestVectorSearch(MarqoTestCase):
 
         assert 3 == len(tensor_search.search(
             config=self.config, index_name=self.index_name_1, text="some text", result_count=4,
-            filter="*:*", verbose=1
+            filter="*:*", verbose=0
         )["hits"])
 
     def test_filter_spaced_fields(self):
@@ -428,7 +542,7 @@ class TestVectorSearch(MarqoTestCase):
         try:
             res_doesnt_exist = tensor_search.search(
                 config=self.config, index_name=self.index_name_1, text="some text", result_count=3,
-                filter="(other field):baaadd", verbose=1
+                filter="(other field):baaadd", verbose=0
             )
             raise AssertionError
         except InvalidArgError:
@@ -930,7 +1044,6 @@ class TestVectorSearch(MarqoTestCase):
         )
         assert len(res['hits']) == 2
         assert {hit['image_field'] for hit in res['hits']} == {url_2, url_1}
-        # print([hit['_highlights']['image_field'] for hit in res['hits']])
         assert {hit['_highlights']['image_field'] for hit in res['hits']} == {url_2, url_1}
 
     def test_multi_search(self):

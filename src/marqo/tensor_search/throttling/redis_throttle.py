@@ -35,8 +35,6 @@ def throttle(request_type: str):
                 return function(*args, **kwargs)
 
             redis = redis_driver.get_db()  # redis instance
-
-            logger.info(f"Beginning throttling check. API request is of type {request_type}")
             lua_shas = redis_driver.get_lua_shas()
 
             # Define maximum thread counts

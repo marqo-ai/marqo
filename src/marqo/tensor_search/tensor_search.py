@@ -328,13 +328,18 @@ def _infer_opensearch_data_type(
         sample_field_content: typing.Any) -> Union[OpenSearchDataType, None]:
     """
     Raises:
-        Exception if sample_field_content list or dict
+        Exception if sample_field_content is a dict
     """
-    if isinstance(sample_field_content, dict):
-        raise errors.InvalidArgError("Field content can't be objects or lists!")
-    elif isinstance(sample_field_content, List):
-        raise errors.InvalidArgError("Field content can't be objects or lists!")
-    elif isinstance(sample_field_content, str):
+    if isinstance(sample_field_content, Sequence) and len(sample_field_content) > 0:
+        # OpenSearch requires that all content of an array be the same type.
+        # This function doesn't validate.
+        to_check = sample_field_content[0]
+    else:
+        to_check = sample_field_content
+
+    if isinstance(to_check, dict):
+        raise errors.InvalidArgError("Field content can't be an object.")
+    elif isinstance(to_check, str):
         return OpenSearchDataType.text
     else:
         return None
@@ -432,7 +437,9 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
         for field in copied:
 
             try:
-                field_content = validation.validate_field_content(copied[field])
+                field_content = validation.validate_field_content(
+                    field_content=copied[field], is_non_tensor_field=field in non_tensor_fields
+                )
             except errors.InvalidArgError as err:
                 document_is_valid = False
                 unsuccessful_docs.append(
@@ -554,7 +561,8 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                     chunk_values_for_filtering = {}
                     for key, value in copied.items():
                         if not (isinstance(value, str) or isinstance(value, float)
-                                or isinstance(value, bool) or isinstance(value, int)):
+                                or isinstance(value, bool) or isinstance(value, int)
+                                or isinstance(value, list)):
                             continue
                         chunk_values_for_filtering[key] = value
                     chunks.append({

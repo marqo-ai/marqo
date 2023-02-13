@@ -99,7 +99,9 @@ def load_image_from_path(image_path: str, timeout=3) -> ImageType:
     elif validators.url(image_path):
         try:
             resp = requests.get(image_path, stream=True, timeout=timeout)
-        except (requests.exceptions.ConnectTimeout, requests.exceptions.ConnectionError) as e:
+        except (requests.exceptions.ConnectTimeout, requests.exceptions.ConnectionError,
+                requests.exceptions.RequestException
+                ) as e:
             raise UnidentifiedImageError(
                 f"image url `{image_path}` is unreachable, perhaps due to timeout. "
                 f"Timeout threshold is set to {timeout} seconds."
@@ -333,7 +335,7 @@ class FP16_CLIP(CLIP):
 
     def load(self) -> None:
         # https://github.com/openai/CLIP/issues/30
-        self.model, self.preprocess = clip.load(self.model_name, device='cuda', jit=False, download_root=ModelCache.clip_cache_path)
+        self.model, self.preprocess = clip.load(self.model_name, device=self.device, jit=False, download_root=ModelCache.clip_cache_path)
         self.model = self.model.to(self.device)
         self.tokenizer = clip.tokenize
         self.model.eval()
