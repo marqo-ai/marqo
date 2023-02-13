@@ -621,6 +621,32 @@ def _get_onnx_clip_properties() -> Dict:
                 "token": None,
                 "resolution" : 224,
             },
+        "onnx32/open_clip/ViT-L-14/openai":
+            {
+                "name": "onnx32/open_clip/ViT-L-14/openai",
+                "dimensions": 768,
+                "type": "clip_onnx",
+                "note": "the onnx float32 version of open_clip ViT-L-14/openai",
+                "repo_id": "Marqo/onnx-open_clip-ViT-L-14",
+                "visual_file": "onnx32-open_clip-ViT-L-14-openai-visual.onnx",
+                "textual_file": "onnx32-open_clip-ViT-L-14-openai-textual.onnx",
+                "token": None,
+                "resolution": 224,
+                "pretrained": "openai"
+            },
+        "onnx16/open_clip/ViT-L-14/openai":
+            {
+                "name": "onnx16/open_clip/ViT-L-14/openai",
+                "dimensions": 768,
+                "type": "clip_onnx",
+                "note": "the onnx float16 version of open_clip ViT-L-14/openai",
+                "repo_id": "Marqo/onnx-open_clip-ViT-L-14",
+                "visual_file": "onnx16-open_clip-ViT-L-14-openai-visual.onnx",
+                "textual_file": "onnx16-open_clip-ViT-L-14-openai-textual.onnx",
+                "token": None,
+                "resolution": 224,
+                "pretrained": "openai"
+            },
         "onnx32/open_clip/ViT-L-14/laion400m_e32":
             {
                 "name" : "onnx32/open_clip/ViT-L-14/laion400m_e32",
