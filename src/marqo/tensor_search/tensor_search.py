@@ -421,6 +421,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
         chunks = []
 
+        # strip meta data here then check
         for field in copied:
 
             try:
@@ -462,6 +463,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                         NsField.split_overlap]
                     content_chunks = text_processor.split_text(field_content, split_by=split_by, split_length=split_length, split_overlap=split_overlap)
                     text_chunks = content_chunks
+               
                 else:
                     # TODO put the logic for getting field parameters into a function and add per field options
                     image_method = index_info.index_settings[NsField.index_defaults][NsField.image_preprocessing][
@@ -492,9 +494,34 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
                     # ADD DOCS TIMER-LOGGER (4)
                     start_time = timer()
+                    
+                    vector_chunks_meta = None
+                    if '<|' in field_content and _is_image(field_content):
+                        from marqo.s2_inference.clip_utils import _remove_image_meta_data_from_string
+                        from marqo.s2_inference.s2_inference import _convert_vectorized_output
+                        import numpy as np
+                        #print("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<SFDDS>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
+                        file_url, meta, weight = _remove_image_meta_data_from_string(field_content)
+                        content_chunks = [file_url]
+                        content_chunks_meta = meta.strip().split('||')
+                        content_chunks_meta = [c.strip() for c in content_chunks_meta]
+                        print(content_chunks, content_chunks_meta, weight)
+
+                        if content_chunks_meta[0] not in ['', ' ', '""', "''", None]:
+                            vector_chunks_meta = s2_inference.vectorise(model_name=index_info.model_name, model_properties=_get_model_properties(index_info), content=content_chunks_meta,
+                            device=selected_device, normalize_embeddings=normalize_embeddings,
+                            infer=infer_if_image)
+                            #print(np.array(vector_chunks_meta).shape, np.array(vector_chunks_meta).mean(0).shape)
+                            vector_chunks_meta = np.array(vector_chunks_meta).mean(0)
+                
                     vector_chunks = s2_inference.vectorise(model_name=index_info.model_name, model_properties=_get_model_properties(index_info), content=content_chunks,
                         device=selected_device, normalize_embeddings=normalize_embeddings,
                         infer=infer_if_image)
+
+                    if vector_chunks_meta is not None:
+                        #print("<<<WE DOING IT>>>")
+                        vector_chunks = np.array(vector_chunks) + weight*np.array(vector_chunks_meta)
+                        vector_chunks = _convert_vectorized_output(vector_chunks)
 
                     end_time = timer()
                     single_vectorise_call = end_time - start_time
@@ -502,7 +529,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                     logger.debug(f"(4) TIME for single vectorise call: {(single_vectorise_call):.3f}s.")
                 except (s2_inference_errors.UnknownModelError,
                         s2_inference_errors.InvalidModelPropertiesError,
-                        s2_inference_errors.ModelLoadError) as model_error:
+                        s2_inference_errors.ModelLoadError, s2_inference_errors.TruncatedImageError) as model_error:
                     raise errors.BadRequestError(
                         message=f'Problem vectorising query. Reason: {str(model_error)}',
                         link="https://marqo.pages.dev/latest/Models-Reference/dense_retrieval/"

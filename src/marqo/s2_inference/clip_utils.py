@@ -96,6 +96,46 @@ def format_and_load_CLIP_image(image: Union[str, ndarray, ImageType]) -> ImageTy
 
     return img
 
+def _remove_image_meta_data_from_string(url_with_meta, open_token='<|', close_token='|>'):
+
+    weight = 1.0
+    if open_token not in url_with_meta:
+        return url_with_meta, "", 0.0
+
+    ind_o = url_with_meta.index(open_token)
+    if close_token in url_with_meta:
+        ind_c = url_with_meta.index(close_token)
+        ind_m = ind_c + len(close_token)
+
+        weight = url_with_meta[ind_o + len(open_token):ind_c]
+        if weight not in ['', "", ' ', None]:
+            weight = float(weight)
+
+    else:
+        ind_m = ind_o  + len(open_token)
+
+    meta_data = url_with_meta[ind_m:]
+    url_without_meta = url_with_meta.split(open_token)[0].strip()
+
+    return url_without_meta, meta_data, weight
+
+
+def test_remove_image_meta_data_From_string():
+    strings = ['images_top5/products_the-shirt-by-rochelle-behrens_10355534345_0.jpg',
+                'images_top5/products_the-shirt-by-rochelle-behrens_10355534345_0.jpg <||>',
+                'images_top5/products_the-shirt-by-rochelle-behrens_10355534345_0.jpg <|0.5|>',
+                'images_top5/products_the-shirt-by-rochelle-behrens_10355534345_0.jpg <|0.5|> fun, easy going',
+                'images_top5/products_the-shirt-by-rochelle-behrens_10355534345_0.jpg <|0.5 fun, easy going',
+                'images_top5/products_the-shirt-by-rochelle-behrens_10355534345_0.jpg <||> fun, easy going']
+
+    for s in strings:
+        string_without, meta, weight = _remove_image_meta_data_from_string(s)
+
+        assert string_without == s.split('<|')[0].strip()
+        
+        if '|0.5|' in s:
+            assert weight == 0.5
+
 def _is_image(inputs: Union[str, List[Union[str, ImageType, ndarray]]]) -> bool:
     # some logic to determine if something is an image or not
     # assume the batch is the same type
@@ -114,6 +154,8 @@ def _is_image(inputs: Union[str, List[Union[str, ImageType, ndarray]]]) -> bool:
     else:
         thing = inputs
     
+    thing, _, _ = _remove_image_meta_data_from_string(thing, open_token='<|', close_token='|>')
+
     # if it is a string, determine if it is a local file or url
     if isinstance(thing, str):
         name, extension = os.path.splitext(thing.lower())

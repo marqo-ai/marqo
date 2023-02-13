@@ -284,7 +284,31 @@ def _get_open_clip_properties() -> Dict:
              'dimensions': 1024,
              'note': 'clip model from open_clip implementation',
              'type': 'open_clip',
-             'pretrained': 'laion2b_s12b_b42k'}}
+             'pretrained': 'laion2b_s12b_b42k'},
+
+        'open_clip/xlm-roberta-base-ViT-B-32/laion5b_s13b_b90k':
+            {'name': 'open_clip/xlm-roberta-base-ViT-B-32/laion5b_s13b_b90k',
+             'dimensions': 512,
+             'note': 'clip model from open_clip implementation',
+             'type': 'open_clip',
+             'pretrained': 'laion5b_s13b_b90k'},
+
+         'open_clip/coca_ViT-B-32/laion2b_s13b_b90k':
+            {'name': 'open_clip/coca_ViT-B-32/laion2b_s13b_b90k',
+             'dimensions': 512,
+             'note': 'clip model from open_clip implementation',
+             'type': 'open_clip',
+             'pretrained': 'laion2B-s13B-b90k'},
+
+         'open_clip/coca_ViT-L-14/laion2b_s13b_b90k':
+            {'name': 'open_clip/coca_ViT-L-14/laion2b_s13b_b90k',
+             'dimensions': 768,
+             'note': 'clip model from open_clip implementation',
+             'type': 'open_clip',
+             'pretrained': 'laion2B-s13B-b90k'}
+             
+             
+             }
 
     return OPEN_CLIP_MODEL_PROPERTIES
 

@@ -7,6 +7,9 @@ class S2InferenceError(Exception):
             self.message = message
             super().__init__(self.message)
 
+class TruncatedImageError(S2InferenceError):
+    pass
+
 
 class ChunkerError(S2InferenceError):
     pass
