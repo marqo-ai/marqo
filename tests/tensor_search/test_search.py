@@ -900,6 +900,38 @@ class TestVectorSearch(MarqoTestCase):
                 raise AssertionError
             except InvalidArgError:
                 pass
+    
+    def test_image_search_highlights(self):
+        """does the URL get returned as the highlight? (it should - because no rerankers are being used)"""
+        settings = {
+            "index_defaults": {
+                "treat_urls_and_pointers_as_images": True,
+                "model": "ViT-B/32",
+            }}
+        tensor_search.create_vector_index(
+            index_name=self.index_name_1, index_settings=settings, config=self.config
+        )
+        url_1 = "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png"
+        url_2 = "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png"
+        docs = [
+            {"_id": "123",
+             "image_field": url_1,
+             "text_field": "some words here"
+             },
+            {"_id": "789",
+             "image_field": url_2},
+        ]
+        tensor_search.add_documents(
+            config=self.config, auto_refresh=True, index_name=self.index_name_1, docs=docs
+        )
+        res = tensor_search.search(
+            config=self.config, index_name=self.index_name_1, text="some text", result_count=3,
+            searchable_attributes=['image_field']
+        )
+        assert len(res['hits']) == 2
+        assert {hit['image_field'] for hit in res['hits']} == {url_2, url_1}
+        # print([hit['_highlights']['image_field'] for hit in res['hits']])
+        assert {hit['_highlights']['image_field'] for hit in res['hits']} == {url_2, url_1}
 
     def test_multi_search(self):
         docs = [
@@ -1060,3 +1092,43 @@ class TestVectorSearch(MarqoTestCase):
                 raise AssertionError
             except InvalidArgError as e:
                 pass
+
+    def test_image_search(self):
+        """This test is to ensure image search works as expected
+        The code paths for image and search have diverged quite a bit
+        """
+        hippo_image = (
+            'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
+        )
+        doc_dict = {
+            'realistic_hippo': {"loc": hippo_image,
+             "_id": 'realistic_hippo'},
+            'artefact_hippo': {"field_a": "Some text about a weird forest",
+             "_id": 'artefact_hippo'}
+        }
+        docs = list(doc_dict.values())
+        image_index_config = {
+            IndexSettingsField.index_defaults: {
+                IndexSettingsField.model: "ViT-B/16",
+                IndexSettingsField.treat_urls_and_pointers_as_images: True
+            }
+        }
+        tensor_search.create_vector_index(
+            config=self.config, index_name=self.index_name_1, index_settings=image_index_config)
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1,
+            docs=docs, auto_refresh=True
+        )
+        res = tensor_search.search(
+            text=hippo_image,
+            index_name=self.index_name_1,
+            result_count=5,
+            config=self.config,
+            search_method=SearchMethod.TENSOR)
+        assert len(res['hits']) == 2
+        for hit in res['hits']:
+            original_doc = doc_dict[hit['_id']]
+            assert len(hit['_highlights']) == 1
+            highlight_field = list(hit['_highlights'].keys())[0]
+            assert highlight_field in original_doc
+            assert hit[highlight_field] == original_doc[highlight_field]

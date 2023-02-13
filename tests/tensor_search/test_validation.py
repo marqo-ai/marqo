@@ -241,4 +241,46 @@ class TestValidation(unittest.TestCase):
             except InvalidIndexNameError:
                 pass
 
+    def test_boost_validation_illegal(self):
+        bad_boosts = [
+            set(), (), {'': [1.2]},
+            {'fine': [1.2], "ok": [1.2, -3], 'bad': [3, 1, -4]},
+            {'fine': [1.2], "ok": [1.2, -3], 'bad': []},
+            {'fine': [1.2], "ok": [1.2, -3], 'bad': ['1iu']},
+            {'bad': ['str']}, {'bad': []}, {'bad': [1, 4, 5]},
+        ]
+        for search_method in ('TENSOR', 'LEXICAL', 'OTHER'):
+            for bad_boost in bad_boosts:
+                try:
+                    validation.validate_boost(boost=bad_boost, search_method=search_method)
+                    raise AssertionError
+                except (InvalidArgError, InvalidFieldNameError) as e:
+                    pass
+
+    def test_boost_validation_good_boost_bad_method(self):
+        good_boosts = [
+            {}, {'fine': [1.2], "ok": [1.2, -3]}, {'fine': [1.2]}, {'fine': [1.2, -1]},
+            {'fine': [0, 0]}, {'fine': [0]}, {'fine': [-1.3]}
+        ]
+        for search_method in ('', 'LEXICAL', 'OTHER'):
+            for good_boost in good_boosts:
+                try:
+
+                    validation.validate_boost(boost=good_boost, search_method=search_method)
+                    raise AssertionError
+                except (InvalidArgError, InvalidFieldNameError) as e:
+                    pass
+
+    def test_boost_validation_good_boosts(self):
+        good_boosts = [
+            {}, {'fine': [1.2], "ok": [1.2, -3]}, None, {'fine': [1.2]}, {'fine': [1.2, -1]},
+        ]
+        for good_boost in good_boosts:
+            assert good_boost == validation.validate_boost(boost=good_boost, search_method='TENSOR')
+
+    def test_boost_validation_None_ok(self):
+        for search_method in ('', 'LEXICAL', 'OTHER', 'TENSOR'):
+            assert None is validation.validate_boost(boost=None, search_method=search_method)
+
+
 

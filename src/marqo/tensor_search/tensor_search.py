@@ -45,7 +45,7 @@ from marqo.tensor_search.enums import (
     EnvVars
 )
 from marqo.tensor_search.enums import IndexSettingsField as NsField
-from marqo.tensor_search import utils, backend, validation, configs, parallel
+from marqo.tensor_search import utils, backend, validation, configs, parallel, add_docs
 from marqo.tensor_search.formatting import _clean_doc
 from marqo.tensor_search.index_meta_cache import get_cache, get_index_info
 from marqo.tensor_search import index_meta_cache
@@ -341,7 +341,8 @@ def _infer_opensearch_data_type(
 
 
 def add_documents(config: Config, index_name: str, docs: List[dict], auto_refresh: bool,
-                  non_tensor_fields=None, device=None, update_mode: str = "replace"):
+                  non_tensor_fields=None, device=None, update_mode: str = "replace",
+                  image_download_thread_count: int = 20):
     """
 
     Args:
@@ -353,7 +354,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
           make tensors for all fields.
         device: Device used to carry out the document update.
         update_mode: {'replace' | 'update'}. If set to replace (default) just
-
+        image_download_thread_count: number of threads used to concurrently download images
     Returns:
 
     """
@@ -388,6 +389,12 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
     unsuccessful_docs = []
     total_vectorise_time = 0
     batch_size = len(docs)
+
+    if index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]:
+        ti_0 = timer()
+        image_repo = add_docs.download_images(docs=docs, thread_count=20, non_tensor_fields=tuple(non_tensor_fields))
+        logger.info(f"          add_documents image download: took {(timer() - ti_0):.3f}s to concurrently download "
+                    f"images for {batch_size} docs using {image_download_thread_count} threads ")
 
     for i, doc in enumerate(docs):
 
@@ -454,7 +461,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                 # 6. if chunking -> then add the extra chunker
 
                 if isinstance(field_content, str) and not _is_image(field_content):
-
+                    # text processing pipeline:
                     split_by = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][
                         NsField.split_method]
                     split_length = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][
@@ -471,14 +478,31 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                     try:
                         # in the future, if we have different chunking methods, make sure we catch possible
                         # errors of different types generated here, too.
-                        content_chunks, text_chunks = image_processor.chunk_image(
-                            field_content, device=selected_device, method=image_method)
-                    except s2_inference_errors.S2InferenceError:
+                        if isinstance(field_content, str) and index_info.index_settings[NsField.index_defaults][
+                                NsField.treat_urls_and_pointers_as_images]:
+                            if not isinstance(image_repo[field_content], Exception):
+                                image_data = image_repo[field_content]
+                            else:
+                                raise s2_inference_errors.S2InferenceError(
+                                    f"Could not find image found at `{field_content}`. \n"
+                                    f"Reason: {str(image_repo[field_content])}"
+                                )
+                        else:
+                            image_data = field_content
+                        if image_method not in [None, 'none', '', "None", ' ']:
+                            content_chunks, text_chunks = image_processor.chunk_image(
+                                image_data, device=selected_device, method=image_method)
+                        else:
+                            # if we are not chunking, then we set the chunks as 1-len lists
+                            # content_chunk is the PIL image
+                            # text_chunk refers to URL
+                            content_chunks, text_chunks = [image_data], [field_content]
+                    except s2_inference_errors.S2InferenceError as e:
                         document_is_valid = False
-                        image_err = errors.InvalidArgError(message=f'Could not process given image: {field_content}')
                         unsuccessful_docs.append(
-                            (i, {'_id': doc_id, 'error': image_err.message, 'status': int(image_err.status_code),
-                                 'code': image_err.code})
+                            (i, {'_id': doc_id, 'error': e.message,
+                                 'status': int(errors.InvalidArgError.status_code),
+                                 'code': errors.InvalidArgError.code})
                         )
                         break
 
@@ -493,7 +517,9 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
                     # ADD DOCS TIMER-LOGGER (4)
                     start_time = timer()
-                    vector_chunks = s2_inference.vectorise(model_name=index_info.model_name, model_properties=_get_model_properties(index_info), content=content_chunks,
+                    vector_chunks = s2_inference.vectorise(
+                        model_name=index_info.model_name,
+                        model_properties=_get_model_properties(index_info), content=content_chunks,
                         device=selected_device, normalize_embeddings=normalize_embeddings,
                         infer=infer_if_image)
 
@@ -772,7 +798,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
            searchable_attributes: Iterable[str] = None, verbose: int = 0, num_highlights: int = 3,
            reranker: Union[str, Dict] = None, simplified_format: bool = True, filter: str = None,
            attributes_to_retrieve: Optional[List[str]] = None,
-           device=None) -> Dict:
+           device=None, boost: Optional[Dict] = None) -> Dict:
     """The root search method. Calls the specific search method
 
     Validation should go here. Validations include:
@@ -793,6 +819,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
         searchable_attributes:
         verbose:
         num_highlights: number of highlights to return for each doc
+        boost: boosters to re-weight the scores of individual fields
 
     Returns:
 
@@ -816,10 +843,9 @@ def search(config: Config, index_name: str, text: Union[str, dict],
 
         raise errors.IllegalRequestedDocCount(f"{upper_bound_explanation} Marqo received search result limit of `{result_count}` "
                                             f"and offset of `{offset}`.")
-    
 
     t0 = timer()
-
+    validation.validate_boost(boost=boost, search_method=search_method)
     if searchable_attributes is not None:
         [validation.validate_field_name(attribute) for attribute in searchable_attributes]
     if attributes_to_retrieve is not None:
@@ -843,7 +869,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
             config=config, index_name=index_name, query=text, result_count=result_count, offset=offset,
             return_doc_ids=return_doc_ids, searchable_attributes=searchable_attributes, verbose=verbose,
             number_of_highlights=num_highlights, simplified_format=simplified_format,
-            filter_string=filter, device=device, attributes_to_retrieve=attributes_to_retrieve
+            filter_string=filter, device=device, attributes_to_retrieve=attributes_to_retrieve, boost=boost
         )
     elif search_method.upper() == SearchMethod.LEXICAL:
         search_result = _lexical_search(
@@ -928,11 +954,11 @@ def _lexical_search(
     
     # Validation for offset (pagination is single field)
     if len(fields_to_search) != 1 and offset > 0:
-        raise errors.InvalidArgError(f"Pagination (offset > 0) is only supported for single field searches! Your search currently has {len(fields_to_search)} fields: {fields_to_search}")              
-    
+        raise errors.InvalidArgError(f"Pagination (offset > 0) is only supported for single field searches! Your search currently has {len(fields_to_search)} fields: {fields_to_search}")
+
     # Parse text into required and optional terms.
     (required_terms, optional_blob) = utils.parse_lexical_query(text)
-    
+
     body = {
         "query": {
             "bool": {
@@ -951,7 +977,7 @@ def _lexical_search(
                                 for field in fields_to_search
                             ]
                         }
-                    } 
+                    }
                     for term in required_terms
                 ],
                 "must_not": [
@@ -1010,7 +1036,7 @@ def _vector_text_search(
         return_doc_ids=False, searchable_attributes: Iterable[str] = None, number_of_highlights=3,
         verbose=0, raise_on_searchable_attribs=False, hide_vectors=True, k=500,
         simplified_format=True, filter_string: str = None, device=None,
-        attributes_to_retrieve: Optional[List[str]] = None):
+        attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None):
     """
     Args:
         config:
@@ -1149,6 +1175,9 @@ def _vector_text_search(
                     },
                     "score_mode": "max"
                 }
+            },
+            "_source": {
+                "exclude": ["__chunks.__vector_*"]
             }
         }
 
@@ -1249,8 +1278,35 @@ def _vector_text_search(
         if not gathered_docs[doc_id]["chunks"]:
             del gathered_docs[doc_id]
 
-    # SORT THE DOCS HERE
+    def boost_score(docs: dict, boosters: dict) -> dict:
+        """ re-weighs the scores of individual fields
+        Args:
+            docs:
+            boosters: {'field_to_be_boosted': (int, int)}
+        """
+        to_be_boosted = docs.copy()
+        boosted_fields = set()
+        if searchable_attributes and boosters:
+            if not set(boosters).issubset(set(searchable_attributes)):
+                raise errors.InvalidArgError(
+                    "Boost fieldnames must be a subset of searchable attributes. "
+                    f"\nSearchable attributes: {searchable_attributes}"
+                    f"\nBoost: {boosters}"
+                )
 
+        for doc_id in list(to_be_boosted.keys()):
+            for chunk in to_be_boosted[doc_id]["chunks"]:
+                field_name = chunk['_source']['__field_name']
+                if field_name in boosters.keys():
+                    booster = boosters[field_name]
+                    if len(booster) == 2:
+                        chunk['_score'] = chunk['_score'] * booster[0] + booster[1]
+                    else:
+                        chunk['_score'] = chunk['_score'] * booster[0]
+                    boosted_fields.add(field_name)
+        return to_be_boosted
+
+    # SORT THE DOCS HERE
     def sort_chunks(docs: dict) -> dict:
         to_be_sorted = docs.copy()
         for doc_id in list(to_be_sorted.keys()):
@@ -1258,7 +1314,11 @@ def _vector_text_search(
                 to_be_sorted[doc_id]["chunks"], key=lambda x: x["_score"], reverse=True)
         return to_be_sorted
 
-    docs_chunks_sorted = sort_chunks(gathered_docs)
+    if boost is not None:
+        docs_chunk_boosted = boost_score(gathered_docs, boost)
+        docs_chunks_sorted = sort_chunks(docs_chunk_boosted)
+    else:
+        docs_chunks_sorted = sort_chunks(gathered_docs)
 
     def sort_docs(docs: dict) -> List[dict]:
         as_list = list(docs.values())
@@ -1320,6 +1380,7 @@ def _vector_text_search(
     total_postprocess_time = end_postprocess_time - start_postprocess_time
     logger.info(f"search (tensor) post-processing: took {(total_postprocess_time):.3f}s to sort and format {len(completely_sorted)} results from Marqo-os.")
     return res
+
 
 def check_health(config: Config):
     TIMEOUT = 3

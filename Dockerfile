@@ -23,6 +23,11 @@ RUN pip3 install --no-cache-dir -r requirements.txt
 COPY scripts scripts
 RUN bash scripts/install_onnx_gpu_for_amd.sh
 RUN bash scripts/install_torch_amd.sh
+# redis installation for throttling
+RUN bash scripts/install_redis.sh
+# redis config lines
+RUN echo "echo never > /sys/kernel/mm/transparent_hugepage/enabled" >> /etc/rc.local
+RUN echo "save ''" | tee -a /etc/redis/redis.conf
 COPY dind_setup dind_setup
 RUN bash dind_setup/setup_dind.sh
 COPY . /app

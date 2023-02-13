@@ -8,7 +8,8 @@ from marqo import config
 from marqo.tensor_search.web import api_utils
 from marqo._httprequests import HttpRequests
 from marqo import errors
-
+from marqo.tensor_search.throttling.redis_throttle import throttle
+from marqo.connections import redis_driver
 
 def on_start(marqo_os_url: str):
         
@@ -17,6 +18,7 @@ def on_start(marqo_os_url: str):
                         DownloadStartText(),
                         CUDAAvailable(), 
                         ModelsForCacheing(), 
+                        InitializeRedis("localhost", 6379),    # TODO, have these variable
                         NLTK(), 
                         DownloadFinishText(),
                         MarqoWelcome(),
@@ -165,6 +167,18 @@ class ModelsForCacheing:
         for message in messages:
             self.logger.info(message)
         self.logger.info("completed loading models")
+
+
+class InitializeRedis:
+
+    def __init__(self, host: str, port: int):
+        self.host = host
+        self.port = port
+
+    def run(self):
+        # Can be turned off with MARQO_ENABLE_THROTTLING = 'FALSE'
+        if utils.read_env_vars_and_defaults(EnvVars.MARQO_ENABLE_THROTTLING) == "TRUE":
+            redis_driver.init_from_app(self.host, self.port)
 
 
 class DownloadStartText:

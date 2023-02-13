@@ -14,6 +14,8 @@ from marqo.tensor_search import utils
 from marqo.tensor_search.on_start_script import on_start
 from marqo import version
 from marqo.tensor_search.backend import get_index_info
+from marqo.tensor_search.enums import RequestType
+from marqo.tensor_search.throttling.redis_throttle import throttle
 
 def replace_host_localhosts(OPENSEARCH_IS_INTERNAL: str, OS_URL: str):
     """Replaces a host's localhost URL with one that can be referenced from
@@ -37,7 +39,6 @@ def replace_host_localhosts(OPENSEARCH_IS_INTERNAL: str, OS_URL: str):
             if replaced_str != OS_URL:
                 return replaced_str
     return OS_URL
-
 
 OPENSEARCH_URL = replace_host_localhosts(
     os.environ.get("OPENSEARCH_IS_INTERNAL", None),
@@ -109,6 +110,7 @@ def create_index(index_name: str, settings: Dict = None, marqo_config: config.Co
 
 
 @app.post("/indexes/{index_name}/search")
+@throttle(RequestType.SEARCH)
 def search(search_query: SearchQuery, index_name: str, device: str = Depends(api_validation.validate_device),
                  marqo_config: config.Config = Depends(generate_config)):
     return tensor_search.search(
@@ -119,11 +121,12 @@ def search(search_query: SearchQuery, index_name: str, device: str = Depends(api
         result_count=search_query.limit, offset=search_query.offset,
         reranker=search_query.reRanker, 
         filter=search_query.filter, device=device,
-        attributes_to_retrieve=search_query.attributesToRetrieve
+        attributes_to_retrieve=search_query.attributesToRetrieve, boost=search_query.boost
     )
 
 
 @app.post("/indexes/{index_name}/documents")
+@throttle(RequestType.INDEX)
 def add_or_replace_documents(docs: List[Dict], index_name: str, refresh: bool = True,
                         marqo_config: config.Config = Depends(generate_config),
                         batch_size: int = 0, processes: int = 1,
@@ -140,6 +143,7 @@ def add_or_replace_documents(docs: List[Dict], index_name: str, refresh: bool = 
 
 
 @app.put("/indexes/{index_name}/documents")
+@throttle(RequestType.INDEX)
 def add_or_update_documents(docs: List[Dict], index_name: str, refresh: bool = True,
                         marqo_config: config.Config = Depends(generate_config),
                         batch_size: int = 0, processes: int = 1,
@@ -239,7 +243,6 @@ def get_cpu_info():
 @app.get("/device/cuda")
 def get_cuda_info():
     return tensor_search.get_cuda_info()
-
 
 
 # try these curl commands:
