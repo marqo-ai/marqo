@@ -10,6 +10,7 @@ from marqo._httprequests import HttpRequests
 from marqo import errors
 from marqo.tensor_search.throttling.redis_throttle import throttle
 from marqo.connections import redis_driver
+from marqo.s2_inference.s2_inference import available_models
 
 def on_start(marqo_os_url: str):
         
@@ -167,6 +168,8 @@ class ModelsForCacheing:
         for message in messages:
             self.logger.info(message)
         self.logger.info("completed loading models")
+        self.logger.info(f"{available_models}")
+
 
 
 class InitializeRedis:
