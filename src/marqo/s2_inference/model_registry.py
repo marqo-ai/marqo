@@ -67,271 +67,307 @@ def _get_clip_properties() -> Dict:
 
         }
     return CLIP_MODEL_PROPERTIES
+
+
 def _get_open_clip_properties() -> Dict:
-
-    #use this link to find all the model_configs
-    #https://github.com/mlfoundations/open_clip/tree/main/src/open_clip/model_configs
-
+    # use this link to find all the model_configs
+    # https://github.com/mlfoundations/open_clip/tree/main/src/open_clip/model_configs
     OPEN_CLIP_MODEL_PROPERTIES = {
         'open_clip/RN50/openai':
-           {'name': 'open_clip/RN50/openai',
-            'dimensions': 1024,
-            'note': 'clip model from open_clip implementation',
-            'type': 'open_clip',
-            'pretrained': 'openai'},
-
+            {'name': 'open_clip/RN50/openai',
+             'dimensions': 1024,
+             'note': 'open_clip models',
+             'type': 'open_clip',
+             'pretrained': 'openai'},
         'open_clip/RN50/yfcc15m':
             {'name': 'open_clip/RN50/yfcc15m',
-             'dimensions': 1024, 'note': 'clip model from open_clip implementation',
-             'type': 'open_clip', 'pretrained': 'yfcc15m'},
-
+             'dimensions': 1024,
+             'note': 'open_clip models',
+             'type': 'open_clip',
+             'pretrained': 'yfcc15m'},
         'open_clip/RN50/cc12m':
             {'name': 'open_clip/RN50/cc12m',
              'dimensions': 1024,
-             'note': 'clip model from open_clip implementation',
-             'type': 'open_clip', 'pretrained': 'cc12m'},
-
+             'note': 'open_clip models',
+             'type': 'open_clip',
+             'pretrained': 'cc12m'},
         'open_clip/RN50-quickgelu/openai':
             {'name': 'open_clip/RN50-quickgelu/openai',
              'dimensions': 1024,
-             'note': 'clip model from open_clip implementation',
-             'type': 'open_clip', 'pretrained': 'openai'},
-
+             'note': 'open_clip models',
+             'type': 'open_clip',
+             'pretrained': 'openai'},
         'open_clip/RN50-quickgelu/yfcc15m':
             {'name': 'open_clip/RN50-quickgelu/yfcc15m',
              'dimensions': 1024,
-             'note': 'clip model from open_clip implementation',
-             'type': 'open_clip', 'pretrained': 'yfcc15m'},
-
+             'note': 'open_clip models',
+             'type': 'open_clip',
+             'pretrained': 'yfcc15m'},
         'open_clip/RN50-quickgelu/cc12m':
             {'name': 'open_clip/RN50-quickgelu/cc12m',
              'dimensions': 1024,
-             'note': 'clip model from open_clip implementation',
-             'type': 'open_clip', 'pretrained': 'cc12m'},
-
+             'note': 'open_clip models',
+             'type': 'open_clip',
+             'pretrained': 'cc12m'},
         'open_clip/RN101/openai':
             {'name': 'open_clip/RN101/openai',
              'dimensions': 512,
-             'note': 'clip model from open_clip implementation',
-             'type': 'open_clip', 'pretrained': 'openai'},
-
+             'note': 'open_clip models',
+             'type': 'open_clip',
+             'pretrained': 'openai'},
         'open_clip/RN101/yfcc15m':
             {'name': 'open_clip/RN101/yfcc15m',
              'dimensions': 512,
-             'note': 'clip model from open_clip implementation',
+             'note': 'open_clip models',
              'type': 'open_clip',
              'pretrained': 'yfcc15m'},
-
         'open_clip/RN101-quickgelu/openai':
             {'name': 'open_clip/RN101-quickgelu/openai',
              'dimensions': 512,
-             'note': 'clip model from open_clip implementation',
+             'note': 'open_clip models',
              'type': 'open_clip',
              'pretrained': 'openai'},
-
         'open_clip/RN101-quickgelu/yfcc15m':
             {'name': 'open_clip/RN101-quickgelu/yfcc15m',
              'dimensions': 512,
-             'note': 'clip model from open_clip implementation',
+             'note': 'open_clip models',
              'type': 'open_clip',
              'pretrained': 'yfcc15m'},
-
         'open_clip/RN50x4/openai':
             {'name': 'open_clip/RN50x4/openai',
              'dimensions': 640,
-             'note': 'clip model from open_clip implementation',
+             'note': 'open_clip models',
              'type': 'open_clip',
              'pretrained': 'openai'},
-
         'open_clip/RN50x16/openai':
             {'name': 'open_clip/RN50x16/openai',
              'dimensions': 768,
-             'note': 'clip model from open_clip implementation',
+             'note': 'open_clip models',
              'type': 'open_clip',
              'pretrained': 'openai'},
-
         'open_clip/RN50x64/openai':
             {'name': 'open_clip/RN50x64/openai',
              'dimensions': 1024,
-             'note': 'clip model from open_clip implementation',
-             'type': 'open_clip', 'pretrained': 'openai'},
-
+             'note': 'open_clip models',
+             'type': 'open_clip',
+             'pretrained': 'openai'},
         'open_clip/ViT-B-32/openai':
             {'name': 'open_clip/ViT-B-32/openai',
              'dimensions': 512,
-             'note': 'clip model from open_clip implementation',
+             'note': 'open_clip models',
              'type': 'open_clip',
              'pretrained': 'openai'},
-
         'open_clip/ViT-B-32/laion400m_e31':
             {'name': 'open_clip/ViT-B-32/laion400m_e31',
              'dimensions': 512,
-             'note': 'clip model from open_clip implementation',
-             'type': 'open_clip', 'pretrained': 'laion400m_e31'},
-
+             'note': 'open_clip models',
+             'type': 'open_clip',
+             'pretrained': 'laion400m_e31'},
         'open_clip/ViT-B-32/laion400m_e32':
             {'name': 'open_clip/ViT-B-32/laion400m_e32',
              'dimensions': 512,
-             'note': 'clip model from open_clip implementation',
-             'type': 'open_clip', 'pretrained': 'laion400m_e32'},
-
+             'note': 'open_clip models',
+             'type': 'open_clip',
+             'pretrained': 'laion400m_e32'},
         'open_clip/ViT-B-32/laion2b_e16':
             {'name': 'open_clip/ViT-B-32/laion2b_e16',
              'dimensions': 512,
-             'note': 'clip model from open_clip implementation',
+             'note': 'open_clip models',
              'type': 'open_clip',
              'pretrained': 'laion2b_e16'},
-
         'open_clip/ViT-B-32/laion2b_s34b_b79k':
             {'name': 'open_clip/ViT-B-32/laion2b_s34b_b79k',
              'dimensions': 512,
-             'note': 'clip model from open_clip implementation',
+             'note': 'open_clip models',
              'type': 'open_clip',
              'pretrained': 'laion2b_s34b_b79k'},
-
         'open_clip/ViT-B-32-quickgelu/openai':
             {'name': 'open_clip/ViT-B-32-quickgelu/openai',
              'dimensions': 512,
-             'note': 'clip model from open_clip implementation',
+             'note': 'open_clip models',
              'type': 'open_clip',
              'pretrained': 'openai'},
-
         'open_clip/ViT-B-32-quickgelu/laion400m_e31':
             {'name': 'open_clip/ViT-B-32-quickgelu/laion400m_e31',
              'dimensions': 512,
-             'note': 'clip model from open_clip implementation',
+             'note': 'open_clip models',
              'type': 'open_clip',
              'pretrained': 'laion400m_e31'},
-
         'open_clip/ViT-B-32-quickgelu/laion400m_e32':
             {'name': 'open_clip/ViT-B-32-quickgelu/laion400m_e32',
              'dimensions': 512,
-             'note': 'clip model from open_clip implementation',
-             'type': 'open_clip', 'pretrained': 'laion400m_e32'},
-
+             'note': 'open_clip models',
+             'type': 'open_clip',
+             'pretrained': 'laion400m_e32'},
         'open_clip/ViT-B-16/openai':
             {'name': 'open_clip/ViT-B-16/openai',
              'dimensions': 512,
-             'note': 'clip model from open_clip implementation',
-             'type': 'open_clip', 'pretrained': 'openai'},
-
+             'note': 'open_clip models',
+             'type': 'open_clip',
+             'pretrained': 'openai'},
         'open_clip/ViT-B-16/laion400m_e31':
             {'name': 'open_clip/ViT-B-16/laion400m_e31',
              'dimensions': 512,
-             'note': 'clip model from open_clip implementation',
-             'type': 'open_clip', 'pretrained': 'laion400m_e31'},
-
+             'note': 'open_clip models',
+             'type': 'open_clip',
+             'pretrained': 'laion400m_e31'},
         'open_clip/ViT-B-16/laion400m_e32':
             {'name': 'open_clip/ViT-B-16/laion400m_e32',
-             'dimensions': 512, 'note': 'clip model from open_clip implementation',
-             'type': 'open_clip', 'pretrained': 'laion400m_e32'},
-
+             'dimensions': 512,
+             'note': 'open_clip models',
+             'type': 'open_clip',
+             'pretrained': 'laion400m_e32'},
+        'open_clip/ViT-B-16/laion2b_s34b_b88k':
+            {'name': 'open_clip/ViT-B-16/laion2b_s34b_b88k',
+             'dimensions': 512,
+             'note': 'open_clip models',
+             'type': 'open_clip',
+             'pretrained': 'laion2b_s34b_b88k'},
         'open_clip/ViT-B-16-plus-240/laion400m_e31':
             {'name': 'open_clip/ViT-B-16-plus-240/laion400m_e31',
              'dimensions': 640,
-             'note': 'clip model from open_clip implementation',
-             'type': 'open_clip', 'pretrained': 'laion400m_e31'},
-
+             'note': 'open_clip models',
+             'type': 'open_clip',
+             'pretrained': 'laion400m_e31'},
         'open_clip/ViT-B-16-plus-240/laion400m_e32':
             {'name': 'open_clip/ViT-B-16-plus-240/laion400m_e32',
              'dimensions': 640,
-             'note': 'clip model from open_clip implementation',
-             'type': 'open_clip', 'pretrained': 'laion400m_e32'},
-
+             'note': 'open_clip models',
+             'type': 'open_clip',
+             'pretrained': 'laion400m_e32'},
         'open_clip/ViT-L-14/openai':
             {'name': 'open_clip/ViT-L-14/openai',
              'dimensions': 768,
-             'note': 'clip model from open_clip implementation',
+             'note': 'open_clip models',
              'type': 'open_clip',
              'pretrained': 'openai'},
-
         'open_clip/ViT-L-14/laion400m_e31':
             {'name': 'open_clip/ViT-L-14/laion400m_e31',
              'dimensions': 768,
-             'note': 'clip model from open_clip implementation',
-             'type': 'open_clip', 'pretrained': 'laion400m_e31'},
-
+             'note': 'open_clip models',
+             'type': 'open_clip',
+             'pretrained': 'laion400m_e31'},
         'open_clip/ViT-L-14/laion400m_e32':
             {'name': 'open_clip/ViT-L-14/laion400m_e32',
              'dimensions': 768,
-             'note': 'clip model from open_clip implementation',
+             'note': 'open_clip models',
              'type': 'open_clip',
              'pretrained': 'laion400m_e32'},
-
         'open_clip/ViT-L-14/laion2b_s32b_b82k':
             {'name': 'open_clip/ViT-L-14/laion2b_s32b_b82k',
              'dimensions': 768,
-             'note': 'clip model from open_clip implementation',
+             'note': 'open_clip models',
              'type': 'open_clip',
              'pretrained': 'laion2b_s32b_b82k'},
-
         'open_clip/ViT-L-14-336/openai':
             {'name': 'open_clip/ViT-L-14-336/openai',
              'dimensions': 768,
-             'note': 'clip model from open_clip implementation',
+             'note': 'open_clip models',
              'type': 'open_clip',
              'pretrained': 'openai'},
-
         'open_clip/ViT-H-14/laion2b_s32b_b79k':
             {'name': 'open_clip/ViT-H-14/laion2b_s32b_b79k',
              'dimensions': 1024,
-             'note': 'clip model from open_clip implementation',
+             'note': 'open_clip models',
              'type': 'open_clip',
              'pretrained': 'laion2b_s32b_b79k'},
-
         'open_clip/ViT-g-14/laion2b_s12b_b42k':
             {'name': 'open_clip/ViT-g-14/laion2b_s12b_b42k',
              'dimensions': 1024,
-             'note': 'clip model from open_clip implementation',
+             'note': 'open_clip models',
              'type': 'open_clip',
              'pretrained': 'laion2b_s12b_b42k'},
-
-        # TODO Uncomment this model in the next open_clip release
-        # There is a typo in the current release of open_clip.
-        # We will add this model once in the next open_clip release.
-        # 'open_clip/convnext_base/laion400m_s13b_b51k':
-        #     {'name': 'open_clip/convnext_base/laion400m_s13b_b51k',
-        #      'dimensions': 512,
-        #      'note': 'clip model from open_clip implementation',
-        #      'type': 'open_clip',
-        #      'pretrained': 'laion400m_s13b_b51k'},
-
-        'open_clip/convnext_base_w/laion2b_s13b_b82k': {
-            'name': 'open_clip/convnext_base_w/laion2b_s13b_b82k',
-            'dimensions': 640,
-            'note': 'clip model from open_clip implementation',
+        'open_clip/ViT-bigG-14/laion2b_s39b_b160k':
+            {'name': 'open_clip/ViT-bigG-14/laion2b_s39b_b160k',
+             'dimensions': 1280,
+             'note': 'open_clip models',
+             'type': 'open_clip',
+             'pretrained': 'laion2b_s39b_b160k'},
+        'open_clip/roberta-ViT-B-32/laion2b_s12b_b32k':
+            {'name': 'open_clip/roberta-ViT-B-32/laion2b_s12b_b32k',
+             'dimensions': 512,
+             'note': 'open_clip models',
+             'type': 'open_clip',
+             'pretrained': 'laion2b_s12b_b32k'},
+        'open_clip/xlm-roberta-base-ViT-B-32/laion5b_s13b_b90k':
+            {'name': 'open_clip/xlm-roberta-base-ViT-B-32/laion5b_s13b_b90k',
+             'dimensions': 512,
+             'note': 'open_clip models',
+             'type': 'open_clip',
+             'pretrained': 'laion5b_s13b_b90k'},
+        'open_clip/xlm-roberta-large-ViT-H-14/frozen_laion5b_s13b_b90k':
+            {'name': 'open_clip/xlm-roberta-large-ViT-H-14/frozen_laion5b_s13b_b90k',
+             'dimensions': 1024,
+             'note': 'open_clip models',
+             'type': 'open_clip',
+             'pretrained': 'frozen_laion5b_s13b_b90k'},
+        'open_clip/convnext_base/laion400m_s13b_b51k':
+            {'name': 'open_clip/convnext_base/laion400m_s13b_b51k',
+             'dimensions': 512,
+             'note': 'open_clip models',
+             'type': 'open_clip',
+             'pretrained': 'laion400m_s13b_b51k'},
+        'open_clip/convnext_base_w/laion2b_s13b_b82k':
+            {'name': 'open_clip/convnext_base_w/laion2b_s13b_b82k',
+             'dimensions': 640,
+             'note': 'open_clip models',
+             'type': 'open_clip',
+             'pretrained': 'laion2b_s13b_b82k'},
+        'open_clip/convnext_base_w/laion2b_s13b_b82k_augreg':
+            {'name': 'open_clip/convnext_base_w/laion2b_s13b_b82k_augreg',
+             'dimensions': 640,
+             'note': 'open_clip models',
+             'type': 'open_clip',
+             'pretrained': 'laion2b_s13b_b82k_augreg'},
+        'open_clip/convnext_base_w/laion_aesthetic_s13b_b82k':
+            {'name': 'open_clip/convnext_base_w/laion_aesthetic_s13b_b82k',
+             'dimensions': 640,
+             'note': 'open_clip models',
+             'type': 'open_clip',
+             'pretrained': 'laion_aesthetic_s13b_b82k'},
+        'open_clip/convnext_base_w_320/laion_aesthetic_s13b_b82k':
+            {'name': 'open_clip/convnext_base_w_320/laion_aesthetic_s13b_b82k',
+             'dimensions': 640,
+             'note': 'open_clip models',
+             'type': 'open_clip',
+             'pretrained': 'laion_aesthetic_s13b_b82k'},
+        'open_clip/convnext_base_w_320/laion_aesthetic_s13b_b82k_augreg':
+            {'name': 'open_clip/convnext_base_w_320/laion_aesthetic_s13b_b82k_augreg',
+             'dimensions': 640,
+             'note': 'open_clip models',
+             'type': 'open_clip',
+             'pretrained': 'laion_aesthetic_s13b_b82k_augreg'},
+        'open_clip/convnext_large_d/laion2b_s26b_b102k_augreg':
+            {'name': 'open_clip/convnext_large_d/laion2b_s26b_b102k_augreg',
+             'dimensions': 768,
+             'note': 'open_clip models',
+             'type': 'open_clip',
+             'pretrained': 'laion2b_s26b_b102k_augreg'},
+        'open_clip/coca_ViT-B-32/laion2b_s13b_b90k':
+            {'name': 'open_clip/coca_ViT-B-32/laion2b_s13b_b90k',
+             'dimensions': 512,
+             'note': 'open_clip models',
+             'type': 'open_clip',
+             'pretrained': 'laion2b_s13b_b90k'},
+        'open_clip/coca_ViT-B-32/mscoco_finetuned_laion2b_s13b_b90k': {
+            'name': 'open_clip/coca_ViT-B-32/mscoco_finetuned_laion2b_s13b_b90k',
+            'dimensions': 512,
+            'note': 'open_clip models',
             'type': 'open_clip',
-            'pretrained': 'laion2b_s13b_b82k'},
-
-        'open_clip/convnext_base_w/laion2b_s13b_b82k_augreg': {
-            'name': 'open_clip/convnext_base_w/laion2b_s13b_b82k_augreg',
-            'dimensions': 640,
-            'note': 'clip model from open_clip implementation',
-            'type': 'open_clip',
-            'pretrained': 'laion2b_s13b_b82k_augreg'},
-
-        'open_clip/convnext_base_w/laion_aesthetic_s13b_b82k': {
-            'name': 'open_clip/convnext_base_w/laion_aesthetic_s13b_b82k',
-            'dimensions': 640,
-            'note': 'clip model from open_clip implementation',
-            'type': 'open_clip',
-            'pretrained': 'laion_aesthetic_s13b_b82k'},
-
-        'open_clip/convnext_base_w_320/laion_aesthetic_s13b_b82k': {
-            'name': 'open_clip/convnext_base_w_320/laion_aesthetic_s13b_b82k',
-            'dimensions': 640,
-            'note': 'clip model from open_clip implementation',
-            'type': 'open_clip',
-            'pretrained': 'laion_aesthetic_s13b_b82k'},
-
-        'open_clip/convnext_base_w_320/laion_aesthetic_s13b_b82k_augreg': {
-            'name': 'open_clip/convnext_base_w_320/laion_aesthetic_s13b_b82k_augreg',
-            'dimensions': 640,
-            'note': 'clip model from open_clip implementation',
-            'type': 'open_clip',
-            'pretrained': 'laion_aesthetic_s13b_b82k_augreg'},
-}
-
+            'pretrained': 'mscoco_finetuned_laion2b_s13b_b90k'},
+        'open_clip/coca_ViT-L-14/laion2b_s13b_b90k':
+            {'name': 'open_clip/coca_ViT-L-14/laion2b_s13b_b90k',
+             'dimensions': 768,
+             'note': 'open_clip models',
+             'type': 'open_clip',
+             'pretrained': 'laion2b_s13b_b90k'},
+        'open_clip/coca_ViT-L-14/mscoco_finetuned_laion2b_s13b_b90k':
+            {'name': 'open_clip/coca_ViT-L-14/mscoco_finetuned_laion2b_s13b_b90k',
+             'dimensions': 768,
+             'note': 'open_clip models',
+             'type': 'open_clip',
+             'pretrained': 'mscoco_finetuned_laion2b_s13b_b90k'}
+    }
     return OPEN_CLIP_MODEL_PROPERTIES
 
 
@@ -584,6 +620,32 @@ def _get_onnx_clip_properties() -> Dict:
                 "textual_file": "onnx16-openai-ViT-L-14-textual.onnx",
                 "token": None,
                 "resolution" : 224,
+            },
+        "onnx32/open_clip/ViT-L-14/openai":
+            {
+                "name": "onnx32/open_clip/ViT-L-14/openai",
+                "dimensions": 768,
+                "type": "clip_onnx",
+                "note": "the onnx float32 version of open_clip ViT-L-14/openai",
+                "repo_id": "Marqo/onnx-open_clip-ViT-L-14",
+                "visual_file": "onnx32-open_clip-ViT-L-14-openai-visual.onnx",
+                "textual_file": "onnx32-open_clip-ViT-L-14-openai-textual.onnx",
+                "token": None,
+                "resolution": 224,
+                "pretrained": "openai"
+            },
+        "onnx16/open_clip/ViT-L-14/openai":
+            {
+                "name": "onnx16/open_clip/ViT-L-14/openai",
+                "dimensions": 768,
+                "type": "clip_onnx",
+                "note": "the onnx float16 version of open_clip ViT-L-14/openai",
+                "repo_id": "Marqo/onnx-open_clip-ViT-L-14",
+                "visual_file": "onnx16-open_clip-ViT-L-14-openai-visual.onnx",
+                "textual_file": "onnx16-open_clip-ViT-L-14-openai-textual.onnx",
+                "token": None,
+                "resolution": 224,
+                "pretrained": "openai"
             },
         "onnx32/open_clip/ViT-L-14/laion400m_e32":
             {
