@@ -1244,7 +1244,7 @@ class TestAddDocuments(MarqoTestCase):
 
     def test_image_download_timeout(self):
         mock_get = mock.MagicMock()
-        mock_get.return_value.raiseError.side_effect = requests.exceptions.RequestException()
+        mock_get.side_effect = requests.exceptions.RequestException
 
         @mock.patch('requests.get', mock_get)
         def run():
