@@ -14,6 +14,7 @@
 - Concurrent image downloads (https://github.com/marqo-ai/marqo/pull/281, https://github.com/marqo-ai/marqo/pull/311)
 - Blazingly fast `fp16` ViT CLIP models (https://github.com/marqo-ai/marqo/pull/286). 
 - Reduction of data transfer between Marqo and Marqo-os (https://github.com/marqo-ai/marqo/pull/300)
+- We see a 3.0x indexing speedup, and a 1.7x search speedup, using the new `fp16/ViT-L/14` CLIP model, compared to the previous release using `ViT-L/14`.  
 
 ## Bug fixes 
 - Fixed 500 error when creating an index while only specifying `number_of_shards`(https://github.com/marqo-ai/marqo/pull/293)
