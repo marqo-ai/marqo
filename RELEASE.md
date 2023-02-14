@@ -1,3 +1,30 @@
+# Release 0.0.13
+
+## New features
+- Support for custom CLIP models using the OpenAI and OpenCLIP architectures (https://github.com/marqo-ai/marqo/pull/286). Read about usage [here](https://docs.marqo.ai/0.0.13/Models-Reference/dense_retrieval/#generic-clip-models).
+- Concurrency throttling (https://github.com/marqo-ai/marqo/pull/304). Configure the number of allowed concurrent indexing and search threads. Read about usage [here](https://docs.marqo.ai/0.0.13/Advanced-Usage/configuration/#configuring-throttling).
+- Configurable logging levels (https://github.com/marqo-ai/marqo/pull/314). Adjust log output for your debugging/log storage needs. See how to configure log level [here](https://docs.marqo.ai/0.0.13/Advanced-Usage/configuration/#configuring-log-level).
+- New array datatype (https://github.com/marqo-ai/marqo/pull/312). You can use these arrays as a collection of tags to filter on! See usage [here](https://docs.marqo.ai/0.0.13/Advanced-Usage/document_fields/#array).
+- Boost tensor fields during search (https://github.com/marqo-ai/marqo/pull/300). Weight fields as higher and lower relative to each other during search. Use this to get a mix of results that suits your use case. See usage [here](https://docs.marqo.ai/0.0.13/API-Reference/search/#boost).
+- Weighted multimodal queries (https://github.com/marqo-ai/marqo/pull/307). You can now search with a dictionary of weighted queries. If searching an image index, these queries can be a weighted mix of image URLs and text. See usage [here](https://docs.marqo.ai/0.0.13/API-Reference/search/#query-q).
+- New GPT-Marqo integration [example](https://github.com/marqo-ai/marqo/tree/mainline/examples/GPT-examples) and [article](https://www.marqo.ai/blog/from-iron-manual-to-ironman-augmenting-gpt-with-marqo-for-fast-editable-memory-to-enable-context-aware-question-answering). Turn your boring user manual into a question-answering bot, with an optional persona, with GPT + Marqo!
+- Added new OpenCLIP models to Marqo (https://github.com/marqo-ai/marqo/pull/299)
+
+## Optimisations
+- Concurrent image downloads (https://github.com/marqo-ai/marqo/pull/281, https://github.com/marqo-ai/marqo/pull/311)
+- Blazingly fast `fp16` ViT CLIP models (https://github.com/marqo-ai/marqo/pull/286). See usage [here](https://docs.marqo.ai/0.0.13/Models-Reference/dense_retrieval/#openai-float16)
+- Reduction of data transfer between Marqo and Marqo-os (https://github.com/marqo-ai/marqo/pull/300)
+- We see a 3.0x indexing speedup, and a 1.7x search speedup, using the new `fp16/ViT-L/14` CLIP model, compared to the previous release using `ViT-L/14`.  
+
+## Bug fixes 
+- Fixed 500 error when creating an index while only specifying `number_of_shards`(https://github.com/marqo-ai/marqo/pull/293)
+- Fixed model cache management no parsing reranker model properties properly (https://github.com/marqo-ai/marqo/pull/308)  
+
+## Contributor shout-outs
+- Thank you to our 2.3k stargazers
+- Thank you to [@codebrain](https://github.com/codebrain) and others for raising issues.
+
+
 # Release 0.0.12
 
 ## New features
