@@ -393,7 +393,7 @@ class TestValidateIndexSettings(unittest.TestCase):
         except InvalidArgError:
             pass
 
-    def test_validate_index_settings_missing_index_settings(self):
+    def test_validate_index_settings_missing_index_defaults(self):
         settings = self.get_good_index_settings()
         # base good settings should be OK
         assert settings == validation.validate_settings_object(settings)
