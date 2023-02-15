@@ -94,9 +94,7 @@ class RequestType:
     CREATE = "CREATE"
 
 
-class ThrottleType:
-    thread_count = "thread_count"
-    data_size = "data_size"
+# Perhaps create a ThrottleType to differentiate thread_count and data_size throttling mechanisms
     
 
 
