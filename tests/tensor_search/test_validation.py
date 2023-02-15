@@ -414,3 +414,10 @@ class TestValidateIndexSettings(unittest.TestCase):
             raise AssertionError
         except InvalidArgError as e:
             pass
+
+    def test_validate_index_settings_img_preprocessing(self):
+        settings = self.get_good_index_settings()
+        # base good settings should be OK
+        assert settings == validation.validate_settings_object(settings)
+        settings['index_defaults']['image_preprocessing']["path_method"] = "frcnn"
+        assert settings == validation.validate_settings_object(settings)

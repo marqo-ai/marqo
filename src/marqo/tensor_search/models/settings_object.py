@@ -75,7 +75,7 @@ settings_schema = {
                     ],
                     "properties": {
                         "patch_method": {
-                            "type": "null",
+                            "type": ["null", "string"],
                             "examples": [
                                 None
                             ]
