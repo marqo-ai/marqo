@@ -1,61 +1,66 @@
+from marqo.tensor_search import enums as ns_enums
+from marqo.tensor_search.enums import IndexSettingsField as NsFields, EnvVars
 
 settings_schema = {
     "$schema": "https://json-schema.org/draft/2019-09/schema",
     "type": "object",
     "required": [
-        "index_defaults",
-        "number_of_shards"
+        NsFields.index_defaults,
+        NsFields.number_of_shards
     ],
     "properties": {
-        "index_defaults": {
+        NsFields.index_defaults: {
             "type": "object",
             "required": [
-                "treat_urls_and_pointers_as_images",
-                "model",
-                "normalize_embeddings",
-                "text_preprocessing",
-                "image_preprocessing"
+                NsFields.treat_urls_and_pointers_as_images,
+                NsFields.model,
+                NsFields.normalize_embeddings,
+                NsFields.text_preprocessing,
+                NsFields.image_preprocessing
             ],
             "properties": {
-                "treat_urls_and_pointers_as_images": {
+                NsFields.treat_urls_and_pointers_as_images: {
                     "type": "boolean",
                     "examples": [
                         False
                     ]
                 },
-                "model": {
+                NsFields.model: {
                     "type": "string",
                     "examples": [
                         "hf/all_datasets_v4_MiniLM-L6"
                     ]
                 },
-                "normalize_embeddings": {
+                NsFields.model_properties: {
+                    "type": "object",
+                },
+                NsFields.normalize_embeddings: {
                     "type": "boolean",
                     "examples": [
                         True
                     ]
                 },
-                "text_preprocessing": {
+                NsFields.text_preprocessing: {
                     "type": "object",
                     "required": [
-                        "split_length",
-                        "split_overlap",
-                        "split_method"
+                        NsFields.split_length,
+                        NsFields.split_overlap,
+                        NsFields.split_method
                     ],
                     "properties": {
-                        "split_length": {
+                        NsFields.split_length: {
                             "type": "integer",
                             "examples": [
                                 2
                             ]
                         },
-                        "split_overlap": {
+                        NsFields.split_overlap: {
                             "type": "integer",
                             "examples": [
                                 0
                             ]
                         },
-                        "split_method": {
+                        NsFields.split_method: {
                             "type": "string",
                             "examples": [
                                 "sentence"
@@ -63,18 +68,18 @@ settings_schema = {
                         }
                     },
                     "examples": [{
-                        "split_length": 2,
-                        "split_overlap": 0,
-                        "split_method": "sentence"
+                        NsFields.split_length: 2,
+                        NsFields.split_overlap: 0,
+                        NsFields.split_method: "sentence"
                     }]
                 },
-                "image_preprocessing": {
+                NsFields.image_preprocessing: {
                     "type": "object",
                     "required": [
-                        "patch_method"
+                        NsFields.patch_method
                     ],
                     "properties": {
-                        "patch_method": {
+                        NsFields.patch_method: {
                             "type": ["null", "string"],
                             "examples": [
                                 None
@@ -82,25 +87,25 @@ settings_schema = {
                         }
                     },
                     "examples": [{
-                        "patch_method": None
+                        NsFields.patch_method: None
                     }]
                 }
             },
             "examples": [{
-                "treat_urls_and_pointers_as_images": False,
-                "model": "hf/all_datasets_v4_MiniLM-L6",
-                "normalize_embeddings": True,
-                "text_preprocessing": {
-                    "split_length": 2,
-                    "split_overlap": 0,
-                    "split_method": "sentence"
+                NsFields.treat_urls_and_pointers_as_images: False,
+                NsFields.model: "hf/all_datasets_v4_MiniLM-L6",
+                NsFields.normalize_embeddings: True,
+                NsFields.text_preprocessing: {
+                    NsFields.split_length: 2,
+                    NsFields.split_overlap: 0,
+                    NsFields.split_method: "sentence"
                 },
-                "image_preprocessing": {
-                    "patch_method": None
+                NsFields.image_preprocessing: {
+                    NsFields.patch_method: None
                 }
             }]
         },
-        "number_of_shards": {
+        NsFields.number_of_shards: {
             "type": "integer",
             "minimum": 1,
             "examples": [
@@ -109,19 +114,19 @@ settings_schema = {
         }
     },
     "examples": [{
-        "index_defaults": {
-            "treat_urls_and_pointers_as_images": False,
-            "model": "hf/all_datasets_v4_MiniLM-L6",
-            "normalize_embeddings": True,
-            "text_preprocessing": {
-                "split_length": 2,
-                "split_overlap": 0,
-                "split_method": "sentence"
+        NsFields.index_defaults: {
+            NsFields.treat_urls_and_pointers_as_images: False,
+            NsFields.model: "hf/all_datasets_v4_MiniLM-L6",
+            NsFields.normalize_embeddings: True,
+            NsFields.text_preprocessing: {
+                NsFields.split_length: 2,
+                NsFields.split_overlap: 0,
+                NsFields.split_method: "sentence"
             },
-            "image_preprocessing": {
-                "patch_method": None
+            NsFields.image_preprocessing: {
+                NsFields.patch_method: None
             }
         },
-        "number_of_shards": 5
+        NsFields.number_of_shards: 5
     }]
 }
