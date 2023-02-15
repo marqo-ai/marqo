@@ -260,3 +260,45 @@ class TestCreateIndex(MarqoTestCase):
             raise AssertionError
         except errors.InvalidIndexNameError:
             pass
+
+    def test_index_validation_bad(self):
+        bad_settings = {
+            "index_defaults": {
+                "treat_urls_and_pointers_as_images": False,
+                "model": "hf/all_datasets_v4_MiniLM-L6",
+                "normalize_embeddings": True,
+                "text_preprocessing": {
+                    "split_length": "2",
+                    "split_overlap": "0",
+                    "split_method": "sentence"
+                },
+                "image_preprocessing": {
+                    "patch_method": None
+                }
+            },
+            "number_of_shards": 5
+        }
+        try:
+            tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings=bad_settings)
+            raise AssertionError
+        except errors.InvalidArgError as e:
+            pass
+
+    def test_index_validation_good(self):
+        bad_settings = {
+            "index_defaults": {
+                "treat_urls_and_pointers_as_images": False,
+                "model": "hf/all_datasets_v4_MiniLM-L6",
+                "normalize_embeddings": True,
+                "text_preprocessing": {
+                    "split_length": 2,
+                    "split_overlap": 0,
+                    "split_method": "sentence"
+                },
+                "image_preprocessing": {
+                    "patch_method": None
+                }
+            },
+            "number_of_shards": 5
+        }
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings=bad_settings)

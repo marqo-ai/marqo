@@ -3,6 +3,7 @@ requests==2.28.1
 fastapi==0.86.0
 uvicorn[standard]
 fastapi-utils==0.2.1
+jsonschema==4.17.1
 # testing:
 pytest
 tox
