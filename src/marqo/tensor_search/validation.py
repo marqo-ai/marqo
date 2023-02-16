@@ -101,6 +101,8 @@ def validate_field_content(field_content: typing.Any, is_non_tensor_field: bool)
     if type(field_content) in constants.ALLOWED_CUSTOMER_FIELD_TYPES:
         if isinstance(field_content, list):
             validate_list(field_content, is_non_tensor_field)
+        elif isinstance(field_content, dict):
+            validate_dict(field_content, is_non_tensor_field)
         return field_content
     else:
         raise InvalidArgError(
@@ -324,3 +326,37 @@ def validate_index_name(name: str) -> str:
             f"Index name `{name}` starts with a protected prefix. "
             f"Please chose a different name for your index.")
     return name
+
+
+def validate_dict(field_content: typing.Dict, is_non_tensor_field: bool):
+    '''
+
+    Args:
+        field_content: the field when it is a dict, especially used for multimodal tensor combination field
+        is_non_tensor_field: for multimodal tensor combination field, this should be True
+
+    Returns:
+        True or raise an error
+    '''
+    if is_non_tensor_field:
+        raise InvalidArgError(
+            f"Field content `{field_content}` \n  "
+            f"of type `{type(field_content).__name__}` is the content for a multimodal tensor combo."
+            f"It CAN NOT be a `non_tensor_field`. Remove this field from `non_tensor_field` or"
+            f"add them as normal fields to fix this problem."
+        )
+
+    for key, value in field_content.items():
+        if not (type(key) in constants.ALLOWED_MULTIMODAL_FIELD_TYPES) :
+            raise InvalidArgError(
+                f"Multimodal-combination field content `{key}` \n  "
+                f"of type `{type(key).__name__}` is not of valid content type (one of {constants.ALLOWED_MULTIMODAL_FIELD_TYPES})."
+            )
+        if not ("weight" in value and isinstance(value["weight"], (float,int))):
+            raise InvalidArgError(
+                f"Multimodal-combination field content `{key}` \n"
+                f"does not contain a valid `weight`. A `weight` must be provided with proper `int` or `float` value."
+        )
+
+    return True
+

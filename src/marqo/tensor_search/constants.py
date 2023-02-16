@@ -8,4 +8,5 @@ INDEX_NAME_PREFIXES_TO_IGNORE = {
 
 ILLEGAL_CUSTOMER_FIELD_NAME_CHARS = {'.', '/', '\n'}
 
-ALLOWED_CUSTOMER_FIELD_TYPES = [str, int, float, bool, list]
+ALLOWED_CUSTOMER_FIELD_TYPES = [str, int, float, bool, list, dict]
+ALLOWED_MULTIMODAL_FIELD_TYPES = [str]

@@ -347,7 +347,7 @@ def _infer_opensearch_data_type(
 
 def add_documents(config: Config, index_name: str, docs: List[dict], auto_refresh: bool,
                   non_tensor_fields=None, device=None, update_mode: str = "replace",
-                  image_download_thread_count: int = 20):
+                  image_download_thread_count: int = 20, multimodal_combination: Optional[Dict[str, Union[float,str]]]= None):
     """
 
     Args:
@@ -360,6 +360,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
         device: Device used to carry out the document update.
         update_mode: {'replace' | 'update'}. If set to replace (default) just
         image_download_thread_count: number of threads used to concurrently download images
+        multimodal_combination: a dictionary to enable the multimodal-tensor-combination for the test
     Returns:
 
     """
@@ -394,6 +395,10 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
     unsuccessful_docs = []
     total_vectorise_time = 0
     batch_size = len(docs)
+
+    if multimodal_combination is not None:
+        # A dictionary to help multimodal-combination
+        chunks_field_vector_mapping = {}
 
     if index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]:
         ti_0 = timer()
@@ -448,129 +453,270 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                 )
                 break
 
-            if field not in existing_fields:
-                new_fields_from_doc.add((field, _infer_opensearch_data_type(copied[field])))
+            if isinstance(field_content, dict):
 
-            # Don't process text/image fields when explicitly told not to.
-            if field in non_tensor_fields:
-                continue
+                if field not in existing_fields:
+                    new_fields_from_doc.add((field, _infer_opensearch_data_type(field_content.keys())))
 
-            # TODO put this into a function to determine routing
-            if isinstance(field_content, (str, Image.Image)):
+                # field_conent = {"tensor_field_one" : {"weight":0.5, "parameter": "test-paramater-1"},
+                #                 "tensor_field_two" : {"weight": 0.5, parameter": "test-parameter-2"}},
+                field_vector_weight = {}
+                for sub_content, sub_content_para in field_content.items():
 
-                # TODO: better/consistent handling of a no-op for processing (but still vectorize)
+                # TODO put this into a function to determine routing
+                    if isinstance(sub_content, (str, Image.Image)):
 
-                # 1. check if urls should be downloaded -> "treat_pointers_and_urls_as_images":True
-                # 2. check if it is a url or pointer
-                # 3. If yes in 1 and 2, download blindly (without type)
-                # 4. Determine media type of downloaded
-                # 5. load correct media type into memory -> PIL (images), videos (), audio (torchaudio)
-                # 6. if chunking -> then add the extra chunker
+                        # TODO: better/consistent handling of a no-op for processing (but still vectorize)
 
-                if isinstance(field_content, str) and not _is_image(field_content):
-                    # text processing pipeline:
-                    split_by = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][
-                        NsField.split_method]
-                    split_length = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][
-                        NsField.split_length]
-                    split_overlap = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][
-                        NsField.split_overlap]
-                    content_chunks = text_processor.split_text(field_content, split_by=split_by, split_length=split_length, split_overlap=split_overlap)
-                    text_chunks = content_chunks
-                else:
-                    # TODO put the logic for getting field parameters into a function and add per field options
-                    image_method = index_info.index_settings[NsField.index_defaults][NsField.image_preprocessing][
-                        NsField.patch_method]
-                    # the chunk_image contains the no-op logic as of now - method = None will be a no-op
-                    try:
-                        # in the future, if we have different chunking methods, make sure we catch possible
-                        # errors of different types generated here, too.
-                        if isinstance(field_content, str) and index_info.index_settings[NsField.index_defaults][
-                                NsField.treat_urls_and_pointers_as_images]:
-                            if not isinstance(image_repo[field_content], Exception):
-                                image_data = image_repo[field_content]
-                            else:
-                                raise s2_inference_errors.S2InferenceError(
-                                    f"Could not find image found at `{field_content}`. \n"
-                                    f"Reason: {str(image_repo[field_content])}"
+                        # 1. check if urls should be downloaded -> "treat_pointers_and_urls_as_images":True
+                        # 2. check if it is a url or pointer
+                        # 3. If yes in 1 and 2, download blindly (without type)
+                        # 4. Determine media type of downloaded
+                        # 5. load correct media type into memory -> PIL (images), videos (), audio (torchaudio)
+                        #                 # 6. if chunking -> then add the extra chunker
+
+                        if isinstance(sub_content, str) and not _is_image(sub_content):
+                            text_chunks = sub_content
+                        else:
+                            # TODO put the logic for getting field parameters into a function and add per field options
+                            try:
+                                # in the future, if we have different chunking methods, make sure we catch possible
+                                # errors of different types generated here, too.
+                                if isinstance(sub_content, str) and index_info.index_settings[NsField.index_defaults][
+                                    NsField.treat_urls_and_pointers_as_images]:
+                                    content_chunks, text_chunks = [sub_content], [sub_content]
+                            except s2_inference_errors.S2InferenceError as e:
+                                document_is_valid = False
+                                unsuccessful_docs.append(
+                                    (i, {'_id': doc_id, 'error': e.message,
+                                         'status': int(errors.InvalidArgError.status_code),
+                                         'code': errors.InvalidArgError.code})
                                 )
-                        else:
-                            image_data = field_content
-                        if image_method not in [None, 'none', '', "None", ' ']:
-                            content_chunks, text_chunks = image_processor.chunk_image(
-                                image_data, device=selected_device, method=image_method)
-                        else:
-                            # if we are not chunking, then we set the chunks as 1-len lists
-                            # content_chunk is the PIL image
-                            # text_chunk refers to URL
-                            content_chunks, text_chunks = [image_data], [field_content]
-                    except s2_inference_errors.S2InferenceError as e:
+                                break
+
+                        normalize_embeddings = index_info.index_settings[NsField.index_defaults][
+                            NsField.normalize_embeddings]
+                        infer_if_image = index_info.index_settings[NsField.index_defaults][
+                            NsField.treat_urls_and_pointers_as_images]
+
+                        try:
+                            # in the future, if we have different underlying vectorising methods, make sure we catch possible
+                            # errors of different types generated here, too.
+
+                            # ADD DOCS TIMER-LOGGER (4)
+                            start_time = timer()
+                            vector_chunks = s2_inference.vectorise(
+                                model_name=index_info.model_name,
+                                model_properties=_get_model_properties(index_info), content=content_chunks,
+                                device=selected_device, normalize_embeddings=normalize_embeddings,
+                                infer=infer_if_image)
+
+                            end_time = timer()
+                            single_vectorise_call = end_time - start_time
+                            total_vectorise_time += single_vectorise_call
+                            logger.debug(f"(4) TIME for single vectorise call: {(single_vectorise_call):.3f}s.")
+                        except (s2_inference_errors.UnknownModelError,
+                                s2_inference_errors.InvalidModelPropertiesError,
+                                s2_inference_errors.ModelLoadError) as model_error:
+                            raise errors.BadRequestError(
+                                message=f'Problem vectorising query. Reason: {str(model_error)}',
+                                link="https://marqo.pages.dev/latest/Models-Reference/dense_retrieval/"
+                            )
+                        except s2_inference_errors.S2InferenceError:
+                            document_is_valid = False
+                            image_err = errors.InvalidArgError(message=f'Could not process given image: {field_content}')
+                            unsuccessful_docs.append(
+                                (i, {'_id': doc_id, 'error': image_err.message, 'status': int(image_err.status_code),
+                                     'code': image_err.code})
+                            )
+                            break
+                        field_vector_weight[sub_content_para["weight"]] = vector_chunks
+
+                vector_chunk = (np.sum([np.array(vector) * weight for weight, vector in field_vector_weight.items()], axis = 0) / np.sum(list(field_vector_weight.keys()))).tolist()
+                chunk_values_for_filtering = {}
+                for key, value in copied.items():
+                    if not (isinstance(value, str) or isinstance(value, float)
+                            or isinstance(value, bool) or isinstance(value, int)
+                            or isinstance(value, list)):
+                        continue
+                    chunk_values_for_filtering[key] = value
+                chunk_values_for_filtering[field] = list(copied[field].keys())
+                chunks.append({
+                    utils.generate_vector_name(field): vector_chunk,
+                    TensorField.field_content: list(copied[field].keys()),
+                    TensorField.field_name: field,
+                    **chunk_values_for_filtering
+                })
+
+                copied_chunks = copy.deepcopy(chunks)
+                for dictionary in copied_chunks:
+                    for key, value in dictionary.items():
+                        if key.startswith("__vector"):
+                            dictionary[key] = "This is the very long vector for the field. [0,....0]"
+                pprint.pprint(copied_chunks, sort_dicts=False)
+            else:
+                if field not in existing_fields:
+                    new_fields_from_doc.add((field, _infer_opensearch_data_type(copied[field])))
+
+                # Don't process text/image fields when explicitly told not to.
+                if field in non_tensor_fields:
+                    continue
+
+                # TODO put this into a function to determine routing
+                if isinstance(field_content, (str, Image.Image)):
+
+                    # TODO: better/consistent handling of a no-op for processing (but still vectorize)
+
+                    # 1. check if urls should be downloaded -> "treat_pointers_and_urls_as_images":True
+                    # 2. check if it is a url or pointer
+                    # 3. If yes in 1 and 2, download blindly (without type)
+                    # 4. Determine media type of downloaded
+                    # 5. load correct media type into memory -> PIL (images), videos (), audio (torchaudio)
+                    #                 # 6. if chunking -> then add the extra chunker
+
+                    if isinstance(field_content, str) and not _is_image(field_content):
+                        # text processing pipeline:
+                        split_by = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][
+                            NsField.split_method]
+                        split_length = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][
+                            NsField.split_length]
+                        split_overlap = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][
+                            NsField.split_overlap]
+                        content_chunks = text_processor.split_text(field_content, split_by=split_by, split_length=split_length, split_overlap=split_overlap)
+                        text_chunks = content_chunks
+                    else:
+                        # TODO put the logic for getting field parameters into a function and add per field options
+                        image_method = index_info.index_settings[NsField.index_defaults][NsField.image_preprocessing][
+                            NsField.patch_method]
+                        # the chunk_image contains the no-op logic as of now - method = None will be a no-op
+                        try:
+                            # in the future, if we have different chunking methods, make sure we catch possible
+                            # errors of different types generated here, too.
+                            if isinstance(field_content, str) and index_info.index_settings[NsField.index_defaults][
+                                    NsField.treat_urls_and_pointers_as_images]:
+                                if not isinstance(image_repo[field_content], Exception):
+                                    image_data = image_repo[field_content]
+                                else:
+                                    raise s2_inference_errors.S2InferenceError(
+                                        f"Could not find image found at `{field_content}`. \n"
+                                        f"Reason: {str(image_repo[field_content])}"
+                                    )
+                            else:
+                                image_data = field_content
+                            if image_method not in [None, 'none', '', "None", ' ']:
+                                content_chunks, text_chunks = image_processor.chunk_image(
+                                    image_data, device=selected_device, method=image_method)
+                            else:
+                                # if we are not chunking, then we set the chunks as 1-len lists
+                                # content_chunk is the PIL image
+                                # text_chunk refers to URL
+                                content_chunks, text_chunks = [image_data], [field_content]
+                        except s2_inference_errors.S2InferenceError as e:
+                            document_is_valid = False
+                            unsuccessful_docs.append(
+                                (i, {'_id': doc_id, 'error': e.message,
+                                     'status': int(errors.InvalidArgError.status_code),
+                                     'code': errors.InvalidArgError.code})
+                            )
+                            break
+
+                    normalize_embeddings = index_info.index_settings[NsField.index_defaults][
+                        NsField.normalize_embeddings]
+                    infer_if_image = index_info.index_settings[NsField.index_defaults][
+                        NsField.treat_urls_and_pointers_as_images]
+
+                    try:
+                        # in the future, if we have different underlying vectorising methods, make sure we catch possible
+                        # errors of different types generated here, too.
+
+                        # ADD DOCS TIMER-LOGGER (4)
+                        start_time = timer()
+                        vector_chunks = s2_inference.vectorise(
+                            model_name=index_info.model_name,
+                            model_properties=_get_model_properties(index_info), content=content_chunks,
+                            device=selected_device, normalize_embeddings=normalize_embeddings,
+                            infer=infer_if_image)
+
+                        end_time = timer()
+                        single_vectorise_call = end_time - start_time
+                        total_vectorise_time += single_vectorise_call
+                        logger.debug(f"(4) TIME for single vectorise call: {(single_vectorise_call):.3f}s.")
+                    except (s2_inference_errors.UnknownModelError,
+                            s2_inference_errors.InvalidModelPropertiesError,
+                            s2_inference_errors.ModelLoadError) as model_error:
+                        raise errors.BadRequestError(
+                            message=f'Problem vectorising query. Reason: {str(model_error)}',
+                            link="https://marqo.pages.dev/latest/Models-Reference/dense_retrieval/"
+                        )
+                    except s2_inference_errors.S2InferenceError:
                         document_is_valid = False
+                        image_err = errors.InvalidArgError(message=f'Could not process given image: {field_content}')
                         unsuccessful_docs.append(
-                            (i, {'_id': doc_id, 'error': e.message,
-                                 'status': int(errors.InvalidArgError.status_code),
-                                 'code': errors.InvalidArgError.code})
+                            (i, {'_id': doc_id, 'error': image_err.message, 'status': int(image_err.status_code),
+                                 'code': image_err.code})
                         )
                         break
 
-                normalize_embeddings = index_info.index_settings[NsField.index_defaults][
-                    NsField.normalize_embeddings]
-                infer_if_image = index_info.index_settings[NsField.index_defaults][
-                    NsField.treat_urls_and_pointers_as_images]
+                    if (len(vector_chunks) != len(text_chunks)):
+                        raise RuntimeError(
+                            f"the input content after preprocessing and its vectorized counterparts must be the same length."
+                            f"recevied text_chunks={len(text_chunks)} and vector_chunks={len(vector_chunks)}. "
+                            f"check the preprocessing functions and try again. ")
 
-                try:
-                    # in the future, if we have different underlying vectorising methods, make sure we catch possible
-                    # errors of different types generated here, too.
+                    for text_chunk, vector_chunk in zip(text_chunks, vector_chunks):
+                        # only add chunk values which are string, boolean or numeric
+                        chunk_values_for_filtering = {}
+                        for key, value in copied.items():
+                            if not (isinstance(value, str) or isinstance(value, float)
+                                    or isinstance(value, bool) or isinstance(value, int)
+                                    or isinstance(value, list) or isinstance(value, dict)):
+                                continue
+                            if not isinstance(value, dict):
+                                chunk_values_for_filtering[key] = value
+                            else:
+                                #print("dfdfadsfasdfasdfdsf")
+                                chunk_values_for_filtering[key] = list(copied[key].keys())
+                        chunks.append({
+                            utils.generate_vector_name(field): vector_chunk,
+                            TensorField.field_content: text_chunk,
+                            TensorField.field_name: field,
+                            **chunk_values_for_filtering
+                        })
+                        # if multimodal_combination is not None:
+                        #     if chunks_field_vector_mapping.get(field, None) is None:
+                        #         chunks_field_vector_mapping[field] = np.array(vector_chunk)
+                        #     #else:
+                        #         #chunks_field_vector_mapping[field] = chunks_field_vector_mapping[field] + np.array(vector_chunk)
 
-                    # ADD DOCS TIMER-LOGGER (4)
-                    start_time = timer()
-                    vector_chunks = s2_inference.vectorise(
-                        model_name=index_info.model_name,
-                        model_properties=_get_model_properties(index_info), content=content_chunks,
-                        device=selected_device, normalize_embeddings=normalize_embeddings,
-                        infer=infer_if_image)
+            # copied_chunks = copy.deepcopy(chunks)
+            # for dictionary in copied_chunks:
+            #     for key, value in dictionary.items():
+            #         if key.startswith("__vector"):
+            #             dictionary[key] = "This is the very long vector for the field. [0,....0]"
+            # pprint.pprint(copied_chunks, sort_dicts=False)
 
-                    end_time = timer()
-                    single_vectorise_call = end_time - start_time
-                    total_vectorise_time += single_vectorise_call
-                    logger.debug(f"(4) TIME for single vectorise call: {(single_vectorise_call):.3f}s.")
-                except (s2_inference_errors.UnknownModelError,
-                        s2_inference_errors.InvalidModelPropertiesError,
-                        s2_inference_errors.ModelLoadError) as model_error:
-                    raise errors.BadRequestError(
-                        message=f'Problem vectorising query. Reason: {str(model_error)}',
-                        link="https://marqo.pages.dev/latest/Models-Reference/dense_retrieval/"
-                    )
-                except s2_inference_errors.S2InferenceError:
-                    document_is_valid = False
-                    image_err = errors.InvalidArgError(message=f'Could not process given image: {field_content}')
-                    unsuccessful_docs.append(
-                        (i, {'_id': doc_id, 'error': image_err.message, 'status': int(image_err.status_code),
-                             'code': image_err.code})
-                    )
-                    break
+            # if multimodal_combination is not None:
+            #     for count, combination in enumerate(multimodal_combination):
+            #         combined_fields = set(combination.keys()).intersection(set(copied.keys()))
+            #         if len(combined_fields) >= 2:
+            #             vector_combined = np.sum([chunks_field_vector_mapping[field] * combination[field] for field in combined_fields], axis = 0) / np.sum(list(combination.values()))
+            #             chunks.append({
+            #                 utils.generate_vector_name(combination.get("_name", f"multimodal_field_{count}")): list(vector_combined),
+            #                 TensorField.field_content: str(combined_fields),
+            #                 TensorField.field_name: str(combined_fields),
+            #                 **chunk_values_for_filtering,
+            #             })
+            #         else:
+            #             pass
 
-                if (len(vector_chunks) != len(text_chunks)):
-                    raise RuntimeError(
-                        f"the input content after preprocessing and its vectorized counterparts must be the same length."
-                        f"recevied text_chunks={len(text_chunks)} and vector_chunks={len(vector_chunks)}. "
-                        f"check the preprocessing functions and try again. ")
+            # copied_chunks = copy.deepcopy(chunks)
+            # for dictionary in copied_chunks:
+            #     for key, value in dictionary.items():
+            #         if key.startswith("__vector"):
+            #             dictionary[key] = "This is the very long vector for the field. [0,....0]"
+            # pprint.pprint(copied_chunks, sort_dicts=False)
 
-                for text_chunk, vector_chunk in zip(text_chunks, vector_chunks):
-                    # only add chunk values which are string, boolean or numeric
-                    chunk_values_for_filtering = {}
-                    for key, value in copied.items():
-                        if not (isinstance(value, str) or isinstance(value, float)
-                                or isinstance(value, bool) or isinstance(value, int)
-                                or isinstance(value, list)):
-                            continue
-                        chunk_values_for_filtering[key] = value
-                    chunks.append({
-                        utils.generate_vector_name(field): vector_chunk,
-                        TensorField.field_content: text_chunk,
-                        TensorField.field_name: field,
-                        **chunk_values_for_filtering
-                    })
+
         if document_is_valid:
             new_fields = new_fields.union(new_fields_from_doc)
             if update_mode == 'replace':
