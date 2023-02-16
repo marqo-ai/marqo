@@ -548,12 +548,6 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                     **chunk_values_for_filtering
                 })
 
-                copied_chunks = copy.deepcopy(chunks)
-                for dictionary in copied_chunks:
-                    for key, value in dictionary.items():
-                        if key.startswith("__vector"):
-                            dictionary[key] = "This is the very long vector for the field. [0,....0]"
-                pprint.pprint(copied_chunks, sort_dicts=False)
             else:
                 if field not in existing_fields:
                     new_fields_from_doc.add((field, _infer_opensearch_data_type(copied[field])))
@@ -716,6 +710,12 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
             #             dictionary[key] = "This is the very long vector for the field. [0,....0]"
             # pprint.pprint(copied_chunks, sort_dicts=False)
 
+        copied_chunks = copy.deepcopy(chunks)
+        for dictionary in copied_chunks:
+            for key, value in dictionary.items():
+                if key.startswith("__vector"):
+                    dictionary[key] = "This is the very long vector for the field. [0,....0]"
+        pprint.pprint(copied_chunks, sort_dicts=False)
 
         if document_is_valid:
             new_fields = new_fields.union(new_fields_from_doc)

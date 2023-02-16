@@ -36,15 +36,15 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                                         },
                 },
                 "_id": "0"
-
             },
-            # {
-            #     "Title": "red bus",
-            #     "text_field": "A red bus is running on the street with a lot of passengers inside.",
-            #     "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg",
-            #     "_id": "1"
-            # }
-        ], auto_refresh=True, multimodal_combination = [{"image_field": 0.5, "text_field":0.5}])
+
+            {
+                "Title": "Horse rider",
+                "text_field": "A rider is riding a horse jumping over the barrier.",
+                "image_field":"https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+                "_id": "1"
+            },
+        ], auto_refresh=True)
 
         res = tensor_search.search(config=self.config,index_name=self.index_name_1, text ="Image for a rider riding a horse.")
         print(res)
