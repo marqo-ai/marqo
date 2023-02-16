@@ -24,7 +24,7 @@ class TestEncoding(unittest.TestCase):
         clear_loaded_models()
 
     def test_vectorize(self):
-        names = ["open_clip/convnext_base_w/laion2b_s13b_b82k",
+        names = ["fp16/ViT-B/32", "open_clip/convnext_base_w/laion2b_s13b_b82k",
                  "open_clip/convnext_base_w_320/laion_aesthetic_s13b_b82k_augreg",
                  "onnx16/open_clip/ViT-B-32/laion400m_e32", 'onnx32/open_clip/ViT-B-32-quickgelu/laion400m_e32',
                  "all-MiniLM-L6-v1", "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6",
@@ -51,7 +51,7 @@ class TestEncoding(unittest.TestCase):
 
 
     def test_load_clip_text_model(self):
-        names = [ "onnx16/open_clip/ViT-B-32/laion400m_e32", 'onnx32/open_clip/ViT-B-32-quickgelu/laion400m_e32',
+        names = ["fp16/ViT-B/32", "onnx16/open_clip/ViT-B-32/laion400m_e32", 'onnx32/open_clip/ViT-B-32-quickgelu/laion400m_e32',
                   'RN50', "ViT-B/16", "open_clip/convnext_base_w/laion2b_s13b_b82k",
                  "open_clip/convnext_base_w_320/laion_aesthetic_s13b_b82k_augreg",]
 
@@ -131,7 +131,7 @@ class TestEncoding(unittest.TestCase):
 
 
     def test_model_outputs(self):
-        names = ["open_clip/convnext_base_w/laion2b_s13b_b82k",
+        names = ["fp16/ViT-B/32", "open_clip/convnext_base_w/laion2b_s13b_b82k",
                  "open_clip/convnext_base_w_320/laion_aesthetic_s13b_b82k_augreg",
                  "onnx16/open_clip/ViT-B-32/laion400m_e32", 'onnx32/open_clip/ViT-B-32-quickgelu/laion400m_e32',
                  'open_clip/ViT-B-32/laion400m_e32', "all-MiniLM-L6-v1",
@@ -153,7 +153,7 @@ class TestEncoding(unittest.TestCase):
 
 
     def test_model_normalization(self):
-        names = ["onnx16/open_clip/ViT-B-32/laion400m_e32", 'onnx32/open_clip/ViT-B-32-quickgelu/laion400m_e32',
+        names = ["fp16/ViT-B/32", "onnx16/open_clip/ViT-B-32/laion400m_e32", 'onnx32/open_clip/ViT-B-32-quickgelu/laion400m_e32',
                  'open_clip/ViT-B-32/laion400m_e32', 'RN50', "ViT-B/16", "all-MiniLM-L6-v1",
                  "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6",
                  "onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]

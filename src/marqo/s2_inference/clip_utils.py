@@ -325,10 +325,11 @@ class FP16_CLIP(CLIP):
         '''
 
         if not self.device.startswith("cuda"):
-            raise IncompatibleModelDeviceError(f"Marqo can not load the provided model `{self.model_type}`"
-                                          f"FP16 clip model `{self.model_type}` is only available with device `cuda`."
-                                          f"Please check you cuda availability or try the fp32 version `{self.model_type.replace('fp16/','')}`"
-                                          f"Check `https://docs.marqo.ai/0.0.13/Models-Reference/dense_retrieval/#generic-clip-models` for more info.")
+            logger.warning(f"The fp16 clip model `{self.model_type} is loaded with device `{self.device}`."
+                              f"FP16 clip model `{self.model_type}` is only available with device `cuda`.\n"
+                              f"With current device `{self.device}`, the model will be loaded in `float32` mode. \n"
+                              f"Please check you cuda availability or try the fp32 version `{self.model_type.replace('fp16/','')}`"
+                              f"Check `https://docs.marqo.ai/0.0.13/Models-Reference/dense_retrieval/#generic-clip-models` for more info.")
 
         self.model_name = self.model_type.replace("fp16/", "")
 
