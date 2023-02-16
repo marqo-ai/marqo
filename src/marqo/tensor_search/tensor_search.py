@@ -242,7 +242,8 @@ def add_documents_orchestrator(
         config: Config, index_name: str, docs: List[dict],
         auto_refresh: bool, batch_size: int = 0, processes: int = 1,
         non_tensor_fields=None,
-        device=None, update_mode: str = 'replace'):
+        device=None, update_mode: str = 'replace', 
+        use_existing_vectors: bool = True):
 
     if non_tensor_fields is None:
         non_tensor_fields = []
@@ -251,7 +252,8 @@ def add_documents_orchestrator(
         logger.info(f"batch_size={batch_size} and processes={processes} - not doing any marqo side batching")
         return add_documents(
             config=config, index_name=index_name, docs=docs, auto_refresh=auto_refresh,
-            device=device, update_mode=update_mode, non_tensor_fields=non_tensor_fields
+            device=device, update_mode=update_mode, non_tensor_fields=non_tensor_fields,
+            use_existing_vectors=use_existing_vectors
         )
     elif processes is not None and processes > 1:
 
@@ -262,7 +264,8 @@ def add_documents_orchestrator(
         results = parallel.add_documents_mp(
             config=config, index_name=index_name, docs=docs,
             auto_refresh=auto_refresh, batch_size=batch_size, processes=processes,
-            device=device, update_mode=update_mode, non_tensor_fields=non_tensor_fields
+            device=device, update_mode=update_mode, non_tensor_fields=non_tensor_fields,
+            use_existing_vectors=use_existing_vectors
         )
 
         # we need to force the cache to update as it does not propagate using mp
@@ -277,12 +280,14 @@ def add_documents_orchestrator(
             raise errors.InvalidArgError("Batch size can't be less than 1!")
         logger.info(f"batch_size={batch_size} and processes={processes} - batching using a single process")
         return _batch_request(config=config, index_name=index_name, dataset=docs, device=device,
-                              batch_size=batch_size, verbose=False, non_tensor_fields=non_tensor_fields)
+                              batch_size=batch_size, verbose=False, non_tensor_fields=non_tensor_fields,
+                              use_existing_vectors=use_existing_vectors)
 
 
 def _batch_request(config: Config, index_name: str, dataset: List[dict],
                    batch_size: int = 100, verbose: bool = True, device=None,
-                   update_mode: str = 'replace', non_tensor_fields=None) -> List[Dict[str, Any]]:
+                   update_mode: str = 'replace', non_tensor_fields=None,
+                   use_existing_vectors: bool = True) -> List[Dict[str, Any]]:
     """Batch by the number of documents"""
     if non_tensor_fields is None:
         non_tensor_fields = []
@@ -308,7 +313,8 @@ def _batch_request(config: Config, index_name: str, dataset: List[dict],
         res = add_documents(
             config=config, index_name=index_name,
             docs=docs, auto_refresh=False, device=device,
-            update_mode=update_mode, non_tensor_fields=non_tensor_fields
+            update_mode=update_mode, non_tensor_fields=non_tensor_fields,
+            use_existing_vectors=use_existing_vectors
         )
         total_batch_time = timer() - t0
         num_docs = len(docs)
@@ -346,7 +352,7 @@ def _infer_opensearch_data_type(
 
 
 def add_documents(config: Config, index_name: str, docs: List[dict], auto_refresh: bool,
-                  non_tensor_fields=None, device=None, update_mode: str = "replace",
+                  non_tensor_fields=None, use_existing_vectors: bool=True, device=None, update_mode: str = "replace",
                   image_download_thread_count: int = 20):
     """
 
@@ -357,6 +363,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
         auto_refresh: Set to False if indexing lots of docs
         non_tensor_fields: List of fields, within documents to not create tensors for. Default to
           make tensors for all fields.
+        use_existing_vectors: Whether or not to use the vectors already in doc (for update docs)
         device: Device used to carry out the document update.
         update_mode: {'replace' | 'update'}. If set to replace (default) just
         image_download_thread_count: number of threads used to concurrently download images
@@ -578,63 +585,73 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                 bulk_parent_dicts.append(indexing_instructions)
                 bulk_parent_dicts.append(copied)
             else:
-                to_upsert = copied.copy()
-                to_upsert[TensorField.chunks] = chunks
-                bulk_parent_dicts.append(indexing_instructions)
-                bulk_parent_dicts.append({
-                    "upsert": to_upsert,
-                    "script": {
-                        "lang": "painless",
-                        "source": f"""
-            
-            // updates the doc's fields with the new content
-            for (key in params.customer_dict.keySet()) {{
-                ctx._source[key] = params.customer_dict[key];
-            }}            
-                        
-            // keep track of the merged doc
-            def merged_doc = [:];
-            merged_doc.putAll(ctx._source);
-            merged_doc.remove("{TensorField.chunks}");
-            
-            // remove chunks if the __field_name matches an updated field
-            // All update fields should be recomputed, and it should be safe to delete these chunks             
-            for (int i=ctx._source.{TensorField.chunks}.length-1; i>=0; i--) {{
-                if (params.doc_fields.contains(ctx._source.{TensorField.chunks}[i].{TensorField.field_name})) {{
-                   ctx._source.{TensorField.chunks}.remove(i);
-                }}
-                // Check if the field should have a tensor, remove if not.
-                else if (params.non_tensor_fields.contains(ctx._source.{TensorField.chunks}[i].{TensorField.field_name})) {{
-                    ctx._source.{TensorField.chunks}.remove(i);
-                }}
-            }}
-            
-            // update the chunks, setting fields to the new data
-            for (int i=ctx._source.{TensorField.chunks}.length-1; i>=0; i--) {{
+                # TODO, add solution here
+                if use_existing_vectors:
+                    print("Debug: Updating docs with existing vectors now!")
+                    # 1. get_documents_by_ids
+                    # 2. Make new chunks for existing fields
+                    # 3. Make new chunks for fields that don't exist yet
+                    # 4. ADd document content as metadata into all chunks
+                    # 5. Send replace operation
+
+                else:
+                    to_upsert = copied.copy()
+                    to_upsert[TensorField.chunks] = chunks
+                    bulk_parent_dicts.append(indexing_instructions)
+                    bulk_parent_dicts.append({
+                        "upsert": to_upsert,
+                        "script": {
+                            "lang": "painless",
+                            "source": f"""
+                
+                // updates the doc's fields with the new content
                 for (key in params.customer_dict.keySet()) {{
-                    ctx._source.{TensorField.chunks}[i][key] = params.customer_dict[key];
+                    ctx._source[key] = params.customer_dict[key];
+                }}            
+                            
+                // keep track of the merged doc
+                def merged_doc = [:];
+                merged_doc.putAll(ctx._source);
+                merged_doc.remove("{TensorField.chunks}");
+                
+                // remove chunks if the __field_name matches an updated field
+                // All update fields should be recomputed, and it should be safe to delete these chunks             
+                for (int i=ctx._source.{TensorField.chunks}.length-1; i>=0; i--) {{
+                    if (params.doc_fields.contains(ctx._source.{TensorField.chunks}[i].{TensorField.field_name})) {{
+                    ctx._source.{TensorField.chunks}.remove(i);
+                    }}
+                    // Check if the field should have a tensor, remove if not.
+                    else if (params.non_tensor_fields.contains(ctx._source.{TensorField.chunks}[i].{TensorField.field_name})) {{
+                        ctx._source.{TensorField.chunks}.remove(i);
+                    }}
                 }}
-            }}
-            
-            // update the new chunks, adding the existing data 
-            for (int i=params.new_chunks.length-1; i>=0; i--) {{
-                for (key in merged_doc.keySet()) {{
-                    params.new_chunks[i][key] = merged_doc[key];
+                
+                // update the chunks, setting fields to the new data
+                for (int i=ctx._source.{TensorField.chunks}.length-1; i>=0; i--) {{
+                    for (key in params.customer_dict.keySet()) {{
+                        ctx._source.{TensorField.chunks}[i][key] = params.customer_dict[key];
+                    }}
                 }}
-            }}
-            
-            // appends the new chunks to the existing chunks  
-            ctx._source.{TensorField.chunks}.addAll(params.new_chunks);
-            
-                        """,
-                        "params": {
-                            "doc_fields": list(copied.keys()),
-                            "new_chunks": chunks,
-                            "customer_dict": copied,
-                            "non_tensor_fields": non_tensor_fields
-                        },
-                    }
-                })
+                
+                // update the new chunks, adding the existing data 
+                for (int i=params.new_chunks.length-1; i>=0; i--) {{
+                    for (key in merged_doc.keySet()) {{
+                        params.new_chunks[i][key] = merged_doc[key];
+                    }}
+                }}
+                
+                // appends the new chunks to the existing chunks  
+                ctx._source.{TensorField.chunks}.addAll(params.new_chunks);
+                
+                            """,
+                            "params": {
+                                "doc_fields": list(copied.keys()),
+                                "new_chunks": chunks,
+                                "customer_dict": copied,
+                                "non_tensor_fields": non_tensor_fields
+                            },
+                        }
+                    })
 
     end_time_3 = timer()
     total_preproc_time = end_time_3 - start_time_3

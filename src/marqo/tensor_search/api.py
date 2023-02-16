@@ -148,6 +148,7 @@ def add_or_update_documents(docs: List[Dict], index_name: str, refresh: bool = T
                         marqo_config: config.Config = Depends(generate_config),
                         batch_size: int = 0, processes: int = 1,
                         non_tensor_fields: List[str] = Query(default=[]),
+                        use_existing_vectors: bool = True,
                         device: str = Depends(api_validation.validate_device)):
     """update add_documents endpoint"""
     return tensor_search.add_documents_orchestrator(
@@ -155,7 +156,8 @@ def add_or_update_documents(docs: List[Dict], index_name: str, refresh: bool = T
         docs=docs,
         index_name=index_name, auto_refresh=refresh,
         batch_size=batch_size, processes=processes, device=device,
-        non_tensor_fields=non_tensor_fields, update_mode='update'
+        non_tensor_fields=non_tensor_fields, update_mode='update',
+        use_existing_vectors=use_existing_vectors
     )
 
 @app.get("/indexes/{index_name}/documents/{document_id}")
