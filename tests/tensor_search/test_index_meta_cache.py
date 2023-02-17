@@ -204,7 +204,8 @@ class TestIndexMetaCache(MarqoTestCase):
             index_name=self.index_name_1, config=self.config, text="a line of text",
             return_doc_ids=True, search_method=SearchMethod.LEXICAL)
         assert len(result["hits"]) == 0
-        time.sleep(1)
+        # REFRESH INTERVAL IS 2 seconds
+        time.sleep(4)
         result_2 = tensor_search.search(
             index_name=self.index_name_1, config=self.config, text="a line of text",
             return_doc_ids=True, search_method=SearchMethod.LEXICAL)
