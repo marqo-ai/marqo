@@ -1,5 +1,7 @@
 import copy
+import datetime
 import pprint
+import threading
 import time
 import unittest
 from marqo.tensor_search.models.index_info import IndexInfo
@@ -12,6 +14,7 @@ from marqo.tensor_search import utils
 from marqo.tensor_search.enums import TensorField, SearchMethod, IndexSettingsField
 from marqo.tensor_search import configs
 from tests.marqo_test import MarqoTestCase
+from unittest import mock
 
 
 class TestIndexMetaCache(MarqoTestCase):
@@ -349,3 +352,50 @@ class TestIndexMetaCache(MarqoTestCase):
         index_meta_cache.refresh_index(config=self.config, index_name=self.index_name_1)
         ix_refreshed_info = index_meta_cache.get_index_info(config=self.config, index_name=self.index_name_1)
         assert ix_refreshed_info.index_settings == expected_index_settings
+
+    def test_index_refresh_on_interval_multi_threaded(self):
+        """ This test involves spinning up 5 threads or so. these threads
+            try to refresh the cache every 0.1 seconds. Despite this, the
+            last_refresh_time ensures we only actually push out a mappings
+            request once per second.
+            Because checking the last_refresh_time isn't threadsafe, this
+            test may occasionally fail. However, most the time it should pass.
+
+        """
+        mock_get = mock.MagicMock()
+        @mock.patch('marqo._httprequests.ALLOWED_OPERATIONS', {mock_get})
+        @mock.patch('requests.get', mock_get)
+        def run():
+            N_seconds = 3
+            REFRESH_INTERVAL_SECONDS = 1
+            start_time = datetime.datetime.now()
+            num_threads = 5
+            total_loops = [0] * num_threads
+            sleep_time = 0.1
+
+            def threaded_while(thread_num, loop_record):
+                thread_loops = 0
+                while datetime.datetime.now() - start_time < datetime.timedelta(seconds=N_seconds):
+                    cache_update_thread = threading.Thread(
+                        target=index_meta_cache.refresh_index_info_on_interval,
+                        args=(self.config, self.index_name_1, REFRESH_INTERVAL_SECONDS))
+                    cache_update_thread.start()
+                    time.sleep(sleep_time)
+                    thread_loops += 1
+                loop_record[thread_num] = thread_loops
+
+            threads = [threading.Thread(target=threaded_while, args=(i, total_loops)) for i in range(num_threads)]
+            for th in threads:
+                th.start()
+
+            for th in threads:
+                th.join()
+            estimated_loops = round((N_seconds/sleep_time) * num_threads)
+            assert sum(total_loops) in range(estimated_loops - num_threads, estimated_loops)
+            time.sleep(0.5)  # let remaining thread complete, if needed
+
+            assert mock_get.call_count == N_seconds
+            return True
+        assert run()
+
+

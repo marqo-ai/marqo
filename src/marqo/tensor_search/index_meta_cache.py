@@ -12,8 +12,19 @@ from typing import Dict
 from marqo import errors
 from marqo.tensor_search import backend
 from marqo.config import Config
+from marqo.tensor_search.tensor_search_logging import get_logger
+
+logger = get_logger(__name__)
+
 
 index_info_cache = dict()
+
+# the following is a non thread safe dict. Its purpose to be used by request
+# threads to calculate whether to refresh an index's cached index_info.
+# Because it is non thread safe, there is a chance multiple threads push out
+# multiple refresh requests at the same. It isn't a critical problem if that
+# happens.
+index_last_refreshed_time = dict()
 
 
 def empty_cache():
@@ -46,6 +57,41 @@ def get_index_info(config: Config, index_name: str) -> IndexInfo:
 
 def get_cache() -> Dict[str, IndexInfo]:
     return index_info_cache
+
+
+def refresh_index_info_on_interval(config: Config, index_name: str, interval_seconds: int) -> None:
+    """Refreshes an index's index_info if inteval_seconds have elapsed since the last time it was refreshed
+
+    Non-thread safe, so there is a chance two threads both refresh index_info at the same time.
+    """
+    try:
+        last_refreshed_time = index_last_refreshed_time[index_name]
+    except KeyError:
+        last_refreshed_time = datetime.datetime.min
+
+    now = datetime.datetime.now()
+
+    interval_as_time_delta = datetime.timedelta(seconds=interval_seconds)
+    if now - last_refreshed_time >= interval_as_time_delta:
+        # We assume that we will successfully refresh index info. We set the time to now ()
+        # to lower the chance of other threads simultaneously refreshing the cache
+        index_last_refreshed_time[index_name] = now
+        try:
+            backend.get_index_info(config=config, index_name=index_name)
+
+        # If we get any errors, we set the index's last refreshed time to what we originally found
+        # This lets another thread come in and update it. There is a chance that, in the mean time
+        except (errors.IndexNotFoundError, errors.NonTensorIndexError):
+            # trying to refresh the index, and not finding any tensor index is considered a
+            # successful of the index.
+            pass
+        except Exception as e2:
+            # any other exception is problematic. We reset the index to the last_refreshed_time to
+            # let another thread refresh the index's index_info
+            index_last_refreshed_time[index_name] = last_refreshed_time
+            logger.warning("error during refresh_index_info_on_interval(). Reason:"
+                           f"\n{e2}")
+            raise e2
 
 
 def refresh_index(config: Config, index_name: str) -> IndexInfo:
