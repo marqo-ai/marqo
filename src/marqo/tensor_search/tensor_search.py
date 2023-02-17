@@ -462,19 +462,15 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                 #                 "tensor_field_two" : {"weight": 0.5, parameter": "test-parameter-2"}},
                 field_vector_weight = {}
                 for sub_content, sub_content_para in field_content.items():
-
                 # TODO put this into a function to determine routing
                     if isinstance(sub_content, (str, Image.Image)):
-
                         # TODO: better/consistent handling of a no-op for processing (but still vectorize)
-
                         # 1. check if urls should be downloaded -> "treat_pointers_and_urls_as_images":True
                         # 2. check if it is a url or pointer
                         # 3. If yes in 1 and 2, download blindly (without type)
                         # 4. Determine media type of downloaded
                         # 5. load correct media type into memory -> PIL (images), videos (), audio (torchaudio)
                         #                 # 6. if chunking -> then add the extra chunker
-
                         if isinstance(sub_content, str) and not _is_image(sub_content):
                             text_chunks = sub_content
                         else:
@@ -668,7 +664,6 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                             if not isinstance(value, dict):
                                 chunk_values_for_filtering[key] = value
                             else:
-                                #print("dfdfadsfasdfasdfdsf")
                                 chunk_values_for_filtering[key] = list(copied[key].keys())
                         chunks.append({
                             utils.generate_vector_name(field): vector_chunk,
@@ -676,40 +671,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                             TensorField.field_name: field,
                             **chunk_values_for_filtering
                         })
-                        # if multimodal_combination is not None:
-                        #     if chunks_field_vector_mapping.get(field, None) is None:
-                        #         chunks_field_vector_mapping[field] = np.array(vector_chunk)
-                        #     #else:
-                        #         #chunks_field_vector_mapping[field] = chunks_field_vector_mapping[field] + np.array(vector_chunk)
-
-            # copied_chunks = copy.deepcopy(chunks)
-            # for dictionary in copied_chunks:
-            #     for key, value in dictionary.items():
-            #         if key.startswith("__vector"):
-            #             dictionary[key] = "This is the very long vector for the field. [0,....0]"
-            # pprint.pprint(copied_chunks, sort_dicts=False)
-
-            # if multimodal_combination is not None:
-            #     for count, combination in enumerate(multimodal_combination):
-            #         combined_fields = set(combination.keys()).intersection(set(copied.keys()))
-            #         if len(combined_fields) >= 2:
-            #             vector_combined = np.sum([chunks_field_vector_mapping[field] * combination[field] for field in combined_fields], axis = 0) / np.sum(list(combination.values()))
-            #             chunks.append({
-            #                 utils.generate_vector_name(combination.get("_name", f"multimodal_field_{count}")): list(vector_combined),
-            #                 TensorField.field_content: str(combined_fields),
-            #                 TensorField.field_name: str(combined_fields),
-            #                 **chunk_values_for_filtering,
-            #             })
-            #         else:
-            #             pass
-
-            # copied_chunks = copy.deepcopy(chunks)
-            # for dictionary in copied_chunks:
-            #     for key, value in dictionary.items():
-            #         if key.startswith("__vector"):
-            #             dictionary[key] = "This is the very long vector for the field. [0,....0]"
-            # pprint.pprint(copied_chunks, sort_dicts=False)
-
+        # TODO remove this print in the PR
         copied_chunks = copy.deepcopy(chunks)
         for dictionary in copied_chunks:
             for key, value in dictionary.items():
