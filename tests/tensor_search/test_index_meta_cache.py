@@ -16,6 +16,7 @@ from marqo.tensor_search.enums import TensorField, SearchMethod, IndexSettingsFi
 from marqo.tensor_search import configs
 from tests.marqo_test import MarqoTestCase
 from unittest import mock
+from marqo import errors
 
 
 class TestIndexMetaCache(MarqoTestCase):
@@ -394,15 +395,129 @@ class TestIndexMetaCache(MarqoTestCase):
             for th in threads:
                 th.join()
             estimated_loops = round((N_seconds/sleep_time) * num_threads)
-            assert sum(total_loops) in range(estimated_loops - num_threads, estimated_loops)
+            assert sum(total_loops) in range(estimated_loops - num_threads, estimated_loops + 1)
             time.sleep(0.5)  # let remaining thread complete, if needed
 
             assert mock_get.call_count == N_seconds
             return True
         assert run()
 
+    def test_index_refresh_on_interval_multi_threaded_no_index(self):
+        """ If we encounter NonTensorIndexError/ IndexNotExists error
+        while refreshing the index info, it is considered a successful
+        refresh and the refresh happens on the intervals as usual.
+
+        isn't threadsafe, this test may occasionally fail.
+
+        """
+        mock_get = mock.MagicMock()
+        mock_response = requests.Response()
+        mock_response.status_code = 200
+        mock_response.json = lambda: '{"a":"b"}'
+
+        # mock_get.return_value = mock_response
+        @mock.patch('marqo._httprequests.ALLOWED_OPERATIONS', {mock_get})
+        @mock.patch('requests.get', mock_get)
+        def run(error):
+            def use_error(*args, **kwargs):
+                raise error('')
+            mock_get.side_effect = use_error
+
+            N_seconds = 3
+            REFRESH_INTERVAL_SECONDS = 1
+            start_time = datetime.datetime.now()
+            num_threads = 5
+            total_loops = [0] * num_threads
+            sleep_time = 0.1
+
+            def threaded_while(thread_num, loop_record):
+                thread_loops = 0
+                while datetime.datetime.now() - start_time < datetime.timedelta(seconds=N_seconds):
+                    cache_update_thread = threading.Thread(
+                        target=index_meta_cache.refresh_index_info_on_interval,
+                        args=(self.config, self.index_name_1, REFRESH_INTERVAL_SECONDS))
+                    cache_update_thread.start()
+                    time.sleep(sleep_time)
+                    thread_loops += 1
+                loop_record[thread_num] = thread_loops
+
+            threads = [threading.Thread(target=threaded_while, args=(i, total_loops)) for i in range(num_threads)]
+            for th in threads:
+                th.start()
+
+            for th in threads:
+                th.join()
+            estimated_loops = round((N_seconds/sleep_time) * num_threads)
+            assert sum(total_loops) in range(estimated_loops - num_threads, estimated_loops + 1)
+            time.sleep(0.5)  # let remaining thread complete, if needed
+            assert mock_get.call_count == N_seconds
+            return True
+        assert run(error=errors.NonTensorIndexError)
+        mock_get.reset_mock()
+        assert run(error=errors.IndexNotFoundError)
+
+    def test_index_refresh_on_interval_multi_threaded_errors(self):
+        """ If we encounter any error besides
+        NonTensorIndexError/ IndexNotExists we this is considered a
+        failed refresh, which doesn't prevent other threads from
+        trying to update it.
+
+        This is not threadsafe and may occassionally fail
+
+        """
+        mock_get = mock.MagicMock()
+        mock_response = requests.Response()
+        mock_response.status_code = 200
+        mock_response.json = lambda: '{"a":"b"}'
+
+        # mock_get.return_value = mock_response
+        @mock.patch('marqo._httprequests.ALLOWED_OPERATIONS', {mock_get})
+        @mock.patch('requests.get', mock_get)
+        def run(error):
+            def use_error(*args, **kwargs):
+                raise error('')
+
+            mock_get.side_effect = use_error
+
+            N_seconds = 3
+            REFRESH_INTERVAL_SECONDS = 1
+            start_time = datetime.datetime.now()
+            num_threads = 5
+            total_loops = [0] * num_threads
+            sleep_time = 0.1
+
+            def threaded_while(thread_num, loop_record):
+                thread_loops = 0
+                while datetime.datetime.now() - start_time < datetime.timedelta(seconds=N_seconds):
+                    cache_update_thread = threading.Thread(
+                        target=index_meta_cache.refresh_index_info_on_interval,
+                        args=(self.config, self.index_name_1, REFRESH_INTERVAL_SECONDS))
+                    cache_update_thread.start()
+                    time.sleep(sleep_time)
+                    thread_loops += 1
+                loop_record[thread_num] = thread_loops
+
+            threads = [threading.Thread(target=threaded_while, args=(i, total_loops)) for i in range(num_threads)]
+            for th in threads:
+                th.start()
+
+            for th in threads:
+                th.join()
+            estimated_loops = round((N_seconds / sleep_time) * num_threads)
+            assert sum(total_loops) in range(estimated_loops - num_threads, estimated_loops + 1)
+            time.sleep(0.5)  # let remaining thread complete, if needed
+            # because we get these failures we set the last_refresh_time back to the original
+            # allowing other threads to refresh index_info
+            assert mock_get.call_count in range(estimated_loops - num_threads, estimated_loops + 1)
+            return True
+
+        assert run(error=ValueError)
+        mock_get.reset_mock()
+        assert run(error=requests.ConnectionError)
+
     def test_search_index_refresh_on_interval_multi_threaded(self):
-        """ The above test, but using the search endpoint.
+        """ Same as test_index_refresh_on_interval_multi_threaded() ,
+        but using the search endpoint.
 
         The same caveat applies: Because checking the last_refresh_time
         isn't threadsafe, this test may occasionally fail.

@@ -6,6 +6,7 @@ index in the search DB via a plugin.
 import asyncio
 import datetime
 import time
+import traceback
 from multiprocessing import Process, Manager
 from marqo.tensor_search.models.index_info import IndexInfo
 from typing import Dict
@@ -89,8 +90,10 @@ def refresh_index_info_on_interval(config: Config, index_name: str, interval_sec
             # any other exception is problematic. We reset the index to the last_refreshed_time to
             # let another thread refresh the index's index_info
             index_last_refreshed_time[index_name] = last_refreshed_time
-            logger.warning("error during refresh_index_info_on_interval(). Reason:"
+            logger.warning("refresh_index_info_on_interval(): error during background index_info refresh. Reason:"
                            f"\n{e2}")
+            logger.debug("refresh_index_info_on_interval(): error during background index_info refresh. "
+                         f"Traceback: \n{traceback.print_stack()}")
             raise e2
 
 
