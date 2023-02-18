@@ -486,7 +486,8 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
             
             # Check if content of this field changed. If no, skip all chunking and vectorisation
             # TODO, maybe store these bools so it's not one long line
-            if (update_mode == 'replace') and use_existing_vectors and existing_doc["found"] and (field in existing_doc["_source"]) and (existing_doc["_source"][field] == field_content):
+            if ((update_mode == 'replace') and use_existing_vectors and existing_doc["found"]
+                    and (field in existing_doc["_source"]) and (existing_doc["_source"][field] == field_content)):
                 # logger.info(f"Using existing vectors for doc {doc_id}, field {field}. Content remains unchanged.")
                 chunks_to_append = _get_chunks_for_field(field_name=field, doc_id=doc_id, doc=existing_doc)
             
@@ -593,9 +594,9 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                             f"recevied text_chunks={len(text_chunks)} and vector_chunks={len(vector_chunks)}. "
                             f"check the preprocessing functions and try again. ")
 
+                    chunks_to_append = []
                     for text_chunk, vector_chunk in zip(text_chunks, vector_chunks):
                         # We do not put in metadata yet at this stage.
-                        chunks_to_append = []
                         chunks_to_append.append({
                             utils.generate_vector_name(field): vector_chunk,
                             TensorField.field_content: text_chunk,
@@ -604,8 +605,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
             
             # Add chunks_to_append along with doc metadata to total chunks
             for chunk in chunks_to_append:
-                chunks.append({**chunk, **chunk_values_for_filtering})       
-                        
+                chunks.append({**chunk, **chunk_values_for_filtering})
         
         if document_is_valid:
             # This block happens per DOC
@@ -814,21 +814,22 @@ def _get_documents_for_upsert(
     
     # Chunk Docs (get field name, field content, vectors)
     chunk_docs = [
-        {"_index": index_name, "_id": validation.validate_id(doc_id)}
+        {"_index": index_name, "_id": validation.validate_id(doc_id),
+         "_source": {"include": [f"__chunks.__field_content", f"__chunks.__field_name", f"__chunks.__vector_*"]}}
         for doc_id in document_ids
     ]
-    for d in chunk_docs:
-        d["_source"] = dict()
-        d["_source"]["include"] = [f"__chunks.__field_content", f"__chunks.__field_name", f"__chunks.__vector_*"]
+    # for d in chunk_docs:
+    #     d["_source"] = dict()
+    #     d["_source"]["include"] =
 
     # Data Docs (get just the source data)
     data_docs = [
-        {"_index": index_name, "_id": validation.validate_id(doc_id)}
+        {"_index": index_name, "_id": validation.validate_id(doc_id), "_source": {"exclude": "__chunks.*"}}
         for doc_id in document_ids
     ]
-    for d in data_docs:
-        d["_source"] = dict()
-        d["_source"]["exclude"] = f"__chunks.*"
+    # for d in data_docs:
+    #     d["_source"] = dict()
+    #     d["_source"]["exclude"] = f"__chunks.*"
 
     res = HttpRequests(config).get(
         f'_mget/',
