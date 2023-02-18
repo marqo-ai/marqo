@@ -90,7 +90,7 @@ class IndexChunk:
                         device: str = None, process_id: int = 0, 
                         non_tensor_fields: List[str] = [],
                         threads_per_process: int = None, update_mode: str = 'replace',
-                        use_existing_vectors: bool = True):
+                        use_existing_vectors: bool = False):
 
         self.config = copy.deepcopy(config)
         self.index_name = index_name
@@ -133,7 +133,7 @@ class IndexChunk:
 
             results.append(tensor_search.add_documents(
                 config=self.config, index_name=self.index_name, docs=_doc, auto_refresh=self.auto_refresh,
-                update_mode=self.update_mode, non_tensor_fields=self.non_tensor_fields, use_existing_vectors=use_existing_vectors
+                update_mode=self.update_mode, non_tensor_fields=self.non_tensor_fields, use_existing_vectors=self.use_existing_vectors
             ))
             t_chunk_end = time.time()
 

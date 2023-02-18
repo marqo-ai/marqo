@@ -131,7 +131,7 @@ def add_or_replace_documents(docs: List[Dict], index_name: str, refresh: bool = 
                         marqo_config: config.Config = Depends(generate_config),
                         batch_size: int = 0, processes: int = 1,
                         non_tensor_fields: List[str] = Query(default=[]),
-                        use_existing_vectors: bool = True,
+                        use_existing_vectors: bool = False,
                         device: str = Depends(api_validation.validate_device)):
     """add_documents endpoint (replace existing docs with the same id)"""
     return tensor_search.add_documents_orchestrator(
@@ -150,7 +150,7 @@ def add_or_update_documents(docs: List[Dict], index_name: str, refresh: bool = T
                         marqo_config: config.Config = Depends(generate_config),
                         batch_size: int = 0, processes: int = 1,
                         non_tensor_fields: List[str] = Query(default=[]),
-                        use_existing_vectors: bool = True,
+                        use_existing_vectors: bool = False,
                         device: str = Depends(api_validation.validate_device)):
     """WILL BE DEPRECATED SOON. update add_documents endpoint"""
     return tensor_search.add_documents_orchestrator(
