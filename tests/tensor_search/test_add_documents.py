@@ -1354,7 +1354,8 @@ class TestAddDocuments(MarqoTestCase):
             image_repo = add_docs.download_images(
                 docs=docs,
                 thread_count=20,
-                non_tensor_fields=('nt_1', 'nt_2')
+                non_tensor_fields=('nt_1', 'nt_2'),
+                image_download_headers={}
             )
             assert len(expected_repo_structure) == len(image_repo)
             for k in expected_repo_structure:
