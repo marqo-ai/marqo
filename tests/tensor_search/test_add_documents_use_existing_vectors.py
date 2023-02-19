@@ -4,6 +4,7 @@ import requests
 from tests.marqo_test import MarqoTestCase
 from marqo.tensor_search import add_docs
 from marqo.s2_inference.s2_inference import vectorise
+from marqo.s2_inference.clip_utils import load_image_from_path
 from marqo.tensor_search import tensor_search, index_meta_cache, backend
 from marqo.errors import IndexNotFoundError, InvalidArgError, BadRequestError
 
@@ -213,3 +214,108 @@ class TestAddDocumentsUseExistingVectors(MarqoTestCase):
             assert index_info.properties[field_name]['type'] == os_type
             assert index_info.properties['__chunks']['properties'][field_name]['type'] == os_type
 
+    def test_use_existing_vectors_long_strings_and_images(self):
+        """Checks vectorise calls and chunk structure for image and text fields with more than 1 chunk"""
+        index_settings = {
+            "index_defaults": {
+                "treat_urls_and_pointers_as_images": True,
+                "model": "ViT-B/32",
+                "text_preprocessing": {
+                    "split_method": "sentence",
+                    "split_length": 1,
+                }
+            }
+        }
+        tensor_search.create_vector_index(
+            index_name=self.index_name_1, index_settings=index_settings, config=self.config)
+        hippo_img = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
+        artefact_hippo_img = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png'
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
+            {
+                "_id": "123",
+                "txt_to_be_the_same": "some text to leave unchanged. I repeat, unchanged",
+                "txt_field_to_be_deleted": "This is my first sentence. This is my second",
+                "txt_to_be_modified": "this is the original 1st sentence. This is the original 2nd.",
+                "img_to_be_deleted": hippo_img,
+                "img_to_be_modified": hippo_img,
+                "img_to_be_same": hippo_img,
+                "fl": 1.23,
+                "non-tensor-field": ["what", "is", "the", "time"]
+
+            }], auto_refresh=True, non_tensor_fields=["non-tensor-field"])
+
+        def pass_through_vectorise(*arg, **kwargs):
+            """Vectorise will behave as usual, but we will be able to see the call list
+            via mock
+            """
+            return vectorise(*arg, **kwargs)
+
+        mock_vectorise = unittest.mock.MagicMock()
+        mock_vectorise.side_effect = pass_through_vectorise
+        @unittest.mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
+        def run():
+            use_existing_vetor_doc = {
+                "txt_to_be_the_same": "some text to leave unchanged. I repeat, unchanged",
+                "txt_to_be_modified": "this is the updated 1st sentence. This is my second", # 2nd sentence not modified
+                "txt_to_be_created": "this is a brand new sentence. Yes it is",
+                "img_to_be_modified": artefact_hippo_img,
+                "img_to_be_same": hippo_img,
+                "img_to_be_Created": artefact_hippo_img,
+                "fl": 3.5,
+                "non-tensor-field": ["it", "is", "9", "o clock"]
+            }
+            tensor_search.add_documents(
+                config=self.config, index_name=self.index_name_1, docs=[{"_id": "123", **use_existing_vetor_doc}],
+                auto_refresh=True, non_tensor_fields=["non-tensor-field"],
+                use_existing_vectors=True)
+
+            vectorised_content = [call_kwargs['content'] for call_args, call_kwargs
+                                  in mock_vectorise.call_args_list]
+            artefact_pil_image = load_image_from_path(artefact_hippo_img)
+            expected_to_be_vectorised = [
+                ["this is the updated 1st sentence.", "This is my second"],
+                ["this is a brand new sentence.", "Yes it is"],
+                [artefact_pil_image], [artefact_pil_image]]
+            assert vectorised_content == expected_to_be_vectorised
+
+            updated_doc = requests.get(
+                url=F"{self.endpoint}/{self.index_name_1}/_doc/123",
+                verify=False
+            )
+
+            parent_doc = updated_doc.json()['_source']
+            del parent_doc['__chunks']
+            assert parent_doc == use_existing_vetor_doc
+
+            # each chunk needs its metadata to be the same as the updated document's content:
+            chunks = [chunk for chunk in updated_doc.json()['_source']['__chunks']]
+            for ch in chunks:
+                ch_meta_data = {k: v for k, v in ch.items() if not k.startswith("__")}
+                assert use_existing_vetor_doc == ch_meta_data
+
+            vector_img_fields = ["img_to_be_modified", "img_to_be_same", "img_to_be_Created"]
+            # check if the vectors/field content is correct for images:
+            for vector_field in vector_img_fields:
+                found_vector_field = False
+                for ch in chunks:
+                    if ch["__field_name"] == vector_field:
+                        found_vector_field = True
+                        assert ch['__field_content'] == use_existing_vetor_doc[vector_field]
+                        assert isinstance(ch[f"__vector_{vector_field}"], list)
+                assert found_vector_field
+
+            expected_text_chunks = {
+                ("txt_to_be_the_same", "some text to leave unchanged."),
+                ("txt_to_be_the_same", "I repeat, unchanged"),
+                ("txt_to_be_modified", "this is the updated 1st sentence."),
+                ("txt_to_be_modified", "This is my second"),
+                ("txt_to_be_created", "this is a brand new sentence."),
+                ("txt_to_be_created", "Yes it is")
+            }
+            real_txt_chunks = {(ch["__field_name"], ch["__field_content"])
+                                for ch in chunks if ch["__field_name"].startswith("txt")}
+            assert real_txt_chunks == expected_text_chunks
+            assert len(chunks) == len(vector_img_fields) + len(expected_text_chunks)
+            return True
+
+        assert run()
