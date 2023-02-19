@@ -31,6 +31,7 @@ Notes on search behaviour with caching and searchable attributes:
 
 """
 import copy
+import json
 import datetime
 from timeit import default_timer as timer
 import functools
@@ -243,16 +244,23 @@ def add_documents_orchestrator(
         config: Config, index_name: str, docs: List[dict],
         auto_refresh: bool, batch_size: int = 0, processes: int = 1,
         non_tensor_fields=None,
-        device=None, update_mode: str = 'replace'):
+        device=None, update_mode: str = 'replace',
+        image_download_headers: str = "{}"):
 
     if non_tensor_fields is None:
         non_tensor_fields = []
+
+    try:
+        image_download_headers_parsed = json.loads(image_download_headers)
+    except json.decoder.JSONDecodeError:
+        raise errors.InvalidArgError(message=f"Could not parse image_download_header '{image_download_headers}'. Ensure it is valid json.")
 
     if batch_size is None or batch_size == 0:
         logger.info(f"batch_size={batch_size} and processes={processes} - not doing any marqo side batching")
         return add_documents(
             config=config, index_name=index_name, docs=docs, auto_refresh=auto_refresh,
-            device=device, update_mode=update_mode, non_tensor_fields=non_tensor_fields
+            device=device, update_mode=update_mode, non_tensor_fields=non_tensor_fields,
+            image_download_headers=image_download_headers_parsed
         )
     elif processes is not None and processes > 1:
 
@@ -263,7 +271,8 @@ def add_documents_orchestrator(
         results = parallel.add_documents_mp(
             config=config, index_name=index_name, docs=docs,
             auto_refresh=auto_refresh, batch_size=batch_size, processes=processes,
-            device=device, update_mode=update_mode, non_tensor_fields=non_tensor_fields
+            device=device, update_mode=update_mode, non_tensor_fields=non_tensor_fields,
+            image_download_headers=image_download_headers_parsed
         )
 
         # we need to force the cache to update as it does not propagate using mp
@@ -347,8 +356,8 @@ def _infer_opensearch_data_type(
 
 
 def add_documents(config: Config, index_name: str, docs: List[dict], auto_refresh: bool,
-                  non_tensor_fields=None, device=None, update_mode: str = "replace",
-                  image_download_thread_count: int = 20):
+                  image_download_headers: dict, non_tensor_fields=None, device=None,
+                  update_mode: str = "replace", image_download_thread_count: int = 20):
     """
 
     Args:
@@ -361,6 +370,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
         device: Device used to carry out the document update.
         update_mode: {'replace' | 'update'}. If set to replace (default) just
         image_download_thread_count: number of threads used to concurrently download images
+        image_download_headers: headers to authenticate image download
     Returns:
 
     """
@@ -398,7 +408,8 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
     if index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]:
         ti_0 = timer()
-        image_repo = add_docs.download_images(docs=docs, thread_count=20, non_tensor_fields=tuple(non_tensor_fields))
+        image_repo = add_docs.download_images(docs=docs, thread_count=20, non_tensor_fields=tuple(non_tensor_fields),
+                                              image_download_headers=image_download_headers)
         logger.info(f"          add_documents image download: took {(timer() - ti_0):.3f}s to concurrently download "
                     f"images for {batch_size} docs using {image_download_thread_count} threads ")
 

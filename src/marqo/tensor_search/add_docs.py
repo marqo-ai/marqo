@@ -9,7 +9,8 @@ import PIL
 from marqo.s2_inference.clip_utils import _is_image, load_image_from_path
 
 
-def threaded_download_images(allocated_docs: List[dict], image_repo: dict, non_tensor_fields: Tuple) -> None:
+def threaded_download_images(allocated_docs: List[dict], image_repo: dict,
+                             non_tensor_fields: Tuple, image_download_headers: dict) -> None:
     """A thread calls this function to download images for its allocated documents
 
     This should be called only if treat URLs as images is True.
@@ -20,6 +21,8 @@ def threaded_download_images(allocated_docs: List[dict], image_repo: dict, non_t
             as values and the URLs as keys
         non_tensor_fields: A tuple of non_tensor_fields. No images will be downloaded for
             these fields
+        image_download_headers: A dict of headers for image download. Can be used
+            to authenticate image downloads
     Side Effects:
         Adds members to the image_repo dict. Each key is a string which is identified as a URL.
         Each value is either a PIL image, or UnidentifiedImageError, if there were any errors encountered retrieving
@@ -41,19 +44,20 @@ def threaded_download_images(allocated_docs: List[dict], image_repo: dict, non_t
                 if doc[field] in image_repo:
                     continue
                 try:
-                    image_repo[doc[field]] = load_image_from_path(doc[field], timeout=TIMEOUT_SECONDS)
+                    image_repo[doc[field]] = load_image_from_path(doc[field], image_download_headers, timeout=TIMEOUT_SECONDS)
                 except PIL.UnidentifiedImageError as e:
                     image_repo[doc[field]] = e
                     continue
 
 
-def download_images(docs: List[dict], thread_count: int, non_tensor_fields: Tuple) -> dict:
+def download_images(docs: List[dict], thread_count: int, non_tensor_fields: Tuple, image_download_headers: dict) -> dict:
     """Concurrently downloads images from each doc, storing them into the image_repo dict
     Args:
         docs: docs with images to be downloaded. These will be allocated to each thread
         thread_count: number of threads to spin up
         non_tensor_fields: A tuple of non_tensor_fields. No images will be downloaded for
             these fields
+        image_download_headers: A dict of image download headers for authentication.
     This should be called only if treat URLs as images is True
 
     Returns:
@@ -64,7 +68,7 @@ def download_images(docs: List[dict], thread_count: int, non_tensor_fields: Tupl
     copied = copy.deepcopy(docs)
     image_repo = dict()
     thread_allocated_docs = [copied[i: i + docs_per_thread] for i in range(len(copied))[::docs_per_thread]]
-    threads = [threading.Thread(target=threaded_download_images, args=(allocation, image_repo, non_tensor_fields))
+    threads = [threading.Thread(target=threaded_download_images, args=(allocation, image_repo, non_tensor_fields, image_download_headers))
                for allocation in thread_allocated_docs]
     for th in threads:
         th.start()

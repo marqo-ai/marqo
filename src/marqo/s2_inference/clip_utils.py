@@ -75,16 +75,17 @@ def format_and_load_CLIP_images(images: List[Union[str, ndarray, ImageType]]) ->
 
     results = []
     for image in images:
-        results.append(format_and_load_CLIP_image(image))
+        results.append(format_and_load_CLIP_image(image, {}))
     
     return results
 
 
-def load_image_from_path(image_path: str, timeout=3) -> ImageType:
+def load_image_from_path(image_path: str, image_download_headers: dict, timeout=3) -> ImageType:
     """Loads an image into PIL from a string path that is either local or a url
 
     Args:
         image_path (str): Local or remote path to image.
+        image_download_headers (dict): header for the image download
         timeout (number): timeout (in seconds)
     Raises:
         ValueError: If the local path is invalid, and is not a url
@@ -98,7 +99,9 @@ def load_image_from_path(image_path: str, timeout=3) -> ImageType:
         img = Image.open(image_path)
     elif validators.url(image_path):
         try:
-            resp = requests.get(image_path, stream=True, timeout=timeout)
+            print(image_download_headers)
+            resp = requests.get(image_path, stream=True, timeout=timeout, headers=image_download_headers)
+            print(resp.status_code)
         except (requests.exceptions.ConnectTimeout, requests.exceptions.ConnectionError,
                 requests.exceptions.RequestException
                 ) as e:
@@ -115,7 +118,7 @@ def load_image_from_path(image_path: str, timeout=3) -> ImageType:
     return img
 
 
-def format_and_load_CLIP_image(image: Union[str, ndarray, ImageType]) -> ImageType:
+def format_and_load_CLIP_image(image: Union[str, ndarray, ImageType], image_download_headers: dict) -> ImageType:
     """standardizes the input to be a PIL image
 
     Args:
@@ -130,7 +133,7 @@ def format_and_load_CLIP_image(image: Union[str, ndarray, ImageType]) -> ImageTy
     """
     # check for the input type
     if isinstance(image, str):
-        img = load_image_from_path(image)
+        img = load_image_from_path(image, image_download_headers)
     elif isinstance(image, np.ndarray):
         img = Image.fromarray(image.astype('uint8'), 'RGB')
 
@@ -279,7 +282,7 @@ class CLIP:
         if isinstance(images, list):
             image_input = format_and_load_CLIP_images(images)
         else:
-            image_input = [format_and_load_CLIP_image(images)]
+            image_input = [format_and_load_CLIP_image(images, {})]
 
         self.image_input_processed = torch.stack([self.preprocess(_img).to(self.device) for _img in image_input])
     
@@ -412,7 +415,7 @@ class OPEN_CLIP(CLIP):
         if isinstance(images, list):
             image_input = format_and_load_CLIP_images(images)
         else:
-            image_input = [format_and_load_CLIP_image(images)]
+            image_input = [format_and_load_CLIP_image(images, {})]
 
         self.image_input_processed = torch.stack([self.preprocess(_img).to(self.device) for _img in image_input])
 
@@ -502,7 +505,7 @@ class MULTILINGUAL_CLIP(CLIP):
         if isinstance(images, list):
             image_input = format_and_load_CLIP_images(images)
         else:
-            image_input = [format_and_load_CLIP_image(images)]
+            image_input = [format_and_load_CLIP_image(images, {})]
 
         self.image_input_processed = torch.stack([self.preprocess(_img).to(self.device) for _img in image_input])
 
