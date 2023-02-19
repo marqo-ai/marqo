@@ -1253,7 +1253,8 @@ class TestAddDocuments(MarqoTestCase):
                 allocated_docs=[
                     {"Title": "frog", "Desc": "blah"}, {"Title": "Dog", "Loc": "https://google.com/my_dog.png"}],
                 image_repo=image_repo,
-                non_tensor_fields=()
+                non_tensor_fields=(),
+                image_download_headers={}
             )
             assert list(image_repo.keys()) == ['https://google.com/my_dog.png']
             assert isinstance(image_repo['https://google.com/my_dog.png'], PIL.UnidentifiedImageError)
@@ -1272,7 +1273,8 @@ class TestAddDocuments(MarqoTestCase):
         add_docs.threaded_download_images(
             allocated_docs=[test_doc],
             image_repo=image_repo,
-            non_tensor_fields=()
+            non_tensor_fields=(),
+            image_download_headers={}
         )
         assert len(image_repo) == 2
         assert isinstance(image_repo['https://google.com/my_dog.png'], PIL.UnidentifiedImageError)
@@ -1312,7 +1314,8 @@ class TestAddDocuments(MarqoTestCase):
             add_docs.threaded_download_images(
                 allocated_docs=docs,
                 image_repo=image_repo,
-                non_tensor_fields=('nt_1', 'nt_2')
+                non_tensor_fields=('nt_1', 'nt_2'),
+                image_download_headers={}
             )
             assert len(expected_repo_structure) == len(image_repo)
             for k in expected_repo_structure:

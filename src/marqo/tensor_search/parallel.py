@@ -1,5 +1,6 @@
 import os
 import time
+import json
 from typing import List, Dict
 import copy
 
@@ -7,6 +8,7 @@ import torch
 import numpy as np
 from torch import multiprocessing as mp
 
+from marqo import errors
 from marqo.tensor_search import tensor_search
 from marqo.marqo_logging import logger
 
@@ -85,12 +87,13 @@ class IndexChunk:
     """wrapper to pass through documents to be indexed to multiprocessing
     """
 
-    def __init__(self, image_download_headers: dict, config=None,
+    def __init__(self, config=None,
                         index_name: str = None, docs: List[Dict] = [],
                         auto_refresh: bool = False, batch_size: int = 50, 
                         device: str = None, process_id: int = 0, 
                         non_tensor_fields: List[str] = [],
-                        threads_per_process: int = None, update_mode: str = 'replace'):
+                        threads_per_process: int = None, update_mode: str = 'replace',
+                        image_download_headers: str = ""):
 
         self.config = copy.deepcopy(config)
         self.index_name = index_name
@@ -166,9 +169,10 @@ def get_threads_per_process(processes: int):
     total_cpu = max(1, mp.cpu_count() - 2)
     return max(1, total_cpu//processes)
 
-def add_documents_mp(image_download_headers: dict, config=None, index_name=None, docs=None,
+def add_documents_mp(config=None, index_name=None, docs=None,
                      auto_refresh=None, batch_size=50, processes=1, device=None,
-                     non_tensor_fields: List[str] = [], update_mode: str = None):
+                     non_tensor_fields: List[str] = [], update_mode: str = None,
+                     image_download_headers: str = "{}"):
     """add documents using parallel processing using ray
     Args:
         documents (_type_): _description_

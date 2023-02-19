@@ -99,9 +99,7 @@ def load_image_from_path(image_path: str, image_download_headers: dict, timeout=
         img = Image.open(image_path)
     elif validators.url(image_path):
         try:
-            print(image_download_headers)
             resp = requests.get(image_path, stream=True, timeout=timeout, headers=image_download_headers)
-            print(resp.status_code)
         except (requests.exceptions.ConnectTimeout, requests.exceptions.ConnectionError,
                 requests.exceptions.RequestException
                 ) as e:
