@@ -350,9 +350,11 @@ def _infer_opensearch_data_type(
     else:
         return None
 
+
 def _get_chunks_for_field(field_name: str, doc_id: str, doc):
     # Find the chunks with a specific __field_name in a doc
     return [chunk for chunk in doc["_source"]["__chunks"] if chunk["__field_name"] == field_name]
+
 
 def add_documents(config: Config, index_name: str, docs: List[dict], auto_refresh: bool,
                   non_tensor_fields=None, use_existing_vectors: bool = False, device=None, update_mode: str = "replace",
@@ -390,6 +392,10 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
     if len(docs) == 0:
         raise errors.BadRequestError(message="Received empty add documents request")
+
+    if use_existing_vectors and update_mode != "replace":
+        raise errors.InvalidArgError("use_existing_vectors=True is only available for add and replace documents,"
+                                     "not for add and update!")
 
     valid_update_modes = ('update', 'replace')
     if update_mode not in valid_update_modes:
