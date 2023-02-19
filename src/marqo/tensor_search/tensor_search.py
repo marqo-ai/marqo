@@ -413,7 +413,6 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
     if update_mode == 'replace' and use_existing_vectors:
         # Get existing documents
-        print("Debug: getting existing vectors now")
         doc_ids = [doc["_id"] for doc in docs]
         existing_docs = _get_documents_for_upsert(config=config, index_name=index_name, document_ids=doc_ids)
 
@@ -842,7 +841,7 @@ def _get_documents_for_upsert(
         # There should always be 2 results per doc.
         result_list = [doc for doc in res["docs"] if doc["_id"] == doc_id]
         if len(result_list) != 2:
-            raise MarqoWebError(f"Bad request for existing documents. There are {len(result_list)} results for doc id {doc_id}.")
+            raise errors.MarqoWebError(f"Bad request for existing documents. There are {len(result_list)} results for doc id {doc_id}.")
 
         for result in result_list:
             if result["found"]:
