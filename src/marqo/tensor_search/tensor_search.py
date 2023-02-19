@@ -419,7 +419,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
     if update_mode == 'replace' and use_existing_vectors:
         # Get existing documents
-        doc_ids = [doc["_id"] for doc in docs]
+        doc_ids = [doc["_id"] for doc in docs if "_id" in doc]
         existing_docs = _get_documents_for_upsert(config=config, index_name=index_name, document_ids=doc_ids)
 
     for i, doc in enumerate(docs):
@@ -451,8 +451,14 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
         if update_mode == "replace":
             indexing_instructions["index"]["_id"] = doc_id
             if use_existing_vectors:
+                matching_doc = [doc for doc in existing_docs["docs"] if doc["_id"] == doc_id]
                 # Should only have 1 result, as only 1 id matches
-                existing_doc = [doc for doc in existing_docs["docs"] if doc["_id"] == doc_id][0]
+                if len(matching_doc) == 1:
+                    existing_doc = matching_doc[0]
+                # When a request isn't sent to get matching docs, because the added docs don't
+                # have IDs:
+                elif len(matching_doc) == 0:
+                    existing_doc = {"found": False}
         else:
             indexing_instructions["update"]["_id"] = doc_id
 
@@ -807,32 +813,35 @@ def _get_documents_for_upsert(
     """returns document chunks and content"""
     if not isinstance(document_ids, typing.Collection):
         raise errors.InvalidArgError("Get documents must be passed a collection of IDs!")
-    if len(document_ids) <= 0:
-        raise errors.InvalidArgError("Can't get empty collection of IDs!")
+
+    # If we receive an invalid ID, we skip it
+    valid_doc_ids = []
+    for d_id in document_ids:
+        try:
+            validation.validate_id(d_id)
+            valid_doc_ids.append(d_id)
+        except errors.InvalidDocumentIdError:
+            pass
+
+    if len(valid_doc_ids) <= 0:
+        return {"docs": []}
     max_docs_limit = utils.read_env_vars_and_defaults(EnvVars.MARQO_MAX_RETRIEVABLE_DOCS)
     if max_docs_limit is not None and len(document_ids) > int(max_docs_limit):
         raise errors.IllegalRequestedDocCount(
             f"{len(document_ids)} documents were requested, which is more than the allowed limit of [{max_docs_limit}], "
             f"set by the environment variable `{EnvVars.MARQO_MAX_RETRIEVABLE_DOCS}`")
-    
+
     # Chunk Docs (get field name, field content, vectors)
     chunk_docs = [
-        {"_index": index_name, "_id": validation.validate_id(doc_id),
+        {"_index": index_name, "_id": doc_id,
          "_source": {"include": [f"__chunks.__field_content", f"__chunks.__field_name", f"__chunks.__vector_*"]}}
-        for doc_id in document_ids
+        for doc_id in valid_doc_ids
     ]
-    # for d in chunk_docs:
-    #     d["_source"] = dict()
-    #     d["_source"]["include"] =
 
-    # Data Docs (get just the source data)
     data_docs = [
-        {"_index": index_name, "_id": validation.validate_id(doc_id), "_source": {"exclude": "__chunks.*"}}
-        for doc_id in document_ids
+        {"_index": index_name, "_id": doc_id, "_source": {"exclude": "__chunks.*"}}
+        for doc_id in valid_doc_ids
     ]
-    # for d in data_docs:
-    #     d["_source"] = dict()
-    #     d["_source"]["exclude"] = f"__chunks.*"
 
     res = HttpRequests(config).get(
         f'_mget/',
@@ -846,8 +855,11 @@ def _get_documents_for_upsert(
     for doc_id in document_ids:
         # There should always be 2 results per doc.
         result_list = [doc for doc in res["docs"] if doc["_id"] == doc_id]
-        if len(result_list) != 2:
-            raise errors.MarqoWebError(f"Bad request for existing documents. There are {len(result_list)} results for doc id {doc_id}.")
+        if len(result_list) == 0:
+            continue
+        if len(result_list) not in (2, 0):
+            raise errors.MarqoWebError(f"Bad request for existing documents. "
+                                       f"There are {len(result_list)} results for doc id {doc_id}.")
 
         for result in result_list:
             if result["found"]:

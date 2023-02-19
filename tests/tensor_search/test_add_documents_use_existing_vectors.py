@@ -20,6 +20,44 @@ class TestAddDocumentsUseExistingVectors(MarqoTestCase):
         except IndexNotFoundError as s:
             pass
 
+    def test_use_existing_vectors_relience(self):
+        """should if one doc fails validation, the rest should still be inserted
+        """
+        d1 = {
+            "title 1": "content 1",
+            "desc 2": "content 2. blah blah blah"
+        }
+        # 1 valid ID doc:
+        res = tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=[d1, {'_id': 1224}, {"_id": "fork", "abc": "123"}],
+            auto_refresh=True, use_existing_vectors=True)
+        assert [item['status'] for item in res['items']] == [201, 400, 201]
+
+        # no valid IDs
+        res_no_valid_id = tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=[d1, {'_id': 1224}, d1],
+            auto_refresh=True, use_existing_vectors=True)
+        # we also should not be send in a get request as there are no valid document IDs
+        assert [item['status'] for item in res_no_valid_id['items']] == [201, 400, 201]
+
+    def test_use_existing_vectors_no_id(self):
+        """should insert if there's no ID
+        """
+        d1 = {
+            "title 1": "content 1",
+            "desc 2": "content 2. blah blah blah"
+        }
+        r1 = tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=[d1],
+            auto_refresh=True, use_existing_vectors=True)
+        r2 = tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=[d1, d1],
+            auto_refresh=True, use_existing_vectors=True)
+        for item in r1['items']:
+            assert item['result'] == 'created'
+        for item in r2['items']:
+            assert item['result'] == 'created'
+
     def test_use_existing_vectors_non_existing(self):
         """check parity between a doc created with and without use_existing_vetors,
         for a newly created doc.
