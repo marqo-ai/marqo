@@ -87,13 +87,12 @@ class IndexChunk:
     """wrapper to pass through documents to be indexed to multiprocessing
     """
 
-    def __init__(self, config=None,
-                        index_name: str = None, docs: List[Dict] = [],
-                        auto_refresh: bool = False, batch_size: int = 50, 
-                        device: str = None, process_id: int = 0, 
-                        non_tensor_fields: List[str] = [],
-                        threads_per_process: int = None, update_mode: str = 'replace',
-                        image_download_headers: str = ""):
+    def __init__(self, config=None, index_name: str = None, docs: List[Dict] = [],
+                auto_refresh: bool = False, batch_size: int = 50,
+                device: str = None, process_id: int = 0,
+                non_tensor_fields: List[str] = [],
+                threads_per_process: int = None, update_mode: str = 'replace',
+                image_download_headers: str = "", use_existing_vectors: bool = False):
 
         self.config = copy.deepcopy(config)
         self.index_name = index_name
@@ -109,6 +108,7 @@ class IndexChunk:
         self.threads_per_process = threads_per_process
         self.non_tensor_fields = non_tensor_fields
         self.image_download_headers = image_download_headers
+        self.use_existing_vectors = use_existing_vectors
 
     def process(self):  
 
@@ -137,7 +137,7 @@ class IndexChunk:
             results.append(tensor_search.add_documents(
                 config=self.config, index_name=self.index_name, docs=_doc, auto_refresh=self.auto_refresh,
                 update_mode=self.update_mode, non_tensor_fields=self.non_tensor_fields,
-                image_download_headers=self.image_download_headers
+                use_existing_vectors=self.use_existing_vectors, image_download_headers=self.image_download_headers
             ))
             t_chunk_end = time.time()
 
@@ -169,10 +169,10 @@ def get_threads_per_process(processes: int):
     total_cpu = max(1, mp.cpu_count() - 2)
     return max(1, total_cpu//processes)
 
-def add_documents_mp(config=None, index_name=None, docs=None,
+def add_documents_mp(config=None, index_name=None, docs=None, 
                      auto_refresh=None, batch_size=50, processes=1, device=None,
                      non_tensor_fields: List[str] = [], update_mode: str = None,
-                     image_download_headers: str = "{}"):
+                     image_download_headers: str = "{}", use_existing_vectors=None):
     """add documents using parallel processing using ray
     Args:
         documents (_type_): _description_
@@ -182,7 +182,8 @@ def add_documents_mp(config=None, index_name=None, docs=None,
         non_tensor_fields (_type, List[str]): _description_. Fields within documents not to create 
           tensors for. Defaults to create tensors for all fields.
         update_mode (str, optional):
-    
+        use_existing_vectors
+
     Assumes running on the same host right now. Ray or something else should 
     be used if the processing is distributed.
 
@@ -212,8 +213,8 @@ def add_documents_mp(config=None, index_name=None, docs=None,
     chunkers = [IndexChunk(
             config=config, index_name=index_name, docs=_docs, non_tensor_fields=non_tensor_fields,
             auto_refresh=auto_refresh, batch_size=batch_size, update_mode=update_mode,
-            process_id=p_id, device=device_ids[p_id], threads_per_process=threads_per_process,
-            image_download_headers=image_download_headers)
+            use_existing_vectors=use_existing_vectors, image_download_headers=image_download_headers,
+            process_id=p_id, device=device_ids[p_id], threads_per_process=threads_per_process)
         for p_id,_docs in enumerate(np.array_split(docs, n_processes))]
     logger.info(f'Performing parallel now across devices {device_ids}...')
     with mp.Pool(n_processes) as pool:
