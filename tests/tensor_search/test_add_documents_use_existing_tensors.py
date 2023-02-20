@@ -9,7 +9,7 @@ from marqo.tensor_search import tensor_search, index_meta_cache, backend
 from marqo.errors import IndexNotFoundError, InvalidArgError, BadRequestError
 
 
-class TestAddDocumentsUseExistingVectors(MarqoTestCase):
+class TestAddDocumentsUseExistingTensors(MarqoTestCase):
 
     def setUp(self) -> None:
         self.endpoint = self.authorized_url
@@ -20,7 +20,7 @@ class TestAddDocumentsUseExistingVectors(MarqoTestCase):
         except IndexNotFoundError as s:
             pass
 
-    def test_use_existing_vectors_relience(self):
+    def test_use_existing_tensors_relience(self):
         """should if one doc fails validation, the rest should still be inserted
         """
         d1 = {
@@ -30,17 +30,17 @@ class TestAddDocumentsUseExistingVectors(MarqoTestCase):
         # 1 valid ID doc:
         res = tensor_search.add_documents(
             config=self.config, index_name=self.index_name_1, docs=[d1, {'_id': 1224}, {"_id": "fork", "abc": "123"}],
-            auto_refresh=True, use_existing_vectors=True)
+            auto_refresh=True, use_existing_tensors=True)
         assert [item['status'] for item in res['items']] == [201, 400, 201]
 
         # no valid IDs
         res_no_valid_id = tensor_search.add_documents(
             config=self.config, index_name=self.index_name_1, docs=[d1, {'_id': 1224}, d1],
-            auto_refresh=True, use_existing_vectors=True)
+            auto_refresh=True, use_existing_tensors=True)
         # we also should not be send in a get request as there are no valid document IDs
         assert [item['status'] for item in res_no_valid_id['items']] == [201, 400, 201]
 
-    def test_use_existing_vectors_no_id(self):
+    def test_use_existing_tensors_no_id(self):
         """should insert if there's no ID
         """
         d1 = {
@@ -49,17 +49,17 @@ class TestAddDocumentsUseExistingVectors(MarqoTestCase):
         }
         r1 = tensor_search.add_documents(
             config=self.config, index_name=self.index_name_1, docs=[d1],
-            auto_refresh=True, use_existing_vectors=True)
+            auto_refresh=True, use_existing_tensors=True)
         r2 = tensor_search.add_documents(
             config=self.config, index_name=self.index_name_1, docs=[d1, d1],
-            auto_refresh=True, use_existing_vectors=True)
+            auto_refresh=True, use_existing_tensors=True)
         for item in r1['items']:
             assert item['result'] == 'created'
         for item in r2['items']:
             assert item['result'] == 'created'
 
-    def test_use_existing_vectors_non_existing(self):
-        """check parity between a doc created with and without use_existing_vetors,
+    def test_use_existing_tensors_non_existing(self):
+        """check parity between a doc created with and without use_existing_tensors,
         for a newly created doc.
         """
         tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
@@ -67,7 +67,7 @@ class TestAddDocumentsUseExistingVectors(MarqoTestCase):
                 "_id": "123",
                 "title 1": "content 1",
                 "desc 2": "content 2. blah blah blah"
-            }], auto_refresh=True, use_existing_vectors=False)
+            }], auto_refresh=True, use_existing_tensors=False)
         regular_doc = tensor_search.get_document_by_id(
             config=self.config, index_name=self.index_name_1,
             document_id="123", show_vectors=True)
@@ -79,16 +79,16 @@ class TestAddDocumentsUseExistingVectors(MarqoTestCase):
                 "_id": "123",
                 "title 1": "content 1",
                 "desc 2": "content 2. blah blah blah"
-            }], auto_refresh=True, use_existing_vectors=True)
-        use_existing_vetors_doc = tensor_search.get_document_by_id(
+            }], auto_refresh=True, use_existing_tensors=True)
+        use_existing_tensors_doc = tensor_search.get_document_by_id(
             config=self.config, index_name=self.index_name_1,
             document_id="123", show_vectors=True)
-        self.assertEqual(use_existing_vetors_doc, regular_doc)
+        self.assertEqual(use_existing_tensors_doc, regular_doc)
 
-    def test_use_existing_vectors_getting_non_tensorised(self):
+    def test_use_existing_tensors_getting_non_tensorised(self):
         """
         During the initial index, one field is set as a non_tensor_field.
-        When we insert the doc again, with use_existing_vectors, because the content
+        When we insert the doc again, with use_existing_tensors, because the content
         hasn't changed, we use the existing (non-existent) vectors
         """
         tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
@@ -108,13 +108,13 @@ class TestAddDocumentsUseExistingVectors(MarqoTestCase):
                 "_id": "123",
                 "title 1": "content 1",
                 "non-tensor-field": "content 2. blah blah blah"
-            }], auto_refresh=True, use_existing_vectors=True)
+            }], auto_refresh=True, use_existing_tensors=True)
         d2 = tensor_search.get_document_by_id(
             config=self.config, index_name=self.index_name_1,
             document_id="123", show_vectors=True)
         self.assertEqual(d1["_tensor_facets"], d2["_tensor_facets"])
 
-    def test_use_existing_vectors_check_updates(self):
+    def test_use_existing_tensors_check_updates(self):
         """ Check to see if the document has been appropriately updated
         """
         tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
@@ -143,14 +143,14 @@ class TestAddDocumentsUseExistingVectors(MarqoTestCase):
                     "modded field": "updated content",  # new vectors because the content is modified
                     "non-tensor-field": "content 2. blah blah blah",  # this would should still have no vectors
                     "2nd-non-tensor-field": "content 2. blah blah blah"  # this one is explicitly being non-tensorised
-                }], auto_refresh=True, non_tensor_fields=["2nd-non-tensor-field"], use_existing_vectors=True)
+                }], auto_refresh=True, non_tensor_fields=["2nd-non-tensor-field"], use_existing_tensors=True)
             content_to_be_vectorised = [call_kwargs['content'] for call_args, call_kwargs
                                         in mock_vectorise.call_args_list]
             assert content_to_be_vectorised == [["cat on mat"], ["updated content"]]
             return True
         assert run()
 
-    def test_use_existing_vectors_check_meta_data(self):
+    def test_use_existing_tensors_check_meta_data(self):
         """
 
         Checks chunk meta data and vectors are as expected
@@ -167,7 +167,7 @@ class TestAddDocumentsUseExistingVectors(MarqoTestCase):
                 "fl": 1.51
             }], auto_refresh=True, non_tensor_fields=["non-tensor-field"])
 
-        use_existing_vetor_doc = {
+        use_existing_tensor_doc = {
                 "title 1": "content 1",  # this one should keep the same vectors
                 "my new field": "cat on mat",  # new vectors because it's a new field
                 "modded field": "updated content",  # new vectors because the content is modified
@@ -180,9 +180,9 @@ class TestAddDocumentsUseExistingVectors(MarqoTestCase):
                 "new_bool": False
             }
         tensor_search.add_documents(
-            config=self.config, index_name=self.index_name_1, docs=[{"_id": "123", **use_existing_vetor_doc}],
+            config=self.config, index_name=self.index_name_1, docs=[{"_id": "123", **use_existing_tensor_doc}],
             auto_refresh=True, non_tensor_fields=["2nd-non-tensor-field", "field_to_be_list", 'new_field_list'],
-            use_existing_vectors=True)
+            use_existing_tensors=True)
 
         updated_doc = requests.get(
             url=F"{self.endpoint}/{self.index_name_1}/_doc/123",
@@ -192,7 +192,7 @@ class TestAddDocumentsUseExistingVectors(MarqoTestCase):
         # each chunk needs its metadata to be the same as the updated document's content
         for ch in chunks:
             ch_meta_data = {k: v for k, v in ch.items() if not k.startswith("__")}
-            assert use_existing_vetor_doc == ch_meta_data
+            assert use_existing_tensor_doc == ch_meta_data
         assert len(chunks) == 3
 
         # check if the vectors/field content is correct
@@ -201,11 +201,11 @@ class TestAddDocumentsUseExistingVectors(MarqoTestCase):
             for ch in chunks:
                 if ch["__field_name"] == vector_field:
                     found_vector_field = True
-                    assert ch['__field_content'] == use_existing_vetor_doc[vector_field]
+                    assert ch['__field_content'] == use_existing_tensor_doc[vector_field]
                     assert isinstance(ch[f"__vector_{vector_field}"], list)
             assert found_vector_field
 
-    def test_use_existing_vectors_check_meta_data_mappings(self):
+    def test_use_existing_tensors_check_meta_data_mappings(self):
         tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
             {
                 "_id": "123",
@@ -217,7 +217,7 @@ class TestAddDocumentsUseExistingVectors(MarqoTestCase):
                 "fl": 1.51
             }], auto_refresh=True, non_tensor_fields=["non-tensor-field"])
 
-        use_existing_vetor_doc = {
+        use_existing_tensor_doc = {
             "title 1": "content 1",  # this one should keep the same vectors
             "my new field": "cat on mat",  # new vectors because it's a new field
             "modded field": "updated content",  # new vectors because the content is modified
@@ -230,9 +230,9 @@ class TestAddDocumentsUseExistingVectors(MarqoTestCase):
             "new_bool": False
         }
         tensor_search.add_documents(
-            config=self.config, index_name=self.index_name_1, docs=[{"_id": "123", **use_existing_vetor_doc}],
+            config=self.config, index_name=self.index_name_1, docs=[{"_id": "123", **use_existing_tensor_doc}],
             auto_refresh=True, non_tensor_fields=["2nd-non-tensor-field", "field_to_be_list", 'new_field_list'],
-            use_existing_vectors=True)
+            use_existing_tensors=True)
 
         tensor_search.index_meta_cache.refresh_index(config=self.config, index_name=self.index_name_1)
 
@@ -252,7 +252,7 @@ class TestAddDocumentsUseExistingVectors(MarqoTestCase):
             assert index_info.properties[field_name]['type'] == os_type
             assert index_info.properties['__chunks']['properties'][field_name]['type'] == os_type
 
-    def test_use_existing_vectors_long_strings_and_images(self):
+    def test_use_existing_tensors_long_strings_and_images(self):
         """Checks vectorise calls and chunk structure for image and text fields with more than 1 chunk"""
         index_settings = {
             "index_defaults": {
@@ -292,7 +292,7 @@ class TestAddDocumentsUseExistingVectors(MarqoTestCase):
         mock_vectorise.side_effect = pass_through_vectorise
         @unittest.mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
         def run():
-            use_existing_vetor_doc = {
+            use_existing_tensor_doc = {
                 "txt_to_be_the_same": "some text to leave unchanged. I repeat, unchanged",
                 "txt_to_be_modified": "this is the updated 1st sentence. This is my second", # 2nd sentence not modified
                 "txt_to_be_created": "this is a brand new sentence. Yes it is",
@@ -303,9 +303,9 @@ class TestAddDocumentsUseExistingVectors(MarqoTestCase):
                 "non-tensor-field": ["it", "is", "9", "o clock"]
             }
             tensor_search.add_documents(
-                config=self.config, index_name=self.index_name_1, docs=[{"_id": "123", **use_existing_vetor_doc}],
+                config=self.config, index_name=self.index_name_1, docs=[{"_id": "123", **use_existing_tensor_doc}],
                 auto_refresh=True, non_tensor_fields=["non-tensor-field"],
-                use_existing_vectors=True)
+                use_existing_tensors=True)
 
             vectorised_content = [call_kwargs['content'] for call_args, call_kwargs
                                   in mock_vectorise.call_args_list]
@@ -323,13 +323,13 @@ class TestAddDocumentsUseExistingVectors(MarqoTestCase):
 
             parent_doc = updated_doc.json()['_source']
             del parent_doc['__chunks']
-            assert parent_doc == use_existing_vetor_doc
+            assert parent_doc == use_existing_tensor_doc
 
             # each chunk needs its metadata to be the same as the updated document's content:
             chunks = [chunk for chunk in updated_doc.json()['_source']['__chunks']]
             for ch in chunks:
                 ch_meta_data = {k: v for k, v in ch.items() if not k.startswith("__")}
-                assert use_existing_vetor_doc == ch_meta_data
+                assert use_existing_tensor_doc == ch_meta_data
 
             vector_img_fields = ["img_to_be_modified", "img_to_be_same", "img_to_be_Created"]
             # check if the vectors/field content is correct for images:
@@ -338,7 +338,7 @@ class TestAddDocumentsUseExistingVectors(MarqoTestCase):
                 for ch in chunks:
                     if ch["__field_name"] == vector_field:
                         found_vector_field = True
-                        assert ch['__field_content'] == use_existing_vetor_doc[vector_field]
+                        assert ch['__field_content'] == use_existing_tensor_doc[vector_field]
                         assert isinstance(ch[f"__vector_{vector_field}"], list)
                 assert found_vector_field
 

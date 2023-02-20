@@ -244,7 +244,7 @@ def add_documents_orchestrator(
         config: Config, index_name: str, docs: List[dict],
         auto_refresh: bool, batch_size: int = 0, processes: int = 1,
         non_tensor_fields=None, image_download_headers: dict = None,
-        device=None, update_mode: str = 'replace', use_existing_vectors: bool = False):
+        device=None, update_mode: str = 'replace', use_existing_tensors: bool = False):
 
     if image_download_headers is None:
         image_download_headers = dict()
@@ -257,7 +257,7 @@ def add_documents_orchestrator(
         return add_documents(
             config=config, index_name=index_name, docs=docs, auto_refresh=auto_refresh,
             device=device, update_mode=update_mode, non_tensor_fields=non_tensor_fields,
-            image_download_headers=image_download_headers, use_existing_vectors=use_existing_vectors
+            use_existing_tensors=use_existing_tensors, image_download_headers=image_download_headers
         )
     elif processes is not None and processes > 1:
 
@@ -269,7 +269,7 @@ def add_documents_orchestrator(
             config=config, index_name=index_name, docs=docs,
             auto_refresh=auto_refresh, batch_size=batch_size, processes=processes,
             device=device, update_mode=update_mode, non_tensor_fields=non_tensor_fields,
-            image_download_headers=image_download_headers, use_existing_vectors=use_existing_vectors
+            use_existing_tensors=use_existing_tensors, image_download_headers=image_download_headers
         )
 
         # we need to force the cache to update as it does not propagate using mp
@@ -285,14 +285,14 @@ def add_documents_orchestrator(
         logger.info(f"batch_size={batch_size} and processes={processes} - batching using a single process")
         return _batch_request(config=config, index_name=index_name, dataset=docs, device=device,
                               batch_size=batch_size, verbose=False, non_tensor_fields=non_tensor_fields,
-                              use_existing_vectors=use_existing_vectors,
+                              use_existing_tensors=use_existing_tensors,
                               image_download_headers=image_download_headers)
 
 
 def _batch_request(config: Config, index_name: str, dataset: List[dict],
                    batch_size: int = 100, verbose: bool = True, device=None,
                    update_mode: str = 'replace', non_tensor_fields=None,
-                   image_download_headers: Optional[Dict] = None, use_existing_vectors: bool = False
+                   image_download_headers: Optional[Dict] = None, use_existing_tensors: bool = False
                    ) -> List[Dict[str, Any]]:
     """Batch by the number of documents"""
     if image_download_headers is None:
@@ -323,7 +323,7 @@ def _batch_request(config: Config, index_name: str, dataset: List[dict],
             config=config, index_name=index_name,
             docs=docs, auto_refresh=False, device=device,
             update_mode=update_mode, non_tensor_fields=non_tensor_fields,
-            use_existing_vectors=use_existing_vectors, image_download_headers=image_download_headers
+            use_existing_tensors=use_existing_tensors, image_download_headers=image_download_headers
         )
         total_batch_time = timer() - t0
         num_docs = len(docs)
@@ -368,7 +368,7 @@ def _get_chunks_for_field(field_name: str, doc_id: str, doc):
 def add_documents(config: Config, index_name: str, docs: List[dict], auto_refresh: bool,
                   non_tensor_fields=None, device=None, update_mode: str = "replace",
                   image_download_thread_count: int = 20, image_download_headers: dict = None,
-                  use_existing_vectors: bool = False):
+                  use_existing_tensors: bool = False):
     """
 
     Args:
@@ -378,7 +378,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
         auto_refresh: Set to False if indexing lots of docs
         non_tensor_fields: List of fields, within documents to not create tensors for. Default to
           make tensors for all fields.
-        use_existing_vectors: Whether or not to use the vectors already in doc (for update docs)
+        use_existing_tensors: Whether or not to use the vectors already in doc (for update docs)
         device: Device used to carry out the document update.
         update_mode: {'replace' | 'update'}. If set to replace (default) just
         image_download_thread_count: number of threads used to concurrently download images
@@ -406,8 +406,8 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
     if len(docs) == 0:
         raise errors.BadRequestError(message="Received empty add documents request")
 
-    if use_existing_vectors and update_mode != "replace":
-        raise errors.InvalidArgError("use_existing_vectors=True is only available for add and replace documents,"
+    if use_existing_tensors and update_mode != "replace":
+        raise errors.InvalidArgError("use_existing_tensors=True is only available for add and replace documents,"
                                      "not for add and update!")
 
     valid_update_modes = ('update', 'replace')
@@ -431,7 +431,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
         logger.info(f"          add_documents image download: took {(timer() - ti_0):.3f}s to concurrently download "
                     f"images for {batch_size} docs using {image_download_thread_count} threads ")
 
-    if update_mode == 'replace' and use_existing_vectors:
+    if update_mode == 'replace' and use_existing_tensors:
         # Get existing documents
         doc_ids = [doc["_id"] for doc in docs if "_id" in doc]
         existing_docs = _get_documents_for_upsert(config=config, index_name=index_name, document_ids=doc_ids)
@@ -464,7 +464,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
         if update_mode == "replace":
             indexing_instructions["index"]["_id"] = doc_id
-            if use_existing_vectors:
+            if use_existing_tensors:
                 matching_doc = [doc for doc in existing_docs["docs"] if doc["_id"] == doc_id]
                 # Should only have 1 result, as only 1 id matches
                 if len(matching_doc) == 1:
@@ -513,7 +513,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
             chunks_to_append = []
 
             # Check if content of this field changed. If no, skip all chunking and vectorisation
-            if ((update_mode == 'replace') and use_existing_vectors and existing_doc["found"]
+            if ((update_mode == 'replace') and use_existing_tensors and existing_doc["found"]
                     and (field in existing_doc["_source"]) and (existing_doc["_source"][field] == field_content)):
                 # logger.info(f"Using existing vectors for doc {doc_id}, field {field}. Content remains unchanged.")
                 chunks_to_append = _get_chunks_for_field(field_name=field, doc_id=doc_id, doc=existing_doc)
