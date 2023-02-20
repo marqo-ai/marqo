@@ -243,8 +243,11 @@ def _check_and_create_index_if_not_exist(config: Config, index_name: str):
 def add_documents_orchestrator(
         config: Config, index_name: str, docs: List[dict],
         auto_refresh: bool, batch_size: int = 0, processes: int = 1,
-        non_tensor_fields=None, image_download_headers: str = "{}",
+        non_tensor_fields=None, image_download_headers: dict = None,
         device=None, update_mode: str = 'replace', use_existing_vectors: bool = False):
+
+    if image_download_headers is None:
+        image_download_headers = dict()
 
     if non_tensor_fields is None:
         non_tensor_fields = []
@@ -361,7 +364,7 @@ def _get_chunks_for_field(field_name: str, doc_id: str, doc):
 
 def add_documents(config: Config, index_name: str, docs: List[dict], auto_refresh: bool,
                   non_tensor_fields=None, device=None, update_mode: str = "replace",
-                  image_download_thread_count: int = 20, image_download_headers: str = "{}",
+                  image_download_thread_count: int = 20, image_download_headers: dict = None,
                   use_existing_vectors: bool = False):
     """
 
@@ -381,6 +384,8 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
     """
     # ADD DOCS TIMER-LOGGER (3)
+    if image_download_headers is None:
+        image_download_headers = dict()
     start_time_3 = timer()
 
     if non_tensor_fields is None:
@@ -388,12 +393,6 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
     t0 = timer()
     bulk_parent_dicts = []
-
-    try:
-        # FIXME: json parsing should be in api.py
-        image_download_headers_parsed = json.loads(image_download_headers)
-    except json.decoder.JSONDecodeError:
-        raise errors.InvalidArgError(message=f"Could not parse image_download_header '{image_download_headers}'. Ensure it is valid json.")
 
     try:
         index_info = backend.get_index_info(config=config, index_name=index_name)
@@ -425,7 +424,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
     if index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]:
         ti_0 = timer()
         image_repo = add_docs.download_images(docs=docs, thread_count=20, non_tensor_fields=tuple(non_tensor_fields),
-                                              image_download_headers=image_download_headers_parsed)
+                                              image_download_headers=image_download_headers)
         logger.info(f"          add_documents image download: took {(timer() - ti_0):.3f}s to concurrently download "
                     f"images for {batch_size} docs using {image_download_thread_count} threads ")
 

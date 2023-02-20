@@ -133,8 +133,10 @@ def add_or_replace_documents(docs: List[Dict], index_name: str, refresh: bool = 
                         non_tensor_fields: List[str] = Query(default=[]),
                         use_existing_vectors: bool = False,
                         device: str = Depends(api_validation.validate_device),
-                        image_download_headers: str = "{}"):
+                        image_download_headers: dict = None):
     """add_documents endpoint (replace existing docs with the same id)"""
+    if image_download_headers is None:
+        image_download_headers = dict()
     return tensor_search.add_documents_orchestrator(
         config=marqo_config,
         docs=docs,
