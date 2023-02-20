@@ -85,7 +85,7 @@ def load_rcnn_image(image_name: str, size: Tuple = (320,320)) -> Tuple[ImageType
     if isinstance(image_name, ImageType):
         image = image_name 
     elif isinstance(image_name, str):
-        image = load_image_from_path(image_name)
+        image = load_image_from_path(image_name, {})
     else:
         raise TypeError(f"received {type(image_name)} but expected a string or PIL image")
 

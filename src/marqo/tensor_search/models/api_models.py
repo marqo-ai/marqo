@@ -22,6 +22,7 @@ class SearchQuery(BaseModel):
     filter: str = None
     attributesToRetrieve: List[str] = None
     boost: Optional[Dict] = None
+    image_download_headers: Optional[Dict] = None
 
     @pydantic.validator('searchMethod')
     def validate_search_method(cls, value):

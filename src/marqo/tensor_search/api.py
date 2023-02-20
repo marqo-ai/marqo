@@ -112,7 +112,7 @@ def create_index(index_name: str, settings: Dict = None, marqo_config: config.Co
 @app.post("/indexes/{index_name}/search")
 @throttle(RequestType.SEARCH)
 def search(search_query: SearchQuery, index_name: str, device: str = Depends(api_validation.validate_device),
-                 marqo_config: config.Config = Depends(generate_config)):
+           marqo_config: config.Config = Depends(generate_config)):
     return tensor_search.search(
         config=marqo_config, text=search_query.q,
         index_name=index_name, highlights=search_query.showHighlights,
@@ -121,18 +121,21 @@ def search(search_query: SearchQuery, index_name: str, device: str = Depends(api
         result_count=search_query.limit, offset=search_query.offset,
         reranker=search_query.reRanker, 
         filter=search_query.filter, device=device,
-        attributes_to_retrieve=search_query.attributesToRetrieve, boost=search_query.boost
+        attributes_to_retrieve=search_query.attributesToRetrieve, boost=search_query.boost,
+        image_download_headers=search_query.image_download_headers
     )
 
 
 @app.post("/indexes/{index_name}/documents")
 @throttle(RequestType.INDEX)
 def add_or_replace_documents(docs: List[Dict], index_name: str, refresh: bool = True,
-                             marqo_config: config.Config = Depends(generate_config),
-                             batch_size: int = 0, processes: int = 1,
-                             non_tensor_fields: List[str] = Query(default=[]),
-                             use_existing_tensors: bool = False,
-                             device: str = Depends(api_validation.validate_device)):
+                        marqo_config: config.Config = Depends(generate_config),
+                        batch_size: int = 0, processes: int = 1,
+                        non_tensor_fields: List[str] = Query(default=[]),
+                        device: str = Depends(api_validation.validate_device),
+                        use_existing_tensors: bool = False,
+                        image_download_headers: typing.Optional[dict] = Depends(
+                            api_utils.decode_image_download_headers)):
     """add_documents endpoint (replace existing docs with the same id)"""
     return tensor_search.add_documents_orchestrator(
         config=marqo_config,
@@ -140,6 +143,7 @@ def add_or_replace_documents(docs: List[Dict], index_name: str, refresh: bool = 
         index_name=index_name, auto_refresh=refresh,
         batch_size=batch_size, processes=processes, device=device,
         non_tensor_fields=non_tensor_fields, update_mode='replace',
+        image_download_headers=image_download_headers,
         use_existing_tensors=use_existing_tensors
     )
 
@@ -157,7 +161,7 @@ def add_or_update_documents(docs: List[Dict], index_name: str, refresh: bool = T
         docs=docs,
         index_name=index_name, auto_refresh=refresh,
         batch_size=batch_size, processes=processes, device=device,
-        non_tensor_fields=non_tensor_fields, update_mode='update',
+        non_tensor_fields=non_tensor_fields, update_mode='update'
     )
 
 @app.get("/indexes/{index_name}/documents/{document_id}")

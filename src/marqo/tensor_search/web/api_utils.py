@@ -1,3 +1,5 @@
+import json
+import urllib.parse
 from marqo.errors import InvalidArgError, InternalError
 from marqo.tensor_search import enums
 from typing import Optional
@@ -61,4 +63,27 @@ def translate_api_device(device: Optional[str]) -> Optional[str]:
     except (IndexError, ValueError) as k:
         raise InvalidArgError(f"Given device `{device}` isn't  a known device type. "
                               f"Acceptable device types: {acceptable_devices}")
+
+
+def decode_image_download_headers(image_download_headers: Optional[str] = None) -> dict:
+    """Decodes and image download header string into a Python dict
+
+    Args:
+        image_download_headers: JSON-serialised, URL encoded header dictionary
+
+    Returns:
+        image_download_headers as a dict
+
+    Raises:
+        InvalidArgError is there is trouble parsing the dictionary
+    """
+    if not image_download_headers:
+        return dict()
+    else:
+        try:
+            as_str = urllib.parse.unquote_plus(image_download_headers)
+            as_dict = json.loads(as_str)
+            return as_dict
+        except json.JSONDecodeError as e:
+            raise InvalidArgError(f"Error parsing image_download_headers. Message: {e}")
 

@@ -124,7 +124,7 @@ class CLIP_ONNX(object):
         if isinstance(images, list):
             image_input = format_and_load_CLIP_images(images)
         else:
-            image_input = [format_and_load_CLIP_image(images)]
+            image_input = [format_and_load_CLIP_image(images, {})]
 
         image_input_processed = torch.stack([self.clip_preprocess(_img) for _img in image_input])
         images_onnx = image_input_processed.detach().cpu().numpy().astype(self.visual_type)

@@ -31,6 +31,7 @@ Notes on search behaviour with caching and searchable attributes:
 
 """
 import copy
+import json
 import datetime
 from timeit import default_timer as timer
 import functools
@@ -242,9 +243,11 @@ def _check_and_create_index_if_not_exist(config: Config, index_name: str):
 def add_documents_orchestrator(
         config: Config, index_name: str, docs: List[dict],
         auto_refresh: bool, batch_size: int = 0, processes: int = 1,
-        non_tensor_fields=None,
-        device=None, update_mode: str = 'replace', 
-        use_existing_tensors: bool = False):
+        non_tensor_fields=None, image_download_headers: dict = None,
+        device=None, update_mode: str = 'replace', use_existing_tensors: bool = False):
+
+    if image_download_headers is None:
+        image_download_headers = dict()
 
     if non_tensor_fields is None:
         non_tensor_fields = []
@@ -254,7 +257,7 @@ def add_documents_orchestrator(
         return add_documents(
             config=config, index_name=index_name, docs=docs, auto_refresh=auto_refresh,
             device=device, update_mode=update_mode, non_tensor_fields=non_tensor_fields,
-            use_existing_tensors=use_existing_tensors
+            use_existing_tensors=use_existing_tensors, image_download_headers=image_download_headers
         )
     elif processes is not None and processes > 1:
 
@@ -266,7 +269,7 @@ def add_documents_orchestrator(
             config=config, index_name=index_name, docs=docs,
             auto_refresh=auto_refresh, batch_size=batch_size, processes=processes,
             device=device, update_mode=update_mode, non_tensor_fields=non_tensor_fields,
-            use_existing_tensors=use_existing_tensors
+            use_existing_tensors=use_existing_tensors, image_download_headers=image_download_headers
         )
 
         # we need to force the cache to update as it does not propagate using mp
@@ -282,14 +285,19 @@ def add_documents_orchestrator(
         logger.info(f"batch_size={batch_size} and processes={processes} - batching using a single process")
         return _batch_request(config=config, index_name=index_name, dataset=docs, device=device,
                               batch_size=batch_size, verbose=False, non_tensor_fields=non_tensor_fields,
-                              use_existing_tensors=use_existing_tensors)
+                              use_existing_tensors=use_existing_tensors,
+                              image_download_headers=image_download_headers)
 
 
 def _batch_request(config: Config, index_name: str, dataset: List[dict],
                    batch_size: int = 100, verbose: bool = True, device=None,
                    update_mode: str = 'replace', non_tensor_fields=None,
-                   use_existing_tensors: bool = False) -> List[Dict[str, Any]]:
+                   image_download_headers: Optional[Dict] = None, use_existing_tensors: bool = False
+                   ) -> List[Dict[str, Any]]:
     """Batch by the number of documents"""
+    if image_download_headers is None:
+        image_download_headers = dict()
+
     if non_tensor_fields is None:
         non_tensor_fields = []
 
@@ -315,7 +323,7 @@ def _batch_request(config: Config, index_name: str, dataset: List[dict],
             config=config, index_name=index_name,
             docs=docs, auto_refresh=False, device=device,
             update_mode=update_mode, non_tensor_fields=non_tensor_fields,
-            use_existing_tensors=use_existing_tensors
+            use_existing_tensors=use_existing_tensors, image_download_headers=image_download_headers
         )
         total_batch_time = timer() - t0
         num_docs = len(docs)
@@ -358,8 +366,9 @@ def _get_chunks_for_field(field_name: str, doc_id: str, doc):
 
 
 def add_documents(config: Config, index_name: str, docs: List[dict], auto_refresh: bool,
-                  non_tensor_fields=None, use_existing_tensors: bool = False, device=None, update_mode: str = "replace",
-                  image_download_thread_count: int = 20):
+                  non_tensor_fields=None, device=None, update_mode: str = "replace",
+                  image_download_thread_count: int = 20, image_download_headers: dict = None,
+                  use_existing_tensors: bool = False):
     """
 
     Args:
@@ -373,10 +382,13 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
         device: Device used to carry out the document update.
         update_mode: {'replace' | 'update'}. If set to replace (default) just
         image_download_thread_count: number of threads used to concurrently download images
+        image_download_headers: headers to authenticate image download
     Returns:
 
     """
     # ADD DOCS TIMER-LOGGER (3)
+    if image_download_headers is None:
+        image_download_headers = dict()
     start_time_3 = timer()
 
     if non_tensor_fields is None:
@@ -414,7 +426,8 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
     if index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]:
         ti_0 = timer()
-        image_repo = add_docs.download_images(docs=docs, thread_count=20, non_tensor_fields=tuple(non_tensor_fields))
+        image_repo = add_docs.download_images(docs=docs, thread_count=20, non_tensor_fields=tuple(non_tensor_fields),
+                                              image_download_headers=image_download_headers)
         logger.info(f"          add_documents image download: took {(timer() - ti_0):.3f}s to concurrently download "
                     f"images for {batch_size} docs using {image_download_thread_count} threads ")
 
@@ -616,7 +629,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
             # Add chunks_to_append along with doc metadata to total chunks
             for chunk in chunks_to_append:
                 chunks.append({**chunk, **chunk_values_for_filtering})
-        
+
         if document_is_valid:
             # This block happens per DOC
             new_fields = new_fields.union(new_fields_from_doc)
@@ -648,7 +661,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
             // All update fields should be recomputed, and it should be safe to delete these chunks             
             for (int i=ctx._source.{TensorField.chunks}.length-1; i>=0; i--) {{
                 if (params.doc_fields.contains(ctx._source.{TensorField.chunks}[i].{TensorField.field_name})) {{
-                ctx._source.{TensorField.chunks}.remove(i);
+                   ctx._source.{TensorField.chunks}.remove(i);
                 }}
                 // Check if the field should have a tensor, remove if not.
                 else if (params.non_tensor_fields.contains(ctx._source.{TensorField.chunks}[i].{TensorField.field_name})) {{
@@ -873,7 +886,7 @@ def _get_documents_for_upsert(
                 doc_in_results = False
                 dummy_res = result
                 break
-        
+
         # Put the chunks list in res_data, so it's complete
         if doc_in_results:
             res_data["_source"]["__chunks"] = res_chunks["_source"]["__chunks"]
@@ -881,9 +894,9 @@ def _get_documents_for_upsert(
         else:
             # This result just says that the doc was not found
             combined_result.append(dummy_res)
-            
+
     res["docs"] = combined_result
-    
+
     # Returns a list of combined docs
     return res
 
@@ -933,7 +946,8 @@ def search(config: Config, index_name: str, text: Union[str, dict],
            searchable_attributes: Iterable[str] = None, verbose: int = 0, num_highlights: int = 3,
            reranker: Union[str, Dict] = None, simplified_format: bool = True, filter: str = None,
            attributes_to_retrieve: Optional[List[str]] = None,
-           device=None, boost: Optional[Dict] = None) -> Dict:
+           device=None, boost: Optional[Dict] = None,
+           image_download_headers: Optional[Dict] = None) -> Dict:
     """The root search method. Calls the specific search method
 
     Validation should go here. Validations include:
@@ -955,6 +969,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
         verbose:
         num_highlights: number of highlights to return for each doc
         boost: boosters to re-weight the scores of individual fields
+        image_download_headers: headers for downloading images
 
     Returns:
 
@@ -977,7 +992,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
                                    f"MARQO_MAX_RETRIEVABLE_DOCS limit of [{max_docs_limit}]. ")
 
         raise errors.IllegalRequestedDocCount(f"{upper_bound_explanation} Marqo received search result limit of `{result_count}` "
-                                            f"and offset of `{offset}`.")
+                                              f"and offset of `{offset}`.")
 
     t0 = timer()
     validation.validate_boost(boost=boost, search_method=search_method)
@@ -1005,7 +1020,8 @@ def search(config: Config, index_name: str, text: Union[str, dict],
             config=config, index_name=index_name, query=text, result_count=result_count, offset=offset,
             return_doc_ids=return_doc_ids, searchable_attributes=searchable_attributes, verbose=verbose,
             number_of_highlights=num_highlights, simplified_format=simplified_format,
-            filter_string=filter, device=device, attributes_to_retrieve=attributes_to_retrieve, boost=boost
+            filter_string=filter, device=device, attributes_to_retrieve=attributes_to_retrieve, boost=boost,
+            image_download_headers=image_download_headers
         )
     elif search_method.upper() == SearchMethod.LEXICAL:
         search_result = _lexical_search(
@@ -1172,7 +1188,8 @@ def _vector_text_search(
         return_doc_ids=False, searchable_attributes: Iterable[str] = None, number_of_highlights=3,
         verbose=0, raise_on_searchable_attribs=False, hide_vectors=True, k=500,
         simplified_format=True, filter_string: str = None, device=None,
-        attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None):
+        attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None,
+        image_download_headers: Optional[Dict] = None):
     """
     Args:
         config:
@@ -1189,6 +1206,8 @@ def _vector_text_search(
         verbose: if 0 - nothing is printed. if 1 - data is printed without vectors, if 2 - full
             objects are printed out
         attributes_to_retrieve: if set, only returns these fields
+        image_download_headers: headers for downloading images
+
     Returns:
 
     Note:
@@ -1232,10 +1251,12 @@ def _vector_text_search(
             to_be_vectorised = [[k for k, _ in ordered_queries], ]
     try:
         vectorised_text = functools.reduce(lambda x, y: x + y,
-            [ s2_inference.vectorise(
+            [s2_inference.vectorise(
                 model_name=index_info.model_name, model_properties=_get_model_properties(index_info),
                 content=batch, device=selected_device,
-                normalize_embeddings=index_info.index_settings['index_defaults']['normalize_embeddings'])
+                normalize_embeddings=index_info.index_settings['index_defaults']['normalize_embeddings'],
+                image_download_headers=image_download_headers
+                )
                 for batch in to_be_vectorised]
         )
         if ordered_queries:

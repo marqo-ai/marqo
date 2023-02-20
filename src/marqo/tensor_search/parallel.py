@@ -1,12 +1,12 @@
 import os
 import time
-from typing import List, Dict
+import json
+from typing import List, Dict, Optional
 import copy
-
 import torch
 import numpy as np
 from torch import multiprocessing as mp
-
+from marqo import errors
 from marqo.tensor_search import tensor_search
 from marqo.marqo_logging import logger
 
@@ -90,7 +90,7 @@ class IndexChunk:
                         device: str = None, process_id: int = 0, 
                         non_tensor_fields: List[str] = [],
                         threads_per_process: int = None, update_mode: str = 'replace',
-                        use_existing_tensors: bool = False):
+                        use_existing_tensors: bool = False, image_download_headers: Optional[Dict] = None,):
 
         self.config = copy.deepcopy(config)
         self.index_name = index_name
@@ -106,6 +106,7 @@ class IndexChunk:
         self.threads_per_process = threads_per_process
         self.non_tensor_fields = non_tensor_fields
         self.use_existing_tensors = use_existing_tensors
+        self.image_download_headers = image_download_headers
 
     def process(self):  
 
@@ -133,7 +134,8 @@ class IndexChunk:
 
             results.append(tensor_search.add_documents(
                 config=self.config, index_name=self.index_name, docs=_doc, auto_refresh=self.auto_refresh,
-                update_mode=self.update_mode, non_tensor_fields=self.non_tensor_fields, use_existing_tensors=self.use_existing_tensors
+                update_mode=self.update_mode, non_tensor_fields=self.non_tensor_fields,
+                use_existing_tensors=self.use_existing_tensors, image_download_headers=self.image_download_headers
             ))
             t_chunk_end = time.time()
 
@@ -168,7 +170,7 @@ def get_threads_per_process(processes: int):
 def add_documents_mp(config=None, index_name=None, docs=None, 
                      auto_refresh=None, batch_size=50, processes=1, device=None,
                      non_tensor_fields: List[str] = [], update_mode: str = None,
-                     use_existing_tensors=None):
+                     image_download_headers: Optional[Dict] = None, use_existing_tensors=None):
     """add documents using parallel processing using ray
     Args:
         documents (_type_): _description_
@@ -186,7 +188,8 @@ def add_documents_mp(config=None, index_name=None, docs=None,
     Returns:
         _type_: _description_
     """
-
+    if image_download_headers is None:
+        image_download_headers = dict()
     selected_device = device if device is not None else config.indexing_device
 
     n_documents = len(docs)
@@ -209,7 +212,7 @@ def add_documents_mp(config=None, index_name=None, docs=None,
     chunkers = [IndexChunk(
             config=config, index_name=index_name, docs=_docs, non_tensor_fields=non_tensor_fields,
             auto_refresh=auto_refresh, batch_size=batch_size, update_mode=update_mode, 
-            use_existing_tensors=use_existing_tensors,
+            use_existing_tensors=use_existing_tensors, image_download_headers=image_download_headers,
             process_id=p_id, device=device_ids[p_id], threads_per_process=threads_per_process)
         for p_id,_docs in enumerate(np.array_split(docs, n_processes))]
     logger.info(f'Performing parallel now across devices {device_ids}...')

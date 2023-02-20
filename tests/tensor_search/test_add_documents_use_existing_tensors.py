@@ -309,7 +309,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
 
             vectorised_content = [call_kwargs['content'] for call_args, call_kwargs
                                   in mock_vectorise.call_args_list]
-            artefact_pil_image = load_image_from_path(artefact_hippo_img)
+            artefact_pil_image = load_image_from_path(artefact_hippo_img, image_download_headers={})
             expected_to_be_vectorised = [
                 ["this is the updated 1st sentence.", "This is my second"],
                 ["this is a brand new sentence.", "Yes it is"],
