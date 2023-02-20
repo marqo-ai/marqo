@@ -61,9 +61,12 @@ class SplitMethod:
     sentence = "sentence"
 
 
-class Device:
+class Device(str, Enum):
     cpu = "cpu"
     cuda = "cuda"
+    def __str__(self):
+        # To pass the str(Device.cpu) == "cpu" check in clip
+        return self.value
 
 
 class OpenSearchDataType:
