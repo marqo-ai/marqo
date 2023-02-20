@@ -128,17 +128,19 @@ def search(search_query: SearchQuery, index_name: str, device: str = Depends(api
 @app.post("/indexes/{index_name}/documents")
 @throttle(RequestType.INDEX)
 def add_or_replace_documents(docs: List[Dict], index_name: str, refresh: bool = True,
-                        marqo_config: config.Config = Depends(generate_config),
-                        batch_size: int = 0, processes: int = 1,
-                        non_tensor_fields: List[str] = Query(default=[]),
-                        device: str = Depends(api_validation.validate_device)):
+                             marqo_config: config.Config = Depends(generate_config),
+                             batch_size: int = 0, processes: int = 1,
+                             non_tensor_fields: List[str] = Query(default=[]),
+                             use_existing_tensors: bool = False,
+                             device: str = Depends(api_validation.validate_device)):
     """add_documents endpoint (replace existing docs with the same id)"""
     return tensor_search.add_documents_orchestrator(
         config=marqo_config,
         docs=docs,
         index_name=index_name, auto_refresh=refresh,
         batch_size=batch_size, processes=processes, device=device,
-        non_tensor_fields=non_tensor_fields, update_mode='replace'
+        non_tensor_fields=non_tensor_fields, update_mode='replace',
+        use_existing_tensors=use_existing_tensors
     )
 
 
@@ -149,13 +151,13 @@ def add_or_update_documents(docs: List[Dict], index_name: str, refresh: bool = T
                         batch_size: int = 0, processes: int = 1,
                         non_tensor_fields: List[str] = Query(default=[]),
                         device: str = Depends(api_validation.validate_device)):
-    """update add_documents endpoint"""
+    """WILL BE DEPRECATED SOON. update add_documents endpoint"""
     return tensor_search.add_documents_orchestrator(
         config=marqo_config,
         docs=docs,
         index_name=index_name, auto_refresh=refresh,
         batch_size=batch_size, processes=processes, device=device,
-        non_tensor_fields=non_tensor_fields, update_mode='update'
+        non_tensor_fields=non_tensor_fields, update_mode='update',
     )
 
 @app.get("/indexes/{index_name}/documents/{document_id}")
