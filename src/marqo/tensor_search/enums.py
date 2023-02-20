@@ -61,7 +61,7 @@ class SplitMethod:
     sentence = "sentence"
 
 
-class Device (str, Enum):
+class Device:
     cpu = "cpu"
     cuda = "cuda"
 
