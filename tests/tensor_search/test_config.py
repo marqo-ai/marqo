@@ -73,3 +73,6 @@ class TestConfig(MarqoTestCase):
             assert not c.cluster_is_remote
             return True
         assert run()
+
+    def test_device_for_clip(self):
+        assert str(enums.Device.cpu) == "cpu"
