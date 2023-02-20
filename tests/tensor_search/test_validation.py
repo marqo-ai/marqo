@@ -303,4 +303,121 @@ class TestValidation(unittest.TestCase):
             assert None is validation.validate_boost(boost=None, search_method=search_method)
 
 
+class TestValidateIndexSettings(unittest.TestCase):
 
+    @staticmethod
+    def get_good_index_settings():
+        return {
+            "index_defaults": {
+                "treat_urls_and_pointers_as_images": False,
+                "model": "hf/all_datasets_v4_MiniLM-L6",
+                "normalize_embeddings": True,
+                "text_preprocessing": {
+                    "split_length": 2,
+                    "split_overlap": 0,
+                    "split_method": "sentence"
+                },
+                "image_preprocessing": {
+                    "patch_method": None
+                }
+            },
+            "number_of_shards": 5
+        }
+
+    def test_validate_index_settings(self):
+        good_settings = {
+            "index_defaults": {
+                "treat_urls_and_pointers_as_images": False,
+                "model": "hf/all_datasets_v4_MiniLM-L6",
+                "normalize_embeddings": True,
+                "text_preprocessing": {
+                    "split_length": 2,
+                    "split_overlap": 0,
+                    "split_method": "sentence"
+                },
+                "image_preprocessing": {
+                    "patch_method": None
+                }
+            },
+            "number_of_shards": 5
+        }
+        assert good_settings == validation.validate_settings_object(good_settings)
+
+    def test_validate_index_settings_model_properties(self):
+        good_settings = self.get_good_index_settings()
+        good_settings['model_properties'] = dict()
+        assert good_settings == validation.validate_settings_object(good_settings)
+
+    def test_validate_index_settings_bad(self):
+        bad_settings = {
+            "index_defaults": {
+                "treat_urls_and_pointers_as_images": False,
+                "model": "hf/all_datasets_v4_MiniLM-L6",
+                "normalize_embeddings": True,
+                "text_preprocessing": {
+                    "split_length": "2",
+                    "split_overlap": "0",
+                    "split_method": "sentence"
+                },
+                "image_preprocessing": {
+                    "patch_method": None
+                }
+            },
+            "number_of_shards": 5
+        }
+        try:
+            validation.validate_settings_object(bad_settings)
+            raise AssertionError
+        except InvalidArgError as e:
+            pass
+
+    def test_validate_index_settings_missing_text_preprocessing(self):
+        settings = self.get_good_index_settings()
+        # base good settings should be OK
+        assert settings == validation.validate_settings_object(settings)
+        del settings['index_defaults']['text_preprocessing']
+        try:
+            validation.validate_settings_object(settings)
+            raise AssertionError
+        except InvalidArgError:
+            pass
+
+    def test_validate_index_settings_missing_model(self):
+        settings = self.get_good_index_settings()
+        # base good settings should be OK
+        assert settings == validation.validate_settings_object(settings)
+        del settings['index_defaults']['model']
+        try:
+            validation.validate_settings_object(settings)
+            raise AssertionError
+        except InvalidArgError:
+            pass
+
+    def test_validate_index_settings_missing_index_defaults(self):
+        settings = self.get_good_index_settings()
+        # base good settings should be OK
+        assert settings == validation.validate_settings_object(settings)
+        del settings['index_defaults']
+        try:
+            validation.validate_settings_object(settings)
+            raise AssertionError
+        except InvalidArgError:
+            pass
+
+    def test_validate_index_settings_bad_number_shards(self):
+        settings = self.get_good_index_settings()
+        # base good settings should be OK
+        assert settings == validation.validate_settings_object(settings)
+        settings['number_of_shards'] = -1
+        try:
+            validation.validate_settings_object(settings)
+            raise AssertionError
+        except InvalidArgError as e:
+            pass
+
+    def test_validate_index_settings_img_preprocessing(self):
+        settings = self.get_good_index_settings()
+        # base good settings should be OK
+        assert settings == validation.validate_settings_object(settings)
+        settings['index_defaults']['image_preprocessing']["path_method"] = "frcnn"
+        assert settings == validation.validate_settings_object(settings)
