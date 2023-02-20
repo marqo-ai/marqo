@@ -1532,14 +1532,14 @@ def get_cuda_info() -> dict:
 
 def vectorise_multimodal_combination_field(chunks: List, field: str, field_content:Dict[str,dict], image_repo, copied:Dict, unsuccessful_docs,
                                        total_vectorise_time, i, doc_id, selected_device,index_info):
-
     '''
     This function is used to vectorise multimodal combination field. The field content should
     have the following structure:
     field_conent = {"tensor_field_one" : {"weight":0.5, "parameter": "test-paramater-1"},
                     "tensor_field_two" : {"weight": 0.5, parameter": "test-parameter-2"}},
 
-    Over all this is a simplified version of the vectorise pipeline in add_documents. We don't do any chunking here.
+    Over all this is a simplified version of the vectorise pipeline in add_documents. Specifically, we don't do any
+    chunking here.
 
     Args:
         field_content:
@@ -1552,7 +1552,6 @@ def vectorise_multimodal_combination_field(chunks: List, field: str, field_conte
         index_info:
 
     Returns:
-
     '''
     # field_conent = {"tensor_field_one" : {"weight":0.5, "parameter": "test-paramater-1"},
     #                 "tensor_field_two" : {"weight": 0.5, parameter": "test-parameter-2"}},
@@ -1594,7 +1593,6 @@ def vectorise_multimodal_combination_field(chunks: List, field: str, field_conte
                 NsField.normalize_embeddings]
             infer_if_image = index_info.index_settings[NsField.index_defaults][
                 NsField.treat_urls_and_pointers_as_images]
-
 
             try:
                 if normalize_embeddings is False:
