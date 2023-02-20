@@ -582,15 +582,15 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                 vectorise_multimodal_combination_field(chunks, field, field_content, image_repo, copied, unsuccessful_docs, total_vectorise_time,
                                                i,doc_id,selected_device,index_info)
 
-
+        print(chunks)
         # TODO remove this print in the PR
-        copied_chunks = copy.deepcopy(chunks)
-        for dictionary in copied_chunks:
-            for key, value in dictionary.items():
-                if key.startswith("__vector"):
-                    dictionary[key] = "This is the very long vector for the field. [0,....0]"
-        pprint.pprint(copied_chunks, sort_dicts=False)
-
+        # copied_chunks = copy.deepcopy(chunks)
+        # for dictionary in copied_chunks:
+        #     for key, value in dictionary.items():
+        #         if key.startswith("__vector"):
+        #             dictionary[key] = "This is the very long vector for the field. [0,....0]"
+        # pprint.pprint(copied_chunks, sort_dicts=False)
+        print(new_fields_from_doc)
         if document_is_valid:
             new_fields = new_fields.union(new_fields_from_doc)
             if update_mode == 'replace':
@@ -663,7 +663,6 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
     
     logger.info(f"          add_documents vectorise: took {(total_vectorise_time):.3f}s for {batch_size} docs, " 
                 f"for an average of {(total_vectorise_time / batch_size):.3f}s per doc.")
-    
     if bulk_parent_dicts:
         # the HttpRequest wrapper handles error logic
         update_mapping_response = backend.add_customer_field_properties(
@@ -674,6 +673,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
         start_time_5 = timer()
         index_parent_response = HttpRequests(config).post(
             path="_bulk", body=utils.dicts_to_jsonl(bulk_parent_dicts))
+        print(index_parent_response)
         end_time_5 = timer()
         total_http_time = end_time_5 - start_time_5
         total_index_time = index_parent_response["took"] * 0.001
@@ -687,7 +687,6 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
     if auto_refresh:
         refresh_response = HttpRequests(config).post(path=F"{index_name}/_refresh")
-
     t1 = timer()
 
     def translate_add_doc_response(response: Optional[dict], time_diff: float) -> dict:
@@ -1559,58 +1558,36 @@ def vectorise_multimodal_combination_field(chunks: List, field: str, field_conte
     # field_conent = {"tensor_field_one" : {"weight":0.5, "parameter": "test-paramater-1"},
     #                 "tensor_field_two" : {"weight": 0.5, parameter": "test-parameter-2"}},
     document_is_valid = True
-    field_vector_weight = {}
+    field_vector_weight = []
     for sub_content, sub_content_para in field_content.items():
+        print(sub_content)
         # TODO put this into a function to determine routing
         if isinstance(sub_content, (str, Image.Image)):
             if isinstance(sub_content, str) and not _is_image(sub_content):
                 text_chunks = sub_content
                 content_chunks = text_chunks
             else:
-                try:
-                    # in the future, if we have different chunking methods, make sure we catch possible
-                    # errors of different types generated here, too.
-                    if isinstance(sub_content, str) and index_info.index_settings[NsField.index_defaults][
-                        NsField.treat_urls_and_pointers_as_images]:
-                        if not isinstance(image_repo[sub_content], Exception):
-                            image_data = image_repo[sub_content]
-                        else:
-                            raise s2_inference_errors.S2InferenceError(
-                                f"Could not find image found at `{sub_content}`. \n"
-                                f"Reason: {str(image_repo[sub_content])}"
-                            )
-                    else:
-                        image_data = sub_content
-
-                    content_chunks, text_chunks = [image_data], [sub_content]
-                except s2_inference_errors.S2InferenceError as e:
-                    document_is_valid = False
-                    unsuccessful_docs.append(
-                        (i, {'_id': doc_id, 'error': e.message,
-                             'status': int(errors.InvalidArgError.status_code),
-                             'code': errors.InvalidArgError.code})
-                    )
-                    return chunks, document_is_valid, unsuccessful_docs, total_vectorise_time
+                content_chunks, text_chunks = [sub_content], [sub_content]
 
             normalize_embeddings = index_info.index_settings[NsField.index_defaults][
                 NsField.normalize_embeddings]
             infer_if_image = index_info.index_settings[NsField.index_defaults][
                 NsField.treat_urls_and_pointers_as_images]
 
-            try:
-                if normalize_embeddings is False:
-                    raise errors.InvalidArgError(
-                        f"The setting `normalized_embedding` is `{normalize_embeddings}` for a multimodal_tensor_combination field."
-                        f"This is not supported. Please change the setting `normalized embedding` as `True` for multimodal_tensor_combination fields. "
-                    )
-            except errors.InvalidArgError as e:
-                document_is_valid = False
-                unsuccessful_docs.append(
-                    (i, {'_id': doc_id, 'error': e.message,
-                         'status': int(errors.InvalidArgError.status_code),
-                         'code': errors.InvalidArgError.code})
-                )
-                return chunks, document_is_valid, unsuccessful_docs, total_vectorise_time
+            # try:
+            #     if normalize_embeddings is False:
+            #         raise errors.InvalidArgError(
+            #             f"The setting `normalized_embedding` is `{normalize_embeddings}` for a multimodal_tensor_combination field."
+            #             f"This is not supported. Please change the setting `normalized embedding` as `True` for multimodal_tensor_combination fields. "
+            #         )
+            # except errors.InvalidArgError as e:
+            #     document_is_valid = False
+            #     unsuccessful_docs.append(
+            #         (i, {'_id': doc_id, 'error': e.message,
+            #              'status': int(errors.InvalidArgError.status_code),
+            #              'code': errors.InvalidArgError.code})
+            #     )
+            #     return chunks, document_is_valid, unsuccessful_docs, total_vectorise_time
 
 
             try:
@@ -1656,12 +1633,11 @@ def vectorise_multimodal_combination_field(chunks: List, field: str, field_conte
                 )
                 return chunks, document_is_valid, unsuccessful_docs, total_vectorise_time
 
-            field_vector_weight[sub_content_para["weight"]] = vector_chunks
+            field_vector_weight.append((sub_content_para["weight"], vector_chunks))
 
-    vector_chunk = (
-                np.sum([np.array(vector) * weight for weight, vector in field_vector_weight.items()], axis=0) / np.sum(
-            list(field_vector_weight.keys()))).tolist()
-
+    vector_chunk = np.squeeze(
+                np.sum([np.array(vector) * weight for weight, vector in field_vector_weight], axis=0) / np.sum(
+            [weight for weight, vector in field_vector_weight])).tolist()
     chunk_values_for_filtering = {}
     for key, value in copied.items():
         if not (isinstance(value, str) or isinstance(value, float)
