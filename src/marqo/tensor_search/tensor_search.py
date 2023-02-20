@@ -289,7 +289,7 @@ def add_documents_orchestrator(
 def _batch_request(config: Config, index_name: str, dataset: List[dict],
                    batch_size: int = 100, verbose: bool = True, device=None,
                    update_mode: str = 'replace', non_tensor_fields=None,
-                   image_download_headers=image_download_headers, use_existing_vectors: bool = False
+                   image_download_headers: str = "{}", use_existing_vectors: bool = False
                    ) -> List[Dict[str, Any]]:
     """Batch by the number of documents"""
     if non_tensor_fields is None:

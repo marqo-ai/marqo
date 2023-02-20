@@ -929,7 +929,7 @@ class TestAddDocuments(MarqoTestCase):
                   {"_id": "789", "Temp": 12.5},
                   ],
             auto_refresh=True, update_mode='update', processes=4, batch_size=1)
-        time.sleep(3)
+        time.sleep(5)
         updated_doc = tensor_search.get_document_by_id(
             config=self.config, index_name=self.index_name_1, document_id='789'
         )
