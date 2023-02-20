@@ -334,6 +334,8 @@ def _infer_opensearch_data_type(
         # OpenSearch requires that all content of an array be the same type.
         # This function doesn't validate.
         to_check = sample_field_content[0]
+    elif isinstance(sample_field_content, dict):
+        to_check = list(sample_field_content.keys())[0]
     else:
         to_check = sample_field_content
 
@@ -580,10 +582,9 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                         **chunk_values_for_filtering
                     })
             elif isinstance(field_content, dict):
-                vector_chunk, unsuccessful_docs, total_vectorise_time = \
-                vectorise_multimodal_combination_field(field_content, copied, unsuccessful_docs, total_vectorise_time,
+                chunks, document_is_valid, unsuccessful_docs, total_vectorise_time = \
+                vectorise_multimodal_combination_field(chunks, field, field_content, image_repo, copied, unsuccessful_docs, total_vectorise_time,
                                                i,doc_id,selected_device,index_info)
-
 
 
         # TODO remove this print in the PR
@@ -1533,7 +1534,7 @@ def get_cuda_info() -> dict:
         ))
 
 
-def vectorise_multimodal_combination_field(field_content:Dict[str,dict], copied:Dict, unsuccessful_docs,
+def vectorise_multimodal_combination_field(chunks: List, field: str, field_content:Dict[str,dict], image_repo, copied:Dict, unsuccessful_docs,
                                        total_vectorise_time, i, doc_id, selected_device,index_info):
 
     '''
@@ -1559,27 +1560,31 @@ def vectorise_multimodal_combination_field(field_content:Dict[str,dict], copied:
     '''
     # field_conent = {"tensor_field_one" : {"weight":0.5, "parameter": "test-paramater-1"},
     #                 "tensor_field_two" : {"weight": 0.5, parameter": "test-parameter-2"}},
+    document_is_valid = True
     field_vector_weight = {}
     for sub_content, sub_content_para in field_content.items():
         # TODO put this into a function to determine routing
         if isinstance(sub_content, (str, Image.Image)):
-            # TODO: better/consistent handling of a no-op for processing (but still vectorize)
-            # 1. check if urls should be downloaded -> "treat_pointers_and_urls_as_images":True
-            # 2. check if it is a url or pointer
-            # 3. If yes in 1 and 2, download blindly (without type)
-            # 4. Determine media type of downloaded
-            # 5. load correct media type into memory -> PIL (images), videos (), audio (torchaudio)
-            #                 # 6. if chunking -> then add the extra chunker
             if isinstance(sub_content, str) and not _is_image(sub_content):
                 text_chunks = sub_content
+                content_chunks = text_chunks
             else:
-                # TODO put the logic for getting field parameters into a function and add per field options
                 try:
                     # in the future, if we have different chunking methods, make sure we catch possible
                     # errors of different types generated here, too.
                     if isinstance(sub_content, str) and index_info.index_settings[NsField.index_defaults][
                         NsField.treat_urls_and_pointers_as_images]:
-                        content_chunks, text_chunks = [sub_content], [sub_content]
+                        if not isinstance(image_repo[sub_content], Exception):
+                            image_data = image_repo[sub_content]
+                        else:
+                            raise s2_inference_errors.S2InferenceError(
+                                f"Could not find image found at `{sub_content}`. \n"
+                                f"Reason: {str(image_repo[sub_content])}"
+                            )
+                    else:
+                        image_data = sub_content
+
+                    content_chunks, text_chunks = [image_data], [sub_content]
                 except s2_inference_errors.S2InferenceError as e:
                     document_is_valid = False
                     unsuccessful_docs.append(
@@ -1587,6 +1592,8 @@ def vectorise_multimodal_combination_field(field_content:Dict[str,dict], copied:
                              'status': int(errors.InvalidArgError.status_code),
                              'code': errors.InvalidArgError.code})
                     )
+                    break
+
             normalize_embeddings = index_info.index_settings[NsField.index_defaults][
                 NsField.normalize_embeddings]
             infer_if_image = index_info.index_settings[NsField.index_defaults][
@@ -1622,26 +1629,26 @@ def vectorise_multimodal_combination_field(field_content:Dict[str,dict], copied:
                     (i, {'_id': doc_id, 'error': image_err.message, 'status': int(image_err.status_code),
                          'code': image_err.code})
                 )
-                return
+                return chunks, document_is_valid, unsuccessful_docs, total_vectorise_time
             field_vector_weight[sub_content_para["weight"]] = vector_chunks
 
     vector_chunk = (
                 np.sum([np.array(vector) * weight for weight, vector in field_vector_weight.items()], axis=0) / np.sum(
             list(field_vector_weight.keys()))).tolist()
 
-    return vector_chunk, unsuccessful_docs, total_vectorise_time
+    chunk_values_for_filtering = {}
+    for key, value in copied.items():
+        if not (isinstance(value, str) or isinstance(value, float)
+                or isinstance(value, bool) or isinstance(value, int)
+                or isinstance(value, list)):
+            continue
+        chunk_values_for_filtering[key] = value
+    chunk_values_for_filtering[field] = list(copied[field].keys())
+    chunks.append({
+        utils.generate_vector_name(field): vector_chunk,
+        TensorField.field_content: list(copied[field].keys()),
+        TensorField.field_name: field,
+        **chunk_values_for_filtering
+    })
 
-    # chunk_values_for_filtering = {}
-    # for key, value in copied.items():
-    #     if not (isinstance(value, str) or isinstance(value, float)
-    #             or isinstance(value, bool) or isinstance(value, int)
-    #             or isinstance(value, list)):
-    #         continue
-    #     chunk_values_for_filtering[key] = value
-    # chunk_values_for_filtering[field] = list(copied[field].keys())
-    # chunks.append({
-    #     utils.generate_vector_name(field): vector_chunk,
-    #     TensorField.field_content: list(copied[field].keys()),
-    #     TensorField.field_name: field,
-    #     **chunk_values_for_filtering
-    # })
+    return chunks, document_is_valid, unsuccessful_docs, total_vectorise_time

@@ -19,7 +19,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         tensor_search.create_vector_index(
                         index_name=self.index_name_1, config=self.config, index_settings={
                         IndexSettingsField.index_defaults: {
-                            IndexSettingsField.model: "random",
+                            IndexSettingsField.model: "ViT-B/32",
                             IndexSettingsField.treat_urls_and_pointers_as_images: True
                         }
                     })
