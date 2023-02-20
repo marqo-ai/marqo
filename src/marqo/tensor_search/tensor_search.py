@@ -349,7 +349,7 @@ def _infer_opensearch_data_type(
 
 def add_documents(config: Config, index_name: str, docs: List[dict], auto_refresh: bool,
                   non_tensor_fields=None, device=None, update_mode: str = "replace",
-                  image_download_thread_count: int = 20, multimodal_combination: Optional[Dict[str, Union[float,str]]]= None):
+                  image_download_thread_count: int = 20):
     """
 
     Args:
@@ -362,7 +362,6 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
         device: Device used to carry out the document update.
         update_mode: {'replace' | 'update'}. If set to replace (default) just
         image_download_thread_count: number of threads used to concurrently download images
-        multimodal_combination: a dictionary to enable the multimodal-tensor-combination for the test
     Returns:
 
     """
@@ -398,9 +397,6 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
     total_vectorise_time = 0
     batch_size = len(docs)
 
-    if multimodal_combination is not None:
-        # A dictionary to help multimodal-combination
-        chunks_field_vector_mapping = {}
 
     if index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]:
         ti_0 = timer()
@@ -472,7 +468,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                 # 3. If yes in 1 and 2, download blindly (without type)
                 # 4. Determine media type of downloaded
                 # 5. load correct media type into memory -> PIL (images), videos (), audio (torchaudio)
-                #                 # 6. if chunking -> then add the extra chunker
+                # 6. if chunking -> then add the extra chunker
 
                 if isinstance(field_content, str) and not _is_image(field_content):
                     # text processing pipeline:
@@ -1592,18 +1588,46 @@ def vectorise_multimodal_combination_field(chunks: List, field: str, field_conte
                              'status': int(errors.InvalidArgError.status_code),
                              'code': errors.InvalidArgError.code})
                     )
-                    break
+                    return chunks, document_is_valid, unsuccessful_docs, total_vectorise_time
 
             normalize_embeddings = index_info.index_settings[NsField.index_defaults][
                 NsField.normalize_embeddings]
             infer_if_image = index_info.index_settings[NsField.index_defaults][
                 NsField.treat_urls_and_pointers_as_images]
 
-            try:
-                # in the future, if we have different underlying vectorising methods, make sure we catch possible
-                # errors of different types generated here, too.
 
-                # ADD DOCS TIMER-LOGGER (4)
+            try:
+                if normalize_embeddings is False:
+                    raise errors.InvalidArgError(
+                        f"The setting `normalized_embedding` is `{normalize_embeddings}` for a multimodal_tensor_combination field."
+                        f"This is not supported. Please change the setting `normalized embedding` as `True` for multimodal_tensor_combination fields. "
+                    )
+            except errors.InvalidArgError as e:
+                document_is_valid = False
+                unsuccessful_docs.append(
+                    (i, {'_id': doc_id, 'error': e.message,
+                         'status': int(errors.InvalidArgError.status_code),
+                         'code': errors.InvalidArgError.code})
+                )
+                return chunks, document_is_valid, unsuccessful_docs, total_vectorise_time
+
+
+            try:
+                if infer_if_image is False:
+                    raise errors.InvalidArgError(
+                        f"The setting `treat_urls_and_pointers_as_images` is `{infer_if_image}` for a multimodal_tensor_combination field."
+                        f"This is not supported. Please change the setting `treat_urls_and_pointers_as_images` as `True` for multimodal_tensor_combination fields. "
+                    )
+            except errors.InvalidArgError as e:
+                document_is_valid = False
+                unsuccessful_docs.append(
+                    (i, {'_id': doc_id, 'error': e.message,
+                         'status': int(errors.InvalidArgError.status_code),
+                         'code': errors.InvalidArgError.code})
+                )
+                return chunks, document_is_valid, unsuccessful_docs, total_vectorise_time
+
+            try:
                 start_time = timer()
                 vector_chunks = s2_inference.vectorise(
                     model_name=index_info.model_name,
@@ -1630,6 +1654,7 @@ def vectorise_multimodal_combination_field(chunks: List, field: str, field_conte
                          'code': image_err.code})
                 )
                 return chunks, document_is_valid, unsuccessful_docs, total_vectorise_time
+
             field_vector_weight[sub_content_para["weight"]] = vector_chunks
 
     vector_chunk = (
