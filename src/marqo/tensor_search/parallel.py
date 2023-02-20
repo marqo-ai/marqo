@@ -1,7 +1,7 @@
 import os
 import time
 import json
-from typing import List, Dict
+from typing import List, Dict, Optional
 import copy
 
 import torch
@@ -172,7 +172,7 @@ def get_threads_per_process(processes: int):
 def add_documents_mp(config=None, index_name=None, docs=None, 
                      auto_refresh=None, batch_size=50, processes=1, device=None,
                      non_tensor_fields: List[str] = [], update_mode: str = None,
-                     image_download_headers: str = "{}", use_existing_vectors=None):
+                     image_download_headers: Optional[Dict] = None, use_existing_vectors=None):
     """add documents using parallel processing using ray
     Args:
         documents (_type_): _description_
@@ -190,7 +190,8 @@ def add_documents_mp(config=None, index_name=None, docs=None,
     Returns:
         _type_: _description_
     """
-
+    if image_download_headers is None:
+        image_download_headers = dict()
     selected_device = device if device is not None else config.indexing_device
 
     n_documents = len(docs)
