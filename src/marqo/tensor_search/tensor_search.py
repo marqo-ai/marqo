@@ -1004,10 +1004,11 @@ def search(config: Config, index_name: str, text: Union[str, dict],
     if index_name not in index_meta_cache.get_cache():
         backend.get_index_info(config=config, index_name=index_name)
 
+    REFRESH_INTERVAL_SECONDS = 2
     # update cache in the background
     cache_update_thread = threading.Thread(
-        target=index_meta_cache.refresh_index,
-        args=(config, index_name))
+        target=index_meta_cache.refresh_index_info_on_interval,
+        args=(config, index_name, REFRESH_INTERVAL_SECONDS))
     cache_update_thread.start()
 
     if search_method.upper() == SearchMethod.TENSOR:
