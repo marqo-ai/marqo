@@ -20,7 +20,8 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                         index_name=self.index_name_1, config=self.config, index_settings={
                         IndexSettingsField.index_defaults: {
                             IndexSettingsField.model: "ViT-B/32",
-                            IndexSettingsField.treat_urls_and_pointers_as_images: True
+                            IndexSettingsField.treat_urls_and_pointers_as_images: True,
+                            IndexSettingsField.normalize_embeddings:False
                         }
                     })
 
