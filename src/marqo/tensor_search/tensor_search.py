@@ -1542,16 +1542,19 @@ def vectorise_multimodal_combination_field(chunks: List, field: str, field_conte
     chunking here.
 
     Args:
-        field_content:
-        copied:
-        unsuccessful_docs:
-        total_vectorise_time:
-        i:
-        doc_id:
-        selected_device:
-        index_info:
+        field_content: the field content that is a dictionary
+        copied: the copied document
+        unsuccessful_docs: a list to store all the unsuccessful documents
+        total_vectorise_time: total vectorise time in the main body
+        i: an interator in the main body
+        doc_id: the document id
+        selected_device: device from main body
+        index_info: index_info from main body
 
-    Returns:
+    Returns: return chunks: the appended chunks from main body
+    document_is_valid:  if the document is a valid
+    unsuccessful_docs: appended unsucessful_docs
+    total_vectorise_time: new total vectorise time
     '''
     # field_conent = {"tensor_field_one" : {"weight":0.5, "parameter": "test-paramater-1"},
     #                 "tensor_field_two" : {"weight": 0.5, parameter": "test-parameter-2"}},
