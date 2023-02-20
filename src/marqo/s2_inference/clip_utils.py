@@ -57,7 +57,7 @@ def _get_transform(n_px: int, image_mean:List[float] = None, image_std: List[flo
     ])
 
 
-def format_and_load_CLIP_images(images: List[Union[str, ndarray, ImageType]]) -> List[ImageType]:
+def format_and_load_CLIP_images(images: List[Union[str, ndarray, ImageType]], image_download_headers: dict) -> List[ImageType]:
     """takes in a list of strings, arrays or urls and either loads and/or converts to PIL
         for the clip model
 
@@ -75,7 +75,7 @@ def format_and_load_CLIP_images(images: List[Union[str, ndarray, ImageType]]) ->
 
     results = []
     for image in images:
-        results.append(format_and_load_CLIP_image(image, {}))
+        results.append(format_and_load_CLIP_image(image, image_download_headers))
     
     return results
 
@@ -270,17 +270,19 @@ class CLIP:
 
         return self._convert_output(outputs)
 
-    def encode_image(self, images: Union[str, ImageType, List[Union[str, ImageType]]], 
-                        normalize = True) -> FloatTensor:
+    def encode_image(self, images: Union[str, ImageType, List[Union[str, ImageType]]],
+                    normalize = True, image_download_headers: Optional[Dict] = None) -> FloatTensor:
         
         if self.model is None:
             self.load()
+        if image_download_headers is None:
+            image_download_headers = dict()
 
         # default to batch encoding
         if isinstance(images, list):
-            image_input = format_and_load_CLIP_images(images)
+            image_input = format_and_load_CLIP_images(images, image_download_headers)
         else:
-            image_input = [format_and_load_CLIP_image(images, {})]
+            image_input = [format_and_load_CLIP_image(images, image_download_headers)]
 
         self.image_input_processed = torch.stack([self.preprocess(_img).to(self.device) for _img in image_input])
     
@@ -311,7 +313,8 @@ class CLIP:
 
         if is_image:
             logger.debug('image')
-            return self.encode_image(inputs, normalize=normalize)
+            image_download_headers = kwargs.get("image_download_headers", dict())
+            return self.encode_image(inputs, normalize=normalize, image_download_headers=image_download_headers)
         else:
             logger.debug('text')
             return self.encode_text(inputs, normalize=normalize)
@@ -404,16 +407,18 @@ class OPEN_CLIP(CLIP):
 
 
     def encode_image(self, images: Union[str, ImageType, List[Union[str, ImageType]]],
+                     image_download_headers: Optional[Dict] = None,
                      normalize=True) -> FloatTensor:
 
         if self.model is None:
             self.load()
-
+        if image_download_headers is None:
+            image_download_headers = dict()
         # default to batch encoding
         if isinstance(images, list):
-            image_input = format_and_load_CLIP_images(images)
+            image_input = format_and_load_CLIP_images(images, image_download_headers)
         else:
-            image_input = [format_and_load_CLIP_image(images, {})]
+            image_input = [format_and_load_CLIP_image(images, image_download_headers)]
 
         self.image_input_processed = torch.stack([self.preprocess(_img).to(self.device) for _img in image_input])
 
@@ -494,14 +499,16 @@ class MULTILINGUAL_CLIP(CLIP):
 
 
     def encode_image(self, images: Union[str, ImageType, List[Union[str, ImageType]]],
-                     normalize=True) -> FloatTensor:
+                     normalize=True, image_download_headers: Optional[dict] = None) -> FloatTensor:
 
         if self.visual_model is None:
             self.load()
+        if image_download_headers is None:
+            image_download_headers = dict()
 
         # default to batch encoding
         if isinstance(images, list):
-            image_input = format_and_load_CLIP_images(images)
+            image_input = format_and_load_CLIP_images(images, image_download_headers)
         else:
             image_input = [format_and_load_CLIP_image(images, {})]
 

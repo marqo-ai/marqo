@@ -943,7 +943,8 @@ def search(config: Config, index_name: str, text: Union[str, dict],
            searchable_attributes: Iterable[str] = None, verbose: int = 0, num_highlights: int = 3,
            reranker: Union[str, Dict] = None, simplified_format: bool = True, filter: str = None,
            attributes_to_retrieve: Optional[List[str]] = None,
-           device=None, boost: Optional[Dict] = None) -> Dict:
+           device=None, boost: Optional[Dict] = None,
+           image_download_headers: Optional[Dict] = None) -> Dict:
     """The root search method. Calls the specific search method
 
     Validation should go here. Validations include:
@@ -965,6 +966,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
         verbose:
         num_highlights: number of highlights to return for each doc
         boost: boosters to re-weight the scores of individual fields
+        image_download_headers: headers for downloading images
 
     Returns:
 
@@ -987,7 +989,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
                                    f"MARQO_MAX_RETRIEVABLE_DOCS limit of [{max_docs_limit}]. ")
 
         raise errors.IllegalRequestedDocCount(f"{upper_bound_explanation} Marqo received search result limit of `{result_count}` "
-                                            f"and offset of `{offset}`.")
+                                              f"and offset of `{offset}`.")
 
     t0 = timer()
     validation.validate_boost(boost=boost, search_method=search_method)
@@ -1015,7 +1017,8 @@ def search(config: Config, index_name: str, text: Union[str, dict],
             config=config, index_name=index_name, query=text, result_count=result_count, offset=offset,
             return_doc_ids=return_doc_ids, searchable_attributes=searchable_attributes, verbose=verbose,
             number_of_highlights=num_highlights, simplified_format=simplified_format,
-            filter_string=filter, device=device, attributes_to_retrieve=attributes_to_retrieve, boost=boost
+            filter_string=filter, device=device, attributes_to_retrieve=attributes_to_retrieve, boost=boost,
+            image_download_headers=image_download_headers
         )
     elif search_method.upper() == SearchMethod.LEXICAL:
         search_result = _lexical_search(
@@ -1182,7 +1185,8 @@ def _vector_text_search(
         return_doc_ids=False, searchable_attributes: Iterable[str] = None, number_of_highlights=3,
         verbose=0, raise_on_searchable_attribs=False, hide_vectors=True, k=500,
         simplified_format=True, filter_string: str = None, device=None,
-        attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None):
+        attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None,
+        image_download_headers: Optional[Dict] = None):
     """
     Args:
         config:
@@ -1199,6 +1203,8 @@ def _vector_text_search(
         verbose: if 0 - nothing is printed. if 1 - data is printed without vectors, if 2 - full
             objects are printed out
         attributes_to_retrieve: if set, only returns these fields
+        image_download_headers: headers for downloading images
+
     Returns:
 
     Note:
@@ -1242,10 +1248,12 @@ def _vector_text_search(
             to_be_vectorised = [[k for k, _ in ordered_queries], ]
     try:
         vectorised_text = functools.reduce(lambda x, y: x + y,
-            [ s2_inference.vectorise(
+            [s2_inference.vectorise(
                 model_name=index_info.model_name, model_properties=_get_model_properties(index_info),
                 content=batch, device=selected_device,
-                normalize_embeddings=index_info.index_settings['index_defaults']['normalize_embeddings'])
+                normalize_embeddings=index_info.index_settings['index_defaults']['normalize_embeddings'],
+                image_download_headers=image_download_headers
+                )
                 for batch in to_be_vectorised]
         )
         if ordered_queries:
