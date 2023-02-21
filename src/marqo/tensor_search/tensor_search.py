@@ -630,14 +630,14 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                     })
 
             # Add chunks_to_append along with doc metadata to total chunks
+
+            elif isinstance(field_content, dict):
+                chunks_to_append, document_is_valid, unsuccessful_docs, total_vectorise_time = \
+                vectorise_multimodal_combination_field(field, field_content, image_repo, copied, unsuccessful_docs, total_vectorise_time,
+                                               i, doc_id, selected_device,index_info)
+
             for chunk in chunks_to_append:
                 chunks.append({**chunk, **chunk_values_for_filtering})
-
-        elif isinstance(field_content, dict):
-            chunks, document_is_valid, unsuccessful_docs, total_vectorise_time = \
-            vectorise_multimodal_combination_field(chunks, field, field_content, image_repo, copied, unsuccessful_docs, total_vectorise_time,
-                                           i,doc_id,selected_device,index_info)
-
         print(chunks)
         # TODO remove this print in the PR
         # copied_chunks = copy.deepcopy(chunks)
@@ -646,7 +646,6 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
         #         if key.startswith("__vector"):
         #             dictionary[key] = "This is the very long vector for the field. [0,....0]"
         # pprint.pprint(copied_chunks, sort_dicts=False)
-        print(new_fields_from_doc)
         if document_is_valid:
             # This block happens per DOC
             new_fields = new_fields.union(new_fields_from_doc)
@@ -1671,3 +1670,117 @@ def get_cuda_info() -> dict:
         raise errors.HardwareCompatabilityError(message=str(
             "ERROR: cuda is not supported in your machine!!"
         ))
+
+
+def vectorise_multimodal_combination_field(field: str, field_content:Dict[str,dict], image_repo, copied:Dict, unsuccessful_docs,
+                                       total_vectorise_time, i, doc_id, selected_device,index_info):
+    '''
+    This function is used to vectorise multimodal combination field. The field content should
+    have the following structure:
+    field_conent = {"tensor_field_one" : {"weight":0.5, "parameter": "test-paramater-1"},
+                    "tensor_field_two" : {"weight": 0.5, parameter": "test-parameter-2"}},
+    Over all this is a simplified version of the vectorise pipeline in add_documents. Specifically, we don't do any
+    chunking here.
+    Args:
+        field_content: the field content that is a dictionary
+        copied: the copied document
+        unsuccessful_docs: a list to store all the unsuccessful documents
+        total_vectorise_time: total vectorise time in the main body
+        i: an interator in the main body
+        doc_id: the document id
+        selected_device: device from main body
+        index_info: index_info from main body
+    Returns: return chunks: the appended chunks from main body
+    document_is_valid:  if the document is a valid
+    unsuccessful_docs: appended unsucessful_docs
+    total_vectorise_time: new total vectorise time
+    '''
+    # field_conent = {"tensor_field_one" : {"weight":0.5, "parameter": "test-paramater-1"},
+    #                 "tensor_field_two" : {"weight": 0.5, parameter": "test-parameter-2"}},
+    document_is_valid = True
+    field_vector_weight = []
+    chunks_to_append = []
+    for sub_content, sub_content_para in field_content.items():
+        if isinstance(sub_content, (str, Image.Image)):
+            if isinstance(sub_content, str) and not _is_image(sub_content):
+                text_chunks = sub_content
+                content_chunks = text_chunks
+            else:
+                image_data = sub_content
+                content_chunks, text_chunks = [image_data], [sub_content]
+
+            normalize_embeddings = index_info.index_settings[NsField.index_defaults][
+                NsField.normalize_embeddings]
+            infer_if_image = index_info.index_settings[NsField.index_defaults][
+                NsField.treat_urls_and_pointers_as_images]
+
+            # try:
+            #     if normalize_embeddings is False:
+            #         raise errors.InvalidArgError(
+            #             f"The setting `normalized_embedding` is `{normalize_embeddings}` for a multimodal_tensor_combination field."
+            #             f"This is not supported. Please change the setting `normalized embedding` as `True` for multimodal_tensor_combination fields. "
+            #         )
+            # except errors.InvalidArgError as e:
+            #     document_is_valid = False
+            #     unsuccessful_docs.append(
+            #         (i, {'_id': doc_id, 'error': e.message,
+            #              'status': int(errors.InvalidArgError.status_code),
+            #              'code': errors.InvalidArgError.code})
+            #     )
+            #     return chunks_to_append, document_is_valid, unsuccessful_docs, total_vectorise_time
+
+
+            try:
+                if infer_if_image is False:
+                    raise errors.InvalidArgError(
+                        f"The setting `treat_urls_and_pointers_as_images` is `{infer_if_image}` for a multimodal_tensor_combination field."
+                        f"This is not supported. Please change the setting `treat_urls_and_pointers_as_images` as `True` for multimodal_tensor_combination fields. "
+                    )
+            except errors.InvalidArgError as e:
+                document_is_valid = False
+                unsuccessful_docs.append(
+                    (i, {'_id': doc_id, 'error': e.message,
+                         'status': int(errors.InvalidArgError.status_code),
+                         'code': errors.InvalidArgError.code})
+                )
+                return chunks_to_append, document_is_valid, unsuccessful_docs, total_vectorise_time
+            try:
+                start_time = timer()
+                vector_chunks = s2_inference.vectorise(
+                    model_name=index_info.model_name,
+                    model_properties=_get_model_properties(index_info), content=content_chunks,
+                    device=selected_device, normalize_embeddings=normalize_embeddings,
+                    infer=infer_if_image)
+
+                end_time = timer()
+                single_vectorise_call = end_time - start_time
+                total_vectorise_time += single_vectorise_call
+                logger.debug(f"(4) TIME for single vectorise call: {(single_vectorise_call):.3f}s.")
+            except (s2_inference_errors.UnknownModelError,
+                    s2_inference_errors.InvalidModelPropertiesError,
+                    s2_inference_errors.ModelLoadError) as model_error:
+                raise errors.BadRequestError(
+                    message=f'Problem vectorising query. Reason: {str(model_error)}',
+                    link="https://marqo.pages.dev/latest/Models-Reference/dense_retrieval/"
+                )
+            except s2_inference_errors.S2InferenceError:
+                document_is_valid = False
+                image_err = errors.InvalidArgError(message=f'Could not process given image: {field_content}')
+                unsuccessful_docs.append(
+                    (i, {'_id': doc_id, 'error': image_err.message, 'status': int(image_err.status_code),
+                         'code': image_err.code})
+                )
+                return chunks_to_append, document_is_valid, unsuccessful_docs, total_vectorise_time
+
+            field_vector_weight.append((sub_content_para["weight"], vector_chunks))
+
+    vector_chunk = np.squeeze(
+                np.sum([np.array(vector) * weight for weight, vector in field_vector_weight], axis=0) / np.sum(
+            [weight for weight, vector in field_vector_weight])).tolist()
+
+    chunks_to_append.append({
+        utils.generate_vector_name(field): vector_chunk,
+        TensorField.field_content: list(copied[field].keys()),
+        TensorField.field_name: field,
+    })
+    return chunks_to_append, document_is_valid, unsuccessful_docs, total_vectorise_time
