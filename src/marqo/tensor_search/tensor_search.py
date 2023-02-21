@@ -355,9 +355,7 @@ def _infer_opensearch_data_type(
     else:
         to_check = sample_field_content
 
-    if isinstance(to_check, dict):
-        raise errors.InvalidArgError("Field content can't be an object.")
-    elif isinstance(to_check, str):
+    if isinstance(to_check, str):
         return OpenSearchDataType.text
     else:
         return None
