@@ -1,4 +1,3 @@
-from marqo.tensor_search.enums import ThrottleType
 from marqo.connections import redis_driver
 from marqo.tensor_search.enums import RequestType, EnvVars
 from marqo.tensor_search import utils

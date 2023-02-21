@@ -61,9 +61,12 @@ class SplitMethod:
     sentence = "sentence"
 
 
-class Device (str, Enum):
+class Device(str, Enum):
     cpu = "cpu"
     cuda = "cuda"
+    def __str__(self):
+        # To pass the str(Device.cpu) == "cpu" check in clip
+        return self.value
 
 
 class OpenSearchDataType:
@@ -94,9 +97,7 @@ class RequestType:
     CREATE = "CREATE"
 
 
-class ThrottleType:
-    thread_count = "thread_count"
-    data_size = "data_size"
+# Perhaps create a ThrottleType to differentiate thread_count and data_size throttling mechanisms
     
 
 

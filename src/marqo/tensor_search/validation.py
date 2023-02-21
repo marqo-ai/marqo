@@ -101,8 +101,6 @@ def validate_field_content(field_content: typing.Any, is_non_tensor_field: bool)
     if type(field_content) in constants.ALLOWED_CUSTOMER_FIELD_TYPES:
         if isinstance(field_content, list):
             validate_list(field_content, is_non_tensor_field)
-        elif isinstance(field_content, dict):
-            validate_dict(field_content, is_non_tensor_field)
         return field_content
     else:
         raise InvalidArgError(
@@ -326,6 +324,23 @@ def validate_index_name(name: str) -> str:
             f"Index name `{name}` starts with a protected prefix. "
             f"Please chose a different name for your index.")
     return name
+
+
+def validate_settings_object(settings_object):
+    """validates index settings.
+    Returns
+        The given index settings if validation has passed
+
+    Raises an InvalidArgError if the settings object is badly formatted
+    """
+    try:
+        jsonschema.validate(instance=settings_object, schema=settings_schema)
+        return settings_object
+    except jsonschema.ValidationError as e:
+        raise InvalidArgError(
+            f"Error validating index settings object. Reason: \n{str(e)}"
+            f"\nRead about the index settings object here: https://docs.marqo.ai/0.0.13/API-Reference/indexes/#body"
+        )
 
 
 def validate_dict(field_content: typing.Dict, is_non_tensor_field: bool):

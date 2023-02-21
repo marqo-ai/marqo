@@ -133,7 +133,7 @@ class PatchifySimple:
 
     def infer(self, image: Union[str, ImageType]):
 
-        self.image = format_and_load_CLIP_image(image)
+        self.image = format_and_load_CLIP_image(image, {})
         self.original_size = self.image.size
         self.image_resized = self.image.resize(self.size)
         self.bboxes_simple = generate_boxes(self.size, self.hn, self.wn, overlap=self.overlap)

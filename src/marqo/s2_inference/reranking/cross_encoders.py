@@ -472,7 +472,7 @@ def _load_image(filename: str, size: Tuple = None) -> ImageType:
     Returns:
         ImageType: _description_
     """
-    im = load_image_from_path(filename)
+    im = load_image_from_path(filename, {})
     original_size = im.size
     if size is not None:
         im = im.resize(size).convert('RGB')
