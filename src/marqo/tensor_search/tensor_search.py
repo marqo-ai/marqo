@@ -633,7 +633,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
             elif isinstance(field_content, dict):
                 chunks_to_append, document_is_valid, unsuccessful_docs, total_vectorise_time = \
-                vectorise_multimodal_combination_field(field, field_content, image_repo, copied, unsuccessful_docs, total_vectorise_time,
+                vectorise_multimodal_combination_field(field, field_content, copied, unsuccessful_docs, total_vectorise_time,
                                                i, doc_id, selected_device,index_info)
 
                 if document_is_valid is False: break
@@ -1669,7 +1669,7 @@ def get_cuda_info() -> dict:
         ))
 
 
-def vectorise_multimodal_combination_field(field: str, field_content:Dict[str,dict], image_repo, copied:Dict, unsuccessful_docs,
+def vectorise_multimodal_combination_field(field: str, field_content:Dict[str,dict], copied:Dict, unsuccessful_docs,
                                        total_vectorise_time, i, doc_id, selected_device,index_info):
     '''
     This function is used to vectorise multimodal combination field. The field content should

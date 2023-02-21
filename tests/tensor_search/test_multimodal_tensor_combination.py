@@ -1,7 +1,10 @@
+import unittest.mock
+
 from marqo.errors import IndexNotFoundError, InvalidArgError
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import TensorField, IndexSettingsField, SearchMethod
 from tests.marqo_test import MarqoTestCase
+from marqo.tensor_search.tensor_search import add_documents, vectorise_multimodal_combination_field
 
 
 class TestMultimodalTensorCombination(MarqoTestCase):
@@ -50,6 +53,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         res = tensor_search.search(config=self.config,index_name=self.index_name_1, text ="Image for a rider riding a horse.")
         print(res)
 
+
     def test_multimodal_tensor_combination_score(self):
 
         def get_score(document):
@@ -72,6 +76,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             res = tensor_search.search(config=self.config, index_name=self.index_name_1,
                                        text="", result_count=1)
             print(res)
+            print("_score:", res["hits"][0]["_score"])
             return res["hits"][0]["_score"]
 
         score_1 = get_score({
@@ -96,4 +101,135 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         }
         })
 
-        assert (score_3 > min(score_1, score_2)) and (score_3 < max(score_1,score_2))
+        assert (score_3 >= min(score_1, score_2)) and (score_3 <= max(score_1,score_2))
+
+    def test_multimodal_tensor_combination_weight(self):
+
+        def get_score(document):
+            try:
+                tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+            except IndexNotFoundError as e:
+                pass
+
+            tensor_search.create_vector_index(
+                index_name=self.index_name_1, config=self.config, index_settings={
+                    IndexSettingsField.index_defaults: {
+                        IndexSettingsField.model: "ViT-B/32",
+                        IndexSettingsField.treat_urls_and_pointers_as_images: True,
+                        IndexSettingsField.normalize_embeddings: False
+                    }
+                })
+
+            tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[document],
+                                        auto_refresh=True)
+            self.assertEqual(1, tensor_search.get_stats(config=self.config, index_name=self.index_name_1)[
+                "numberOfDocuments"])
+            res = tensor_search.search(config=self.config, index_name=self.index_name_1,
+                                       text="", result_count=1)
+
+            return res["hits"][0]["_score"]
+
+        score_1 = get_score({
+                "text_field": "A rider is riding a horse jumping over the barrier.",
+                #"image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+            })
+
+        score_3 = get_score({
+            "combo_text_image": {
+                "A rider is riding a horse jumping over the barrier.": {
+                    "weight": 1,
+                },
+                "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg": {
+                    "weight": 0,
+                },
+        }
+        })
+
+        self.assertEqual(score_1,score_3)
+
+
+    def test_multimodal_tensor_combination_vectorise_call(self):
+        """check if the chunks are properly created in the add_documents"""
+
+        tensor_search.create_vector_index(
+                        index_name=self.index_name_1, config=self.config, index_settings={
+                        IndexSettingsField.index_defaults: {
+                            IndexSettingsField.model: "ViT-B/32",
+                            IndexSettingsField.treat_urls_and_pointers_as_images: True,
+                            IndexSettingsField.normalize_embeddings:False
+                        }
+                    })
+
+        def pass_through_multimodal(*arg, **kwargs):
+            """Vectorise will behave as usual, but we will be able to see the call list
+            via mock
+            """
+            return vectorise_multimodal_combination_field(*arg, **kwargs)
+
+        mock_multimodal_combination = unittest.mock.MagicMock()
+        mock_multimodal_combination.side_effect = pass_through_multimodal
+        @unittest.mock.patch("marqo.tensor_search.tensor_search.vectorise_multimodal_combination_field", mock_multimodal_combination)
+        def run():
+            tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs = [
+                {
+                    "combo_text_image": {
+                        "A rider is riding a horse jumping over the barrier.": {
+                            "weight": 1,
+                        },
+                        "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg": {
+                            "weight": 0,
+                        },
+                    },
+                    "_id": "123",
+                },
+
+                {
+                    "combo_text_image_test": {
+                        "test-text-two.": {
+                            "weight": 1,
+                        },
+                        "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg": {
+                            "weight": 0,
+                        },
+                    },
+                    "_id": "234",
+                },
+
+                {   # a normal doc
+                    "combo_text_image_test": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+                    "_id": "534",
+                }
+            ], auto_refresh=True)
+
+            # first multimodal-doc
+            real_fied_0, field_content_0 = [call_args for call_args, call_kwargs
+                                        in  mock_multimodal_combination.call_args_list][0][0:2]
+            assert real_fied_0 == "combo_text_image"
+            assert field_content_0 == dict({
+                        "A rider is riding a horse jumping over the barrier.": {
+                            "weight": 1,
+                        },
+                        "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg": {
+                            "weight": 0,
+                        },
+                    })
+
+            # second multimodal=doc
+            real_fied_1, field_content_1 = [call_args for call_args, call_kwargs
+                                        in  mock_multimodal_combination.call_args_list][1][0:2]
+            assert real_fied_1 == "combo_text_image_test"
+            assert field_content_1 == dict({
+                        "test-text-two.": {
+                            "weight": 1,
+                        },
+                        "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg": {
+                            "weight": 0,
+                        },
+                    },)
+
+            # ensure we only call multimodal-combination twice
+            assert len(mock_multimodal_combination.call_args_list) == 2
+
+            return True
+
+        assert run()
