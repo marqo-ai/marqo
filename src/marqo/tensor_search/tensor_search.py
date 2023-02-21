@@ -636,16 +636,13 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                 vectorise_multimodal_combination_field(field, field_content, image_repo, copied, unsuccessful_docs, total_vectorise_time,
                                                i, doc_id, selected_device,index_info)
 
+                if document_is_valid is False: break
+
             for chunk in chunks_to_append:
                 chunks.append({**chunk, **chunk_values_for_filtering})
         print(chunks)
         # TODO remove this print in the PR
-        # copied_chunks = copy.deepcopy(chunks)
-        # for dictionary in copied_chunks:
-        #     for key, value in dictionary.items():
-        #         if key.startswith("__vector"):
-        #             dictionary[key] = "This is the very long vector for the field. [0,....0]"
-        # pprint.pprint(copied_chunks, sort_dicts=False)
+
         if document_is_valid:
             # This block happens per DOC
             new_fields = new_fields.union(new_fields_from_doc)
@@ -1679,8 +1676,9 @@ def vectorise_multimodal_combination_field(field: str, field_content:Dict[str,di
     have the following structure:
     field_conent = {"tensor_field_one" : {"weight":0.5, "parameter": "test-paramater-1"},
                     "tensor_field_two" : {"weight": 0.5, parameter": "test-parameter-2"}},
-    Over all this is a simplified version of the vectorise pipeline in add_documents. Specifically, we don't do any
-    chunking here.
+    Over all this is a simplified version of the vectorise pipeline in add_documents. Specifically,
+    1. we don't do any chunking here.
+    2. we don't use image repo for concurrent downloading.
     Args:
         field_content: the field content that is a dictionary
         copied: the copied document

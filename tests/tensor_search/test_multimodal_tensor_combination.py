@@ -97,4 +97,4 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         }
         })
 
-        print(score_1, score_2, score_3)
+        assert (score_3 > min(score_1, score_2)) and (score_3 < max(score_1,score_2))
