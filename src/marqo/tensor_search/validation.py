@@ -103,6 +103,8 @@ def validate_field_content(field_content: typing.Any, is_non_tensor_field: bool)
     if type(field_content) in constants.ALLOWED_CUSTOMER_FIELD_TYPES:
         if isinstance(field_content, list):
             validate_list(field_content, is_non_tensor_field)
+        elif isinstance(field_content, dict):
+            validate_dict(field_content, is_non_tensor_field)
         return field_content
     else:
         raise InvalidArgError(
@@ -369,7 +371,14 @@ def validate_dict(field_content: typing.Dict, is_non_tensor_field: bool):
                 f"Multimodal-combination field content `{key}` \n  "
                 f"of type `{type(key).__name__}` is not of valid content type (one of {constants.ALLOWED_MULTIMODAL_FIELD_TYPES})."
             )
-        if not ("weight" in value and isinstance(value["weight"], (float,int))):
+
+        if not isinstance(value, dict):
+            raise InvalidArgError(
+                f"Multimodal-combination field content `{key}` \n"
+                f"does not contain a dictionary with `weight`."
+            )
+
+        if not ("weight" in value and isinstance(value["weight"], (float, int))):
             raise InvalidArgError(
                 f"Multimodal-combination field content `{key}` \n"
                 f"does not contain a valid `weight`. A `weight` must be provided with proper `int` or `float` value."

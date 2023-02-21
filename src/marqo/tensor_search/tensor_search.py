@@ -350,7 +350,7 @@ def _infer_opensearch_data_type(
         # OpenSearch requires that all content of an array be the same type.
         # This function doesn't validate.
         to_check = sample_field_content[0]
-    elif isinstance(sample_field_content, dict):
+    elif isinstance(sample_field_content, dict) and len(list(sample_field_content.keys())) > 1:
         to_check = list(sample_field_content.keys())[0]
     else:
         to_check = sample_field_content
@@ -640,8 +640,6 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
             for chunk in chunks_to_append:
                 chunks.append({**chunk, **chunk_values_for_filtering})
-        print(chunks)
-        # TODO remove this print in the PR
 
         if document_is_valid:
             # This block happens per DOC
