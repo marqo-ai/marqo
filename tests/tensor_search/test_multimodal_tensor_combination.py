@@ -71,7 +71,6 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             self.assertEqual(1, tensor_search.get_stats(config=self.config, index_name=self.index_name_1)["numberOfDocuments"])
             res = tensor_search.search(config=self.config, index_name=self.index_name_1,
                                        text="", result_count=1)
-            print(tensor_search.get_stats(config=self.config, index_name=self.index_name_1)["numberOfDocuments"])
             print(res)
             return res["hits"][0]["_score"]
 
