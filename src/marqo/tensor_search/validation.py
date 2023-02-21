@@ -12,6 +12,8 @@ from marqo.tensor_search import constants
 from typing import Any, Type, Sequence
 import inspect
 from enum import Enum
+import jsonschema
+from marqo.tensor_search.models.settings_object import settings_schema
 
 
 def validate_query(q: Union[dict, str], search_method: Union[str, SearchMethod]):
