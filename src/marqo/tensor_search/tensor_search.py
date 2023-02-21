@@ -350,7 +350,7 @@ def _infer_opensearch_data_type(
         # OpenSearch requires that all content of an array be the same type.
         # This function doesn't validate.
         to_check = sample_field_content[0]
-    elif isinstance(sample_field_content, dict) and len(list(sample_field_content.keys())) > 1:
+    elif isinstance(sample_field_content, dict):
         to_check = list(sample_field_content.keys())[0]
     else:
         to_check = sample_field_content

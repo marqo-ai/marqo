@@ -357,13 +357,10 @@ def validate_dict(field_content: typing.Dict, is_non_tensor_field: bool):
     Returns:
         True or raise an error
     '''
-    if is_non_tensor_field:
+    if len(field_content) < 2:
         raise InvalidArgError(
-            f"Field content `{field_content}` \n  "
-            f"of type `{type(field_content).__name__}` is the content for a multimodal tensor combo."
-            f"It CAN NOT be a `non_tensor_field`. Remove this field from `non_tensor_field` or"
-            f"add them as normal fields to fix this problem."
-        )
+            f"The length of field_content `{field_content}` is smaller than 2. This is not a valid format of field content."
+            f"If you aim to use multimodal-tensor-combination, please check `https://docs.marqo.ai/0.0.14/` for more info.")
 
     for key, value in field_content.items():
         if not (type(key) in constants.ALLOWED_MULTIMODAL_FIELD_TYPES) :
@@ -384,5 +381,12 @@ def validate_dict(field_content: typing.Dict, is_non_tensor_field: bool):
                 f"does not contain a valid `weight`. A `weight` must be provided with proper `int` or `float` value."
         )
 
+    if is_non_tensor_field:
+        raise InvalidArgError(
+            f"Field content `{field_content}` \n  "
+            f"of type `{type(field_content).__name__}` is the content for a multimodal tensor combo."
+            f"It CAN NOT be a `non_tensor_field`. Remove this field from `non_tensor_field` or"
+            f"add them as normal fields to fix this problem."
+        )
     return True
 
