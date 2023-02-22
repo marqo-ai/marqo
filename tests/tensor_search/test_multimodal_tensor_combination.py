@@ -5,6 +5,8 @@ from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import TensorField, IndexSettingsField, SearchMethod
 from tests.marqo_test import MarqoTestCase
 from marqo.tensor_search.tensor_search import add_documents, vectorise_multimodal_combination_field
+from marqo.errors import DocumentNotFoundError
+import numpy as np
 
 
 class TestMultimodalTensorCombination(MarqoTestCase):
@@ -49,12 +51,23 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             },
         ], auto_refresh=True)
 
-        res = tensor_search.search(config=self.config,index_name=self.index_name_1, text ="Image for a rider riding a horse.")
-
+        expected_doc = tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="0")
+        print(expected_doc)
+        self.assertEqual(expected_doc, dict({
+                "Title": "Horse rider",
+                "combo_text_image": {
+                    "A rider is riding a horse jumping over the barrier." : {
+                        "weight" : 0.5,
+                                        },
+                    "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg": {
+                    "weight": 0.5,
+                                        },
+                },
+                "_id": "0"
+            },) )
 
 
     def test_multimodal_tensor_combination_score(self):
-
         def get_score(document):
             try:
                 tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
@@ -100,6 +113,52 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         })
 
         assert (score_3 >= min(score_1, score_2)) and (score_3 <= max(score_1,score_2))
+
+
+    def test_multimodal_tensor_combiantion_tensor_value(self):
+        tensor_search.create_vector_index(
+            index_name=self.index_name_1, config=self.config, index_settings={
+                IndexSettingsField.index_defaults: {
+                    IndexSettingsField.model: "ViT-B/32",
+                    IndexSettingsField.treat_urls_and_pointers_as_images: True,
+                    IndexSettingsField.normalize_embeddings: False
+                }
+            })
+
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
+            {
+                "combo_text_image": {
+                    "A rider is riding a horse jumping over the barrier.": {
+                        "weight": -1,
+                    },
+                    "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg": {
+                        "weight": 1,
+                    },
+                },
+                "_id": "0"
+            },
+
+            {
+                "text_field": "A rider is riding a horse jumping over the barrier.",
+                "_id": "1"
+            },
+            {
+                "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+                "_id": "2"
+            },
+
+        ], auto_refresh=True)
+
+        combo_tensor = np.array(tensor_search.get_document_by_id(config=self.config,
+                             index_name=self.index_name_1,document_id="0",show_vectors=True )['_tensor_facets'][0]["_embedding"])
+        text_tensor = \
+        np.array(tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="1",
+                                         show_vectors=True)['_tensor_facets'][0]["_embedding"])
+        image_tensor = \
+            np.array(tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="2",
+                                             show_vectors=True)['_tensor_facets'][0]["_embedding"])
+
+        assert np.sum(combo_tensor - (text_tensor * -1 + image_tensor * 1)) == 0
 
 
     def test_multimodal_tensor_combination_weight(self):
@@ -245,7 +304,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                     })
 
         # invalid weight string
-        res = tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
             {
                 "combo_text_image": {
                     "A rider is riding a horse jumping over the barrier.": {
@@ -257,10 +316,15 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                 },
                 "_id": "123",
             },], auto_refresh=True)
-        assert res["errors"] == True
+        try:
+            tensor_search.get_document_by_id(config=self.config,index_name=self.index_name_1, document_id="123")
+            raise AssertionError
+        except DocumentNotFoundError:
+            pass
+
 
         # invalid weight format string
-        res = tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
             {
                 "combo_text_image": {
                     "A rider is riding a horse jumping over the barrier.": {
@@ -272,10 +336,15 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                 },
                 "_id": "123",
             }, ], auto_refresh=True)
-        assert res["errors"] == True
+        try:
+            tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="123")
+            raise AssertionError
+        except DocumentNotFoundError:
+            pass
+
 
         # invalid field content format
-        res = tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
             {
                 "combo_text_image": {
                     "A rider is riding a horse jumping over the barrier.": 0.5,
@@ -285,5 +354,9 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                 },
                 "_id": "123",
             }, ], auto_refresh=True)
-        assert res["errors"] == True
+        try:
+            tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="123")
+            raise AssertionError
+        except DocumentNotFoundError:
+            pass
 

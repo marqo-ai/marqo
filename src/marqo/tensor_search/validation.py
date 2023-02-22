@@ -359,8 +359,9 @@ def validate_dict(field_content: typing.Dict, is_non_tensor_field: bool):
     '''
     if len(field_content) < 2:
         raise InvalidArgError(
-            f"The length of field_content `{field_content}` is smaller than 2. This is not a valid format of field content."
-            f"If you aim to use multimodal-tensor-combination, please check `https://docs.marqo.ai/0.0.14/` for more info.")
+            f"The field_content `{field_content}` is a dictonary will less than 2 fields. This is not a valid format of field content."
+            f"If you aim to use multimodal-tensor-combination, it must contain at least 2 fields. "
+            f"please check `https://docs.marqo.ai/0.0.15/` for more info.")
 
     for key, value in field_content.items():
         if not (type(key) in constants.ALLOWED_MULTIMODAL_FIELD_TYPES) :

@@ -73,8 +73,8 @@ logger = get_logger(__name__)
 
 
 def create_vector_index(
-    config: Config, index_name: str, media_type: Union[str, MediaType] = MediaType.default,
-    refresh_interval: str = "1s", index_settings=None):
+        config: Config, index_name: str, media_type: Union[str, MediaType] = MediaType.default,
+        refresh_interval: str = "1s", index_settings=None):
     """
     Args:
         media_type: 'text'|'image'
@@ -194,7 +194,7 @@ def _autofill_index_settings(index_settings: dict):
     #     copied_settings[NsField.index_defaults] = default_settings[NsField.index_defaults]
 
     if NsField.treat_urls_and_pointers_as_images in copied_settings[NsField.index_defaults] and \
-            copied_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images] is True\
+            copied_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images] is True \
             and copied_settings[NsField.index_defaults][NsField.model] is None:
         copied_settings[NsField.index_defaults][NsField.model] = MlModel.clip
 
@@ -246,7 +246,6 @@ def add_documents_orchestrator(
         auto_refresh: bool, batch_size: int = 0, processes: int = 1,
         non_tensor_fields=None, image_download_headers: dict = None,
         device=None, update_mode: str = 'replace', use_existing_tensors: bool = False):
-
     if image_download_headers is None:
         image_download_headers = dict()
 
@@ -330,7 +329,7 @@ def _batch_request(config: Config, index_name: str, dataset: List[dict],
         num_docs = len(docs)
 
         logger.info(f"    batch {i}: ingested {num_docs} docs. Time taken: {(total_batch_time):.3f}. "
-                    f"Average time per doc {(total_batch_time/num_docs):.3f}")
+                    f"Average time per doc {(total_batch_time / num_docs):.3f}")
         if verbose:
             logger.info(f"        results from indexing batch {i}: {res}")
         return res
@@ -483,9 +482,12 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
         for key, value in copied.items():
             if not (isinstance(value, str) or isinstance(value, float)
                     or isinstance(value, bool) or isinstance(value, int)
-                    or isinstance(value, list)):
+                    or isinstance(value, list) or isinstance(value, dict)):
                 continue
-            chunk_values_for_filtering[key] = value
+            if isinstance(value, dict):
+                chunk_values_for_filtering[key] = list(value.keys())
+            else:
+                chunk_values_for_filtering[key] = value
 
         chunks = []
 
@@ -538,7 +540,8 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                         NsField.split_length]
                     split_overlap = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][
                         NsField.split_overlap]
-                    content_chunks = text_processor.split_text(field_content, split_by=split_by, split_length=split_length, split_overlap=split_overlap)
+                    content_chunks = text_processor.split_text(field_content, split_by=split_by,
+                                                               split_length=split_length, split_overlap=split_overlap)
                     text_chunks = content_chunks
                 else:
                     # TODO put the logic for getting field parameters into a function and add per field options
@@ -549,7 +552,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                         # in the future, if we have different chunking methods, make sure we catch possible
                         # errors of different types generated here, too.
                         if isinstance(field_content, str) and index_info.index_settings[NsField.index_defaults][
-                                NsField.treat_urls_and_pointers_as_images]:
+                            NsField.treat_urls_and_pointers_as_images]:
                             if not isinstance(image_repo[field_content], Exception):
                                 image_data = image_repo[field_content]
                             else:
@@ -571,8 +574,8 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                         document_is_valid = False
                         unsuccessful_docs.append(
                             (i, {'_id': doc_id, 'error': e.message,
-                                'status': int(errors.InvalidArgError.status_code),
-                                'code': errors.InvalidArgError.code})
+                                 'status': int(errors.InvalidArgError.status_code),
+                                 'code': errors.InvalidArgError.code})
                         )
                         break
 
@@ -609,7 +612,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                     image_err = errors.InvalidArgError(message=f'Could not process given image: {field_content}')
                     unsuccessful_docs.append(
                         (i, {'_id': doc_id, 'error': image_err.message, 'status': int(image_err.status_code),
-                            'code': image_err.code})
+                             'code': image_err.code})
                     )
                     break
 
@@ -630,11 +633,16 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
             # Add chunks_to_append along with doc metadata to total chunks
 
             elif isinstance(field_content, dict):
-                chunks_to_append, document_is_valid, unsuccessful_docs, total_vectorise_time = \
-                vectorise_multimodal_combination_field(field, field_content, copied, unsuccessful_docs, total_vectorise_time,
-                                               i, doc_id, selected_device,index_info)
+                chunks_to_append, document_is_valid, unsuccessful_doc_to_append, vectorise_time_to_add = \
+                    vectorise_multimodal_combination_field(field, field_content, copied, \
+                                                           i, doc_id, selected_device, index_info)
 
-                if document_is_valid is False: break
+                if document_is_valid is False:
+                    for unsuccessful_doc in unsuccessful_doc_to_append:
+                        unsuccessful_docs.append(unsuccessful_doc)
+                    break
+
+                total_vectorise_time = total_vectorise_time + vectorise_time_to_add
 
             for chunk in chunks_to_append:
                 chunks.append({**chunk, **chunk_values_for_filtering})
@@ -709,16 +717,16 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
     total_preproc_time = end_time_3 - start_time_3
     logger.info(f"      add_documents pre-processing: took {(total_preproc_time):.3f}s total for {batch_size} docs, "
                 f"for an average of {(total_preproc_time / batch_size):.3f}s per doc.")
-    
-    logger.info(f"          add_documents vectorise: took {(total_vectorise_time):.3f}s for {batch_size} docs, " 
+
+    logger.info(f"          add_documents vectorise: took {(total_vectorise_time):.3f}s for {batch_size} docs, "
                 f"for an average of {(total_vectorise_time / batch_size):.3f}s per doc.")
-    
+
     if bulk_parent_dicts:
         # the HttpRequest wrapper handles error logic
         update_mapping_response = backend.add_customer_field_properties(
             config=config, index_name=index_name, customer_field_names=new_fields,
             model_properties=_get_model_properties(index_info))
-        
+
         # ADD DOCS TIMER-LOGGER (5)
         start_time_5 = timer()
         index_parent_response = HttpRequests(config).post(
@@ -726,11 +734,13 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
         end_time_5 = timer()
         total_http_time = end_time_5 - start_time_5
         total_index_time = index_parent_response["took"] * 0.001
-        logger.info(f"      add_documents roundtrip: took {(total_http_time):.3f}s to send {batch_size} docs (roundtrip) to Marqo-os, " 
-                    f"for an average of {(total_http_time / batch_size):.3f}s per doc.")
-        
-        logger.info(f"          add_documents Marqo-os index: took {(total_index_time):.3f}s for Marqo-os to index {batch_size} docs, "
-                    f"for an average of {(total_index_time / batch_size):.3f}s per doc.")
+        logger.info(
+            f"      add_documents roundtrip: took {(total_http_time):.3f}s to send {batch_size} docs (roundtrip) to Marqo-os, "
+            f"for an average of {(total_http_time / batch_size):.3f}s per doc.")
+
+        logger.info(
+            f"          add_documents Marqo-os index: took {(total_index_time):.3f}s for Marqo-os to index {batch_size} docs, "
+            f"for an average of {(total_index_time / batch_size):.3f}s per doc.")
     else:
         index_parent_response = None
 
@@ -787,7 +797,7 @@ def get_document_by_id(
 def get_documents_by_ids(
         config: Config, index_name: str, document_ids: List[str],
         show_vectors: bool = False,
-    ):
+):
     """returns documents by their IDs"""
     if not isinstance(document_ids, typing.Collection):
         raise errors.InvalidArgError("Get documents must be passed a collection of IDs!")
@@ -833,7 +843,7 @@ def get_documents_by_ids(
 def _get_documents_for_upsert(
         config: Config, index_name: str, document_ids: List[str],
         show_vectors: bool = False,
-    ):
+):
     """returns document chunks and content"""
     if not isinstance(document_ids, typing.Collection):
         raise errors.InvalidArgError("Get documents must be passed a collection of IDs!")
@@ -909,6 +919,8 @@ def _get_documents_for_upsert(
 
     # Returns a list of combined docs
     return res
+
+
 def delete_documents(config: Config, index_name: str, doc_ids: List[str], auto_refresh):
     """Deletes documents """
     if not doc_ids:
@@ -986,9 +998,9 @@ def search(config: Config, index_name: str, text: Union[str, dict],
     if result_count <= 0:
         raise errors.IllegalRequestedDocCount("search result limit must be greater than 0!")
     if offset < 0:
-        raise errors.IllegalRequestedDocCount("search result offset cannot be less than 0!")   
+        raise errors.IllegalRequestedDocCount("search result offset cannot be less than 0!")
 
-    # validate query
+        # validate query
     validation.validate_query(q=text, search_method=search_method)
 
     # Validate result_count + offset <= int(max_docs_limit)
@@ -998,8 +1010,9 @@ def search(config: Config, index_name: str, text: Union[str, dict],
         upper_bound_explanation = ("The search result limit + offset must be less than or equal to the "
                                    f"MARQO_MAX_RETRIEVABLE_DOCS limit of [{max_docs_limit}]. ")
 
-        raise errors.IllegalRequestedDocCount(f"{upper_bound_explanation} Marqo received search result limit of `{result_count}` "
-                                            f"and offset of `{offset}`.")
+        raise errors.IllegalRequestedDocCount(
+            f"{upper_bound_explanation} Marqo received search result limit of `{result_count}` "
+            f"and offset of `{offset}`.")
 
     t0 = timer()
     validation.validate_boost(boost=boost, search_method=search_method)
@@ -1042,20 +1055,23 @@ def search(config: Config, index_name: str, text: Union[str, dict],
     if reranker is not None:
         logger.info("reranking using {}".format(reranker))
         if searchable_attributes is None:
-            raise errors.InvalidArgError(f"searchable_attributes cannot be None when re-ranking. Specify which fields to search and rerank over.")
+            raise errors.InvalidArgError(
+                f"searchable_attributes cannot be None when re-ranking. Specify which fields to search and rerank over.")
         try:
             # SEARCH TIMER-LOGGER (reranking)
             start_rerank_time = timer()
             rerank.rerank_search_results(search_result=search_result, query=text,
-                model_name=reranker, device=config.indexing_device if device is None else device,
-                searchable_attributes=searchable_attributes, num_highlights=1 if simplified_format else num_highlights)
+                                         model_name=reranker,
+                                         device=config.indexing_device if device is None else device,
+                                         searchable_attributes=searchable_attributes,
+                                         num_highlights=1 if simplified_format else num_highlights)
             end_rerank_time = timer()
             total_rerank_time = end_rerank_time - start_rerank_time
-            logger.info(f"search ({search_method.lower()}) reranking using {reranker}: took {(total_rerank_time):.3f}s to rerank results.")
+            logger.info(
+                f"search ({search_method.lower()}) reranking using {reranker}: took {(total_rerank_time):.3f}s to rerank results.")
         except Exception as e:
             raise errors.BadRequestError(f"reranking failure due to {str(e)}")
 
-    
     search_result["query"] = text
     search_result["limit"] = result_count
     search_result["offset"] = offset
@@ -1063,7 +1079,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
     if not highlights:
         for hit in search_result["hits"]:
             del hit["_highlights"]
-    
+
     time_taken = timer() - t0
     search_result["processingTimeMs"] = round(time_taken * 1000)
     logger.info(f"search ({search_method.lower()}) completed with total processing time: {(time_taken):.3f}s.")
@@ -1110,10 +1126,11 @@ def _lexical_search(
         fields_to_search = index_meta_cache.get_index_info(
             config=config, index_name=index_name
         ).get_true_text_properties()
-    
+
     # Validation for offset (pagination is single field)
     if len(fields_to_search) != 1 and offset > 0:
-        raise errors.InvalidArgError(f"Pagination (offset > 0) is only supported for single field searches! Your search currently has {len(fields_to_search)} fields: {fields_to_search}")
+        raise errors.InvalidArgError(
+            f"Pagination (offset > 0) is only supported for single field searches! Your search currently has {len(fields_to_search)} fields: {fields_to_search}")
 
     # Parse text into required and optional terms.
     (required_terms, optional_blob) = utils.parse_lexical_query(text)
@@ -1157,11 +1174,11 @@ def _lexical_search(
             body["_source"] = dict()
         if body["_source"] is not False:
             body["_source"]["exclude"] = [f"*{TensorField.vector_prefix}*"]
-    
+
     end_preprocess_time = timer()
     total_preprocess_time = end_preprocess_time - start_preprocess_time
     logger.info(f"search (lexical) pre-processing: took {(total_preprocess_time):.3f}s to process query.")
-    
+
     start_search_http_time = timer()
     search_res = HttpRequests(config).get(path=f"{index_name}/_search", body=body)
 
@@ -1169,8 +1186,10 @@ def _lexical_search(
     total_search_http_time = end_search_http_time - start_search_http_time
     total_os_process_time = search_res["took"] * 0.001
     num_results = len(search_res['hits']['hits'])
-    logger.info(f"search (lexical) roundtrip: took {(total_search_http_time):.3f}s to send search query (roundtrip) to Marqo-os and received {num_results} results.")
-    logger.info(f"  search (lexical) Marqo-os processing time: took {(total_os_process_time):.3f}s for Marqo-os to execute the search.")
+    logger.info(
+        f"search (lexical) roundtrip: took {(total_search_http_time):.3f}s to send search query (roundtrip) to Marqo-os and received {num_results} results.")
+    logger.info(
+        f"  search (lexical) Marqo-os processing time: took {(total_os_process_time):.3f}s for Marqo-os to execute the search.")
 
     # SEARCH TIMER-LOGGER (post-processing)
     start_postprocess_time = timer()
@@ -1182,11 +1201,12 @@ def _lexical_search(
             just_doc["_id"] = doc["_id"]
             just_doc["_score"] = doc["_score"]
         res_list.append({**just_doc, "_highlights": []})
-    
+
     end_postprocess_time = timer()
     total_postprocess_time = end_postprocess_time - start_postprocess_time
-    logger.info(f"search (lexical) post-processing: took {(total_postprocess_time):.3f}s to format {len(res_list)} results.")
-    
+    logger.info(
+        f"search (lexical) post-processing: took {(total_postprocess_time):.3f}s to format {len(res_list)} results.")
+
     return {'hits': res_list}
 
 
@@ -1257,17 +1277,20 @@ def _vector_text_search(
             to_be_vectorised = [[k for k, _ in ordered_queries], ]
     try:
         vectorised_text = functools.reduce(lambda x, y: x + y,
-            [s2_inference.vectorise(
-                model_name=index_info.model_name, model_properties=_get_model_properties(index_info),
-                content=batch, device=selected_device,
-                normalize_embeddings=index_info.index_settings['index_defaults']['normalize_embeddings'],
-                image_download_headers=image_download_headers
-                )
-                for batch in to_be_vectorised]
-        )
+                                           [s2_inference.vectorise(
+                                               model_name=index_info.model_name,
+                                               model_properties=_get_model_properties(index_info),
+                                               content=batch, device=selected_device,
+                                               normalize_embeddings=index_info.index_settings['index_defaults'][
+                                                   'normalize_embeddings'],
+                                               image_download_headers=image_download_headers
+                                           )
+                                               for batch in to_be_vectorised]
+                                           )
         if ordered_queries:
             # multiple queries. We have to weight and combine them:
-            weighted_vectors = [np.asarray(vec) * weight for vec, weight in zip(vectorised_text, [w for _, w in ordered_queries])]
+            weighted_vectors = [np.asarray(vec) * weight for vec, weight in
+                                zip(vectorised_text, [w for _, w in ordered_queries])]
             vectorised_text = np.mean(weighted_vectors, axis=0)
             if index_info.index_settings['index_defaults']['normalize_embeddings']:
                 norm = np.linalg.norm(vectorised_text, axis=-1, keepdims=True)
@@ -1306,8 +1329,10 @@ def _vector_text_search(
 
     # Validation for offset (pagination is single field)
     if len(vector_properties_to_search) != 1 and offset > 0:
-        human_readable_vector_properties = [v.replace(TensorField.vector_prefix, "") for v in list(vector_properties_to_search)]
-        raise errors.InvalidArgError(f"Pagination (offset > 0) is only supported for single field searches! Your search currently has {len(vector_properties_to_search)} vectorisable fields: {human_readable_vector_properties}")
+        human_readable_vector_properties = [v.replace(TensorField.vector_prefix, "") for v in
+                                            list(vector_properties_to_search)]
+        raise errors.InvalidArgError(
+            f"Pagination (offset > 0) is only supported for single field searches! Your search currently has {len(vector_properties_to_search)} vectorisable fields: {human_readable_vector_properties}")
 
     if filter_string is not None:
         contextualised_filter = utils.contextualise_filter(
@@ -1373,7 +1398,7 @@ def _vector_text_search(
         # empty body means that there are no vector fields associated with the index.
         # This probably means the index is emtpy
         return {"hits": []}
-    
+
     end_preprocess_time = timer()
     total_preprocess_time = end_preprocess_time - start_preprocess_time
     logger.info(f"search (tensor) pre-processing: took {(total_preprocess_time):.3f}s to vectorize and process query.")
@@ -1386,8 +1411,9 @@ def _vector_text_search(
     total_search_http_time = end_search_http_time - start_search_http_time
     total_os_process_time = response["took"] * 0.001
     num_responses = len(response["responses"])
-    logger.info(f"search (tensor) roundtrip: took {(total_search_http_time):.3f}s to send {num_responses} search queries (roundtrip) to Marqo-os.")
-    
+    logger.info(
+        f"search (tensor) roundtrip: took {(total_search_http_time):.3f}s to send {num_responses} search queries (roundtrip) to Marqo-os.")
+
     try:
         responses = [r['hits']['hits'] for r in response["responses"]]
 
@@ -1395,7 +1421,8 @@ def _vector_text_search(
         for i in range(len(vector_properties_to_search)):
             indiv_responses = response["responses"][i]['hits']['hits']
             indiv_query_time = response["responses"][i]["took"] * 0.001
-            logger.info(f"  search (tensor) Marqo-os processing time (search field = {list(vector_properties_to_search)[i]}): took {(indiv_query_time):.3f}s and received {len(indiv_responses)} hits.")
+            logger.info(
+                f"  search (tensor) Marqo-os processing time (search field = {list(vector_properties_to_search)[i]}): took {(indiv_query_time):.3f}s and received {len(indiv_responses)} hits.")
 
     except KeyError as e:
         # KeyError indicates we have received a non-successful result
@@ -1413,7 +1440,8 @@ def _vector_text_search(
         except (KeyError, IndexError) as e2:
             raise e
 
-    logger.info(f"  search (tensor) Marqo-os processing time: took {(total_os_process_time):.3f}s for Marqo-os to execute the search.")
+    logger.info(
+        f"  search (tensor) Marqo-os processing time: took {(total_os_process_time):.3f}s for Marqo-os to execute the search.")
 
     # SEARCH TIMER-LOGGER (post-processing)
     start_postprocess_time = timer()
@@ -1434,7 +1462,7 @@ def _vector_text_search(
                     "doc": doc,
                     "chunks": doc_chunks
                 }
-    
+
     # Filter out docs with no inner hits:
 
     for doc_id in list(gathered_docs.keys()):
@@ -1537,11 +1565,13 @@ def _vector_text_search(
     if simplified_format:
         res = format_ordered_docs_simple(ordered_docs_w_chunks=completely_sorted)
     else:
-        res = format_ordered_docs_preserving(ordered_docs_w_chunks=completely_sorted, num_highlights=number_of_highlights)
+        res = format_ordered_docs_preserving(ordered_docs_w_chunks=completely_sorted,
+                                             num_highlights=number_of_highlights)
 
     end_postprocess_time = timer()
     total_postprocess_time = end_postprocess_time - start_postprocess_time
-    logger.info(f"search (tensor) post-processing: took {(total_postprocess_time):.3f}s to sort and format {len(completely_sorted)} results from Marqo-os.")
+    logger.info(
+        f"search (tensor) post-processing: took {(total_postprocess_time):.3f}s to sort and format {len(completely_sorted)} results from Marqo-os.")
     return res
 
 
@@ -1628,7 +1658,7 @@ def _get_model_properties(index_info):
 
 def get_loaded_models() -> dict:
     available_models = s2_inference.get_available_models()
-    message = {"models":[]}
+    message = {"models": []}
 
     for ix in available_models:
         if isinstance(ix, str):
@@ -1638,7 +1668,7 @@ def get_loaded_models() -> dict:
 
 def eject_model(model_name: str, device: str) -> dict:
     try:
-       result = s2_inference.eject_model(model_name, device)
+        result = s2_inference.eject_model(model_name, device)
     except s2_inference_errors.ModelNotInCacheError as e:
         raise errors.ModelNotInCacheError(message=str(e))
     return result
@@ -1646,18 +1676,20 @@ def eject_model(model_name: str, device: str) -> dict:
 
 def get_cpu_info() -> dict:
     return {
-        "cpu_usage_percent": f"{psutil.cpu_percent(1)} %", # The number 1 is a time interval for CPU usage calculation.
-        "memory_used_percent": f"{psutil.virtual_memory()[2]} %",  # The number 2 is just a index number to get the expected results
-        "memory_used_gb": f"{round(psutil.virtual_memory()[3]/1000000000,1)}", # The number 3 is just a index number to get the expected results
+        "cpu_usage_percent": f"{psutil.cpu_percent(1)} %",  # The number 1 is a time interval for CPU usage calculation.
+        "memory_used_percent": f"{psutil.virtual_memory()[2]} %",
+        # The number 2 is just a index number to get the expected results
+        "memory_used_gb": f"{round(psutil.virtual_memory()[3] / 1000000000, 1)}",
+        # The number 3 is just a index number to get the expected results
     }
 
 
 def get_cuda_info() -> dict:
     if torch.cuda.is_available():
-        return {"cuda_devices": [{"device_id" : _device_id, "device_name" : torch.cuda.get_device_name(_device_id),
-                "memory_used":f"{round(torch.cuda.memory_allocated(_device_id) / 1024**3, 1)} GiB",
-                "total_memory": f"{round(torch.cuda.get_device_properties(_device_id).total_memory/ 1024**3, 1)} GiB"}
-                for _device_id in range(torch.cuda.device_count())]}
+        return {"cuda_devices": [{"device_id": _device_id, "device_name": torch.cuda.get_device_name(_device_id),
+                                  "memory_used": f"{round(torch.cuda.memory_allocated(_device_id) / 1024 ** 3, 1)} GiB",
+                                  "total_memory": f"{round(torch.cuda.get_device_properties(_device_id).total_memory / 1024 ** 3, 1)} GiB"}
+                                 for _device_id in range(torch.cuda.device_count())]}
 
     else:
         raise errors.HardwareCompatabilityError(message=str(
@@ -1665,8 +1697,8 @@ def get_cuda_info() -> dict:
         ))
 
 
-def vectorise_multimodal_combination_field(field: str, field_content:Dict[str,dict], copied:Dict, unsuccessful_docs,
-                                       total_vectorise_time, i, doc_id, selected_device,index_info):
+def vectorise_multimodal_combination_field(field: str, field_content: Dict[str, dict], copied: Dict,i,
+                                            doc_id, selected_device, index_info):
     '''
     This function is used to vectorise multimodal combination field. The field content should
     have the following structure:
@@ -1684,7 +1716,8 @@ def vectorise_multimodal_combination_field(field: str, field_content:Dict[str,di
         doc_id: the document id
         selected_device: device from main body
         index_info: index_info from main body
-    Returns: return chunks: the appended chunks from main body
+    Returns:
+    chunks_to_append: the chunks to be appended to the main body
     document_is_valid:  if the document is a valid
     unsuccessful_docs: appended unsucessful_docs
     total_vectorise_time: new total vectorise time
@@ -1694,6 +1727,8 @@ def vectorise_multimodal_combination_field(field: str, field_content:Dict[str,di
     document_is_valid = True
     field_vector_weight = []
     chunks_to_append = []
+    unsuccessful_doc_to_append = []
+    vectorise_time_to_add = 0
     for sub_content, sub_content_para in field_content.items():
         if isinstance(sub_content, (str, Image.Image)):
             if isinstance(sub_content, str) and not _is_image(sub_content):
@@ -1708,22 +1743,6 @@ def vectorise_multimodal_combination_field(field: str, field_content:Dict[str,di
             infer_if_image = index_info.index_settings[NsField.index_defaults][
                 NsField.treat_urls_and_pointers_as_images]
 
-            # try:
-            #     if normalize_embeddings is False:
-            #         raise errors.InvalidArgError(
-            #             f"The setting `normalized_embedding` is `{normalize_embeddings}` for a multimodal_tensor_combination field."
-            #             f"This is not supported. Please change the setting `normalized embedding` as `True` for multimodal_tensor_combination fields. "
-            #         )
-            # except errors.InvalidArgError as e:
-            #     document_is_valid = False
-            #     unsuccessful_docs.append(
-            #         (i, {'_id': doc_id, 'error': e.message,
-            #              'status': int(errors.InvalidArgError.status_code),
-            #              'code': errors.InvalidArgError.code})
-            #     )
-            #     return chunks_to_append, document_is_valid, unsuccessful_docs, total_vectorise_time
-
-
             try:
                 if infer_if_image is False:
                     raise errors.InvalidArgError(
@@ -1732,23 +1751,24 @@ def vectorise_multimodal_combination_field(field: str, field_content:Dict[str,di
                     )
             except errors.InvalidArgError as e:
                 document_is_valid = False
-                unsuccessful_docs.append(
+                unsuccessful_doc_to_append.append(
                     (i, {'_id': doc_id, 'error': e.message,
                          'status': int(errors.InvalidArgError.status_code),
                          'code': errors.InvalidArgError.code})
                 )
-                return chunks_to_append, document_is_valid, unsuccessful_docs, total_vectorise_time
+                return chunks_to_append, document_is_valid, unsuccessful_doc_to_append, total_vectorise_time
             try:
                 start_time = timer()
                 vector_chunks = s2_inference.vectorise(
                     model_name=index_info.model_name,
                     model_properties=_get_model_properties(index_info), content=content_chunks,
-                    device=selected_device, normalize_embeddings=normalize_embeddings,
+                    device=selected_device, normalize_embeddings=False,
+                    # it should always be false for multimodal-combination
                     infer=infer_if_image)
 
                 end_time = timer()
                 single_vectorise_call = end_time - start_time
-                total_vectorise_time += single_vectorise_call
+                vectorise_time_to_add += single_vectorise_call
                 logger.debug(f"(4) TIME for single vectorise call: {(single_vectorise_call):.3f}s.")
             except (s2_inference_errors.UnknownModelError,
                     s2_inference_errors.InvalidModelPropertiesError,
@@ -1760,21 +1780,26 @@ def vectorise_multimodal_combination_field(field: str, field_content:Dict[str,di
             except s2_inference_errors.S2InferenceError:
                 document_is_valid = False
                 image_err = errors.InvalidArgError(message=f'Could not process given image: {field_content}')
-                unsuccessful_docs.append(
+                unsuccessful_doc_to_append.append(
                     (i, {'_id': doc_id, 'error': image_err.message, 'status': int(image_err.status_code),
                          'code': image_err.code})
                 )
-                return chunks_to_append, document_is_valid, unsuccessful_docs, total_vectorise_time
+                return chunks_to_append, document_is_valid, unsuccessful_doc_to_append, total_vectorise_time
 
             field_vector_weight.append((sub_content_para["weight"], vector_chunks))
 
     vector_chunk = np.squeeze(
-                np.sum([np.array(vector) * weight for weight, vector in field_vector_weight], axis=0) / np.sum(
-            [weight for weight, vector in field_vector_weight])).tolist()
+        np.sum([np.array(vector) * weight for weight, vector in field_vector_weight], axis=0))
+
+    # Normalize the vector if normalize_embeddings = True
+    if normalize_embeddings is True:
+        vector_chunk = vector_chunk / np.linalg.norm(vector_chunk)
+
+    vector_chunk = vector_chunk.tolist()
 
     chunks_to_append.append({
         utils.generate_vector_name(field): vector_chunk,
         TensorField.field_content: list(copied[field].keys()),
         TensorField.field_name: field,
     })
-    return chunks_to_append, document_is_valid, unsuccessful_docs, total_vectorise_time
+    return chunks_to_append, document_is_valid, unsuccessful_doc_to_append, vectorise_time_to_add
