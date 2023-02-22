@@ -477,7 +477,8 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
             indexing_instructions["update"]["_id"] = doc_id
 
         # Metadata can be calculated here at the doc level.
-        # Only add chunk values which are string, boolean or numeric.
+        # Only add chunk values which are string, boolean, numeric or dictionary.
+        # Dictionary keys will be store in a list.
         chunk_values_for_filtering = {}
         for key, value in copied.items():
             if not (isinstance(value, str) or isinstance(value, float)
@@ -633,19 +634,21 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
             # Add chunks_to_append along with doc metadata to total chunks
 
             elif isinstance(field_content, dict):
-                chunks_to_append, document_is_valid, unsuccessful_doc_to_append, vectorise_time_to_add = \
-                    vectorise_multimodal_combination_field(field, field_content, copied, \
+                combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add = \
+                    vectorise_multimodal_combination_field(field, field_content, copied,
                                                            i, doc_id, selected_device, index_info, image_repo)
 
-                if document_is_valid is False:
-                    for unsuccessful_doc in unsuccessful_doc_to_append:
-                        unsuccessful_docs.append(unsuccessful_doc)
+                total_vectorise_time = total_vectorise_time + combo_vectorise_time_to_add
+                if combo_document_is_valid is False:
+                    unsuccessful_docs.append(unsuccessful_doc_to_append)
                     break
-
-                total_vectorise_time = total_vectorise_time + vectorise_time_to_add
+                else:
+                    chunks.append({**combo_chunk, **chunk_values_for_filtering})
+                    continue
 
             for chunk in chunks_to_append:
                 chunks.append({**chunk, **chunk_values_for_filtering})
+
 
         if document_is_valid:
             # This block happens per DOC
@@ -1717,18 +1720,18 @@ def vectorise_multimodal_combination_field(field: str, field_content: Dict[str, 
         selected_device: device from main body
         index_info: index_info from main body
     Returns:
-    chunks_to_append: the chunks to be appended to the main body
-    document_is_valid:  if the document is a valid
+    combo_chunk_to_append: the combo_chunk to be appended to the main body
+    combo_document_is_valid:  if the document is a valid
     unsuccessful_docs: appended unsucessful_docs
-    total_vectorise_time: new total vectorise time
+    combo_total_vectorise_time: the vectorise time spent in combo field
     '''
     # field_conent = {"tensor_field_one" : {"weight":0.5, "parameter": "test-paramater-1"},
     #                 "tensor_field_two" : {"weight": 0.5, parameter": "test-parameter-2"}},
-    document_is_valid = True
+    combo_document_is_valid = True
     field_vector_weight = []
-    chunks_to_append = []
-    unsuccessful_doc_to_append = []
-    vectorise_time_to_add = 0
+    combo_vectorise_time_to_add = 0
+    combo_chunk = {}
+    unsuccessful_doc_to_append = tuple()
 
     # Copy the important mutable objects from main body for safety purpose
     field_content_copy = copy.deepcopy(field_content)
@@ -1756,12 +1759,12 @@ def vectorise_multimodal_combination_field(field: str, field_content: Dict[str, 
                     content_chunks, text_chunks = [image_data], [sub_content]
 
                 except s2_inference_errors.S2InferenceError as e:
-                    document_is_valid = False
-                    unsuccessful_doc_to_append.append(
+                    combo_document_is_valid = False
+                    unsuccessful_doc_to_append =\
                         (doc_index, {'_id': doc_id, 'error': e.message,
                              'status': int(errors.InvalidArgError.status_code),
                              'code': errors.InvalidArgError.code})
-                    )
+
                     break
 
             normalize_embeddings = index_info.index_settings[NsField.index_defaults][
@@ -1776,13 +1779,13 @@ def vectorise_multimodal_combination_field(field: str, field_content: Dict[str, 
                         f"This is not supported. Please change the setting `treat_urls_and_pointers_as_images` as `True` for multimodal_tensor_combination fields. "
                     )
             except errors.InvalidArgError as e:
-                document_is_valid = False
-                unsuccessful_doc_to_append.append(
+                combo_document_is_valid = False
+                unsuccessful_doc_to_append = \
                     (doc_index, {'_id': doc_id, 'error': e.message,
                          'status': int(errors.InvalidArgError.status_code),
                          'code': errors.InvalidArgError.code})
-                )
-                return chunks_to_append, document_is_valid, unsuccessful_doc_to_append, vectorise_time_to_add
+
+                return combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add
             try:
                 start_time = timer()
                 vector_chunks = s2_inference.vectorise(
@@ -1794,7 +1797,7 @@ def vectorise_multimodal_combination_field(field: str, field_content: Dict[str, 
 
                 end_time = timer()
                 single_vectorise_call = end_time - start_time
-                vectorise_time_to_add += single_vectorise_call
+                combo_vectorise_time_to_add += single_vectorise_call
                 logger.debug(f"(4) TIME for single vectorise call: {(single_vectorise_call):.3f}s.")
             except (s2_inference_errors.UnknownModelError,
                     s2_inference_errors.InvalidModelPropertiesError,
@@ -1804,13 +1807,13 @@ def vectorise_multimodal_combination_field(field: str, field_content: Dict[str, 
                     link="https://marqo.pages.dev/latest/Models-Reference/dense_retrieval/"
                 )
             except s2_inference_errors.S2InferenceError:
-                document_is_valid = False
+                combo_document_is_valid = False
                 image_err = errors.InvalidArgError(message=f'Could not process given image: {field_content_copy}')
-                unsuccessful_doc_to_append.append(
+                unsuccessful_doc_to_append = \
                     (doc_index, {'_id': doc_id, 'error': image_err.message, 'status': int(image_err.status_code),
                          'code': image_err.code})
-                )
-                return chunks_to_append, document_is_valid, unsuccessful_doc_to_append, vectorise_time_to_add
+
+                return combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add
 
             field_vector_weight.append((sub_content_para["weight"], vector_chunks))
 
@@ -1823,9 +1826,9 @@ def vectorise_multimodal_combination_field(field: str, field_content: Dict[str, 
 
     vector_chunk = vector_chunk.tolist()
 
-    chunks_to_append.append({
+    combo_chunk = dict({
         utils.generate_vector_name(field): vector_chunk,
         TensorField.field_content: list(doc_copy[field].keys()),
         TensorField.field_name: field,
     })
-    return chunks_to_append, document_is_valid, unsuccessful_doc_to_append, vectorise_time_to_add
+    return combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add

@@ -7,6 +7,7 @@ from tests.marqo_test import MarqoTestCase
 from marqo.tensor_search.tensor_search import add_documents, vectorise_multimodal_combination_field
 from marqo.errors import DocumentNotFoundError
 import numpy as np
+from marqo.tensor_search.validation import validate_dict
 
 
 class TestMultimodalTensorCombination(MarqoTestCase):
@@ -29,8 +30,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                         }
                     })
 
-        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
-            {
+        expected_doc = dict({
                 "Title": "Horse rider",
                 "combo_text_image": {
                     "A rider is riding a horse jumping over the barrier." : {
@@ -41,8 +41,11 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                                         },
                 },
                 "_id": "0"
-            },
+            })
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
+            expected_doc,
 
+            # this is just a dummy one
             {
                 "Title": "Horse rider",
                 "text_field": "A rider is riding a horse jumping over the barrier.",
@@ -51,20 +54,23 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             },
         ], auto_refresh=True)
 
-        expected_doc = tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="0")
-        print(expected_doc)
-        self.assertEqual(expected_doc, dict({
-                "Title": "Horse rider",
-                "combo_text_image": {
-                    "A rider is riding a horse jumping over the barrier." : {
-                        "weight" : 0.5,
-                                        },
-                    "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg": {
-                    "weight": 0.5,
-                                        },
-                },
-                "_id": "0"
-            },) )
+        added_doc = tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="0", show_vectors=True)
+        for key, value in expected_doc.items():
+            assert expected_doc[key] == added_doc[key]
+
+        tensor_field = added_doc["_tensor_facets"]
+        self.assertEqual(len(tensor_field), 2)
+        # for "Title" : "Horse Rider"
+        assert "_embedding" in tensor_field[0]
+        assert tensor_field[0]["Title"] == expected_doc["Title"]
+
+        # for combo filed
+        assert "_embedding" in tensor_field[1]
+        assert tensor_field[1]["combo_text_image"] == list(expected_doc["combo_text_image"])
+
+
+
+
 
 
     def test_multimodal_tensor_combination_score(self):
@@ -360,3 +366,33 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         except DocumentNotFoundError:
             pass
 
+
+    def test_validate_dict(self):
+        valid_dict = [{"test":{"weight":0.3}, "test_test":{"weight" : -0.3}},
+                      {"test":{"weight" : 0.5}, "test_test":{"weight" : 0.3}, "test_3":{"weight":0.6}}]
+
+        invalid_dict = [ {"test":{"weight" : 0.5}}, # field should be not less than 2
+                         {3232:{"weight" : 0.5}, "test_2":{"weight":0.5}}, # field can only be string
+                         {"test": {"weightsfd": 0.5}, "test_test": {"weight": 0.3}}, # incorrect spelling of "weight"
+                         {"test": {"weight": "1"}, "test_test": {"weight": 0.3}}, # weight is not a float or int
+                         {"test": 0.5, "test_test": {"weight": 0.3}}, # incorrect weight format
+                         {"test": {"test":0.5}, "test_test": {"weight": 0.3}}, # no weight for a field
+                         {}, # empty
+        ]
+
+        for valid_content_field in valid_dict:
+            validate_dict(valid_content_field, is_non_tensor_field=False)
+            try:
+                validate_dict(valid_content_field, is_non_tensor_field=True)
+                raise AssertionError
+            except InvalidArgError as e:
+                assert "non_tensor_field" in e.message
+                pass
+
+
+        for invalid_content_field in invalid_dict:
+            try:
+                validate_dict(invalid_content_field, is_non_tensor_field=False)
+                raise AssertionError
+            except InvalidArgError:
+                pass
