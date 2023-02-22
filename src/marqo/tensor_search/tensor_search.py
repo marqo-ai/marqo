@@ -1697,8 +1697,8 @@ def get_cuda_info() -> dict:
         ))
 
 
-def vectorise_multimodal_combination_field(field: str, field_content: Dict[str, dict], copied: Dict,i,
-                                            doc_id, selected_device, index_info):
+def vectorise_multimodal_combination_field(field: str, field_content: Dict[str, dict], copied: dict, doc_index: int ,
+                                            doc_id:str, selected_device:str, index_info):
     '''
     This function is used to vectorise multimodal combination field. The field content should
     have the following structure:
@@ -1712,7 +1712,7 @@ def vectorise_multimodal_combination_field(field: str, field_content: Dict[str, 
         copied: the copied document
         unsuccessful_docs: a list to store all the unsuccessful documents
         total_vectorise_time: total vectorise time in the main body
-        i: an interator in the main body
+        doc_index: the index of the document. This is an interator variable `i` in the main body to iterator throught the docs
         doc_id: the document id
         selected_device: device from main body
         index_info: index_info from main body
@@ -1729,6 +1729,7 @@ def vectorise_multimodal_combination_field(field: str, field_content: Dict[str, 
     chunks_to_append = []
     unsuccessful_doc_to_append = []
     vectorise_time_to_add = 0
+
     for sub_content, sub_content_para in field_content.items():
         if isinstance(sub_content, (str, Image.Image)):
             if isinstance(sub_content, str) and not _is_image(sub_content):
@@ -1752,7 +1753,7 @@ def vectorise_multimodal_combination_field(field: str, field_content: Dict[str, 
             except errors.InvalidArgError as e:
                 document_is_valid = False
                 unsuccessful_doc_to_append.append(
-                    (i, {'_id': doc_id, 'error': e.message,
+                    (doc_index, {'_id': doc_id, 'error': e.message,
                          'status': int(errors.InvalidArgError.status_code),
                          'code': errors.InvalidArgError.code})
                 )
@@ -1781,10 +1782,10 @@ def vectorise_multimodal_combination_field(field: str, field_content: Dict[str, 
                 document_is_valid = False
                 image_err = errors.InvalidArgError(message=f'Could not process given image: {field_content}')
                 unsuccessful_doc_to_append.append(
-                    (i, {'_id': doc_id, 'error': image_err.message, 'status': int(image_err.status_code),
+                    (doc_index, {'_id': doc_id, 'error': image_err.message, 'status': int(image_err.status_code),
                          'code': image_err.code})
                 )
-                return chunks_to_append, document_is_valid, unsuccessful_doc_to_append, total_vectorise_time
+                return chunks_to_append, document_is_valid, unsuccessful_doc_to_append, vectorise_time_to_add
 
             field_vector_weight.append((sub_content_para["weight"], vector_chunks))
 
