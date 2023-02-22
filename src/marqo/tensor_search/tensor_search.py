@@ -635,7 +635,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
             elif isinstance(field_content, dict):
                 chunks_to_append, document_is_valid, unsuccessful_doc_to_append, vectorise_time_to_add = \
                     vectorise_multimodal_combination_field(field, field_content, copied, \
-                                                           i, doc_id, selected_device, index_info)
+                                                           i, doc_id, selected_device, index_info, image_repo)
 
                 if document_is_valid is False:
                     for unsuccessful_doc in unsuccessful_doc_to_append:
@@ -1697,8 +1697,8 @@ def get_cuda_info() -> dict:
         ))
 
 
-def vectorise_multimodal_combination_field(field: str, field_content: Dict[str, dict], copied: dict, doc_index: int ,
-                                            doc_id:str, selected_device:str, index_info):
+def vectorise_multimodal_combination_field(field: str, field_content: Dict[str, dict], doc: dict, doc_index: int,
+                                            doc_id:str, selected_device:str, index_info, image_repo):
     '''
     This function is used to vectorise multimodal combination field. The field content should
     have the following structure:
@@ -1730,14 +1730,39 @@ def vectorise_multimodal_combination_field(field: str, field_content: Dict[str, 
     unsuccessful_doc_to_append = []
     vectorise_time_to_add = 0
 
-    for sub_content, sub_content_para in field_content.items():
-        if isinstance(sub_content, (str, Image.Image)):
+    # Copy the important mutable objects from main body for safety purpose
+    field_content_copy = copy.deepcopy(field_content)
+    doc_copy = copy.deepcopy(doc)
+
+    for sub_content, sub_content_para in field_content_copy.items():
+        if isinstance(sub_content, str):
             if isinstance(sub_content, str) and not _is_image(sub_content):
                 text_chunks = sub_content
                 content_chunks = text_chunks
             else:
-                image_data = sub_content
-                content_chunks, text_chunks = [image_data], [sub_content]
+                try:
+                    if isinstance(sub_content, str) and index_info.index_settings[NsField.index_defaults][
+                        NsField.treat_urls_and_pointers_as_images]:
+                        if not isinstance(image_repo[sub_content], Exception):
+                            image_data = image_repo[sub_content]
+                        else:
+                            raise s2_inference_errors.S2InferenceError(
+                                f"Could not find image found at `{sub_content}`. \n"
+                                f"Reason: {str(image_repo[sub_content])}"
+                            )
+                    else:
+                        image_data = sub_content
+
+                    content_chunks, text_chunks = [image_data], [sub_content]
+
+                except s2_inference_errors.S2InferenceError as e:
+                    document_is_valid = False
+                    unsuccessful_doc_to_append.append(
+                        (doc_index, {'_id': doc_id, 'error': e.message,
+                             'status': int(errors.InvalidArgError.status_code),
+                             'code': errors.InvalidArgError.code})
+                    )
+                    break
 
             normalize_embeddings = index_info.index_settings[NsField.index_defaults][
                 NsField.normalize_embeddings]
@@ -1757,7 +1782,7 @@ def vectorise_multimodal_combination_field(field: str, field_content: Dict[str, 
                          'status': int(errors.InvalidArgError.status_code),
                          'code': errors.InvalidArgError.code})
                 )
-                return chunks_to_append, document_is_valid, unsuccessful_doc_to_append, total_vectorise_time
+                return chunks_to_append, document_is_valid, unsuccessful_doc_to_append, vectorise_time_to_add
             try:
                 start_time = timer()
                 vector_chunks = s2_inference.vectorise(
@@ -1780,7 +1805,7 @@ def vectorise_multimodal_combination_field(field: str, field_content: Dict[str, 
                 )
             except s2_inference_errors.S2InferenceError:
                 document_is_valid = False
-                image_err = errors.InvalidArgError(message=f'Could not process given image: {field_content}')
+                image_err = errors.InvalidArgError(message=f'Could not process given image: {field_content_copy}')
                 unsuccessful_doc_to_append.append(
                     (doc_index, {'_id': doc_id, 'error': image_err.message, 'status': int(image_err.status_code),
                          'code': image_err.code})
@@ -1800,7 +1825,7 @@ def vectorise_multimodal_combination_field(field: str, field_content: Dict[str, 
 
     chunks_to_append.append({
         utils.generate_vector_name(field): vector_chunk,
-        TensorField.field_content: list(copied[field].keys()),
+        TensorField.field_content: list(doc_copy[field].keys()),
         TensorField.field_name: field,
     })
     return chunks_to_append, document_is_valid, unsuccessful_doc_to_append, vectorise_time_to_add

@@ -48,6 +48,20 @@ def threaded_download_images(allocated_docs: List[dict], image_repo: dict,
                 except PIL.UnidentifiedImageError as e:
                     image_repo[doc[field]] = e
                     continue
+            # For multimodal tensor combination
+            elif isinstance(doc[field], dict):
+                for sub_field in list(doc[field]):
+                    if _is_image(sub_field):
+                        if sub_field in image_repo:
+                            continue
+                        try:
+                            image_repo[sub_field] = load_image_from_path(sub_field, image_download_headers,
+                                                                          timeout=TIMEOUT_SECONDS)
+                        except PIL.UnidentifiedImageError as e:
+                            image_repo[sub_field] = e
+                            continue
+
+
 
 
 def download_images(docs: List[dict], thread_count: int, non_tensor_fields: Tuple, image_download_headers: dict) -> dict:
