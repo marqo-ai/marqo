@@ -368,7 +368,9 @@ class TestMultimodalTensorCombination(MarqoTestCase):
 
     def test_validate_dict(self):
         valid_dict = [{"test": {"weight": 0.3}, "test_test": {"weight": -0.3}},
-                      {"test": {"weight": 0.5}, "test_test": {"weight": 0.3}, "test_3": {"weight": 0.6}}]
+                      {"test": {"weight": 0.5}, "test_test": {"weight": 0.3}, "test_3": {"weight": 0.6}},
+                      {"test": {"weight": 1}, "test_test":{"weight": -1}},
+                      {"test": {"weight": 2}, "test_test":{"weight": -1}}]
 
         invalid_dict = [{"test": {"weight": 0.5}},  # field should be not less than 2
                         {3232: {"weight": 0.5}, "test_2": {"weight": 0.5}},  # field can only be string
@@ -602,3 +604,5 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             "please search me.",
             "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg"
         ]
+
+
