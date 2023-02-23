@@ -1748,9 +1748,6 @@ def vectorise_multimodal_combination_field(field: str, field_content: Dict[str, 
     # 4 list to store content_chunks, text_chunks to image and text.
     # It can also be two list of tuples, but i don't think they can be dictioanry.
     # I choose to use 4 lists as they are easy to handle.
-
-
-
     text_content_chunks = []
     text_text_chunks = []
 
