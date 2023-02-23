@@ -423,6 +423,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
     unsuccessful_docs = []
     total_vectorise_time = 0
     batch_size = len(docs)
+    image_repo = {}
 
     if index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]:
         ti_0 = timer()
@@ -649,7 +650,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
             for chunk in chunks_to_append:
                 chunks.append({**chunk, **chunk_values_for_filtering})
 
-
+        print(chunks)
         if document_is_valid:
             # This block happens per DOC
             new_fields = new_fields.union(new_fields_from_doc)
@@ -1737,90 +1738,96 @@ def vectorise_multimodal_combination_field(field: str, field_content: Dict[str, 
     field_content_copy = copy.deepcopy(field_content)
     doc_copy = copy.deepcopy(doc)
 
-    for sub_content, sub_content_para in field_content_copy.items():
-        if isinstance(sub_content, str):
-            if isinstance(sub_content, str) and not _is_image(sub_content):
-                text_chunks = sub_content
-                content_chunks = text_chunks
-            else:
-                try:
-                    if isinstance(sub_content, str) and index_info.index_settings[NsField.index_defaults][
-                        NsField.treat_urls_and_pointers_as_images]:
-                        if not isinstance(image_repo[sub_content], Exception):
-                            image_data = image_repo[sub_content]
-                        else:
-                            raise s2_inference_errors.S2InferenceError(
-                                f"Could not find image found at `{sub_content}`. \n"
-                                f"Reason: {str(image_repo[sub_content])}"
-                            )
-                    else:
-                        image_data = sub_content
+    # 4 list to store content_chunks, text_chunks to image and text.
+    # It can also be two list of tuples, but i don't think they can be dictioanry.
+    # I choose to use 4 lists as they are easy to handle.
 
-                    content_chunks, text_chunks = [image_data], [sub_content]
 
-                except s2_inference_errors.S2InferenceError as e:
-                    combo_document_is_valid = False
-                    unsuccessful_doc_to_append =\
-                        (doc_index, {'_id': doc_id, 'error': e.message,
-                             'status': int(errors.InvalidArgError.status_code),
-                             'code': errors.InvalidArgError.code})
 
-                    break
+    text_content_chunks = []
+    text_text_chunks = []
 
-            normalize_embeddings = index_info.index_settings[NsField.index_defaults][
-                NsField.normalize_embeddings]
-            infer_if_image = index_info.index_settings[NsField.index_defaults][
-                NsField.treat_urls_and_pointers_as_images]
+    image_content_chunks = []
+    image_text_chunks = []
 
+    for sub_content in list(field_content_copy):
+        if isinstance(sub_content, str) and not _is_image(sub_content):
+            text_content_chunks.append(sub_content)
+            text_text_chunks.append(sub_content)
+        else:
             try:
-                if infer_if_image is False:
-                    raise errors.InvalidArgError(
-                        f"The setting `treat_urls_and_pointers_as_images` is `{infer_if_image}` for a multimodal_tensor_combination field."
-                        f"This is not supported. Please change the setting `treat_urls_and_pointers_as_images` as `True` for multimodal_tensor_combination fields. "
-                    )
-            except errors.InvalidArgError as e:
+                if isinstance(sub_content, str) and index_info.index_settings[NsField.index_defaults][
+                    NsField.treat_urls_and_pointers_as_images]:
+                    if not isinstance(image_repo[sub_content], Exception):
+                        image_data = image_repo[sub_content]
+                    else:
+                        raise s2_inference_errors.S2InferenceError(
+                            f"Could not find image found at `{sub_content}`. \n"
+                            f"Reason: {str(image_repo[sub_content])}"
+                        )
+                else:
+                    image_data = sub_content
+
+                image_content_chunks.append(image_data)
+                image_text_chunks.append(sub_content)
+
+            except s2_inference_errors.S2InferenceError as e:
                 combo_document_is_valid = False
                 unsuccessful_doc_to_append = \
                     (doc_index, {'_id': doc_id, 'error': e.message,
-                         'status': int(errors.InvalidArgError.status_code),
-                         'code': errors.InvalidArgError.code})
-
-                return combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add
-            try:
-                start_time = timer()
-                vector_chunks = s2_inference.vectorise(
-                    model_name=index_info.model_name,
-                    model_properties=_get_model_properties(index_info), content=content_chunks,
-                    device=selected_device, normalize_embeddings=False,
-                    # it should always be false for multimodal-combination
-                    infer=infer_if_image)
-
-                end_time = timer()
-                single_vectorise_call = end_time - start_time
-                combo_vectorise_time_to_add += single_vectorise_call
-                logger.debug(f"(4) TIME for single vectorise call: {(single_vectorise_call):.3f}s.")
-            except (s2_inference_errors.UnknownModelError,
-                    s2_inference_errors.InvalidModelPropertiesError,
-                    s2_inference_errors.ModelLoadError) as model_error:
-                raise errors.BadRequestError(
-                    message=f'Problem vectorising query. Reason: {str(model_error)}',
-                    link="https://marqo.pages.dev/latest/Models-Reference/dense_retrieval/"
-                )
-            except s2_inference_errors.S2InferenceError:
-                combo_document_is_valid = False
-                image_err = errors.InvalidArgError(message=f'Could not process given image: {field_content_copy}')
-                unsuccessful_doc_to_append = \
-                    (doc_index, {'_id': doc_id, 'error': image_err.message, 'status': int(image_err.status_code),
-                         'code': image_err.code})
+                                 'status': int(errors.InvalidArgError.status_code),
+                                 'code': errors.InvalidArgError.code})
 
                 return combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add
 
-            field_vector_weight.append((sub_content_para["weight"], vector_chunks))
+    normalize_embeddings = index_info.index_settings[NsField.index_defaults][
+        NsField.normalize_embeddings]
+    infer_if_image = index_info.index_settings[NsField.index_defaults][
+        NsField.treat_urls_and_pointers_as_images]
 
-    vector_chunk = np.squeeze(
-        np.sum([np.array(vector) * weight for weight, vector in field_vector_weight], axis=0))
 
-    # Normalize the vector if normalize_embeddings = True
+    try:
+        start_time = timer()
+
+        text_vector_chunks = s2_inference.vectorise(
+            model_name=index_info.model_name,
+            model_properties=_get_model_properties(index_info), content=text_content_chunks,
+            device=selected_device, normalize_embeddings=normalize_embeddings,
+            # it should always be false for multimodal-combination
+            infer=infer_if_image)
+
+        image_vector_chunks = s2_inference.vectorise(
+            model_name=index_info.model_name,
+            model_properties=_get_model_properties(index_info), content=image_content_chunks,
+            device=selected_device, normalize_embeddings=normalize_embeddings,
+            # it should always be false for multimodal-combination
+            infer=infer_if_image)
+
+        end_time = timer()
+        single_vectorise_call = end_time - start_time
+        combo_vectorise_time_to_add += single_vectorise_call
+        logger.debug(f"(4) TIME for single vectorise call: {(single_vectorise_call):.3f}s.")
+    except (s2_inference_errors.UnknownModelError,
+            s2_inference_errors.InvalidModelPropertiesError,
+            s2_inference_errors.ModelLoadError) as model_error:
+        raise errors.BadRequestError(
+            message=f'Problem vectorising query. Reason: {str(model_error)}',
+            link="https://marqo.pages.dev/latest/Models-Reference/dense_retrieval/"
+        )
+    except s2_inference_errors.S2InferenceError:
+        combo_document_is_valid = False
+        image_err = errors.InvalidArgError(message=f'Could not process given image: {field_content_copy}')
+        unsuccessful_doc_to_append = \
+            (doc_index, {'_id': doc_id, 'error': image_err.message, 'status': int(image_err.status_code),
+                 'code': image_err.code})
+
+        return combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add
+
+    content_list = text_text_chunks + image_text_chunks
+    vectors_list = text_vector_chunks + image_vector_chunks
+
+    vector_chunk = np.squeeze(np.sum([np.array(vector) * field_content_copy[content]["weight"] for content, vector in zip(content_list, vectors_list)], axis=0))
+
     if normalize_embeddings is True:
         vector_chunk = vector_chunk / np.linalg.norm(vector_chunk)
 
@@ -1828,7 +1835,114 @@ def vectorise_multimodal_combination_field(field: str, field_content: Dict[str, 
 
     combo_chunk = dict({
         utils.generate_vector_name(field): vector_chunk,
-        TensorField.field_content: list(doc_copy[field].keys()),
+        TensorField.field_content: list(doc_copy[field].keys()), # replace text_chunks
         TensorField.field_name: field,
     })
+    print(combo_chunk)
     return combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add
+
+
+
+
+
+
+
+
+
+    # for sub_content, sub_content_para in field_content_copy.items():
+    #     if isinstance(sub_content, str):
+    #         if isinstance(sub_content, str) and not _is_image(sub_content):
+    #             text_chunks = sub_content
+    #             content_chunks = text_chunks
+    #             text_content_list.append((text_chunks, content_chunks))
+    #         else:
+    #             try:
+    #                 if isinstance(sub_content, str) and index_info.index_settings[NsField.index_defaults][
+    #                     NsField.treat_urls_and_pointers_as_images]:
+    #                     if not isinstance(image_repo[sub_content], Exception):
+    #                         image_data = image_repo[sub_content]
+    #                     else:
+    #                         raise s2_inference_errors.S2InferenceError(
+    #                             f"Could not find image found at `{sub_content}`. \n"
+    #                             f"Reason: {str(image_repo[sub_content])}"
+    #                         )
+    #                 else:
+    #                     image_data = sub_content
+    #
+    #                 content_chunks, text_chunks = [image_data], [sub_content]
+    #                 image_content_list.append((text_chunks, content_chunks))
+    #
+    #             except s2_inference_errors.S2InferenceError as e:
+    #                 combo_document_is_valid = False
+    #                 unsuccessful_doc_to_append =\
+    #                     (doc_index, {'_id': doc_id, 'error': e.message,
+    #                          'status': int(errors.InvalidArgError.status_code),
+    #                          'code': errors.InvalidArgError.code})
+    #
+    #                 return combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add
+    #
+    # normalize_embeddings = index_info.index_settings[NsField.index_defaults][
+    #     NsField.normalize_embeddings]
+    # infer_if_image = index_info.index_settings[NsField.index_defaults][
+    #     NsField.treat_urls_and_pointers_as_images]
+    #
+    # try:
+    #     if infer_if_image is False:
+    #         raise errors.InvalidArgError(
+    #             f"The setting `treat_urls_and_pointers_as_images` is `{infer_if_image}` for a multimodal_tensor_combination field."
+    #             f"This is not supported. Please change the setting `treat_urls_and_pointers_as_images` as `True` for multimodal_tensor_combination fields. "
+    #         )
+    # except errors.InvalidArgError as e:
+    #     combo_document_is_valid = False
+    #     unsuccessful_doc_to_append = \
+    #         (doc_index, {'_id': doc_id, 'error': e.message,
+    #              'status': int(errors.InvalidArgError.status_code),
+    #              'code': errors.InvalidArgError.code})
+    #
+    #     return combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add
+    # try:
+    #     start_time = timer()
+    #     vector_chunks = s2_inference.vectorise(
+    #         model_name=index_info.model_name,
+    #         model_properties=_get_model_properties(index_info), content=content_chunks,
+    #         device=selected_device, normalize_embeddings=normalize_embeddings,
+    #         # it should always be false for multimodal-combination
+    #         infer=infer_if_image)
+    #
+    #     end_time = timer()
+    #     single_vectorise_call = end_time - start_time
+    #     combo_vectorise_time_to_add += single_vectorise_call
+    #     logger.debug(f"(4) TIME for single vectorise call: {(single_vectorise_call):.3f}s.")
+    # except (s2_inference_errors.UnknownModelError,
+    #         s2_inference_errors.InvalidModelPropertiesError,
+    #         s2_inference_errors.ModelLoadError) as model_error:
+    #     raise errors.BadRequestError(
+    #         message=f'Problem vectorising query. Reason: {str(model_error)}',
+    #         link="https://marqo.pages.dev/latest/Models-Reference/dense_retrieval/"
+    #     )
+    # except s2_inference_errors.S2InferenceError:
+    #     combo_document_is_valid = False
+    #     image_err = errors.InvalidArgError(message=f'Could not process given image: {field_content_copy}')
+    #     unsuccessful_doc_to_append = \
+    #         (doc_index, {'_id': doc_id, 'error': image_err.message, 'status': int(image_err.status_code),
+    #              'code': image_err.code})
+    #
+    #     return combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add
+    #
+    # field_vector_weight.append((sub_content_para["weight"], vector_chunks))
+    #
+    # vector_chunk = np.squeeze(
+    #     np.sum([np.array(vector) * weight for weight, vector in field_vector_weight], axis=0))
+    #
+    # # Normalize the vector if normalize_embeddings = True
+    # if normalize_embeddings is True:
+    #     vector_chunk = vector_chunk / np.linalg.norm(vector_chunk)
+    #
+    # vector_chunk = vector_chunk.tolist()
+    #
+    # combo_chunk = dict({
+    #     utils.generate_vector_name(field): vector_chunk,
+    #     TensorField.field_content: list(doc_copy[field].keys()), # replace text_chunks
+    #     TensorField.field_name: field,
+    # })
+    # return combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add

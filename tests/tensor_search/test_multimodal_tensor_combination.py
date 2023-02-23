@@ -8,6 +8,8 @@ from marqo.tensor_search.tensor_search import add_documents, vectorise_multimoda
 from marqo.errors import DocumentNotFoundError
 import numpy as np
 from marqo.tensor_search.validation import validate_dict
+from marqo.s2_inference.s2_inference import vectorise
+from marqo.s2_inference.clip_utils import load_image_from_path
 
 
 class TestMultimodalTensorCombination(MarqoTestCase):
@@ -396,3 +398,209 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                 raise AssertionError
             except InvalidArgError:
                 pass
+
+    def test_batched_vectorise_call(self):
+        tensor_search.create_vector_index(
+                        index_name=self.index_name_1, config=self.config, index_settings={
+                        IndexSettingsField.index_defaults: {
+                            IndexSettingsField.model: "ViT-B/32",
+                            IndexSettingsField.treat_urls_and_pointers_as_images: True,
+                            IndexSettingsField.normalize_embeddings:False
+                        }
+                    })
+
+        def pass_through_vectorise(*arg, **kwargs):
+            """Vectorise will behave as usual, but we will be able to see the call list
+            via mock
+            """
+            return vectorise(*arg, **kwargs)
+
+        mock_vectorise = unittest.mock.MagicMock()
+        mock_vectorise.side_effect = pass_through_vectorise
+        @unittest.mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
+        def run():
+            tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs = [
+                {
+                    "combo_text_image": {
+                        "A rider is riding a horse jumping over the barrier_0.": {
+                            "weight": 0.1,
+                        },
+                        "A rider is riding a horse jumping over the barrier_1.": {
+                            "weight": 0.1,
+                        },
+                        "A rider is riding a horse jumping over the barrier_2.": {
+                            "weight": 0.1,
+                        },
+                        "A rider is riding a horse jumping over the barrier_3.": {
+                            "weight": 0.1,
+                        },
+                        "A rider is riding a horse jumping over the barrier_4.": {
+                            "weight": 0.1,
+                        },
+                        "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image0.jpg": {
+                            "weight": 0.1,
+                        },
+                        "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg": {
+                            "weight": 0.1,
+                        },
+                        "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg": {
+                            "weight": 0.1,
+                        },
+                        "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image3.jpg": {
+                            "weight": 0.1,
+                        },
+                        "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg": {
+                            "weight": 0.1,
+                        },
+                    },
+                    "_id": "111",
+                },
+
+            ], auto_refresh=True)
+            # Ensure the doc is added
+            assert tensor_search.get_document_by_id(config=self.config,index_name=self.index_name_1, document_id="111")
+            # Ensure that vectorise is only called twice
+            assert len(mock_vectorise.call_args_list) == 2
+
+            text_content = [f"A rider is riding a horse jumping over the barrier_{i}." for i in range(5)]
+
+            real_text_content = [call_kwargs['content'] for call_args, call_kwargs
+             in mock_vectorise.call_args_list][0]
+
+            # Ensure the text vectorise is expected
+            self.assertEqual(real_text_content, text_content)
+            return True
+
+        assert run()
+
+
+    def test_concurrent_image_downloading(self):
+
+        tensor_search.create_vector_index(
+            index_name=self.index_name_1, config=self.config, index_settings={
+                IndexSettingsField.index_defaults: {
+                    IndexSettingsField.model: "ViT-B/32",
+                    IndexSettingsField.treat_urls_and_pointers_as_images: True,
+                    IndexSettingsField.normalize_embeddings: False
+                }
+            })
+        def pass_through_load_image_from_path(*arg, **kwargs):
+            return load_image_from_path(*arg, **kwargs)
+
+        mock_load_image_from_path = unittest.mock.MagicMock()
+        mock_load_image_from_path.side_effect = pass_through_load_image_from_path
+        @unittest.mock.patch("marqo.s2_inference.clip_utils.load_image_from_path", mock_load_image_from_path)
+        def run():
+            tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
+                {
+                    "combo_text_image": {
+                        "A rider is riding a horse jumping over the barrier_0.": {
+                            "weight": 0.1,
+                        },
+                        "A rider is riding a horse jumping over the barrier_1.": {
+                            "weight": 0.1,
+                        },
+                        "A rider is riding a horse jumping over the barrier_2.": {
+                            "weight": 0.1,
+                        },
+                        "A rider is riding a horse jumping over the barrier_3.": {
+                            "weight": 0.1,
+                        },
+                        "A rider is riding a horse jumping over the barrier_4.": {
+                            "weight": 0.1,
+                        },
+                        "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image0.jpg": {
+                            "weight": 0.1,
+                        },
+                        "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg": {
+                            "weight": 0.1,
+                        },
+                        "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg": {
+                            "weight": 0.1,
+                        },
+                        "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image3.jpg": {
+                            "weight": 0.1,
+                        },
+                        "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg": {
+                            "weight": 0.1,
+                        },
+                    },
+                    "_id": "111",
+                },
+
+            ], auto_refresh=True)
+
+            assert tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="111")
+            # Ensure that vectorise is only called twice
+            assert len(mock_load_image_from_path.call_args_list) == 5
+
+            return True
+        assert run()
+
+
+    def test_lexical_search_on_multimodal_combination(self):
+
+        tensor_search.create_vector_index(
+            index_name=self.index_name_1, config=self.config, index_settings={
+                IndexSettingsField.index_defaults: {
+                    IndexSettingsField.model: "ViT-B/32",
+                    IndexSettingsField.treat_urls_and_pointers_as_images: False,
+                    IndexSettingsField.normalize_embeddings: False
+                }
+            })
+
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
+            {   "title":"test_0",
+                "combo_text_image_0": {
+                "A rider is riding a horse jumping over the barrier_0.": {
+                    "weight": 0.1,},
+                "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image0.jpg": {
+                    "weight": 0.1,
+                    }
+                },"_id":"0"},
+
+            {   "title":"test_1",
+                "combo_text_image_1": {
+                    "A rider is riding a horse jumping over the barrier_1.": {
+                        "weight": 0.1, },
+                    "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg": {
+                        "weight": 0.1,
+                    }},"_id":"1"},
+
+            {   "title":"test_2",
+                "combo_text_image_2": {
+                    "A rider is riding a horse jumping over the barrier_2.": {
+                        "weight": 0.1, },
+                    "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg": {
+                        "weight": 0.1,
+                    }}, "_id":"2"},
+
+            {   "title":"test_3",
+                "combo_text_image_3": {
+                    "A rider is riding a horse jumping over the barrier_3.": {
+                        "weight": 0.1, },
+                    "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image3.jpg": {
+                        "weight": 0.1,
+                    }},"_id":"3"},
+
+            {   "title":"test_4",
+                "combo_text_image_4": {
+                    "A rider is riding a horse jumping over the barrier_4.": {
+                        "weight": 0.1, },
+                    "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg": {
+                        "weight": 0.1,
+                    }},"_id": "4"},
+
+            {"title": "test_5",
+             "combo_text_image_5_test" : ["A rider is riding a horse jumping over the barrier_5.",
+                                     "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg"],
+              "_id": "5"},
+        ], auto_refresh=True, non_tensor_fields=["combo_text_image_5_test"])
+
+
+        res = tensor_search._lexical_search(config=self.config, index_name=self.index_name_1,
+                    text="barrier_4")
+        assert tensor_search.get_stats(config=self.config,index_name=self.index_name_1)["numberOfDocuments"] == 6
+
+
+
