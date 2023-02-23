@@ -59,7 +59,11 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         added_doc = tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="0",
                                                      show_vectors=True)
         for key, value in expected_doc.items():
-            assert expected_doc[key] == added_doc[key]
+            if not isinstance(value, dict):
+                assert expected_doc[key] == added_doc[key]
+            else:
+                assert list(expected_doc[key]) == added_doc[key]
+
 
         tensor_field = added_doc["_tensor_facets"]
         self.assertEqual(len(tensor_field), 2)
