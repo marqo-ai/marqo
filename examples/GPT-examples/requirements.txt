@@ -1,0 +1,8 @@
+transformers
+torch
+langchain
+nltk
+pandas
+numpy
+more_itertools
+openai
