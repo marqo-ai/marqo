@@ -643,7 +643,6 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                                                            i, doc_id, selected_device, index_info, image_repo)
 
                 multimodal_field_for_filter[field] = list(field_content)
-                new_fields_from_doc.add((field, 'text'))
 
                 total_vectorise_time = total_vectorise_time + combo_vectorise_time_to_add
                 if combo_document_is_valid is False:
@@ -1708,7 +1707,7 @@ def get_cuda_info() -> dict:
         ))
 
 
-def vectorise_multimodal_combination_field(field: str, field_content: Dict[str, dict], doc: dict, doc_index: int,
+def vectorise_multimodal_combination_field(field: str, multimodal_object: Dict[str, dict], doc: dict, doc_index: int,
                                             doc_id:str, selected_device:str, index_info, image_repo):
     '''
     This function is used to vectorise multimodal combination field. The field content should
@@ -1728,7 +1727,7 @@ def vectorise_multimodal_combination_field(field: str, field_content: Dict[str, 
         selected_device: device from main body
         index_info: index_info from main body
     Returns:
-    combo_chunk_to_append: the combo_chunk to be appended to the main body
+    combo_chunk: the combo_chunk to be appended to the main body
     combo_document_is_valid:  if the document is a valid
     unsuccessful_docs: appended unsucessful_docs
     combo_total_vectorise_time: the vectorise time spent in combo field
@@ -1736,79 +1735,77 @@ def vectorise_multimodal_combination_field(field: str, field_content: Dict[str, 
     # field_conent = {"tensor_field_one" : {"weight":0.5, "parameter": "test-paramater-1"},
     #                 "tensor_field_two" : {"weight": 0.5, parameter": "test-parameter-2"}},
     combo_document_is_valid = True
-    field_vector_weight = []
     combo_vectorise_time_to_add = 0
     combo_chunk = {}
     unsuccessful_doc_to_append = tuple()
 
     # Copy the important mutable objects from main body for safety purpose
-    field_content_copy = copy.deepcopy(field_content)
+    multimodal_object_copy = copy.deepcopy(multimodal_object)
     doc_copy = copy.deepcopy(doc)
 
-    # 4 list to store content_chunks, text_chunks to image and text.
-    # It can also be two list of tuples, but i don't think they can be dictioanry.
-    # I choose to use 4 lists as they are easy to handle.
-    text_content_chunks = []
-    text_text_chunks = []
+    # 3 lists to store the original content and the content sent to vectorise.
+    # For text, they are the same. For image, image_content_to_vectorise stores the PIL.Image,
+    # image_pointer_text stores the original pointers and urls.
+    text_content_to_vectorise = []
 
-    image_content_chunks = []
-    image_text_chunks = []
-
-    for sub_content in list(field_content_copy):
-        if isinstance(sub_content, str) and not _is_image(sub_content):
-            text_content_chunks.append(sub_content)
-            text_text_chunks.append(sub_content)
-        else:
-            try:
-                if isinstance(sub_content, str) and index_info.index_settings[NsField.index_defaults][
-                    NsField.treat_urls_and_pointers_as_images]:
-                    if not isinstance(image_repo[sub_content], Exception):
-                        image_data = image_repo[sub_content]
-                    else:
-                        raise s2_inference_errors.S2InferenceError(
-                            f"Could not find image found at `{sub_content}`. \n"
-                            f"Reason: {str(image_repo[sub_content])}"
-                        )
-                else:
-                    image_data = sub_content
-
-                image_content_chunks.append(image_data)
-                image_text_chunks.append(sub_content)
-
-            except s2_inference_errors.S2InferenceError as e:
-                combo_document_is_valid = False
-                unsuccessful_doc_to_append = \
-                    (doc_index, {'_id': doc_id, 'error': e.message,
-                                 'status': int(errors.InvalidArgError.status_code),
-                                 'code': errors.InvalidArgError.code})
-
-                return combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add
+    image_content_to_vectorise = []
+    image_pointers_text= []
 
     normalize_embeddings = index_info.index_settings[NsField.index_defaults][
         NsField.normalize_embeddings]
     infer_if_image = index_info.index_settings[NsField.index_defaults][
         NsField.treat_urls_and_pointers_as_images]
 
+    if infer_if_image is False:
+        text_content_to_vectorise = list(multimodal_object)
+    else:
+        for sub_content in list(multimodal_object_copy):
+            if isinstance(sub_content, str) and not _is_image(sub_content):
+                text_content_to_vectorise.append(sub_content)
+            else:
+                try:
+                    if isinstance(sub_content, str) and index_info.index_settings[NsField.index_defaults][
+                        NsField.treat_urls_and_pointers_as_images]:
+                        if not isinstance(image_repo[sub_content], Exception):
+                            image_data = image_repo[sub_content]
+                        else:
+                            raise s2_inference_errors.S2InferenceError(
+                                f"Could not find image found at `{sub_content}`. \n"
+                                f"Reason: {str(image_repo[sub_content])}"
+                            )
+                    else:
+                        image_data = sub_content
+
+                    image_content_to_vectorise.append(image_data)
+                    image_pointers_text.append(sub_content)
+
+                except s2_inference_errors.S2InferenceError as e:
+                    combo_document_is_valid = False
+                    unsuccessful_doc_to_append = \
+                        (doc_index, {'_id': doc_id, 'error': e.message,
+                                     'status': int(errors.InvalidArgError.status_code),
+                                     'code': errors.InvalidArgError.code})
+
+                    return combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add
 
     try:
         start_time = timer()
-
-        text_vector_chunks = s2_inference.vectorise(
-            model_name=index_info.model_name,
-            model_properties=_get_model_properties(index_info), content=text_content_chunks,
-            device=selected_device, normalize_embeddings=normalize_embeddings,
-            infer=infer_if_image)
-
-        image_vector_chunks = s2_inference.vectorise(
-            model_name=index_info.model_name,
-            model_properties=_get_model_properties(index_info), content=image_content_chunks,
-            device=selected_device, normalize_embeddings=normalize_embeddings,
-            infer=infer_if_image)
-
+        if len(text_content_to_vectorise) > 0:
+            text_vectors = s2_inference.vectorise(
+                model_name=index_info.model_name,
+                model_properties=_get_model_properties(index_info), content=text_content_to_vectorise,
+                device=selected_device, normalize_embeddings=normalize_embeddings,
+                infer=infer_if_image)
+        if len(image_content_to_vectorise) > 0:
+            image_vectors = s2_inference.vectorise(
+                model_name=index_info.model_name,
+                model_properties=_get_model_properties(index_info), content=image_content_to_vectorise,
+                device=selected_device, normalize_embeddings=normalize_embeddings,
+                infer=infer_if_image)
         end_time = timer()
-        single_vectorise_call = end_time - start_time
-        combo_vectorise_time_to_add += single_vectorise_call
-        logger.debug(f"(4) TIME for single vectorise call: {(single_vectorise_call):.3f}s.")
+        multimodal_inference_call = end_time - start_time
+        combo_vectorise_time_to_add += multimodal_inference_call
+        logger.debug(f"(4) TIME for `multimodal_inference_call` call: {(multimodal_inference_call):.3f}s.")
     except (s2_inference_errors.UnknownModelError,
             s2_inference_errors.InvalidModelPropertiesError,
             s2_inference_errors.ModelLoadError) as model_error:
@@ -1818,17 +1815,28 @@ def vectorise_multimodal_combination_field(field: str, field_content: Dict[str, 
         )
     except s2_inference_errors.S2InferenceError:
         combo_document_is_valid = False
-        image_err = errors.InvalidArgError(message=f'Could not process given image: {field_content_copy}')
+        image_err = errors.InvalidArgError(message=f'Could not process given image: {multimodal_object_copy}')
         unsuccessful_doc_to_append = \
             (doc_index, {'_id': doc_id, 'error': image_err.message, 'status': int(image_err.status_code),
                  'code': image_err.code})
 
         return combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add
 
-    content_list = text_text_chunks + image_text_chunks
-    vectors_list = text_vector_chunks + image_vector_chunks
+    content_list = text_content_to_vectorise + image_pointers_text
+    vectors_list = text_vectors + image_vectors
 
-    vector_chunk = np.squeeze(np.sum([np.array(vector) * field_content_copy[content]["weight"] for content, vector in zip(content_list, vectors_list)], axis=0))
+    try:
+        if not len(content_list) == len(vectors_list):
+            raise s2_inference_errors.BatchInferenceSizeNotMatchError
+    except s2_inference_errors.BatchInferenceSizeNotMatchError:
+        combo_document_is_valid = False
+        doc_err = errors.InvalidArgError(message=f"Batch inference size does not match content for multimodal field {field}")
+        unsuccessful_doc_to_append = \
+            (doc_index, {'_id': doc_id, 'error': doc_err.message,
+                         'status': int(doc_err.status_code), 'code': doc_err.code})
+        return combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add
+
+    vector_chunk = np.squeeze(np.sum([np.array(vector) * multimodal_object_copy[content]["weight"] for content, vector in zip(content_list, vectors_list)], axis=0))
 
     if normalize_embeddings is True:
         vector_chunk = vector_chunk / np.linalg.norm(vector_chunk)
@@ -1841,6 +1849,8 @@ def vectorise_multimodal_combination_field(field: str, field_content: Dict[str, 
         TensorField.field_name: field,
     })
     return combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add
+
+
     # TODO remove comments
     # for sub_content, sub_content_para in field_content_copy.items():
     #     if isinstance(sub_content, str):
