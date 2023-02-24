@@ -50,7 +50,7 @@ def threaded_download_images(allocated_docs: List[dict], image_repo: dict,
                     continue
             # For multimodal tensor combination
             elif isinstance(doc[field], dict):
-                for sub_field in list(doc[field]):
+                for sub_field in list(doc[field].values()):
                     if isinstance(sub_field, str) and clip_utils._is_image(sub_field):
                         if sub_field in image_repo:
                             continue

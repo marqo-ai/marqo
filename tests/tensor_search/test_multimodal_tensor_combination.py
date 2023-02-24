@@ -606,3 +606,95 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         ]
 
 
+    def test_new_add_documents(self):
+        tensor_search.create_vector_index(
+            index_name=self.index_name_1, config=self.config, index_settings={
+                IndexSettingsField.index_defaults: {
+                    IndexSettingsField.model: "ViT-B/32",
+                    IndexSettingsField.treat_urls_and_pointers_as_images: True,
+                    IndexSettingsField.normalize_embeddings: False
+                }
+            })
+
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
+            {"Title": "The Travels of Marco Polo",
+             "Description": "A 13th-century travelogue describing the travels of Polo",
+             "Genre": "History"},
+
+            {"Title": "Extravehicular Mobility Unit (EMU)",
+             "Description": "The EMU is a spacesuit that provides environmental protection",
+             "_id": "article_591",
+             "Genre": "Science",
+            "my_combination_field": {"my_image": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg",
+                                     "some_text": "hello there"}}
+        ],
+
+            mappings = {
+            "my_combination_field": {
+                "type": "multimodal_combination",
+                "weights": {
+                    "my_image": 0.5,
+                    "some_text": 0.5,
+                }
+            }}
+        ,auto_refresh=True)
+
+
+
+    def test_new_lexical_search_on_multimodal_combination(self):
+
+        tensor_search.create_vector_index(
+            index_name=self.index_name_1, config=self.config, index_settings={
+                IndexSettingsField.index_defaults: {
+                    IndexSettingsField.model: "ViT-B/32",
+                    IndexSettingsField.treat_urls_and_pointers_as_images: True,
+                    IndexSettingsField.normalize_embeddings: False
+                }
+            })
+
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
+            # {"Title": "The Travels of Marco Polo",
+            #  "Description": "A 13th-century travelogue describing the travels of Polo",
+            #  "Genre": "History"},
+
+            {"Title": "Extravehicular Mobility Unit (EMU)",
+             "Description": "The EMU is a spacesuit that provides environmental protection",
+             "_id": "article_591",
+             "Genre": "Science",
+             "my_combination_field": {
+                 "my_image": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg",
+                 "some_text": "hello there",
+                "lexical_field": "search me please",}}
+        ],
+            mappings={
+                "my_combination_field": {
+                    "type": "multimodal_combination",
+                    "weights": {
+                        "my_image": 0.5,
+                        "some_text": 0.5,
+                        "lexical_field":0.1,
+                    }
+                }}
+                                    , auto_refresh=True)
+
+        res = tensor_search._lexical_search(config=self.config, index_name=self.index_name_1, text="search me please")
+        print(res["hits"][0])
+
+    # added_doc = tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="0",
+    #                                              show_vectors=True)
+    # for key, value in expected_doc.items():
+    #     if not isinstance(value, dict):
+    #         assert expected_doc[key] == added_doc[key]
+    #     else:
+    #         assert list(expected_doc[key]) == added_doc[key]
+    #
+    #
+    # tensor_field = added_doc["_tensor_facets"]
+    # self.assertEqual(len(tensor_field), 2)
+    # # for "Title" : "Horse Rider"
+    # assert "_embedding" in tensor_field[0]
+    # assert tensor_field[0]["Title"] == expected_doc["Title"]
+    #
+    # # for combo filed
+    # assert "_embedding" in tensor_field[1]
+    # assert tensor_field[1]["combo_text_image"] == list(expected_doc["combo_text_image"])

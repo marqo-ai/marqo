@@ -91,7 +91,7 @@ def validate_list(field_content: typing.List, is_non_tensor_field: bool):
     return True
 
 
-def validate_field_content(field_content: typing.Any, is_non_tensor_field: bool) -> typing.Any:
+def validate_field_content(field: typing.Any, field_content: typing.Any, is_non_tensor_field: bool, mappings: dict) -> typing.Any:
     """
 
     Returns
@@ -104,7 +104,7 @@ def validate_field_content(field_content: typing.Any, is_non_tensor_field: bool)
         if isinstance(field_content, list):
             validate_list(field_content, is_non_tensor_field)
         elif isinstance(field_content, dict):
-            validate_dict(field_content, is_non_tensor_field)
+            validate_dict(field, field_content, is_non_tensor_field, mappings)
         return field_content
     else:
         raise InvalidArgError(
@@ -347,7 +347,7 @@ def validate_settings_object(settings_object):
         )
 
 
-def validate_dict(field_content: typing.Dict, is_non_tensor_field: bool):
+def validate_dict(field: str, field_content: typing.Dict, is_non_tensor_field: bool, mappings:dict):
     '''
 
     Args:
@@ -357,35 +357,38 @@ def validate_dict(field_content: typing.Dict, is_non_tensor_field: bool):
     Returns:
         True or raise an error
     '''
-    if len(field_content) < 2:
+    if field not in mappings:
         raise InvalidArgError(
-            f"The field_content `{field_content}` is a dictonary will less than 2 fields. This is not a valid format of field content."
-            f"If you aim to use multimodal-tensor-combination, it must contain at least 2 fields. "
+            f"The field `{field}` contains a dictionary field content `{field_content}`."
+            f"However, this field `{field}` is not in the add_document parameter mappings `{mappings}`, which is not supported."
+            f"Please change the type of your field content."
+            f"If you aim to use dictionary filed content as a special field,"
             f"please check `https://docs.marqo.ai/0.0.15/` for more info.")
 
+    if mappings[field]["type"] == "multimodal_combination":
+        validate_multimodal_combination(field_content, is_non_tensor_field)
+
+
+def validate_multimodal_combination(field_content, is_non_tensor_field):
+    if len(field_content) < 2:
+        raise InvalidArgError(
+            f"The multimodal_combination_field `{field_content}` is a dictonary will less than 2 fields. "
+            f"This is not a valid format of field content."
+            f"If you aim to use multimodal_combination, it must contain at least 2 fields. "
+            f"please check `https://docs.marqo.ai/0.0.15/` for more info.")
+
+
     for key, value in field_content.items():
-        if not (type(key) in constants.ALLOWED_MULTIMODAL_FIELD_TYPES) :
+        if not ((type(key) in constants.ALLOWED_MULTIMODAL_FIELD_TYPES) and (type(value) in constants.ALLOWED_CUSTOMER_FIELD_TYPES)):
             raise InvalidArgError(
-                f"Multimodal-combination field content `{key}` \n  "
-                f"of type `{type(key).__name__}` is not of valid content type (one of {constants.ALLOWED_MULTIMODAL_FIELD_TYPES})."
+                f"Multimodal-combination field content `{key}:{value}` \n  "
+                f"of type `{type(key).__name__} : {type(value).__name__}` is not of valid content type (one of {constants.ALLOWED_MULTIMODAL_FIELD_TYPES})."
             )
-
-        if not isinstance(value, dict):
-            raise InvalidArgError(
-                f"Multimodal-combination field content `{key}` \n"
-                f"does not contain a dictionary with `weight`."
-            )
-
-        if not ("weight" in value and isinstance(value["weight"], (float, int))):
-            raise InvalidArgError(
-                f"Multimodal-combination field content `{key}` \n"
-                f"does not contain a valid `weight`. A `weight` must be provided with proper `int` or `float` value."
-        )
 
     if is_non_tensor_field:
         raise InvalidArgError(
-            f"Field content `{field_content}` \n  "
-            f"of type `{type(field_content).__name__}` is the content for a multimodal tensor combo."
+            f"Field content `{field_content}` \n  " 
+            f"of type `{type(field_content).__name__}` is the content for a multimodal_combination."
             f"It CAN NOT be a `non_tensor_field`. Remove this field from `non_tensor_field` or"
             f"add them as normal fields to fix this problem."
         )
