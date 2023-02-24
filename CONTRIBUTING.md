@@ -89,4 +89,4 @@ The Python Marqo client has its own test suite. Clone [the repo](https://github.
 
 - Separation between data and configuration 
 - Usability is super important, unless it clashes with performance. In that case, performance takes precedence.
-
+- Easy things should be easy, hard things should be possible
