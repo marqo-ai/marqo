@@ -357,6 +357,14 @@ def validate_dict(field: str, field_content: typing.Dict, is_non_tensor_field: b
     Returns:
         True or raise an error
     '''
+    if mappings is None:
+        raise InvalidArgError(
+            f"The field `{field}` contains a dictionary field content `{field_content}`."
+            f"However, the parameter `mappings` is {mappings}. Dictionary field contents are not supported in"
+            f"Marqo unless `mappings` is provided. Please change the type of field."
+            f"If you aim to use dictionary filed content as a special field,"
+            f"please check `https://docs.marqo.ai/0.0.15/` for more info.")
+
     if field not in mappings:
         raise InvalidArgError(
             f"The field `{field}` contains a dictionary field content `{field_content}`."

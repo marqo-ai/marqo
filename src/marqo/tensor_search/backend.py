@@ -1,4 +1,5 @@
 """Communication with Marqo's persistence and search layer (OpenSearch)"""
+import copy
 import json
 import typing
 from marqo.tensor_search.models.index_info import IndexInfo
@@ -79,8 +80,11 @@ def add_customer_field_properties(config: Config, index_name: str,
 
     # check if there is multimodal fie;ds and convert the fields name to a list with the same
     # format of customer_field_names
+    update_chunk_fields = copy.deepcopy(customer_field_names)
     if len(multimodal_combination_field) > 0:
         multimodal_customer_field_names = set([(field_name, "_") for field_name in list(multimodal_combination_field)])
+        update_chunk_fields = update_chunk_fields.union(multimodal_customer_field_names)
+
     body = {
         "properties": {
             enums.TensorField.chunks: {
@@ -99,7 +103,7 @@ def add_customer_field_properties(config: Config, index_name: str,
                                 "m": 16
                             }
                         }
-                    } for field_name in customer_field_names.union(multimodal_customer_field_names)
+                    } for field_name in update_chunk_fields
                 }
             }
         }
