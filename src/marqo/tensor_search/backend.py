@@ -153,7 +153,7 @@ def add_customer_field_properties(config: Config, index_name: str,
     if len(multimodal_combination_field) > 0:
         for field_name, sub_field_names in multimodal_combination_field.items():
             for sub_field_name, type_to_set in sub_field_names:
-                new_index_properties[f"f{field_name}.{sub_field_name}"] = {
+                new_index_properties[validation.validate_field_name(f"{field_name}.{sub_field_name}")] = {
                     "type" : type_to_set,
                 }
 
