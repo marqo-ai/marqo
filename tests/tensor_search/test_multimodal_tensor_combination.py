@@ -1,5 +1,5 @@
 import unittest.mock
-
+import pprint
 from marqo.errors import IndexNotFoundError, InvalidArgError
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import TensorField, IndexSettingsField, SearchMethod
@@ -9,8 +9,9 @@ from marqo.errors import DocumentNotFoundError
 import numpy as np
 from marqo.tensor_search.validation import validate_dict
 from marqo.s2_inference.s2_inference import vectorise
+import requests
 from marqo.s2_inference.clip_utils import load_image_from_path
-
+import json
 
 
 class TestMultimodalTensorCombination(MarqoTestCase):
@@ -63,7 +64,6 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                 assert expected_doc[key] == added_doc[key]
             else:
                 assert list(expected_doc[key]) == added_doc[key]
-
 
         tensor_field = added_doc["_tensor_facets"]
         self.assertEqual(len(tensor_field), 2)
@@ -369,8 +369,8 @@ class TestMultimodalTensorCombination(MarqoTestCase):
     def test_validate_dict(self):
         valid_dict = [{"test": {"weight": 0.3}, "test_test": {"weight": -0.3}},
                       {"test": {"weight": 0.5}, "test_test": {"weight": 0.3}, "test_3": {"weight": 0.6}},
-                      {"test": {"weight": 1}, "test_test":{"weight": -1}},
-                      {"test": {"weight": 2}, "test_test":{"weight": -1}}]
+                      {"test": {"weight": 1}, "test_test": {"weight": -1}},
+                      {"test": {"weight": 2}, "test_test": {"weight": -1}}]
 
         invalid_dict = [{"test": {"weight": 0.5}},  # field should be not less than 2
                         {3232: {"weight": 0.5}, "test_2": {"weight": 0.5}},  # field can only be string
@@ -484,7 +484,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             })
 
         def pass_through_load_image_from_path(*arg, **kwargs):
-            return load_image_from_path(*arg,**kwargs)
+            return load_image_from_path(*arg, **kwargs)
 
         mock_load_image_from_path = unittest.mock.MagicMock()
         mock_load_image_from_path.side_effect = pass_through_load_image_from_path
@@ -605,7 +605,6 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg"
         ]
 
-
     def test_new_add_documents(self):
         tensor_search.create_vector_index(
             index_name=self.index_name_1, config=self.config, index_settings={
@@ -625,37 +624,37 @@ class TestMultimodalTensorCombination(MarqoTestCase):
              "Description": "The EMU is a spacesuit that provides environmental protection",
              "_id": "article_591",
              "Genre": "Science",
-            "my_combination_field": {"my_image": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg",
-                                     "some_text": "hello there"}}
+             "my_combination_field": {
+                 "my_image": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg",
+                 "some_text": "hello there"}}
         ],
 
-            mappings = {
-            "my_combination_field": {
-                "type": "multimodal_combination",
-                "weights": {
-                    "my_image": 0.5,
-                    "some_text": 0.5,
-                }
-            }}
-        ,auto_refresh=True)
-
-
+                                    mappings={
+                                        "my_combination_field": {
+                                            "type": "multimodal_combination",
+                                            "weights": {
+                                                "my_image": 0.5,
+                                                "some_text": 0.5,
+                                            }
+                                        }}
+                                    , auto_refresh=True)
 
     def test_new_lexical_search_on_multimodal_combination(self):
 
+        #tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         tensor_search.create_vector_index(
             index_name=self.index_name_1, config=self.config, index_settings={
                 IndexSettingsField.index_defaults: {
-                    IndexSettingsField.model: "ViT-B/32",
+                    IndexSettingsField.model: "random/small",
                     IndexSettingsField.treat_urls_and_pointers_as_images: True,
                     IndexSettingsField.normalize_embeddings: False
                 }
             })
 
         tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
-            # {"Title": "The Travels of Marco Polo",
-            #  "Description": "A 13th-century travelogue describing the travels of Polo",
-            #  "Genre": "History"},
+            # {"what": "The Travels of Marco Polo",
+            #  "this": "A 13th-century travelogue describing the travels of Polo",
+            #  "that": "History"},
 
             {"Title": "Extravehicular Mobility Unit (EMU)",
              "Description": "The EMU is a spacesuit that provides environmental protection",
@@ -664,21 +663,67 @@ class TestMultimodalTensorCombination(MarqoTestCase):
              "my_combination_field": {
                  "my_image": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg",
                  "some_text": "hello there",
-                "lexical_field": "search me please",}}
+                 "lexical_field": "search me please", }}
         ],
-            mappings={
-                "my_combination_field": {
-                    "type": "multimodal_combination",
-                    "weights": {
-                        "my_image": 0.5,
-                        "some_text": 0.5,
-                        "lexical_field":0.1,
-                    }
-                }}
+                                    mappings={
+                                        "my_combination_field": {
+                                            "type": "multimodal_combination",
+                                            "weights": {
+                                                "my_image": 0.5,
+                                                "some_text": 0.5,
+                                                "lexical_field": 0.1,
+
+                                                # "my_combonitaion_field.lexical_field"
+                                            }
+                                        }}
                                     , auto_refresh=True)
 
         res = tensor_search._lexical_search(config=self.config, index_name=self.index_name_1, text="search me please")
-        print(res["hits"][0])
+        index_info = tensor_search.get_index_info(config=self.config, index_name=self.index_name_1)
+        #pprint.pprint(index_info.properties)
+        doc = tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="article_591")
+        # index_info = tensor_search.get_index_info(config=self.config, index_name=self.index_name_1)
+        # pprint.pprint(doc)
+        self.endpoint = self.authorized_url
+        #assert res["hits"][0]
+
+        search = requests.get(
+            url=F"{self.endpoint}/{self.index_name_1}/_search",
+            verify=False,
+            json={
+                "query": {
+                    "match": {
+                        "my_combination_field.lexical_field": "search me please"
+                    }
+                }
+            }
+        ).text
+        print(search)
+
+        pprint.pprint(json.loads(requests.get(url =
+                                              f"{self.endpoint}/{self.index_name_1}/_mapping", verify=False).text))
+
+
+
+        print("searchable fields")
+        pprint.pprint(tensor_search.get_index_info(
+            config=self.config, index_name=self.index_name_1
+        ).get_true_text_properties())
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     # added_doc = tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="0",
     #                                              show_vectors=True)

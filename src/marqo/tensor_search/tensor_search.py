@@ -349,14 +349,13 @@ def _infer_opensearch_data_type(
         # OpenSearch requires that all content of an array be the same type.
         # This function doesn't validate.
         to_check = sample_field_content[0]
+    elif isinstance(sample_field_content, dict):
+        to_check = list(sample_field_content.values())[0]
     else:
         to_check = sample_field_content
 
     if isinstance(to_check, str):
         return OpenSearchDataType.text
-    elif isinstance(to_check, dict):
-        return OpenSearchDataType.object
-
     else:
         return None
 
@@ -418,6 +417,10 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
     existing_fields = set(index_info.properties.keys())
     new_fields = set()
+    # A dict to store the multimodal_fields and their sub_fields
+    # dict = {multi_modal_field_1 : set(),
+    #      =  multi_modal_field_2 : set()}
+    new_multimodal_combo_fields = dict()
 
     selected_device = config.indexing_device if device is None else device
 
@@ -445,7 +448,6 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
         document_is_valid = True
         new_fields_from_doc = set()
-        new_fields_from_multimodal_combination = set()
 
         doc_id = None
         try:
@@ -509,7 +511,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                 )
                 break
 
-            if field not in existing_fields:
+            if (field not in existing_fields) and (not isinstance(field_content, dict)):
                 new_fields_from_doc.add((field, _infer_opensearch_data_type(copied[field])))
 
             # Don't process text/image fields when explicitly told not to.
@@ -644,31 +646,26 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                         vectorise_multimodal_combination_field(field, field_content, copied,
                                                                i, doc_id, selected_device, index_info, image_repo, mappings[field])
 
-                    #multimodal_field_for_filter[field] = list(field_content)
-
                     total_vectorise_time = total_vectorise_time + combo_vectorise_time_to_add
                     if combo_document_is_valid is False:
                         unsuccessful_docs.append(unsuccessful_doc_to_append)
                         break
                     else:
+                        if field not in new_multimodal_combo_fields:
+                            new_multimodal_combo_fields[field] = set()
+                        new_multimodal_combo_fields[field] = new_multimodal_combo_fields[field].union(new_fields_from_multimodal_combination)
                         chunks.append({**combo_chunk, **chunk_values_for_filtering})
                         continue
 
             for chunk in chunks_to_append:
                 chunks.append({**chunk, **chunk_values_for_filtering})
 
-
         if document_is_valid:
-            #copied.update(multimodal_field_for_filter)
-            # This block happens per DOC
             new_fields = new_fields.union(new_fields_from_doc)
-            new_fields = new_fields.union(new_fields_from_multimodal_combination)
-            print(new_fields)
             if update_mode == 'replace':
                 copied[TensorField.chunks] = chunks
                 bulk_parent_dicts.append(indexing_instructions)
                 bulk_parent_dicts.append(copied)
-                print(copied)
             else:
                 to_upsert = copied.copy()
                 to_upsert[TensorField.chunks] = chunks
@@ -740,13 +737,14 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
         # the HttpRequest wrapper handles error logic
         update_mapping_response = backend.add_customer_field_properties(
             config=config, index_name=index_name, customer_field_names=new_fields,
-            model_properties=_get_model_properties(index_info))
+            model_properties=_get_model_properties(index_info), multimodal_combination_field=new_multimodal_combo_fields)
 
         # ADD DOCS TIMER-LOGGER (5)
         start_time_5 = timer()
         index_parent_response = HttpRequests(config).post(
             path="_bulk", body=utils.dicts_to_jsonl(bulk_parent_dicts))
         end_time_5 = timer()
+        pprint.pprint(index_parent_response)
         total_http_time = end_time_5 - start_time_5
         total_index_time = index_parent_response["took"] * 0.001
         logger.info(
@@ -1855,7 +1853,8 @@ def vectorise_multimodal_combination_field(field: str, multimodal_object: Dict[s
 
     combo_chunk = dict({
         utils.generate_vector_name(field): vector_chunk,
-        TensorField.field_content: multimodal_object, # replace text_chunks
+        # TODO think of a good highlight
+        TensorField.field_content: list(multimodal_object), # replace text_chunks
         TensorField.field_name: field,
     })
     return combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add, new_field_from_multimodal_combination

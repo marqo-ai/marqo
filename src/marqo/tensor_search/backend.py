@@ -10,9 +10,9 @@ from marqo.tensor_search import validation, constants, enums
 from marqo.tensor_search import utils
 from marqo import errors
 #
-from typing import Iterable, List, Union, Optional, Tuple
+from typing import Iterable, List, Union, Optional, Tuple, Dict
 from marqo.tensor_search.index_meta_cache import get_cache
-
+import pprint
 
 def get_index_info(config: Config, index_name: str) -> IndexInfo:
     """Gets useful information about the index. Also updates the IndexInfo cache
@@ -59,7 +59,7 @@ def get_index_info(config: Config, index_name: str) -> IndexInfo:
 
 def add_customer_field_properties(config: Config, index_name: str,
                                   customer_field_names: Iterable[Tuple[str, enums.OpenSearchDataType]],
-                                  model_properties: dict):
+                                  model_properties: dict, multimodal_combination_field: Dict[str, Iterable[Tuple[str, enums.OpenSearchDataType]]]):
     """Adds new customer fields to index mapping.
 
     Pushes the updated mapping to OpenSearch, and updates the local cache.
@@ -77,6 +77,10 @@ def add_customer_field_properties(config: Config, index_name: str,
     """
     engine = "lucene"
 
+    # check if there is multimodal fie;ds and convert the fields name to a list with the same
+    # format of customer_field_names
+    if len(multimodal_combination_field) > 0:
+        multimodal_customer_field_names = set([(field_name, "_") for field_name in list(multimodal_combination_field)])
     body = {
         "properties": {
             enums.TensorField.chunks: {
@@ -95,12 +99,11 @@ def add_customer_field_properties(config: Config, index_name: str,
                                 "m": 16
                             }
                         }
-                    } for field_name in customer_field_names
+                    } for field_name in customer_field_names.union(multimodal_customer_field_names)
                 }
             }
         }
     }
-
     existing_info = get_cache()[index_name]
     new_index_properties = existing_info.properties.copy()
 
@@ -113,9 +116,21 @@ def add_customer_field_properties(config: Config, index_name: str,
                 "type": enums.OpenSearchDataType.keyword,
                 "ignore_above": 32766  # this is the Marqo-OS bytes limit
             }
+    if len(multimodal_combination_field) > 0:
+        for field_name in list(multimodal_combination_field):
+            body["properties"][enums.TensorField.chunks]["properties"][
+                validation.validate_field_name(field_name)] = {"properties":{
+                sub_field[0]:{
+                    "type": enums.OpenSearchDataType.keyword,
+                    "ignore_above": 32766  # this is the Marqo-OS bytes limit
+                } for sub_field in multimodal_combination_field[field_name]
+            },
+        }
+    pprint.pprint(body)
 
     mapping_res = HttpRequests(config).put(path=F"{index_name}/_mapping", body=json.dumps(body))
 
+    pprint.pprint(mapping_res)
     merged_chunk_properties = {
         **existing_info.properties[enums.TensorField.chunks]["properties"],
         **body["properties"][enums.TensorField.chunks]["properties"]
@@ -130,11 +145,18 @@ def add_customer_field_properties(config: Config, index_name: str,
     app_type_mapping = {field: field_type for field, field_type in customer_field_names}
     new_properties = applying_properties - existing_properties
     for new_prop in new_properties:
-        type_to_set = app_type_mapping[new_prop] if app_type_mapping[new_prop] == enums.OpenSearchDataType.text \
-                        else enums.OpenSearchDataType.to_be_defined
+        type_to_set = app_type_mapping[new_prop] #if app_type_mapping[new_prop] == enums.OpenSearchDataType.text \
+                        #else enums.OpenSearchDataType.to_be_defined
         new_index_properties[validation.validate_field_name(new_prop)] = {
             "type": type_to_set
         }
+    if len(multimodal_combination_field) > 0:
+        for field_name, sub_field_names in multimodal_combination_field.items():
+            for sub_field_name, type_to_set in sub_field_names:
+                new_index_properties[f"f{field_name}.{sub_field_name}"] = {
+                    "type" : type_to_set,
+                }
+
     get_cache()[index_name] = IndexInfo(
         model_name=existing_info.model_name,
         properties=new_index_properties,
