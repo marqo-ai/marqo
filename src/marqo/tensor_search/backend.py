@@ -126,11 +126,9 @@ def add_customer_field_properties(config: Config, index_name: str,
                 } for sub_field in multimodal_combination_field[field_name]
             },
         }
-    pprint.pprint(body)
 
     mapping_res = HttpRequests(config).put(path=F"{index_name}/_mapping", body=json.dumps(body))
 
-    pprint.pprint(mapping_res)
     merged_chunk_properties = {
         **existing_info.properties[enums.TensorField.chunks]["properties"],
         **body["properties"][enums.TensorField.chunks]["properties"]
@@ -145,8 +143,8 @@ def add_customer_field_properties(config: Config, index_name: str,
     app_type_mapping = {field: field_type for field, field_type in customer_field_names}
     new_properties = applying_properties - existing_properties
     for new_prop in new_properties:
-        type_to_set = app_type_mapping[new_prop] #if app_type_mapping[new_prop] == enums.OpenSearchDataType.text \
-                        #else enums.OpenSearchDataType.to_be_defined
+        type_to_set = app_type_mapping[new_prop] if app_type_mapping[new_prop] == enums.OpenSearchDataType.text \
+                        else enums.OpenSearchDataType.to_be_defined
         new_index_properties[validation.validate_field_name(new_prop)] = {
             "type": type_to_set
         }

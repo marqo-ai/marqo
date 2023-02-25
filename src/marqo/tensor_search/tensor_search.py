@@ -744,7 +744,6 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
         index_parent_response = HttpRequests(config).post(
             path="_bulk", body=utils.dicts_to_jsonl(bulk_parent_dicts))
         end_time_5 = timer()
-        pprint.pprint(index_parent_response)
         total_http_time = end_time_5 - start_time_5
         total_index_time = index_parent_response["took"] * 0.001
         logger.info(

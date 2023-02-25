@@ -1,5 +1,7 @@
 import unittest.mock
 import pprint
+
+import marqo.tensor_search.backend
 from marqo.errors import IndexNotFoundError, InvalidArgError
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import TensorField, IndexSettingsField, SearchMethod
@@ -685,30 +687,31 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         # index_info = tensor_search.get_index_info(config=self.config, index_name=self.index_name_1)
         # pprint.pprint(doc)
         self.endpoint = self.authorized_url
-        #assert res["hits"][0]
+        print(res["hits"][0])
+        pprint.pprint(marqo.tensor_search.backend.get_index_info(config=self.config, index_name=self.index_name_1).get_true_text_properties())
 
-        search = requests.get(
-            url=F"{self.endpoint}/{self.index_name_1}/_search",
-            verify=False,
-            json={
-                "query": {
-                    "match": {
-                        "my_combination_field.lexical_field": "search me please"
-                    }
-                }
-            }
-        ).text
-        print(search)
+        # search = requests.get(
+        #     url=F"{self.endpoint}/{self.index_name_1}/_search",
+        #     verify=False,
+        #     json={
+        #         "query": {
+        #             "match": {
+        #                 "my_combination_field.lexical_field": "search me please"
+        #             }
+        #         }
+        #     }
+        # ).text
+        # print(search)
+        #
+        # pprint.pprint(json.loads(requests.get(url =
+        #                                       f"{self.endpoint}/{self.index_name_1}/_mapping", verify=False).text))
 
-        pprint.pprint(json.loads(requests.get(url =
-                                              f"{self.endpoint}/{self.index_name_1}/_mapping", verify=False).text))
 
 
-
-        print("searchable fields")
-        pprint.pprint(tensor_search.get_index_info(
-            config=self.config, index_name=self.index_name_1
-        ).get_true_text_properties())
+        # print("searchable fields")
+        # pprint.pprint(tensor_search.get_index_info(
+        #     config=self.config, index_name=self.index_name_1
+        # ).get_true_text_properties())
 
 
 
