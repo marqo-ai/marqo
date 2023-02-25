@@ -35,7 +35,6 @@ class IndexInfo(NamedTuple):
         bool fields.
 
         """
-        print(self.properties.items())
         return {
             text_field: text_props
             for text_field, text_props in self.properties.items()
@@ -47,15 +46,14 @@ class IndexInfo(NamedTuple):
         """returns a dict containing only names and properties of fields that
         are true text fields
         """
-
         # get_text_properties will naturally return multimodal_fields
-        # Example:
-        # {'Description': {'type': 'text'},
-        #  'Genre': {'type': 'text'},
-        #  'Title': {'type': 'text'},
-        #  'my_combination_field': {'properties': {'lexical_field': {'type': 'text'},
-        #                                          'my_image': {'type': 'text'},
-        #                                          'some_text': {'type': 'text'}}}}
+        # Example: left-text_properties   right-true_text_properties
+        # {'Description': {'type': 'text'},                                                         {'Description': {'type': 'text'},
+        #  'Genre': {'type': 'text'},                                                                'Genre': {'type': 'text'},
+        #  'Title': {'type': 'text'},                                                                'Title': {'type': 'text'},
+        #  'my_combination_field': {'properties': {'lexical_field': {'type': 'text'}, ----->         'my_combination_field.lexical_field': {'type': 'text'},
+        #                                          'my_image': {'type': 'text'},                     'my_combination_field.my_image': {'type': 'text'},
+        #                                          'some_text': {'type': 'text'}}}}                   'my_combination_field.some_text': {'type': 'text'}}
         simple_props = self.get_text_properties()
 
         true_text_props = dict()
