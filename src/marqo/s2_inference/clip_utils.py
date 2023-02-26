@@ -400,7 +400,7 @@ class OPEN_CLIP(CLIP):
         tokenizer_name = self.model_properties.get("tokenizer", "clip")
 
         if tokenizer_name == "clip":
-            return clip.tokenize
+            return open_clip.tokenize
         else:
             logger.info(f"Custom HFTokenizer is provided. Loading...")
             return HFTokenizer(tokenizer_name)
