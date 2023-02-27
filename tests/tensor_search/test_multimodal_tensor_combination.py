@@ -1,6 +1,8 @@
 import unittest.mock
 import pprint
 
+import torch
+
 import marqo.tensor_search.backend
 from marqo.errors import IndexNotFoundError, InvalidArgError
 from marqo.tensor_search import tensor_search
@@ -20,6 +22,9 @@ class TestMultimodalTensorCombination(MarqoTestCase):
 
     def setUp(self):
         self.index_name_1 = "my-test-index-1"
+        self.mappings = {"combo_text_image" :{"type": "multimodal_combination", "weights" : {
+            "text" : 0.5, "image" : 0.8}
+        }}
         try:
             tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         except IndexNotFoundError as e:
@@ -38,12 +43,8 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         expected_doc = dict({
             "Title": "Horse rider",
             "combo_text_image": {
-                "A rider is riding a horse jumping over the barrier.": {
-                    "weight": 0.5,
-                },
-                "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg": {
-                    "weight": 0.5,
-                },
+                "text": "A rider is riding a horse jumping over the barrier.",
+                "image": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg"
             },
             "_id": "0"
         })
@@ -57,25 +58,24 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                 "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
                 "_id": "1"
             },
-        ], auto_refresh=True)
+        ], mappings = {"combo_text_image" :{"type": "multimodal_combination", "weights" : {
+            "text" : 0.5, "image" : 0.8}
+        }},auto_refresh=True)
 
         added_doc = tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="0",
                                                      show_vectors=True)
         for key, value in expected_doc.items():
-            if not isinstance(value, dict):
-                assert expected_doc[key] == added_doc[key]
-            else:
-                assert list(expected_doc[key]) == added_doc[key]
+            assert expected_doc[key] == added_doc[key]
 
         tensor_field = added_doc["_tensor_facets"]
-        self.assertEqual(len(tensor_field), 2)
+
         # for "Title" : "Horse Rider"
         assert "_embedding" in tensor_field[0]
         assert tensor_field[0]["Title"] == expected_doc["Title"]
-
+        #
         # for combo filed
         assert "_embedding" in tensor_field[1]
-        assert tensor_field[1]["combo_text_image"] == list(expected_doc["combo_text_image"])
+        assert tensor_field[1]["combo_text_image"] == json.dumps(expected_doc["combo_text_image"])
 
     def test_multimodal_tensor_combination_score(self):
         def get_score(document):
@@ -94,11 +94,12 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                 })
 
             tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[document],
-                                        auto_refresh=True)
+                                        auto_refresh=True, mappings = {"combo_text_image" : {"type":"multimodal_combination",
+            "weights":{"image_field":0.5,"text_field":0.5}}})
             self.assertEqual(1, tensor_search.get_stats(config=self.config, index_name=self.index_name_1)[
                 "numberOfDocuments"])
             res = tensor_search.search(config=self.config, index_name=self.index_name_1,
-                                       text="", result_count=1)
+                                       text="", result_count=1, )
 
             return res["hits"][0]["_score"]
 
@@ -114,13 +115,9 @@ class TestMultimodalTensorCombination(MarqoTestCase):
 
         score_3 = get_score({
             "combo_text_image": {
-                "A rider is riding a horse jumping over the barrier.": {
-                    "weight": 0.5,
-                },
-                "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg": {
-                    "weight": 0.5,
-                },
-            }
+                "text_field" : "A rider is riding a horse jumping over the barrier.",
+                "image_field" : "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+        },
         })
 
         assert (score_3 >= min(score_1, score_2)) and (score_3 <= max(score_1, score_2))
@@ -137,14 +134,11 @@ class TestMultimodalTensorCombination(MarqoTestCase):
 
         tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
             {
-                "combo_text_image": {
-                    "A rider is riding a horse jumping over the barrier.": {
-                        "weight": -1,
+                 "combo_text_image": {
+                "text_field" : "A rider is riding a horse jumping over the barrier.",
+                "image_field" : "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
                     },
-                    "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg": {
-                        "weight": 1,
-                    },
-                },
+
                 "_id": "0"
             },
 
@@ -157,7 +151,8 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                 "_id": "2"
             },
 
-        ], auto_refresh=True)
+        ], auto_refresh=True, mappings = {"combo_text_image" : {"type":"multimodal_combination",
+            "weights":{"image_field": 1,"text_field": -1}}})
 
         combo_tensor = np.array(tensor_search.get_document_by_id(config=self.config,
                                                                  index_name=self.index_name_1, document_id="0",
@@ -171,8 +166,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
 
         assert np.sum(combo_tensor - (text_tensor * -1 + image_tensor * 1)) == 0
 
-    def test_multimodal_tensor_combination_weight(self):
-
+    def test_multimodal_tensor_combination_zero_weight(self):
         def get_score(document):
             try:
                 tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
@@ -189,7 +183,9 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                 })
 
             tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[document],
-                                        auto_refresh=True)
+                                        auto_refresh=True, mappings = {"combo_text_image" : {"type":"multimodal_combination",
+            "weights":{"image_field": 0,"text_field": 1}}})
+
             self.assertEqual(1, tensor_search.get_stats(config=self.config, index_name=self.index_name_1)[
                 "numberOfDocuments"])
             res = tensor_search.search(config=self.config, index_name=self.index_name_1,
@@ -204,20 +200,15 @@ class TestMultimodalTensorCombination(MarqoTestCase):
 
         score_3 = get_score({
             "combo_text_image": {
-                "A rider is riding a horse jumping over the barrier.": {
-                    "weight": 1,
+            "text_field" : "A rider is riding a horse jumping over the barrier.",
+            "image_field" : "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
                 },
-                "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg": {
-                    "weight": 0,
-                },
-            }
         })
 
         self.assertEqual(score_1, score_3)
 
     def test_multimodal_tensor_combination_vectorise_call(self):
         """check if the chunks are properly created in the add_documents"""
-
         tensor_search.create_vector_index(
             index_name=self.index_name_1, config=self.config, index_settings={
                 IndexSettingsField.index_defaults: {
@@ -242,24 +233,16 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
                 {
                     "combo_text_image": {
-                        "A rider is riding a horse jumping over the barrier.": {
-                            "weight": 1,
-                        },
-                        "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg": {
-                            "weight": 0,
-                        },
+                        "text_field": "A rider is riding a horse jumping over the barrier.",
+                        "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
                     },
                     "_id": "123",
                 },
 
                 {
-                    "combo_text_image_test": {
-                        "test-text-two.": {
-                            "weight": 1,
-                        },
-                        "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg": {
-                            "weight": 0,
-                        },
+                    "combo_text_image": {
+                        "text_field" : "test-text-two.",
+                        "image_field":"https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
                     },
                     "_id": "234",
                 },
@@ -268,33 +251,26 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                     "combo_text_image_test": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
                     "_id": "534",
                 }
-            ], auto_refresh=True)
+            ], mappings = {"combo_text_image" : {"type":"multimodal_combination",
+            "weights":{"image_field": 0.5,"text_field": 0.5}}}, auto_refresh=True)
 
             # first multimodal-doc
             real_fied_0, field_content_0 = [call_args for call_args, call_kwargs
                                             in mock_multimodal_combination.call_args_list][0][0:2]
             assert real_fied_0 == "combo_text_image"
-            assert field_content_0 == dict({
-                "A rider is riding a horse jumping over the barrier.": {
-                    "weight": 1,
-                },
-                "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg": {
-                    "weight": 0,
-                },
-            })
+            assert field_content_0 ==    {
+                        "text_field": "A rider is riding a horse jumping over the barrier.",
+                        "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+                    }
 
             # second multimodal=doc
             real_fied_1, field_content_1 = [call_args for call_args, call_kwargs
                                             in mock_multimodal_combination.call_args_list][1][0:2]
-            assert real_fied_1 == "combo_text_image_test"
-            assert field_content_1 == dict({
-                "test-text-two.": {
-                    "weight": 1,
-                },
-                "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg": {
-                    "weight": 0,
-                },
-            }, )
+            assert real_fied_1 == "combo_text_image"
+            assert field_content_1 =={
+                        "text_field" : "test-text-two.",
+                        "image_field":"https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+                    }
 
             # ensure we only call multimodal-combination twice
             assert len(mock_multimodal_combination.call_args_list) == 2
@@ -313,55 +289,47 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                 }
             })
 
-        # invalid weight string
+        # invalid field_content int
         tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
             {
                 "combo_text_image": {
-                    "A rider is riding a horse jumping over the barrier.": {
-                        "weight-void": 1,
-                    },
-                    "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg": {
-                        "weight": 0,
-                    },
+                    "A rider is riding a horse jumping over the barrier." : 0.5,
+                    "image_field" : 0.5,
                 },
                 "_id": "123",
-            }, ], auto_refresh=True)
+            }, ], mappings=self.mappings, auto_refresh=True)
         try:
             tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="123")
             raise AssertionError
         except DocumentNotFoundError:
             pass
 
-        # invalid weight format string
+        # invalid field content dict
         tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
             {
                 "combo_text_image": {
-                    "A rider is riding a horse jumping over the barrier.": {
-                        "weight-void": "1.0",
-                    },
-                    "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg": {
-                        "weight": 0,
-                    },
+                    "text_field": "A rider is riding a horse jumping over the barrier.",
+                    "image_field": {"image_url" : "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+                   },
                 },
                 "_id": "123",
-            }, ], auto_refresh=True)
+            }, ], mappings=self.mappings, auto_refresh=True)
         try:
             tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="123")
             raise AssertionError
         except DocumentNotFoundError:
             pass
 
-        # invalid field content format
+        # invalid field name format
         tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
             {
                 "combo_text_image": {
-                    "A rider is riding a horse jumping over the barrier.": 0.5,
-                    "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg": {
-                        "weight": 0,
-                    },
+                    "text_field" : "A rider is riding a horse jumping over the barrier.",
+                    934343 : "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+
                 },
                 "_id": "123",
-            }, ], auto_refresh=True)
+            }, ], mappings = self.mappings, auto_refresh=True)
         try:
             tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="123")
             raise AssertionError
@@ -369,35 +337,51 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             pass
 
     def test_validate_dict(self):
-        valid_dict = [{"test": {"weight": 0.3}, "test_test": {"weight": -0.3}},
-                      {"test": {"weight": 0.5}, "test_test": {"weight": 0.3}, "test_3": {"weight": 0.6}},
-                      {"test": {"weight": 1}, "test_test": {"weight": -1}},
-                      {"test": {"weight": 2}, "test_test": {"weight": -1}}]
+        test_mappings = {"my_combo_field":{"type":"multimodal_combination", "weights":{
+            "test_1":0.5, "test_2":0.5
+        }}}
+        field = "my_combo_field"
+        valid_dict = {"test_1": "test", "test_2": "test_test"}
 
-        invalid_dict = [{"test": {"weight": 0.5}},  # field should be not less than 2
-                        {3232: {"weight": 0.5}, "test_2": {"weight": 0.5}},  # field can only be string
-                        {"test": {"weightsfd": 0.5}, "test_test": {"weight": 0.3}},  # incorrect spelling of "weight"
-                        {"test": {"weight": "1"}, "test_test": {"weight": 0.3}},  # weight is not a float or int
-                        {"test": 0.5, "test_test": {"weight": 0.3}},  # incorrect weight format
-                        {"test": {"test": 0.5}, "test_test": {"weight": 0.3}},  # no weight for a field
-                        {},  # empty
-                        ]
+        # valid_dict
+        validate_dict(field, valid_dict, is_non_tensor_field=False, mappings=test_mappings)
 
-        for valid_content_field in valid_dict:
-            validate_dict(valid_content_field, is_non_tensor_field=False)
-            try:
-                validate_dict(valid_content_field, is_non_tensor_field=True)
-                raise AssertionError
-            except InvalidArgError as e:
-                assert "non_tensor_field" in e.message
-                pass
+        # mapping is None
+        try:
+            validate_dict(field, valid_dict, is_non_tensor_field=False, mappings=None)
+            raise AssertionError
+        except InvalidArgError as e:
+            assert "the parameter `mappings`" in e.message
 
-        for invalid_content_field in invalid_dict:
-            try:
-                validate_dict(invalid_content_field, is_non_tensor_field=False)
-                raise AssertionError
-            except InvalidArgError:
-                pass
+        # field not in mappings
+        try:
+            validate_dict('void_field', valid_dict, is_non_tensor_field=False, mappings=test_mappings)
+            raise AssertionError
+        except InvalidArgError as e:
+            assert "not in the add_document parameter mappings" in e.message
+
+        # sub_fields not in mappings["weight"]
+        try:
+            validate_dict(field, {"test_void": "test", "test_2": "test_test"}, is_non_tensor_field=False, mappings=test_mappings)
+            raise AssertionError
+        except InvalidArgError as e:
+            assert "Each sub_field requires a weights" in e.message
+
+        # length of fields
+        try:
+            validate_dict(field, {"test_void": "test"}, is_non_tensor_field=False, mappings=test_mappings)
+            raise AssertionError
+        except InvalidArgError as e:
+            assert "it must contain at least 2 fields" in e.message
+
+        # nontensor_field
+        try:
+            validate_dict(field, valid_dict, is_non_tensor_field=True, mappings=test_mappings)
+            raise AssertionError
+        except InvalidArgError as e:
+            assert "It CAN NOT be a `non_tensor_field`" in e.message
+
+
 
     def test_batched_vectorise_call(self):
         tensor_search.create_vector_index(
@@ -423,41 +407,24 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
                 {
                     "combo_text_image": {
-                        "A rider is riding a horse jumping over the barrier_0.": {
-                            "weight": 0.1,
-                        },
-                        "A rider is riding a horse jumping over the barrier_1.": {
-                            "weight": 0.1,
-                        },
-                        "A rider is riding a horse jumping over the barrier_2.": {
-                            "weight": 0.1,
-                        },
-                        "A rider is riding a horse jumping over the barrier_3.": {
-                            "weight": 0.1,
-                        },
-                        "A rider is riding a horse jumping over the barrier_4.": {
-                            "weight": 0.1,
-                        },
-                        "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image0.jpg": {
-                            "weight": 0.1,
-                        },
-                        "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg": {
-                            "weight": 0.1,
-                        },
-                        "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg": {
-                            "weight": 0.1,
-                        },
-                        "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image3.jpg": {
-                            "weight": 0.1,
-                        },
-                        "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg": {
-                            "weight": 0.1,
-                        },
+                        "text_0": "A rider is riding a horse jumping over the barrier_0.",
+                        "text_1":"A rider is riding a horse jumping over the barrier_1.",
+                        "text_2":"A rider is riding a horse jumping over the barrier_2.",
+                        "text_3":"A rider is riding a horse jumping over the barrier_3.",
+                        "text_4":"A rider is riding a horse jumping over the barrier_4.",
+                        "image_0" :  "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image0.jpg",
+                        "image_1" : "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+                        "image_2" : "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+                        "image_3" : "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image3.jpg",
+                        "image_4" : "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg",
                     },
                     "_id": "111",
                 },
 
-            ], auto_refresh=True)
+            ], mappings = {"combo_text_image" :{"type":"multimodal_combination", "weights":{
+                "text_0" : 0.1, "text_1" : 0.1, "text_2" : 0.1, "text_3" : 0.1, "text_4" : 0.1,
+                "image_0" : 0.1,"image_1" : 0.1,"image_2" : 0.1,"image_3" : 0.1,"image_4" : 0.1,
+            }}}, auto_refresh=True)
             # Ensure the doc is added
             assert tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="111")
             # Ensure that vectorise is only called twice
@@ -496,42 +463,24 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
                 {
                     "combo_text_image": {
-                        "A rider is riding a horse jumping over the barrier_0.": {
-                            "weight": 0.1,
-                        },
-                        "A rider is riding a horse jumping over the barrier_1.": {
-                            "weight": 0.1,
-                        },
-                        "A rider is riding a horse jumping over the barrier_2.": {
-                            "weight": 0.1,
-                        },
-                        "A rider is riding a horse jumping over the barrier_3.": {
-                            "weight": 0.1,
-                        },
-                        "A rider is riding a horse jumping over the barrier_4.": {
-                            "weight": 0.1,
-                        },
-                        "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image0.jpg": {
-                            "weight": 0.1,
-                        },
-                        "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg": {
-                            "weight": 0.1,
-                        },
-                        "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg": {
-                            "weight": 0.1,
-                        },
-                        "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image3.jpg": {
-                            "weight": 0.1,
-                        },
-                        "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg": {
-                            "weight": 0.1,
-                        },
+                        "text_0": "A rider is riding a horse jumping over the barrier_0.",
+                        "text_1": "A rider is riding a horse jumping over the barrier_1.",
+                        "text_2": "A rider is riding a horse jumping over the barrier_2.",
+                        "text_3": "A rider is riding a horse jumping over the barrier_3.",
+                        "text_4": "A rider is riding a horse jumping over the barrier_4.",
+                        "image_0": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image0.jpg",
+                        "image_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+                        "image_2": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+                        "image_3": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image3.jpg",
+                        "image_4": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg",
                     },
                     "_id": "111",
                 },
 
-            ], auto_refresh=True)
-
+            ], mappings={"combo_text_image": {"type": "multimodal_combination", "weights": {
+                "text_0": 0.1, "text_1": 0.1, "text_2": 0.1, "text_3": 0.1, "text_4": 0.1,
+                "image_0": 0.1, "image_1": 0.1, "image_2": 0.1, "image_3": 0.1, "image_4": 0.1,
+            }}}, auto_refresh=True)
             assert tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="111")
             # Ensure that vectorise is only called twice
             assert len(mock_load_image_from_path.call_args_list) == 5
@@ -607,43 +556,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg"
         ]
 
-    def test_new_add_documents(self):
-        tensor_search.create_vector_index(
-            index_name=self.index_name_1, config=self.config, index_settings={
-                IndexSettingsField.index_defaults: {
-                    IndexSettingsField.model: "ViT-B/32",
-                    IndexSettingsField.treat_urls_and_pointers_as_images: True,
-                    IndexSettingsField.normalize_embeddings: False
-                }
-            })
-
-        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
-            {"Title": "The Travels of Marco Polo",
-             "Description": "A 13th-century travelogue describing the travels of Polo",
-             "Genre": "History"},
-
-            {"Title": "Extravehicular Mobility Unit (EMU)",
-             "Description": "The EMU is a spacesuit that provides environmental protection",
-             "_id": "article_591",
-             "Genre": "Science",
-             "my_combination_field": {
-                 "my_image": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg",
-                 "some_text": "hello there"}}
-        ],
-
-                                    mappings={
-                                        "my_combination_field": {
-                                            "type": "multimodal_combination",
-                                            "weights": {
-                                                "my_image": 0.5,
-                                                "some_text": 0.5,
-                                            }
-                                        }}
-                                    , auto_refresh=True)
-
-    def test_new_lexical_search_on_multimodal_combination(self):
-
-        #tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+    def test_lexical_search_on_multimodal_combination(self):
         tensor_search.create_vector_index(
             index_name=self.index_name_1, config=self.config, index_settings={
                 IndexSettingsField.index_defaults: {
@@ -654,10 +567,6 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             })
 
         tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
-            # {"what": "The Travels of Marco Polo",
-            #  "this": "A 13th-century travelogue describing the travels of Polo",
-            #  "that": "History"},
-
             {"Title": "Extravehicular Mobility Unit (EMU)",
              "Description": "The EMU is a spacesuit that provides environmental protection",
              "_id": "article_591",
@@ -681,14 +590,17 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                                     , auto_refresh=True)
 
         res = tensor_search._lexical_search(config=self.config, index_name=self.index_name_1, text="search me please")
-        index_info = tensor_search.get_index_info(config=self.config, index_name=self.index_name_1)
-        #pprint.pprint(index_info.properties)
-        doc = tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="article_591")
+        assert res["hits"][0]["_id"] == "article_591"
+
+        #
         # index_info = tensor_search.get_index_info(config=self.config, index_name=self.index_name_1)
-        # pprint.pprint(doc)
-        self.endpoint = self.authorized_url
-        print(res["hits"][0])
-        pprint.pprint(marqo.tensor_search.backend.get_index_info(config=self.config, index_name=self.index_name_1).get_true_text_properties())
+        # #pprint.pprint(index_info.properties)
+        # doc = tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="article_591")
+        # # index_info = tensor_search.get_index_info(config=self.config, index_name=self.index_name_1)
+        # # pprint.pprint(doc)
+        # self.endpoint = self.authorized_url
+        # print(res["hits"][0])
+        # pprint.pprint(marqo.tensor_search.backend.get_index_info(config=self.config, index_name=self.index_name_1).get_true_text_properties())
 
         # search = requests.get(
         #     url=F"{self.endpoint}/{self.index_name_1}/_search",

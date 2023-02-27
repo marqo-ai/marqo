@@ -1853,7 +1853,7 @@ def vectorise_multimodal_combination_field(field: str, multimodal_object: Dict[s
     combo_chunk = dict({
         utils.generate_vector_name(field): vector_chunk,
         # TODO think of a good highlight
-        TensorField.field_content: list(multimodal_object), # replace text_chunks
+        TensorField.field_content: json.dumps(multimodal_object),
         TensorField.field_name: field,
     })
     return combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add, new_field_from_multimodal_combination
