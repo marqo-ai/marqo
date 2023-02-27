@@ -14,6 +14,7 @@ import inspect
 from enum import Enum
 import jsonschema
 from marqo.tensor_search.models.settings_object import settings_schema
+from marqo.tensor_search.models.mappings_object import mappings_schema, multimodal_combination_schema
 
 
 def validate_query(q: Union[dict, str], search_method: Union[str, SearchMethod]):
@@ -426,6 +427,46 @@ def validate_multimodal_combination(field_content, is_non_tensor_field, field_ma
     return True
 
 
+def validate_mappings_object(mappings_object: dict):
+    """validates the mappings object.
+    Returns
+        The given mappings object if validation has passed
+
+    Raises an InvalidArgError if the settings object is badly formatted
+    """
+    try:
+        jsonschema.validate(instance=mappings_object, schema=mappings_schema)
+        for field_name, config in mappings_object.items():
+            if config["type"] == enums.MappingsObjectType.multimodal_combination:
+                validate_multimodal_combination_object(config)
+        return mappings_object
+    except jsonschema.ValidationError as e:
+        raise InvalidArgError(
+            f"Error validating mappings object. Reason: \n{str(e)}"
+            f"\nRead about the mappings object here: https://docs.marqo.ai/0.0.15/API-Reference/mappings/"
+        )
+
+
+def validate_multimodal_combination_object(multimodal_mappings: dict):
+    """Validates the multimodal mappings object
+
+    Args:
+        multimodal_mappings:
+
+    Returns:
+        The original object, if it passes validation
+    Raises InvalidArgError if the object is badly formatted
+    """
+    try:
+        jsonschema.validate(instance=multimodal_mappings, schema=multimodal_combination_schema)
+        return multimodal_mappings
+    except jsonschema.ValidationError as e:
+        raise InvalidArgError(
+            f"Error validating multimodal combination object. Reason: \n{str(e)}"
+            f"\nRead about the mappings object here: https://docs.marqo.ai/0.0.15/API-Reference/mappings/"
+        )
+
+
 def validate_mappings(mappings: dict):
     '''
     Args:
@@ -467,8 +508,3 @@ def validate_multimodal_combination_mapping(field_mapping: dict):
                 f"In multimodal_combination fields, weight must be an int or float."
                 f"Please check `https://docs.marqo.ai/0.0.15/` for more info."
             )
-
-
-
-
-
