@@ -396,6 +396,9 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
     if non_tensor_fields is None:
         non_tensor_fields = []
 
+    if mappings is not None:
+        validation.validate_mappings_object(mappings_object=mappings)
+
     t0 = timer()
     bulk_parent_dicts = []
 
