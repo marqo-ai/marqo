@@ -886,3 +886,4 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         res = tensor_search._lexical_search(config=self.config, index_name=self.index_name_1, text="marqo is good")
         assert res["hits"][0]["_id"] == "article_592"
 
+
