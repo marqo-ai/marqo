@@ -1837,16 +1837,8 @@ def vectorise_multimodal_combination_field(field: str, multimodal_object: Dict[s
     sub_field_name_list = text_field_names + image_field_names
     vectors_list = text_vectors + image_vectors
 
-    try:
-        if not len(sub_field_name_list) == len(vectors_list):
-            raise errors.BatchInferenceSizeError
-    except errors.BatchInferenceSizeError:
-        combo_document_is_valid = False
-        doc_err = errors.InvalidArgError(message=f"Batch inference size does not match content for multimodal field {field}")
-        unsuccessful_doc_to_append = \
-            (doc_index, {'_id': doc_id, 'error': doc_err.message,
-                         'status': int(doc_err.status_code), 'code': doc_err.code})
-        return combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add, new_fields_from_multimodal_combination
+    if not len(sub_field_name_list) == len(vectors_list):
+        raise errors.BatchInferenceSizeError(message=f"Batch inference size does not match content for multimodal field {field}")
 
     vector_chunk = np.squeeze(np.sum([np.array(vector) * field_map["weights"][sub_field_name] for sub_field_name, vector in zip(sub_field_name_list, vectors_list)], axis=0))
 

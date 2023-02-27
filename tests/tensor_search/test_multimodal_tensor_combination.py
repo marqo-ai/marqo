@@ -632,32 +632,3 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         except MarqoWebError:
             pass
 
-
-
-
-
-
-
-
-
-
-
-
-    # added_doc = tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="0",
-    #                                              show_vectors=True)
-    # for key, value in expected_doc.items():
-    #     if not isinstance(value, dict):
-    #         assert expected_doc[key] == added_doc[key]
-    #     else:
-    #         assert list(expected_doc[key]) == added_doc[key]
-    #
-    #
-    # tensor_field = added_doc["_tensor_facets"]
-    # self.assertEqual(len(tensor_field), 2)
-    # # for "Title" : "Horse Rider"
-    # assert "_embedding" in tensor_field[0]
-    # assert tensor_field[0]["Title"] == expected_doc["Title"]
-    #
-    # # for combo filed
-    # assert "_embedding" in tensor_field[1]
-    # assert tensor_field[1]["combo_text_image"] == list(expected_doc["combo_text_image"])
