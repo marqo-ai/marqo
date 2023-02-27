@@ -94,7 +94,6 @@ def load_image_from_path(image_path: str, image_download_headers: dict, timeout=
     Returns:
         ImageType: In-memory PIL image.
     """
-    
     if os.path.isfile(image_path):
         img = Image.open(image_path)
     elif validators.url(image_path):

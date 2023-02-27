@@ -46,13 +46,29 @@ class IndexInfo(NamedTuple):
         """returns a dict containing only names and properties of fields that
         are true text fields
         """
+        # get_text_properties will naturally return multimodal_fields
+        # Example: left-text_properties   right-true_text_properties
+        # {'Description': {'type': 'text'},                                                         {'Description': {'type': 'text'},
+        #  'Genre': {'type': 'text'},                                                                'Genre': {'type': 'text'},
+        #  'Title': {'type': 'text'},                                                                'Title': {'type': 'text'},
+        #  'my_combination_field': {'properties': {'lexical_field': {'type': 'text'}, ----->         'my_combination_field.lexical_field': {'type': 'text'},
+        #                                          'my_image': {'type': 'text'},                     'my_combination_field.my_image': {'type': 'text'},
+        #                                          'some_text': {'type': 'text'}}}}                   'my_combination_field.some_text': {'type': 'text'}}
         simple_props = self.get_text_properties()
 
         true_text_props = dict()
         for text_field, text_props in simple_props.items():
-            try:
-                if text_props["type"] == enums.OpenSearchDataType.text:
-                    true_text_props[text_field] = text_props
-            except KeyError:
-                continue
+            if not "properties" in text_props:
+                try:
+                    if text_props["type"] == enums.OpenSearchDataType.text:
+                        true_text_props[text_field] = text_props
+                except KeyError:
+                    continue
+            elif "properties" in text_props:
+                for sub_field, sub_field_props in text_props["properties"].items():
+                    try:
+                        if sub_field_props["type"] == enums.OpenSearchDataType.text:
+                            true_text_props[f"{text_field}.{sub_field}"] = sub_field_props
+                    except KeyError:
+                        continue
         return true_text_props
