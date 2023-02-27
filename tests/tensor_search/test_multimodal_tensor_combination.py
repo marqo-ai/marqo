@@ -443,6 +443,66 @@ class TestMultimodalTensorCombination(MarqoTestCase):
 
         assert run()
 
+
+    def test_batched_vectorise_call_infer_image_is_false(self):
+        tensor_search.create_vector_index(
+            index_name=self.index_name_1, config=self.config, index_settings={
+                IndexSettingsField.index_defaults: {
+                    IndexSettingsField.model: "ViT-B/32",
+                    IndexSettingsField.treat_urls_and_pointers_as_images: False,
+                    IndexSettingsField.normalize_embeddings: False
+                }
+            })
+
+        def pass_through_vectorise(*arg, **kwargs):
+            """Vectorise will behave as usual, but we will be able to see the call list
+            via mock
+            """
+            return vectorise(*arg, **kwargs)
+
+        mock_vectorise = unittest.mock.MagicMock()
+        mock_vectorise.side_effect = pass_through_vectorise
+
+        @unittest.mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
+        def run():
+            tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
+                {
+                    "combo_text_image": {
+                        "text_0": "A rider is riding a horse jumping over the barrier_0.",
+                        "text_1":"A rider is riding a horse jumping over the barrier_1.",
+                        "text_2":"A rider is riding a horse jumping over the barrier_2.",
+                        "text_3":"A rider is riding a horse jumping over the barrier_3.",
+                        "text_4":"A rider is riding a horse jumping over the barrier_4.",
+                        "image_0" :  "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image0.jpg",
+                        "image_1" : "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+                        "image_2" : "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+                        "image_3" : "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image3.jpg",
+                        "image_4" : "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg",
+                    },
+                    "_id": "111",
+                },
+
+            ], mappings = {"combo_text_image" :{"type":"multimodal_combination", "weights":{
+                "text_0" : 0.1, "text_1" : 0.1, "text_2" : 0.1, "text_3" : 0.1, "text_4" : 0.1,
+                "image_0" : 0.1,"image_1" : 0.1,"image_2" : 0.1,"image_3" : 0.1,"image_4" : 0.1,
+            }}}, auto_refresh=True)
+            # Ensure the doc is added
+            assert tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="111")
+            # Ensure that vectorise is only called twice
+            assert len(mock_vectorise.call_args_list) == 1
+
+            text_content = [f"A rider is riding a horse jumping over the barrier_{i}." for i in range(5)]
+            text_content = text_content  + [f"https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image{i}.jpg" for i in range(5)]
+
+            real_text_content = [call_kwargs['content'] for call_args, call_kwargs
+                                 in mock_vectorise.call_args_list][0]
+
+            # Ensure the text vectorise is expected
+            self.assertEqual(real_text_content, text_content)
+            return True
+
+        assert run()
+
     def test_concurrent_image_downloading(self):
 
         tensor_search.create_vector_index(
