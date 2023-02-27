@@ -245,7 +245,9 @@ def add_documents_orchestrator(
         config: Config, index_name: str, docs: List[dict],
         auto_refresh: bool, batch_size: int = 0, processes: int = 1,
         non_tensor_fields=None, image_download_headers: dict = None,
-        device=None, update_mode: str = 'replace', use_existing_tensors: bool = False):
+        device=None, update_mode: str = 'replace', use_existing_tensors: bool = False,
+        mappings: dict = None
+    ):
     if image_download_headers is None:
         image_download_headers = dict()
 
@@ -257,7 +259,8 @@ def add_documents_orchestrator(
         return add_documents(
             config=config, index_name=index_name, docs=docs, auto_refresh=auto_refresh,
             device=device, update_mode=update_mode, non_tensor_fields=non_tensor_fields,
-            use_existing_tensors=use_existing_tensors, image_download_headers=image_download_headers
+            use_existing_tensors=use_existing_tensors, image_download_headers=image_download_headers,
+            mappings=mappings
         )
     elif processes is not None and processes > 1:
 
@@ -269,7 +272,8 @@ def add_documents_orchestrator(
             config=config, index_name=index_name, docs=docs,
             auto_refresh=auto_refresh, batch_size=batch_size, processes=processes,
             device=device, update_mode=update_mode, non_tensor_fields=non_tensor_fields,
-            use_existing_tensors=use_existing_tensors, image_download_headers=image_download_headers
+            use_existing_tensors=use_existing_tensors, image_download_headers=image_download_headers,
+            mappings=mappings
         )
 
         # we need to force the cache to update as it does not propagate using mp
@@ -286,13 +290,14 @@ def add_documents_orchestrator(
         return _batch_request(config=config, index_name=index_name, dataset=docs, device=device,
                               batch_size=batch_size, verbose=False, non_tensor_fields=non_tensor_fields,
                               use_existing_tensors=use_existing_tensors,
-                              image_download_headers=image_download_headers)
+                              image_download_headers=image_download_headers, mappings=mappings)
 
 
 def _batch_request(config: Config, index_name: str, dataset: List[dict],
                    batch_size: int = 100, verbose: bool = True, device=None,
                    update_mode: str = 'replace', non_tensor_fields=None,
-                   image_download_headers: Optional[Dict] = None, use_existing_tensors: bool = False
+                   image_download_headers: Optional[Dict] = None, use_existing_tensors: bool = False,
+                   mappings: dict = None
                    ) -> List[Dict[str, Any]]:
     """Batch by the number of documents"""
     if image_download_headers is None:
@@ -323,7 +328,8 @@ def _batch_request(config: Config, index_name: str, dataset: List[dict],
             config=config, index_name=index_name,
             docs=docs, auto_refresh=False, device=device,
             update_mode=update_mode, non_tensor_fields=non_tensor_fields,
-            use_existing_tensors=use_existing_tensors, image_download_headers=image_download_headers
+            use_existing_tensors=use_existing_tensors, image_download_headers=image_download_headers,
+            mappings=mappings
         )
         total_batch_time = timer() - t0
         num_docs = len(docs)
