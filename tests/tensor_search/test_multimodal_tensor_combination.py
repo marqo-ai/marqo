@@ -517,8 +517,6 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                                                 "some_text": 0.5,
                                                 "lexical_field": 0.1,
                                                 "additional_field" : 0.2,
-
-                                                # "my_combonitaion_field.lexical_field"
                                             }
                                         }}
                                     , auto_refresh=True)

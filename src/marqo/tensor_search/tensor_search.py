@@ -416,6 +416,8 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
     if update_mode not in valid_update_modes:
         raise errors.InvalidArgError(message=f"Unknown update_mode `{update_mode}` "
                                              f"received! Valid update modes: {valid_update_modes}")
+    if mappings is not None:
+        validate_mappings = validation.validate_mappings(mappings)
 
     existing_fields = set(index_info.properties.keys())
     new_fields = set()

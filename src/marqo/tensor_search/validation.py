@@ -424,3 +424,50 @@ def validate_multimodal_combination(field_content, is_non_tensor_field, field_ma
         )
     return True
 
+
+def validate_mappings(mappings: dict):
+    '''
+    Args:
+        mappings:  a dictionary to help handle object content field
+    Returns:
+    '''
+    for field, field_mapping in mappings.items():
+        validate_field_name(field)
+        if field_mapping["type"] not in constants.ALLOWED_MAPPINGS_TYPES:
+            raise InvalidArgError(
+                f"The type `{field_mapping['type']}` in mappings for filed `{field}` is not supported."
+                f"Please check the type of your mappings."
+                f"Supported mappings can be found in `https://docs.marqo.ai/0.0.15/`."
+            )
+        if field_mapping["type"] == "multimodal_combination":
+            validate_multimodal_combination_mapping(field_mapping)
+
+    return True
+
+
+def validate_multimodal_combination_mapping(field_mapping: dict):
+    if "weights" not in field_mapping:
+        raise InvalidArgError(
+            f"The multimodal_combination mapping `{field_mapping}` does not contain `weights`"
+            f"Please check `https://docs.marqo.ai/0.0.15/` for more info."
+        )
+
+    for child_field, weight in field_mapping["weights"]:
+        if child_field not in constants.ALLOWED_MULTIMODAL_FIELD_TYPES:
+            raise InvalidArgError(
+                f"The multimodal_combination mapping `{field_mapping}` has an invalid child_field `{child_field}` of type `{type(child_field).__name__}`."
+                f"In multimodal_combination fields, it must be a string."
+                f"Please check `https://docs.marqo.ai/0.0.15/` for more info."
+            )
+
+        if not isinstance(weight, (float, int)):
+            raise InvalidArgError(
+                f"The multimodal_combination mapping `{field_mapping}` has an invalid weight `{weight}` of type `{type(weight).__name__}`."
+                f"In multimodal_combination fields, weight must be an int or float."
+                f"Please check `https://docs.marqo.ai/0.0.15/` for more info."
+            )
+
+
+
+
+
