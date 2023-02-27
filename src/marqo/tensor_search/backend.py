@@ -153,12 +153,19 @@ def add_customer_field_properties(config: Config, index_name: str,
             "type": type_to_set
         }
 
-    # TODO instead of updating all the multimodal_fields, try to only add new properties
     if len(multimodal_combination_field) > 0:
         for multimodal_field, child_fields in multimodal_combination_field.items():
-            new_index_properties[validation.validate_field_name(multimodal_field)] = \
-                {"properties": {validation.validate_field_name(child_field_name): {"type":child_type}
-                 for child_field_name, child_type in child_fields}}
+            # update the new multimdal_field if it's not in it
+            if multimodal_field not in new_properties[multimodal_field]:
+                new_index_properties[validation.validate_field_name(multimodal_field)] = \
+                    {"properties": {validation.validate_field_name(child_field_name): {"type":child_type}
+                     for child_field_name, child_type in child_fields}}
+            # update the new child fields if it's already in it
+            elif multimodal_field in new_properties[multimodal_field]:
+                new_index_properties[validation.validate_field_name(multimodal_field)]["properties"] = \
+                     {validation.validate_field_name(child_field_name): {"type": child_type}
+                                    for child_field_name, child_type in child_fields}
+
 
     get_cache()[index_name] = IndexInfo(
         model_name=existing_info.model_name,

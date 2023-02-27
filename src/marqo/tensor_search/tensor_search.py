@@ -496,10 +496,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                     or isinstance(value, bool) or isinstance(value, int)
                     or isinstance(value, list) or isinstance(value, dict)):
                 continue
-            # if isinstance(value, dict):
-            #     chunk_values_for_filtering[key] = list(value.keys())
-            else:
-                chunk_values_for_filtering[key] = value
+            chunk_values_for_filtering[key] = value
 
         chunks = []
 
