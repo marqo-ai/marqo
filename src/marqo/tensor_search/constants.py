@@ -1,3 +1,5 @@
+from marqo.tensor_search.enums import MappingsObjectType
+
 INDEX_NAMES_TO_IGNORE = {
     '.opendistro_security',
     '.opendistro-security'
@@ -5,6 +7,8 @@ INDEX_NAMES_TO_IGNORE = {
 INDEX_NAME_PREFIXES_TO_IGNORE = {
     'security-auditlog-'
 }
+
+MARQO_OBJECT_TYPES = {MappingsObjectType.multimodal_combination}
 
 ILLEGAL_CUSTOMER_FIELD_NAME_CHARS = {'.', '/', '\n'}
 
