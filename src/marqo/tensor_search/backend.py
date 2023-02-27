@@ -60,7 +60,7 @@ def get_index_info(config: Config, index_name: str) -> IndexInfo:
 
 def add_customer_field_properties(config: Config, index_name: str,
                                   customer_field_names: Iterable[Tuple[str, enums.OpenSearchDataType]],
-                                  model_properties: dict, multimodal_combination_field: Dict[str, Iterable[Tuple[str, enums.OpenSearchDataType]]]):
+                                  model_properties: dict, multimodal_combination_fields: Dict[str, Iterable[Tuple[str, enums.OpenSearchDataType]]]):
     """Adds new customer fields to index mapping.
 
     Pushes the updated mapping to OpenSearch, and updates the local cache.
@@ -81,8 +81,8 @@ def add_customer_field_properties(config: Config, index_name: str,
     # check if there is multimodal fie;ds and convert the fields name to a list with the same
     # format of customer_field_names
     knn_field_names = copy.deepcopy(customer_field_names)
-    if len(multimodal_combination_field) > 0:
-        multimodal_customer_field_names = set([(field_name, "_") for field_name in list(multimodal_combination_field)])
+    if len(multimodal_combination_fields) > 0:
+        multimodal_customer_field_names = set([(field_name, "_") for field_name in list(multimodal_combination_fields)])
         knn_field_names = knn_field_names.union(multimodal_customer_field_names)
 
     body = {
@@ -120,16 +120,16 @@ def add_customer_field_properties(config: Config, index_name: str,
                 "type": enums.OpenSearchDataType.keyword,
                 "ignore_above": 32766  # this is the Marqo-OS bytes limit
             }
-    if len(multimodal_combination_field) > 0:
-        for field_name in list(multimodal_combination_field):
-            body["properties"][enums.TensorField.chunks]["properties"][
-                validation.validate_field_name(field_name)] = {"properties":{
-                sub_field[0]:{
-                    "type": enums.OpenSearchDataType.keyword,
-                    "ignore_above": 32766  # this is the Marqo-OS bytes limit
-                } for sub_field in multimodal_combination_field[field_name]
-            },
-        }
+
+    for field_name in list(multimodal_combination_fields):
+        body["properties"][enums.TensorField.chunks]["properties"][
+            validation.validate_field_name(field_name)] = {"properties":{
+            sub_field[0]:{
+                "type": enums.OpenSearchDataType.keyword,
+                "ignore_above": 32766  # this is the Marqo-OS bytes limit
+            } for sub_field in multimodal_combination_fields[field_name]
+        },
+    }
 
     mapping_res = HttpRequests(config).put(path=F"{index_name}/_mapping", body=json.dumps(body))
 
@@ -153,17 +153,17 @@ def add_customer_field_properties(config: Config, index_name: str,
             "type": type_to_set
         }
 
-    if len(multimodal_combination_field) > 0:
-        for multimodal_field, child_fields in multimodal_combination_field.items():
-            # update the new multimodal_field if it's not in it
-            if multimodal_field not in new_index_properties:
-                new_index_properties[validation.validate_field_name(multimodal_field)] = \
-                    {"properties": {validation.validate_field_name(child_field_name): {"type":child_type}
-                     for child_field_name, child_type in child_fields}}
-            # update the new child fields if the multimodal_field already in it
-            elif multimodal_field in new_index_properties:
-                for child_field_name, child_type in child_fields:
-                    new_index_properties[validation.validate_field_name(multimodal_field)]["properties"][child_field_name] = {"type":child_type}
+
+    for multimodal_field, child_fields in multimodal_combination_fields.items():
+        # update the new multimodal_field if it's not in it
+        if multimodal_field not in new_index_properties:
+            new_index_properties[validation.validate_field_name(multimodal_field)] = \
+                {"properties": {validation.validate_field_name(child_field_name): {"type":child_type}
+                 for child_field_name, child_type in child_fields}}
+        # update the new child fields if the multimodal_field already in it
+        elif multimodal_field in new_index_properties:
+            for child_field_name, child_type in child_fields:
+                new_index_properties[validation.validate_field_name(multimodal_field)]["properties"][child_field_name] = {"type":child_type}
 
     get_cache()[index_name] = IndexInfo(
         model_name=existing_info.model_name,

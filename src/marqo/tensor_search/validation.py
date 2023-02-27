@@ -393,9 +393,9 @@ def validate_multimodal_combination(field_content, is_non_tensor_field, field_ma
     Returns:
 
     '''
-    if len(field_content) < 2:
+    if len(field_content) < 1:
         raise InvalidArgError(
-            f"The multimodal_combination_field `{field_content}` is a dictonary will less than 2 fields. "
+            f"The multimodal_combination_field `{field_content}` is an empty dictionary. "
             f"This is not a valid format of field content."
             f"If you aim to use multimodal_combination, it must contain at least 2 fields. "
             f"please check `https://docs.marqo.ai/0.0.15/` for more info.")

@@ -353,7 +353,7 @@ def _infer_opensearch_data_type(
         to_check = sample_field_content
 
     if isinstance(to_check, dict):
-        raise errors.InvalidArgError("Field content can't be an object. An object should not be passed into _infer_opensearch_data_type"
+        raise errors.MarqoError("Field content can't be an object. An object should not be passed into _infer_opensearch_data_type"
                                      "to check.")
     elif isinstance(to_check, str):
         return OpenSearchDataType.text
@@ -426,7 +426,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
     # dict = {parent_field_1 : set((child_field_1, type), ),
     #      =  parent_field_2 : set((child_field_1, type), )}
     # Check backend to see the differences between multimodal_fields and new_fields
-    new_multimodal_combo_fields = dict()
+    new_obj_fields = dict()
 
     selected_device = config.indexing_device if device is None else device
 
@@ -656,9 +656,9 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                         unsuccessful_docs.append(unsuccessful_doc_to_append)
                         break
                     else:
-                        if field not in new_multimodal_combo_fields:
-                            new_multimodal_combo_fields[field] = set()
-                        new_multimodal_combo_fields[field] = new_multimodal_combo_fields[field].union(new_fields_from_multimodal_combination)
+                        if field not in new_obj_fields:
+                            new_obj_fields = set()
+                        new_obj_fields[field] = new_obj_fields[field].union(new_fields_from_multimodal_combination)
                         chunks.append({**combo_chunk, **chunk_values_for_filtering})
                         continue
 
@@ -742,7 +742,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
         # the HttpRequest wrapper handles error logic
         update_mapping_response = backend.add_customer_field_properties(
             config=config, index_name=index_name, customer_field_names=new_fields,
-            model_properties=_get_model_properties(index_info), multimodal_combination_field=new_multimodal_combo_fields)
+            model_properties=_get_model_properties(index_info), multimodal_combination_field=new_obj_fields)
 
         # ADD DOCS TIMER-LOGGER (5)
         start_time_5 = timer()
@@ -1294,16 +1294,14 @@ def _vector_text_search(
             to_be_vectorised = [[k for k, _ in ordered_queries], ]
     try:
         vectorised_text = functools.reduce(lambda x, y: x + y,
-                                           [s2_inference.vectorise(
-                                               model_name=index_info.model_name,
-                                               model_properties=_get_model_properties(index_info),
-                                               content=batch, device=selected_device,
-                                               normalize_embeddings=index_info.index_settings['index_defaults'][
-                                                   'normalize_embeddings'],
-                                               image_download_headers=image_download_headers
-                                           )
-                                               for batch in to_be_vectorised]
-                                           )
+           [s2_inference.vectorise(
+               model_name=index_info.model_name, model_properties=_get_model_properties(index_info),
+               content=batch, device=selected_device,
+               normalize_embeddings=index_info.index_settings['index_defaults']['normalize_embeddings'],
+               image_download_headers=image_download_headers
+               )
+               for batch in to_be_vectorised]
+           )
         if ordered_queries:
             # multiple queries. We have to weight and combine them:
             weighted_vectors = [np.asarray(vec) * weight for vec, weight in

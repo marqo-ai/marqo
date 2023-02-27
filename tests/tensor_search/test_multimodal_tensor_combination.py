@@ -585,8 +585,6 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         #     config=self.config, index_name=self.index_name_1
         # ).get_true_text_properties())
 
-
-
     def test_overwrite_multimodal_tensor_field(self):
         tensor_search.create_vector_index(
             index_name=self.index_name_1, config=self.config, index_settings={
@@ -633,6 +631,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             raise AssertionError
         except MarqoWebError:
             pass
+
 
 
 
