@@ -281,7 +281,6 @@ class TestMultimodalTensorCombination(MarqoTestCase):
 
         assert run()
 
-
     def test_multimodal_field_content_dictionary_validation(self):
         tensor_search.create_vector_index(
             index_name=self.index_name_1, config=self.config, index_settings={
@@ -423,8 +422,6 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         except InvalidArgError as e:
             assert "It CANNOT be a `non_tensor_field`" in e.message
 
-
-
     def test_batched_vectorise_call(self):
         tensor_search.create_vector_index(
             index_name=self.index_name_1, config=self.config, index_settings={
@@ -482,7 +479,6 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             return True
 
         assert run()
-
 
     def test_batched_vectorise_call_infer_image_is_false(self):
         tensor_search.create_vector_index(
@@ -591,7 +587,6 @@ class TestMultimodalTensorCombination(MarqoTestCase):
 
         assert run()
 
-
     def test_lexical_search_on_multimodal_combination(self):
         tensor_search.create_vector_index(
             index_name=self.index_name_1, config=self.config, index_settings={
@@ -652,7 +647,6 @@ class TestMultimodalTensorCombination(MarqoTestCase):
 
         res = tensor_search._lexical_search(config=self.config, index_name=self.index_name_1, text="test_search here")
         assert res["hits"][0]["_id"] == "article_592"
-
 
     def test_overwrite_multimodal_tensor_field(self):
         tensor_search.create_vector_index(
@@ -760,7 +754,6 @@ class TestMultimodalTensorCombination(MarqoTestCase):
 
         assert res_nonexist_1["hits"] == []
 
-
     def test_index_info_cache_update(self):
         tensor_search.create_vector_index(
             index_name=self.index_name_1, config=self.config, index_settings={
@@ -822,7 +815,6 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         assert pre_res_2["hits"] == post_res_2["hits"]
         assert pre_res_1["hits"] == post_res_1["hits"]
         assert pre_res_0["hits"] == post_res_0["hits"]
-
 
     def test_duplication_in_child_fields(self):
         tensor_search.create_vector_index(
