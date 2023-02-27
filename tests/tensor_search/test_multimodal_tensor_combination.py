@@ -16,6 +16,7 @@ from marqo.s2_inference.s2_inference import vectorise
 import requests
 from marqo.s2_inference.clip_utils import load_image_from_path
 import json
+from marqo.errors import MarqoWebError
 
 
 class TestMultimodalTensorCombination(MarqoTestCase):
@@ -25,6 +26,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         self.mappings = {"combo_text_image" :{"type": "multimodal_combination", "weights" : {
             "text" : 0.5, "image" : 0.8}
         }}
+        self.endpoint = self.authorized_url
         try:
             tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         except IndexNotFoundError as e:
@@ -508,7 +510,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
              "my_combination_field": {
                  "my_image": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg",
                  "some_text": "hello there",
-                 "lexical_field": "search me please", }},],
+                 "lexical_field": "search me please",}},],
                                     mappings={
                                         "my_combination_field": {
                                             "type": "multimodal_combination",
@@ -520,41 +522,50 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                                             }
                                         }}
                                     , auto_refresh=True)
+
         tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
             {"Title": "text",
              "Description": "text_2",
              "_id": "article_592",
              "Genre": "text",
              "my_combination_field": {
-                 "my_image": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg",
-                 "some_text": "hello there",
-                 "lexical_field": "no no no",
-                 "additional_field" : "search me again"}}
+                 "my_image_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg",
+                 "some_text_1": "hello there",
+                 "lexical_field_1": "no no no",
+                 "additional_field_1" : "test_search here"}}
             ],
-                                    mappings={
-                                        "my_combination_field": {
-                                            "type": "multimodal_combination",
-                                            "weights": {
-                                                "my_image": 0.5,
-                                                "some_text": 0.5,
-                                                "lexical_field": 0.1,
-                                                "additional_field" : 0.2,
+            mappings={
+                "my_combination_field": {
+                    "type": "multimodal_combination",
+                    "weights": {
+                        "my_image_1": 0.5,
+                        "some_text_1": 0.5,
+                        "lexical_field_1": 0.1,
+                        "additional_field_1" : 0.2,
+                    }
+                }}
+                ,auto_refresh=True)
 
-                                                # "my_combonitaion_field.lexical_field"
-                                            }
-                                        }}
-                                    , auto_refresh=True)
 
         res = tensor_search._lexical_search(config=self.config, index_name=self.index_name_1, text="search me please")
         assert res["hits"][0]["_id"] == "article_591"
 
-        res = tensor_search._lexical_search(config=self.config, index_name=self.index_name_1, text="search me again")
+        res = tensor_search._lexical_search(config=self.config, index_name=self.index_name_1, text="test_search here")
         assert res["hits"][0]["_id"] == "article_592"
+        #
+        # index_info = tensor_search.get_index_info(config=self.config, index_name=self.index_name_1).get_true_text_properties()
 
-        index_info = tensor_search.get_index_info(config=self.config, index_name=self.index_name_1).get_true_text_properties()
 
-
-
+        # pprint.pprint(requests.get(
+        #     url = f"{self.endpoint}/{self.index_name_1}/_search", verify= False,
+        #     json = {
+        #         "query":{
+        #             "match":{
+        #                 "my_combination_field.lexical_field" : "search me please"
+        #             }
+        #         }
+        #     }
+        # ).text)
 
         #pprint.pprint(index_info)
         # doc = tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="article_591")
@@ -562,7 +573,6 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         # # pprint.pprint(doc)
         # self.endpoint = self.authorized_url
         # print(res["hits"][0])
-        #pprint.pprint(marqo.tensor_search.backend.get_index_info(config=self.config, index_name=self.index_name_1).get_true_text_properties())
 
         #
         # pprint.pprint(json.loads(requests.get(url =
@@ -577,8 +587,52 @@ class TestMultimodalTensorCombination(MarqoTestCase):
 
 
 
+    def test_overwrite_multimodal_tensor_field(self):
+        tensor_search.create_vector_index(
+            index_name=self.index_name_1, config=self.config, index_settings={
+                IndexSettingsField.index_defaults: {
+                    IndexSettingsField.model: "random/small",
+                    IndexSettingsField.treat_urls_and_pointers_as_images: True,
+                    IndexSettingsField.normalize_embeddings: False
+                }
+            })
 
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
+            {"Title": "Extravehicular Mobility Unit (EMU)",
+             "Description": "The EMU is a spacesuit that provides environmental protection",
+             "_id": "article_591",
+             "Genre": "Science",
+             "my_combination_field": "dummy"
+             },]
+                                    , auto_refresh=True)
 
+        try:
+            tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
+                {"Title": "text",
+                 "Description": "text_2",
+                 "_id": "article_592",
+                 "Genre": "text",
+                 "my_combination_field": {
+                     "my_image_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg",
+                     "some_text_1": "hello there",
+                     "lexical_field_1": "no no no",
+                     "additional_field_1" : "test_search here"}}
+                ],
+                mappings={
+                    "my_combination_field": {
+                        "type": "multimodal_combination",
+                        "weights": {
+                            "my_image_1": 0.5,
+                            "some_text_1": 0.5,
+                            "lexical_field_1": 0.1,
+                            "additional_field_1" : 0.2,
+                        }
+                    }}
+                    ,auto_refresh=True)
+
+            raise AssertionError
+        except MarqoWebError:
+            pass
 
 
 

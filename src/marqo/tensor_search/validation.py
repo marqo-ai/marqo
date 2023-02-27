@@ -452,8 +452,8 @@ def validate_multimodal_combination_mapping(field_mapping: dict):
             f"Please check `https://docs.marqo.ai/0.0.15/` for more info."
         )
 
-    for child_field, weight in field_mapping["weights"]:
-        if child_field not in constants.ALLOWED_MULTIMODAL_FIELD_TYPES:
+    for child_field, weight in field_mapping["weights"].items():
+        if type(child_field) not in constants.ALLOWED_MULTIMODAL_FIELD_TYPES:
             raise InvalidArgError(
                 f"The multimodal_combination mapping `{field_mapping}` has an invalid child_field `{child_field}` of type `{type(child_field).__name__}`."
                 f"In multimodal_combination fields, it must be a string."
