@@ -412,14 +412,15 @@ def validate_multimodal_combination(field_content, is_non_tensor_field, field_ma
             raise InvalidArgError(
                 f"Multimodal-combination field content `{key}:{value}` \n  "
                 f"is not in the multimodal_field mappings weights `{field_mapping['weights']}`. Each sub_field requires a weights."
-                f"Please add the `{key}` to the mappings.")
+                f"Please add the `{key}` to the mappings."
+                f"please check `https://docs.marqo.ai/0.0.15/` for more info.")
 
 
     if is_non_tensor_field:
         raise InvalidArgError(
             f"Field content `{field_content}` \n  " 
             f"of type `{type(field_content).__name__}` is the content for a multimodal_combination."
-            f"It CAN NOT be a `non_tensor_field`. Remove this field from `non_tensor_field` or"
+            f"It CANNOT be a `non_tensor_field`. Remove this field from `non_tensor_field` or"
             f"add them as normal fields to fix this problem."
         )
     return True
