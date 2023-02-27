@@ -153,6 +153,7 @@ def add_customer_field_properties(config: Config, index_name: str,
             "type": type_to_set
         }
 
+    # TODO instead of updating all the multimodal_fields, try to only add new properties
     if len(multimodal_combination_field) > 0:
         for multimodal_field, child_fields in multimodal_combination_field.items():
             new_index_properties[validation.validate_field_name(multimodal_field)] = \
