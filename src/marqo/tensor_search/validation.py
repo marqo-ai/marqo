@@ -92,7 +92,7 @@ def validate_list(field_content: typing.List, is_non_tensor_field: bool):
     return True
 
 
-def validate_field_content(field_content: typing.Any, is_non_tensor_field: bool, field: typing.Any = None, mappings: dict = None) -> typing.Any:
+def validate_field_content(field_content: typing.Any, is_non_tensor_field: bool) -> typing.Any:
     """
     field: the field name of the field content. we need this to passed to validate_dict
     Returns
@@ -105,7 +105,8 @@ def validate_field_content(field_content: typing.Any, is_non_tensor_field: bool,
         if isinstance(field_content, list):
             validate_list(field_content, is_non_tensor_field)
         elif isinstance(field_content, dict):
-            validate_dict(field, field_content, is_non_tensor_field, mappings)
+            # We will be validating the dictionaries in a separate call.
+            return field_content
         return field_content
     else:
         raise InvalidArgError(
@@ -379,6 +380,8 @@ def validate_dict(field: str, field_content: typing.Dict, is_non_tensor_field: b
     if mappings[field]["type"] == "multimodal_combination":
         validate_multimodal_combination(field_content, is_non_tensor_field, mappings[field])
 
+    return field_content
+
 
 def validate_multimodal_combination(field_content, is_non_tensor_field, field_mapping):
     '''
@@ -391,11 +394,11 @@ def validate_multimodal_combination(field_content, is_non_tensor_field, field_ma
     Returns:
 
     '''
-    if len(field_content) < 2:
+    if len(field_content) < 1:
         raise InvalidArgError(
-            f"The multimodal_combination_field `{field_content}` is a dictonary will less than 2 fields. "
+            f"The multimodal_combination_field `{field_content}` is an empty dictionary. "
             f"This is not a valid format of field content."
-            f"If you aim to use multimodal_combination, it must contain at least 2 fields. "
+            f"If you aim to use multimodal_combination, it must contain at least 1 field. "
             f"please check `https://docs.marqo.ai/0.0.15/` for more info.")
 
 
@@ -410,14 +413,15 @@ def validate_multimodal_combination(field_content, is_non_tensor_field, field_ma
             raise InvalidArgError(
                 f"Multimodal-combination field content `{key}:{value}` \n  "
                 f"is not in the multimodal_field mappings weights `{field_mapping['weights']}`. Each sub_field requires a weights."
-                f"Please add the `{key}` to the mappings.")
+                f"Please add the `{key}` to the mappings."
+                f"please check `https://docs.marqo.ai/0.0.15/` for more info.")
 
 
     if is_non_tensor_field:
         raise InvalidArgError(
             f"Field content `{field_content}` \n  " 
             f"of type `{type(field_content).__name__}` is the content for a multimodal_combination."
-            f"It CAN NOT be a `non_tensor_field`. Remove this field from `non_tensor_field` or"
+            f"It CANNOT be a `non_tensor_field`. Remove this field from `non_tensor_field` or"
             f"add them as normal fields to fix this problem."
         )
     return True
@@ -461,3 +465,46 @@ def validate_multimodal_combination_object(multimodal_mappings: dict):
             f"Error validating multimodal combination object. Reason: \n{str(e)}"
             f"\nRead about the mappings object here: https://docs.marqo.ai/0.0.15/API-Reference/mappings/"
         )
+
+
+def validate_mappings(mappings: dict):
+    '''
+    Args:
+        mappings:  a dictionary to help handle object content field
+    Returns:
+    '''
+    for field, field_mapping in mappings.items():
+        validate_field_name(field)
+        if field_mapping["type"] not in constants.ALLOWED_MAPPINGS_TYPES:
+            raise InvalidArgError(
+                f"The type `{field_mapping['type']}` in mappings for filed `{field}` is not supported."
+                f"Please check the type of your mappings."
+                f"Supported mappings can be found in `https://docs.marqo.ai/0.0.15/`."
+            )
+        if field_mapping["type"] == "multimodal_combination":
+            validate_multimodal_combination_mapping(field_mapping)
+
+    return True
+
+
+def validate_multimodal_combination_mapping(field_mapping: dict):
+    if "weights" not in field_mapping:
+        raise InvalidArgError(
+            f"The multimodal_combination mapping `{field_mapping}` does not contain `weights`"
+            f"Please check `https://docs.marqo.ai/0.0.15/` for more info."
+        )
+
+    for child_field, weight in field_mapping["weights"].items():
+        if type(child_field) not in constants.ALLOWED_MULTIMODAL_FIELD_TYPES:
+            raise InvalidArgError(
+                f"The multimodal_combination mapping `{field_mapping}` has an invalid child_field `{child_field}` of type `{type(child_field).__name__}`."
+                f"In multimodal_combination fields, it must be a string."
+                f"Please check `https://docs.marqo.ai/0.0.15/` for more info."
+            )
+
+        if not isinstance(weight, (float, int)):
+            raise InvalidArgError(
+                f"The multimodal_combination mapping `{field_mapping}` has an invalid weight `{weight}` of type `{type(weight).__name__}`."
+                f"In multimodal_combination fields, weight must be an int or float."
+                f"Please check `https://docs.marqo.ai/0.0.15/` for more info."
+            )
