@@ -1750,7 +1750,6 @@ def vectorise_multimodal_combination_field(field: str, multimodal_object: Dict[s
 
     # Copy the important mutable objects from main body for safety purpose
     multimodal_object_copy = copy.deepcopy(multimodal_object)
-    doc_copy = copy.deepcopy(doc)
 
     # 4 lists to store the field name and field content to vectorise.
     text_field_names = []
@@ -1765,8 +1764,9 @@ def vectorise_multimodal_combination_field(field: str, multimodal_object: Dict[s
         NsField.treat_urls_and_pointers_as_images]
 
     if infer_if_image is False:
+        text_field_names = list(multimodal_object.keys())
         text_content_to_vectorise = list(multimodal_object.values())
-        new_fields_from_multimodal_combination.add([(sub_field_name, _infer_opensearch_data_type(sub_content)) for sub_field_name
+        new_fields_from_multimodal_combination =set([(sub_field_name, _infer_opensearch_data_type(sub_content)) for sub_field_name
         , sub_content in multimodal_object.items()])
     else:
         for sub_field_name, sub_content in multimodal_object.items():
@@ -1802,12 +1802,14 @@ def vectorise_multimodal_combination_field(field: str, multimodal_object: Dict[s
 
     try:
         start_time = timer()
+        text_vectors = []
         if len(text_content_to_vectorise) > 0:
             text_vectors = s2_inference.vectorise(
                 model_name=index_info.model_name,
                 model_properties=_get_model_properties(index_info), content=text_content_to_vectorise,
                 device=selected_device, normalize_embeddings=normalize_embeddings,
                 infer=infer_if_image)
+        image_vectors = []
         if len(image_content_to_vectorise) > 0:
             image_vectors = s2_inference.vectorise(
                 model_name=index_info.model_name,
