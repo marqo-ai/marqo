@@ -657,7 +657,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                         break
                     else:
                         if field not in new_obj_fields:
-                            new_obj_fields = set()
+                            new_obj_fields[field] = set()
                         new_obj_fields[field] = new_obj_fields[field].union(new_fields_from_multimodal_combination)
                         chunks.append({**combo_chunk, **chunk_values_for_filtering})
                         continue
@@ -742,7 +742,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
         # the HttpRequest wrapper handles error logic
         update_mapping_response = backend.add_customer_field_properties(
             config=config, index_name=index_name, customer_field_names=new_fields,
-            model_properties=_get_model_properties(index_info), multimodal_combination_field=new_obj_fields)
+            model_properties=_get_model_properties(index_info), multimodal_combination_fields=new_obj_fields)
 
         # ADD DOCS TIMER-LOGGER (5)
         start_time_5 = timer()

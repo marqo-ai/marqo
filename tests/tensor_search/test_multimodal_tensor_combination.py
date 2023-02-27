@@ -371,10 +371,10 @@ class TestMultimodalTensorCombination(MarqoTestCase):
 
         # length of fields
         try:
-            validate_dict(field, {"test_void": "test"}, is_non_tensor_field=False, mappings=test_mappings)
+            validate_dict(field, {}, is_non_tensor_field=False, mappings=test_mappings)
             raise AssertionError
         except InvalidArgError as e:
-            assert "it must contain at least 2 fields" in e.message
+            assert "it must contain at least 1 field" in e.message
 
         # nontensor_field
         try:
