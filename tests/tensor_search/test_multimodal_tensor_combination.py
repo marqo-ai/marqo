@@ -381,7 +381,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             validate_dict(field, valid_dict, is_non_tensor_field=True, mappings=test_mappings)
             raise AssertionError
         except InvalidArgError as e:
-            assert "It CAN NOT be a `non_tensor_field`" in e.message
+            assert "It CANNOT be a `non_tensor_field`" in e.message
 
 
 
