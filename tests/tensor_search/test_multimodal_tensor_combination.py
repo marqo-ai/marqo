@@ -281,6 +281,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
 
         assert run()
 
+
     def test_multimodal_field_content_dictionary_validation(self):
         tensor_search.create_vector_index(
             index_name=self.index_name_1, config=self.config, index_settings={
