@@ -508,8 +508,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
              "my_combination_field": {
                  "my_image": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg",
                  "some_text": "hello there",
-                 "lexical_field": "search me please", }}
-        ],
+                 "lexical_field": "search me please", }},],
                                     mappings={
                                         "my_combination_field": {
                                             "type": "multimodal_combination",
@@ -517,6 +516,31 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                                                 "my_image": 0.5,
                                                 "some_text": 0.5,
                                                 "lexical_field": 0.1,
+                                                "additional_field" : 0.2,
+
+                                                # "my_combonitaion_field.lexical_field"
+                                            }
+                                        }}
+                                    , auto_refresh=True)
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
+            {"Title": "text",
+             "Description": "text_2",
+             "_id": "article_592",
+             "Genre": "text",
+             "my_combination_field": {
+                 "my_image": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg",
+                 "some_text": "hello there",
+                 "lexical_field": "no no no",
+                 "additional_field" : "search me again"}}
+            ],
+                                    mappings={
+                                        "my_combination_field": {
+                                            "type": "multimodal_combination",
+                                            "weights": {
+                                                "my_image": 0.5,
+                                                "some_text": 0.5,
+                                                "lexical_field": 0.1,
+                                                "additional_field" : 0.2,
 
                                                 # "my_combonitaion_field.lexical_field"
                                             }
@@ -526,15 +550,21 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         res = tensor_search._lexical_search(config=self.config, index_name=self.index_name_1, text="search me please")
         assert res["hits"][0]["_id"] == "article_591"
 
-        #
-        # index_info = tensor_search.get_index_info(config=self.config, index_name=self.index_name_1)
-        # pprint.pprint(index_info.properties)
+        res = tensor_search._lexical_search(config=self.config, index_name=self.index_name_1, text="search me again")
+        assert res["hits"][0]["_id"] == "article_592"
+
+        index_info = tensor_search.get_index_info(config=self.config, index_name=self.index_name_1).get_true_text_properties()
+
+
+
+
+        #pprint.pprint(index_info)
         # doc = tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="article_591")
         # # index_info = tensor_search.get_index_info(config=self.config, index_name=self.index_name_1)
         # # pprint.pprint(doc)
         # self.endpoint = self.authorized_url
         # print(res["hits"][0])
-        # pprint.pprint(marqo.tensor_search.backend.get_index_info(config=self.config, index_name=self.index_name_1).get_true_text_properties())
+        #pprint.pprint(marqo.tensor_search.backend.get_index_info(config=self.config, index_name=self.index_name_1).get_true_text_properties())
 
         #
         # pprint.pprint(json.loads(requests.get(url =

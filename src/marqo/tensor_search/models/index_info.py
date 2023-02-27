@@ -35,18 +35,17 @@ class IndexInfo(NamedTuple):
         bool fields.
 
         """
-        return {
-            text_field: text_props
-            for text_field, text_props in self.properties.items()
-            if not text_field.startswith(enums.TensorField.vector_prefix)
-                and not text_field in enums.TensorField.__dict__.values()
-        }
+        text_props_dict = {}
+        for text_field, text_props in self.properties.items():
+            if not text_field.startswith(enums.TensorField.vector_prefix) and not text_field in enums.TensorField.__dict__.values():
+                if not "properties" in text_props:
+                    text_props_dict[text_field] = text_props
+                elif "properties" in text_props:
+                    for sub_field, sub_field_props in text_props["properties"].items():
+                            text_props_dict[f"{text_field}.{sub_field}"] = sub_field_props
+        return text_props_dict
 
-    def get_true_text_properties(self) -> dict:
-        """returns a dict containing only names and properties of fields that
-        are true text fields
-        """
-        # get_text_properties will naturally return multimodal_fields
+        # get_text_properties will flatten the object properties
         # Example: left-text_properties   right-true_text_properties
         # {'Description': {'type': 'text'},                                                         {'Description': {'type': 'text'},
         #  'Genre': {'type': 'text'},                                                                'Genre': {'type': 'text'},
@@ -54,21 +53,17 @@ class IndexInfo(NamedTuple):
         #  'my_combination_field': {'properties': {'lexical_field': {'type': 'text'}, ----->         'my_combination_field.lexical_field': {'type': 'text'},
         #                                          'my_image': {'type': 'text'},                     'my_combination_field.my_image': {'type': 'text'},
         #                                          'some_text': {'type': 'text'}}}}                   'my_combination_field.some_text': {'type': 'text'}}
-        simple_props = self.get_text_properties()
 
+    def get_true_text_properties(self) -> dict:
+        """returns a dict containing only names and properties of fields that
+        are true text fields
+        """
+        simple_props = self.get_text_properties()
         true_text_props = dict()
         for text_field, text_props in simple_props.items():
-            if not "properties" in text_props:
-                try:
-                    if text_props["type"] == enums.OpenSearchDataType.text:
-                        true_text_props[text_field] = text_props
-                except KeyError:
-                    continue
-            elif "properties" in text_props:
-                for sub_field, sub_field_props in text_props["properties"].items():
-                    try:
-                        if sub_field_props["type"] == enums.OpenSearchDataType.text:
-                            true_text_props[f"{text_field}.{sub_field}"] = sub_field_props
-                    except KeyError:
-                        continue
+            try:
+                if text_props["type"] == enums.OpenSearchDataType.text:
+                    true_text_props[text_field] = text_props
+            except KeyError:
+                continue
         return true_text_props

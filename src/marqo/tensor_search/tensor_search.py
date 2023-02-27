@@ -419,9 +419,11 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
     existing_fields = set(index_info.properties.keys())
     new_fields = set()
-    # A dict to store the multimodal_fields and their sub_fields
-    # dict = {multi_modal_field_1 : set(),
-    #      =  multi_modal_field_2 : set()}
+
+    # A dict to store the multimodal_fields and their (child_fields, opensearch_type)
+    # dict = {parent_field_1 : set((child_field_1, type), ),
+    #      =  parent_field_2 : set((child_field_1, type), )}
+    # Check backend to see the differences between multimodal_fields and new_fields
     new_multimodal_combo_fields = dict()
 
     selected_device = config.indexing_device if device is None else device
@@ -503,8 +505,10 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
             try:
                 field_content = validation.validate_field_content(
-                    field_content=copied[field], is_non_tensor_field=field in non_tensor_fields, field = field, mappings = mappings,
-                )
+                    field_content=copied[field], is_non_tensor_field=field in non_tensor_fields)
+                if isinstance(field_content, dict):
+                    field_content = validation.validate_dict(field = field, field_content = field_content,
+                                                             is_non_tensor_field=field in non_tensor_fields, mappings=mappings)
             except errors.InvalidArgError as err:
                 document_is_valid = False
                 unsuccessful_docs.append(

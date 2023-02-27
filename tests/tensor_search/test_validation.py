@@ -177,7 +177,7 @@ class TestValidation(unittest.TestCase):
 
     def test_validate_field_content_bad(self):
         bad_field_content = [
-            {123}, None, {"abw": "cjnk"}, ['not 100% strings', 134, 1.4, False],
+            {123}, None,['not 100% strings', 134, 1.4, False],
             ['not 100% strings', True]
         ]
         for non_tensor_field in (True, False):

@@ -91,7 +91,7 @@ def validate_list(field_content: typing.List, is_non_tensor_field: bool):
     return True
 
 
-def validate_field_content(field_content: typing.Any, is_non_tensor_field: bool, field: typing.Any = None, mappings: dict = None) -> typing.Any:
+def validate_field_content(field_content: typing.Any, is_non_tensor_field: bool) -> typing.Any:
     """
     field: the field name of the field content. we need this to passed to validate_dict
     Returns
@@ -104,7 +104,8 @@ def validate_field_content(field_content: typing.Any, is_non_tensor_field: bool,
         if isinstance(field_content, list):
             validate_list(field_content, is_non_tensor_field)
         elif isinstance(field_content, dict):
-            validate_dict(field, field_content, is_non_tensor_field, mappings)
+            # We will be validating the dictionaries in a separate call.
+            return field_content
         return field_content
     else:
         raise InvalidArgError(
@@ -377,6 +378,8 @@ def validate_dict(field: str, field_content: typing.Dict, is_non_tensor_field: b
 
     if mappings[field]["type"] == "multimodal_combination":
         validate_multimodal_combination(field_content, is_non_tensor_field, mappings[field])
+
+    return field_content
 
 
 def validate_multimodal_combination(field_content, is_non_tensor_field, field_mapping):
