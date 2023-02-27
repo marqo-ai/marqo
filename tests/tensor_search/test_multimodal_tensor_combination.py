@@ -348,6 +348,45 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         # valid_dict
         validate_dict(field, valid_dict, is_non_tensor_field=False, mappings=test_mappings)
 
+        # invalid str:str format
+        # str:list
+        try:
+            validate_dict(field, {"test_1": ["my","test"], "test_2": "test_test"}, is_non_tensor_field=False, mappings=test_mappings)
+            raise AssertionError
+        except InvalidArgError as e:
+            assert "is not of valid content type" in e.message
+        # str:tuple
+        try:
+            validate_dict(field, {"test_1": ("my","test"), "test_2": "test_test"}, is_non_tensor_field=False,
+                          mappings=test_mappings)
+            raise AssertionError
+        except InvalidArgError as e:
+            assert "is not of valid content type" in e.message
+
+        # str:dict
+        try:
+            validate_dict(field, {"test_1": {"my":"test"}, "test_2": "test_test"}, is_non_tensor_field=False,
+                          mappings=test_mappings)
+            raise AssertionError
+        except InvalidArgError as e:
+            assert "is not of valid content type" in e.message
+
+        # str:int
+        try:
+            validate_dict(field, {"test_1": 53213, "test_2": "test_test"}, is_non_tensor_field=False,
+                          mappings=test_mappings)
+            raise AssertionError
+        except InvalidArgError as e:
+            assert "is not of valid content type" in e.message
+
+        # str:None
+        try:
+            validate_dict(field, {"test_1": None, "test_2": "test_test"}, is_non_tensor_field=False,
+                          mappings=test_mappings)
+            raise AssertionError
+        except InvalidArgError as e:
+            assert "is not of valid content type" in e.message
+
         # mapping is None
         try:
             validate_dict(field, valid_dict, is_non_tensor_field=False, mappings=None)
