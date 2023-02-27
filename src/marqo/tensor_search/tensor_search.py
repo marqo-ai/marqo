@@ -349,12 +349,13 @@ def _infer_opensearch_data_type(
         # OpenSearch requires that all content of an array be the same type.
         # This function doesn't validate.
         to_check = sample_field_content[0]
-    elif isinstance(sample_field_content, dict):
-        to_check = list(sample_field_content.values())[0]
     else:
         to_check = sample_field_content
 
-    if isinstance(to_check, str):
+    if isinstance(to_check, dict):
+        raise errors.InvalidArgError("Field content can't be an object. An object should not be passed into _infer_opensearch_data_type"
+                                     "to check.")
+    elif isinstance(to_check, str):
         return OpenSearchDataType.text
     else:
         return None
@@ -383,6 +384,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
         update_mode: {'replace' | 'update'}. If set to replace (default) just
         image_download_thread_count: number of threads used to concurrently download images
         image_download_headers: headers to authenticate image download
+        mappings: a dictionary used to handle all the object field content in the doc, e.g., multimodal_combination field
     Returns:
 
     """
@@ -501,7 +503,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
             try:
                 field_content = validation.validate_field_content(
-                    field = field, field_content=copied[field], is_non_tensor_field=field in non_tensor_fields, mappings = mappings,
+                    field_content=copied[field], is_non_tensor_field=field in non_tensor_fields, field = field, mappings = mappings,
                 )
             except errors.InvalidArgError as err:
                 document_is_valid = False

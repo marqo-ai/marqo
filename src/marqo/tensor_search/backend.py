@@ -80,10 +80,10 @@ def add_customer_field_properties(config: Config, index_name: str,
 
     # check if there is multimodal fie;ds and convert the fields name to a list with the same
     # format of customer_field_names
-    update_chunk_fields = copy.deepcopy(customer_field_names)
+    knn_field_names = copy.deepcopy(customer_field_names)
     if len(multimodal_combination_field) > 0:
         multimodal_customer_field_names = set([(field_name, "_") for field_name in list(multimodal_combination_field)])
-        update_chunk_fields = update_chunk_fields.union(multimodal_customer_field_names)
+        knn_field_names = knn_field_names.union(multimodal_customer_field_names)
 
     body = {
         "properties": {
@@ -103,7 +103,7 @@ def add_customer_field_properties(config: Config, index_name: str,
                                 "m": 16
                             }
                         }
-                    } for field_name in update_chunk_fields
+                    } for field_name in knn_field_names
                 }
             }
         }
@@ -152,12 +152,12 @@ def add_customer_field_properties(config: Config, index_name: str,
         new_index_properties[validation.validate_field_name(new_prop)] = {
             "type": type_to_set
         }
+
     if len(multimodal_combination_field) > 0:
-        for field_name, sub_field_names in multimodal_combination_field.items():
-            for sub_field_name, type_to_set in sub_field_names:
-                new_index_properties[validation.validate_field_name(f"{field_name}.{sub_field_name}")] = {
-                    "type" : type_to_set,
-                }
+        for multimodal_field, child_fields in multimodal_combination_field.items():
+            new_index_properties[validation.validate_field_name(multimodal_field)] = \
+                {"properties": {validation.validate_field_name(child_field_name): {"type":child_type}
+                 for child_field_name, child_type in child_fields}}
 
     get_cache()[index_name] = IndexInfo(
         model_name=existing_info.model_name,

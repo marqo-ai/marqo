@@ -91,9 +91,9 @@ def validate_list(field_content: typing.List, is_non_tensor_field: bool):
     return True
 
 
-def validate_field_content(field: typing.Any, field_content: typing.Any, is_non_tensor_field: bool, mappings: dict) -> typing.Any:
+def validate_field_content(field_content: typing.Any, is_non_tensor_field: bool, field: typing.Any = None, mappings: dict = None) -> typing.Any:
     """
-
+    field: the field name of the field content. we need this to passed to validate_dict
     Returns
         field_content, if it is valid
 
@@ -351,8 +351,10 @@ def validate_dict(field: str, field_content: typing.Dict, is_non_tensor_field: b
     '''
 
     Args:
+        field: the field name
         field_content: the field when it is a dict, especially used for multimodal tensor combination field
         is_non_tensor_field: for multimodal tensor combination field, this should be True
+        mappings: a dictionary to help validate the object field content
 
     Returns:
         True or raise an error
@@ -378,6 +380,16 @@ def validate_dict(field: str, field_content: typing.Dict, is_non_tensor_field: b
 
 
 def validate_multimodal_combination(field_content, is_non_tensor_field, field_mapping):
+    '''
+
+    Args:
+        field_content: the field content
+        is_non_tensor_field: whether this is a non-tensor-field
+        field_mapping: the mapping to help validate this field content
+
+    Returns:
+
+    '''
     if len(field_content) < 2:
         raise InvalidArgError(
             f"The multimodal_combination_field `{field_content}` is a dictonary will less than 2 fields. "

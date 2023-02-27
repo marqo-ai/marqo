@@ -76,7 +76,6 @@ class OpenSearchDataType:
     float = "float"
     integer = "integer"
     to_be_defined = "to_be_defined"  # to be defined by OpenSearch
-    object = "nested"
 
 
 class EnvVars:

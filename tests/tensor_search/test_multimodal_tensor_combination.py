@@ -489,72 +489,6 @@ class TestMultimodalTensorCombination(MarqoTestCase):
 
         assert run()
 
-    def test_lexical_search_on_multimodal_combination(self):
-
-        tensor_search.create_vector_index(
-            index_name=self.index_name_1, config=self.config, index_settings={
-                IndexSettingsField.index_defaults: {
-                    IndexSettingsField.model: "ViT-B/32",
-                    IndexSettingsField.treat_urls_and_pointers_as_images: True,
-                    IndexSettingsField.normalize_embeddings: False
-                }
-            })
-
-        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
-            {"title": "test_0",
-             "combo_text_image_0": {
-                 "A rider is riding a horse jumping over the barrier_0.": {
-                     "weight": 0.1, },
-                 "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image0.jpg": {
-                     "weight": 0.1,
-                 }
-             }, "_id": "0"},
-
-            {"title": "test_1",
-             "combo_text_image_1": {
-                 "A rider is riding a horse jumping over the barrier_1.": {
-                     "weight": 0.1, },
-                 "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg": {
-                     "weight": 0.1,
-                 }}, "_id": "1"},
-
-            {"title": "test_2",
-             "combo_text_image_2": {
-                 "A rider is riding a horse jumping over the barrier_2.": {
-                     "weight": 0.1, },
-                 "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg": {
-                     "weight": 0.1,
-                 }}, "_id": "2"},
-
-            {"title": "test_3",
-             "combo_text_image_3": {
-                 "A rider is riding a horse jumping over the barrier_3.": {
-                     "weight": 0.1, },
-                 "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image3.jpg": {
-                     "weight": 0.1,
-                 }}, "_id": "3"},
-
-            {"title": "combo_4",
-             "combo_text_image_4": {
-                 "A rider is riding a horse jumping over the barrier_4.": {
-                     "weight": 0.1, },
-                 "please search me.": {
-                     "weight": 0.2,
-                 },
-                 "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg": {
-                     "weight": 0.1,
-                 }}, "_id": "4"},
-        ], auto_refresh=True, non_tensor_fields=["combo_text_image_4_test"])
-
-        res = tensor_search._lexical_search(config=self.config, index_name=self.index_name_1,
-                                            text="please search me")
-        assert tensor_search.get_stats(config=self.config, index_name=self.index_name_1)["numberOfDocuments"] == 5
-        assert res["hits"][0]["title"] == "combo_4"
-        assert res["hits"][0]["combo_text_image_4"] == [
-            "A rider is riding a horse jumping over the barrier_4.",
-            "please search me.",
-            "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg"
-        ]
 
     def test_lexical_search_on_multimodal_combination(self):
         tensor_search.create_vector_index(
@@ -594,7 +528,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
 
         #
         # index_info = tensor_search.get_index_info(config=self.config, index_name=self.index_name_1)
-        # #pprint.pprint(index_info.properties)
+        # pprint.pprint(index_info.properties)
         # doc = tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="article_591")
         # # index_info = tensor_search.get_index_info(config=self.config, index_name=self.index_name_1)
         # # pprint.pprint(doc)
@@ -602,18 +536,6 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         # print(res["hits"][0])
         # pprint.pprint(marqo.tensor_search.backend.get_index_info(config=self.config, index_name=self.index_name_1).get_true_text_properties())
 
-        # search = requests.get(
-        #     url=F"{self.endpoint}/{self.index_name_1}/_search",
-        #     verify=False,
-        #     json={
-        #         "query": {
-        #             "match": {
-        #                 "my_combination_field.lexical_field": "search me please"
-        #             }
-        #         }
-        #     }
-        # ).text
-        # print(search)
         #
         # pprint.pprint(json.loads(requests.get(url =
         #                                       f"{self.endpoint}/{self.index_name_1}/_mapping", verify=False).text))
