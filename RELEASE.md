@@ -1,7 +1,7 @@
 ## Release 0.0.15
 
 ## New features 
-- Multimodal tensor combination (https://github.com/marqo-ai/marqo/pull/332). Multimodal combination objects can be added as a Marqo field. Use this to encode text metadata into image vectors. See usage https://docs.marqo.ai/0.0.15/Advanced-Usage/document_fields/#multimodal-combination-object.
+- Multimodal tensor combination (https://github.com/marqo-ai/marqo/pull/332). Multimodal combination objects can be added as a Marqo field. Use this to encode text metadata into image vectors. See usage [here](https://docs.marqo.ai/0.0.15/Advanced-Usage/document_fields/#multimodal-combination-object).
 
 ## Bug fixes
 - Fixed bug where CLIP device check wasn't behaving as expected (https://github.com/marqo-ai/marqo/pull/337)
