@@ -1,25 +1,25 @@
 ## Release 0.0.15
 
 ## New features 
-- Multimodal tensor combination (https://github.com/marqo-ai/marqo/pull/332, https://github.com/marqo-ai/marqo/pull/355). Multimodal combination objects can be added as a Marqo field. Use this to encode text metadata into image vectors. See usage [here](https://docs.marqo.ai/0.0.15/Advanced-Usage/document_fields/#multimodal-combination-object).
+- Multimodal tensor combination (https://github.com/marqo-ai/marqo/pull/332, https://github.com/marqo-ai/marqo/pull/355). Combine image and text data into a single vector! Multimodal combination objects can be added as a Marqo field. This can be used to encode text metadata into image vectors. See usage [here](https://docs.marqo.ai/0.0.15/Advanced-Usage/document_fields/#multimodal-combination-object).
 
 ## Bug fixes
 - Fixed bug where CLIP device check wasn't behaving as expected (https://github.com/marqo-ai/marqo/pull/337)
-- CLIP utils set to use OpenCLIP default tokenizer so that long texts inputs are truncated correctly (https://github.com/marqo-ai/marqo/pull/351). 
+- CLIP utils set to use the OpenCLIP default tokenizer so that long text inputs are truncated correctly (https://github.com/marqo-ai/marqo/pull/351). 
 
 
 # Release 0.0.14
 
 ## New features 
-- `use_existing_vectors` flag (https://github.com/marqo-ai/marqo/pull/335). Use existing Marqo vectors, on unchanged tensor fields. This let's you quickly add new metadata while minimising inference operations. See usage [here](https://docs.marqo.ai/0.0.14/API-Reference/documents/#query-parameters).
-- `image_download_headings` parameter (https://github.com/marqo-ai/marqo/pull/336). Add image download auth information to `add_documents` and `search` calls. See usage [here](https://docs.marqo.ai/0.0.14/API-Reference/image_downloads/).
+- `use_existing_tensors` flag (https://github.com/marqo-ai/marqo/pull/335). Use existing Marqo vectors to autofill unchanged tensor fields. This lets you quickly add new metadata while minimising inference operations. See usage [here](https://docs.marqo.ai/0.0.14/API-Reference/documents/#query-parameters).
+- `image_download_headings` parameter (https://github.com/marqo-ai/marqo/pull/336). Index and search non-publicly available images. Add image download auth information to `add_documents` and `search` requests. See usage [here](https://docs.marqo.ai/0.0.14/API-Reference/image_downloads/).
 
 ## Optimisations
 - The index cache is now updated in intervals of 2 seconds (https://github.com/marqo-ai/marqo/pull/333), rather than on every search. This reduces the pressure on Marqo-OS, allowing for greater search and indexing throughput. 
 
 ## Bug fixes
-- Helpful validation errors for invalid index settings (https://github.com/marqo-ai/marqo/pull/330). Helpful error messages means a happier getting started experience. 
-- Automatic conversion to fp32 when using fp16 models on CPU  (https://github.com/marqo-ai/marqo/pull/331). Allows CPU-usage of a `fp16` CLIP index (although we still recommend interacting with a `fp16` index with `device=CUDA` for best results). 
+- Helpful validation errors for invalid index settings (https://github.com/marqo-ai/marqo/pull/330). Helpful error messages allow for a smoother getting-started experience. 
+- Automatic conversion to `fp32` when using `fp16` models on CPU  (https://github.com/marqo-ai/marqo/pull/331). This allows Marqo running on a CPU-only machine to index and search a `fp16` CLIP index (although we still recommend interacting with a `fp16` index with `device=CUDA` for the best results). 
 - Broadening of the types of image download errors gracefully handled. (https://github.com/marqo-ai/marqo/pull/321)
 
 
