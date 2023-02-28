@@ -7,6 +7,10 @@
 - Fixed a bug that prevented CLIP's device check from behaving as expected (https://github.com/marqo-ai/marqo/pull/337)
 - CLIP utils is set to use the OpenCLIP default tokenizer so that long text inputs are truncated correctly (https://github.com/marqo-ai/marqo/pull/351). 
 
+## Contributor shout-outs:
+- Thank you to our 2.4k stargazers
+- Thank you to [@ed-muthiah](https://github.com/ed-muthiah), [@codebrain](https://github.com/codebrain) and others for raising issues.
+
 
 # Release 0.0.14
 
