@@ -4,7 +4,7 @@
 - Multimodal tensor combination (https://github.com/marqo-ai/marqo/pull/332, https://github.com/marqo-ai/marqo/pull/355). Combine image and text data into a single vector! Multimodal combination objects can be added as Marqo document fields. This can be used to encode text metadata into image vectors. See usage [here](https://docs.marqo.ai/0.0.15/Advanced-Usage/document_fields/#multimodal-combination-object).
 
 ## Bug fixes
-- Fixed bug that prevented CLIP's device check from behaving as expected (https://github.com/marqo-ai/marqo/pull/337)
+- Fixed a bug that prevented CLIP's device check from behaving as expected (https://github.com/marqo-ai/marqo/pull/337)
 - CLIP utils is set to use the OpenCLIP default tokenizer so that long text inputs are truncated correctly (https://github.com/marqo-ai/marqo/pull/351). 
 
 
