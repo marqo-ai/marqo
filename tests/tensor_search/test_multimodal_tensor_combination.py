@@ -888,4 +888,60 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         res = tensor_search._lexical_search(config=self.config, index_name=self.index_name_1, text="marqo is good")
         assert res["hits"][0]["_id"] == "article_592"
 
+    def test_multimodal_combination_open_search_chunks(self):
+        test_doc ={
+                 "my_combination_field": {
+                     "image": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg",
+                     "text": "marqo is good" },
+                   "_id": "123",
+                   }
+        tensor_search.create_vector_index(
+            index_name=self.index_name_1, config=self.config, index_settings={
+                IndexSettingsField.index_defaults: {
+                    IndexSettingsField.model: "random/small",
+                    IndexSettingsField.treat_urls_and_pointers_as_images: True,
+                    IndexSettingsField.normalize_embeddings: True
+                }
+            })
+
+        res = tensor_search.add_documents(
+            self.config,
+            docs = [test_doc],
+            auto_refresh=True, index_name=self.index_name_1,
+            mappings={"my_combination_field": {"type":"multimodal_combination", "weights":{
+                "text":0.5, "image":0.5
+            }}}
+        )
+
+        doc_w_facets = tensor_search.get_document_by_id(
+            self.config, index_name=self.index_name_1, document_id='123', show_vectors=True)
+        # check tensor facets:
+        assert len(doc_w_facets[TensorField.tensor_facets]) == 1
+        assert 'my_combination_field' in doc_w_facets[TensorField.tensor_facets][0]
+
+        assert doc_w_facets['my_combination_field'] == test_doc['my_combination_field']
+        assert doc_w_facets[TensorField.tensor_facets][0]['my_combination_field'] == json.dumps(test_doc['my_combination_field'])
+
+        # check OpenSearch, to ensure the list got added as a filter field
+        original_doc = requests.get(
+            url=F"{self.endpoint}/{self.index_name_1}/_doc/123",
+            verify=False
+        ).json()
+        assert len(original_doc['_source']['__chunks']) == 1
+        multi_combo_chunk = original_doc['_source']['__chunks'][0]
+        # check if the chunk represents the tensorsied "multimodal_combination" field
+        assert multi_combo_chunk['__field_name'] == 'my_combination_field'
+        assert multi_combo_chunk['__field_content'] == json.dumps(test_doc['my_combination_field'])
+        assert isinstance(multi_combo_chunk['__vector_my_combination_field'], list)
+        # Check if all filter fields are  there (inc. the non tensorised my_list):
+        assert multi_combo_chunk['my_combination_field'] == test_doc["my_combination_field"]
+
+        # # check index info. child fields needs to be keyword within each chunk
+        index_info = tensor_search.backend.get_index_info(config=self.config, index_name=self.index_name_1)
+        assert index_info.properties['my_combination_field']['properties']['image']["type"] == 'text'
+        assert index_info.properties['my_combination_field']['properties']['text']["type"] == 'text'
+        assert index_info.properties['__chunks']['properties']['my_combination_field']['properties']['text']["type"]   == 'keyword'
+        assert index_info.properties['__chunks']['properties']['my_combination_field']['properties']['image']["type"] == 'keyword'
+        assert index_info.properties['__chunks']['properties']['__vector_my_combination_field']['type']  == 'knn_vector'
+
 
