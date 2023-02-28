@@ -1,18 +1,18 @@
 ## Release 0.0.15
 
 ## New features 
-- Multimodal tensor combination (https://github.com/marqo-ai/marqo/pull/332, https://github.com/marqo-ai/marqo/pull/355). Combine image and text data into a single vector! Multimodal combination objects can be added as a Marqo field. This can be used to encode text metadata into image vectors. See usage [here](https://docs.marqo.ai/0.0.15/Advanced-Usage/document_fields/#multimodal-combination-object).
+- Multimodal tensor combination (https://github.com/marqo-ai/marqo/pull/332, https://github.com/marqo-ai/marqo/pull/355). Combine image and text data into a single vector! Multimodal combination objects can be added as Marqo document fields. This can be used to encode text metadata into image vectors. See usage [here](https://docs.marqo.ai/0.0.15/Advanced-Usage/document_fields/#multimodal-combination-object).
 
 ## Bug fixes
-- Fixed bug where CLIP device check wasn't behaving as expected (https://github.com/marqo-ai/marqo/pull/337)
-- CLIP utils set to use the OpenCLIP default tokenizer so that long text inputs are truncated correctly (https://github.com/marqo-ai/marqo/pull/351). 
+- Fixed bug that prevented CLIP's device check from behaving as expected (https://github.com/marqo-ai/marqo/pull/337)
+- CLIP utils is set to use the OpenCLIP default tokenizer so that long text inputs are truncated correctly (https://github.com/marqo-ai/marqo/pull/351). 
 
 
 # Release 0.0.14
 
 ## New features 
-- `use_existing_tensors` flag (https://github.com/marqo-ai/marqo/pull/335). Use existing Marqo vectors to autofill unchanged tensor fields. This lets you quickly add new metadata while minimising inference operations. See usage [here](https://docs.marqo.ai/0.0.14/API-Reference/documents/#query-parameters).
-- `image_download_headings` parameter (https://github.com/marqo-ai/marqo/pull/336). Index and search non-publicly available images. Add image download auth information to `add_documents` and `search` requests. See usage [here](https://docs.marqo.ai/0.0.14/API-Reference/image_downloads/).
+- `use_existing_tensors` flag (https://github.com/marqo-ai/marqo/pull/335). Use existing Marqo tensors to autofill unchanged tensor fields, for existing documents. This lets you quickly add new metadata while minimising inference operations. See usage [here](https://docs.marqo.ai/0.0.14/API-Reference/documents/#query-parameters).
+- `image_download_headers` parameter (https://github.com/marqo-ai/marqo/pull/336). Index and search non-publicly available images. Add image download auth information to `add_documents` and `search` requests. See usage [here](https://docs.marqo.ai/0.0.14/API-Reference/image_downloads/).
 
 ## Optimisations
 - The index cache is now updated in intervals of 2 seconds (https://github.com/marqo-ai/marqo/pull/333), rather than on every search. This reduces the pressure on Marqo-OS, allowing for greater search and indexing throughput. 
