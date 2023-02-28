@@ -161,7 +161,7 @@ def add_customer_field_properties(config: Config, index_name: str,
                 {"properties": {validation.validate_field_name(child_field_name): {"type":child_type}
                  for child_field_name, child_type in child_fields}}
         # update the new child fields if the multimodal_field already in it
-        elif multimodal_field in new_index_properties:
+        else:
             for child_field_name, child_type in child_fields:
                 new_index_properties[validation.validate_field_name(multimodal_field)]["properties"][child_field_name] = {"type":child_type}
 

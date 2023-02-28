@@ -475,7 +475,7 @@ def validate_mappings(mappings: dict):
     '''
     for field, field_mapping in mappings.items():
         validate_field_name(field)
-        if field_mapping["type"] not in constants.ALLOWED_MAPPINGS_TYPES:
+        if field_mapping["type"] not in constants.MARQO_OBJECT_TYPES:
             raise InvalidArgError(
                 f"The type `{field_mapping['type']}` in mappings for filed `{field}` is not supported."
                 f"Please check the type of your mappings."

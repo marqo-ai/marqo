@@ -124,7 +124,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
 
         assert (score_3 >= min(score_1, score_2)) and (score_3 <= max(score_1, score_2))
 
-    def test_multimodal_tensor_combiantion_tensor_value(self):
+    def test_multimodal_tensor_combination_tensor_value(self):
         tensor_search.create_vector_index(
             index_name=self.index_name_1, config=self.config, index_settings={
                 IndexSettingsField.index_defaults: {
@@ -273,12 +273,14 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                         "text_field" : "test-text-two.",
                         "image_field":"https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
                     }
-
             # ensure we only call multimodal-combination twice
             assert len(mock_multimodal_combination.call_args_list) == 2
 
-            return True
+            assert json.loads(requests.get(url = f"{self.endpoint}/{self.index_name_1}/_doc/123", verify=False).text)["found"] == True
+            assert json.loads(requests.get(url = f"{self.endpoint}/{self.index_name_1}/_doc/234", verify=False).text)["found"] == True
+            assert json.loads(requests.get(url = f"{self.endpoint}/{self.index_name_1}/_doc/534", verify=False).text)["found"] == True
 
+            return True
         assert run()
 
     def test_multimodal_field_content_dictionary_validation(self):
@@ -292,7 +294,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             })
 
         # invalid field_content int
-        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
+        res_0 = tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
             {
                 "combo_text_image": {
                     "A rider is riding a horse jumping over the barrier." : 0.5,
@@ -300,6 +302,9 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                 },
                 "_id": "123",
             }, ], mappings=self.mappings, auto_refresh=True)
+        assert res_0["errors"]
+        assert not json.loads(requests.get(url = f"{self.endpoint}/{self.index_name_1}/_doc/123", verify=False).text)["found"]
+
         try:
             tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="123")
             raise AssertionError
@@ -307,7 +312,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             pass
 
         # invalid field content dict
-        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
+        res_1 = tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
             {
                 "combo_text_image": {
                     "text_field": "A rider is riding a horse jumping over the barrier.",
@@ -316,6 +321,8 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                 },
                 "_id": "123",
             }, ], mappings=self.mappings, auto_refresh=True)
+        assert res_1["errors"]
+        assert not json.loads(requests.get(url = f"{self.endpoint}/{self.index_name_1}/_doc/123", verify=False).text)["found"]
         try:
             tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="123")
             raise AssertionError
@@ -323,7 +330,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             pass
 
         # invalid field name format
-        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
+        res_2 = tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
             {
                 "combo_text_image": {
                     "text_field" : "A rider is riding a horse jumping over the barrier.",
@@ -332,6 +339,8 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                 },
                 "_id": "123",
             }, ], mappings = self.mappings, auto_refresh=True)
+        assert res_2["errors"]
+        assert not json.loads(requests.get(url = f"{self.endpoint}/{self.index_name_1}/_doc/123", verify=False).text)["found"]
         try:
             tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="123")
             raise AssertionError
