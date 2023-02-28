@@ -55,3 +55,7 @@ class ModelNotInCacheError(S2InferenceError):
 # the other one is provided
 class IncompatibleModelDeviceError(S2InferenceError):
     pass
+
+
+class BatchInferenceSizeNotMatchError(S2InferenceError):
+    pass

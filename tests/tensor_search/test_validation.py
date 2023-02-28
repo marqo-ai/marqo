@@ -177,7 +177,7 @@ class TestValidation(unittest.TestCase):
 
     def test_validate_field_content_bad(self):
         bad_field_content = [
-            {123}, None, {"abw": "cjnk"}, ['not 100% strings', 134, 1.4, False],
+            {123}, None,['not 100% strings', 134, 1.4, False],
             ['not 100% strings', True]
         ]
         for non_tensor_field in (True, False):
@@ -421,3 +421,246 @@ class TestValidateIndexSettings(unittest.TestCase):
         assert settings == validation.validate_settings_object(settings)
         settings['index_defaults']['image_preprocessing']["path_method"] = "frcnn"
         assert settings == validation.validate_settings_object(settings)
+
+    def test_validate_mappings(self):
+        mappings = [
+             {
+                "my_combination_field": {
+                    "type": "multimodal_combination",
+                    "weights": {
+                        "some_text": 0.5
+                    }
+                }
+            },
+            {
+                "my_combination_field": {
+                    "type": "multimodal_combination",
+                    "weights": {
+                        "some_text": 0.5
+                    }
+                },
+                "other_field": {
+                    "type": "multimodal_combination",
+                    "weights": {
+                        "some_text": 0.7,
+                        "bugs": 200
+                    }
+                },
+            },
+            {},
+            {
+                " ": {
+                    "type": "multimodal_combination",
+                    "weights": {
+                        "some_text": -2
+                    }
+                }
+            },
+            {
+                "abcd ": {
+                    "type": "multimodal_combination",
+                    "weights": {
+                        "some_text": -4.6,
+                        "other_text": 22
+                    }
+                }
+            },
+            {
+                "abcd ": {
+                    "type": "multimodal_combination",
+                    "weights": {}
+                }
+            },
+            {
+                "abcd ": {
+                    "type": "multimodal_combination",
+                    "weights": {
+                        "some_text": 0,
+                    }
+                }
+            },
+        ]
+        for d in mappings:
+            assert d == validation.validate_mappings_object(d)
+
+
+    def test_validate_mappings_invalid(self):
+        mappings = [
+            {
+                "my_combination_field": {
+                    "type": "othertype",  # bad type
+                    "weights": {
+                        "some_text": 0.5
+
+                    }
+                }
+            },
+            {
+                "my_combination_field": {
+                    "type": "multimodal_combination",
+                    "non_weights": {  # unknown fieldname 'non_weights' config in multimodal_combination
+                        "some_text": 0.5
+                    }
+                }
+            },
+            {
+                "my_combination_field": {
+                    "type": "multimodal_combination",
+                    # missing weights for multimodal_combination
+                }
+            },
+            {
+                "my_combination_field": {
+                    "type": "multimodal_combination",
+                    "weights": {"blah": "woo"}  # non-number weights
+                }
+            },
+            {
+                "my_combination_field": {
+                    "type": "multimodal_combination",
+                    "weights": {"blah": "1.3"}  # non-number weights
+                }
+            },
+            {
+                "abcd ": {
+                    "type": "multimodal_combination",
+                    "weights": {
+                        "some_text": -4.6,
+                        "other_text": 22
+                    },
+                    "extra_field": {"blah"}  # unknown field
+                }
+            },
+            {
+                "abcd ": {
+                    "type": "multimodal_combination",
+                    "weights": {
+                        "some_text": -4.6,
+                        "other_text": 22,
+                        "nontext": True  # non-number
+                    },
+                }
+            },
+            { # needs more nesting
+                "type": "multimodal_combination",
+                "weights": {
+                    "some_text": 0.5
+                }
+            },
+            {
+                "my_combination_field": { # this dict is OK
+                    "type": "multimodal_combination",
+                    "weights": {
+                        "some_text": 0.5
+                    }
+                },
+                "other_field": {
+                    "type": "multimodal_combination",
+                    "weights": {
+                        "some_text": 0.7,
+                        "bugs": [0.5, -1.3]  # this is bad array
+                    }
+                },
+            },
+        ]
+        for mapping in mappings:
+            try:
+                validation.validate_mappings_object(mapping)
+                raise AssertionError
+            except InvalidArgError as e:
+                pass
+
+    def test_validate_multimodal_combination_object(self):
+        mappings = [
+            {
+                "type": "multimodal_combination",
+                "weights": {
+                    "some_text": 0.5
+                }
+            },
+            {
+                "type": "multimodal_combination",
+                "weights": {
+                    "some_text": -2
+                }
+            },
+            {
+                "type": "multimodal_combination",
+                "weights": {
+                    "some_text": -4.6,
+                    "other_text": 22
+                }
+            },
+            {
+                "type": "multimodal_combination",
+                "weights": {}
+            },
+            {
+                "type": "multimodal_combination",
+                "weights": {
+                    "some_text": 0,
+                }
+            },
+        ]
+        for d in mappings:
+            assert d == validation.validate_multimodal_combination_object(d)
+
+    def test_validate_multimodal_combination_object_invalid(self):
+        mappings = [
+            {
+                "my_combination_field": { # valid mappings dir, but not valid multimodal
+                    "type": "multimodal_combination",
+                    "weights": {
+                        "some_text": 0.5
+                    }
+                }
+            },
+            {
+                "type": "othertype",  # bad type
+                "weights": {
+                    "some_text": 0.5
+
+                }
+            },
+            {
+                "type": "multimodal_combination",
+                "non_weights": {  # unknown fieldname 'non_weights' config in multimodal_combination
+                    "some_text": 0.5
+                }
+            },
+            {
+                "type": "multimodal_combination",
+                # missing weights for multimodal_combination
+            },
+            {
+                "type": "multimodal_combination",
+                "weights": {"blah": "woo"}  # non-number weights
+            },
+            {
+                "type": "multimodal_combination",
+                "weights": {"blah": "1.3"}  # non-number weights
+            },
+            {
+                "type": "multimodal_combination",
+                "weights": {
+                    "some_text": -4.6,
+                    "other_text": 22
+                },
+                "extra_field": {"blah"}  # unknown field
+            },
+            {
+                "type": "multimodal_combination",
+                "weights": {
+                    "some_text": -4.6,
+                    "other_text": 22,
+                    "nontext": True  # non-number
+                },
+            }
+        ]
+        for mapping in mappings:
+            try:
+                validation.validate_multimodal_combination_object(mapping)
+                raise AssertionError
+            except InvalidArgError as e:
+                pass
+
