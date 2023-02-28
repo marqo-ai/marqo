@@ -23,7 +23,7 @@
 
 ## Bug fixes
 - Helpful validation errors for invalid index settings (https://github.com/marqo-ai/marqo/pull/330). Helpful error messages allow for a smoother getting-started experience. 
-- Automatic conversion to `fp32` when using `fp16` models on CPU  (https://github.com/marqo-ai/marqo/pull/331). This allows Marqo running on a CPU-only machine to index and search a `fp16` CLIP index (although we still recommend interacting with a `fp16` index with `device=CUDA` for the best results). 
+- Automatic precision conversion to `fp32` when using `fp16` models on CPU (https://github.com/marqo-ai/marqo/pull/331). 
 - Broadening of the types of image download errors gracefully handled. (https://github.com/marqo-ai/marqo/pull/321)
 
 
