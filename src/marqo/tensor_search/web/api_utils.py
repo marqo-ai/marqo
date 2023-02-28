@@ -87,3 +87,25 @@ def decode_image_download_headers(image_download_headers: Optional[str] = None) 
         except json.JSONDecodeError as e:
             raise InvalidArgError(f"Error parsing image_download_headers. Message: {e}")
 
+
+def decode_mappings(mappings: Optional[str] = None) -> dict:
+    """Decodes mappings string into a Python dict
+
+       Args:
+           mappings: JSON-serialised, URL encoded mappings object
+
+       Returns:
+           mappings as a dict
+
+       Raises:
+           InvalidArgError is there is trouble parsing the dictionary
+    """
+    if not mappings:
+        return dict()
+    else:
+        try:
+            as_str = urllib.parse.unquote_plus(mappings)
+            as_dict = json.loads(as_str)
+            return as_dict
+        except json.JSONDecodeError as e:
+            raise InvalidArgError(f"Error parsing mappings. Message: {e}")

@@ -97,6 +97,10 @@ class RequestType:
     CREATE = "CREATE"
 
 
+class MappingsObjectType:
+    multimodal_combination = "multimodal_combination"
+
+
 # Perhaps create a ThrottleType to differentiate thread_count and data_size throttling mechanisms
     
 

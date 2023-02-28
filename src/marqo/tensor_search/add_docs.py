@@ -6,7 +6,7 @@ import threading
 import warnings
 from typing import List, Tuple
 import PIL
-from marqo.s2_inference.clip_utils import _is_image, load_image_from_path
+from marqo.s2_inference import clip_utils
 
 
 def threaded_download_images(allocated_docs: List[dict], image_repo: dict,
@@ -40,14 +40,28 @@ def threaded_download_images(allocated_docs: List[dict], image_repo: dict,
         for field in list(doc):
             if field in non_tensor_fields:
                 continue
-            if isinstance(doc[field], str) and _is_image(doc[field]):
+            if isinstance(doc[field], str) and clip_utils._is_image(doc[field]):
                 if doc[field] in image_repo:
                     continue
                 try:
-                    image_repo[doc[field]] = load_image_from_path(doc[field], image_download_headers, timeout=TIMEOUT_SECONDS)
+                    image_repo[doc[field]] = clip_utils.load_image_from_path(doc[field], image_download_headers, timeout=TIMEOUT_SECONDS)
                 except PIL.UnidentifiedImageError as e:
                     image_repo[doc[field]] = e
                     continue
+            # For multimodal tensor combination
+            elif isinstance(doc[field], dict):
+                for sub_field in list(doc[field].values()):
+                    if isinstance(sub_field, str) and clip_utils._is_image(sub_field):
+                        if sub_field in image_repo:
+                            continue
+                        try:
+                            image_repo[sub_field] = clip_utils.load_image_from_path(sub_field, image_download_headers,
+                                                                          timeout=TIMEOUT_SECONDS)
+                        except PIL.UnidentifiedImageError as e:
+                            image_repo[sub_field] = e
+                            continue
+
+
 
 
 def download_images(docs: List[dict], thread_count: int, non_tensor_fields: Tuple, image_download_headers: dict) -> dict:
