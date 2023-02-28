@@ -36,7 +36,7 @@ __Notes__:
 - This is for marqo-os (Marqo OpenSearch) running locally. You can alternatively set
 `OPENSEARCH_URL` to  a remote Marqo OpenSearch cluster 
 
-## Redis set up
+## Redis set up (Needed for Options A and E)
 Marqo uses redis to handle concurrency throttling. Redis is automatically set up when running Marqo in docker (Options B-D), but if you are running Marqo locally on your machine (Options A and E), you have to set redis up yourself.
 
 ### Installation
