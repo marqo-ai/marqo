@@ -347,7 +347,7 @@ Marqo uses redis to handle concurrency throttling.
 
 See `Redis setup` in the [developer guide](https://github.com/marqo-ai/marqo/tree/mainline/src/marqo#developer-guide) to set up redis for throttling in your dev environment. 
 
-This is optional but if redis is not set up, you will see warnings containing `There is likely a problem with your redis instance or connection...`). To suppress these warnings, disable throttling completely with:
+This is optional but if redis is not set up, you will see warnings containing `There is likely a problem with your redis instance or connection...`. To suppress these warnings, disable throttling completely with:
 ```
 export MARQO_ENABLE_THROTTLING='FALSE'
 ```
