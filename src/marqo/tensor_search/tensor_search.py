@@ -255,7 +255,7 @@ def add_documents_orchestrator(
         non_tensor_fields = []
 
     if batch_size is None or batch_size == 0:
-        logger.info(f"batch_size={batch_size} and processes={processes} - not doing any marqo side batching")
+        logger.debug(f"batch_size={batch_size} and processes={processes} - not doing any marqo side batching")
         return add_documents(
             config=config, index_name=index_name, docs=docs, auto_refresh=auto_refresh,
             device=device, update_mode=update_mode, non_tensor_fields=non_tensor_fields,
@@ -267,7 +267,7 @@ def add_documents_orchestrator(
         # create beforehand or pull from the cache so it is upto date for the multi-processing
         _check_and_create_index_if_not_exist(config=config, index_name=index_name)
 
-        logger.info(f"batch_size={batch_size} and processes={processes} - using multi-processing")
+        logger.debug(f"batch_size={batch_size} and processes={processes} - using multi-processing")
         results = parallel.add_documents_mp(
             config=config, index_name=index_name, docs=docs,
             auto_refresh=auto_refresh, batch_size=batch_size, processes=processes,
@@ -286,7 +286,7 @@ def add_documents_orchestrator(
     else:
         if batch_size < 0:
             raise errors.InvalidArgError("Batch size can't be less than 1!")
-        logger.info(f"batch_size={batch_size} and processes={processes} - batching using a single process")
+        logger.debug(f"batch_size={batch_size} and processes={processes} - batching using a single process")
         return _batch_request(config=config, index_name=index_name, dataset=docs, device=device,
                               batch_size=batch_size, verbose=False, non_tensor_fields=non_tensor_fields,
                               use_existing_tensors=use_existing_tensors,
@@ -323,7 +323,7 @@ def _batch_request(config: Config, index_name: str, dataset: List[dict],
     def verbosely_add_docs(i, docs):
         t0 = timer()
 
-        logger.info(f"    batch {i}: beginning ingestion. ")
+        logger.debug(f"    batch {i}: beginning ingestion. ")
         res = add_documents(
             config=config, index_name=index_name,
             docs=docs, auto_refresh=False, device=device,
@@ -334,10 +334,10 @@ def _batch_request(config: Config, index_name: str, dataset: List[dict],
         total_batch_time = timer() - t0
         num_docs = len(docs)
 
-        logger.info(f"    batch {i}: ingested {num_docs} docs. Time taken: {(total_batch_time):.3f}. "
+        logger.debug(f"    batch {i}: ingested {num_docs} docs. Time taken: {(total_batch_time):.3f}. "
                     f"Average time per doc {(total_batch_time / num_docs):.3f}")
         if verbose:
-            logger.info(f"        results from indexing batch {i}: {res}")
+            logger.debug(f"        results from indexing batch {i}: {res}")
         return res
 
     results = [verbosely_add_docs(i, docs) for i, docs in enumerate(batched)]
