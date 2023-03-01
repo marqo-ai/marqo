@@ -2,7 +2,9 @@ import os
 import typing
 import functools
 import json
+from timeit import default_timer as timer
 import torch
+
 from marqo import errors
 from marqo.tensor_search import enums, configs
 from typing import (
@@ -292,3 +294,12 @@ def _get_marqo_root() -> str:
     marqo_base_dir = tensor_search_dir.parent.resolve()
     return str(marqo_base_dir)
 
+def add_timing(f, key: str = "processingTimeMs"):
+    @functools.wraps(f)
+    def wrap(*args, **kw):
+        t0 = timer()
+        r = f(*args, **kw)
+        time_taken = timer() - t0
+        r[key] = round(time_taken * 1000)
+        return r
+    return wrap
