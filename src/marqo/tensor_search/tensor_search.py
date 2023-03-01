@@ -448,7 +448,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
         ti_0 = timer()
         image_repo = add_docs.download_images(docs=docs, thread_count=20, non_tensor_fields=tuple(non_tensor_fields),
                                               image_download_headers=image_download_headers)
-        logger.info(f"          add_documents image download: took {(timer() - ti_0):.3f}s to concurrently download "
+        logger.debug(f"          add_documents image download: took {(timer() - ti_0):.3f}s to concurrently download "
                     f"images for {batch_size} docs using {image_download_thread_count} threads ")
 
     if update_mode == 'replace' and use_existing_tensors:
@@ -740,10 +740,10 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
     end_time_3 = timer()
     total_preproc_time = end_time_3 - start_time_3
-    logger.info(f"      add_documents pre-processing: took {(total_preproc_time):.3f}s total for {batch_size} docs, "
+    logger.debug(f"      add_documents pre-processing: took {(total_preproc_time):.3f}s total for {batch_size} docs, "
                 f"for an average of {(total_preproc_time / batch_size):.3f}s per doc.")
 
-    logger.info(f"          add_documents vectorise: took {(total_vectorise_time):.3f}s for {batch_size} docs, "
+    logger.debug(f"          add_documents vectorise: took {(total_vectorise_time):.3f}s for {batch_size} docs, "
                 f"for an average of {(total_vectorise_time / batch_size):.3f}s per doc.")
 
     if bulk_parent_dicts:
@@ -759,11 +759,11 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
         end_time_5 = timer()
         total_http_time = end_time_5 - start_time_5
         total_index_time = index_parent_response["took"] * 0.001
-        logger.info(
+        logger.debug(
             f"      add_documents roundtrip: took {(total_http_time):.3f}s to send {batch_size} docs (roundtrip) to Marqo-os, "
             f"for an average of {(total_http_time / batch_size):.3f}s per doc.")
 
-        logger.info(
+        logger.debug(
             f"          add_documents Marqo-os index: took {(total_index_time):.3f}s for Marqo-os to index {batch_size} docs, "
             f"for an average of {(total_index_time / batch_size):.3f}s per doc.")
     else:
@@ -1092,7 +1092,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
                                          num_highlights=1 if simplified_format else num_highlights)
             end_rerank_time = timer()
             total_rerank_time = end_rerank_time - start_rerank_time
-            logger.info(
+            logger.debug(
                 f"search ({search_method.lower()}) reranking using {reranker}: took {(total_rerank_time):.3f}s to rerank results.")
         except Exception as e:
             raise errors.BadRequestError(f"reranking failure due to {str(e)}")
@@ -1107,7 +1107,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
 
     time_taken = timer() - t0
     search_result["processingTimeMs"] = round(time_taken * 1000)
-    logger.info(f"search ({search_method.lower()}) completed with total processing time: {(time_taken):.3f}s.")
+    logger.debug(f"search ({search_method.lower()}) completed with total processing time: {(time_taken):.3f}s.")
 
     return search_result
 
@@ -1202,7 +1202,7 @@ def _lexical_search(
 
     end_preprocess_time = timer()
     total_preprocess_time = end_preprocess_time - start_preprocess_time
-    logger.info(f"search (lexical) pre-processing: took {(total_preprocess_time):.3f}s to process query.")
+    logger.debug(f"search (lexical) pre-processing: took {(total_preprocess_time):.3f}s to process query.")
 
     start_search_http_time = timer()
     search_res = HttpRequests(config).get(path=f"{index_name}/_search", body=body)
@@ -1211,9 +1211,9 @@ def _lexical_search(
     total_search_http_time = end_search_http_time - start_search_http_time
     total_os_process_time = search_res["took"] * 0.001
     num_results = len(search_res['hits']['hits'])
-    logger.info(
+    logger.debug(
         f"search (lexical) roundtrip: took {(total_search_http_time):.3f}s to send search query (roundtrip) to Marqo-os and received {num_results} results.")
-    logger.info(
+    logger.debug(
         f"  search (lexical) Marqo-os processing time: took {(total_os_process_time):.3f}s for Marqo-os to execute the search.")
 
     # SEARCH TIMER-LOGGER (post-processing)
@@ -1229,7 +1229,7 @@ def _lexical_search(
 
     end_postprocess_time = timer()
     total_postprocess_time = end_postprocess_time - start_postprocess_time
-    logger.info(
+    logger.debug(
         f"search (lexical) post-processing: took {(total_postprocess_time):.3f}s to format {len(res_list)} results.")
 
     return {'hits': res_list}
@@ -1424,7 +1424,7 @@ def _vector_text_search(
 
     end_preprocess_time = timer()
     total_preprocess_time = end_preprocess_time - start_preprocess_time
-    logger.info(f"search (tensor) pre-processing: took {(total_preprocess_time):.3f}s to vectorize and process query.")
+    logger.debug(f"search (tensor) pre-processing: took {(total_preprocess_time):.3f}s to vectorize and process query.")
 
     # SEARCH TIMER-LOGGER (roundtrip)
     start_search_http_time = timer()
@@ -1434,7 +1434,7 @@ def _vector_text_search(
     total_search_http_time = end_search_http_time - start_search_http_time
     total_os_process_time = response["took"] * 0.001
     num_responses = len(response["responses"])
-    logger.info(
+    logger.debug(
         f"search (tensor) roundtrip: took {(total_search_http_time):.3f}s to send {num_responses} search queries (roundtrip) to Marqo-os.")
 
     try:
@@ -1444,7 +1444,7 @@ def _vector_text_search(
         for i in range(len(vector_properties_to_search)):
             indiv_responses = response["responses"][i]['hits']['hits']
             indiv_query_time = response["responses"][i]["took"] * 0.001
-            logger.info(
+            logger.debug(
                 f"  search (tensor) Marqo-os processing time (search field = {list(vector_properties_to_search)[i]}): took {(indiv_query_time):.3f}s and received {len(indiv_responses)} hits.")
 
     except KeyError as e:
@@ -1463,7 +1463,7 @@ def _vector_text_search(
         except (KeyError, IndexError) as e2:
             raise e
 
-    logger.info(
+    logger.debug(
         f"  search (tensor) Marqo-os processing time: took {(total_os_process_time):.3f}s for Marqo-os to execute the search.")
 
     # SEARCH TIMER-LOGGER (post-processing)
@@ -1593,7 +1593,7 @@ def _vector_text_search(
 
     end_postprocess_time = timer()
     total_postprocess_time = end_postprocess_time - start_postprocess_time
-    logger.info(
+    logger.debug(
         f"search (tensor) post-processing: took {(total_postprocess_time):.3f}s to sort and format {len(completely_sorted)} results from Marqo-os.")
     return res
 
