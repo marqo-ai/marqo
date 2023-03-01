@@ -996,24 +996,35 @@ def bulk_search(query: BulkSearchQuery, device: str, marqo_config: config.Config
 
     fill_index_cache(marqo_config, [q.index for q in query.queries])
 
-    ## TODO: Add lexical queries to bulk msearch
-    tensor_queries = list(filter(lambda q: q.searchMethod == SearchMethod.TENSOR, query.queries))
-    lexical_queries = list(filter(lambda q: q.searchMethod == SearchMethod.LEXICAL, query.queries))
+    tensor_queries: Dict[int, BulkSearchQueryEntity] = dict(filter(lambda e: e[1].searchMethod == SearchMethod.TENSOR, enumerate(query.queries)))
+    lexical_queries: Dict[int, BulkSearchQueryEntity] = dict(filter(lambda e: e[1].searchMethod == SearchMethod.LEXICAL, enumerate(query.queries)))
 
     if len(lexical_queries) + len(tensor_queries) == 0:
         raise errors.InvalidArgError(f"Bulk search called with unknown search method(s)")
 
-    if len(tensor_queries) > 0:
+    lexical_search_results = {}
+    tensor_search_results = {}
+    if len(tensor_queries.values()) > 0:
         selected_device = marqo_config.indexing_device if device is None else device
-        search_results = _bulk_vector_text_search(marqo_config, query.queries, selected_device, simplified_format=simplified_format, number_of_highlights=number_of_highlights, return_doc_ids=return_doc_ids)
+        tensor_search_results = dict(zip(tensor_queries.keys(), _bulk_vector_text_search(
+            marqo_config, list(tensor_queries.values()), selected_device,
+            simplified_format=simplified_format,
+            number_of_highlights=number_of_highlights,
+            return_doc_ids=return_doc_ids
+        )))
 
-    if len(lexical_queries) > 0:
+    if len(lexical_queries.values()) > 0:
         # TODO: parallelise
-        search_results = [_lexical_search(
+        lexical_search_results = dict(zip(lexical_queries.keys(), [_lexical_search(
             config=marqo_config, index_name=q.index, text=q.q, result_count=q.limit, offset=q.offset,
             return_doc_ids=return_doc_ids, searchable_attributes=q.searchableAttributes, verbose=verbose,
             filter_string=q.filter, attributes_to_retrieve=q.attributesToRetrieve
-        ) for q in lexical_queries]
+        ) for q in lexical_queries.values()]))
+
+    # Recombine lexical and tensor in order
+    combined_results = list({**tensor_search_results, **lexical_search_results}.items())
+    combined_results.sort()
+    search_results = [r[1] for r in combined_results]
 
     for i, s in enumerate(search_results):
         q = query.queries[i]
@@ -1493,8 +1504,6 @@ def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity
             jobs.append(j)
             job_to_query_idx[j] = i
 
-        ## TODO: Must download images prior.
-
     ## 2. Vectorise against all queries
     ## TODO need go group VectorisedJobs with common parameters (i.e. combine v.content, aggregate by other params)
     vectorise_results: Dict[VectorisedJobs, List[float]] = {}
@@ -1562,8 +1571,10 @@ def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity
     # 6. Get documents back to each query, perform "gather" operation
     query_to_results: Dict[int, List[Dict]] = {}
     for qidx, count in query_to_body_count.items():
-        query_to_results[qidx] = responses[:count]
-        responses = responses[count:]
+        num_of_docs = count // 2
+        query_to_results[qidx] = responses[:num_of_docs]
+        responses = responses[num_of_docs:]
+
 
     results = []
     for qidx, result in query_to_results.items():
