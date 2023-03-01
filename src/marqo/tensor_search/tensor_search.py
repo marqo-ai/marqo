@@ -998,30 +998,26 @@ def bulk_search(query: BulkSearchQuery, device: str, marqo_config: config.Config
 
     fill_index_cache(marqo_config, [q.index for q in query.queries])
 
-    tensor_queries: Dict[int, BulkSearchQueryEntity] = dict(filter(lambda e: e[1].searchMethod == SearchMethod.TENSOR, enumerate(query.queries)))
-    lexical_queries: Dict[int, BulkSearchQueryEntity] = dict(filter(lambda e: e[1].searchMethod == SearchMethod.LEXICAL, enumerate(query.queries)))
+    tensor_queries = dict(filter(lambda e: e[1].searchMethod == SearchMethod.TENSOR, enumerate(query.queries)))
+    lexical_queries = dict(filter(lambda e: e[1].searchMethod == SearchMethod.LEXICAL, enumerate(query.queries)))
 
     if len(lexical_queries) + len(tensor_queries) == 0:
         raise errors.InvalidArgError(f"Bulk search called with unknown search method(s)")
 
-    lexical_search_results = {}
-    tensor_search_results = {}
-    if len(tensor_queries.values()) > 0:
-        selected_device = marqo_config.indexing_device if device is None else device
-        tensor_search_results = dict(zip(tensor_queries.keys(), _bulk_vector_text_search(
+    selected_device = marqo_config.indexing_device if device is None else device
+    tensor_search_results = dict(zip(tensor_queries.keys(), _bulk_vector_text_search(
             marqo_config, list(tensor_queries.values()), selected_device,
             simplified_format=simplified_format,
             number_of_highlights=number_of_highlights,
             return_doc_ids=return_doc_ids
         )))
 
-    if len(lexical_queries.values()) > 0:
-        # TODO: parallelise
-        lexical_search_results = dict(zip(lexical_queries.keys(), [_lexical_search(
-            config=marqo_config, index_name=q.index, text=q.q, result_count=q.limit, offset=q.offset,
-            return_doc_ids=return_doc_ids, searchable_attributes=q.searchableAttributes, verbose=verbose,
-            filter_string=q.filter, attributes_to_retrieve=q.attributesToRetrieve
-        ) for q in lexical_queries.values()]))
+    # TODO: combine lexical + tensor queries into /_msearch
+    lexical_search_results = dict(zip(lexical_queries.keys(), [_lexical_search(
+        config=marqo_config, index_name=q.index, text=q.q, result_count=q.limit, offset=q.offset,
+        return_doc_ids=return_doc_ids, searchable_attributes=q.searchableAttributes, verbose=verbose,
+        filter_string=q.filter, attributes_to_retrieve=q.attributesToRetrieve
+    ) for q in lexical_queries.values()]))
 
     # Recombine lexical and tensor in order
     combined_results = list({**tensor_search_results, **lexical_search_results}.items())
@@ -1042,10 +1038,9 @@ def bulk_search(query: BulkSearchQuery, device: str, marqo_config: config.Config
                 for hit in s["hits"]:
                     del hit["_highlights"]
 
-    result = {
+    return {
         "result": search_results
     }
-    return result
 
 
 def rerank(query: BulkSearchQueryEntity, result: Dict[str, Any], reranker: Union[str, Dict], device: str, num_highlights: int):
@@ -1484,6 +1479,9 @@ def gather_documents_from_response(resp):
 
 
 def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity], selected_device, raise_on_searchable_attribs=False, simplified_format=True, number_of_highlights: int = 3, return_doc_ids=False,  result_count: int = 5):
+    if len(queries) == 0:
+        return []
+
     start_preprocessing_time = timer()
     jobs: List[VectorisedJobs] = []
     job_to_query_idx: Dict[VectorisedJobs, int] = {} # Map job to index of query it came from
@@ -1571,20 +1569,15 @@ def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity
     start_postprocess_time = timer()
 
     # 6. Get documents back to each query, perform "gather" operation
-    query_to_results: Dict[int, List[Dict]] = {}
+    results = []
     for qidx, count in query_to_body_count.items():
         num_of_docs = count // 2
-        query_to_results[qidx] = responses[:num_of_docs]
-        responses = responses[num_of_docs:]
-
-
-    results = []
-    for qidx, result in query_to_results.items():
+        result = responses[:num_of_docs]
+        responses = responses[num_of_docs:] # remove docs from response for next query
         query = queries[qidx]
         gathered_docs = gather_documents_from_response(result)
         if query.boost is not None:
             gathered_docs = boost_score(gathered_docs, query.boost)
-
         docs_chunks_sorted = sort_chunks(gathered_docs)
 
         if simplified_format:
