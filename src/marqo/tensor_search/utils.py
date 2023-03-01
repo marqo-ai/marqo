@@ -2,7 +2,9 @@ import os
 import typing
 import functools
 import json
+from timeit import default_timer as timer
 import torch
+
 from marqo import errors
 from marqo.tensor_search import enums, configs
 from typing import (
@@ -254,3 +256,14 @@ def parse_lexical_query(text: str) -> Tuple[List[str], str]:
     optional_blob = optional_blob.replace('\\"', '"')
 
     return (required_terms, optional_blob)
+
+
+def add_timing(f, key: str = "processingTimeMs"):
+    @functools.wraps(f)
+    def wrap(*args, **kw):
+        t0 = timer()
+        r = f(*args, **kw)
+        time_taken = timer() - t0
+        r[key] = round(time_taken * 1000)
+        return r
+    return wrap
