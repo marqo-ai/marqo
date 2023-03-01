@@ -619,7 +619,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                     end_time = timer()
                     single_vectorise_call = end_time - start_time
                     total_vectorise_time += single_vectorise_call
-                    logger.debug(f"(4) TIME for single vectorise call: {(single_vectorise_call):.3f}s.")
+                    #logger.debug(f"(4) TIME for single vectorise call: {(single_vectorise_call):.3f}s.")
                 except (s2_inference_errors.UnknownModelError,
                         s2_inference_errors.InvalidModelPropertiesError,
                         s2_inference_errors.ModelLoadError) as model_error:
@@ -1827,7 +1827,7 @@ def vectorise_multimodal_combination_field(field: str, multimodal_object: Dict[s
         end_time = timer()
         multimodal_inference_call = end_time - start_time
         combo_vectorise_time_to_add += multimodal_inference_call
-        logger.debug(f"(4) TIME for `multimodal_inference_call` call: {(multimodal_inference_call):.3f}s.")
+        #logger.debug(f"(4) TIME for `multimodal_inference_call` call: {(multimodal_inference_call):.3f}s.")
     except (s2_inference_errors.UnknownModelError,
             s2_inference_errors.InvalidModelPropertiesError,
             s2_inference_errors.ModelLoadError) as model_error:
