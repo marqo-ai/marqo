@@ -343,33 +343,14 @@ Marqo is a community project with the goal of making tensor search accessible to
 5. If you update dependencies, make sure to delete the .tox dir and rerun.
 
 ## Redis set up
-Marqo uses redis to handle concurrency throttling. Redis is automatically set up when running Marqo in docker , but if you are running Marqo locally on your machine, you have to set redis up yourself.
+Marqo uses redis to handle concurrency throttling. 
 
-### Installation
-The redis-server version to install is redis 7.0.8. Install it using this command for Ubuntu 22.0.4:
-```
-apt-get update
-apt-get install redis-server -y
-```
+See `Redis setup` in the [developer guide](https://github.com/marqo-ai/marqo/tree/mainline/src/marqo#developer-guide) to set up redis for throttling in your dev environment. 
 
-If you are using an older version of Ubuntu, this may install an older version of redis. To get the latest redis version, run these commands instead:
+This is optional but if redis is not set up, you will see warnings containing `There is likely a problem with your redis instance or connection...`). To suppress these warnings, disable throttling completely with:
 ```
-apt install lsb-release
-curl -fsSL https://packages.redis.io/gpg | gpg --dearmor -o /usr/share/keyrings/redis-archive-keyring.gpg
-echo "deb [signed-by=/usr/share/keyrings/redis-archive-keyring.gpg] https://packages.redis.io/deb $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/redis.list
-apt-get update
-apt-get install redis-server -y
-``` 
-
-### Running redis
-To start up redis, simply run the command:
+export MARQO_ENABLE_THROTTLING='FALSE'
 ```
-redis-server /etc/redis/redis.conf
-```
-
-The `/etc/redis/redis.conf` configuration file should have been automatically created upon the redis installation step.
-
-Note: If you do not have redis set up properly, Marqo will still run as normal, but throttling will be disabled.
 
 ## Merge instructions:
 
