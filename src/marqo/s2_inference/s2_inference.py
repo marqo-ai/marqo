@@ -12,6 +12,7 @@ import torch
 from datetime import datetime
 import psutil
 from marqo.s2_inference.constants import RAM_THRESHOLD, CUDA_THRESHOLD, MODEL_TYPE_SIZE_MAPPING
+import gc
 
 logger = get_logger(__name__)
 
@@ -115,6 +116,8 @@ def device_memory_manage(model_name:str, model_properties: dict, device:str) -> 
                                       key=lambda x: available_models[x]["time_stamp"], reverse=True)
         for key in sorted_key_in_device:
             del available_models[key]
+            if device.startswith("cpu"):
+                gc.collect()
             logger.info(f"Ejecting model = `{key.split('||')[0]}` from device = `{device}` to save space for model = `{model_name}`.")
             if check_device_memory_status(device, model_size):
                 return True
