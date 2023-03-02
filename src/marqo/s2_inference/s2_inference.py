@@ -107,7 +107,7 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
 
 
 def device_memory_manage(model_name:str, model_properties: dict, device:str) -> None:
-    model_size = load_model_properties.get("model_size", MODEL_TYPE_SIZE_MAPPING.get(model_properties["type"], 1))
+    model_size = model_properties.get("model_size", MODEL_TYPE_SIZE_MAPPING.get(model_properties["type"], 1))
     if check_device_memory_status(device, model_size):
         return True
     else:
