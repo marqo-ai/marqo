@@ -137,8 +137,9 @@ def check_device_memory_status(device:str, model_size:Union[float, int] = 1):
         logger.warning(f"Unable to check the device cache for device=`{device}`. The model loading will proceed"
                        f"without device cache check. This might break down Marqo if too many models are loaded.")
         return True
-
-    return used_memory + model_size < available_memory
+    print(used_memory + model_size)
+    print(available_memory)
+    return (used_memory + model_size) < available_memory
 
 
 def _validate_model_properties(model_name: str, model_properties: dict) -> dict:
