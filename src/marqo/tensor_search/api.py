@@ -114,7 +114,7 @@ def create_index(index_name: str, settings: Dict = None, marqo_config: config.Co
 @throttle(RequestType.SEARCH)
 @add_timing
 def bulk_search(query: BulkSearchQuery, device: str = Depends(api_validation.validate_device), marqo_config: config.Config = Depends(generate_config)):
-    return tensor_search.bulk_search(query, device, marqo_config)
+    return tensor_search.bulk_search(query, marqo_config, device=device)
 
 @app.post("/indexes/{index_name}/search")
 @throttle(RequestType.SEARCH)

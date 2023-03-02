@@ -990,7 +990,7 @@ def refresh_index(config: Config, index_name: str):
 
 
 @add_timing
-def bulk_search(query: BulkSearchQuery, device: str, marqo_config: config.Config, reranker: Union[str, Dict] = None, simplified_format=True, number_of_highlights: int = 3, return_doc_ids=False, verbose: bool = True):
+def bulk_search(query: BulkSearchQuery, marqo_config: config.Config, reranker: Union[str, Dict] = None, simplified_format=True, number_of_highlights: int = 3, return_doc_ids=False, verbose: bool = True, device=None):
     errs = [validate_query_input(q) for q in query.queries]
     if any(errs):
         err = next(e for e in errs if e is not None)
@@ -1004,9 +1004,8 @@ def bulk_search(query: BulkSearchQuery, device: str, marqo_config: config.Config
     if len(lexical_queries) + len(tensor_queries) == 0:
         raise errors.InvalidArgError(f"Bulk search called with unknown search method(s)")
 
-    selected_device = marqo_config.indexing_device if device is None else device
     tensor_search_results = dict(zip(tensor_queries.keys(), _bulk_vector_text_search(
-            marqo_config, list(tensor_queries.values()), selected_device,
+            marqo_config, list(tensor_queries.values()),
             simplified_format=simplified_format,
             number_of_highlights=number_of_highlights,
             return_doc_ids=return_doc_ids
@@ -1478,13 +1477,15 @@ def gather_documents_from_response(resp):
     return gathered_docs
 
 
-def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity], selected_device, raise_on_searchable_attribs=False, simplified_format=True, number_of_highlights: int = 3, return_doc_ids=False,  result_count: int = 5):
+def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity], device=None, raise_on_searchable_attribs=False, simplified_format=True, number_of_highlights: int = 3, return_doc_ids=False,  result_count: int = 5):
     if len(queries) == 0:
         return []
 
     start_preprocessing_time = timer()
     jobs: List[VectorisedJobs] = []
     job_to_query_idx: Dict[VectorisedJobs, int] = {} # Map job to index of query it came from
+
+    selected_device = config.indexing_device if device is None else device
 
     ## 1. Pre-process inputs ready for s2_inference.vectorise
     for i in range(len(queries)):
@@ -1560,7 +1561,7 @@ def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity
 
     aggregate_body = [line for body in query_to_body_parts.values() for line in body]
     if not aggregate_body:
-        return {"hits": []}
+        return []
 
     logger.info(f"search (tensor) pre-processing: took {(timer() - start_preprocessing_time):.3f}s to vectorize and process query.")
 
