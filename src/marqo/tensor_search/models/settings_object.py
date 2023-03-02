@@ -8,6 +8,7 @@ settings_schema = {
         NsFields.index_defaults,
         NsFields.number_of_shards
     ],
+    "additionalProperties": False,
     "properties": {
         NsFields.index_defaults: {
             "type": "object",
@@ -18,6 +19,7 @@ settings_schema = {
                 NsFields.text_preprocessing,
                 NsFields.image_preprocessing
             ],
+            "additionalProperties": False,
             "properties": {
                 NsFields.treat_urls_and_pointers_as_images: {
                     "type": "boolean",
