@@ -132,7 +132,7 @@ def check_device_memory_status(device:str, model_size:Union[float, int] = 1):
         used_memory = torch.cuda.memory_allocated(device) / 1024 ** 3
     elif device.startswith("cpu"):
         available_memory = psutil.virtual_memory()[0] / 1024 ** 3 * RAM_THRESHOLD
-        used_memory = psutil.virtual_memory()[0] - psutil.virtual_memory()[1] / 1024 ** 3
+        used_memory = (psutil.virtual_memory()[0] - psutil.virtual_memory()[1] / 1024) ** 3
     else:
         logger.warning(f"Unable to check the device cache for device=`{device}`. The model loading will proceed"
                        f"without device cache check. This might break down Marqo if too many models are loaded.")
