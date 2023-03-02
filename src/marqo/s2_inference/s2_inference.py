@@ -13,6 +13,7 @@ from datetime import datetime
 import psutil
 from marqo.s2_inference.constants import RAM_THRESHOLD, CUDA_THRESHOLD, MODEL_TYPE_SIZE_MAPPING
 import gc
+import time
 
 logger = get_logger(__name__)
 
@@ -123,6 +124,7 @@ def device_memory_manage(model_name:str, model_properties: dict, device:str) -> 
                 return True
 
         # Raise an error if we still can't find enough space after we eject all the models
+        time.sleep(5)
         if check_device_memory_status(device, model_size) is False:
             raise ModelCacheManageError(f"Marqo CANNOT find enough space to load model = `{model_name}` in device = `{device}`.\n"
                                         f"Marqo tried to eject all the models on this device = `{device}` but still can't enough space. \n"
