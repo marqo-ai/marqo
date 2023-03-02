@@ -89,7 +89,7 @@ def construct_authorized_url(url_base: str, username: str, password: str) -> str
     return f"{http_part}{http_sep}{username}:{password}@{domain_part}"
 
 
-def contextualise_filter(filter_string: str, simple_properties: typing.Iterable) -> str:
+def contextualise_filter(filter_string: Optional[str], simple_properties: typing.Iterable) -> str:
     """adds the chunk prefix to the start of properties found in simple string
 
     This allows for filtering within chunks.
@@ -102,6 +102,8 @@ def contextualise_filter(filter_string: str, simple_properties: typing.Iterable)
     Returns:
         a string where the properties are referenced as children of a chunk.
     """
+    if filter_string is None:
+        return ''
     contextualised_filter = filter_string
     for field in simple_properties:
         if ' ' in field:
