@@ -119,7 +119,8 @@ def device_memory_manage(model_name:str, model_properties: dict, device:str) -> 
             del available_models[key]
             if device.startswith("cpu"):
                 gc.collect()
-            logger.info(f"Ejecting model = `{key.split('||')[0]}` from device = `{device}` to save space for model = `{model_name}`.")
+            print("Currently used memory:", (psutil.virtual_memory()[0] - psutil.virtual_memory()[1]) / 1024 ** 3)
+            logger.info(f"Eject model = `{key.split('||')[0]}` from device = `{device}` to save space for model = `{model_name}`.")
             if check_device_memory_status(device, model_size):
                 return True
 
