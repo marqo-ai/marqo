@@ -124,6 +124,8 @@ def device_memory_manage(model_name:str, model_properties: dict, device:str) -> 
                 return True
 
         # Raise an error if we still can't find enough space after we eject all the models
+        logger.info(f"Marqo eject all the models to load model = `{model_name}` in device = `{device}`.\n"
+                    f"Please wait for 5 seconds to release the memory.")
         time.sleep(5)
         if check_device_memory_status(device, model_size) is False:
             raise ModelCacheManageError(f"Marqo CANNOT find enough space to load model = `{model_name}` in device = `{device}`.\n"
