@@ -9,7 +9,7 @@ from marqo.s2_inference.configs import get_default_device, get_default_normaliza
 from marqo.s2_inference.types import *
 from marqo.s2_inference.logger import get_logger
 import torch
-from datetime import datetime
+import datetime
 import psutil
 from marqo.s2_inference.constants import RAM_THRESHOLD, CUDA_THRESHOLD, MODEL_TYPE_SIZE_MAPPING
 import time
@@ -87,7 +87,7 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
                              normalize_embeddings: bool) -> None:
     """loads the model if it is not already loaded
     """
-    time_stamp = datetime.now()
+    time_stamp = datetime.datetime.now()
     if model_cache_key not in available_models:
         device_memory_manage(model_name, validated_model_properties, device)
         try:
@@ -103,7 +103,7 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
                 f"and the model has valid access permission. ")
     else:
         logger.debug(f'renew {model_name} on device {device} with new time={time_stamp}.')
-        available_models[model_cache_key]["time_stamp"] = datetime.now()
+        available_models[model_cache_key]["time_stamp"] = time_stamp
 
 
 def device_memory_manage(model_name:str, model_properties: dict, device:str) -> None:

@@ -268,7 +268,7 @@ def load_sbert_cross_encoder_model(model_name: str, device: str = 'cpu', max_len
                 if max_length > model_max_len:
                     model.max_length = model_max_len
                     logger.warning(f"specified max_length of {max_length} is greater than model max length of {model_max_len}, setting to model max length")
-        available_models[model_cache_key] ={"model": model, "time_stamp" : datetime.now()}
+        available_models[model_cache_key] ={"model": model, "time_stamp" : datetime.datetime.now()}
 
     return {'model':model}
 
@@ -295,7 +295,7 @@ def load_hf_cross_encoder_model(model_name: str, device: str = 'cpu') -> Dict:
         logger.info(f"loading {model_name} on device {device} and adding to cache...")    
         model = AutoModelForSequenceClassification.from_pretrained(model_name).to(device)
         tokenizer = AutoTokenizer.from_pretrained(model_name)
-        available_models[model_cache_key] = {"model":(model, tokenizer), "time_stamp": datetime.now()}
+        available_models[model_cache_key] = {"model":(model, tokenizer), "time_stamp": datetime.datetime.now()}
 
     model.eval()
     
@@ -320,7 +320,7 @@ def load_owl_vit(model_name: str, device: str = 'cpu') -> Dict:
     else:
         processor = OwlViTProcessor.from_pretrained(model_name)
         model = OwlViTForObjectDetection.from_pretrained(model_name).to(device)
-        available_models[model_cache_key] = {"model": (model, processor), "time_stamp" : datetime.now()}
+        available_models[model_cache_key] = {"model": (model, processor), "time_stamp" : datetime.datetime.now()}
 
     model.eval()
 

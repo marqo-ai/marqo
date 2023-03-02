@@ -5,7 +5,6 @@ import PIL
 import numpy as np
 import torch
 import torchvision
-
 from marqo.s2_inference.s2_inference import available_models,_create_model_cache_key
 from marqo.s2_inference.s2_inference import get_logger
 from marqo.s2_inference.types import Dict, List, Union, ImageType, Tuple, ndarray, Literal
@@ -213,7 +212,7 @@ class PatchifyModel:
             self.model, self.preprocess = func(self.model_name, self.device)
 
             available_models[model_cache_key] = {"model":(self.model, self.preprocess),
-                                                 "time_stampe" : datetime.now()}
+                                                 "time_stampe" : datetime.datetime.now()}
 
         else:
             self.model, self.preprocess = available_models[model_cache_key]["model"]
