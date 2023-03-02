@@ -52,7 +52,7 @@ from marqo.tensor_search import utils, backend, validation, configs, parallel, a
 from marqo.tensor_search.formatting import _clean_doc
 from marqo.tensor_search.index_meta_cache import get_cache, get_index_info
 from marqo.tensor_search import index_meta_cache
-from marqo.tensor_search.models.api_models import BulkSearchQueryEntity, VectorisedJobs, BulkSearchQuery
+from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQueryEntity, VectorisedJobs, VectorisedJobPointer, Qidx, JHash
 from marqo.tensor_search.models.index_info import IndexInfo
 from marqo.tensor_search import constants
 from marqo.tensor_search.utils import add_timing
@@ -1476,15 +1476,35 @@ def gather_documents_from_response(resp):
 
     return gathered_docs
 
+def assign_query_to_vector_job(q, jobs, content, index_info, device) -> VectorisedJobPointer:
+    vector_job = VectorisedJobs(
+        model_name=index_info.model_name,
+        model_properties=_get_model_properties(index_info),
+        content=content,
+        device=device,
+        normalize_embeddings=index_info.index_settings['index_defaults']['normalize_embeddings'],
+        image_download_headers=q.image_download_headers
+    )
+    # If exists, add content to vector job. Otherwise create new
+    if jobs.get(vector_job.groupby_key()) is not None:
+        j = jobs.get(vector_job.groupby_key())
+        ptr = j.add_content(content)
+    else:
+        jobs[vector_job.groupby_key()] = vector_job
+        ptr = VectorisedJobPointer(
+            job_hash=vector_job.groupby_key(),
+            start_idx=0,
+            end_idx=len(vector_job.content)
+        )
+    return ptr
 
 def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity], device=None, raise_on_searchable_attribs=False, simplified_format=True, number_of_highlights: int = 3, return_doc_ids=False,  result_count: int = 5):
     if len(queries) == 0:
         return []
 
     start_preprocessing_time = timer()
-    jobs: List[VectorisedJobs] = []
-    job_to_query_idx: Dict[VectorisedJobs, int] = {} # Map job to index of query it came from
-
+    jobs: Dict[JHash, VectorisedJobs] = {} # job_hash to job
+    qidx_to_job: Dict[Qidx, VectorisedJobPointer] = {}
     selected_device = config.indexing_device if device is None else device
 
     ## 1. Pre-process inputs ready for s2_inference.vectorise
@@ -1492,40 +1512,27 @@ def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity
         q = queries[i]
         index_info = get_index_info(config=config, index_name=q.index)
         to_be_vectorised: List[List[str]] = construct_vector_input_batches(q.q, index_info)
-        q_jobs = list(map(lambda content: VectorisedJobs(
-            model_name=index_info.model_name,
-            model_properties=_get_model_properties(index_info),
-            content=to_be_vectorised,
-            device=selected_device,
-            normalize_embeddings=index_info.index_settings['index_defaults']['normalize_embeddings'],
-            image_download_headers=q.image_download_headers
-        ),  to_be_vectorised))
-
-        for j in q_jobs:
-            jobs.append(j)
-            job_to_query_idx[j] = i
+        qidx_to_job[i] = assign_query_to_vector_job(q, jobs, to_be_vectorised, index_info, selected_device)
 
     ## 2. Vectorise against all queries
-    ## TODO need go group VectorisedJobs with common parameters (i.e. combine v.content, aggregate by other params)
-    vectorise_results: Dict[VectorisedJobs, List[float]] = {}
-    for v in jobs:
-        vectorise_results[v] = functools.reduce(
+    job_ptr_to_vectors: Dict[JHash, List[float]] = {}
+    for idx, v in jobs.items():
+        job_ptr_to_vectors[idx] = functools.reduce(
             lambda x, y: x + y,
             [s2_inference.vectorise(
                 model_name=v.model_name, model_properties=v.model_properties,
                 content=batch, device=v.device,
                 normalize_embeddings=v.normalize_embeddings,
                 image_download_headers=v.image_download_headers
-            ) for batch in v.content]
+            ) for batch in v.content] # Todo: check if should be batching.
         )
 
-    ## 3. Get vectors back from batch, into each query.
-    query_to_vectors: Dict[int, List[List[float]]] = defaultdict(list)
-    for job, result in vectorise_results.items():
-        qidx = job_to_query_idx[job]
-        query_to_vectors[qidx].append(result)
+    ## 3. Get vectors back from batch, process `ordered_queries` into each query.
+    qidx_to_vectors: Dict[Qidx, List[List[float]]] = defaultdict(list)
+    for qidx, ptr in qidx_to_job.items():
+        vectors = job_ptr_to_vectors[ptr.job_hash][ptr.start_idx: ptr.end_idx]
+        qidx_to_vectors[qidx].append(vectors)
 
-    for qidx, vectors in query_to_vectors.items():
         q = queries[qidx]
         ordered_queries = list(q.q.items()) if isinstance(q.q, dict) else None
         if ordered_queries:
@@ -1537,13 +1544,13 @@ def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity
                 norm = np.linalg.norm(vectorised_text, axis=-1, keepdims=True)
                 if norm > 0:
                     vectorised_text /= np.linalg.norm(vectorised_text, axis=-1, keepdims=True)
-            query_to_vectors[qidx] = list(vectorised_text)
+            qidx_to_vectors[qidx] = list(vectorised_text)
         else:
-            query_to_vectors[qidx] = vectors[0]
+            qidx_to_vectors[qidx] = vectors[0]
 
-    ## 4. Create POST body for Opensearch _msearch
-    query_to_body_parts: Dict[int, List[Dict]] = {}
-    query_to_body_count: Dict[int, int] = {}
+    ## 4. Create msearch request bodies and combine to aggregate.
+    query_to_body_parts: Dict[Qidx, List[Dict]] = {}
+    query_to_body_count: Dict[Qidx, int] = {} # Keep track of count, so we can separate after msearch call.
     for qidx, qq in enumerate(queries):
         index_info = get_index_info(config=config, index_name=q.index)
         if q.filter is not None:
@@ -1554,7 +1561,7 @@ def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity
             contextualised_filter = ''
 
         vector_properties_to_search = get_vector_properties_to_search(qq.searchableAttributes, index_info, raise_on_searchable_attribs)
-        vectorised_text = query_to_vectors[qidx][0] ## TODO risk: We shouldn't need to [0] here
+        vectorised_text = qidx_to_vectors[qidx]
         body = construct_msearch_body_elements(vector_properties_to_search, qq.offset, q.filter, index_info, qq.limit, vectorised_text, qq.attributesToRetrieve, qq.index, contextualised_filter)
         query_to_body_parts[qidx] = body
         query_to_body_count[qidx] = len(body)
@@ -1565,7 +1572,7 @@ def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity
 
     logger.info(f"search (tensor) pre-processing: took {(timer() - start_preprocessing_time):.3f}s to vectorize and process query.")
 
-    ## 5. Bulk post to /_msearch
+    ## 5. POST aggregate  to /_msearch
     responses = bulk_msearch(config, aggregate_body)
     start_postprocess_time = timer()
 
