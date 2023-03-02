@@ -108,7 +108,7 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
 
 
 def device_memory_manage(model_name:str, model_properties: dict, device:str) -> None:
-    model_size = MODEL_TYPE_SIZE_MAPPING.get(model_properties["type"], 1)
+    model_size = load_model_properties.get("model_size", MODEL_TYPE_SIZE_MAPPING.get(model_properties["type"], 1))
     if check_device_memory_status(device, model_size):
         return True
     else:
@@ -124,14 +124,11 @@ def device_memory_manage(model_name:str, model_properties: dict, device:str) -> 
             if check_device_memory_status(device, model_size):
                 return True
 
-        # Raise an error if we still can't find enough space after we eject all the models
-        logger.info(f"Marqo eject all the models to load model = `{model_name}` in device = `{device}`.\n"
-                    f"Please wait for 5 seconds to release the memory.")
-        time.sleep(5)
         if check_device_memory_status(device, model_size) is False:
-            raise ModelCacheManageError(f"Marqo CANNOT find enough space to load model = `{model_name}` in device = `{device}`.\n"
+            raise logger.warning(f"Marqo CANNOT find enough space to load model = `{model_name}` in device = `{device}`.\n"
                                         f"Marqo tried to eject all the models on this device = `{device}` but still can't find enough space. \n"
                                         f"Please change a smaller model in the settings.")
+        return True
 
 
 def check_device_memory_status(device:str, model_size:Union[float, int] = 1):
@@ -145,8 +142,6 @@ def check_device_memory_status(device:str, model_size:Union[float, int] = 1):
         logger.warning(f"Unable to check the device cache for device=`{device}`. The model loading will proceed"
                        f"without device cache check. This might break down Marqo if too many models are loaded.")
         return True
-    #print(used_memory + model_size)
-    #print(available_memory)
     return (used_memory + model_size) < available_memory
 
 
