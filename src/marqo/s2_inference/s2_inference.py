@@ -2,16 +2,21 @@
 The functions defined here would have endpoints, later on.
 """
 import numpy as np
-from marqo.s2_inference.errors import VectoriseError, InvalidModelPropertiesError, ModelLoadError, UnknownModelError, ModelNotInCacheError
+from marqo.s2_inference.errors import VectoriseError, InvalidModelPropertiesError, ModelLoadError, UnknownModelError, ModelNotInCacheError, ModelCacheManageError
 from PIL import UnidentifiedImageError
 from marqo.s2_inference.model_registry import load_model_properties
 from marqo.s2_inference.configs import get_default_device, get_default_normalization, get_default_seq_length
 from marqo.s2_inference.types import *
 from marqo.s2_inference.logger import get_logger
 import torch
+from datetime import datetime
+import psutil
+from constants import RAM_THRESHOLD, CUDA_THRESHOLD, MODEL_TYPE_SIZE_MAPPING
 
 logger = get_logger(__name__)
 
+# The avaiable has the structure:
+# {"model_cache_key_1":{"model" : model_object, "time_stamp": time}}
 available_models = dict()
 MODEL_PROPERTIES = load_model_properties()
 
@@ -43,7 +48,7 @@ def vectorise(model_name: str, content: Union[str, List[str]], model_properties:
     _update_available_models(model_cache_key, model_name, validated_model_properties, device, normalize_embeddings)
 
     try:
-        vectorised = available_models[model_cache_key].encode(content, normalize=normalize_embeddings, **kwargs)
+        vectorised = available_models[model_cache_key]["model"].encode(content, normalize=normalize_embeddings, **kwargs)
     except UnidentifiedImageError as e:
         raise VectoriseError(str(e)) from e
 
@@ -81,17 +86,59 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
                              normalize_embeddings: bool) -> None:
     """loads the model if it is not already loaded
     """
+    time_stamp = datetime.now()
     if model_cache_key not in available_models:
+        device_memory_manage(model_name, validated_model_properties, device)
         try:
-            available_models[model_cache_key] = _load_model(model_name,
-                                                            validated_model_properties, device=device)
-            logger.info(f'loaded {model_name} on device {device} with normalization={normalize_embeddings}')
+            available_models[model_cache_key] = {"model":_load_model(model_name,
+                                                            validated_model_properties, device=device),
+                                                 "time_stamp": time_stamp}
+            logger.info(f'loaded {model_name} on device {device} with normalization={normalize_embeddings} at time={time_stamp}.')
         except:
             raise ModelLoadError(
                 f"Unable to load model={model_name} on device={device} with normalization={normalize_embeddings}. "
                 f"If you are trying to load a custom model, "
                 f"please check that model_properties={validated_model_properties} is correct "
                 f"and the model has valid access permission. ")
+    else:
+        logger.debug(f'renew {model_name} on device {device} with new time={time_stamp}.')
+        available_models[model_cache_key]["time_stamp"] = datetime.now()
+
+
+def device_memory_manage(model_name:str, model_properties: dict, device:str) -> None:
+    model_size = MODEL_TYPE_SIZE_MAPPING.get(model_properties["type"], 1)
+    if check_device_memory_status(device, model_size):
+        return True
+    else:
+        model_cache_key_in_device = [key for key in list(available_models) if key.endswith(device)]
+        sorted_key_in_device = sorted(model_cache_key_in_device,
+                                      key=available_models[model_cache_key_in_device]["time_stamp"], reverse=True)
+        for key in sorted_key_in_device:
+            del available_models[key]
+            logger.info(f"Ejecting model = `{key.split('||')[0]}` from device = `{device}` to save space for model = `{model_name}`.")
+            if check_device_memory_status(device, model_size):
+                return True
+
+        # Raise an error if we still can't find enough space after we eject all the models
+        if check_device_memory_status(device, model_size) is False:
+            raise ModelCacheManageError(f"Marqo CANNOT find enough space to load model = `{model_name}` in device = `{device}`.\n"
+                                        f"Marqo tried to eject all the models on this device = `{device}` but still can't enough space. \n"
+                                        f"Please change a smaller model in the settings.")
+
+
+def check_device_memory_status(device:str, model_size:Union[float, int] = 1):
+    if device.startswith("cuda"):
+        available_memory = torch.cuda.get_device_properties(device).total_memory / 1024 ** 3 * CUDA_THRESHOLD
+        used_memory = torch.cuda.memory_allocated(device) / 1024 ** 3
+    elif device.startswith("cpu"):
+        available_memory = psutil.virtual_memory()[0] / 1024 ** 3 * RAM_THRESHOLD
+        used_memory = psutil.virtual_memory()[0] - psutil.virtual_memory()[1] / 1024 ** 3
+    else:
+        logger.warning(f"Unable to check the device cache for device=`{device}`. The model loading will proceed"
+                       f"without device cache check. This might break down Marqo if too many models are loaded.")
+        return True
+
+    return used_memory + model_size < available_memory
 
 
 def _validate_model_properties(model_name: str, model_properties: dict) -> dict:
