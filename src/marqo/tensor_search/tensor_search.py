@@ -990,7 +990,7 @@ def refresh_index(config: Config, index_name: str):
 
 
 @add_timing
-def bulk_search(query: BulkSearchQuery, marqo_config: config.Config, reranker: Union[str, Dict] = None, simplified_format=True, number_of_highlights: int = 3, return_doc_ids=False, verbose: bool = True, device=None):
+def bulk_search(query: BulkSearchQuery, marqo_config: config.Config, reranker: Union[str, Dict] = None, simplified_format=True, number_of_highlights: int = 3, return_doc_ids=False, verbose: bool = True, device=None, raise_on_searchable_attribs: bool=False):
     errs = [validate_query_input(q) for q in query.queries]
     if any(errs):
         err = next(e for e in errs if e is not None)
@@ -1008,7 +1008,9 @@ def bulk_search(query: BulkSearchQuery, marqo_config: config.Config, reranker: U
             marqo_config, list(tensor_queries.values()),
             simplified_format=simplified_format,
             number_of_highlights=number_of_highlights,
-            return_doc_ids=return_doc_ids
+            return_doc_ids=return_doc_ids,
+            device=device,
+            raise_on_searchable_attribs=raise_on_searchable_attribs
         )))
 
     # TODO: combine lexical + tensor queries into /_msearch
@@ -1033,9 +1035,6 @@ def bulk_search(query: BulkSearchQuery, marqo_config: config.Config, reranker: U
         logger.info("reranking using {}".format(reranker))
         for i, s in enumerate(search_results):
             rerank(query.queries[i], s, reranker, device, 1 if simplified_format else number_of_highlights)
-            if not query.queries[0].highlights:
-                for hit in s["hits"]:
-                    del hit["_highlights"]
 
     return {
         "result": search_results
@@ -1083,7 +1082,7 @@ def validate_query_input(q: BulkSearchQueryEntity) -> Optional[errors.MarqoError
     if not check_upper:
         raise errors.IllegalRequestedDocCount(
             f"The search result limit + offset must be less than or equal to the MARQO_MAX_RETRIEVABLE_DOCS limit of"
-            f"[{max_docs_limit}]. Marqo received search result limit of `{q.query_limit}` and offset of `{q.offset}`."
+            f"[{max_docs_limit}]. Marqo received search result limit of `{q.limit}` and offset of `{q.offset}`."
         )
 
     validation.validate_boost(boost=q.boost, search_method=q.searchMethod)
@@ -1593,6 +1592,11 @@ def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity
         else:
             res = _format_ordered_docs_preserving(ordered_docs_w_chunks=docs_chunks_sorted, num_highlights=number_of_highlights, return_doc_ids=return_doc_ids, result_count=result_count)
         results.append(res)
+
+    for i, q in enumerate(queries):
+        if not q.showHighlights:
+            for hit in results[i]["hits"]:
+                del hit["_highlights"]
 
     logger.info(f"bulk search (tensor) post-processing: took {(timer() - start_postprocess_time):.3f}s")
     return results
