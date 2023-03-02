@@ -19,6 +19,7 @@ def on_start(marqo_os_url: str):
                         CUDAAvailable(), 
                         ModelsForCacheing(), 
                         InitializeRedis("localhost", 6379),    # TODO, have these variable
+                        NLTK(), 
                         DownloadFinishText(),
                         MarqoWelcome(),
                         MarqoPhrase()
@@ -91,6 +92,30 @@ class CUDAAvailable:
         for device_id in device_ids:
             device_names.append( {'id':device_id, 'name':id_to_device(device_id)})
         self.logger.info(f"found devices {device_names}")
+
+
+class NLTK:
+    """Pre-downloads the nltk stuff
+    """
+
+    logger = get_logger('NLTK setup')
+
+    def __init__(self):
+
+        pass 
+
+    def run(self):
+        
+        import nltk
+
+        try:
+            nltk.data.find('tokenizers/punkt')
+            self.logger.info("nltk data: tokenizers/punkt already downloaded")
+        except LookupError:
+            self.logger.info("could not find nltk data. downloading it now....")
+            nltk.download('punkt')        
+            self.logger.info("completed downloading nltk data")
+
 
 class ModelsForCacheing:
     """warms the in-memory model cache by preloading good defaults
