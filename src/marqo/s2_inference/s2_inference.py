@@ -113,7 +113,7 @@ def device_memory_manage(model_name:str, model_properties: dict, device:str) -> 
     else:
         model_cache_key_in_device = [key for key in list(available_models) if key.endswith(device)]
         sorted_key_in_device = sorted(model_cache_key_in_device,
-                                      key=lambda x: available_models[x]["time_stamp"], reverse=True)
+                                      key=lambda x: available_models[x]["time_stamp"])
         for key in sorted_key_in_device:
             del available_models[key]
             if device.startswith("cpu"):
