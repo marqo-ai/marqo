@@ -112,7 +112,7 @@ def device_memory_manage(model_name:str, model_properties: dict, device:str) -> 
     else:
         model_cache_key_in_device = [key for key in list(available_models) if key.endswith(device)]
         sorted_key_in_device = sorted(model_cache_key_in_device,
-                                      key=available_models[model_cache_key_in_device]["time_stamp"], reverse=True)
+                                      key=lambda x: available_models[x]["time_stamp"], reverse=True)
         for key in sorted_key_in_device:
             del available_models[key]
             logger.info(f"Ejecting model = `{key.split('||')[0]}` from device = `{device}` to save space for model = `{model_name}`.")
