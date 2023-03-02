@@ -11,7 +11,7 @@ from marqo.s2_inference.logger import get_logger
 import torch
 from datetime import datetime
 import psutil
-from constants import RAM_THRESHOLD, CUDA_THRESHOLD, MODEL_TYPE_SIZE_MAPPING
+from marqo.s2_inference.constants import RAM_THRESHOLD, CUDA_THRESHOLD, MODEL_TYPE_SIZE_MAPPING
 
 logger = get_logger(__name__)
 
