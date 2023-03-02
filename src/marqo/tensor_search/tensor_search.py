@@ -39,7 +39,7 @@ import functools
 import pprint
 import typing
 import uuid
-from typing import List, Optional, Union, Iterable, Sequence, Dict, Any
+from typing import List, Optional, Union, Iterable, Sequence, Dict, Any, Tuple, Set
 import numpy as np
 from PIL import Image
 import marqo.config as config
@@ -1358,24 +1358,26 @@ def construct_vector_input_batches(query: Union[str, Dict], index_info) -> Union
             return [[k for k, _ in ordered_queries], ]
 
 
-def get_vector_properties_to_search(searchable_attributes, index_info,  raise_on_searchable_attribs: bool):
+def get_vector_properties_to_search(searchable_attributes: Union[None, List[str]], index_info: IndexInfo,  raise_on_searchable_attribs: bool) -> List[str]:
     if searchable_attributes is None:
         return index_info.get_vector_properties().keys()
     else:
         if raise_on_searchable_attribs:
             return validation.validate_searchable_vector_props(
-        existing_vector_properties=index_info.get_vector_properties().keys(),
-        subset_vector_properties=searchable_attributes
-        )
+                existing_vector_properties=index_info.get_vector_properties().keys(),
+                subset_vector_properties=searchable_attributes
+            )
         else:
-            searchable_attributes_as_vectors = {utils.generate_vector_name(field_name=attribute)
-                                                for attribute in searchable_attributes}
+            searchable_attributes_as_vectors = {
+                utils.generate_vector_name(field_name=attribute) for attribute in searchable_attributes
+            }
             # discard searchable attributes that aren't found in the cache:
-            return searchable_attributes_as_vectors.intersection(
-        index_info.get_vector_properties().keys())
+            return list(searchable_attributes_as_vectors.intersection(
+                index_info.get_vector_properties().keys()
+            ))
 
 
-def construct_msearch_body_elements(vector_properties_to_search, offset, filter_string, index_info, result_count, vectorised_text, attributes_to_retrieve, index_name, contextualised_filter):
+def construct_msearch_body_elements(vector_properties_to_search: List[str], offset: int, filter_string: str, index_info: IndexInfo, result_count: int, vectorised_text: List[float], attributes_to_retrieve: List[str], index_name: str, contextualised_filter: str):
     body = []
 
     # Validation for offset (pagination is single field)
@@ -1452,6 +1454,7 @@ def bulk_msearch(config: Config, body: List[Dict]):
     return responses
 
 def gather_documents_from_response(resp):
+    """For the specific responses to a query, gather correct responses"""
     gathered_docs = dict()
 
     for i, query_res in enumerate(resp):
@@ -1468,14 +1471,22 @@ def gather_documents_from_response(resp):
                 }
 
         # Filter out docs with no inner hits:
-
         for doc_id in list(gathered_docs.keys()):
             if not gathered_docs[doc_id]["chunks"]:
-                del gath
+                del gathered_docs[doc_id]
 
     return gathered_docs
 
-def assign_query_to_vector_job(q, jobs, content, index_info, device) -> VectorisedJobPointer:
+def assign_query_to_vector_job(q: BulkSearchQueryEntity, jobs: Dict[JHash, VectorisedJobs], content: List[Union[str, List[str]]], index_info: IndexInfo, device: str) -> VectorisedJobPointer:
+    """
+        For a individual query, assign its content (to be vectorised) to a vector job. If none exist with the correct
+        specifications, create a new job.
+
+        Mutates entries in, and adds values to `jobs` param.
+
+        Returns: A pointer to the location in a vector job that will have it's vectorised content.
+
+    """
     vector_job = VectorisedJobs(
         model_name=index_info.model_name,
         model_properties=_get_model_properties(index_info),
@@ -1497,26 +1508,31 @@ def assign_query_to_vector_job(q, jobs, content, index_info, device) -> Vectoris
         )
     return ptr
 
-def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity], device=None, raise_on_searchable_attribs=False, simplified_format=True, number_of_highlights: int = 3, return_doc_ids=False,  result_count: int = 5):
-    if len(queries) == 0:
-        return []
+def create_vector_jobs(queries: List[BulkSearchQueryEntity], config: Config, selected_device: str) -> Tuple[Dict[Qidx, VectorisedJobPointer], Dict[JHash, VectorisedJobs]]:
+    """
+        For each query:
+            - Find what needs to be vectorised
+            - Group content (across search requests), that could be vectorised together
+            - Keep track of the Job related to a search query
 
-    start_preprocessing_time = timer()
-    jobs: Dict[JHash, VectorisedJobs] = {} # job_hash to job
+        Returns:
+            - A mapping of the query index to the VectorisedJobPointer that points to the VectorisedJobs that will process its content.
+            - A mapping of job key to job (for fast access).
+    """
     qidx_to_job: Dict[Qidx, VectorisedJobPointer] = {}
-    selected_device = config.indexing_device if device is None else device
-
-    ## 1. Pre-process inputs ready for s2_inference.vectorise
+    jobs: Dict[JHash, VectorisedJobs] = {}
     for i in range(len(queries)):
         q = queries[i]
         index_info = get_index_info(config=config, index_name=q.index)
         to_be_vectorised: List[List[str]] = construct_vector_input_batches(q.q, index_info)
         qidx_to_job[i] = assign_query_to_vector_job(q, jobs, to_be_vectorised, index_info, selected_device)
+    return qidx_to_job, jobs
 
-    ## 2. Vectorise against all queries
-    job_ptr_to_vectors: Dict[JHash, List[float]] = {}
-    for idx, v in jobs.items():
-        job_ptr_to_vectors[idx] = functools.reduce(
+def vectorise_jobs(jobs: List[VectorisedJobs]) -> Dict[JHash, List[float]]:
+    """ Run s2 inference on a set of vector jobs."""
+    result: Dict[JHash, List[float]] = {}
+    for v in jobs:
+        result[v.groupby_key()] = functools.reduce(
             lambda x, y: x + y,
             [s2_inference.vectorise(
                 model_name=v.model_name, model_properties=v.model_properties,
@@ -1525,12 +1541,17 @@ def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity
                 image_download_headers=v.image_download_headers
             ) for batch in v.content] # Todo: check if should be batching.
         )
+    return result
 
-    ## 3. Get vectors back from batch, process `ordered_queries` into each query.
-    qidx_to_vectors: Dict[Qidx, List[List[float]]] = defaultdict(list)
+def get_query_vectors_from_jobs(queries: List[BulkSearchQueryEntity], qidx_to_job: Dict[Qidx, VectorisedJobs], job_to_vectors: Dict[JHash, VectorisedJobs], config: Config):
+    """
+    Retrieve the vectorised content associated to each query from the set of batch vectorise jobs.
+
+    """
+    result: Dict[Qidx, List[List[float]]] = defaultdict(list)
     for qidx, ptr in qidx_to_job.items():
-        vectors = job_ptr_to_vectors[ptr.job_hash][ptr.start_idx: ptr.end_idx]
-        qidx_to_vectors[qidx].append(vectors)
+        vectors = job_to_vectors[ptr.job_hash][ptr.start_idx: ptr.end_idx]
+        # qidx_to_vectors[qidx].append(vectors)
 
         q = queries[qidx]
         ordered_queries = list(q.q.items()) if isinstance(q.q, dict) else None
@@ -1543,25 +1564,38 @@ def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity
                 norm = np.linalg.norm(vectorised_text, axis=-1, keepdims=True)
                 if norm > 0:
                     vectorised_text /= np.linalg.norm(vectorised_text, axis=-1, keepdims=True)
-            qidx_to_vectors[qidx] = list(vectorised_text)
+            result[qidx] = list(vectorised_text)
         else:
-            qidx_to_vectors[qidx] = vectors[0]
+            result[qidx] = vectors[0]
+    return result
+
+def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity], device=None, raise_on_searchable_attribs=False, simplified_format=True, number_of_highlights: int = 3, return_doc_ids=False,  result_count: int = 5):
+    if len(queries) == 0:
+        return []
+
+    start_preprocessing_time = timer()
+    selected_device = config.indexing_device if device is None else device
+
+    # 1. Pre-process inputs ready for s2_inference.vectorise
+    qidx_to_job, jobs = create_vector_jobs(queries, config, selected_device)
+
+    # 2. Vectorise in batches against all queries
+    job_ptr_to_vectors: Dict[JHash, List[float]] = vectorise_jobs(list(jobs.values()))
+
+    # 3. For each query, get associated vectors
+    qidx_to_vectors: Dict[Qidx, List[List[float]]] = get_query_vectors_from_jobs(
+        queries, qidx_to_job, job_ptr_to_vectors, config
+    )
 
     ## 4. Create msearch request bodies and combine to aggregate.
     query_to_body_parts: Dict[Qidx, List[Dict]] = {}
     query_to_body_count: Dict[Qidx, int] = {} # Keep track of count, so we can separate after msearch call.
-    for qidx, qq in enumerate(queries):
+    for qidx, q in enumerate(queries):
         index_info = get_index_info(config=config, index_name=q.index)
-        if q.filter is not None:
-            contextualised_filter = utils.contextualise_filter(
-                filter_string=q.filter,
-                simple_properties=index_info.get_text_properties())
-        else:
-            contextualised_filter = ''
+        contextualised_filter = utils.contextualise_filter(filter_string=q.filter, simple_properties=index_info.get_text_properties())
+        vector_properties_to_search = get_vector_properties_to_search(q.searchableAttributes, index_info, raise_on_searchable_attribs)
+        body = construct_msearch_body_elements(vector_properties_to_search, q.offset, q.filter, index_info, q.limit, qidx_to_vectors[qidx], q.attributesToRetrieve, q.index, contextualised_filter)
 
-        vector_properties_to_search = get_vector_properties_to_search(qq.searchableAttributes, index_info, raise_on_searchable_attribs)
-        vectorised_text = qidx_to_vectors[qidx]
-        body = construct_msearch_body_elements(vector_properties_to_search, qq.offset, q.filter, index_info, qq.limit, vectorised_text, qq.attributesToRetrieve, qq.index, contextualised_filter)
         query_to_body_parts[qidx] = body
         query_to_body_count[qidx] = len(body)
 
@@ -1576,11 +1610,28 @@ def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity
     start_postprocess_time = timer()
 
     # 6. Get documents back to each query, perform "gather" operation
+    results = create_bulk_search_response(queries, query_to_body_count, responses, result_count, number_of_highlights, return_doc_ids, simplified_format)
+
+    logger.info(f"bulk search (tensor) post-processing: took {(timer() - start_postprocess_time):.3f}s")
+    return results
+
+def create_bulk_search_response(queries: List[BulkSearchQueryEntity], query_to_body_count: Dict[Qidx, int], responses, result_count: int, number_of_highlights: int, return_doc_ids: bool, simplified_format: bool):
+    """
+        Create Marqo search responses by extracting the appropriate elements from the batched /_msearch response. Also handles:
+            - Boosting score (optional)
+            - Sorting chunks
+            - Formatting style
+            - (no) highlights
+        Does not mutate `responses` param.
+
+    """
     results = []
+    msearch_resp = copy.deepcopy(responses)
     for qidx, count in query_to_body_count.items():
         num_of_docs = count // 2
-        result = responses[:num_of_docs]
-        responses = responses[num_of_docs:] # remove docs from response for next query
+        result = msearch_resp[:num_of_docs]
+        msearch_resp = msearch_resp[num_of_docs:]  # remove docs from response for next query
+
         query = queries[qidx]
         gathered_docs = gather_documents_from_response(result)
         if query.boost is not None:
@@ -1591,14 +1642,12 @@ def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity
             res = _format_ordered_docs_simple(ordered_docs_w_chunks=docs_chunks_sorted, result_count=result_count)
         else:
             res = _format_ordered_docs_preserving(ordered_docs_w_chunks=docs_chunks_sorted, num_highlights=number_of_highlights, return_doc_ids=return_doc_ids, result_count=result_count)
+
+        if not query.showHighlights:
+            for hit in res["hits"]:
+                del hit["_highlights"]
         results.append(res)
 
-    for i, q in enumerate(queries):
-        if not q.showHighlights:
-            for hit in results[i]["hits"]:
-                del hit["_highlights"]
-
-    logger.info(f"bulk search (tensor) post-processing: took {(timer() - start_postprocess_time):.3f}s")
     return results
 
 def _vector_text_search(
