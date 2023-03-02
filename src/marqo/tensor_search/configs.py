@@ -7,9 +7,9 @@ def get_default_index_settings():
     # if new fields are added, also update index.py to take in the new params
     return {
         NsFields.index_defaults: {
-            NsFields.treat_urls_and_pointers_as_images: False, # only used for models that have text and vision encoders
+            NsFields.treat_urls_and_pointers_as_images: False,  # only used for models with text and vision encoders
             NsFields.model: ns_enums.MlModel.bert,
-#            NsFields.model_properties: dict(),
+            # NsFields.model_properties: dict(),
             NsFields.normalize_embeddings: True,
             NsFields.text_preprocessing: {
                 NsFields.split_length: 2,
@@ -39,6 +39,7 @@ def default_env_vars() -> dict:
         EnvVars.MARQO_MAX_CONCURRENT_SEARCH: 8,
         EnvVars.MARQO_THREAD_EXPIRY_TIME: 1800,     # 30 minutes
         EnvVars.MARQO_ENABLE_THROTTLING: "TRUE",
-        EnvVars.MARQO_LOG_LEVEL: "info"             # This env variable is set to "info" by default in run_marqo.sh, which overrides this value
+        EnvVars.MARQO_LOG_LEVEL: "info",             # This env variable is set to "info" by default in run_marqo.sh, which overrides this value
+        EnvVars.MARQO_VECTORISE_MAX_BATCH_SIZE: 16  # maximum number of images/text strings to vectorise at one time.
     }
 
