@@ -1,3 +1,4 @@
+import datetime
 from functools import partial
 
 import PIL
@@ -211,9 +212,11 @@ class PatchifyModel:
 
             self.model, self.preprocess = func(self.model_name, self.device)
 
-            available_models[model_cache_key] = self.model, self.preprocess
+            available_models[model_cache_key] = {"model":(self.model, self.preprocess),
+                                                 "time_stampe" : datetime.now()}
+
         else:
-            self.model, self.preprocess = available_models[model_cache_key]
+            self.model, self.preprocess = available_models[model_cache_key]["model"]
 
     def _load_image(self, image):
         self.image, self.image_pt, self.original_size = load_rcnn_image(image, size=self.size)
