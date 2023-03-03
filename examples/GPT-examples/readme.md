@@ -16,12 +16,7 @@ pip install marqo
 
 3. Install other dependencies
 ```
-pip install transformers
-pip install torch
-pip install langchain
-pip install --user -U nltk
-pip install pandas
-pip install numpy
+pip install -r requirements.txt
 ```
 
 # 1. Product question and answering
