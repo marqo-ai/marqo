@@ -17,7 +17,7 @@ import time
 logger = get_logger(__name__)
 
 # The avaiable has the structure:
-# {"model_cache_key_1":{"model" : model_object, "time_stamp": time, "size" : size}}
+# {"model_cache_key_1":{"model" : model_object, "time_stamp": time, "model_size" : model_size}}
 available_models = dict()
 MODEL_PROPERTIES = load_model_properties()
 
@@ -47,7 +47,6 @@ def vectorise(model_name: str, content: Union[str, List[str]], model_properties:
     model_cache_key = _create_model_cache_key(model_name, device, validated_model_properties)
 
     _update_available_models(model_cache_key, model_name, validated_model_properties, device, normalize_embeddings)
-    print(available_models)
     try:
         vectorised = available_models[model_cache_key]["model"].encode(content, normalize=normalize_embeddings, **kwargs)
     except UnidentifiedImageError as e:
@@ -96,7 +95,7 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
             available_models[model_cache_key] = {"model":_load_model(model_name,
                                                             validated_model_properties, device=device),
                                                  "time_stamp": time_stamp,
-                                                 "size": model_size}
+                                                 "model_size": model_size}
             logger.info(f'loaded {model_name} on device {device} with normalization={normalize_embeddings} at time={time_stamp}.')
         except:
             raise ModelLoadError(
@@ -129,7 +128,7 @@ def device_memory_manage(model_name: str, model_properties: dict, device: str) -
         sorted_key_in_device = sorted(model_cache_key_in_device,
                                       key=lambda x: available_models[x]["time_stamp"])
         for key in sorted_key_in_device:
-            logger.info(f"Eject model = `{key.split('||')[0]}` with size = `{available_models[key].get('size', DEFAULT_MODEL_SIZE)}` from device = `{device}` "
+            logger.info(f"Eject model = `{key.split('||')[0]}` with size = `{available_models[key].get('model_size', DEFAULT_MODEL_SIZE)}` from device = `{device}` "
                         f"to save space for model = `{model_name}`.")
             del available_models[key]
             if check_device_memory_status(device, model_size):
@@ -138,7 +137,7 @@ def device_memory_manage(model_name: str, model_properties: dict, device: str) -
         if check_device_memory_status(device, model_size) is False:
             raise ModelCacheManageError(f"Marqo CANNOT find enough space to load model = `{model_name}` in device = `{device}`.\n"
                                         f"Marqo tried to eject all the models on this device = `{device}` but still can't find enough space. \n"
-                                        f"Please change a smaller model in the settings or increase the memory threshold.")
+                                        f"Please use a smaller model or increase the memory threshold.")
 
 
 def check_device_memory_status(device:str, model_size: Union[float, int] = 1):
@@ -156,7 +155,7 @@ def check_device_memory_status(device:str, model_size: Union[float, int] = 1):
         used_memory = torch.cuda.memory_allocated(device) / 1024 ** 3
         threshold = MARQO_MAX_CUDA_MODEL_MEMORY
     elif device.startswith("cpu"):
-        used_memory = sum([available_models[key].get("size", DEFAULT_MODEL_SIZE) for key, values in available_models.items() if key.endswith("cpu")])
+        used_memory = sum([available_models[key].get("model_size", DEFAULT_MODEL_SIZE) for key, values in available_models.items() if key.endswith("cpu")])
         threshold = MARQO_MAX_CPU_MODEL_MEMORY
     else:
         raise ModelCacheManageError(f"Unable to check the device cache for device=`{device}`. The model loading will proceed"
