@@ -342,16 +342,6 @@ Marqo is a community project with the goal of making tensor search accessible to
 
 5. If you update dependencies, make sure to delete the .tox dir and rerun.
 
-## Redis set up
-Marqo uses redis to handle concurrency throttling. 
-
-See `Redis setup` in the [developer guide](https://github.com/marqo-ai/marqo/tree/mainline/src/marqo#developer-guide) to set up redis for throttling in your dev environment. 
-
-This is optional but if redis is not set up, you will see warnings containing `There is likely a problem with your redis instance or connection...`. To suppress these warnings, disable throttling completely with:
-```
-export MARQO_ENABLE_THROTTLING='FALSE'
-```
-
 ## Merge instructions:
 
 1. Run the full test suite (by using the command `tox` in this dir).

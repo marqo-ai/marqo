@@ -39,12 +39,10 @@ __Notes__:
 ## Redis setup (Applicable for Options A and E)
 Marqo uses redis to handle concurrency throttling. Redis is automatically set up when running Marqo in docker (Options B-D), but if you are running Marqo locally on your machine (Options A and E), you will have to set redis up yourself to enable throttling.
 
-Note: This setup is optional. If you do not have redis set up properly, Marqo will still run as normal, but throttling will be disabled (you will see warnings containing `There is likely a problem with your redis instance or connection...`). To suppress these warnings, disable throttling completely with:
+Note: This setup is optional. If you do not have redis set up properly, Marqo will still run as normal, but throttling will be disabled (you will see warnings containing `There is a problem with your redis connection...`). To suppress these warnings, disable throttling completely with:
 ```
 export MARQO_ENABLE_THROTTLING='FALSE'
 ```
-
-
 
 ### Installation
 The redis-server version to install is redis 7.0.8. Install it using this command for Ubuntu 22.0.4:

@@ -51,7 +51,7 @@ def throttle(request_type: str):
                 try:
                     redis.zrem(key, name)
                 except Exception as e:
-                    logger.warn(f"There is a problem with your redis instance. Skipping throttling decrement. Reason: {e}")
+                    logger.warn(f"There is a problem with your redis connection. Skipping throttling decrement. To suppress these warnings, disable throttling with export MARQO_ENABLE_THROTTLING='FALSE'. Read more under Redis setup section of the developer guide: https://github.com/marqo-ai/marqo/tree/mainline/src/marqo#developer-guide. Redis error reason: {e}")
                     redis_driver.set_faulty(True)
 
             # Check current thread count / increment using LUA script
@@ -65,7 +65,7 @@ def throttle(request_type: str):
                     utils.read_env_vars_and_defaults(EnvVars.MARQO_THREAD_EXPIRY_TIME)  # expire_time
                 )
             except Exception as e:
-                logger.warn(f"Could not load throttling scripts onto Redis. There is likely a problem with your redis instance or connection. Skipping throttling check. Reason: {e}")
+                logger.warn(f"There is a problem with your redis connection. Skipping throttling check. To suppress these warnings, disable throttling with export MARQO_ENABLE_THROTTLING='FALSE'. Read more under Redis setup section of the developer guide: https://github.com/marqo-ai/marqo/tree/mainline/src/marqo#developer-guide. Redis error reason: {e}")
                 redis_driver.set_faulty(True)
                 return function(*args, **kwargs)
 

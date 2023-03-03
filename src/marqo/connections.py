@@ -56,7 +56,7 @@ class RedisDriver:
             logger.info(f"Took {((t1-t0)*1000):.3f}ms to connect to redis and load scripts.")
 
         except Exception as e:
-            logger.warn(f"There is a problem with your redis instance. Could not load throttling scripts onto redis. Reason: {e}")
+            logger.warn(f"There is a problem with your redis connection. Could not load throttling scripts onto redis. To suppress these warnings, disable throttling with export MARQO_ENABLE_THROTTLING='FALSE'. Read more under Redis setup section of the developer guide: https://github.com/marqo-ai/marqo/tree/mainline/src/marqo#developer-guide. Redis error reason: {e}")
             self.faulty = True
 
     def connect(self) -> redis.Redis:
@@ -88,15 +88,6 @@ class RedisDriver:
     
     def get_lua_shas(self):
         return self.lua_shas
-    
-    def is_alive(self):
-        # Not using this, in the interest of speed. Pinging every connection adds latency.
-        try: 
-            self.driver.ping()
-            return True
-        except Exception as e:
-            logger.warn(f"Could not confirm connection to redis. Ensure you have a redis server running for throttling. Reason: {e}")
-            return False
 
 # Starts up redis driver
 redis_driver = RedisDriver()
