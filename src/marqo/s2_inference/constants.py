@@ -8,7 +8,9 @@ MODEL_TYPE_SIZE_MAPPING = {
     "sbert" : 0.7,
 }
 
-DEFAULT_MODEL_SIZE = 0.5
+# Set this to be a special number so we can tell the model size is from default
+DEFAULT_MODEL_SIZE = 0.66
+
 MARQO_MAX_CPU_MODEL_MEMORY = read_env_vars_and_defaults('MARQO_MAX_CPU_MODEL_MEMORY')
 MARQO_MAX_CUDA_MODEL_MEMORY = read_env_vars_and_defaults('MARQO_MAX_CUDA_MODEL_MEMORY')
 
