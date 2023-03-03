@@ -44,7 +44,7 @@ class TestAutomaticModelEject(unittest.TestCase):
         checked_models = [call_kwargs["device"] for call_args, call_kwargs
                                             in mock_device_memory_manage.call_args_list]
 
-        self.assertEqual(small_list_of_models == checked_models)
+        self.assertEqual(small_list_of_models, checked_models)
 
 
 
