@@ -52,7 +52,7 @@ from marqo.tensor_search.formatting import _clean_doc
 from marqo.tensor_search.index_meta_cache import get_cache, get_index_info
 from marqo.tensor_search import index_meta_cache
 from marqo.tensor_search.models.index_info import IndexInfo
-from marqo.tensor_search.bulk_vectorise import VectoriseArgs, execute_bulk_vectorise
+from marqo.tensor_search.bulk_vectorise import VectoriseArgs, execute_bulk_vectorise, distribute_vectors_to_chunks
 from marqo.tensor_search import constants
 from marqo.s2_inference.processing import text as text_processor
 from marqo.s2_inference.processing import image as image_processor
@@ -398,7 +398,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
     """
 
     # VectoriseArgs: (content_to_be_vectorised, content2vectors)
-    to_be_vectorised_dict: Dict[VectoriseArgs, typing.Tuple[set, Optional[dict]]] = dict()
+    to_be_vectorised_dict: Dict[VectoriseArgs, set] = dict()
     # ADD DOCS TIMER-LOGGER (3)
     if image_download_headers is None:
         image_download_headers = dict()
@@ -628,9 +628,9 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                         infer=infer_if_image)
 
                     if vec_args in to_be_vectorised_dict:
-                        to_be_vectorised_dict[vec_args][0].add(content_chunks)
+                        to_be_vectorised_dict[vec_args].add(content_chunks)
                     else:
-                        to_be_vectorised_dict[vec_args] = (set(content_chunks), None)
+                        to_be_vectorised_dict[vec_args] = set(content_chunks)
 
                     end_time = timer()
                     total_vectorise_time += (end_time - start_time)
@@ -749,7 +749,8 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                     }
                 })
 
-    execute_bulk_vectorise(to_be_vectorised_dict)
+    vectorised_dict = execute_bulk_vectorise(to_be_vectorised_dict)
+    distribute_vectors_to_chunks(bulk_parent_dicts, vectorised_dict)
 
     end_time_3 = timer()
     total_preproc_time = end_time_3 - start_time_3

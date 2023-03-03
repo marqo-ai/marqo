@@ -1,7 +1,9 @@
-from typing import Union, Optional, Tuple, Dict
+from typing import Union, Optional, Tuple, Dict, Sequence, List
 from marqo.tensor_search.enums import MediaType
 from marqo import errors
 from marqo.s2_inference.s2_inference import vectorise
+from marqo.tensor_search import utils
+
 
 class VectoriseArgs:
     """Class that holds args to be executed by vectorise()
@@ -35,15 +37,50 @@ class VectoriseArgs:
 #     def __init__(self, ):
 
 
-def execute_bulk_vectorise(to_be_vectorised_dict: Dict[VectoriseArgs, Tuple[set, Optional[dict]]]) -> None:
-    """"""
+def execute_bulk_vectorise(
+        to_be_vectorised_dict: Dict[VectoriseArgs, set]) -> Dict[VectoriseArgs, Dict[str, Sequence[float]]]:
+    """Vectorises sets of content that share the same vectorise argument.
+
+    From a mapping of <VectoriseArguments: Set(content to vectorise)> a mapping
+    <VectoriseArguments: Dict<content: vector>> is created.
+
+    Returns a new dict with the structure <VectoriseArguments: Dict<content: vector>>
+    """
+    args2content_vectors = dict()
     for vectorise_arg in to_be_vectorised_dict:
-        content_as_list = list(to_be_vectorised_dict[vectorise_arg][0])
+        content_as_list = list(to_be_vectorised_dict[vectorise_arg])
         content2vectors = dict(zip(
             content_as_list,
             vectorise(**vectorise_arg.vec_kwargs, content=content_as_list)
         ))
-        to_be_vectorised_dict[vectorise_arg] = (
-            to_be_vectorised_dict[vectorise_arg][0],
-            content2vectors
-        )
+        args2content_vectors[vectorise_arg] = content2vectors
+    return args2content_vectors
+
+
+def distribute_vectors_to_chunks(
+        docs: List[Dict], vectorised_dict: Dict[VectoriseArgs, Dict[str, Sequence[float]]]) -> None:
+    """ Takes the bulk parent dicts, and distributes the docs to them
+    TODO:
+        - use enum instead of __chunks
+        - consider ranming bulk_paranet_dicts
+        - We need to ensure we separate the modalities (include tests)
+    Args:
+        docs:
+        vectorised_dict:
+
+    Returns:
+
+    """
+    for doc in docs:
+        if '__chunks' not in doc:
+            # also skips the indexing instructions
+            continue
+        for chunk in doc['__chunks']:
+            field_name = chunk['__field_name']
+            knn_field_name = utils.generate_vector_name(field_name)
+            vectorise_args_hash = chunk['__vectorise_args'].hash
+            # get the content2vec dict for this set of args
+            content2vec = vectorised_dict[vectorise_args_hash]
+
+            chunk[knn_field_name] = content2vec[chunk['__field_content']]
+
