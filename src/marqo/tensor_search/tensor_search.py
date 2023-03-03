@@ -31,6 +31,7 @@ Notes on search behaviour with caching and searchable attributes:
 
 """
 import copy
+import itertools
 import json
 import datetime
 from timeit import default_timer as timer
@@ -51,6 +52,7 @@ from marqo.tensor_search.formatting import _clean_doc
 from marqo.tensor_search.index_meta_cache import get_cache, get_index_info
 from marqo.tensor_search import index_meta_cache
 from marqo.tensor_search.models.index_info import IndexInfo
+from marqo.tensor_search.bulk_vectorise import VectoriseArgs, execute_bulk_vectorise
 from marqo.tensor_search import constants
 from marqo.s2_inference.processing import text as text_processor
 from marqo.s2_inference.processing import image as image_processor
@@ -394,6 +396,9 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
     Returns:
 
     """
+
+    # VectoriseArgs: (content_to_be_vectorised, content2vectors)
+    to_be_vectorised_dict: Dict[VectoriseArgs, typing.Tuple[set, Optional[dict]]] = dict()
     # ADD DOCS TIMER-LOGGER (3)
     if image_download_headers is None:
         image_download_headers = dict()
@@ -553,6 +558,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                 # 6. if chunking -> then add the extra chunker
 
                 if isinstance(field_content, str) and not _is_image(field_content):
+                    content_type = MediaType.text
                     # text processing pipeline:
                     split_by = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][
                         NsField.split_method]
@@ -564,6 +570,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                                                                split_length=split_length, split_overlap=split_overlap)
                     text_chunks = content_chunks
                 else:
+                    content_type = MediaType.image
                     # TODO put the logic for getting field parameters into a function and add per field options
                     image_method = index_info.index_settings[NsField.index_defaults][NsField.image_preprocessing][
                         NsField.patch_method]
@@ -604,17 +611,26 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                 infer_if_image = index_info.index_settings[NsField.index_defaults][
                     NsField.treat_urls_and_pointers_as_images]
 
+                if not infer_if_image:
+                    content_type = MediaType.text
+
                 try:
                     # in the future, if we have different underlying vectorising methods, make sure we catch possible
                     # errors of different types generated here, too.
 
                     # ADD DOCS TIMER-LOGGER (4)
                     start_time = timer()
-                    vector_chunks = s2_inference.vectorise(
+                    vec_args = VectoriseArgs(
+                        content_type=content_type,
                         model_name=index_info.model_name,
-                        model_properties=_get_model_properties(index_info), content=content_chunks,
+                        model_properties=_get_model_properties(index_info),
                         device=selected_device, normalize_embeddings=normalize_embeddings,
                         infer=infer_if_image)
+
+                    if vec_args in to_be_vectorised_dict:
+                        to_be_vectorised_dict[vec_args][0].add(content_chunks)
+                    else:
+                        to_be_vectorised_dict[vec_args] = (set(content_chunks), None)
 
                     end_time = timer()
                     total_vectorise_time += (end_time - start_time)
@@ -634,16 +650,11 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                     )
                     break
 
-                if (len(vector_chunks) != len(text_chunks)):
-                    raise RuntimeError(
-                        f"the input content after preprocessing and its vectorized counterparts must be the same length."
-                        f"recevied text_chunks={len(text_chunks)} and vector_chunks={len(vector_chunks)}. "
-                        f"check the preprocessing functions and try again. ")
-
-                for text_chunk, vector_chunk in zip(text_chunks, vector_chunks):
+                for text_chunk, vectorise_args in zip(text_chunks, itertools.repeat(vec_args)):
                     # We do not put in metadata yet at this stage.
                     chunks_to_append.append({
-                        utils.generate_vector_name(field): vector_chunk,
+                        # we will replace the args with resulting vector:
+                        utils.generate_vector_name(field): vectorise_args,
                         TensorField.field_content: text_chunk,
                         TensorField.field_name: field
                     })
@@ -651,9 +662,9 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
             # Add chunks_to_append along with doc metadata to total chunks
 
             elif isinstance(field_content, dict):
-                if mappings[field]["type"]=="multimodal_combination":
+                if mappings[field]["type"] == "multimodal_combination":
                     combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add,\
-                        new_fields_from_multimodal_combination= \
+                        new_fields_from_multimodal_combination = \
                         vectorise_multimodal_combination_field(field, field_content, copied,
                                                                i, doc_id, selected_device, index_info, image_repo, mappings[field])
 
@@ -670,6 +681,8 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
             for chunk in chunks_to_append:
                 chunks.append({**chunk, **chunk_values_for_filtering})
+
+        # args have been organised. Time to vectorise. Make sure we handle to multimodal combo case
 
         if document_is_valid:
             new_fields = new_fields.union(new_fields_from_doc)
@@ -735,6 +748,8 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                         },
                     }
                 })
+
+    execute_bulk_vectorise(to_be_vectorised_dict)
 
     end_time_3 = timer()
     total_preproc_time = end_time_3 - start_time_3
@@ -1718,7 +1733,6 @@ def get_cuda_info() -> dict:
         ))
 
 
-
 def vectorise_multimodal_combination_field(field: str, multimodal_object: Dict[str, dict], doc: dict, doc_index: int,
                                             doc_id:str, selected_device:str, index_info, image_repo, field_map:dict):
     '''
@@ -1746,8 +1760,6 @@ def vectorise_multimodal_combination_field(field: str, multimodal_object: Dict[s
     new_fields_from_multimodal_combination: the new fields from multimodal combination field that will be added to index properties
 
     '''
-    # field_conent = {"tensor_field_one" : {"weight":0.5, "parameter": "test-paramater-1"},
-    #                 "tensor_field_two" : {"weight": 0.5, parameter": "test-parameter-2"}},
     combo_document_is_valid = True
     combo_vectorise_time_to_add = 0
     combo_chunk = {}
