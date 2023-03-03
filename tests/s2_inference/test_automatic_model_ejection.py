@@ -29,7 +29,6 @@ class TestAutomaticModelEject(unittest.TestCase):
 
     def test_device_memory_manage(self):
         def pass_through_device_memory_manage(*arg, **kwargs):
-            print("called")
             return device_memory_manage(*arg, **kwargs)
 
         mock_device_memory_manage = unittest.mock.MagicMock()
