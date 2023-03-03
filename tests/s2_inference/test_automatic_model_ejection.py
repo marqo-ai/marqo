@@ -1,6 +1,7 @@
 import unittest
 import os
 import torch
+import unittest.mock
 
 from marqo.s2_inference.types import FloatTensor
 from marqo.s2_inference.s2_inference import clear_loaded_models, get_model_properties_from_registry
@@ -30,7 +31,7 @@ class TestAutomaticModelEject(unittest.TestCase):
         def pass_through_device_memory_manage(*arg, **kwargs):
             return device_memory_manage(*arg, **kwargs)
 
-        mock_device_memory_manage= unittest.mock.MagicMock()
+        mock_device_memory_manage = unittest.mock.MagicMock()
         mock_device_memory_manage.side_effect = pass_through_device_memory_manage
 
         small_list_of_models = ['open_clip/convnext_base_w_320/laion_aesthetic_s13b_b82k',
