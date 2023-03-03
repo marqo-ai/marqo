@@ -11,13 +11,13 @@ from marqo.s2_inference.logger import get_logger
 import torch
 import datetime
 import psutil
-from marqo.s2_inference.constants import RAM_THRESHOLD, CUDA_THRESHOLD, MODEL_TYPE_SIZE_MAPPING
+from marqo.s2_inference.constants import MARQO_MAX_CPU_MODEL_MEMORY, MARQO_MAX_CUDA_MODEL_MEMORY, MODEL_TYPE_SIZE_MAPPING, DEFAULT_MODEL_SIZE
 import time
 
 logger = get_logger(__name__)
 
 # The avaiable has the structure:
-# {"model_cache_key_1":{"model" : model_object, "time_stamp": time}}
+# {"model_cache_key_1":{"model" : model_object, "time_stamp": time, "size" : size}}
 available_models = dict()
 MODEL_PROPERTIES = load_model_properties()
 
@@ -87,13 +87,16 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
                              normalize_embeddings: bool) -> None:
     """loads the model if it is not already loaded
     """
-    time_stamp = datetime.datetime.now()
+    global cpu_memory_usage
+    model_size = validated_model_properties.get("model_size", MODEL_TYPE_SIZE_MAPPING.get(validated_model_properties["type"], 1))
     if model_cache_key not in available_models:
         device_memory_manage(model_name, validated_model_properties, device)
         try:
+            time_stamp = datetime.datetime.now()
             available_models[model_cache_key] = {"model":_load_model(model_name,
                                                             validated_model_properties, device=device),
-                                                 "time_stamp": time_stamp}
+                                                 "time_stamp": time_stamp,
+                                                 "model_size": model_size}
             logger.info(f'loaded {model_name} on device {device} with normalization={normalize_embeddings} at time={time_stamp}.')
         except:
             raise ModelLoadError(
@@ -102,12 +105,23 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
                 f"please check that model_properties={validated_model_properties} is correct "
                 f"and the model has valid access permission. ")
     else:
+        time_stamp = datetime.datetime.now()
         logger.debug(f'renew {model_name} on device {device} with new time={time_stamp}.')
         available_models[model_cache_key]["time_stamp"] = time_stamp
 
 
-def device_memory_manage(model_name:str, model_properties: dict, device:str) -> None:
-    model_size = model_properties.get("model_size", MODEL_TYPE_SIZE_MAPPING.get(model_properties["type"], 1))
+def device_memory_manage(model_name: str, model_properties: dict, device: str) -> None:
+    '''
+    A function to manage the memory usage in devices when we want to load a new model
+    Args:
+        model_name: The name of the model to load
+        model_properties: The model properties of the model
+        device: The target device to laod the model
+    Returns:
+        True we have enough space for the model
+        Raise an error and return False if we can't find enough space for the model.
+    '''
+    model_size = model_properties.get("model_size", MODEL_TYPE_SIZE_MAPPING.get(model_properties["type"], DEFAULT_MODEL_SIZE))
     if check_device_memory_status(device, model_size):
         return True
     else:
@@ -115,31 +129,39 @@ def device_memory_manage(model_name:str, model_properties: dict, device:str) -> 
         sorted_key_in_device = sorted(model_cache_key_in_device,
                                       key=lambda x: available_models[x]["time_stamp"])
         for key in sorted_key_in_device:
+            logger.info(f"Eject model = `{key.split('||')[0]}` with size = `{available_models[key]['size']}` from device = `{device}` "
+                        f"to save space for model = `{model_name}`.")
             del available_models[key]
-            print("Currently used memory:", (psutil.virtual_memory()[0] - psutil.virtual_memory()[1]) / 1024 ** 3)
-            logger.info(f"Eject model = `{key.split('||')[0]}` from device = `{device}` to save space for model = `{model_name}`.")
             if check_device_memory_status(device, model_size):
                 return True
 
         if check_device_memory_status(device, model_size) is False:
-            raise logger.warning(f"Marqo CANNOT find enough space to load model = `{model_name}` in device = `{device}`.\n"
+            raise ModelCacheManageError(f"Marqo CANNOT find enough space to load model = `{model_name}` in device = `{device}`.\n"
                                         f"Marqo tried to eject all the models on this device = `{device}` but still can't find enough space. \n"
-                                        f"Please change a smaller model in the settings.")
-        return True
+                                        f"Please change a smaller model in the settings or increase the memory threshold.")
 
 
-def check_device_memory_status(device:str, model_size:Union[float, int] = 1):
+def check_device_memory_status(device:str, model_size: Union[float, int] = 1):
+    '''
+    Check the memory usage in the target device and decide whether we can add a new model
+    Args:
+        device: the target device to check
+        model_size: the size of the model to load
+    Returns:
+        True if we have enough space
+        False if we don't have enough space
+    '''
     if device.startswith("cuda"):
-        available_memory = torch.cuda.get_device_properties(device).total_memory / 1024 ** 3 * CUDA_THRESHOLD
+        torch.cuda.synchronize(device)
         used_memory = torch.cuda.memory_allocated(device) / 1024 ** 3
+        threshold = MARQO_MAX_CUDA_MODEL_MEMORY
     elif device.startswith("cpu"):
-        available_memory = psutil.virtual_memory()[0] / 1024 ** 3 * RAM_THRESHOLD
-        used_memory = (psutil.virtual_memory()[0] - psutil.virtual_memory()[1]) / 1024 ** 3
+        used_memory = sum([available_models[key].get("size", DEFAULT_MODEL_SIZE) for key, values in available_models.items() if key.endswith("cpu")])
+        threshold = MARQO_MAX_CPU_MODEL_MEMORY
     else:
-        logger.warning(f"Unable to check the device cache for device=`{device}`. The model loading will proceed"
-                       f"without device cache check. This might break down Marqo if too many models are loaded.")
-        return True
-    return (used_memory + model_size) < available_memory
+        raise ModelCacheManageError(f"Unable to check the device cache for device=`{device}`. The model loading will proceed"
+                                    f"without device cache check. This might break down Marqo if too many models are loaded.")
+    return used_memory + model_size < threshold
 
 
 def _validate_model_properties(model_name: str, model_properties: dict) -> dict:

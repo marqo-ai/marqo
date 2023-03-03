@@ -1,4 +1,4 @@
-
+from marqo.tensor_search.utils import read_env_vars_and_defaults
 
 MODEL_TYPE_SIZE_MAPPING = {
     # A mapping to estimate the size of the
@@ -8,7 +8,7 @@ MODEL_TYPE_SIZE_MAPPING = {
     "sbert" : 0.7,
 }
 
-
-CUDA_THRESHOLD = 0.6
-RAM_THRESHOLD = 1
+DEFAULT_MODEL_SIZE = 0.5
+MARQO_MAX_CPU_MODEL_MEMORY = read_env_vars_and_defaults('MARQO_MAX_CPU_MODEL_MEMORY')
+MARQO_MAX_CUDA_MODEL_MEMORY = read_env_vars_and_defaults('MARQO_MAX_CUDA_MODEL_MEMORY')
 
