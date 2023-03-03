@@ -45,7 +45,7 @@ class TestAutomaticModelEject(unittest.TestCase):
             for model in small_list_of_models:
                 _ = vectorise(model_name=model, content=content, device="cpu")
             print(mock_device_memory_manage.call_args_list)
-            checked_models = [call_args[0] for call_args, call_kwargs
+            checked_models = [call_kwargs["device"] for call_args, call_kwargs
                                                 in mock_device_memory_manage.call_args_list]
 
             self.assertEqual(small_list_of_models, checked_models)
