@@ -276,7 +276,8 @@ def _get_open_clip_properties() -> Dict:
              'dimensions': 1024,
              'note': 'open_clip models',
              'type': 'open_clip',
-             'pretrained': 'laion2b_s12b_b42k'},
+             'pretrained': 'laion2b_s12b_b42k',
+             'model_size': 5,},
         'open_clip/ViT-bigG-14/laion2b_s39b_b160k':
             {'name': 'open_clip/ViT-bigG-14/laion2b_s39b_b160k',
              'dimensions': 1280,
@@ -1129,7 +1130,7 @@ def _get_onnx_clip_properties() -> Dict:
                 'resolution': 224,
                 'pretrained': 'laion2b_s32b_b79k',
                 'image_mean': None,
-                'image_std': None
+                'image_std': None,
             },
 
         'onnx32/open_clip/ViT-H-14/laion2b_s32b_b79k':
