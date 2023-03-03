@@ -261,6 +261,10 @@ def parse_lexical_query(text: str) -> Tuple[List[str], str]:
 
 
 def add_timing(f, key: str = "processingTimeMs"):
+    """
+        Decorator for functions that adds the processing time to the return Dict (NOTE: must return value of function
+        must be a dictionary). `key` param denotes what the processing time will be stored against.
+    """
     @functools.wraps(f)
     def wrap(*args, **kw):
         t0 = timer()
