@@ -988,11 +988,14 @@ def refresh_index(config: Config, index_name: str):
 
 
 @add_timing
-def bulk_search(query: BulkSearchQuery, marqo_config: config.Config, reranker: Union[str, Dict] = None, simplified_format=True, number_of_highlights: int = 3, return_doc_ids=False, verbose: bool = True, device=None, raise_on_searchable_attribs: bool=False):
-    errs = [validate_query_input(q) for q in query.queries]
+def bulk_search(query: BulkSearchQuery, marqo_config: config.Config, reranker: Union[str, Dict] = None, return_doc_ids: bool=False, verbose: bool = True, device=None, raise_on_searchable_attribs: bool=False):
+    errs = [validation.validate_bulk_query_input(q) for q in query.queries]
     if any(errs):
         err = next(e for e in errs if e is not None)
         raise err
+
+    if len(query.queries) == 0:
+        return {"result": []}
 
     fill_index_cache(marqo_config, [q.index for q in query.queries])
 
@@ -1004,9 +1007,6 @@ def bulk_search(query: BulkSearchQuery, marqo_config: config.Config, reranker: U
 
     tensor_search_results = dict(zip(tensor_queries.keys(), _bulk_vector_text_search(
             marqo_config, list(tensor_queries.values()),
-            simplified_format=simplified_format,
-            number_of_highlights=number_of_highlights,
-            return_doc_ids=return_doc_ids,
             device=device,
             raise_on_searchable_attribs=raise_on_searchable_attribs
         )))
@@ -1032,7 +1032,7 @@ def bulk_search(query: BulkSearchQuery, marqo_config: config.Config, reranker: U
     if reranker is not None:
         logger.info("reranking using {}".format(reranker))
         for i, s in enumerate(search_results):
-            rerank(query.queries[i], s, reranker, device, 1 if simplified_format else number_of_highlights)
+            rerank(query.queries[i], s, reranker, device, 1)
 
     return {
         "result": search_results
@@ -1047,7 +1047,7 @@ def rerank(query: BulkSearchQueryEntity, result: Dict[str, Any], reranker: Union
         rerank.rerank_search_results(search_result=result, query=query.q,
                                      model_name=reranker, device=device,
                                      searchable_attributes=query.searchableAttributes, num_highlights=num_highlights)
-        logger.info(f"search ({query.searchMethod.lower()}) reranking using {reranker}: took {(timer() - start_rerank_time):.3f}s to rerank results.")
+        logger.debug(f"search ({query.searchMethod.lower()}) reranking using {reranker}: took {(timer() - start_rerank_time):.3f}s to rerank results.")
     except Exception as e:
         raise errors.BadRequestError(f"reranking failure due to {str(e)}")
 
@@ -1064,34 +1064,6 @@ def fill_index_cache(config: Config, index_names: List[str]):
             args=(config, idx, REFRESH_INTERVAL_SECONDS))
         cache_update_thread.start()
 
-
-def validate_query_input(q: BulkSearchQueryEntity) -> Optional[errors.MarqoError]:
-    if q.limit <= 0:
-        return errors.IllegalRequestedDocCount("search result limit must be greater than 0!")
-    if q.offset < 0:
-        return errors.IllegalRequestedDocCount("search result offset cannot be less than 0!")
-
-    # validate query
-    validation.validate_query(q=q.q, search_method=q.searchMethod)
-
-    # Validate result_count + offset <= int(max_docs_limit)
-    max_docs_limit = utils.read_env_vars_and_defaults(EnvVars.MARQO_MAX_RETRIEVABLE_DOCS)
-    check_upper = True if max_docs_limit is None else q.limit + q.offset <= int(max_docs_limit)
-    if not check_upper:
-        raise errors.IllegalRequestedDocCount(
-            f"The search result limit + offset must be less than or equal to the MARQO_MAX_RETRIEVABLE_DOCS limit of"
-            f"[{max_docs_limit}]. Marqo received search result limit of `{q.limit}` and offset of `{q.offset}`."
-        )
-
-    validation.validate_boost(boost=q.boost, search_method=q.searchMethod)
-    if q.searchableAttributes is not None:
-        [validation.validate_field_name(attribute) for attribute in q.searchableAttributes]
-    if q.attributesToRetrieve is not None:
-        if not isinstance(q.attributesToRetrieve, (List, typing.Tuple)):
-            raise errors.InvalidArgError("attributes_to_retrieve must be a sequence!")
-        [validation.validate_field_name(attribute) for attribute in q.attributesToRetrieve]
-
-    return None
 
 def search(config: Config, index_name: str, text: Union[str, dict],
            result_count: int = 3, offset: int = 0, highlights=True, return_doc_ids=True,
@@ -1375,7 +1347,7 @@ def get_vector_properties_to_search(searchable_attributes: Union[None, List[str]
             ))
 
 
-def construct_msearch_body_elements(vector_properties_to_search: List[str], offset: int, filter_string: str, index_info: IndexInfo, result_count: int, vectorised_text: List[float], attributes_to_retrieve: List[str], index_name: str, contextualised_filter: str):
+def construct_msearch_body_elements(vector_properties_to_search: List[str], offset: int, filter_string: str, index_info: IndexInfo, result_count: int, vectorised_text: List[float], attributes_to_retrieve: List[str], index_name: str, contextualised_filter: str) -> List[Dict[str, Any]]:
     body = []
 
     # Validation for offset (pagination is single field)
@@ -1423,7 +1395,7 @@ def construct_msearch_body_elements(vector_properties_to_search: List[str], offs
         body += [{"index": index_name}, search_query]
     return body
 
-def bulk_msearch(config: Config, body: List[Dict]):
+def bulk_msearch(config: Config, body: List[Dict]) -> List[Dict]:
     start_search_http_time = timer()
     try:
         response = HttpRequests(config).get(path=F"_msearch", body=utils.dicts_to_jsonl(body))
@@ -1431,7 +1403,7 @@ def bulk_msearch(config: Config, body: List[Dict]):
         total_search_http_time = end_search_http_time - start_search_http_time
         total_os_process_time = response["took"] * 0.001
         num_responses = len(response["responses"])
-        logger.info(f"search (tensor) roundtrip: took {total_search_http_time:.3f}s to send {num_responses} search queries (roundtrip) to Marqo-os.")
+        logger.debug(f"search (tensor) roundtrip: took {total_search_http_time:.3f}s to send {num_responses} search queries (roundtrip) to Marqo-os.")
 
         responses = [r['hits']['hits'] for r in response["responses"]]
 
@@ -1448,11 +1420,14 @@ def bulk_msearch(config: Config, body: List[Dict]):
         except (KeyError, IndexError) as e2:
             raise e
 
-    logger.info(f"  search (tensor) Marqo-os processing time: took {total_os_process_time:.3f}s for Marqo-os to execute the search.")
+    logger.debug(f"  search (tensor) Marqo-os processing time: took {total_os_process_time:.3f}s for Marqo-os to execute the search.")
     return responses
 
-def gather_documents_from_response(resp):
-    """For the specific responses to a query, gather correct responses"""
+def gather_documents_from_response(resp: List[List[Dict[str, Any]]]) -> Dict[str, Any]:
+    """
+        For the specific responses to a query, gather correct responses. This is used to aggregate documents, for cases
+        where the same document is retrieved for multiple field-queries.
+    """
     gathered_docs = dict()
 
     for i, query_res in enumerate(resp):
@@ -1519,7 +1494,7 @@ def create_vector_jobs(queries: List[BulkSearchQueryEntity], config: Config, sel
     """
     qidx_to_job: Dict[Qidx, VectorisedJobPointer] = {}
     jobs: Dict[JHash, VectorisedJobs] = {}
-    for i in range(len(queries)):
+    for i, q in enumerate(queries):
         q = queries[i]
         index_info = get_index_info(config=config, index_name=q.index)
         to_be_vectorised: List[List[str]] = construct_vector_input_batches(q.q, index_info)
@@ -1541,7 +1516,7 @@ def vectorise_jobs(jobs: List[VectorisedJobs]) -> Dict[JHash, List[float]]:
         )
     return result
 
-def get_query_vectors_from_jobs(queries: List[BulkSearchQueryEntity], qidx_to_job: Dict[Qidx, VectorisedJobs], job_to_vectors: Dict[JHash, VectorisedJobs], config: Config):
+def get_query_vectors_from_jobs(queries: List[BulkSearchQueryEntity], qidx_to_job: Dict[Qidx, VectorisedJobs], job_to_vectors: Dict[JHash, VectorisedJobs], config: Config) -> Dict[Qidx, List[List[float]]]:
     """
     Retrieve the vectorised content associated to each query from the set of batch vectorise jobs.
 
@@ -1567,7 +1542,7 @@ def get_query_vectors_from_jobs(queries: List[BulkSearchQueryEntity], qidx_to_jo
             result[qidx] = vectors[0]
     return result
 
-def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity], device=None, raise_on_searchable_attribs=False, simplified_format=True, number_of_highlights: int = 3, return_doc_ids=False,  result_count: int = 5):
+def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity], device=None, raise_on_searchable_attribs=False, result_count: int = 5) -> List[Dict]:
     if len(queries) == 0:
         return []
 
@@ -1608,12 +1583,12 @@ def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity
     start_postprocess_time = timer()
 
     # 6. Get documents back to each query, perform "gather" operation
-    results = create_bulk_search_response(queries, query_to_body_count, responses, result_count, number_of_highlights, return_doc_ids, simplified_format)
+    results = create_bulk_search_response(queries, query_to_body_count, responses, result_count)
 
     logger.info(f"bulk search (tensor) post-processing: took {(timer() - start_postprocess_time):.3f}s")
     return results
 
-def create_bulk_search_response(queries: List[BulkSearchQueryEntity], query_to_body_count: Dict[Qidx, int], responses, result_count: int, number_of_highlights: int, return_doc_ids: bool, simplified_format: bool):
+def create_bulk_search_response(queries: List[BulkSearchQueryEntity], query_to_body_count: Dict[Qidx, int], responses, result_count: int) -> List[Dict]:
     """
         Create Marqo search responses by extracting the appropriate elements from the batched /_msearch response. Also handles:
             - Boosting score (optional)
@@ -1636,10 +1611,7 @@ def create_bulk_search_response(queries: List[BulkSearchQueryEntity], query_to_b
             gathered_docs = boost_score(gathered_docs, query.boost)
         docs_chunks_sorted = sort_chunks(gathered_docs)
 
-        if simplified_format:
-            res = _format_ordered_docs_simple(ordered_docs_w_chunks=docs_chunks_sorted, result_count=result_count)
-        else:
-            res = _format_ordered_docs_preserving(ordered_docs_w_chunks=docs_chunks_sorted, num_highlights=number_of_highlights, return_doc_ids=return_doc_ids, result_count=result_count)
+        res = _format_ordered_docs_simple(ordered_docs_w_chunks=docs_chunks_sorted, result_count=result_count)
 
         if not query.showHighlights:
             for hit in res["hits"]:

@@ -46,7 +46,7 @@ class TestBulkSearch(MarqoTestCase):
             ], auto_refresh=True)
         search_res = tensor_search._bulk_vector_text_search(
             config=self.config, queries=[BulkSearchQueryEntity(index=self.index_name_1, q=" efgh ")],
-            return_doc_ids=True, number_of_highlights=2, result_count=10
+            result_count=10
         )
         assert len(search_res) == 1
         assert len(search_res[0]['hits']) == 2
@@ -55,7 +55,7 @@ class TestBulkSearch(MarqoTestCase):
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
         search_res = tensor_search._bulk_vector_text_search(
             config=self.config, queries=[BulkSearchQueryEntity(index=self.index_name_1, q=" efgh ")],
-            return_doc_ids=True, number_of_highlights=2, result_count=10
+            result_count=10
         )
         assert len(search_res) == 0
 
@@ -63,7 +63,7 @@ class TestBulkSearch(MarqoTestCase):
         try:
             tensor_search._bulk_vector_text_search(
                 config=self.config, queries=[BulkSearchQueryEntity(index=self.index_name_1, q=" efgh ")],
-                return_doc_ids=True, number_of_highlights=2, result_count=10
+                result_count=10
             )
             raise AssertionError
         except IndexNotFoundError:
@@ -81,41 +81,10 @@ class TestBulkSearch(MarqoTestCase):
             ], auto_refresh=True)
         search_res = tensor_search._bulk_vector_text_search(
             config=self.config, queries=[BulkSearchQueryEntity(index=self.index_name_1, q=query_text)],
-            return_doc_ids=True
+
         )
         assert len(search_res) == 1
         assert len(search_res[0]['hits']) == 2
-
-    def test_bulk_vector_text_search_all_highlights(self):
-        tensor_search.add_documents(
-            config=self.config, index_name=self.index_name_1, docs=[
-                {"abc": "Exact match hehehe efgh ", "other field": "baaadd efgh ",
-                 "_id": "5678", "finally": "some field efgh "},
-                {"abc": "random text efgh ", "other field": "Close matc efgh h hehehe",
-                 "_id": "1234", "finally": "Random text here efgh "},
-            ], auto_refresh=True)
-        search_res = tensor_search._bulk_vector_text_search(
-            config=self.config, queries=[BulkSearchQueryEntity(index=self.index_name_1, q=" efgh ")],
-            return_doc_ids=True, number_of_highlights=None, simplified_format=False
-        )
-        assert len(search_res) == 1
-        for res in search_res[0]['hits']:
-            assert len(res["highlights"]) == 3
-
-    def test_bulk_vector_text_search_n_highlights(self):
-        tensor_search.add_documents(
-            config=self.config, index_name=self.index_name_1, docs=[
-                {"abc": "Exact match hehehe efgh ", "other field": "baaadd efgh ",
-                 "_id": "5678", "finally": "some field efgh "},
-                {"abc": "random text efgh ", "other field": "Close matc efgh h hehehe",
-                 "_id": "1234", "finally": "Random text here efgh "},
-            ], auto_refresh=True)
-        search_res = tensor_search._bulk_vector_text_search(
-            config=self.config, queries=[BulkSearchQueryEntity(index=self.index_name_1, q=" efgh ")],
-            return_doc_ids=True, number_of_highlights=2, simplified_format=False
-        )
-        for res in search_res[0]['hits']:
-            assert len(res["highlights"]) == 2
 
     def test_bulk_vector_text_search_searchable_attributes(self):
         tensor_search.add_documents(
@@ -125,7 +94,7 @@ class TestBulkSearch(MarqoTestCase):
             ], auto_refresh=True)
         search_res = tensor_search.bulk_search(
             query=BulkSearchQuery(queries=[BulkSearchQueryEntity(index=self.index_name_1, q="Exact match hehehe", searchableAttributes=["other field"])]),
-            marqo_config=self.config, return_doc_ids=True
+            marqo_config=self.config,
         )
         assert len(search_res['result']) == 1
         assert search_res['result'][0]["hits"][0]["_id"] == "1234"
@@ -144,7 +113,7 @@ class TestBulkSearch(MarqoTestCase):
             query=BulkSearchQuery(queries=[BulkSearchQueryEntity(
                 index=self.index_name_1, q="Exact match hehehe", searchableAttributes=["other field", "Cool Field 1"]
             )]),
-            marqo_config=self.config, return_doc_ids=True
+            marqo_config=self.config,
         )
         assert len(search_res['result']) == 1
         ids = [search_res['result'][0]["hits"][0]["_id"], search_res['result'][0]["hits"][1]["_id"]]
@@ -168,7 +137,7 @@ class TestBulkSearch(MarqoTestCase):
             query=BulkSearchQuery(queries=[BulkSearchQueryEntity(
                 index=self.index_name_1, q=q, searchableAttributes=["other field", "Cool Field 1"], limit=50
             )]),
-            marqo_config=self.config, return_doc_ids=True
+            marqo_config=self.config,
         )
         assert len(search_res["result"]) == 1
         print(search_res)
@@ -193,27 +162,27 @@ class TestBulkSearch(MarqoTestCase):
         try:
             # too big
             tensor_search.bulk_search(
-                marqo_config=self.config, query=BulkSearchQuery(queries=[BulkSearchQueryEntity(index=self.index_name_1, q="Exact match hehehe", limit=-1)], return_doc_ids=True))
+                marqo_config=self.config, query=BulkSearchQuery(queries=[BulkSearchQueryEntity(index=self.index_name_1, q="Exact match hehehe", limit=-1)], ))
             raise AssertionError
         except IllegalRequestedDocCount as e:
             pass
         try:
             # too small
             tensor_search.bulk_search(
-                marqo_config=self.config, query=BulkSearchQuery(queries=[BulkSearchQueryEntity(index=self.index_name_1, q="Exact match hehehe", limit=1000000)], return_doc_ids=True))
+                marqo_config=self.config, query=BulkSearchQuery(queries=[BulkSearchQueryEntity(index=self.index_name_1, q="Exact match hehehe", limit=1000000)], ))
             raise AssertionError
         except IllegalRequestedDocCount as e:
             pass
         try:
             # should not work with 0
             tensor_search.bulk_search(
-                marqo_config=self.config, query=BulkSearchQuery(queries=[BulkSearchQueryEntity(index=self.index_name_1, q="Exact match hehehe", limit=0)], return_doc_ids=True))
+                marqo_config=self.config, query=BulkSearchQuery(queries=[BulkSearchQueryEntity(index=self.index_name_1, q="Exact match hehehe", limit=0)], ))
             raise AssertionError
         except IllegalRequestedDocCount as e:
             pass
         # should work with 1:
         search_results = tensor_search.bulk_search(
-            marqo_config=self.config, query=BulkSearchQuery(queries=[BulkSearchQueryEntity(index=self.index_name_1, q="Exact match hehehe", limit=1)], return_doc_ids=True))
+            marqo_config=self.config, query=BulkSearchQuery(queries=[BulkSearchQueryEntity(index=self.index_name_1, q="Exact match hehehe", limit=1)], ))
         assert len(search_results["result"]) >= 1
         assert len(search_results["result"][0]['hits']) >= 1
 
@@ -464,7 +433,7 @@ class TestBulkSearch(MarqoTestCase):
                     index=self.index_name_1,
                     q="Exact match hehehe",
                     attributesToRetrieve=["other field", "Cool Field 1"]
-                )], return_doc_ids=True))
+                )], ))
 
         assert len(results['result']) == 1
         search_res = results['result'][0]
@@ -488,7 +457,7 @@ class TestBulkSearch(MarqoTestCase):
     #     for method in ("LEXICAL", "TENSOR"):
     #         search_res = tensor_search.search(
     #             config=self.config, index_name=self.index_name_1, text="Exact match hehehe",
-    #             attributes_to_retrieve=[], return_doc_ids=True, search_method=method
+    #             attributes_to_retrieve=[], search_method=method
     #         )
     #         assert len(search_res["hits"]) == 3
     #         for res in search_res["hits"]:
@@ -501,7 +470,7 @@ class TestBulkSearch(MarqoTestCase):
     #         for method in ("LEXICAL", "TENSOR"):
     #             search_res = tensor_search.search(
     #                 config=self.config, index_name=self.index_name_1, text="Exact match hehehe",
-    #                 attributes_to_retrieve=to_retrieve, return_doc_ids=True, search_method=method
+    #                 attributes_to_retrieve=to_retrieve, search_method=method
     #             )
     #             assert len(search_res["hits"]) == 0
     #             assert search_res['query'] == "Exact match hehehe"
@@ -520,7 +489,7 @@ class TestBulkSearch(MarqoTestCase):
     #         for method in ("TENSOR", "LEXICAL"):
     #             search_res = tensor_search.search(
     #                 config=self.config, index_name=self.index_name_1, text=" a ",
-    #                 attributes_to_retrieve=to_retrieve, return_doc_ids=True, search_method=method
+    #                 attributes_to_retrieve=to_retrieve, search_method=method
     #             )
     #             assert len(search_res["hits"]) == 3
     #             for res in search_res["hits"]:
@@ -548,7 +517,7 @@ class TestBulkSearch(MarqoTestCase):
     #         for method in ("TENSOR", "LEXICAL"):
     #             search_res = tensor_search.search(
     #                 config=self.config, index_name=self.index_name_1, text="a",
-    #                 attributes_to_retrieve=to_retrieve, return_doc_ids=True, search_method=method,
+    #                 attributes_to_retrieve=to_retrieve, search_method=method,
     #                 searchable_attributes=to_search
     #             )
     #             assert len(search_res["hits"]) == len(expected_ids)
@@ -568,7 +537,7 @@ class TestBulkSearch(MarqoTestCase):
     #             try:
     #                 tensor_search.search(
     #                     config=self.config, index_name=self.index_name_1, text="a",
-    #                     attributes_to_retrieve=bad_attr, return_doc_ids=True, search_method=method,
+    #                     attributes_to_retrieve=bad_attr, search_method=method,
     #                 )
     #                 raise AssertionError
     #             except (InvalidArgError, InvalidFieldNameError):
