@@ -211,8 +211,8 @@ class PatchifyModel:
 
             self.model, self.preprocess = func(self.model_name, self.device)
 
-            available_models[model_cache_key] = {"model":(self.model, self.preprocess),
-                                                 "time_stampe" : datetime.datetime.now()}
+            available_models[model_cache_key] = {"model": (self.model, self.preprocess),
+                                                 "time_stamp" : datetime.datetime.now()}
 
         else:
             self.model, self.preprocess = available_models[model_cache_key]["model"]
