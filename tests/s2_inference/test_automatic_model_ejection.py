@@ -42,7 +42,6 @@ class TestAutomaticModelEject(unittest.TestCase):
         def run():
             for model in small_list_of_models:
                 _ = vectorise(model_name=model, content=content, device="cpu")
-            print(mock_device_memory_manage.call_args_list)
             checked_models = [call_kwargs["device"] for call_args, call_kwargs
                                                 in mock_device_memory_manage.call_args_list]
 
@@ -50,7 +49,7 @@ class TestAutomaticModelEject(unittest.TestCase):
             return True
         assert run
 
-
+    def test_
 
     def test_model_management(self):
         # Instance should be out of memory without model management
