@@ -325,27 +325,65 @@ class TestValidateIndexSettings(unittest.TestCase):
         }
 
     def test_validate_index_settings(self):
-        good_settings = {
-            "index_defaults": {
-                "treat_urls_and_pointers_as_images": False,
-                "model": "hf/all_datasets_v4_MiniLM-L6",
-                "normalize_embeddings": True,
-                "text_preprocessing": {
-                    "split_length": 2,
-                    "split_overlap": 0,
-                    "split_method": "sentence"
+
+        good_settings =[
+            {
+                "index_defaults": {
+                    "treat_urls_and_pointers_as_images": False,
+                    "model": "hf/all_datasets_v4_MiniLM-L6",
+                    "normalize_embeddings": True,
+                    "text_preprocessing": {
+                        "split_length": 2,
+                        "split_overlap": 0,
+                        "split_method": "sentence"
+                    },
+                    "image_preprocessing": {
+                        "patch_method": None
+                    }
                 },
-                "image_preprocessing": {
-                    "patch_method": None
-                }
+                "number_of_shards": 5
             },
-            "number_of_shards": 5
-        }
-        assert good_settings == validation.validate_settings_object(good_settings)
+            {   # extra field in text_preprocessing: OK
+                "index_defaults": {
+                    "treat_urls_and_pointers_as_images": False,
+                    "model": "hf/all_datasets_v4_MiniLM-L6",
+                    "normalize_embeddings": True,
+                    "text_preprocessing": {
+                        "split_length": 2,
+                        "split_overlap": 0,
+                        "split_method": "sentence",
+                        "blah blah blah": "woohoo"
+                    },
+                    "image_preprocessing": {
+                        "patch_method": None
+                    }
+                },
+                "number_of_shards": 5
+            },
+            {  # extra field in image_preprocessing: OK
+                "index_defaults": {
+                    "treat_urls_and_pointers_as_images": False,
+                    "model": "hf/all_datasets_v4_MiniLM-L6",
+                    "normalize_embeddings": True,
+                    "text_preprocessing": {
+                        "split_length": 2,
+                        "split_overlap": 0,
+                        "split_method": "sentence",
+                    },
+                    "image_preprocessing": {
+                        "patch_method": None,
+                        "blah blah blah": "woohoo"
+                    }
+                },
+                "number_of_shards": 5,
+            }
+        ]
+        for settings in good_settings:
+            assert settings == validation.validate_settings_object(settings)
 
     def test_validate_index_settings_model_properties(self):
         good_settings = self.get_good_index_settings()
-        good_settings['model_properties'] = dict()
+        good_settings['index_defaults']['model_properties'] = dict()
         assert good_settings == validation.validate_settings_object(good_settings)
 
     def test_validate_index_settings_bad(self):
@@ -421,6 +459,101 @@ class TestValidateIndexSettings(unittest.TestCase):
         assert settings == validation.validate_settings_object(settings)
         settings['index_defaults']['image_preprocessing']["path_method"] = "frcnn"
         assert settings == validation.validate_settings_object(settings)
+
+    def test_validate_index_settings_misplaced_fields(self):
+        bad_settings = [
+            {
+                "index_defaults": {
+                    "treat_urls_and_pointers_as_images": False,
+                    "model": "hf/all_datasets_v4_MiniLM-L6",
+                    "normalize_embeddings": True,
+                    "text_preprocessing": {
+                        "split_length": 2,
+                        "split_overlap": 0,
+                        "split_method": "sentence"
+                    },
+                    "image_preprocessing": {
+                        "patch_method": None
+                    }
+                },
+                "number_of_shards": 5,
+                "model": "hf/all_datasets_v4_MiniLM-L6"  # model is also outside, here...
+            },
+            {
+                "index_defaults": {
+                    "image_preprocessing": {
+                        "patch_method": None  # no models here
+                    },
+                    "normalize_embeddings": True,
+                    "text_preprocessing": {
+                        "split_length": 2,
+                        "split_method": "sentence",
+                        "split_overlap": 0
+                    },
+                    "treat_urls_and_pointers_as_images": False
+                },
+                "model": "open_clip/ViT-L-14/laion2b_s32b_b82k", # model here (bad)
+                "number_of_shards": 5,
+                "treat_urls_and_pointers_as_images": True
+            },
+            {
+                "index_defaults": {
+                    "image_preprocessing": {
+                        "patch_method": None,
+                        "model": "open_clip/ViT-L-14/laion2b_s32b_b82k",
+                    },
+                    "normalize_embeddings": True,
+                    "text_preprocessing": {
+                        "split_length": 2,
+                        "split_method": "sentence",
+                        "split_overlap": 0
+                    },
+                    "treat_urls_and_pointers_as_images": False,
+                    "number_of_shards": 5,  # shouldn't be here
+                },
+                "treat_urls_and_pointers_as_images": True
+            },
+            {  # good, BUT extra field in index_defaults
+                "index_defaults": {
+                    "number_of_shards": 5,
+                    "treat_urls_and_pointers_as_images": False,
+                    "model": "hf/all_datasets_v4_MiniLM-L6",
+                    "normalize_embeddings": True,
+                    "text_preprocessing": {
+                        "split_length": 2,
+                        "split_overlap": 0,
+                        "split_method": "sentence"
+                    },
+                    "image_preprocessing": {
+                        "patch_method": None
+                    }
+                },
+                "number_of_shards": 5
+            },
+            {  # good, BUT extra field in root
+                "model": "hf/all_datasets_v4_MiniLM-L6",
+                "index_defaults": {
+                    "treat_urls_and_pointers_as_images": False,
+                    "model": "hf/all_datasets_v4_MiniLM-L6",
+                    "normalize_embeddings": True,
+                    "text_preprocessing": {
+                        "split_length": 2,
+                        "split_overlap": 0,
+                        "split_method": "sentence"
+                    },
+                    "image_preprocessing": {
+                        "patch_method": None
+                    }
+                },
+                "number_of_shards": 5
+            }
+        ]
+        for bad_set in bad_settings:
+            try:
+                validation.validate_settings_object(bad_set)
+                raise AssertionError
+            except InvalidArgError as e:
+                pass
 
     def test_validate_mappings(self):
         mappings = [
