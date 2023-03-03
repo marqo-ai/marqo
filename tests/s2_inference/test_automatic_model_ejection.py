@@ -10,7 +10,7 @@ from marqo.tensor_search import tensor_search
 from marqo.s2_inference.s2_inference import clear_loaded_models, vectorise
 
 
-class TestEncoding(unittest.TestCase):
+class TestAutomaticModelEject(unittest.TestCase):
     def setUp(self) -> None:
         clear_loaded_models()
 
