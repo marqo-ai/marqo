@@ -11,7 +11,7 @@ from marqo.s2_inference.logger import get_logger
 import torch
 import datetime
 import psutil
-from marqo.s2_inference.constants import MARQO_MAX_CPU_MODEL_MEMORY, MARQO_MAX_CUDA_MODEL_MEMORY, MODEL_TYPE_SIZE_MAPPING, DEFAULT_MODEL_SIZE
+from marqo.s2_inference import constants
 import time
 
 logger = get_logger(__name__)
@@ -87,7 +87,7 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
     """loads the model if it is not already loaded
     """
     global cpu_memory_usage
-    model_size = validated_model_properties.get("model_size", MODEL_TYPE_SIZE_MAPPING.get(validated_model_properties["type"], 1))
+    model_size = validated_model_properties.get("model_size", constants.MODEL_TYPE_SIZE_MAPPING.get(validated_model_properties["type"], 1))
     if model_cache_key not in available_models:
         device_memory_manage(model_name, validated_model_properties, device)
         try:
@@ -120,7 +120,7 @@ def device_memory_manage(model_name: str, model_properties: dict, device: str) -
         True we have enough space for the model
         Raise an error and return False if we can't find enough space for the model.
     '''
-    model_size = model_properties.get("model_size", MODEL_TYPE_SIZE_MAPPING.get(model_properties["type"], DEFAULT_MODEL_SIZE))
+    model_size = model_properties.get("model_size", constants.MODEL_TYPE_SIZE_MAPPING.get(model_properties["type"], constants.DEFAULT_MODEL_SIZE))
     if check_device_memory_status(device, model_size):
         return True
     else:
@@ -128,7 +128,7 @@ def device_memory_manage(model_name: str, model_properties: dict, device: str) -
         sorted_key_in_device = sorted(model_cache_key_in_device,
                                       key=lambda x: available_models[x]["time_stamp"])
         for key in sorted_key_in_device:
-            logger.info(f"Eject model = `{key.split('||')[0]}` with size = `{available_models[key].get('model_size', DEFAULT_MODEL_SIZE)}` from device = `{device}` "
+            logger.info(f"Eject model = `{key.split('||')[0]}` with size = `{available_models[key].get('model_size', constants.DEFAULT_MODEL_SIZE)}` from device = `{device}` "
                         f"to save space for model = `{model_name}`.")
             del available_models[key]
             if check_device_memory_status(device, model_size):
@@ -153,13 +153,14 @@ def check_device_memory_status(device:str, model_size: Union[float, int] = 1):
     if device.startswith("cuda"):
         torch.cuda.synchronize(device)
         used_memory = torch.cuda.memory_allocated(device) / 1024 ** 3
-        threshold = MARQO_MAX_CUDA_MODEL_MEMORY
+        threshold = constants.MARQO_MAX_CUDA_MODEL_MEMORY
     elif device.startswith("cpu"):
-        used_memory = sum([available_models[key].get("model_size", DEFAULT_MODEL_SIZE) for key, values in available_models.items() if key.endswith("cpu")])
-        threshold = MARQO_MAX_CPU_MODEL_MEMORY
+        used_memory = sum([available_models[key].get("model_size", constants.DEFAULT_MODEL_SIZE) for key, values in available_models.items() if key.endswith("cpu")])
+        threshold = constants.MARQO_MAX_CPU_MODEL_MEMORY
     else:
         raise ModelCacheManageError(f"Unable to check the device cache for device=`{device}`. The model loading will proceed"
                                     f"without device cache check. This might break down Marqo if too many models are loaded.")
+    print(used_memory, model_size, threshold)
     return used_memory + model_size < threshold
 
 

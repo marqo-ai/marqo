@@ -9,7 +9,8 @@ from marqo.s2_inference.model_registry import load_model_properties, _get_open_c
 import numpy as np
 from marqo.tensor_search import tensor_search
 from marqo.s2_inference.s2_inference import clear_loaded_models, vectorise, device_memory_manage,\
-                                            check_device_memory_status
+                                            check_device_memory_status, _validate_model_properties
+import marqo.s2_inference.constants
 
 
 class TestAutomaticModelEject(unittest.TestCase):
@@ -74,6 +75,10 @@ class TestAutomaticModelEject(unittest.TestCase):
                 raise AssertionError
             except ModelCacheManageError as e:
                 assert "Marqo CANNOT find enough space to load model" in e.message
+
+        with unittest.mock.patch('marqo.s2_inference.constants.MARQO_MAX_CPU_MODEL_MEMORY', 6):
+            for model in huge_models:
+                assert device_memory_manage(model, _validate_model_properties(model,None), device="cpu")
 
     def test_model_management(self):
         # Instance should be out of memory without model management
