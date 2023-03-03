@@ -55,7 +55,7 @@ A tensor-based search and analytics engine that seamlessly integrates with appli
 - Store unstructred data and semi-structured metadata together in documents, using a range of supported datatypes like bools, ints and keywords.
 
 **🍱 Managed cloud**
-- Scale marqo at the click of a button and Marqo at million document scale with high performace, including performant management of in-memory HNSW indexes.
+- Scale Marqo at the click of a button.
 - Multi-az, accelerated inference.
 - Marqo cloud ☁️ is in beta. If you’re interested, [apply here](https://q78175g1wwa.typeform.com/to/d0PEuRPC).
 
@@ -82,7 +82,7 @@ A tensor-based search and analytics engine that seamlessly integrates with appli
 ## Getting started
 
 
-1. Marqo requires docker. To install Docker go to the [Docker Official website.]([https://docs.docker.com/get-docker/](https://docs.docker.com/get-docker/)). Ensure that docker has at least 8GB memory and 50GB storage.
+1. Marqo requires docker. To install Docker go to the [Docker Official website](https://docs.docker.com/get-docker/). Ensure that docker has at least 8GB memory and 50GB storage.
 
 2. Use docker to run Marqo (Mac users with M-series chips will need to [go here](#m-series-mac-users)):
 

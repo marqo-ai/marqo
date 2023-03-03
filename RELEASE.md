@@ -1,3 +1,32 @@
+## Release 0.0.15
+
+## New features 
+- Multimodal tensor combination (https://github.com/marqo-ai/marqo/pull/332, https://github.com/marqo-ai/marqo/pull/355). Combine image and text data into a single vector! Multimodal combination objects can be added as Marqo document fields. For example, this can be used to encode text metadata into image vectors. See usage [here](https://docs.marqo.ai/0.0.15/Advanced-Usage/document_fields/#multimodal-combination-object).
+
+## Bug fixes
+- Fixed a bug that prevented CLIP's device check from behaving as expected (https://github.com/marqo-ai/marqo/pull/337)
+- CLIP utils is set to use the OpenCLIP default tokenizer so that long text inputs are truncated correctly (https://github.com/marqo-ai/marqo/pull/351). 
+
+## Contributor shout-outs:
+- Thank you to our 2.4k stargazers
+- Thank you to [@ed-muthiah](https://github.com/ed-muthiah), [@codebrain](https://github.com/codebrain) and others for raising issues.
+
+
+# Release 0.0.14
+
+## New features 
+- `use_existing_tensors` flag, for `add_documents` (https://github.com/marqo-ai/marqo/pull/335). Use existing Marqo tensors to autofill unchanged tensor fields, for existing documents. This lets you quickly add new metadata while minimising inference operations. See usage [here](https://docs.marqo.ai/0.0.14/API-Reference/documents/#query-parameters).
+- `image_download_headers` parameter for `search` and `add_documents` (https://github.com/marqo-ai/marqo/pull/336). Index and search non-publicly available images. Add image download auth information to `add_documents` and `search` requests. See usage [here](https://docs.marqo.ai/0.0.14/API-Reference/image_downloads/).
+
+## Optimisations
+- The index cache is now updated on intervals of 2 seconds (https://github.com/marqo-ai/marqo/pull/333), rather than on every search. This reduces the pressure on Marqo-OS, allowing for greater search and indexing throughput. 
+
+## Bug fixes
+- Helpful validation errors for invalid index settings (https://github.com/marqo-ai/marqo/pull/330). Helpful error messages allow for a smoother getting-started experience. 
+- Automatic precision conversion to `fp32` when using `fp16` models on CPU (https://github.com/marqo-ai/marqo/pull/331). 
+- Broadening of the types of image download errors gracefully handled. (https://github.com/marqo-ai/marqo/pull/321)
+
+
 # Release 0.0.13
 
 ## New features
