@@ -110,11 +110,11 @@ class NLTK:
 
         try:
             nltk.data.find('tokenizers/punkt')
-            self.logger.info("nltk data: tokenizers/punkt already downloaded")
+            self.logger.debug("nltk data: tokenizers/punkt already downloaded")
         except LookupError:
-            self.logger.info("could not find nltk data. downloading it now....")
+            self.logger.debug("could not find nltk data. downloading it now....")
             nltk.download('punkt')        
-            self.logger.info("completed downloading nltk data")
+            self.logger.debug("completed downloading nltk data")
 
 
 class ModelsForCacheing:
