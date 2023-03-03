@@ -52,7 +52,8 @@ from marqo.tensor_search import utils, backend, validation, configs, parallel, a
 from marqo.tensor_search.formatting import _clean_doc
 from marqo.tensor_search.index_meta_cache import get_cache, get_index_info
 from marqo.tensor_search import index_meta_cache
-from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQueryEntity, VectorisedJobs, VectorisedJobPointer, Qidx, JHash
+from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQueryEntity
+from marqo.tensor_search.models.search import VectorisedJobs, VectorisedJobPointer, Qidx, JHash
 from marqo.tensor_search.models.index_info import IndexInfo
 from marqo.tensor_search import constants
 from marqo.tensor_search.utils import add_timing
