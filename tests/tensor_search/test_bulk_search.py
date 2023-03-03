@@ -1,15 +1,13 @@
-import math
 from unittest import mock
 from marqo.tensor_search.enums import TensorField, SearchMethod, EnvVars, IndexSettingsField
 from marqo.errors import (
     IndexNotFoundError, InvalidArgError, InvalidFieldNameError, IllegalRequestedDocCount, BadRequestError
 )
-from marqo.tensor_search.models.api_models import BulkSearchQueryEntity, VectorisedJobs, BulkSearchQuery
+from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQueryEntity
 from marqo.tensor_search import tensor_search, constants, index_meta_cache
 import copy
 from tests.marqo_test import MarqoTestCase
-import requests
-import random
+
 
 class TestBulkSearch(MarqoTestCase):
 
