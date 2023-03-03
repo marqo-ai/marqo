@@ -135,7 +135,10 @@ def add_or_replace_documents(docs: List[Dict], index_name: str, refresh: bool = 
                         device: str = Depends(api_validation.validate_device),
                         use_existing_tensors: bool = False,
                         image_download_headers: typing.Optional[dict] = Depends(
-                            api_utils.decode_image_download_headers)):
+                            api_utils.decode_image_download_headers),
+                        mappings: typing.Optional[dict] = Depends(
+                            api_utils.decode_mappings)
+                             ):
     """add_documents endpoint (replace existing docs with the same id)"""
     return tensor_search.add_documents_orchestrator(
         config=marqo_config,
@@ -144,7 +147,8 @@ def add_or_replace_documents(docs: List[Dict], index_name: str, refresh: bool = 
         batch_size=batch_size, processes=processes, device=device,
         non_tensor_fields=non_tensor_fields, update_mode='replace',
         image_download_headers=image_download_headers,
-        use_existing_tensors=use_existing_tensors
+        use_existing_tensors=use_existing_tensors,
+        mappings=mappings
     )
 
 

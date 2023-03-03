@@ -199,3 +199,10 @@ class BackendTimeoutError(InternalError):
     """Error when Marqo operation takes longer than expected"""
     code = "backend_timeout_error"
     status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+
+
+class BatchInferenceSizeError(InternalError):
+    """Error when batch inference does not return expected size"""
+    code = "batch_inference_size_error"
+    status_code =  HTTPStatus.INTERNAL_SERVER_ERROR
+
