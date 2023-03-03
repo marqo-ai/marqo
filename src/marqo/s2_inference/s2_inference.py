@@ -109,7 +109,27 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
         available_models[model_cache_key]["time_stamp"] = time_stamp
 
 
-def device_memory_manage(model_name: str, model_properties: dict, device: str) -> None:
+def get_model_size(model_name:str, model_properties:dict) -> (int, float):
+    if "model_size" in model_properties:
+        return model_properties["model_size"]
+    type = model_properties["type"]
+    lower_model_name = model_name.lower()
+    if type in ("open_clip", "clip", "clip_onnx"):
+        if "vit-l" in lower_model_name :
+            return 1.5
+        elif "vit-g" in lower_model_name or "vit-h" in lower_model_name:
+            return 5
+        else:
+            return constants.DEFAULT_MODEL_SIZE[type]
+    elif type in ("sbert", "sbert_onnx", "hf"):
+        return constants.DEFAULT_MODEL_SIZE[type]
+
+    elif type in ("multilingual_clip"):
+        return 5
+
+    return constants.DEFAULT_MODEL_SIZE
+
+def device_memory_manage(model_name: str, model_properties: dict, device: str) -> bool:
     '''
     A function to manage the memory usage in devices when we want to load a new model
     Args:
@@ -120,7 +140,7 @@ def device_memory_manage(model_name: str, model_properties: dict, device: str) -
         True we have enough space for the model
         Raise an error and return False if we can't find enough space for the model.
     '''
-    model_size = model_properties.get("model_size", constants.MODEL_TYPE_SIZE_MAPPING.get(model_properties["type"], constants.DEFAULT_MODEL_SIZE))
+    model_size = get_model_size(model_name, model_properties)
     if check_device_memory_status(device, model_size):
         return True
     else:
@@ -140,7 +160,7 @@ def device_memory_manage(model_name: str, model_properties: dict, device: str) -
                                         f"Please use a smaller model or increase the memory threshold.")
 
 
-def check_device_memory_status(device:str, model_size: Union[float, int] = 1):
+def check_device_memory_status(device:str, model_size: Union[float, int] = 1) -> bool:
     '''
     Check the memory usage in the target device and decide whether we can add a new model
     Args:
@@ -160,7 +180,6 @@ def check_device_memory_status(device:str, model_size: Union[float, int] = 1):
     else:
         raise ModelCacheManageError(f"Unable to check the device cache for device=`{device}`. The model loading will proceed"
                                     f"without device cache check. This might break down Marqo if too many models are loaded.")
-    print(used_memory, model_size, threshold)
     return used_memory + model_size < threshold
 
 

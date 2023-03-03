@@ -6,6 +6,7 @@ MODEL_TYPE_SIZE_MAPPING = {
     "open_clip" : 1,
     "clip" : 1,
     "sbert" : 0.7,
+    "random" : 0.1,
 }
 
 # Set this to be a special number so we can tell the model size is from default
