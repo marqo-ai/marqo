@@ -129,7 +129,7 @@ def device_memory_manage(model_name: str, model_properties: dict, device: str) -
         sorted_key_in_device = sorted(model_cache_key_in_device,
                                       key=lambda x: available_models[x]["time_stamp"])
         for key in sorted_key_in_device:
-            logger.info(f"Eject model = `{key.split('||')[0]}` with size = `{available_models[key]['size']}` from device = `{device}` "
+            logger.info(f"Eject model = `{key.split('||')[0]}` with size = `{available_models[key].get('size', DEFAULT_MODEL_SIZE)}` from device = `{device}` "
                         f"to save space for model = `{model_name}`.")
             del available_models[key]
             if check_device_memory_status(device, model_size):
