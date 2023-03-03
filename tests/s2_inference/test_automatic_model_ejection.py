@@ -35,9 +35,8 @@ class TestAutomaticModelEject(unittest.TestCase):
         mock_device_memory_manage = unittest.mock.MagicMock()
         mock_device_memory_manage.side_effect = pass_through_device_memory_manage
 
-        # small_list_of_models = ['open_clip/convnext_base_w_320/laion_aesthetic_s13b_b82k',
-        #     "sentence-transformers/all-MiniLM-L6-v2", "flax-sentence-embeddings/all_datasets_v4_mpnet-base", 'open_clip/ViT-B-16/laion2b_s34b_b88k']
-        small_list_of_models = ["open_clip/ViT-B-32/openai"]
+        small_list_of_models = ['open_clip/convnext_base_w_320/laion_aesthetic_s13b_b82k',
+            "sentence-transformers/all-MiniLM-L6-v2", "flax-sentence-embeddings/all_datasets_v4_mpnet-base", 'open_clip/ViT-B-16/laion2b_s34b_b88k']
         content = "Try to kill the cpu"
 
         @unittest.mock.patch("marqo.s2_inference.s2_inference.device_memory_manage", mock_device_memory_manage)
