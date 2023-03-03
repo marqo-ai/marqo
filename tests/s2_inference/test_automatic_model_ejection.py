@@ -40,13 +40,17 @@ class TestAutomaticModelEject(unittest.TestCase):
         small_list_of_models = ["open_clip/ViT-B-32/openai"]
         content = "Try to kill the cpu"
 
-        for model in small_list_of_models:
-            _ = vectorise(model_name=model, content=content, device="cpu")
-        print(mock_device_memory_manage.call_args_list)
-        checked_models = [call_args[0] for call_args, call_kwargs
-                                            in mock_device_memory_manage.call_args_list]
+        @unittest.mock.patch("marqo.s2_inference.s2_inference.device_memory_manage", mock_device_memory_manage)
+        def run():
+            for model in small_list_of_models:
+                _ = vectorise(model_name=model, content=content, device="cpu")
+            print(mock_device_memory_manage.call_args_list)
+            checked_models = [call_args[0] for call_args, call_kwargs
+                                                in mock_device_memory_manage.call_args_list]
 
-        self.assertEqual(small_list_of_models, checked_models)
+            self.assertEqual(small_list_of_models, checked_models)
+            return True
+        assert run
 
 
 
