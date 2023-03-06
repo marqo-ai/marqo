@@ -116,7 +116,6 @@ def get_model_size(model_name:str, model_properties:dict) -> (int, float):
         return model_properties["model_size"]
 
     name_info = (model_name + model_properties.get("name", "")).lower().replace("/", "-")
-    print(name_info)
     for name, size in constants.MODEL_NAME_SIZE_MAPPING.items():
         if name in name_info:
             return size
