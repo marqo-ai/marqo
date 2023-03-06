@@ -1035,7 +1035,7 @@ def bulk_search(query: BulkSearchQuery, marqo_config: config.Config, verbose: bo
                 del hit["_highlights"]
 
         if q.reRanker is not None:
-            logger.info("reranking {i}th query using {}".format(q.reRanker))
+            logger.info(f"reranking {i}th query using {q.reRanker}")
             rerank(q, s, q.reRanker, device, 1)
 
     return {

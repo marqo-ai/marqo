@@ -35,6 +35,131 @@ class TestBulkSearch(MarqoTestCase):
     def test_bulk_vector_text_search_searchable_attributes_non_existent(self):
         """TODO: non existent attrib."""
 
+
+    def test_bulk_search_multiple_indexes(self):
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=[
+                {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "id1-first"},
+                {"abc": "random text", "other field": "Close match hehehe", "_id": "id1-second"},
+            ], auto_refresh=True)
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_2, docs=[
+                {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "id2-first"},
+                {"abc": "random text", "other field": "Close match hehehe", "_id": "id2-second"},
+            ], auto_refresh=True)
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_3)
+
+        resp = tensor_search.bulk_search(
+            query=BulkSearchQuery(queries=[
+                BulkSearchQueryEntity(index=self.index_name_1, q="match"),
+                BulkSearchQueryEntity(index=self.index_name_2, q="match"),
+                BulkSearchQueryEntity(index=self.index_name_3, q="match")
+            ]),
+            marqo_config=self.config,
+        )
+
+        assert len(resp['result']) == 3
+        idx1 = resp['result'][0]
+        idx2 = resp['result'][1]
+        idx3 = resp['result'][2]
+        
+        assert all([r["_id"][:4] == "id1-" for r in idx1["hits"]])
+        assert all([r["_id"][:4] == "id2-" for r in idx2["hits"]])
+        assert len(idx3['hits']) == 0
+
+    @mock.patch("marqo._httprequests.HttpRequests.get")
+    def test_bulk_search_multiple_queries_single_msearch_request(self, mock_msearch_get):
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=[
+                {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "id1-first"},
+                {"abc": "random text", "other field": "Close match hehehe", "_id": "id1-second"},
+            ], auto_refresh=True
+        )
+        tensor_search.bulk_search(
+            query=BulkSearchQuery(queries=[
+                BulkSearchQueryEntity(index=self.index_name_1, q="one thing"),
+                BulkSearchQueryEntity(index=self.index_name_1, q="two things"),
+                BulkSearchQueryEntity(index=self.index_name_1, q="many things")
+            ]),
+            marqo_config=self.config,
+        )
+
+        self.assertEqual(mock_msearch_get.call_count, 1)
+
+    @mock.patch("marqo.s2_inference.s2_inference.vectorise")
+    def test_bulk_search_different_models_separate_vectorise_calls(self, mock_vectorise):
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings={
+            "normalize_embeddings": False,
+        })
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_2)
+
+
+
+    def test_bulk_search_multiple_search_methods(self):
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=[
+                {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "id1-first"},
+                {"abc": "random text", "other field": "Close match hehehe", "_id": "id1-second"},
+            ], auto_refresh=True)
+
+        resp = tensor_search.bulk_search(
+            query=BulkSearchQuery(queries=[
+                BulkSearchQueryEntity(index=self.index_name_1, q="match", searchMethod="TENSOR"),
+                BulkSearchQueryEntity(index=self.index_name_1, q="random text", searchableAttributes=["abc"], searchMethod="LEXICAL"),
+            ]),
+            marqo_config=self.config,
+        )
+
+        assert len(resp['result']) == 2
+        tensor_result = resp['result'][0]
+        lexical_result = resp['result'][1]
+
+        assert lexical_result["hits"] != []
+        assert lexical_result["hits"][0]["_id"] == "id1-second" # Exact match with Lexical search should be first.
+
+    
+    def test_bulk_search_highlight_per_search_query(self):
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=[
+                {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "id1-first"},
+                {"abc": "random text", "other field": "Close match hehehe", "_id": "id1-second"},
+            ], auto_refresh=True)
+
+        resp = tensor_search.bulk_search(
+            query=BulkSearchQuery(queries=[
+                BulkSearchQueryEntity(index=self.index_name_1, q="match", showHighlights=True),
+                BulkSearchQueryEntity(index=self.index_name_1, q="match", showHighlights=False),
+            ]),
+            marqo_config=self.config,
+        )
+        assert len(resp['result']) == 2
+        idx1 = resp['result'][0]
+        idx2 = resp['result'][1]
+
+        for h in idx1["hits"]:
+            assert len(h.get("_highlights", [])) > 0
+
+        for h in idx2["hits"]:
+            assert h.get("_highlights", []) == []
+
+
+    def test_bulk_search_rerank_per_search_query(self):
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=[
+                {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "id1-first"},
+                {"abc": "random text", "other field": "Close match hehehe", "_id": "id1-second"},
+            ], auto_refresh=True)
+
+        resp = tensor_search.bulk_search(
+            query=BulkSearchQuery(queries=[
+                BulkSearchQueryEntity(index=self.index_name_1, q="match", reRanker='_testing'),
+                BulkSearchQueryEntity(index=self.index_name_1, q="match"),
+            ]),
+            marqo_config=self.config,
+        )
+
+
     def test_each_doc_returned_once(self):
         """TODO: make sure each return only has one doc for each ID,
                 - esp if matches are found in multiple fields
