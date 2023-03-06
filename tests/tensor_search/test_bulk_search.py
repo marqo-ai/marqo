@@ -90,10 +90,62 @@ class TestBulkSearch(MarqoTestCase):
     @mock.patch("marqo.s2_inference.s2_inference.vectorise")
     def test_bulk_search_different_models_separate_vectorise_calls(self, mock_vectorise):
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings={
-            "normalize_embeddings": False,
+            "index_defaults" : {
+                "normalize_embeddings": False,
+            }
         })
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_2)
+        tensor_search.bulk_search(
+            query=BulkSearchQuery(queries=[
+                BulkSearchQueryEntity(index=self.index_name_1, q="one thing"),
+                BulkSearchQueryEntity(index=self.index_name_2, q="two things"),
+            ]), marqo_config=self.config
+        )
+        mock_vectorise.assert_any_call(
+            model_name='hf/all_datasets_v4_MiniLM-L6', 
+            model_properties={'name': 'flax-sentence-embeddings/all_datasets_v4_MiniLM-L6', 'dimensions': 384, 'tokens': 128, 'type': 'hf', 'notes': ''},
+            content='one thing',
+            device='cpu',
+            normalize_embeddings=False,
+            image_download_headers=None
+        )
+        mock_vectorise.assert_any_call(
+            model_name='hf/all_datasets_v4_MiniLM-L6', 
+            model_properties={'name': 'flax-sentence-embeddings/all_datasets_v4_MiniLM-L6', 'dimensions': 384, 'tokens': 128, 'type': 'hf', 'notes': ''},
+            content='two things',
+            device='cpu',
+            normalize_embeddings=True,
+            image_download_headers=None
+        )
+        self.assertEqual(mock_vectorise.call_count, 2)
 
+    @mock.patch("marqo.s2_inference.s2_inference.vectorise")
+    def test_bulk_search_different_index_same_vector_models_single_vectorise_calls(self, mock_vectorise):
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_2)
+        tensor_search.bulk_search(
+            query=BulkSearchQuery(queries=[
+                BulkSearchQueryEntity(index=self.index_name_1, q="one thing"),
+                BulkSearchQueryEntity(index=self.index_name_1, q="two things"),
+            ]), marqo_config=self.config
+        )
+        mock_vectorise.assert_any_call(
+            model_name='hf/all_datasets_v4_MiniLM-L6', 
+            model_properties={'name': 'flax-sentence-embeddings/all_datasets_v4_MiniLM-L6', 'dimensions': 384, 'tokens': 128, 'type': 'hf', 'notes': ''},
+            content='one thing',
+            device='cpu',
+            normalize_embeddings=True,
+            image_download_headers=None
+        )
+        mock_vectorise.assert_any_call(
+            model_name='hf/all_datasets_v4_MiniLM-L6', 
+            model_properties={'name': 'flax-sentence-embeddings/all_datasets_v4_MiniLM-L6', 'dimensions': 384, 'tokens': 128, 'type': 'hf', 'notes': ''},
+            content='two things',
+            device='cpu',
+            normalize_embeddings=True,
+            image_download_headers=None
+        )
+        self.assertEqual(mock_vectorise.call_count, 2)
 
 
     def test_bulk_search_multiple_search_methods(self):
@@ -143,8 +195,8 @@ class TestBulkSearch(MarqoTestCase):
         for h in idx2["hits"]:
             assert h.get("_highlights", []) == []
 
-
-    def test_bulk_search_rerank_per_search_query(self):
+    @mock.patch("marqo.s2_inference.reranking.rerank.rerank_search_results")
+    def test_bulk_search_rerank_per_search_query(self, mock_rerank_search_results):
         tensor_search.add_documents(
             config=self.config, index_name=self.index_name_1, docs=[
                 {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "id1-first"},
@@ -153,12 +205,14 @@ class TestBulkSearch(MarqoTestCase):
 
         resp = tensor_search.bulk_search(
             query=BulkSearchQuery(queries=[
-                BulkSearchQueryEntity(index=self.index_name_1, q="match", reRanker='_testing'),
-                BulkSearchQueryEntity(index=self.index_name_1, q="match"),
+                BulkSearchQueryEntity(index=self.index_name_1, q="match", searchableAttributes=["abc", "other field"], reRanker='_testing'),
+                BulkSearchQueryEntity(index=self.index_name_1, q="match", searchableAttributes=["abc", "other field"]),
             ]),
             marqo_config=self.config,
         )
 
+        self.assertEqual(mock_rerank_search_results.call_count, 1)
+        
 
     def test_each_doc_returned_once(self):
         """TODO: make sure each return only has one doc for each ID,
