@@ -991,7 +991,7 @@ def refresh_index(config: Config, index_name: str):
 
 
 @add_timing
-def bulk_search(query: BulkSearchQuery, marqo_config: config.Config, reranker: Union[str, Dict] = None, return_doc_ids: bool=False, verbose: bool = True, device=None, raise_on_searchable_attribs: bool=False):
+def bulk_search(query: BulkSearchQuery, marqo_config: config.Config, reranker: Union[str, Dict] = None, verbose: bool = True, device=None, raise_on_searchable_attribs: bool=False):
     errs = [validation.validate_bulk_query_input(q) for q in query.queries]
     if any(errs):
         err = next(e for e in errs if e is not None)
@@ -1009,15 +1009,14 @@ def bulk_search(query: BulkSearchQuery, marqo_config: config.Config, reranker: U
         raise errors.InvalidArgError(f"Bulk search called with unknown search method(s)")
 
     tensor_search_results = dict(zip(tensor_queries.keys(), _bulk_vector_text_search(
-            marqo_config, list(tensor_queries.values()),
-            device=device,
+            marqo_config, list(tensor_queries.values()), device=device,
             raise_on_searchable_attribs=raise_on_searchable_attribs
         )))
 
     # TODO: combine lexical + tensor queries into /_msearch
     lexical_search_results = dict(zip(lexical_queries.keys(), [_lexical_search(
         config=marqo_config, index_name=q.index, text=q.q, result_count=q.limit, offset=q.offset,
-        return_doc_ids=return_doc_ids, searchable_attributes=q.searchableAttributes, verbose=verbose,
+        return_doc_ids=True, searchable_attributes=q.searchableAttributes, verbose=verbose,
         filter_string=q.filter, attributes_to_retrieve=q.attributesToRetrieve
     ) for q in lexical_queries.values()]))
 
@@ -1031,6 +1030,12 @@ def bulk_search(query: BulkSearchQuery, marqo_config: config.Config, reranker: U
         s["query"] = q.q
         s["limit"] = q.limit
         s["offset"] = q.offset
+
+        ## TODO: filter out highlights within `_lexical_search` 
+        if not q.showHighlights:
+            for hit in s["hits"]:
+                del hit["_highlights"]
+
 
     if reranker is not None:
         logger.info("reranking using {}".format(reranker))
@@ -1327,8 +1332,9 @@ def construct_vector_input_batches(query: Union[str, Dict], index_info) -> Union
             text_queries = [k for k, _ in ordered_queries if _is_image(k)]
             image_queries = [k for k, _ in ordered_queries if not _is_image(k)]
             return [batch for batch in [text_queries, image_queries] if batch]
+            return text_queries + image_queries
         else:
-            return [[k for k, _ in ordered_queries], ]
+            return [k for k, _ in ordered_queries]
 
 
 def get_vector_properties_to_search(searchable_attributes: Union[None, List[str]], index_info: IndexInfo,  raise_on_searchable_attribs: bool) -> List[str]:
@@ -1386,7 +1392,6 @@ def construct_msearch_body_elements(vector_properties_to_search: List[str], offs
             }
         }
 
-        field_names = list(index_info.get_text_properties().keys())
         if attributes_to_retrieve is not None:
             search_query["_source"] = {"include": attributes_to_retrieve} if len(attributes_to_retrieve) > 0 else False
 
@@ -1519,7 +1524,7 @@ def vectorise_jobs(jobs: List[VectorisedJobs]) -> Dict[JHash, List[float]]:
         )
     return result
 
-def get_query_vectors_from_jobs(queries: List[BulkSearchQueryEntity], qidx_to_job: Dict[Qidx, VectorisedJobs], job_to_vectors: Dict[JHash, VectorisedJobs], config: Config) -> Dict[Qidx, List[List[float]]]:
+def get_query_vectors_from_jobs(queries: List[BulkSearchQueryEntity], qidx_to_job: Dict[Qidx, VectorisedJobPointer], job_to_vectors: Dict[JHash, List[List[float]]], config: Config) -> Dict[Qidx, List[List[float]]]:
     """
     Retrieve the vectorised content associated to each query from the set of batch vectorise jobs.
 
@@ -1545,7 +1550,14 @@ def get_query_vectors_from_jobs(queries: List[BulkSearchQueryEntity], qidx_to_jo
             result[qidx] = vectors[0]
     return result
 
-def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity], device=None, raise_on_searchable_attribs=False, result_count: int = 5) -> List[Dict]:
+def create_empty_query_response(queries: List[BulkSearchQueryEntity]) -> List[Dict]:
+    return list(
+        map(
+            lambda x: {"hits": []}, queries
+        )
+    )
+
+def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity], device=None, raise_on_searchable_attribs=False) -> List[Dict]:
     if len(queries) == 0:
         return []
 
@@ -1577,7 +1589,8 @@ def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity
 
     aggregate_body = [line for body in query_to_body_parts.values() for line in body]
     if not aggregate_body:
-        return []
+        # Must return empty response, per search query
+        return list(map(lambda x: {"hits": []}, queries))
 
     logger.info(f"search (tensor) pre-processing: took {(timer() - start_preprocessing_time):.3f}s to vectorize and process query.")
 
@@ -1586,12 +1599,12 @@ def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity
     start_postprocess_time = timer()
 
     # 6. Get documents back to each query, perform "gather" operation
-    results = create_bulk_search_response(queries, query_to_body_count, responses, result_count)
+    results = create_bulk_search_response(queries, query_to_body_count, responses)
 
     logger.info(f"bulk search (tensor) post-processing: took {(timer() - start_postprocess_time):.3f}s")
     return results
 
-def create_bulk_search_response(queries: List[BulkSearchQueryEntity], query_to_body_count: Dict[Qidx, int], responses, result_count: int) -> List[Dict]:
+def create_bulk_search_response(queries: List[BulkSearchQueryEntity], query_to_body_count: Dict[Qidx, int], responses) -> List[Dict]:
     """
         Create Marqo search responses by extracting the appropriate elements from the batched /_msearch response. Also handles:
             - Boosting score (optional)
@@ -1613,13 +1626,9 @@ def create_bulk_search_response(queries: List[BulkSearchQueryEntity], query_to_b
         if query.boost is not None:
             gathered_docs = boost_score(gathered_docs, query.boost)
         docs_chunks_sorted = sort_chunks(gathered_docs)
-
-        res = _format_ordered_docs_simple(ordered_docs_w_chunks=docs_chunks_sorted, result_count=result_count)
-
-        if not query.showHighlights:
-            for hit in res["hits"]:
-                del hit["_highlights"]
-        results.append(res)
+        results.append(
+            _format_ordered_docs_simple(ordered_docs_w_chunks=docs_chunks_sorted, result_count=query.limit)
+        )
 
     return results
 
@@ -1984,21 +1993,6 @@ def _vector_text_search(
         f"search (tensor) post-processing: took {(total_postprocess_time):.3f}s to sort and format {len(completely_sorted)} results from Marqo-os.")
     return res
 
-def _format_ordered_docs_preserving(ordered_docs_w_chunks: List[dict], num_highlights: Optional[int], return_doc_ids, result_count: int) -> dict:
-    """Formats docs so that it preserves the original document, unless doc_ids are returned
-    Args:
-        ordered_docs_w_chunks:
-        num_highlights: number of highlights to return.
-    Returns:
-    """
-    return {'hits': [dict([
-        ('doc', _clean_doc(doc['doc']["_source"], doc_id=doc['_id'] if return_doc_ids else None)),
-        ('highlights', [{
-        the_chunk["_source"][TensorField.field_name]: the_chunk["_source"][TensorField.field_content]
-        } for the_chunk in doc['chunks']][:num_highlights])
-        ]) for doc in ordered_docs_w_chunks][:result_count]}
-
-    # format output:
 def _format_ordered_docs_simple(ordered_docs_w_chunks: List[dict], result_count: int) -> dict:
     """Only one highlight is returned
     Args:

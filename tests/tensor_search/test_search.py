@@ -1066,6 +1066,7 @@ class TestVectorSearch(MarqoTestCase):
             ({"Dogs": -2.0, "Poodles": 2}, ['poodle_doc', 'irrelevant_doc', 'dog_doc']),
         ]
         for query, expected_ordering in queries_expected_ordering:
+            
             res = tensor_search.search(
                 text=query,
                 index_name=self.index_name_1,
