@@ -116,14 +116,15 @@ def get_model_size(model_name:str, model_properties:dict) -> (int, float):
     '''
     if "model_size" in model_properties:
         return model_properties["model_size"]
-    type = model_properties["type"]
-    name_info = (model_name + model_properties.get(["name"], "")).lower().replace("/", "-")
 
+    name_info = (model_name + model_properties.get(["name"], "")).lower().replace("/", "-")
     for name, size in constants.MODEL_NAME_SIZE_MAPPING.items():
         if name in name_info:
             return size
 
+    type = model_properties["type"]
     return constants.MODEL_TYPE_SIZE_MAPPING.get(type, constants.DEFAULT_MODEL_SIZE)
+
 
 def device_memory_manage(model_name: str, model_properties: dict, device: str) -> bool:
     '''
