@@ -86,7 +86,6 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
                              normalize_embeddings: bool) -> None:
     """loads the model if it is not already loaded
     """
-    global cpu_memory_usage
     model_size = validated_model_properties.get("model_size", constants.MODEL_TYPE_SIZE_MAPPING.get(validated_model_properties["type"], 1))
     if model_cache_key not in available_models:
         device_memory_manage(model_name, validated_model_properties, device)
