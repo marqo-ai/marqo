@@ -72,10 +72,12 @@ def validate_bulk_query_input(q: 'BulkSearchQueryEntity') -> Optional[MarqoError
 
     validate_boost(boost=q.boost, search_method=q.searchMethod)
     if q.searchableAttributes is not None:
+        if not isinstance(q.searchableAttributes, (List, typing.Tuple)):
+            raise InvalidArgError("searchableAttributes must be a sequence!")
         [validate_field_name(attribute) for attribute in q.searchableAttributes]
     if q.attributesToRetrieve is not None:
         if not isinstance(q.attributesToRetrieve, (List, typing.Tuple)):
-            raise InvalidArgError("attributes_to_retrieve must be a sequence!")
+            raise InvalidArgError("attributesToRetrieve must be a sequence!")
         [validate_field_name(attribute) for attribute in q.attributesToRetrieve]
 
     return None

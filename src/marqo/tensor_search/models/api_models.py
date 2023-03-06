@@ -19,7 +19,7 @@ class SearchQuery(BaseModel):
     showHighlights: bool = True
     reRanker: str = None
     filter: str = None
-    attributesToRetrieve: List[str] = None
+    attributesToRetrieve: Union[None, List[str]] = None
     boost: Optional[Dict] = None
     image_download_headers: Optional[Dict] = None
 

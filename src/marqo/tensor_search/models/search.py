@@ -2,15 +2,21 @@ import json
 from pydantic import BaseModel
 from typing import Any, Union, List, Dict, Optional, NewType
 
-Qidx = NewType('Qidx', int)
-JHash = NewType('JHash', int)
+Qidx = NewType('Qidx', int) # Indicates the position of a search query in a bulk search request
+JHash = NewType('JHash', int) # hash of a VectoriseJob. Used for quick access of VectorisedJobs
 
 class VectorisedJobPointer(BaseModel):
+    """A VectorisedJobPointer is pointer to a subset of content within a VectorisedJobs (generally from a single query/
+    request). `start_idx:end_idx` is a slice to content (or vectors) within a VectorisedJob."""
     job_hash: JHash
     start_idx: int
     end_idx: int
 
 class VectorisedJobs(BaseModel):
+    """A vectorised job describes content (e.q. search queries, images) that can be vectorised (i.e can be sent to 
+    `s2_inference.vectorise`) in a single batch given they share common inference parameters.
+    
+    """
     model_name: str
     model_properties: Dict[str, Any]
     content: List[Union[str, List[str]]]
