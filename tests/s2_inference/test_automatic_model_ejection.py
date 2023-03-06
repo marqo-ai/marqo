@@ -1,17 +1,10 @@
 import unittest
-import os
-import torch
 import unittest.mock
 from marqo.s2_inference.errors import ModelCacheManageError
-from marqo.s2_inference.types import FloatTensor
-from marqo.s2_inference.s2_inference import clear_loaded_models, get_model_properties_from_registry
-from marqo.s2_inference.model_registry import load_model_properties, _get_open_clip_properties
-import numpy as np
 from marqo.tensor_search import tensor_search
 from marqo.s2_inference.s2_inference import clear_loaded_models, vectorise, device_memory_manage,\
                                             check_device_memory_status, _validate_model_properties,\
                                             get_model_size
-import marqo.s2_inference.constants
 
 
 class TestAutomaticModelEject(unittest.TestCase):
