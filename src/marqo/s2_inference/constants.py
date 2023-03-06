@@ -8,7 +8,8 @@ MODEL_TYPE_SIZE_MAPPING = {
     "sbert" : 0.7,
     "random" : 0.1,
     "multilingual_clip" : 5,
-
+    "clip_onnx":1,
+    'sbert_onnx' : 0.7,
 }
 
 MODEL_NAME_SIZE_MAPPING = {

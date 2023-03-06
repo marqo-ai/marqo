@@ -90,12 +90,30 @@ class TestAutomaticModelEject(unittest.TestCase):
             "flax-sentence-embeddings/all_datasets_v4_mpnet-base" : 0.7,
             'open_clip/ViT-B-16/laion2b_s34b_b88k': 1,
             'open_clip/coca_ViT-L-14/laion2b_s13b_b90k':1.5,
-           'open_clip/RN50x64/openai':1,
+            'open_clip/RN50x64/openai':1,
             "onnx16/open_clip/ViT-B-32/laion2b_e16":1,
         }
 
         for model_name, size in models_and_sizes.items():
-            self.assertEqual(get_model_size(model_name, _validate_model_properties(model_name)), size)
+            self.assertEqual(get_model_size(model_name, _validate_model_properties(model_name, None)), size, msg=model_name)
+
+        generic_model = {
+            "model_name" : "my_custom_clip",
+            "model_properties_1" : {
+                "name" : "ViT-L-14",
+                "type":"open_clip",
+                "dimensions" : 768,
+                "model_size" : 1.53,
+            },
+            "model_properties_2": {
+                "name": "ViT-L/14",
+                "dimensions": 768,
+                "type": "clip",
+            }
+        }
+
+        self.assertEqual(get_model_size(generic_model["model_name"],generic_model["model_properties_1"]), 1.53)
+        self.assertEqual(get_model_size(generic_model["model_name"], generic_model["model_properties_2"]), 1.5)
 
     def test_model_management(self):
         # Instance should be out of memory without model management
