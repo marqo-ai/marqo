@@ -297,9 +297,10 @@ def _get_marqo_root() -> str:
     return str(marqo_base_dir)
 
 def add_timing(f, key: str = "processingTimeMs"):
-    """
-        Decorator for functions that adds the processing time to the return Dict (NOTE: must return value of function
-        must be a dictionary). `key` param denotes what the processing time will be stored against.
+    """ Function decorator to add function timing to response payload.
+
+    Decorator for functions that adds the processing time to the return Dict (NOTE: must return value of function must
+    be a dictionary). `key` param denotes what the processing time will be stored against.
     """
     @functools.wraps(f)
     def wrap(*args, **kw):
