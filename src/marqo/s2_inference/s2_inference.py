@@ -113,7 +113,6 @@ def get_model_size(model_name:str, model_properties:dict) -> (int, float):
     '''
     Return the model size for given model
     Note that the priorities are size_in_properties -> model_name -> model_type
-
     '''
     if "model_size" in model_properties:
         return model_properties["model_size"]
