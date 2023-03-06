@@ -1001,6 +1001,8 @@ def bulk_search(query: BulkSearchQuery, marqo_config: config.Config, verbose: bo
 
     refresh_indexes_in_background(marqo_config, [q.index for q in query.queries])
 
+    selected_device = marqo_config.indexing_device if device is None else device
+
     tensor_queries: Dict[int, BulkSearchQueryEntity] = dict(filter(lambda e: e[1].searchMethod == SearchMethod.TENSOR, enumerate(query.queries)))
     lexical_queries: Dict[int, BulkSearchQueryEntity] = dict(filter(lambda e: e[1].searchMethod == SearchMethod.LEXICAL, enumerate(query.queries)))
 
@@ -1008,7 +1010,7 @@ def bulk_search(query: BulkSearchQuery, marqo_config: config.Config, verbose: bo
         raise errors.InvalidArgError(f"Bulk search called with unknown search method(s)")
 
     tensor_search_results = dict(zip(tensor_queries.keys(), _bulk_vector_text_search(
-            marqo_config, list(tensor_queries.values()), device=device,
+            marqo_config, list(tensor_queries.values()), device=selected_device,
         )))
 
     # TODO: combine lexical + tensor queries into /_msearch
@@ -1036,14 +1038,14 @@ def bulk_search(query: BulkSearchQuery, marqo_config: config.Config, verbose: bo
 
         if q.reRanker is not None:
             logger.info(f"reranking {i}th query using {q.reRanker}")
-            rerank(q, s, q.reRanker, device, 1)
+            rerank_query(q, s, q.reRanker, selected_device, 1)
 
     return {
         "result": search_results
     }
 
 
-def rerank(query: BulkSearchQueryEntity, result: Dict[str, Any], reranker: Union[str, Dict], device: str, num_highlights: int):
+def rerank_query(query: BulkSearchQueryEntity, result: Dict[str, Any], reranker: Union[str, Dict], device: str, num_highlights: int):
     if query.searchableAttributes is None:
         raise errors.InvalidArgError(f"searchable_attributes cannot be None when re-ranking. Specify which fields to search and rerank over.")
     try:
@@ -1391,8 +1393,8 @@ def construct_msearch_body_elements(vector_properties_to_search: List[str], offs
         if filter_string is not None:
             search_query["query"]["nested"]["query"]["knn"][f"{TensorField.chunks}.{vector_field}"][
                 "filter"] = {
-                    "query_string": {"query": f"{contextualised_filter}"}
-                }
+                "query_string": {"query": f"{contextualised_filter}"}
+            }
         body += [{"index": index_name}, search_query]
     return body
 
@@ -1775,20 +1777,20 @@ def _vector_text_search(
                             "include": ["__chunks.__field_content", "__chunks.__field_name"]
                         }
                     },
-                "query": {
-                "knn": {
-                    f"{TensorField.chunks}.{vector_field}": {
-                        "vector": vectorised_text,
-                        "k": result_count + offset
-                    }
+                    "query": {
+                        "knn": {
+                            f"{TensorField.chunks}.{vector_field}": {
+                                "vector": vectorised_text,
+                                "k": result_count + offset
+                            }
+                        }
+                    },
+                    "score_mode": "max"
                 }
             },
-            "score_mode": "max"
+            "_source": {
+                "exclude": ["__chunks.__vector_*"]
             }
-                },
-                "_source": {
-                    "exclude": ["__chunks.__vector_*"]
-                }
         }
 
         field_names = list(index_info.get_text_properties().keys())
@@ -1798,23 +1800,23 @@ def _vector_text_search(
         if filter_string is not None:
             search_query["query"]["nested"]["query"]["knn"][f"{TensorField.chunks}.{vector_field}"][
                 "filter"] = {
-                    "query_string": {"query": f"{contextualised_filter}"}
-                }
-            body += [{"index": index_name}, search_query]
+                "query_string": {"query": f"{contextualised_filter}"}
+            }
+        body += [{"index": index_name}, search_query]
 
-        if verbose:
-            print("vector search body:")
-            if verbose == 1:
-                readable_body = copy.deepcopy(body)
-                for i, q in enumerate(readable_body):
-                    if "index" in q:
-                            continue
-                    for vec in list(q["query"]["nested"]["query"]["knn"].keys()):
-                        readable_body[i]["query"]["nested"]["query"]["knn"][vec]["vector"] = \
-                            readable_body[i]["query"]["nested"]["query"]["knn"][vec]["vector"][:5]
-                    pprint.pprint(readable_body)
-            if verbose == 2:
-                pprint.pprint(body, compact=True)
+    if verbose:
+        print("vector search body:")
+        if verbose == 1:
+            readable_body = copy.deepcopy(body)
+            for i, q in enumerate(readable_body):
+                if "index" in q:
+                        continue
+                for vec in list(q["query"]["nested"]["query"]["knn"].keys()):
+                    readable_body[i]["query"]["nested"]["query"]["knn"][vec]["vector"] = \
+                        readable_body[i]["query"]["nested"]["query"]["knn"][vec]["vector"][:5]
+                pprint.pprint(readable_body)
+        if verbose == 2:
+            pprint.pprint(body, compact=True)
 
     if not body:
         # empty body means that there are no vector fields associated with the index.
