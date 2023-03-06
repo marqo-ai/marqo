@@ -83,7 +83,8 @@ def _create_model_cache_key(model_name: str, device: str, model_properties: dict
 def _update_available_models(model_cache_key: str, model_name: str, validated_model_properties: dict,
                              device: str,
                              normalize_embeddings: bool) -> None:
-    """loads the model if it is not already loaded
+    """loads the model if it is not already loaded.
+    Note this method assume the model_properties are validated.
     """
     model_size = validated_model_properties.get("model_size", constants.MODEL_TYPE_SIZE_MAPPING.get(validated_model_properties["type"], 1))
     if model_cache_key not in available_models:
