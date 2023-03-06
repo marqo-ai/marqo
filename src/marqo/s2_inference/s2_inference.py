@@ -10,14 +10,13 @@ from marqo.s2_inference.types import *
 from marqo.s2_inference.logger import get_logger
 import torch
 import datetime
-import psutil
 from marqo.s2_inference import constants
-import time
+from marqo.tensor_search.utils import read_env_vars_and_defaults
+from marqo.tensor_search.configs import EnvVars
 
 logger = get_logger(__name__)
-
 # The avaiable has the structure:
-# {"model_cache_key_1":{"model" : model_object, "time_stamp": time, "model_size" : model_size}}
+# {"model_cache_key_1":{"model" : model_object, "most_recently_used_time": time, "model_size" : model_size}}
 available_models = dict()
 MODEL_PROPERTIES = load_model_properties()
 
@@ -90,12 +89,12 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
     if model_cache_key not in available_models:
         device_memory_manage(model_name, validated_model_properties, device)
         try:
-            time_stamp = datetime.datetime.now()
+            most_recently_used_time = datetime.datetime.now()
             available_models[model_cache_key] = {"model":_load_model(model_name,
                                                             validated_model_properties, device=device),
-                                                 "time_stamp": time_stamp,
+                                                 "most_recently_used_time": most_recently_used_time,
                                                  "model_size": model_size}
-            logger.info(f'loaded {model_name} on device {device} with normalization={normalize_embeddings} at time={time_stamp}.')
+            logger.info(f'loaded {model_name} on device {device} with normalization={normalize_embeddings} at time={most_recently_used_time}.')
         except:
             raise ModelLoadError(
                 f"Unable to load model={model_name} on device={device} with normalization={normalize_embeddings}. "
@@ -103,9 +102,9 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
                 f"please check that model_properties={validated_model_properties} is correct "
                 f"and the model has valid access permission. ")
     else:
-        time_stamp = datetime.datetime.now()
-        logger.debug(f'renew {model_name} on device {device} with new time={time_stamp}.')
-        available_models[model_cache_key]["time_stamp"] = time_stamp
+        most_recently_used_time = datetime.datetime.now()
+        logger.debug(f'renew {model_name} on device {device} with new time={most_recently_used_time}.')
+        available_models[model_cache_key]["most_recently_used_time"] = most_recently_used_time
 
 
 def get_model_size(model_name:str, model_properties:dict) -> (int, float):
@@ -143,7 +142,7 @@ def device_memory_manage(model_name: str, model_properties: dict, device: str) -
     else:
         model_cache_key_in_device = [key for key in list(available_models) if key.endswith(device)]
         sorted_key_in_device = sorted(model_cache_key_in_device,
-                                      key=lambda x: available_models[x]["time_stamp"])
+                                      key=lambda x: available_models[x]["most_recently_used_time"])
         for key in sorted_key_in_device:
             logger.info(f"Eject model = `{key.split('||')[0]}` with size = `{available_models[key].get('model_size', constants.DEFAULT_MODEL_SIZE)}` from device = `{device}` "
                         f"to save space for model = `{model_name}`.")
@@ -170,13 +169,18 @@ def check_device_memory_status(device:str, model_size: Union[float, int] = 1) ->
     if device.startswith("cuda"):
         torch.cuda.synchronize(device)
         used_memory = torch.cuda.memory_allocated(device) / 1024 ** 3
-        threshold = constants.MARQO_MAX_CUDA_MODEL_MEMORY
+        threshold = read_env_vars_and_defaults(EnvVars.MARQO_MAX_CUDA_MODEL_MEMORY)
     elif device.startswith("cpu"):
         used_memory = sum([available_models[key].get("model_size", constants.DEFAULT_MODEL_SIZE) for key, values in available_models.items() if key.endswith("cpu")])
-        threshold = constants.MARQO_MAX_CPU_MODEL_MEMORY
+        threshold = read_env_vars_and_defaults(EnvVars.MARQO_MAX_CPU_MODEL_MEMORY)
     else:
         raise ModelCacheManageError(f"Unable to check the device cache for device=`{device}`. The model loading will proceed"
                                     f"without device cache check. This might break down Marqo if too many models are loaded.")
+    if model_size > threshold:
+        raise ModelCacheManageError(
+            f"You are trying to load a model with size = `{model_size}` into device = `{device}`, which is larger than the device threshlod = `{threshold}`."
+            f"We CANNOT find enough space for the model. Please change the threshold by setting the environment variables.\n"
+            f"You can check the detailed information at `https://docs.marqo.ai/0.0.16/Advanced-Usage/configuration/`.")
     return used_memory + model_size < threshold
 
 

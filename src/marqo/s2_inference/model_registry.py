@@ -277,7 +277,7 @@ def _get_open_clip_properties() -> Dict:
              'note': 'open_clip models',
              'type': 'open_clip',
              'pretrained': 'laion2b_s12b_b42k',
-             'model_size': 5,},
+             'model_size': 5},
         'open_clip/ViT-bigG-14/laion2b_s39b_b160k':
             {'name': 'open_clip/ViT-bigG-14/laion2b_s39b_b160k',
              'dimensions': 1280,

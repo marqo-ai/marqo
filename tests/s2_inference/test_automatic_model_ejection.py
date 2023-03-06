@@ -75,11 +75,8 @@ class TestAutomaticModelEject(unittest.TestCase):
                 _ = vectorise(model_name=model, content = 'this is a huge model', device="cpu")
                 raise AssertionError
             except ModelCacheManageError as e:
-                assert "Marqo CANNOT find enough space to load model" in e.message
+                assert "CANNOT find enough space" in e.message
 
-        with unittest.mock.patch('marqo.s2_inference.constants.MARQO_MAX_CPU_MODEL_MEMORY', 6):
-            for model in huge_models:
-                assert device_memory_manage(model, _validate_model_properties(model,None), device="cpu")
 
     def test_get_model_size(self):
         models_and_sizes = {
