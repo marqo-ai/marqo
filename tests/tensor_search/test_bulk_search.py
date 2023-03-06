@@ -1,11 +1,15 @@
+import copy
+import math
+import requests
+import random
 from unittest import mock
+
 from marqo.tensor_search.enums import TensorField, SearchMethod, EnvVars, IndexSettingsField
 from marqo.errors import (
     IndexNotFoundError, InvalidArgError, InvalidFieldNameError, IllegalRequestedDocCount, BadRequestError
 )
 from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQueryEntity
 from marqo.tensor_search import tensor_search, constants, index_meta_cache
-import copy
 from tests.marqo_test import MarqoTestCase
 
 
@@ -43,8 +47,7 @@ class TestBulkSearch(MarqoTestCase):
                  "_id": "1234", "finally": "Random text here efgh "},
             ], auto_refresh=True)
         search_res = tensor_search._bulk_vector_text_search(
-            config=self.config, queries=[BulkSearchQueryEntity(index=self.index_name_1, q=" efgh ")],
-            result_count=10
+            config=self.config, queries=[BulkSearchQueryEntity(index=self.index_name_1, q=" efgh ", limit=10)]
         )
         assert len(search_res) == 1
         assert len(search_res[0]['hits']) == 2
@@ -52,16 +55,16 @@ class TestBulkSearch(MarqoTestCase):
     def test_bulk_vector_text_search_against_empty_index(self):
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
         search_res = tensor_search._bulk_vector_text_search(
-            config=self.config, queries=[BulkSearchQueryEntity(index=self.index_name_1, q=" efgh ")],
-            result_count=10
+            config=self.config, queries=[BulkSearchQueryEntity(index=self.index_name_1, q=" efgh ", limit=10)]
         )
-        assert len(search_res) == 0
+        assert len(search_res) > 0
+        assert len(search_res[0]['hits']) == 0
+
 
     def test_bulk_vector_text_search_against_non_existent_index(self):
         try:
             tensor_search._bulk_vector_text_search(
-                config=self.config, queries=[BulkSearchQueryEntity(index=self.index_name_1, q=" efgh ")],
-                result_count=10
+                config=self.config, queries=[BulkSearchQueryEntity(index=self.index_name_1, q=" efgh ", limit=10)]
             )
             raise AssertionError
         except IndexNotFoundError:
@@ -442,529 +445,647 @@ class TestBulkSearch(MarqoTestCase):
             assert set(k for k in res.keys() if k not in TensorField.__dict__.values()) == \
                    {"other field", "Cool Field 1", "_id"}
 
-    # def test_attributes_to_retrieve_empty(self):
-    #     docs = {
-    #         "5678": {"abc": "Exact match hehehe", "other field": "baaadd",
-    #                  "Cool Field 1": "res res res", "_id": "5678"},
-    #         "rgjknrgnj": {"Cool Field 1": "somewhat match", "_id": "rgjknrgnj",
-    #                       "abc": "random text", "other field": "Close match hehehe"},
-    #         "9000": {"Cool Field 1": "somewhat match", "_id": "9000", "other field": "weewowow"}
-    #     }
-    #     tensor_search.add_documents(
-    #         config=self.config, index_name=self.index_name_1, docs=list(docs.values()), auto_refresh=True)
-    #     for method in ("LEXICAL", "TENSOR"):
-    #         search_res = tensor_search.search(
-    #             config=self.config, index_name=self.index_name_1, text="Exact match hehehe",
-    #             attributes_to_retrieve=[], search_method=method
-    #         )
-    #         assert len(search_res["hits"]) == 3
-    #         for res in search_res["hits"]:
-    #             assert set(k for k in res.keys() if k not in TensorField.__dict__.values()) == {"_id"}
+    def test_attributes_to_retrieve_empty(self):
+        docs = {
+            "5678": {"abc": "Exact match hehehe", "other field": "baaadd",
+                     "Cool Field 1": "res res res", "_id": "5678"},
+            "rgjknrgnj": {"Cool Field 1": "somewhat match", "_id": "rgjknrgnj",
+                          "abc": "random text", "other field": "Close match hehehe"},
+            "9000": {"Cool Field 1": "somewhat match", "_id": "9000", "other field": "weewowow"}
+        }
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=list(docs.values()), auto_refresh=True)
+        for method in ("LEXICAL", "TENSOR"):
+            search_res = tensor_search.bulk_search(
+                marqo_config=self.config, query=BulkSearchQuery(
+                queries=[BulkSearchQueryEntity(
+                    index=self.index_name_1,
+                    q="Exact match hehehe",
+                    attributesToRetrieve=[],
+                    searchMethod=method
+                )]
+            ))
+            assert len(search_res['result'][0]["hits"]) == 3
+            print(search_res)
+            for res in search_res['result'][0]["hits"]:
+                print("res=", res)
+                assert set(k for k in res.keys() if k not in TensorField.__dict__.values()) == {"_id"}
+    
+    def test_attributes_to_retrieve_empty_index(self):
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
+        assert 0 == tensor_search.get_stats(config=self.config, index_name=self.index_name_1)['numberOfDocuments']
+        for to_retrieve in [[], ["some field name"], ["some field name", "wowowow field"]]:
+            for method in ("LEXICAL", "TENSOR"):
+                search_res = tensor_search.bulk_search(
+                    marqo_config=self.config, query=BulkSearchQuery(
+                    queries=[BulkSearchQueryEntity(
+                        index=self.index_name_1,
+                        q="Exact match hehehe",
+                        attributesToRetrieve=to_retrieve,
+                        searchMethod=method
+                    )]
+                ))
+                print(search_res)
+                assert len(search_res['result']) > 0
+                search_res = search_res['result'][0]
+                
+                assert len(search_res["hits"]) == 0
+                assert search_res['query'] == "Exact match hehehe"
     #
-    # def test_attributes_to_retrieve_empty_index(self):
-    #     tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
-    #     assert 0 == tensor_search.get_stats(config=self.config, index_name=self.index_name_1)['numberOfDocuments']
-    #     for to_retrieve in [[], ["some field name"], ["some field name", "wowowow field"]]:
-    #         for method in ("LEXICAL", "TENSOR"):
-    #             search_res = tensor_search.search(
-    #                 config=self.config, index_name=self.index_name_1, text="Exact match hehehe",
-    #                 attributes_to_retrieve=to_retrieve, search_method=method
-    #             )
-    #             assert len(search_res["hits"]) == 0
-    #             assert search_res['query'] == "Exact match hehehe"
-    #
-    # def test_attributes_to_retrieve_non_existent(self):
-    #     docs = {
-    #         "5678": {"abc": "Exact a match hehehe", "other field": "baaadd",
-    #                  "Cool Field 1": "res res res", "_id": "5678"},
-    #         "rgjknrgnj": {"Cool Field 1": "somewhata  match", "_id": "rgjknrgnj",
-    #                       "abc": "random a text", "other field": "Close match hehehe"},
-    #         "9000": {"Cool Field 1": "somewhat a match", "_id": "9000", "other field": "weewowow"}
-    #     }
-    #     tensor_search.add_documents(
-    #         config=self.config, index_name=self.index_name_1, docs=list(docs.values()), auto_refresh=True)
-    #     for to_retrieve in [[], ["non existing field name"], ["other field", "non existing field name"]]:
-    #         for method in ("TENSOR", "LEXICAL"):
-    #             search_res = tensor_search.search(
-    #                 config=self.config, index_name=self.index_name_1, text=" a ",
-    #                 attributes_to_retrieve=to_retrieve, search_method=method
-    #             )
-    #             assert len(search_res["hits"]) == 3
-    #             for res in search_res["hits"]:
-    #                 assert "non existing field name" not in res
-    #                 assert set(k for k in res.keys()
-    #                            if k not in TensorField.__dict__.values() and k != "_id"
-    #                            ).issubset(to_retrieve)
-    #
-    # def test_attributes_to_retrieve_and_searchable_attribs(self):
-    #     docs = {
-    #         "i_1": {"field_1": "a", "other field": "baaadd",
-    #                 "Cool Field 1": "res res res", "_id": "i_1"},
-    #         "i_2": {"field_1": "a", "_id": "i_2",
-    #                 "field_2": "a", "other field": "Close match hehehe"},
-    #         "i_3": {"field_1": " a ", "_id": "i_3", "field_2": "a",
-    #                 "field_3": "a "}
-    #     }
-    #     tensor_search.add_documents(
-    #         config=self.config, index_name=self.index_name_1, docs=list(docs.values()), auto_refresh=True)
-    #     for to_retrieve, to_search, expected_ids, expected_fields in [
-    #         (["field_1"], ["field_3"], ["i_3"], ["field_1"]),
-    #         (["field_3"], ["field_1"], ["i_1", "i_2", "i_3"], ["field_3"]),
-    #         (["field_1", "field_2"], ["field_2", "field_3"], ["i_2", "i_3"], ["field_1", "field_2"]),
-    #     ]:
-    #         for method in ("TENSOR", "LEXICAL"):
-    #             search_res = tensor_search.search(
-    #                 config=self.config, index_name=self.index_name_1, text="a",
-    #                 attributes_to_retrieve=to_retrieve, search_method=method,
-    #                 searchable_attributes=to_search
-    #             )
-    #             assert len(search_res["hits"]) == len(expected_ids)
-    #             assert set(expected_ids) == {h['_id'] for h in search_res["hits"]}
-    #             for res in search_res["hits"]:
-    #                 relevant_fields = set(expected_fields).intersection(set(docs[res["_id"]].keys()))
-    #                 assert set(k for k in res.keys()
-    #                            if k not in TensorField.__dict__.values() and k != "_id"
-    #                            ) == relevant_fields
-    #
-    # def test_attributes_to_retrieve_non_list(self):
-    #     tensor_search.add_documents(config=self.config, index_name=self.index_name_1,
-    #                                 docs=[{"cool field 111": "this is some content"}],
-    #                                 auto_refresh=True)
-    #     for method in ("TENSOR", "LEXICAL"):
-    #         for bad_attr in ["jknjhc", "", dict(), 1234, 1.245]:
-    #             try:
-    #                 tensor_search.search(
-    #                     config=self.config, index_name=self.index_name_1, text="a",
-    #                     attributes_to_retrieve=bad_attr, search_method=method,
-    #                 )
-    #                 raise AssertionError
-    #             except (InvalidArgError, InvalidFieldNameError):
-    #                 pass
-    #
-    # def test_limit_results(self):
-    #     """"""
-    #     vocab_source = "https://www.mit.edu/~ecprice/wordlist.10000"
-    #
-    #     vocab = requests.get(vocab_source).text.splitlines()
-    #
-    #     tensor_search.add_documents(
-    #         config=self.config, index_name=self.index_name_1,
-    #         docs=[{"Title": "a " + (" ".join(random.choices(population=vocab, k=25)))}
-    #               for _ in range(2000)], auto_refresh=False
-    #     )
-    #     tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
-    #     for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
-    #         for max_doc in [0, 1, 2, 5, 10, 100, 1000]:
-    #
-    #             _environ = {EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: str(max_doc)}
-    #
-    #             @mock.patch("os.environ", mock_environ)
-    #             def run():
-    #                 half_search = tensor_search.search(search_method=search_method,
-    #                     config=self.config, index_name=self.index_name_1, text='a', result_count=max_doc//2)
-    #                 assert half_search['limit'] == max_doc//2
-    #                 assert len(half_search['hits']) == max_doc//2
-    #                 limit_search = tensor_search.search(search_method=search_method,
-    #                     config=self.config, index_name=self.index_name_1, text='a', result_count=max_doc)
-    #                 assert limit_search['limit'] == max_doc
-    #                 assert len(limit_search['hits']) == max_doc
-    #                 try:
-    #                     oversized_search = tensor_search.search(search_method=search_method,
-    #                         config=self.config, index_name=self.index_name_1, text='a', result_count=max_doc + 1)
-    #                 except IllegalRequestedDocCount:
-    #                     pass
-    #                 try:
-    #                     very_oversized_search = tensor_search.search(search_method=search_method,
-    #                         config=self.config, index_name=self.index_name_1, text='a', result_count=(max_doc + 1) * 2)
-    #                 except IllegalRequestedDocCount:
-    #                     pass
-    #                 return True
-    #         assert run()
-    #
-    # def test_limit_results_none(self):
-    #     """if env var isn't set or is None"""
-    #     vocab_source = "https://www.mit.edu/~ecprice/wordlist.10000"
-    #
-    #     vocab = requests.get(vocab_source).text.splitlines()
-    #
-    #     tensor_search.add_documents_orchestrator(
-    #         config=self.config, index_name=self.index_name_1,
-    #         docs=[{"Title": "a " + (" ".join(random.choices(population=vocab, k=25)))}
-    #               for _ in range(700)], auto_refresh=False, processes=4, batch_size=50
-    #     )
-    #     tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
-    #
-    #     for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
-    #         for mock_environ in [dict(), {EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: None},
-    #                              {EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: ''}]:
-    #             @mock.patch("os.environ", mock_environ)
-    #             def run():
-    #                 lim = 500
-    #                 half_search = tensor_search.search(
-    #                     search_method=search_method,
-    #                     config=self.config, index_name=self.index_name_1, text='a', result_count=lim)
-    #                 assert half_search['limit'] == lim
-    #                 assert len(half_search['hits']) == lim
-    #                 return True
-    #
-    #             assert run()
-    #
-    # def test_pagination_single_field(self):
-    #     vocab_source = "https://www.mit.edu/~ecprice/wordlist.10000"
-    #
-    #     vocab = requests.get(vocab_source).text.splitlines()
-    #     num_docs = 2000
-    #
-    #     tensor_search.add_documents(
-    #         config=self.config, index_name=self.index_name_1,
-    #         docs=[{"Title": "a " + (" ".join(random.choices(population=vocab, k=25))),
-    #                 "_id": str(i)
-    #                 }
-    #               for i in range(num_docs)], auto_refresh=False
-    #     )
-    #     tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
-    #
-    #     for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
-    #         for doc_count in [2000]:
-    #             # Query full results
-    #             full_search_results = tensor_search.search(
-    #                                     search_method=search_method,
-    #                                     config=self.config,
-    #                                     index_name=self.index_name_1,
-    #                                     text='a',
-    #                                     result_count=doc_count)
-    #
-    #             for page_size in [5, 10, 100, 1000, 2000]:
-    #                 paginated_search_results = {"hits": []}
-    #
-    #                 for page_num in range(math.ceil(num_docs / page_size)):
-    #                     lim = page_size
-    #                     off = page_num * page_size
-    #                     page_res = tensor_search.search(
-    #                                     search_method=search_method,
-    #                                     config=self.config,
-    #                                     index_name=self.index_name_1,
-    #                                     text='a',
-    #                                     result_count=lim, offset=off)
-    #
-    #                     paginated_search_results["hits"].extend(page_res["hits"])
-    #
-    #                 # Compare paginated to full results (length only for now)
-    #                 assert len(full_search_results["hits"]) == len(paginated_search_results["hits"])
-    #
-    #                 # TODO: re-add this assert when KNN incosistency bug is fixed
-    #                 # assert full_search_results["hits"] == paginated_search_results["hits"]
-    #
-    # def test_pagination_break_limitations(self):
-    #     tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
-    #     # Negative offset
-    #     for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
-    #         for lim in [1, 10, 1000]:
-    #             for off in [-1, -10, -1000]:
-    #                 try:
-    #                     tensor_search.search(text=" ",
-    #                                         index_name=self.index_name_1,
-    #                                         config=self.config,
-    #                                         result_count=lim,
-    #                                         offset=off,
-    #                                         search_method=search_method)
-    #                     raise AssertionError
-    #                 except IllegalRequestedDocCount:
-    #                     pass
-    #
-    #     # Negative limit
-    #     for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
-    #         for lim in [0, -1, -10, -1000]:
-    #             for off in [1, 10, 1000]:
-    #                 try:
-    #                     tensor_search.search(text=" ",
-    #                                         index_name=self.index_name_1,
-    #                                         config=self.config,
-    #                                         result_count=lim,
-    #                                         offset=off,
-    #                                         search_method=search_method)
-    #                     raise AssertionError
-    #                 except IllegalRequestedDocCount:
-    #                     pass
-    #
-    #     # Going over 10,000 for offset + limit
-    #     mock_environ = {EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: "10000"}
-    #     @mock.patch("os.environ", mock_environ)
-    #     def run():
-    #         for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
-    #             try:
-    #                 tensor_search.search(search_method=search_method,
-    #                                     config=self.config, index_name=self.index_name_1, text=' ',
-    #                                     result_count=10000,
-    #                                     offset=1)
-    #                 raise AssertionError
-    #             except IllegalRequestedDocCount:
-    #                 pass
-    #
-    #         return True
-    #
-    #     assert run()
-    #
-    # def test_pagination_multi_field_error(self):
-    #     # Try pagination with 0, 2, and 3 fields
-    #     # To be removed when multi-field pagination is added.
-    #     docs = [
-    #         {
-    #             "field_a": 0,
-    #             "field_b": 0,
-    #             "field_c": 0
-    #         },
-    #         {
-    #             "field_a": 1,
-    #             "field_b": 1,
-    #             "field_c": 1
-    #         }
-    #     ]
-    #
-    #     tensor_search.add_documents(
-    #         config=self.config, index_name=self.index_name_1,
-    #         docs=docs, auto_refresh=False
-    #     )
-    #
-    #     tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
-    #
-    #     for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
-    #         try:
-    #             tensor_search.search(text=" ",
-    #                                 index_name=self.index_name_1,
-    #                                 config=self.config,
-    #                                 offset=1,
-    #                                 searchable_attributes=["field_a", "field_b"],
-    #                                 search_method=search_method)
-    #             raise AssertionError
-    #         except InvalidArgError:
-    #             pass
-    #
-    #         try:
-    #             tensor_search.search(text=" ",
-    #                                 index_name=self.index_name_1,
-    #                                 config=self.config,
-    #                                 offset=1,
-    #                                 search_method=search_method)
-    #             raise AssertionError
-    #         except InvalidArgError:
-    #             pass
-    #
-    #         try:
-    #             tensor_search.search(text=" ",
-    #                                 index_name=self.index_name_1,
-    #                                 config=self.config,
-    #                                 offset=1,
-    #                                 searchable_attributes=[],
-    #                                 search_method=search_method)
-    #             raise AssertionError
-    #         except InvalidArgError:
-    #             pass
-    #
-    # def test_image_search_highlights(self):
-    #     """does the URL get returned as the highlight? (it should - because no rerankers are being used)"""
-    #     settings = {
-    #         "index_defaults": {
-    #             "treat_urls_and_pointers_as_images": True,
-    #             "model": "ViT-B/32",
-    #         }}
-    #     tensor_search.create_vector_index(
-    #         index_name=self.index_name_1, index_settings=settings, config=self.config
-    #     )
-    #     url_1 = "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png"
-    #     url_2 = "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png"
-    #     docs = [
-    #         {"_id": "123",
-    #          "image_field": url_1,
-    #          "text_field": "some words here"
-    #          },
-    #         {"_id": "789",
-    #          "image_field": url_2},
-    #     ]
-    #     tensor_search.add_documents(
-    #         config=self.config, auto_refresh=True, index_name=self.index_name_1, docs=docs
-    #     )
-    #     res = tensor_search.search(
-    #         config=self.config, index_name=self.index_name_1, text="some text", result_count=3,
-    #         searchable_attributes=['image_field']
-    #     )
-    #     assert len(res['hits']) == 2
-    #     assert {hit['image_field'] for hit in res['hits']} == {url_2, url_1}
-    #     assert {hit['_highlights']['image_field'] for hit in res['hits']} == {url_2, url_1}
-    #
-    # def test_multi_search(self):
-    #     docs = [
-    #         {"field_a": "Doberman, canines, golden retrievers are humanity's best friends",
-    #          "_id": 'dog_doc'},
-    #         {"field_a": "All things poodles! Poodles are great pets",
-    #          "_id": 'poodle_doc'},
-    #         {"field_a": "Construction and scaffolding equipment",
-    #          "_id": 'irrelevant_doc'}
-    #     ]
-    #     tensor_search.add_documents(
-    #         config=self.config, index_name=self.index_name_1,
-    #         docs=docs, auto_refresh=True
-    #     )
-    #     queries_expected_ordering = [
-    #         ({"Dogs": 2.0, "Poodles": -2}, ['dog_doc', 'irrelevant_doc', 'poodle_doc']),
-    #         ("dogs", ['dog_doc', 'poodle_doc', 'irrelevant_doc']),
-    #         ({"dogs": 1}, ['dog_doc', 'poodle_doc', 'irrelevant_doc']),
-    #         ({"Dogs": -2.0, "Poodles": 2}, ['poodle_doc', 'irrelevant_doc', 'dog_doc']),
-    #     ]
-    #     for query, expected_ordering in queries_expected_ordering:
-    #         res = tensor_search.search(
-    #             text=query,
-    #             index_name=self.index_name_1,
-    #             result_count=5,
-    #             config=self.config,
-    #             search_method=SearchMethod.TENSOR, )
-    #
-    #         # the poodle doc should be lower ranked than the irrelevant doc
-    #         for hit_position, _ in enumerate(res['hits']):
-    #             assert res['hits'][hit_position]['_id'] == expected_ordering[hit_position]
-    #
-    # def test_multi_search_images(self):
-    #     docs = [
-    #         {"loc a": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
-    #          "_id": 'realistic_hippo'},
-    #         {"loc b": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png",
-    #          "_id": 'artefact_hippo'}
-    #     ]
-    #     image_index_config = {
-    #         IndexSettingsField.index_defaults: {
-    #             IndexSettingsField.model: "ViT-B/16",
-    #             IndexSettingsField.treat_urls_and_pointers_as_images: True
-    #         }
-    #     }
-    #     tensor_search.create_vector_index(
-    #         config=self.config, index_name=self.index_name_1, index_settings=image_index_config)
-    #     tensor_search.add_documents(
-    #         config=self.config, index_name=self.index_name_1,
-    #         docs=docs, auto_refresh=True
-    #     )
-    #     queries_expected_ordering = [
-    #         ({"Nature photography": 2.0, "Artefact": -2}, ['realistic_hippo', 'artefact_hippo']),
-    #         ({"Nature photography": -1.0, "Artefact": 1.0}, ['artefact_hippo', 'realistic_hippo']),
-    #         ({"Nature photography": -1.5, "Artefact": 1.0, "hippo": 1.0}, ['artefact_hippo', 'realistic_hippo']),
-    #         ({"https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png": -1.0,
-    #           "blah": 1.0}, ['realistic_hippo', 'artefact_hippo']),
-    #         ({"https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png": 2.0,
-    #           "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png": -1.0},
-    #          ['artefact_hippo', 'realistic_hippo']),
-    #         ({"https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png": 2.0,
-    #           "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png": -1.0,
-    #           "artefact": 1.0, "photo realistic": -1,
-    #           },
-    #          ['artefact_hippo', 'realistic_hippo']),
-    #     ]
-    #     for query, expected_ordering in queries_expected_ordering:
-    #         res = tensor_search.search(
-    #             text=query,
-    #             index_name=self.index_name_1,
-    #             result_count=5,
-    #             config=self.config,
-    #             search_method=SearchMethod.TENSOR)
-    #         # the poodle doc should be lower ranked than the irrelevant doc
-    #         for hit_position, _ in enumerate(res['hits']):
-    #             assert res['hits'][hit_position]['_id'] == expected_ordering[hit_position]
-    #
-    # def test_multi_search_images_edge_cases(self):
-    #     docs = [
-    #         {"loc": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
-    #          "_id": 'realistic_hippo'},
-    #         {"field_a": "Some text about a weird forest",
-    #          "_id": 'artefact_hippo'}
-    #     ]
-    #     image_index_config = {
-    #         IndexSettingsField.index_defaults: {
-    #             IndexSettingsField.model: "ViT-B/16",
-    #             IndexSettingsField.treat_urls_and_pointers_as_images: True
-    #         }
-    #     }
-    #     tensor_search.create_vector_index(
-    #         config=self.config, index_name=self.index_name_1, index_settings=image_index_config)
-    #     tensor_search.add_documents(
-    #         config=self.config, index_name=self.index_name_1,
-    #         docs=docs, auto_refresh=True
-    #     )
-    #     invalid_queries = [{}, None, {123: 123}, {'123': None},
-    #                        {"https://marqo_not_real.com/image_1.png": 3}, set()]
-    #     for q in invalid_queries:
-    #         try:
-    #             tensor_search.search(
-    #                 text=q,
-    #                 index_name=self.index_name_1,
-    #                 result_count=5,
-    #                 config=self.config,
-    #                 search_method=SearchMethod.TENSOR)
-    #             raise AssertionError
-    #         except (InvalidArgError, BadRequestError) as e:
-    #             pass
-    #
-    # def test_multi_search_images_ok_edge_cases(self):
-    #     docs = [
-    #         {"loc": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
-    #          "_id": 'realistic_hippo'},
-    #         {"field_a": "Some text about a weird forest",
-    #          "_id": 'artefact_hippo'}
-    #     ]
-    #     image_index_config = {
-    #         IndexSettingsField.index_defaults: {
-    #             IndexSettingsField.model: "ViT-B/16",
-    #             IndexSettingsField.treat_urls_and_pointers_as_images: True
-    #         }
-    #     }
-    #     tensor_search.create_vector_index(
-    #         config=self.config, index_name=self.index_name_1, index_settings=image_index_config)
-    #     tensor_search.add_documents(
-    #         config=self.config, index_name=self.index_name_1,
-    #         docs=docs, auto_refresh=True
-    #     )
-    #     alright_queries = [{"v ": 1.2}, {"d ": 0}, {"vf": -1}]
-    #     for q in alright_queries:
-    #         tensor_search.search(
-    #             text=q,
-    #             index_name=self.index_name_1,
-    #             result_count=5,
-    #             config=self.config,
-    #             search_method=SearchMethod.TENSOR)
-    #
-    # def test_image_search(self):
-    #     """This test is to ensure image search works as expected
-    #     The code paths for image and search have diverged quite a bit
-    #     """
-    #     hippo_image = (
-    #         'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
-    #     )
-    #     doc_dict = {
-    #         'realistic_hippo': {"loc": hippo_image,
-    #          "_id": 'realistic_hippo'},
-    #         'artefact_hippo': {"field_a": "Some text about a weird forest",
-    #          "_id": 'artefact_hippo'}
-    #     }
-    #     docs = list(doc_dict.values())
-    #     image_index_config = {
-    #         IndexSettingsField.index_defaults: {
-    #             IndexSettingsField.model: "ViT-B/16",
-    #             IndexSettingsField.treat_urls_and_pointers_as_images: True
-    #         }
-    #     }
-    #     tensor_search.create_vector_index(
-    #         config=self.config, index_name=self.index_name_1, index_settings=image_index_config)
-    #     tensor_search.add_documents(
-    #         config=self.config, index_name=self.index_name_1,
-    #         docs=docs, auto_refresh=True
-    #     )
-    #     res = tensor_search.search(
-    #         text=hippo_image,
-    #         index_name=self.index_name_1,
-    #         result_count=5,
-    #         config=self.config,
-    #         search_method=SearchMethod.TENSOR)
-    #     assert len(res['hits']) == 2
-    #     for hit in res['hits']:
-    #         original_doc = doc_dict[hit['_id']]
-    #         assert len(hit['_highlights']) == 1
-    #         highlight_field = list(hit['_highlights'].keys())[0]
-    #         assert highlight_field in original_doc
-    #         assert hit[highlight_field] == original_doc[highlight_field]
+    def test_attributes_to_retrieve_non_existent(self):
+        docs = {
+            "5678": {"abc": "Exact a match hehehe", "other field": "baaadd",
+                     "Cool Field 1": "res res res", "_id": "5678"},
+            "rgjknrgnj": {"Cool Field 1": "somewhata  match", "_id": "rgjknrgnj",
+                          "abc": "random a text", "other field": "Close match hehehe"},
+            "9000": {"Cool Field 1": "somewhat a match", "_id": "9000", "other field": "weewowow"}
+        }
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=list(docs.values()), auto_refresh=True)
+        for to_retrieve in [[], ["non existing field name"], ["other field", "non existing field name"]]:
+            for method in ("TENSOR", "LEXICAL"):
+                search_res = tensor_search.bulk_search(
+                    marqo_config=self.config, query=BulkSearchQuery(
+                    queries=[BulkSearchQueryEntity(
+                        index=self.index_name_1,
+                        q="Exact match hehehe",
+                        attributesToRetrieve=to_retrieve,
+                        searchMethod=method
+                    )]
+                ))
+                assert len(search_res['result']) > 0
+                search_res = search_res['result'][0]
+                assert len(search_res["hits"]) == 3
+                for res in search_res["hits"]:
+                    assert "non existing field name" not in res
+                    assert set(k for k in res.keys()
+                               if k not in TensorField.__dict__.values() and k != "_id"
+                               ).issubset(to_retrieve)
+
+    def test_attributes_to_retrieve_and_searchable_attribs(self):
+        docs = {
+            "i_1": {"field_1": "a", "other field": "baaadd",
+                    "Cool Field 1": "res res res", "_id": "i_1"},
+            "i_2": {"field_1": "a", "_id": "i_2",
+                    "field_2": "a", "other field": "Close match hehehe"},
+            "i_3": {"field_1": " a ", "_id": "i_3", "field_2": "a",
+                    "field_3": "a "}
+        }
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=list(docs.values()), auto_refresh=True)
+        for to_retrieve, to_search, expected_ids, expected_fields in [
+            (["field_1"], ["field_3"], ["i_3"], ["field_1"]),
+            (["field_3"], ["field_1"], ["i_1", "i_2", "i_3"], ["field_3"]),
+            (["field_1", "field_2"], ["field_2", "field_3"], ["i_2", "i_3"], ["field_1", "field_2"]),
+        ]:
+            for method in ("TENSOR", "LEXICAL"):
+                search_res = tensor_search.bulk_search(
+                    marqo_config=self.config, query=BulkSearchQuery(
+                    queries=[BulkSearchQueryEntity(
+                        index=self.index_name_1,
+                        q="a",
+                        attributesToRetrieve=to_retrieve,
+                        searchableAttributes=to_search,
+                        searchMethod=method
+                    )]
+                ))
+                assert len(search_res["result"]) > 0
+                search_res = search_res["result"][0]
+
+                assert len(search_res["hits"]) == len(expected_ids)
+                assert set(expected_ids) == {h['_id'] for h in search_res["hits"]}
+                for res in search_res["hits"]:
+                    relevant_fields = set(expected_fields).intersection(set(docs[res["_id"]].keys()))
+                    assert set(k for k in res.keys()
+                               if k not in TensorField.__dict__.values() and k != "_id"
+                               ) == relevant_fields
+
+    def test_limit_results(self):
+        """"""
+        vocab_source = "https://www.mit.edu/~ecprice/wordlist.10000"
+    
+        vocab = requests.get(vocab_source).text.splitlines()
+    
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1,
+            docs=[{"Title": "a " + (" ".join(random.choices(population=vocab, k=25)))}
+                  for _ in range(2000)], auto_refresh=False
+        )
+        tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
+        for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
+            for max_doc in [0, 1, 2, 5, 10, 100, 1000]:
+    
+                mock_environ = {EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: str(max_doc)}
+    
+                @mock.patch("os.environ", mock_environ)
+                def run():
+                    half_search = tensor_search.bulk_search(
+                        marqo_config=self.config, query=BulkSearchQuery(
+                        queries=[BulkSearchQueryEntity(
+                            index=self.index_name_1,
+                            q="a",
+                            searchMethod=search_method,
+                            limit=max_doc//2
+                        )]
+                    ))
+                    assert len(half_search['result']) > 0 
+                    half_search = half_search['result'][0]
+
+                    assert half_search['limit'] == max_doc//2
+                    assert len(half_search['hits']) == max_doc//2
+                    limit_search = tensor_search.bulk_search(
+                        marqo_config=self.config, query=BulkSearchQuery(
+                        queries=[BulkSearchQueryEntity(
+                            index=self.index_name_1,
+                            q="a",
+                            searchMethod=search_method,
+                            limit=max_doc
+                        )]
+                    ))
+                    assert len(limit_search['result']) > 0 
+                    limit_search = limit_search['result'][0]
+
+                    assert limit_search['limit'] == max_doc
+                    assert len(limit_search['hits']) == max_doc
+                    try:
+                        tensor_search.bulk_search(
+                            marqo_config=self.config, query=BulkSearchQuery(
+                            queries=[BulkSearchQueryEntity(
+                                index=self.index_name_1,
+                                q="a",
+                                searchMethod=search_method,
+                                limit=max_doc+1
+                                )]
+                        ))
+                        raise AssertionError("Should not be able to search with limit > max_docs")
+                    except IllegalRequestedDocCount:
+                        pass
+
+                    try:
+                        tensor_search.bulk_search(
+                            marqo_config=self.config, query=BulkSearchQuery(
+                            queries=[BulkSearchQueryEntity(
+                                index=self.index_name_1,
+                                q="a",
+                                searchMethod=search_method,
+                                limit=(max_doc+1) * 2
+                                )]
+                        ))
+                        raise AssertionError("Should not be able to search with limit > max_docs")
+                    except IllegalRequestedDocCount:
+                        pass
+                    return True
+            assert run()
+    
+    def test_limit_results_none(self):
+        """if env var isn't set or is None"""
+        vocab_source = "https://www.mit.edu/~ecprice/wordlist.10000"
+    
+        vocab = requests.get(vocab_source).text.splitlines()
+    
+        tensor_search.add_documents_orchestrator(
+            config=self.config, index_name=self.index_name_1,
+            docs=[{"Title": "a " + (" ".join(random.choices(population=vocab, k=25)))}
+                  for _ in range(700)], auto_refresh=False, processes=4, batch_size=50
+        )
+        tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
+    
+        for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
+            for mock_environ in [dict(), {EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: None},
+                                 {EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: ''}]:
+                @mock.patch("os.environ", mock_environ)
+                def run():
+                    lim = 500
+                    half_search = tensor_search.bulk_search(
+                            marqo_config=self.config, query=BulkSearchQuery(
+                            queries=[BulkSearchQueryEntity(
+                                index=self.index_name_1,
+                                q="a",
+                                searchMethod=search_method,
+                                limit=lim
+                            )]
+                        ))
+                    assert len(half_search['result']) > 0 
+                    half_search = half_search['result'][0]
+
+                    assert half_search['limit'] == lim
+                    assert len(half_search['hits']) == lim
+                    return True
+    
+                assert run()
+
+    def test_pagination_single_field(self):
+        vocab_source = "https://www.mit.edu/~ecprice/wordlist.10000"
+    
+        vocab = requests.get(vocab_source).text.splitlines()
+        num_docs = 2000
+    
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1,
+            docs=[{"Title": "a " + (" ".join(random.choices(population=vocab, k=25))),
+                    "_id": str(i)
+                    }
+                  for i in range(num_docs)], auto_refresh=False
+        )
+        tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
+    
+        for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
+            for doc_count in [2000]:
+                # Query full results
+                full_search_results = tensor_search.bulk_search(
+                            marqo_config=self.config, query=BulkSearchQuery(
+                            queries=[BulkSearchQueryEntity(
+                                index=self.index_name_1,
+                                q="a",
+                                searchMethod=search_method,
+                                limit=doc_count
+                            )]
+                        ))
+                full_search_results = full_search_results['result'][0]
+    
+                for page_size in [5, 10, 100, 1000, 2000]:
+                    paginated_search_results = {"hits": []}
+    
+                    for page_num in range(math.ceil(num_docs / page_size)):
+                        lim = page_size
+                        off = page_num * page_size
+                        page_res = tensor_search.bulk_search(
+                            marqo_config=self.config, query=BulkSearchQuery(
+                            queries=[BulkSearchQueryEntity(
+                                index=self.index_name_1,
+                                q="a",
+                                searchMethod=search_method,
+                                limit=lim,
+                                offset=off
+                            )]
+                        ))
+                        page_res = page_res['result'][0]
+                        paginated_search_results["hits"].extend(page_res["hits"])
+    
+                    # Compare paginated to full results (length only for now)
+                    assert len(full_search_results["hits"]) == len(paginated_search_results["hits"])
+    
+
+    def test_pagination_break_limitations(self):
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
+        # Negative offset
+        for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
+            for lim in [1, 10, 1000]:
+                for off in [-1, -10, -1000]:
+                    try:
+                        tensor_search.bulk_search(
+                            marqo_config=self.config, query=BulkSearchQuery(
+                            queries=[BulkSearchQueryEntity(
+                                index=self.index_name_1,
+                                q=" ",
+                                searchMethod=search_method,
+                                limit=lim,
+                                offset=off
+                            )]
+                        ))
+                        raise AssertionError
+                    except IllegalRequestedDocCount:
+                        pass
+    
+        # Negative limit
+        for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
+            for lim in [0, -1, -10, -1000]:
+                for off in [1, 10, 1000]:
+                    try:
+                        tensor_search.bulk_search(
+                            marqo_config=self.config, query=BulkSearchQuery(
+                            queries=[BulkSearchQueryEntity(
+                                index=self.index_name_1,
+                                q=" ",
+                                searchMethod=search_method,
+                                limit=lim,
+                                offset=off
+                            )]
+                        ))
+                        raise AssertionError
+                    except IllegalRequestedDocCount:
+                        pass
+    
+        # Going over 10,000 for offset + limit
+        mock_environ = {EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: "10000"}
+        @mock.patch("os.environ", mock_environ)
+        def run():
+            for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
+                try:
+                    tensor_search.bulk_search(
+                            marqo_config=self.config, query=BulkSearchQuery(
+                            queries=[BulkSearchQueryEntity(
+                                index=self.index_name_1,
+                                q=" ",
+                                searchMethod=search_method,
+                                limit=10000,
+                                offset=1
+                            )]
+                        ))
+                    raise AssertionError
+                except IllegalRequestedDocCount:
+                    pass
+    
+            return True
+    
+        assert run()
+
+    def test_pagination_multi_field_error(self):
+        # Try pagination with 0, 2, and 3 fields
+        # To be removed when multi-field pagination is added.
+        docs = [
+            {
+                "field_a": 0,
+                "field_b": 0,
+                "field_c": 0
+            },
+            {
+                "field_a": 1,
+                "field_b": 1,
+                "field_c": 1
+            }
+        ]
+    
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1,
+            docs=docs, auto_refresh=False
+        )
+    
+        tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
+    
+        for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
+            try:
+                tensor_search.bulk_search(
+                    marqo_config=self.config, query=BulkSearchQuery(
+                    queries=[BulkSearchQueryEntity(
+                        index=self.index_name_1,
+                        q=" ",
+                        searchMethod=search_method,
+                        searchableAttributes=["field_a", "field_b"],
+                        offset=1
+                    )]
+                ))
+                raise AssertionError
+            except InvalidArgError:
+                pass
+    
+            try:
+                tensor_search.bulk_search(
+                    marqo_config=self.config, query=BulkSearchQuery(
+                    queries=[BulkSearchQueryEntity(
+                        index=self.index_name_1,
+                        q=" ",
+                        searchMethod=search_method,
+                        offset=1
+                    )]
+                ))
+                raise AssertionError
+            except InvalidArgError:
+                pass
+    
+            try:
+                tensor_search.bulk_search(
+                    marqo_config=self.config, query=BulkSearchQuery(
+                    queries=[BulkSearchQueryEntity(
+                        index=self.index_name_1,
+                        q=" ",
+                        searchMethod=search_method,
+                        searchableAttributes=[],
+                        offset=1
+                    )]
+                ))
+                raise AssertionError
+            except InvalidArgError:
+                pass
+
+    def test_image_search_highlights(self):
+        """does the URL get returned as the highlight? (it should - because no rerankers are being used)"""
+        settings = {
+            "index_defaults": {
+                "treat_urls_and_pointers_as_images": True,
+                "model": "ViT-B/32",
+            }}
+        tensor_search.create_vector_index(
+            index_name=self.index_name_1, index_settings=settings, config=self.config
+        )
+        url_1 = "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png"
+        url_2 = "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png"
+        docs = [
+            {"_id": "123",
+             "image_field": url_1,
+             "text_field": "some words here"
+             },
+            {"_id": "789",
+             "image_field": url_2},
+        ]
+        tensor_search.add_documents(
+            config=self.config, auto_refresh=True, index_name=self.index_name_1, docs=docs
+        )
+        res = tensor_search.bulk_search(
+            marqo_config=self.config, query=BulkSearchQuery(
+            queries=[BulkSearchQueryEntity(
+                index=self.index_name_1,
+                q="some text",
+                limit=3,
+                searchableAttributes=['image_field'],
+            )]
+        ))
+        res = res['result'][0]
+
+        assert len(res['hits']) == 2
+        assert {hit['image_field'] for hit in res['hits']} == {url_2, url_1}
+        assert {hit['_highlights']['image_field'] for hit in res['hits']} == {url_2, url_1}
+
+    def test_multi_search(self):
+        docs = [
+            {"field_a": "Doberman, canines, golden retrievers are humanity's best friends",
+             "_id": 'dog_doc'},
+            {"field_a": "All things poodles! Poodles are great pets",
+             "_id": 'poodle_doc'},
+            {"field_a": "Construction and scaffolding equipment",
+             "_id": 'irrelevant_doc'}
+        ]
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1,
+            docs=docs, auto_refresh=True
+        )
+        queries_expected_ordering = [
+            ({"Dogs": 2.0, "Poodles": -2}, ['dog_doc', 'irrelevant_doc', 'poodle_doc']),
+            ("dogs", ['dog_doc', 'poodle_doc', 'irrelevant_doc']),
+            ({"dogs": 1}, ['dog_doc', 'poodle_doc', 'irrelevant_doc']),
+            ({"Dogs": -2.0, "Poodles": 2}, ['poodle_doc', 'irrelevant_doc', 'dog_doc']),
+        ]
+        for query, expected_ordering in queries_expected_ordering:
+            res = tensor_search.bulk_search(
+                marqo_config=self.config, query=BulkSearchQuery(
+                queries=[BulkSearchQueryEntity(
+                    index=self.index_name_1,
+                    q=query,
+                    limit=5,
+                    searchMethod=SearchMethod.TENSOR,
+                )]
+            ))
+            res = res['result'][0]
+            print(query, res, expected_ordering)
+            # the poodle doc should be lower ranked than the irrelevant doc
+            for hit_position, _ in enumerate(res['hits']):
+                assert res['hits'][hit_position]['_id'] == expected_ordering[hit_position]
+
+    def test_multi_search_images(self):
+        docs = [
+            {"loc a": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+             "_id": 'realistic_hippo'},
+            {"loc b": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png",
+             "_id": 'artefact_hippo'}
+        ]
+        image_index_config = {
+            IndexSettingsField.index_defaults: {
+                IndexSettingsField.model: "ViT-B/16",
+                IndexSettingsField.treat_urls_and_pointers_as_images: True
+            }
+        }
+        tensor_search.create_vector_index(
+            config=self.config, index_name=self.index_name_1, index_settings=image_index_config)
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1,
+            docs=docs, auto_refresh=True
+        )
+        queries_expected_ordering = [
+            ({"Nature photography": 2.0, "Artefact": -2}, ['realistic_hippo', 'artefact_hippo']),
+            ({"Nature photography": -1.0, "Artefact": 1.0}, ['artefact_hippo', 'realistic_hippo']),
+            ({"Nature photography": -1.5, "Artefact": 1.0, "hippo": 1.0}, ['artefact_hippo', 'realistic_hippo']),
+            ({"https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png": -1.0,
+              "blah": 1.0}, ['realistic_hippo', 'artefact_hippo']),
+            ({"https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png": 2.0,
+              "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png": -1.0},
+             ['artefact_hippo', 'realistic_hippo']),
+            ({"https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png": 2.0,
+              "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png": -1.0,
+              "artefact": 1.0, "photo realistic": -1,
+              },
+             ['artefact_hippo', 'realistic_hippo']),
+        ]
+        for query, expected_ordering in queries_expected_ordering:
+            res = tensor_search.bulk_search(
+                marqo_config=self.config, query=BulkSearchQuery(
+                queries=[BulkSearchQueryEntity(
+                    index=self.index_name_1,
+                    q=query,
+                    limit=5,
+                    searchMethod=SearchMethod.TENSOR,
+                )]
+            ))
+            res = res['result'][0]
+            # the poodle doc should be lower ranked than the irrelevant doc
+            for hit_position, _ in enumerate(res['hits']):
+                assert res['hits'][hit_position]['_id'] == expected_ordering[hit_position]
+
+    def test_multi_search_images_edge_cases(self):
+        docs = [
+            {"loc": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+             "_id": 'realistic_hippo'},
+            {"field_a": "Some text about a weird forest",
+             "_id": 'artefact_hippo'}
+        ]
+        image_index_config = {
+            IndexSettingsField.index_defaults: {
+                IndexSettingsField.model: "ViT-B/16",
+                IndexSettingsField.treat_urls_and_pointers_as_images: True
+            }
+        }
+        tensor_search.create_vector_index(
+            config=self.config, index_name=self.index_name_1, index_settings=image_index_config)
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1,
+            docs=docs, auto_refresh=True
+        )
+        invalid_queries = [{}, set(), {"https://marqo_not_real.com/image_1.png": 3}]
+        for q in invalid_queries:
+            try:
+                tensor_search.bulk_search(
+                    marqo_config=self.config, query=BulkSearchQuery(
+                    queries=[BulkSearchQueryEntity(
+                        index=self.index_name_1,
+                        q=q,
+                        limit=5,
+                        searchMethod=SearchMethod.TENSOR,
+                    )]
+                ))
+                raise AssertionError(f"Invalid query {q} did not raise error")
+            except (InvalidArgError, BadRequestError) as e:
+                pass
+
+    def test_multi_search_images_ok_edge_cases(self):
+        docs = [
+            {"loc": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+             "_id": 'realistic_hippo'},
+            {"field_a": "Some text about a weird forest",
+             "_id": 'artefact_hippo'}
+        ]
+        image_index_config = {
+            IndexSettingsField.index_defaults: {
+                IndexSettingsField.model: "ViT-B/16",
+                IndexSettingsField.treat_urls_and_pointers_as_images: True
+            }
+        }
+        tensor_search.create_vector_index(
+            config=self.config, index_name=self.index_name_1, index_settings=image_index_config)
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1,
+            docs=docs, auto_refresh=True
+        )
+        alright_queries = [{"v ": 1.2}, {"d ": 0}, {"vf": -1}]
+        for q in alright_queries:
+            tensor_search.bulk_search(
+                marqo_config=self.config, query=BulkSearchQuery(
+                queries=[BulkSearchQueryEntity(
+                    index=self.index_name_1,
+                    q=q,
+                    limit=5,
+                    searchMethod=SearchMethod.TENSOR,
+                )]
+            ))
+
+    def test_image_search(self):
+        """This test is to ensure image search works as expected
+        The code paths for image and search have diverged quite a bit
+        """
+        hippo_image = (
+            'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
+        )
+        doc_dict = {
+            'realistic_hippo': {"loc": hippo_image,
+             "_id": 'realistic_hippo'},
+            'artefact_hippo': {"field_a": "Some text about a weird forest",
+             "_id": 'artefact_hippo'}
+        }
+        docs = list(doc_dict.values())
+        image_index_config = {
+            IndexSettingsField.index_defaults: {
+                IndexSettingsField.model: "ViT-B/16",
+                IndexSettingsField.treat_urls_and_pointers_as_images: True
+            }
+        }
+        tensor_search.create_vector_index(
+            config=self.config, index_name=self.index_name_1, index_settings=image_index_config)
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1,
+            docs=docs, auto_refresh=True
+        )
+        res = tensor_search.bulk_search(
+            marqo_config=self.config, query=BulkSearchQuery(
+            queries=[BulkSearchQueryEntity(
+                index=self.index_name_1,
+                q=hippo_image,
+                limit=5,
+                searchMethod=SearchMethod.TENSOR,
+            )]
+        ))
+        res = res['result'][0]
+        assert len(res['hits']) == 2
+        for hit in res['hits']:
+            original_doc = doc_dict[hit['_id']]
+            assert len(hit['_highlights']) == 1
+            highlight_field = list(hit['_highlights'].keys())[0]
+            assert highlight_field in original_doc
+            assert hit[highlight_field] == original_doc[highlight_field]

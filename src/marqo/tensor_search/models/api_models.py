@@ -3,10 +3,9 @@
 Choices (enum-type structure) in fastAPI:
 https://pydantic-docs.helpmanual.io/usage/types/#enums-and-choices
 """
-import json
 import pydantic
 from pydantic import BaseModel
-from typing import Any, Union, List, Dict, Optional, NewType
+from typing import Union, List, Dict, Optional
 from marqo.tensor_search.enums import SearchMethod, Device
 from marqo.tensor_search import validation
 
