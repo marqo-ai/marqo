@@ -52,7 +52,9 @@ from marqo.tensor_search.formatting import _clean_doc
 from marqo.tensor_search.index_meta_cache import get_cache, get_index_info
 from marqo.tensor_search import index_meta_cache
 from marqo.tensor_search.models.index_info import IndexInfo
-from marqo.tensor_search.bulk_vectorise import VectoriseArgs, execute_bulk_vectorise, distribute_vectors_to_chunks
+from marqo.tensor_search.bulk_vectorise import (
+    VectoriseArgs, execute_bulk_vectorise, distribute_vectors_to_chunks, Content4Vectorising
+)
 from marqo.tensor_search import constants
 from marqo.s2_inference.processing import text as text_processor
 from marqo.s2_inference.processing import image as image_processor
@@ -627,10 +629,14 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                         device=selected_device, normalize_embeddings=normalize_embeddings,
                         infer=infer_if_image)
 
+                    contents4vectorising = [Content4Vectorising(
+                            string_representation=text_chunk, content_to_vectorise=content_chunk
+                        ) for content_chunk, text_chunk in zip(content_chunks, text_chunks)]
+
                     if vec_args in to_be_vectorised_dict:
-                        to_be_vectorised_dict[vec_args].add(content_chunks)
+                        to_be_vectorised_dict[vec_args].add(contents4vectorising)
                     else:
-                        to_be_vectorised_dict[vec_args] = set(content_chunks)
+                        to_be_vectorised_dict[vec_args] = set(contents4vectorising)
 
                     end_time = timer()
                     total_vectorise_time += (end_time - start_time)
