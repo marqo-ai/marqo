@@ -7,6 +7,15 @@ MODEL_TYPE_SIZE_MAPPING = {
     "clip" : 1,
     "sbert" : 0.7,
     "random" : 0.1,
+    "multilingual_clip" : 5,
+
+}
+
+MODEL_NAME_SIZE_MAPPING = {
+    "vit-l-14" : 1.5,
+    "vit-g" : 5,
+    "vit-h" : 5,
+    "vit-bigg-14":6,
 }
 
 # Set this to be a special number so we can tell the model size is from default

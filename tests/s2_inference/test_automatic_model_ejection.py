@@ -9,7 +9,8 @@ from marqo.s2_inference.model_registry import load_model_properties, _get_open_c
 import numpy as np
 from marqo.tensor_search import tensor_search
 from marqo.s2_inference.s2_inference import clear_loaded_models, vectorise, device_memory_manage,\
-                                            check_device_memory_status, _validate_model_properties
+                                            check_device_memory_status, _validate_model_properties,\
+                                            get_model_size
 import marqo.s2_inference.constants
 
 
@@ -80,6 +81,22 @@ class TestAutomaticModelEject(unittest.TestCase):
             for model in huge_models:
                 assert device_memory_manage(model, _validate_model_properties(model,None), device="cpu")
 
+    def test_get_model_size(self):
+        models_and_sizes = {
+            "open_clip/ViT-L-14/openai" : 1.5,
+            'open_clip/ViT-L-14/laion400m_e31' :1.5,
+            'open_clip/convnext_base_w_320/laion_aesthetic_s13b_b82k': 1,
+            "sentence-transformers/all-MiniLM-L6-v2": 0.7,
+            "flax-sentence-embeddings/all_datasets_v4_mpnet-base" : 0.7,
+            'open_clip/ViT-B-16/laion2b_s34b_b88k': 1,
+            'open_clip/coca_ViT-L-14/laion2b_s13b_b90k':1.5,
+           'open_clip/RN50x64/openai':1,
+            "onnx16/open_clip/ViT-B-32/laion2b_e16":1,
+        }
+
+        for model_name, size in models_and_sizes.items():
+            self.assertEqual(get_model_size(model_name, _validate_model_properties(model_name)), size)
+
     def test_model_management(self):
         # Instance should be out of memory without model management
         content = "Try to kill the cpu"
@@ -90,6 +107,8 @@ class TestAutomaticModelEject(unittest.TestCase):
         ]
         for model in list_of_models:
             _ = vectorise(model_name = model, content = content, device="cpu")
+
+
 
 
 

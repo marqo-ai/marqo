@@ -110,24 +110,20 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
 
 
 def get_model_size(model_name:str, model_properties:dict) -> (int, float):
+    '''
+    Return the model size for given model
+    Note that the priorities are size_in_properties -> model_name -> model_type
+    '''
     if "model_size" in model_properties:
         return model_properties["model_size"]
     type = model_properties["type"]
     lower_model_name = model_name.lower()
-    if type in ("open_clip", "clip", "clip_onnx"):
-        if "vit-l" in lower_model_name :
-            return 1.5
-        elif "vit-g" in lower_model_name or "vit-h" in lower_model_name:
-            return 5
-        else:
-            return constants.DEFAULT_MODEL_SIZE[type]
-    elif type in ("sbert", "sbert_onnx", "hf"):
-        return constants.DEFAULT_MODEL_SIZE[type]
 
-    elif type in ("multilingual_clip"):
-        return 5
+    for name, size in constants.MODEL_NAME_SIZE_MAPPING.items():
+        if name in lower_model_name:
+            return size
 
-    return constants.DEFAULT_MODEL_SIZE
+    return constants.MODEL_TYPE_SIZE_MAPPING(type, constants.DEFAULT_MODEL_SIZE)
 
 def device_memory_manage(model_name: str, model_properties: dict, device: str) -> bool:
     '''
