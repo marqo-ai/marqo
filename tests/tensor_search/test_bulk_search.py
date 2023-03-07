@@ -67,8 +67,8 @@ class TestBulkSearch(MarqoTestCase):
         assert all([r["_id"][:4] == "id2-" for r in idx2["hits"]])
         assert len(idx3['hits']) == 0
 
-    @mock.patch("marqo._httprequests.HttpRequests.get")
-    def test_bulk_search_multiple_queries_single_msearch_request(self, mock_msearch_get):
+    @mock.patch("marqo.tensor_search.tensor_search.bulk_msearch")
+    def test_bulk_search_multiple_queries_single_msearch_request(self, mock_bulk_msearch):
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
         tensor_search.add_documents(
             config=self.config, index_name=self.index_name_1, docs=[
@@ -85,7 +85,7 @@ class TestBulkSearch(MarqoTestCase):
             marqo_config=self.config,
         )
 
-        self.assertEqual(mock_msearch_get.call_count, 1)
+        self.assertEqual(mock_bulk_msearch.call_count, 1)
 
     @mock.patch("marqo.s2_inference.s2_inference.vectorise")
     def test_bulk_search_different_models_separate_vectorise_calls(self, mock_vectorise):
