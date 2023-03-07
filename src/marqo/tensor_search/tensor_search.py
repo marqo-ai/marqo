@@ -1506,8 +1506,17 @@ def create_vector_jobs(queries: List[BulkSearchQueryEntity], config: Config, sel
         qidx_to_job[i] = assign_query_to_vector_job(q, jobs, to_be_vectorised, index_info, selected_device)
     return qidx_to_job, jobs
 
+
+def group_content_by_type(content: Union[List[str], str], treat_urls_as_images) -> Tuple[List[str], List[str]]:
+    # TODO
+    text_queries = [k for k, _ in content if _is_image(k)]
+    image_queries = [k for k, _ in content if not _is_image(k)]
+
+
 def vectorise_jobs(jobs: List[VectorisedJobs]) -> Dict[JHash, List[float]]:
-    """ Run s2 inference on a set of vector jobs."""
+    """ Run s2 inference on a set of vector jobs.
+    TODO: return a mapping of mapping: <JHash: <content: vector> >
+    """
     result: Dict[JHash, List[float]] = {}
     for v in jobs:
         # TODO: Handle exception for single job, and allow others to run.
@@ -1547,6 +1556,7 @@ def get_query_vectors_from_jobs(queries: List[BulkSearchQueryEntity], qidx_to_jo
         if ordered_queries:
             # multiple queries. We have to weight and combine them:
             index_info = get_index_info(config=config, index_name=q.index)
+            # TODO how doe we ensure order?
             weighted_vectors = [np.asarray(vec) * weight for vec, weight in zip(vectors, [w for _, w in ordered_queries])]
             merged_vector = np.mean(weighted_vectors, axis=0)
             if index_info.index_settings['index_defaults']['normalize_embeddings']:
