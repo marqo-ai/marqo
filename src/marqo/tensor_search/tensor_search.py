@@ -55,7 +55,6 @@ from marqo.tensor_search import index_meta_cache
 from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQueryEntity
 from marqo.tensor_search.models.search import VectorisedJobs, VectorisedJobPointer, Qidx, JHash
 from marqo.tensor_search.models.index_info import IndexInfo
-from marqo.tensor_search.bulk_vectorise import Content4Vectorising, VectoriseArgs, execute_bulk_vectorise
 from marqo.tensor_search.utils import add_timing
 from marqo.s2_inference.processing import text as text_processor
 from marqo.s2_inference.processing import image as image_processor
