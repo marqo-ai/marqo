@@ -1538,20 +1538,20 @@ def create_vector_jobs(queries: List[BulkSearchQueryEntity], config: Config, sel
     return qidx_to_job, jobs
 
 
-def vectorise_jobs(jobs: List[VectorisedJobs]) -> Dict[JHash, List[List[float]]]:
+def vectorise_jobs(jobs: List[VectorisedJobs]) -> Dict[JHash, Dict[str, List[float]]]:
     """ Run s2_+inference.vectorise() on against each vector jobs.
     TODO: return a mapping of mapping: <JHash: <content: vector> >
     """
-    result: Dict[JHash, List[List[float]]] = dict()
+    result: Dict[JHash, Dict[str, List[float]]] = dict()
     for v in jobs:
         # TODO: Handle exception for single job, and allow others to run.
         try:
-            result[v.groupby_key()] = s2_inference.vectorise(
+            result[v.groupby_key()] = dict(zip(v.content, s2_inference.vectorise(
                     model_name=v.model_name, model_properties=v.model_properties,
                     content=v.content, device=v.device,
                     normalize_embeddings=v.normalize_embeddings,
                     image_download_headers=v.image_download_headers
-                )
+                )))
         except s2_inference_errors.S2InferenceError:
             # TODO: differentiate image processing errors from other types of vectorise errors
             raise errors.InvalidArgError(message=f'Could not process given image in: {v.content}')
@@ -1561,7 +1561,8 @@ def vectorise_jobs(jobs: List[VectorisedJobs]) -> Dict[JHash, List[List[float]]]
 
 def get_query_vectors_from_jobs(
         queries: List[BulkSearchQueryEntity], qidx_to_job: Dict[Qidx, List[VectorisedJobPointer]],
-        job_to_vectors: Dict[JHash, List[List[float]]], config: Config
+        job_to_vectors: Dict[JHash, Dict[str, List[float]]], config: Config,
+        jobs: Dict[JHash, VectorisedJobs]
 ) -> Dict[Qidx, List[float]]:
     """
     Retrieve the vectorised content associated to each query from the set of batch vectorise jobs.
@@ -1574,18 +1575,31 @@ def get_query_vectors_from_jobs(
         - config: standard Marqo config.
 
     """
-    result: Dict[Qidx, List[List[float]]] = defaultdict(list)
-    for qidx, ptr in qidx_to_job.items():
-        vectors = job_to_vectors[ptr.job_hash][ptr.start_idx: ptr.end_idx]
-        # qidx_to_vectors[qidx].append(vectors)
+    result: Dict[Qidx, List[float]] = defaultdict(list)
+    for qidx, ptrs in qidx_to_job.items():
 
+        # vectors = job_to_vectors[ptrs.job_hash][ptrs.start_idx: ptrs.end_idx]
+
+        # qidx_to_vectors[qidx].append(vectors)
         q = queries[qidx]
+        index_info = get_index_info(config=config, index_name=q.index)
+
         ordered_queries = list(q.q.items()) if isinstance(q.q, dict) else None
         if ordered_queries:
             # multiple queries. We have to weight and combine them:
-            index_info = get_index_info(config=config, index_name=q.index)
+            vectorised_ordered_queries = [
+                (get_content_vector(
+                    possible_jobs=qidx_to_job[qidx],
+                    jobs=jobs,
+                    job_to_vectors=job_to_vectors,
+                    treat_urls_as_images=index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images],
+                    content=content),
+                 weight,
+                 content
+                ) for content, weight in ordered_queries
+            ]
             # TODO how doe we ensure order?
-            weighted_vectors = [np.asarray(vec) * weight for vec, weight in zip(vectors, [w for _, w in ordered_queries])]
+            weighted_vectors = [np.asarray(vec) * weight for vec, weight, content in vectorised_ordered_queries]
             merged_vector = np.mean(weighted_vectors, axis=0)
             if index_info.index_settings['index_defaults']['normalize_embeddings']:
                 norm = np.linalg.norm(merged_vector, axis=-1, keepdims=True)
@@ -1593,8 +1607,43 @@ def get_query_vectors_from_jobs(
                     merged_vector /= np.linalg.norm(merged_vector, axis=-1, keepdims=True)
             result[qidx] = list(merged_vector)
         else:
-            result[qidx] = vectors[0]
+            # result[qidx] = vectors[0]
+            result[qidx] = get_content_vector(
+                possible_jobs=qidx_to_job[qidx],
+                jobs=jobs,
+                job_to_vectors= job_to_vectors,
+                treat_urls_as_images=index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images],
+                content=q.q
+            )
     return result
+
+
+def get_content_vector(possible_jobs: List[VectorisedJobPointer], job_to_vectors: Dict[JHash, Dict[str, List[float]]],
+                       jobs: Dict[JHash, VectorisedJobs],
+                       treat_urls_as_images: bool, content: str) -> List[float]:
+    """finds the vector associated with a piece of content
+
+    Args:
+        possible_jobs: The jobs where the target vector may reside
+        treat_urls_as_images: and index_parameter that indicates whether content should be treated as image,
+            if it has a URL structure
+        content: The content to search
+
+    Returns:
+        Associated vector, if it is found.
+
+    Raises runtime error if is not found
+    """
+    content_type = 'image' if treat_urls_as_images and _is_image(content) else 'text'
+    not_found_error = RuntimeError(f"get_content_vector(): could not corresponding vector for content `{content}`")
+    for vec_job_pointer in possible_jobs:
+        if jobs[vec_job_pointer.job_hash].content == content_type:
+            try:
+                return job_to_vectors[vec_job_pointer.job_hash][content]
+            except KeyError:
+                raise not_found_error
+    raise not_found_error
+
 
 def create_empty_query_response(queries: List[BulkSearchQueryEntity]) -> List[Dict]:
     return list(
@@ -1612,21 +1661,22 @@ def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity
 
     # 1. Pre-process inputs ready for s2_inference.vectorise
     # we can still use qidx_to_job. But the jobs structure may need to be different
-    create_vector_jobs_tuple: Tuple[Dict[Qidx, List[VectorisedJobPointer]], Dict[JHash, VectorisedJobs]] = (
+    vector_jobs_tuple: Tuple[Dict[Qidx, List[VectorisedJobPointer]], Dict[JHash, VectorisedJobs]] = (
         create_vector_jobs(queries, config, selected_device)
     )
-    qidx_to_jobs, jobs = create_vector_jobs_tuple
+    qidx_to_jobs, jobs = vector_jobs_tuple
                     # #     Pandu: create a mapping <VectoriseArguments: Set(content to vectorise)>
                     # to_be_vectorised_dict: Dict[VectoriseArgs, Set[Content4Vectorising]] = dict()
 
 
     # 2. Vectorise in batches against all queries
     ## TODO: To ensure that we are vectorising in batches, we can mock vectorise (), and see if the number of calls is as expected (if batch_size = 16, and number of docs = 32, and all args are the same, then number of calls = 2)
-    job_ptr_to_vectors: Dict[JHash, List[List[float]]] = vectorise_jobs(list(jobs.values()))
+    # TODO: we need to enable str/PIL image structure:
+    job_ptr_to_vectors: Dict[JHash, Dict[str, List[float]]] = vectorise_jobs(list(jobs.values()))
 
     # 3. For each query, get associated vectors
     qidx_to_vectors: Dict[Qidx, List[List[float]]] = get_query_vectors_from_jobs(
-        queries, qidx_to_jobs, job_ptr_to_vectors, config
+        queries, qidx_to_jobs, job_ptr_to_vectors, config, jobs
     )
 
     #    Pandu: re-write get_query_vectors_from_jobs needs to from <VectoriseArguments: Dict<content: vector>>
