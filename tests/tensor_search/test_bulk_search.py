@@ -3,7 +3,8 @@ import math
 import requests
 import random
 from unittest import mock
-
+from marqo.s2_inference.s2_inference import vectorise
+import unittest
 from marqo.tensor_search.enums import TensorField, SearchMethod, EnvVars, IndexSettingsField
 from marqo.errors import (
     IndexNotFoundError, InvalidArgError, InvalidFieldNameError, IllegalRequestedDocCount, BadRequestError
@@ -11,6 +12,13 @@ from marqo.errors import (
 from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQueryEntity
 from marqo.tensor_search import tensor_search, constants, index_meta_cache
 from tests.marqo_test import MarqoTestCase
+
+
+def pass_through_vectorise(*arg, **kwargs):
+    """Vectorise will behave as usual, but we will be able to see the call list
+    via mock
+    """
+    return vectorise(*arg, **kwargs)
 
 
 class TestBulkSearch(MarqoTestCase):
@@ -87,65 +95,75 @@ class TestBulkSearch(MarqoTestCase):
 
         self.assertEqual(mock_bulk_msearch.call_count, 1)
 
-    @mock.patch("marqo.s2_inference.s2_inference.vectorise")
-    def test_bulk_search_different_models_separate_vectorise_calls(self, mock_vectorise):
-        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings={
-            "index_defaults" : {
-                "normalize_embeddings": False,
-            }
-        })
-        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_2)
-        tensor_search.bulk_search(
-            query=BulkSearchQuery(queries=[
-                BulkSearchQueryEntity(index=self.index_name_1, q="one thing"),
-                BulkSearchQueryEntity(index=self.index_name_2, q="two things"),
-            ]), marqo_config=self.config
-        )
-        mock_vectorise.assert_any_call(
-            model_name='hf/all_datasets_v4_MiniLM-L6', 
-            model_properties={'name': 'flax-sentence-embeddings/all_datasets_v4_MiniLM-L6', 'dimensions': 384, 'tokens': 128, 'type': 'hf', 'notes': ''},
-            content='one thing',
-            device='cpu',
-            normalize_embeddings=False,
-            image_download_headers=None
-        )
-        mock_vectorise.assert_any_call(
-            model_name='hf/all_datasets_v4_MiniLM-L6', 
-            model_properties={'name': 'flax-sentence-embeddings/all_datasets_v4_MiniLM-L6', 'dimensions': 384, 'tokens': 128, 'type': 'hf', 'notes': ''},
-            content='two things',
-            device='cpu',
-            normalize_embeddings=True,
-            image_download_headers=None
-        )
-        self.assertEqual(mock_vectorise.call_count, 2)
+    def test_bulk_search_different_models_separate_vectorise_calls(self):
+        mock_vectorise = unittest.mock.MagicMock()
+        mock_vectorise.side_effect = pass_through_vectorise
+
+        @unittest.mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
+        def run():
+            tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings={
+                "index_defaults": {
+                    "normalize_embeddings": False,
+                }
+            })
+            tensor_search.create_vector_index(config=self.config, index_name=self.index_name_2)
+            tensor_search.bulk_search(
+                query=BulkSearchQuery(queries=[
+                    BulkSearchQueryEntity(index=self.index_name_1, q="one thing"),
+                    BulkSearchQueryEntity(index=self.index_name_2, q="two things"),
+                ]), marqo_config=self.config
+            )
+            mock_vectorise.assert_any_call(
+                model_name='hf/all_datasets_v4_MiniLM-L6',
+                model_properties={'name': 'flax-sentence-embeddings/all_datasets_v4_MiniLM-L6', 'dimensions': 384, 'tokens': 128, 'type': 'hf', 'notes': ''},
+                content=['one thing'],
+                device='cpu',
+                normalize_embeddings=False,
+                image_download_headers=None
+            )
+
+            print("ock_vectorise.call_args_listock_vectorise.call_args_list",  mock_vectorise.call_args_list)
+            mock_vectorise.assert_any_call(
+                model_name='hf/all_datasets_v4_MiniLM-L6',
+                model_properties={'name': 'flax-sentence-embeddings/all_datasets_v4_MiniLM-L6', 'dimensions': 384,
+                                  'tokens': 128, 'type': 'hf', 'notes': ''},
+                content=['two things'],
+                device='cpu',
+                normalize_embeddings=True,
+                image_download_headers=None
+            )
+
+            self.assertEqual(mock_vectorise.call_count, 2)
+            return True
+        assert run()
 
     @mock.patch("marqo.s2_inference.s2_inference.vectorise")
     def test_bulk_search_different_index_same_vector_models_single_vectorise_calls(self, mock_vectorise):
-        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
-        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_2)
-        tensor_search.bulk_search(
-            query=BulkSearchQuery(queries=[
-                BulkSearchQueryEntity(index=self.index_name_1, q="one thing"),
-                BulkSearchQueryEntity(index=self.index_name_1, q="two things"),
-            ]), marqo_config=self.config
-        )
-        mock_vectorise.assert_any_call(
-            model_name='hf/all_datasets_v4_MiniLM-L6', 
-            model_properties={'name': 'flax-sentence-embeddings/all_datasets_v4_MiniLM-L6', 'dimensions': 384, 'tokens': 128, 'type': 'hf', 'notes': ''},
-            content='one thing',
-            device='cpu',
-            normalize_embeddings=True,
-            image_download_headers=None
-        )
-        mock_vectorise.assert_any_call(
-            model_name='hf/all_datasets_v4_MiniLM-L6', 
-            model_properties={'name': 'flax-sentence-embeddings/all_datasets_v4_MiniLM-L6', 'dimensions': 384, 'tokens': 128, 'type': 'hf', 'notes': ''},
-            content='two things',
-            device='cpu',
-            normalize_embeddings=True,
-            image_download_headers=None
-        )
-        self.assertEqual(mock_vectorise.call_count, 2)
+
+        mock_vectorise = unittest.mock.MagicMock()
+        mock_vectorise.side_effect = pass_through_vectorise
+        @unittest.mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
+        def run ():
+            tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
+            tensor_search.create_vector_index(config=self.config, index_name=self.index_name_2)
+            tensor_search.bulk_search(
+                query=BulkSearchQuery(queries=[
+                    BulkSearchQueryEntity(index=self.index_name_1, q="one thing"),
+                    BulkSearchQueryEntity(index=self.index_name_1, q="two things"),
+                ]), marqo_config=self.config
+            )
+            mock_vectorise.assert_any_call(
+                model_name='hf/all_datasets_v4_MiniLM-L6',
+                model_properties={'name': 'flax-sentence-embeddings/all_datasets_v4_MiniLM-L6', 'dimensions': 384,
+                                  'tokens': 128, 'type': 'hf', 'notes': ''},
+                content=['one thing', 'two things'],
+                device='cpu',
+                normalize_embeddings=True,
+                image_download_headers=None
+            )
+            self.assertEqual(mock_vectorise.call_count, 1)
+            return True
+        assert run()
 
 
     def test_bulk_search_multiple_search_methods(self):
@@ -1105,7 +1123,6 @@ class TestBulkSearch(MarqoTestCase):
                 )]
             ))
             res = res['result'][0]
-            print(query, res, expected_ordering)
             # the poodle doc should be lower ranked than the irrelevant doc
             for hit_position, _ in enumerate(res['hits']):
                 assert res['hits'][hit_position]['_id'] == expected_ordering[hit_position]
