@@ -1510,15 +1510,20 @@ def vectorise_jobs(jobs: List[VectorisedJobs]) -> Dict[JHash, List[float]]:
     """ Run s2 inference on a set of vector jobs."""
     result: Dict[JHash, List[float]] = {}
     for v in jobs:
-        result[v.groupby_key()] = functools.reduce(
-            lambda x, y: x + y,
-            [s2_inference.vectorise(
-                model_name=v.model_name, model_properties=v.model_properties,
-                content=batch, device=v.device,
-                normalize_embeddings=v.normalize_embeddings,
-                image_download_headers=v.image_download_headers
-            ) for batch in v.content] # Todo: check if should be batching.
-        )
+        # TODO: Handle exception for single job, and allow others to run.
+        try:
+            result[v.groupby_key()] = functools.reduce(
+                lambda x, y: x + y,
+                [s2_inference.vectorise(
+                    model_name=v.model_name, model_properties=v.model_properties,
+                    content=batch, device=v.device,
+                    normalize_embeddings=v.normalize_embeddings,
+                    image_download_headers=v.image_download_headers
+                ) for batch in v.content] # Todo: check if should be batching.
+            )
+        except s2_inference_errors.S2InferenceError:
+            raise errors.InvalidArgError(message=f'Could not process given image in: {v.content}')
+
     return result
 
 def get_query_vectors_from_jobs(queries: List[BulkSearchQueryEntity], qidx_to_job: Dict[Qidx, VectorisedJobPointer], job_to_vectors: Dict[JHash, List[List[float]]], config: Config) -> Dict[Qidx, List[List[float]]]:
