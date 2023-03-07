@@ -1,5 +1,5 @@
 name: largemodel_unit_test_CI
-# runs unit tests on AMD64 machine
+# runs unit tests on CUDA machine with large model tests.
 
 on: workflow_dispatch
 
