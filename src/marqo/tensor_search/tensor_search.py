@@ -55,7 +55,7 @@ from marqo.tensor_search import index_meta_cache
 from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQueryEntity
 from marqo.tensor_search.models.search import VectorisedJobs, VectorisedJobPointer, Qidx, JHash
 from marqo.tensor_search.models.index_info import IndexInfo
-from marqo.tensor_search import constants
+from marqo.tensor_search.bulk_vectorise import Content4Vectorising, VectoriseArgs, execute_bulk_vectorise
 from marqo.tensor_search.utils import add_timing
 from marqo.s2_inference.processing import text as text_processor
 from marqo.s2_inference.processing import image as image_processor
@@ -1325,18 +1325,26 @@ def _lexical_search(
     return {'hits': res_list}
 
 
-def construct_vector_input_batches(query: Union[str, Dict], index_info) -> Union[List[str], List[List[str]]]:
+def construct_vector_input_batches(query: Union[str, Dict], index_info) -> Tuple[List[str], List[str]]:
+    """Splits images from text in a single query (either a query string, or dict of weighted strings).
+
+    Args:
+        query: a string query, or a dict of weight strings.
+        index_info: used to determine whether URLs should be treated as images
+
+    Returns:
+        A tuple of string batches. The first is text content the second is image content.
+    """
     if isinstance(query, str):
-        return [query, ]
+        return [query, ], []
     else:  # is dict:
         ordered_queries = list(query.items())
         if index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]:
             text_queries = [k for k, _ in ordered_queries if _is_image(k)]
             image_queries = [k for k, _ in ordered_queries if not _is_image(k)]
-            return [batch for batch in [text_queries, image_queries] if batch]
-            return text_queries + image_queries
+            return text_queries, image_queries
         else:
-            return [k for k, _ in ordered_queries]
+            return [k for k, _ in ordered_queries], []
 
 
 def get_vector_properties_to_search(searchable_attributes: Union[None, List[str]], index_info: IndexInfo) -> List[str]:
@@ -1457,38 +1465,58 @@ def gather_documents_from_response(resp: List[List[Dict[str, Any]]]) -> Dict[str
 
     return gathered_docs
 
-def assign_query_to_vector_job(q: BulkSearchQueryEntity, jobs: Dict[JHash, VectorisedJobs], content: List[Union[str, List[str]]], index_info: IndexInfo, device: str) -> VectorisedJobPointer:
+
+def assign_query_to_vector_job(
+        q: BulkSearchQueryEntity, jobs: Dict[JHash, VectorisedJobs], grouped_content: Tuple[List[str], List[str]],
+        index_info: IndexInfo, device: str) -> List[VectorisedJobPointer]:
     """
-        For a individual query, assign its content (to be vectorised) to a vector job. If none exist with the correct
-        specifications, create a new job.
+    For a individual query, assign its content (to be vectorised) to a vector job. If none exist with the correct
+    specifications, create a new job.
 
-        Mutates entries in, and adds values to `jobs` param.
+    Mutates entries in, and adds values to, the `jobs` param.
 
-        Returns: A pointer to the location in a vector job that will have its vectorised content.
+    Args:
+        q:
+        jobs:
+        grouped_content: a 2-tuple of content, belonging to a single query, the first element is a list of text content.
+            The second is a list of image URLs. Either element can be an empty list
+        index_info:
+        device:
 
+    Returns:
+        A list of pointers to the location in a vector job that will have its vectorised content.
     """
-    vector_job = VectorisedJobs(
-        model_name=index_info.model_name,
-        model_properties=_get_model_properties(index_info),
-        content=content,
-        device=device,
-        normalize_embeddings=index_info.index_settings['index_defaults']['normalize_embeddings'],
-        image_download_headers=q.image_download_headers
-    )
-    # If exists, add content to vector job. Otherwise create new
-    if jobs.get(vector_job.groupby_key()) is not None:
-        j = jobs.get(vector_job.groupby_key())
-        ptr = j.add_content(content)
-    else:
-        jobs[vector_job.groupby_key()] = vector_job
-        ptr = VectorisedJobPointer(
-            job_hash=vector_job.groupby_key(),
-            start_idx=0,
-            end_idx=len(vector_job.content)
+    if len(grouped_content) != 2:
+        raise RuntimeError(
+            "assign_query_to_vector_job() expects param `grouped_content` with 2 elems. Instead received"
+            f" `grouped_content` with {len(grouped_content)} elems")
+    ptrs = []
+    for i, grouped_content in enumerate(grouped_content):
+        content_type = 'text' if i == 0 else 'image'
+        vector_job = VectorisedJobs(
+            model_name=index_info.model_name,
+            model_properties=_get_model_properties(index_info),
+            content=grouped_content,
+            device=device,
+            normalize_embeddings=index_info.index_settings['index_defaults']['normalize_embeddings'],
+            image_download_headers=q.image_download_headers,
+            content_type=content_type
         )
-    return ptr
+        # If exists, add content to vector job. Otherwise create new
+        if jobs.get(vector_job.groupby_key()) is not None:
+            j = jobs.get(vector_job.groupby_key())
+            ptrs.append(j.add_content(grouped_content))
+        else:
+            jobs[vector_job.groupby_key()] = vector_job
+            ptrs.append(VectorisedJobPointer(
+                job_hash=vector_job.groupby_key(),
+                start_idx=0,
+                end_idx=len(vector_job.content)
+            ))
+    return ptrs
 
-def create_vector_jobs(queries: List[BulkSearchQueryEntity], config: Config, selected_device: str) -> Tuple[Dict[Qidx, VectorisedJobPointer], Dict[JHash, VectorisedJobs]]:
+
+def create_vector_jobs(queries: List[BulkSearchQueryEntity], config: Config, selected_device: str) -> Tuple[Dict[Qidx, List[VectorisedJobPointer]], Dict[JHash, VectorisedJobs]]:
     """
         For each query:
             - Find what needs to be vectorised
@@ -1499,47 +1527,45 @@ def create_vector_jobs(queries: List[BulkSearchQueryEntity], config: Config, sel
             - A mapping of the query index to the VectorisedJobPointer that points to the VectorisedJobs that will process its content.
             - A mapping of job key to job (for fast access).
     """
-    qidx_to_job: Dict[Qidx, VectorisedJobPointer] = {}
+    qidx_to_job: Dict[Qidx, List[VectorisedJobPointer]] = dict()
     jobs: Dict[JHash, VectorisedJobs] = {}
     for i, q in enumerate(queries):
         q = queries[i]
         index_info = get_index_info(config=config, index_name=q.index)
-        to_be_vectorised: List[List[str]] = construct_vector_input_batches(q.q, index_info)
+        # split images from text:
+        to_be_vectorised: Tuple[List[str], List[str]] = construct_vector_input_batches(q.q, index_info)
         qidx_to_job[i] = assign_query_to_vector_job(q, jobs, to_be_vectorised, index_info, selected_device)
     return qidx_to_job, jobs
 
 
-def group_content_by_type(content: Union[List[str], str], treat_urls_as_images) -> Tuple[List[str], List[str]]:
-    # TODO
-    text_queries = [k for k, _ in content if _is_image(k)]
-    image_queries = [k for k, _ in content if not _is_image(k)]
-
-
-def vectorise_jobs(jobs: List[VectorisedJobs]) -> Dict[JHash, List[float]]:
-    """ Run s2 inference on a set of vector jobs.
+def vectorise_jobs(jobs: List[VectorisedJobs]) -> Dict[JHash, List[List[float]]]:
+    """ Run s2_+inference.vectorise() on against each vector jobs.
     TODO: return a mapping of mapping: <JHash: <content: vector> >
     """
-    result: Dict[JHash, List[float]] = {}
+    result: Dict[JHash, List[List[float]]] = dict()
     for v in jobs:
         # TODO: Handle exception for single job, and allow others to run.
         try:
-            result[v.groupby_key()] = functools.reduce(
-                lambda x, y: x + y,
-                [s2_inference.vectorise(
+            result[v.groupby_key()] = s2_inference.vectorise(
                     model_name=v.model_name, model_properties=v.model_properties,
-                    content=batch, device=v.device,
+                    content=v.content, device=v.device,
                     normalize_embeddings=v.normalize_embeddings,
                     image_download_headers=v.image_download_headers
-                ) for batch in v.content] # Todo: check if should be batching.
-            )
+                )
         except s2_inference_errors.S2InferenceError:
+            # TODO: differentiate image processing errors from other types of vectorise errors
             raise errors.InvalidArgError(message=f'Could not process given image in: {v.content}')
 
     return result
 
-def get_query_vectors_from_jobs(queries: List[BulkSearchQueryEntity], qidx_to_job: Dict[Qidx, VectorisedJobPointer], job_to_vectors: Dict[JHash, List[List[float]]], config: Config) -> Dict[Qidx, List[List[float]]]:
+
+def get_query_vectors_from_jobs(
+        queries: List[BulkSearchQueryEntity], qidx_to_job: Dict[Qidx, List[VectorisedJobPointer]],
+        job_to_vectors: Dict[JHash, List[List[float]]], config: Config
+) -> Dict[Qidx, List[float]]:
     """
     Retrieve the vectorised content associated to each query from the set of batch vectorise jobs.
+    Handles multi-modal queries, by weighting and combining queries into a single vector
 
     Args:
         - queries: Original search queries. 
@@ -1585,16 +1611,26 @@ def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity
     selected_device = config.indexing_device if device is None else device
 
     # 1. Pre-process inputs ready for s2_inference.vectorise
-    qidx_to_job, jobs = create_vector_jobs(queries, config, selected_device)
+    # we can still use qidx_to_job. But the jobs structure may need to be different
+    create_vector_jobs_tuple: Tuple[Dict[Qidx, List[VectorisedJobPointer]], Dict[JHash, VectorisedJobs]] = (
+        create_vector_jobs(queries, config, selected_device)
+    )
+    qidx_to_jobs, jobs = create_vector_jobs_tuple
+                    # #     Pandu: create a mapping <VectoriseArguments: Set(content to vectorise)>
+                    # to_be_vectorised_dict: Dict[VectoriseArgs, Set[Content4Vectorising]] = dict()
+
 
     # 2. Vectorise in batches against all queries
     ## TODO: To ensure that we are vectorising in batches, we can mock vectorise (), and see if the number of calls is as expected (if batch_size = 16, and number of docs = 32, and all args are the same, then number of calls = 2)
-    job_ptr_to_vectors: Dict[JHash, List[float]] = vectorise_jobs(list(jobs.values()))
+    job_ptr_to_vectors: Dict[JHash, List[List[float]]] = vectorise_jobs(list(jobs.values()))
 
     # 3. For each query, get associated vectors
     qidx_to_vectors: Dict[Qidx, List[List[float]]] = get_query_vectors_from_jobs(
-        queries, qidx_to_job, job_ptr_to_vectors, config
+        queries, qidx_to_jobs, job_ptr_to_vectors, config
     )
+
+    #    Pandu: re-write get_query_vectors_from_jobs needs to from <VectoriseArguments: Dict<content: vector>>
+
 
     ## 4. Create msearch request bodies and combine to aggregate.
     query_to_body_parts: Dict[Qidx, List[Dict]] = {}
@@ -1625,6 +1661,29 @@ def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity
 
     logger.info(f"bulk search (tensor) post-processing: took {(timer() - start_postprocess_time):.3f}s")
     return results
+#
+#
+# def create_bulk_search_to_be_vectorised_dict(
+#         queries: List[BulkSearchQueryEntity], config: Config, selected_device: str
+# ) -> Tuple[Dict[Qidx, List[VectoriseArgs]], Dict[VectoriseArgs, Set[Content4Vectorising]]]:
+#     """
+#         For each query:
+#             - Find what needs to be vectorised
+#             - Group content (across search requests), that could be vectorised together
+#             - Keep track of the Job related to a search query
+#
+#         Returns:
+#             - A mapping of the query index to the VectorisedJobPointer that points to the VectorisedJobs that will process its content.
+#             - A mapping of job key to job (for fast access).
+#     """
+#     to_be_vectorised: Dict[VectoriseArgs, Set[Content4Vectorising]] = dict()
+#     for i, q in enumerate(queries):
+#         q = queries[i]
+#         index_info = get_index_info(config=config, index_name=q.index)
+#         to_be_vectorised[VectorisedJobs] = construct_vector_input_batches(q.q, index_info)
+#         qidx_to_job[i] = assign_query_to_vector_job(q, jobs, to_be_vectorised, index_info, selected_device)
+#     return qidx_to_job, jobs
+
 
 def create_bulk_search_response(queries: List[BulkSearchQueryEntity], query_to_body_count: Dict[Qidx, int], responses) -> List[Dict]:
     """

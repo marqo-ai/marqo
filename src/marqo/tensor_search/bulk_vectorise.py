@@ -75,7 +75,7 @@ class Content4Vectorising:
 def execute_bulk_vectorise(
         to_be_vectorised_dict: Dict[VectoriseArgs, Set[Content4Vectorising]]
 ) -> Dict[VectoriseArgs, Dict[Content4Vectorising, Sequence[float]]]:
-    """Vectorises sets of content that share the same vectorise argument.
+    """Vectorises sets of content that share the same vectorise arguments.
 
     From a mapping of <VectoriseArguments: Set(content to vectorise)> a mapping
     <VectoriseArguments: Dict<content: vector>> is created.
