@@ -1710,28 +1710,6 @@ def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity
 
     logger.info(f"bulk search (tensor) post-processing: took {(timer() - start_postprocess_time):.3f}s")
     return results
-#
-#
-# def create_bulk_search_to_be_vectorised_dict(
-#         queries: List[BulkSearchQueryEntity], config: Config, selected_device: str
-# ) -> Tuple[Dict[Qidx, List[VectoriseArgs]], Dict[VectoriseArgs, Set[Content4Vectorising]]]:
-#     """
-#         For each query:
-#             - Find what needs to be vectorised
-#             - Group content (across search requests), that could be vectorised together
-#             - Keep track of the Job related to a search query
-#
-#         Returns:
-#             - A mapping of the query index to the VectorisedJobPointer that points to the VectorisedJobs that will process its content.
-#             - A mapping of job key to job (for fast access).
-#     """
-#     to_be_vectorised: Dict[VectoriseArgs, Set[Content4Vectorising]] = dict()
-#     for i, q in enumerate(queries):
-#         q = queries[i]
-#         index_info = get_index_info(config=config, index_name=q.index)
-#         to_be_vectorised[VectorisedJobs] = construct_vector_input_batches(q.q, index_info)
-#         qidx_to_job[i] = assign_query_to_vector_job(q, jobs, to_be_vectorised, index_info, selected_device)
-#     return qidx_to_job, jobs
 
 
 def create_bulk_search_response(queries: List[BulkSearchQueryEntity], query_to_body_count: Dict[Qidx, int], responses) -> List[Dict]:
