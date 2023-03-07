@@ -1,4 +1,4 @@
-name: unit_test_CI
+name: largemodel_unit_test_CI
 # runs unit tests on AMD64 machine
 
 on: workflow_dispatch
@@ -26,10 +26,10 @@ jobs:
         with:
           mode: start
           github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
-          ec2-image-id:  ${{ secrets.AMD_EC2_IMAGE_ID }}
+          ec2-image-id: ${{ secrets.CUDA_EC2_IMAGE_ID }}
           ec2-instance-type: g4dn.xlarge
-          subnet-id: ${{ secrets.AMD_SUBNET_ID }}
-          security-group-id: ${{ secrets.AMD_SECURITY_GROUP_ID }}
+          subnet-id: ${{ secrets.CUDA_SUBNET_ID }}
+          security-group-id: ${{ secrets.CUDA_SECURITY_GROUP_ID }}
 
   Test-Marqo:
     name: Run Marqo Test Suite
