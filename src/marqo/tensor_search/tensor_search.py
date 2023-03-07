@@ -1333,13 +1333,17 @@ def construct_vector_input_batches(query: Union[str, Dict], index_info) -> Tuple
     Returns:
         A tuple of string batches. The first is text content the second is image content.
     """
+    treat_urls_as_images = index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]
     if isinstance(query, str):
-        return [query, ], []
+        if treat_urls_as_images and _is_image(query):
+            return [], [query, ]
+        else:
+            return [query, ], []
     else:  # is dict:
         ordered_queries = list(query.items())
-        if index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]:
-            text_queries = [k for k, _ in ordered_queries if _is_image(k)]
-            image_queries = [k for k, _ in ordered_queries if not _is_image(k)]
+        if treat_urls_as_images:
+            text_queries = [k for k, _ in ordered_queries if not _is_image(k)]
+            image_queries = [k for k, _ in ordered_queries if _is_image(k)]
             return text_queries, image_queries
         else:
             return [k for k, _ in ordered_queries], []
@@ -1545,16 +1549,16 @@ def vectorise_jobs(jobs: List[VectorisedJobs]) -> Dict[JHash, Dict[str, List[flo
         # TODO: Handle exception for single job, and allow others to run.
         try:
             if v.content:
-                result[v.groupby_key()] = dict(zip(v.content, s2_inference.vectorise(
-                        model_name=v.model_name, model_properties=v.model_properties,
-                        content=v.content, device=v.device,
-                        normalize_embeddings=v.normalize_embeddings,
-                        image_download_headers=v.image_download_headers
-                    )))
+                vectors = s2_inference.vectorise(
+                    model_name=v.model_name, model_properties=v.model_properties,
+                    content=v.content, device=v.device,
+                    normalize_embeddings=v.normalize_embeddings,
+                    image_download_headers=v.image_download_headers
+                )
+                result[v.groupby_key()] = dict(zip(v.content, vectors))
         except s2_inference_errors.S2InferenceError:
             # TODO: differentiate image processing errors from other types of vectorise errors
             raise errors.InvalidArgError(message=f'Could not process given image in: {v.content}')
-
     return result
 
 
@@ -1674,16 +1678,13 @@ def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity
     job_ptr_to_vectors: Dict[JHash, Dict[str, List[float]]] = vectorise_jobs(list(jobs.values()))
 
     # 3. For each query, get associated vectors
-    qidx_to_vectors: Dict[Qidx, List[List[float]]] = get_query_vectors_from_jobs(
+    qidx_to_vectors: Dict[Qidx, List[float]] = get_query_vectors_from_jobs(
         queries, qidx_to_jobs, job_ptr_to_vectors, config, jobs
     )
 
-    #    Pandu: re-write get_query_vectors_from_jobs needs to from <VectoriseArguments: Dict<content: vector>>
-
-
     ## 4. Create msearch request bodies and combine to aggregate.
-    query_to_body_parts: Dict[Qidx, List[Dict]] = {}
-    query_to_body_count: Dict[Qidx, int] = {} # Keep track of count, so we can separate after msearch call.
+    query_to_body_parts: Dict[Qidx, List[Dict]] = dict()
+    query_to_body_count: Dict[Qidx, int] = dict() # Keep track of count, so we can separate after msearch call.
     for qidx, q in enumerate(queries):
         index_info = get_index_info(config=config, index_name=q.index)
         contextualised_filter = utils.contextualise_filter(filter_string=q.filter, simple_properties=index_info.get_text_properties())
@@ -1820,8 +1821,8 @@ def _vector_text_search(
     else:  # is dict:
         ordered_queries = list(query.items())
         if index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]:
-            text_queries = [k for k, _ in ordered_queries if _is_image(k)]
-            image_queries = [k for k, _ in ordered_queries if not _is_image(k)]
+            text_queries = [k for k, _ in ordered_queries if not _is_image(k)]
+            image_queries = [k for k, _ in ordered_queries if _is_image(k)]
             to_be_vectorised = [batch for batch in [text_queries, image_queries] if batch]
         else:
             to_be_vectorised = [[k for k, _ in ordered_queries], ]
