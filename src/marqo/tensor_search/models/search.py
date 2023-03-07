@@ -16,9 +16,6 @@ class VectorisedJobs(BaseModel):
     """A vectorised job describes content (e.q. search queries, images) that can be vectorised (i.e can be sent to 
     `s2_inference.vectorise`) in a single batch given they share common inference parameters.
 
-    TODO:
-        - pull out image and text content separately.
-        -
     """
     model_name: str
     model_properties: Dict[str, Any]
