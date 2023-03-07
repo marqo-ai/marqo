@@ -1544,12 +1544,13 @@ def vectorise_jobs(jobs: List[VectorisedJobs]) -> Dict[JHash, Dict[str, List[flo
     for v in jobs:
         # TODO: Handle exception for single job, and allow others to run.
         try:
-            result[v.groupby_key()] = dict(zip(v.content, s2_inference.vectorise(
-                    model_name=v.model_name, model_properties=v.model_properties,
-                    content=v.content, device=v.device,
-                    normalize_embeddings=v.normalize_embeddings,
-                    image_download_headers=v.image_download_headers
-                )))
+            if v.content:
+                result[v.groupby_key()] = dict(zip(v.content, s2_inference.vectorise(
+                        model_name=v.model_name, model_properties=v.model_properties,
+                        content=v.content, device=v.device,
+                        normalize_embeddings=v.normalize_embeddings,
+                        image_download_headers=v.image_download_headers
+                    )))
         except s2_inference_errors.S2InferenceError:
             # TODO: differentiate image processing errors from other types of vectorise errors
             raise errors.InvalidArgError(message=f'Could not process given image in: {v.content}')
@@ -1633,9 +1634,9 @@ def get_content_vector(possible_jobs: List[VectorisedJobPointer], job_to_vectors
     Raises runtime error if is not found
     """
     content_type = 'image' if treat_urls_as_images and _is_image(content) else 'text'
-    not_found_error = RuntimeError(f"get_content_vector(): could not corresponding vector for content `{content}`")
+    not_found_error = RuntimeError(f"get_content_vector(): could not find corresponding vector for content `{content}`")
     for vec_job_pointer in possible_jobs:
-        if jobs[vec_job_pointer.job_hash].content == content_type:
+        if jobs[vec_job_pointer.job_hash].content_type == content_type:
             try:
                 return job_to_vectors[vec_job_pointer.job_hash][content]
             except KeyError:
