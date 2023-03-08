@@ -1036,7 +1036,7 @@ def bulk_search(query: BulkSearchQuery, marqo_config: config.Config, verbose: bo
                 del hit["_highlights"]
 
         if q.reRanker is not None:
-            logger.info(f"reranking {i}th query using {q.reRanker}")
+            logger.debug(f"reranking {i}th query using {q.reRanker}")
             rerank_query(q, s, q.reRanker, selected_device, 1)
 
     return {
@@ -1655,6 +1655,16 @@ def create_empty_query_response(queries: List[BulkSearchQueryEntity]) -> List[Di
     )
 
 def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity], device=None) -> List[Dict]:
+    """Resolve a batch of search queries in parallel. 
+
+    Args:
+        - config: 
+        - queries: A list of independent search queries. Can be across multiple indexes, but are all expected to have `searchMethod = "TENSOR"`
+    Returns:
+        A list of search query responses (see `_format_ordered_docs_simple` for structure of individual entities). 
+    Note:
+        - Search results are in the same order as `queries`. 
+    """
     if len(queries) == 0:
         return []
 
@@ -1697,7 +1707,7 @@ def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity
     aggregate_body = functools.reduce(lambda x, y: x + y, query_to_body_parts.values())
     if not aggregate_body:
         # Must return empty response, per search query
-        return list(map(lambda x: {"hits": []}, queries))
+        return create_empty_query_response(queries)
 
     logger.info(f"search (tensor) pre-processing: took {(timer() - start_preprocessing_time):.3f}s to vectorize and process query.")
 
