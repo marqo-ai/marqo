@@ -1005,9 +1005,6 @@ def bulk_search(query: BulkSearchQuery, marqo_config: config.Config, verbose: bo
     tensor_queries: Dict[int, BulkSearchQueryEntity] = dict(filter(lambda e: e[1].searchMethod == SearchMethod.TENSOR, enumerate(query.queries)))
     lexical_queries: Dict[int, BulkSearchQueryEntity] = dict(filter(lambda e: e[1].searchMethod == SearchMethod.LEXICAL, enumerate(query.queries)))
 
-    if len(lexical_queries) + len(tensor_queries) == 0:
-        raise errors.InvalidArgError(f"Bulk search called with unknown search method(s)")
-
     tensor_search_results = dict(zip(tensor_queries.keys(), _bulk_vector_text_search(
             marqo_config, list(tensor_queries.values()), device=selected_device,
         )))
