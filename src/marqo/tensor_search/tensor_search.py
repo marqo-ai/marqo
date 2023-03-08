@@ -990,7 +990,8 @@ def search(config: Config, index_name: str, text: Union[str, dict],
            reranker: Union[str, Dict] = None, simplified_format: bool = True, filter: str = None,
            attributes_to_retrieve: Optional[List[str]] = None,
            device=None, boost: Optional[Dict] = None,
-           image_download_headers: Optional[Dict] = None) -> Dict:
+           image_download_headers: Optional[Dict] = None,
+           context: Optional[Dict] = None) -> Dict:
     """The root search method. Calls the specific search method
 
     Validation should go here. Validations include:
@@ -1064,7 +1065,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
             return_doc_ids=return_doc_ids, searchable_attributes=searchable_attributes, verbose=verbose,
             number_of_highlights=num_highlights, simplified_format=simplified_format,
             filter_string=filter, device=device, attributes_to_retrieve=attributes_to_retrieve, boost=boost,
-            image_download_headers=image_download_headers
+            image_download_headers=image_download_headers, context=context
         )
     elif search_method.upper() == SearchMethod.LEXICAL:
         search_result = _lexical_search(
@@ -1239,7 +1240,8 @@ def _vector_text_search(
         verbose=0, raise_on_searchable_attribs=False, hide_vectors=True, k=500,
         simplified_format=True, filter_string: str = None, device=None,
         attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None,
-        image_download_headers: Optional[Dict] = None):
+        image_download_headers: Optional[Dict] = None,
+        context: Optional[Dict] = None,):
     """
     Args:
         config:
@@ -1278,12 +1280,16 @@ def _vector_text_search(
         - searching a non existent index should return a HTTP-type error
     """
     # SEARCH TIMER-LOGGER (pre-processing)
+    validation.validate_context_object(context)
+    custom_tensors = context.get("tensor", None)
     start_preprocess_time = timer()
     try:
         index_info = get_index_info(config=config, index_name=index_name)
     except KeyError as e:
         raise errors.IndexNotFoundError(message="Tried to search a non-existent index: {}".format(index_name))
     selected_device = config.indexing_device if device is None else device
+
+    print(index_info.index_settings["index_defaults"]["model"])
 
     # query, weight pairs, if query is a dict:
     ordered_queries = None
@@ -1312,7 +1318,16 @@ def _vector_text_search(
             # multiple queries. We have to weight and combine them:
             weighted_vectors = [np.asarray(vec) * weight for vec, weight in
                                 zip(vectorised_text, [w for _, w in ordered_queries])]
-            vectorised_text = np.mean(weighted_vectors, axis=0)
+            # append the vectors in "__vectors"
+            if custom_tensors:
+                weighted_vectors += [np.asarray(v["vector"]) * v["weight"]for v in custom_tensors]
+            try:
+                vectorised_text = np.mean(weighted_vectors, axis=0)
+            except ValueError as e:
+                raise errors.InvalidArgError(f"The provided vectors are not in the same dimension of the index."
+                                             f"This causes the error when we do `numpy.mean()` over all the vectors."
+                                             f"The original error is {e.message}.\n"
+                                             f"Please check `https://docs.marqo.ai/0.0.15/API-Reference/search/`.")
             if index_info.index_settings['index_defaults']['normalize_embeddings']:
                 norm = np.linalg.norm(vectorised_text, axis=-1, keepdims=True)
                 if norm > 0:

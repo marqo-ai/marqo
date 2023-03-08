@@ -15,6 +15,7 @@ from enum import Enum
 import jsonschema
 from marqo.tensor_search.models.settings_object import settings_schema
 from marqo.tensor_search.models.mappings_object import mappings_schema, multimodal_combination_schema
+from marqo.tensor_search.models.context_object import context_schema
 
 
 def validate_query(q: Union[dict, str], search_method: Union[str, SearchMethod]):
@@ -51,6 +52,9 @@ def validate_query(q: Union[dict, str], search_method: Union[str, SearchMethod])
         )
     return q
 
+
+def validate_context(context:dict=None):
+    pass
 
 def validate_str_against_enum(value: Any, enum_class: Type[Enum], case_sensitive: bool = True):
     """Checks whether a value is found as the value of a str attribute of the
@@ -427,6 +431,23 @@ def validate_multimodal_combination(field_content, is_non_tensor_field, field_ma
     return True
 
 
+def validate_context_object(context_object: dict):
+    """validates the mappings object.
+        Returns
+            The given mappings object if validation has passed
+
+        Raises an InvalidArgError if the settings object is badly formatted
+        """
+    try:
+        jsonschema.validate(instance=context_object, schema=context_schema)
+        return context_object
+    except jsonschema.ValidationError as e:
+        raise InvalidArgError(
+            f"Error validating mappings object. Reason: \n{str(e)}"
+            f"\nRead about the mappings object here: https://docs.marqo.ai/0.0.15/API-Reference/mappings/"
+        )
+
+
 def validate_mappings_object(mappings_object: dict):
     """validates the mappings object.
     Returns
@@ -436,10 +457,6 @@ def validate_mappings_object(mappings_object: dict):
     """
     try:
         jsonschema.validate(instance=mappings_object, schema=mappings_schema)
-        for field_name, config in mappings_object.items():
-            if config["type"] == enums.MappingsObjectType.multimodal_combination:
-                validate_multimodal_combination_object(config)
-        return mappings_object
     except jsonschema.ValidationError as e:
         raise InvalidArgError(
             f"Error validating mappings object. Reason: \n{str(e)}"
