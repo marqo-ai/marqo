@@ -254,3 +254,9 @@ def parse_lexical_query(text: str) -> Tuple[List[str], str]:
     optional_blob = optional_blob.replace('\\"', '"')
 
     return (required_terms, optional_blob)
+
+
+def generate_batches(seq: Sequence, batch_size):
+    """Yields batches of length k from the sequence."""
+    for i in range(0, len(seq), batch_size):
+        yield seq[i:i + batch_size]

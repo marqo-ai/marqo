@@ -218,3 +218,29 @@ class TestUtils(unittest.TestCase):
                 raise AssertionError
             except TypeError as e:
                 assert "string as input" in str(e)
+
+    def test_batch_size(self):
+        # Test that each batch has the correct size
+        seq = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        k = 3
+        batches = list(utils.generate_batches(seq, batch_size=k))
+        self.assertEqual(len(batches), 4)
+        for batch in batches[:-1]:
+            self.assertEqual(len(batch), k)
+        self.assertEqual(len(batches[-1]), 1)
+
+    def test_batch_contents(self):
+        # Test that each batch contains the correct elements
+        seq = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        k = 3
+        batches = list(utils.generate_batches(seq, batch_size=k))
+        expected_batches = [[1, 2, 3], [4, 5, 6], [7, 8, 9], [10]]
+        for i, batch in enumerate(batches):
+            self.assertEqual(batch, expected_batches[i])
+
+    def test_empty_sequence(self):
+        # Test that an empty sequence returns an empty generator
+        seq = []
+        k = 3
+        batches = list(utils.generate_batches(seq, batch_size=k))
+        self.assertEqual(len(batches), 0)

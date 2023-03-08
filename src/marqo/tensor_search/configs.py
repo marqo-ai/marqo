@@ -39,6 +39,7 @@ def default_env_vars() -> dict:
         EnvVars.MARQO_MAX_CONCURRENT_SEARCH: 8,
         EnvVars.MARQO_THREAD_EXPIRY_TIME: 1800,     # 30 minutes
         EnvVars.MARQO_ENABLE_THROTTLING: "TRUE",
-        EnvVars.MARQO_LOG_LEVEL: "info"             # This env variable is set to "info" by default in run_marqo.sh, which overrides this value
+        EnvVars.MARQO_LOG_LEVEL: "info",             # This env variable is set to "info" by default in run_marqo.sh, which overrides this value\
+        EnvVars.MARQO_MAX_VECTORISE_BATCH_SIZE: 16
     }
 

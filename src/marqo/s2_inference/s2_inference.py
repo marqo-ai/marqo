@@ -9,6 +9,8 @@ from marqo.s2_inference.configs import get_default_device, get_default_normaliza
 from marqo.s2_inference.types import *
 from marqo.s2_inference.logger import get_logger
 import torch
+from marqo.tensor_search.utils import read_env_vars_and_defaults, generate_batches
+from marqo.tensor_search.configs import EnvVars
 
 logger = get_logger(__name__)
 
@@ -43,7 +45,13 @@ def vectorise(model_name: str, content: Union[str, List[str]], model_properties:
     _update_available_models(model_cache_key, model_name, validated_model_properties, device, normalize_embeddings)
 
     try:
-        vectorised = available_models[model_cache_key].encode(content, normalize=normalize_embeddings, **kwargs)
+        if isinstance(content, str):
+            vectorised = available_models[model_cache_key].encode(content, normalize=normalize_embeddings, **kwargs)
+        else:
+            vectorised = []
+            batch_size = read_env_vars_and_defaults(EnvVars.MARQO_MAX_VECTORISE_BATCH_SIZE)
+            for batch in generate_batches(content, batch_size=batch_size):
+                vectorised += available_models[model_cache_key].encode(batch, normalize=normalize_embeddings, **kwargs)
     except UnidentifiedImageError as e:
         raise VectoriseError(str(e)) from e
 
