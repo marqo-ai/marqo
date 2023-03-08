@@ -1826,11 +1826,11 @@ def _vector_text_search(
             readable_body = copy.deepcopy(body)
             for i, q in enumerate(readable_body):
                 if "index" in q:
-                        continue
+                    continue
                 for vec in list(q["query"]["nested"]["query"]["knn"].keys()):
                     readable_body[i]["query"]["nested"]["query"]["knn"][vec]["vector"] = \
                         readable_body[i]["query"]["nested"]["query"]["knn"][vec]["vector"][:5]
-                pprint.pprint(readable_body)
+            pprint.pprint(readable_body)
         if verbose == 2:
             pprint.pprint(body, compact=True)
 
