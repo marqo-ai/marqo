@@ -35,6 +35,107 @@ class TestBulkSearch(MarqoTestCase):
     def test_bulk_vector_text_search_searchable_attributes_non_existent(self):
         """TODO: non existent attrib."""
 
+    def test_multimodal_tensor_combination_zero_weight(self):
+        documents = [{
+                "text_field": "A rider is riding a horse jumping over the barrier.",
+                # "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+            },{
+                "combo_text_image": {
+                    "text_field" : "A rider is riding a horse jumping over the barrier.",
+                    "image_field" : "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+                },
+        }]
+        try:
+            tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+        except IndexNotFoundError as e:
+            pass
+
+        tensor_search.create_vector_index(
+            index_name=self.index_name_1, config=self.config, index_settings={
+                IndexSettingsField.index_defaults: {
+                    IndexSettingsField.model: "ViT-B/32",
+                    IndexSettingsField.treat_urls_and_pointers_as_images: True,
+                    IndexSettingsField.normalize_embeddings: False
+                }
+            })
+
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=documents, auto_refresh=True,
+            mappings = {"combo_text_image" : {"type":"multimodal_combination", "weights":{"image_field": 0,"text_field": 1}}}
+        )
+
+        res = tensor_search.bulk_search(query=BulkSearchQuery(queries=[
+            BulkSearchQueryEntity(index=self.index_name_1, q="", limit=2),
+        ]), marqo_config=self.config)
+
+        # Get scores [0], [1]
+        assert len(res['result']) == 1
+        assert res['result'][0]["hits"][0]["_score"] == res['result'][0]["hits"][1]["_score"]
+
+    def test_bulk_search_works_on_uncached_field(self):
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=[
+                {"abc": "Exact match hehehe efgh ", "other field": "baaadd efgh ",
+                 "_id": "5678", "finally": "some field efgh "},
+                {"abc": "random text efgh ", "other field": "Close matc efgh h hehehe",
+                 "_id": "1234", "finally": "Random text here efgh "},
+            ], auto_refresh=True)
+        index_meta_cache.empty_cache()
+        tensor_search.bulk_search(
+            query=BulkSearchQuery(queries=[BulkSearchQueryEntity(index=self.index_name_1, q="some text")]),
+            marqo_config=self.config,
+        )
+        assert self.index_name_1 in index_meta_cache.get_cache()
+
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_3)
+        tensor_search.bulk_search(
+            query=BulkSearchQuery(queries=[
+                BulkSearchQueryEntity(index=self.index_name_1, q="some text"),
+                BulkSearchQueryEntity(index=self.index_name_3, q="some text")
+            ]),
+            marqo_config=self.config,
+        )
+        assert self.index_name_1 in index_meta_cache.get_cache()
+        assert self.index_name_3 in index_meta_cache.get_cache()
+
+    def test_bulk_search_query_boosted(self):
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=[
+                {
+                    "Title": "The Travels of Marco Polo",
+                    "Description": "A 13th-century travelogue describing Polo's travels",
+                    "_id": "article_590"
+                },
+                {
+                    "Title": "Extravehicular Mobility Unit (EMU)",
+                    "Description": "The EMU is a spacesuit that provides environmental protection, "
+                                   "mobility, life support, and communications for astronauts",
+                    "_id": "article_591"
+                }
+            ], auto_refresh=True
+        )
+        q = "What is the best outfit to wear on the moon?"
+        resp = tensor_search.bulk_search(
+            query=BulkSearchQuery(queries=[
+                BulkSearchQueryEntity(index=self.index_name_1, q=q),
+                BulkSearchQueryEntity(index=self.index_name_1, q=q, boost={"Title": [5, 1]}),
+                BulkSearchQueryEntity(index=self.index_name_1, q=q, boost={"Title": [-5, -1]}),
+                BulkSearchQueryEntity(index=self.index_name_1, q=q, boost={"Title": [-5, -1], "Description": [-5, -1]})
+            ]),
+            marqo_config=self.config,
+        )
+        assert len(resp['result']) == 4
+
+        score = resp['result'][0]['hits'][0]['_score']
+        score_boosted = resp['result'][1]['hits'][0]['_score']
+        score_half_negative = resp['result'][2]['hits'][0]['_score']
+        score_neg_boosted = resp['result'][3]['hits'][0]['_score']
+
+        self.assertGreater(score_boosted, score)
+        self.assertEqual(score, score_half_negative) # 
+        self.assertGreater(score, score_neg_boosted)
+        self.assertGreater(score_boosted, score_neg_boosted)
+
 
     def test_bulk_search_multiple_indexes(self):
         tensor_search.add_documents(
