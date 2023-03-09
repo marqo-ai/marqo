@@ -46,7 +46,8 @@ class TestAutomaticModelEject(unittest.TestCase):
         mock_check_memory_threshold_for_model.side_effect = pass_through_check_memory_threshold_for_model
 
         small_list_of_models = ['open_clip/convnext_base_w_320/laion_aesthetic_s13b_b82k',
-            "sentence-transformers/all-MiniLM-L6-v2", "flax-sentence-embeddings/all_datasets_v4_mpnet-base", 'open_clip/ViT-B-16/laion2b_s34b_b88k']
+            "sentence-transformers/all-MiniLM-L6-v2", "flax-sentence-embeddings/all_datasets_v4_mpnet-base",
+                                'open_clip/ViT-B-16/laion2b_s34b_b88k']
         content = "Try to kill the cpu"
 
         @unittest.mock.patch("marqo.s2_inference.AvailableModels.validate_model_into_device", mock_check_memory_threshold_for_model)
@@ -107,12 +108,13 @@ class TestAutomaticModelEject(unittest.TestCase):
     def test_model_management(self):
         # Instance should be out of memory without model management
         content = "Try to kill the cpu"
-        # Note that these models are tested in encoding test to avoid downloading again.
+        # These models are tested in encoding test to avoid downloading again.
         list_of_models = ["fp16/ViT-B/32", "open_clip/convnext_base_w/laion2b_s13b_b82k",
                  "open_clip/convnext_base_w_320/laion_aesthetic_s13b_b82k_augreg",
                  "onnx16/open_clip/ViT-B-32/laion400m_e32", 'onnx32/open_clip/ViT-B-32-quickgelu/laion400m_e32',
                  "all-MiniLM-L6-v1", "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6",
                  "onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]
+
         for model in list_of_models:
             _ = vectorise(model_name = model, content = content, device="cpu")
 
