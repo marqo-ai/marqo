@@ -93,7 +93,7 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
             available_models[model_cache_key] = {AvailableModelsKey.model:_load_model(model_name,
                                                             validated_model_properties, device=device),
                                                  AvailableModelsKey.most_recently_used_time: most_recently_used_time,
-                                                 AvailableModelsKey.key: model_size}
+                                                 AvailableModelsKey.model_size: model_size}
             logger.info(f'loaded {model_name} on device {device} with normalization={normalize_embeddings} at time={most_recently_used_time}.')
         except:
             raise ModelLoadError(

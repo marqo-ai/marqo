@@ -47,6 +47,7 @@ class AvailableModels:
                         f"Marqo CANNOT find enough space to load model = `{model_name}` in device = `{device}`.\n"
                         f"Marqo tried to eject all the models on this device = `{device}` but still can't find enough space. \n"
                         f"Please use a smaller model or increase the memory threshold.")
+
     @classmethod
     def check_memory_threshold_for_model(self, device: str, model_size: Union[float, int]) -> bool:
         '''
