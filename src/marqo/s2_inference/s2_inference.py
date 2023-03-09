@@ -11,8 +11,6 @@ from marqo.s2_inference.logger import get_logger
 import torch
 import datetime
 from marqo.s2_inference import constants
-from marqo.tensor_search.utils import read_env_vars_and_defaults
-from marqo.tensor_search.configs import EnvVars
 from marqo.tensor_search.enums import AvailableModelsKey
 from marqo.s2_inference.avail_models import AvailableModels
 logger = get_logger(__name__)

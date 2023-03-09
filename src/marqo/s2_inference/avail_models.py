@@ -1,5 +1,4 @@
 import threading
-from marqo.s2_inference.s2_inference import available_models
 from marqo.tensor_search.enums import AvailableModelsKey
 from marqo.s2_inference.logger import get_logger
 from marqo.s2_inference.types import *
@@ -10,10 +9,12 @@ import torch
 from marqo.s2_inference import constants
 from marqo.s2_inference.s2_inference import get_model_size
 
+
 logger = get_logger(__name__)
 class AvailableModels:
     def __init__(self):
         self.lock = threading.Lock()
+
 
     def validate_model_into_device(self, model_name, model_properties, device):
         with self.lock():
@@ -27,6 +28,7 @@ class AvailableModels:
                    True we have enough space for the model
                    Raise an error and return False if we can't find enough space for the model.
                '''
+            from marqo.s2_inference.s2_inference import available_models
             model_size = get_model_size(model_name, model_properties)
             if self.check_memory_threshold_for_model(device, model_size):
                 return True
@@ -59,6 +61,7 @@ class AvailableModels:
             True if we have enough space
             False if we don't have enough space
         '''
+        from marqo.s2_inference.s2_inference import available_models
         if device.startswith("cuda"):
             torch.cuda.synchronize(device)
             used_memory = torch.cuda.memory_allocated(device) / 1024 ** 3
