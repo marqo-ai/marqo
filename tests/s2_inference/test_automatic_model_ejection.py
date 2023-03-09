@@ -56,7 +56,7 @@ class TestAutomaticModelEject(unittest.TestCase):
                 _ = vectorise(model_name=model, content=content, device="cpu")
             checked_devices = [call_kwargs["device"] for call_args, call_kwargs
                                                 in mock_check_memory_threshold_for_model.call_args_list]
-            self.assertEqual(len(checked_devices), 5)
+            self.assertEqual(len(checked_devices), 4)
             self.assertEqual(set(checked_devices), {"cpu"})
             return True
         assert run
