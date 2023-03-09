@@ -1280,8 +1280,10 @@ def _vector_text_search(
         - searching a non existent index should return a HTTP-type error
     """
     # SEARCH TIMER-LOGGER (pre-processing)
-    validation.validate_context_object(context)
-    custom_tensors = context.get("tensor", None)
+    custom_tensors = None
+    if context is not None:
+        validation.validate_context_object(context_object=context)
+        custom_tensors = context.get("tensor", None)
     start_preprocess_time = timer()
     try:
         index_info = get_index_info(config=config, index_name=index_name)
@@ -1318,15 +1320,14 @@ def _vector_text_search(
             # multiple queries. We have to weight and combine them:
             weighted_vectors = [np.asarray(vec) * weight for vec, weight in
                                 zip(vectorised_text, [w for _, w in ordered_queries])]
-            # append the vectors in "__vectors"
             if custom_tensors:
                 weighted_vectors += [np.asarray(v["vector"]) * v["weight"]for v in custom_tensors]
             try:
                 vectorised_text = np.mean(weighted_vectors, axis=0)
             except ValueError as e:
                 raise errors.InvalidArgError(f"The provided vectors are not in the same dimension of the index."
-                                             f"This causes the error when we do `numpy.mean()` over all the vectors."
-                                             f"The original error is {e.message}.\n"
+                                             f"This causes the error when we do `numpy.mean()` over all the vectors.\n"
+                                             f"The original error is `{e}`.\n"
                                              f"Please check `https://docs.marqo.ai/0.0.15/API-Reference/search/`.")
             if index_info.index_settings['index_defaults']['normalize_embeddings']:
                 norm = np.linalg.norm(vectorised_text, axis=-1, keepdims=True)

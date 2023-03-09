@@ -890,12 +890,19 @@ class TestValidateIndexSettings(unittest.TestCase):
                 "tensor": [
                     {"vector": [0.2132] * 53, "weight": 1},
                     {"vector": [23, ], "weight": 1},
-                    {"vectors": 3, "weight": 1},
+                    {"vectors": None, "weight": 1},
                 ],
                 "addition_field_1": None,
                 "addition_field_2": "random"
             },
-
+            {
+                # None
+                "tensor": None,
+            },
+            {
+                # Empty tensor
+                "tensor": [],
+            },
         ]
 
         for invalid_context in valid_context_list:

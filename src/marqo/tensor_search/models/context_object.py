@@ -4,6 +4,7 @@ context_schema = {
   "properties": {
     "tensor": {
       "type": "array",
+      "minItems":1,
       "items":
         {
           "type": "object",
