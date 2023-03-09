@@ -434,9 +434,9 @@ def validate_multimodal_combination(field_content, is_non_tensor_field, field_ma
 def validate_context_object(context_object: dict):
     """validates the mappings object.
         Returns
-            The given mappings object if validation has passed
+            the given context_object if passed the validation
 
-        Raises an InvalidArgError if the settings object is badly formatted
+        Raises an InvalidArgError if the context object is badly formatted
         """
     try:
         jsonschema.validate(instance=context_object, schema=context_schema)

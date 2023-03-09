@@ -1014,6 +1014,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
         num_highlights: number of highlights to return for each doc
         boost: boosters to re-weight the scores of individual fields
         image_download_headers: headers for downloading images
+        context: a dictionary to allow custom vectors in search, for tensor search only
     Returns:
 
     """
@@ -1259,6 +1260,7 @@ def _vector_text_search(
             objects are printed out
         attributes_to_retrieve: if set, only returns these fields
         image_download_headers: headers for downloading images
+        context: a dictionary to allow custom vectors in search
     Returns:
 
     Note:
