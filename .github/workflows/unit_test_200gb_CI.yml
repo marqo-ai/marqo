@@ -1,4 +1,4 @@
-name: unit_test_CI
+name: unit_test_200gb_CI
 # runs unit tests on AMD64 machine
 
 on:
@@ -32,7 +32,7 @@ jobs:
         with:
           mode: start
           github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
-          ec2-image-id:  ${{ secrets.AMD_EC2_IMAGE_ID }}
+          ec2-image-id:  ${{ secrets.AMD_200GB_EC2_IMAGE_ID }}
           ec2-instance-type: t3.xlarge
           subnet-id: ${{ secrets.AMD_SUBNET_ID }}
           security-group-id: ${{ secrets.AMD_SECURITY_GROUP_ID }}
@@ -98,7 +98,7 @@ jobs:
           
       - name: Run Unit Tests
         run: |
-          export MQ_API_TEST_BRANCH="${GITHUB_REF##*/}"
+          export MQ_API_TEST_BRANCH=$(echo "${GITHUB_REF}" | cut -d'/' -f3-)
           tox -e py3-local_os_unit_tests_w_requirements
   
   Stop-Runner:
