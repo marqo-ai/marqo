@@ -10,7 +10,7 @@ from marqo.s2_inference.s2_inference import get_logger
 from marqo.s2_inference.types import Dict, List, Union, ImageType, Tuple, ndarray, Literal
 from marqo.s2_inference.clip_utils import format_and_load_CLIP_image
 from marqo.s2_inference.errors import ChunkerError
-
+from marqo.tensor_search.enums import AvailableModelsKey
 from marqo.s2_inference.processing.DINO_utils import _load_DINO_model,attention_to_bboxs,DINO_inference
 from marqo.s2_inference.processing.pytorch_utils import load_pytorch
 from marqo.s2_inference.processing.yolox_utils import (
@@ -211,8 +211,8 @@ class PatchifyModel:
 
             self.model, self.preprocess = func(self.model_name, self.device)
 
-            available_models[model_cache_key] = {"model": (self.model, self.preprocess),
-                                                 "most_recently_used_time" : datetime.datetime.now()}
+            available_models[model_cache_key] = {AvailableModelsKey.model: (self.model, self.preprocess),
+                                                 AvailableModelsKey.most_recently_used_time : datetime.datetime.now()}
 
         else:
             self.model, self.preprocess = available_models[model_cache_key]["model"]

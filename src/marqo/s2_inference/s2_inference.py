@@ -13,6 +13,7 @@ import datetime
 from marqo.s2_inference import constants
 from marqo.tensor_search.utils import read_env_vars_and_defaults
 from marqo.tensor_search.configs import EnvVars
+from marqo.tensor_search.enums import AvailableModelsKey
 
 logger = get_logger(__name__)
 # The avaiable has the structure:
@@ -47,7 +48,7 @@ def vectorise(model_name: str, content: Union[str, List[str]], model_properties:
 
     _update_available_models(model_cache_key, model_name, validated_model_properties, device, normalize_embeddings)
     try:
-        vectorised = available_models[model_cache_key]["model"].encode(content, normalize=normalize_embeddings, **kwargs)
+        vectorised = available_models[model_cache_key][AvailableModelsKey.model].encode(content, normalize=normalize_embeddings, **kwargs)
     except UnidentifiedImageError as e:
         raise VectoriseError(str(e)) from e
 
@@ -91,10 +92,10 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
         device_memory_manage(model_name, validated_model_properties, device)
         try:
             most_recently_used_time = datetime.datetime.now()
-            available_models[model_cache_key] = {"model":_load_model(model_name,
+            available_models[model_cache_key] = {AvailableModelsKey.model:_load_model(model_name,
                                                             validated_model_properties, device=device),
-                                                 "most_recently_used_time": most_recently_used_time,
-                                                 "model_size": model_size}
+                                                 AvailableModelsKey.most_recently_used_time: most_recently_used_time,
+                                                 AvailableModelsKey.key: model_size}
             logger.info(f'loaded {model_name} on device {device} with normalization={normalize_embeddings} at time={most_recently_used_time}.')
         except:
             raise ModelLoadError(
@@ -105,7 +106,7 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
     else:
         most_recently_used_time = datetime.datetime.now()
         logger.debug(f'renew {model_name} on device {device} with new time={most_recently_used_time}.')
-        available_models[model_cache_key]["most_recently_used_time"] = most_recently_used_time
+        available_models[model_cache_key][AvailableModelsKey.most_recently_used_time] = most_recently_used_time
 
 
 def get_model_size(model_name:str, model_properties:dict) -> (int, float):
@@ -137,26 +138,26 @@ def device_memory_manage(model_name: str, model_properties: dict, device: str) -
         Raise an error and return False if we can't find enough space for the model.
     '''
     model_size = get_model_size(model_name, model_properties)
-    if check_device_memory_status(device, model_size):
+    if check_memory_threshold_for_model(device, model_size):
         return True
     else:
-        model_cache_key_in_device = [key for key in list(available_models) if key.endswith(device)]
-        sorted_key_in_device = sorted(model_cache_key_in_device,
-                                      key=lambda x: available_models[x]["most_recently_used_time"])
-        for key in sorted_key_in_device:
+        model_cache_key_for_device = [key for key in list(available_models) if key.endswith(device)]
+        sorted_key_for_device = sorted(model_cache_key_for_device,
+                                      key=lambda x: available_models[x][AvailableModelsKey.most_recently_used_time])
+        for key in sorted_key_for_device:
             logger.info(f"Eject model = `{key.split('||')[0]}` with size = `{available_models[key].get('model_size', constants.DEFAULT_MODEL_SIZE)}` from device = `{device}` "
                         f"to save space for model = `{model_name}`.")
             del available_models[key]
-            if check_device_memory_status(device, model_size):
+            if check_memory_threshold_for_model(device, model_size):
                 return True
 
-        if check_device_memory_status(device, model_size) is False:
+        if check_memory_threshold_for_model(device, model_size) is False:
             raise ModelCacheManageError(f"Marqo CANNOT find enough space to load model = `{model_name}` in device = `{device}`.\n"
                                         f"Marqo tried to eject all the models on this device = `{device}` but still can't find enough space. \n"
                                         f"Please use a smaller model or increase the memory threshold.")
 
 
-def check_device_memory_status(device:str, model_size: Union[float, int] = 1) -> bool:
+def check_memory_threshold_for_model(device:str, model_size: Union[float, int]) -> bool:
     '''
     Check the memory usage in the target device and decide whether we can add a new model
     Args:
