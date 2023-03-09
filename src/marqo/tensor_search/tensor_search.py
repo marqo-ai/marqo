@@ -1007,9 +1007,6 @@ def bulk_search(query: BulkSearchQuery, marqo_config: config.Config, verbose: bo
     tensor_queries: Dict[int, BulkSearchQueryEntity] = dict(filter(lambda e: e[1].searchMethod == SearchMethod.TENSOR, enumerate(query.queries)))
     lexical_queries: Dict[int, BulkSearchQueryEntity] = dict(filter(lambda e: e[1].searchMethod == SearchMethod.LEXICAL, enumerate(query.queries)))
 
-    if len(lexical_queries) + len(tensor_queries) == 0:
-        raise errors.InvalidArgError(f"Bulk search called with unknown search method(s)")
-
     tensor_search_results = dict(zip(tensor_queries.keys(), _bulk_vector_text_search(
             marqo_config, list(tensor_queries.values()), device=selected_device,
         )))
@@ -1038,7 +1035,7 @@ def bulk_search(query: BulkSearchQuery, marqo_config: config.Config, verbose: bo
                 del hit["_highlights"]
 
         if q.reRanker is not None:
-            logger.info(f"reranking {i}th query using {q.reRanker}")
+            logger.debug(f"reranking {i}th query using {q.reRanker}")
             rerank_query(q, s, q.reRanker, selected_device, 1)
 
     return {
@@ -1657,6 +1654,16 @@ def create_empty_query_response(queries: List[BulkSearchQueryEntity]) -> List[Di
     )
 
 def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity], device=None) -> List[Dict]:
+    """Resolve a batch of search queries in parallel. 
+
+    Args:
+        - config: 
+        - queries: A list of independent search queries. Can be across multiple indexes, but are all expected to have `searchMethod = "TENSOR"`
+    Returns:
+        A list of search query responses (see `_format_ordered_docs_simple` for structure of individual entities). 
+    Note:
+        - Search results are in the same order as `queries`. 
+    """
     if len(queries) == 0:
         return []
 
@@ -1699,7 +1706,7 @@ def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity
     aggregate_body = functools.reduce(lambda x, y: x + y, query_to_body_parts.values())
     if not aggregate_body:
         # Must return empty response, per search query
-        return list(map(lambda x: {"hits": []}, queries))
+        return create_empty_query_response(queries)
 
     logger.info(f"search (tensor) pre-processing: took {(timer() - start_preprocessing_time):.3f}s to vectorize and process query.")
 
@@ -1734,7 +1741,7 @@ def create_bulk_search_response(queries: List[BulkSearchQueryEntity], query_to_b
         query = queries[qidx]
         gathered_docs = gather_documents_from_response(result)
         if query.boost is not None:
-            gathered_docs = boost_score(gathered_docs, query.boost)
+            gathered_docs = boost_score(gathered_docs, query.boost, query.searchableAttributes)
         docs_chunks_sorted = sort_chunks(gathered_docs)
         results.append(
             _format_ordered_docs_simple(ordered_docs_w_chunks=docs_chunks_sorted, result_count=query.limit)
@@ -1915,11 +1922,11 @@ def _vector_text_search(
             readable_body = copy.deepcopy(body)
             for i, q in enumerate(readable_body):
                 if "index" in q:
-                        continue
+                    continue
                 for vec in list(q["query"]["nested"]["query"]["knn"].keys()):
                     readable_body[i]["query"]["nested"]["query"]["knn"][vec]["vector"] = \
                         readable_body[i]["query"]["nested"]["query"]["knn"][vec]["vector"][:5]
-                pprint.pprint(readable_body)
+            pprint.pprint(readable_body)
         if verbose == 2:
             pprint.pprint(body, compact=True)
 

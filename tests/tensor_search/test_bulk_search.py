@@ -7,7 +7,7 @@ from marqo.s2_inference.s2_inference import vectorise
 import unittest
 from marqo.tensor_search.enums import TensorField, SearchMethod, EnvVars, IndexSettingsField
 from marqo.errors import (
-    IndexNotFoundError, InvalidArgError, InvalidFieldNameError, IllegalRequestedDocCount, BadRequestError
+    BackendCommunicationError, IndexNotFoundError, InvalidArgError, IllegalRequestedDocCount, BadRequestError
 )
 from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQueryEntity
 from marqo.tensor_search import tensor_search, constants, index_meta_cache
@@ -40,9 +40,172 @@ class TestBulkSearch(MarqoTestCase):
             except IndexNotFoundError as s:
                 pass
 
-    def test_bulk_vector_text_search_searchable_attributes_non_existent(self):
-        """TODO: non existent attrib."""
 
+    def test_bulk_search_no_queries_return_early(self):
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=[
+                {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "id1-first"},
+                {"abc": "random text", "other field": "Close match hehehe", "_id": "id1-second"},
+            ], auto_refresh=True
+        ) 
+        resp = tensor_search.bulk_search(marqo_config=self.config, query=BulkSearchQuery(queries=[]))
+        assert resp['result'] == []
+
+    def test_bulk_search_multiple_indexes_and_queries(self):
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=[
+                {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "id1-first"},
+                {"abc": "random text", "other field": "Close match hehehe", "_id": "id1-second"},
+            ], auto_refresh=True
+        )
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_2, docs=[
+                {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "id2-first"},
+                {"abc": "random text", "other field": "Close match hehehe", "_id": "id2-second"},
+            ], auto_refresh=True
+        )
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_3, docs=[
+                {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "id3-first"},
+                {"abc": "random text", "other field": "Close match hehehe", "_id": "id3-second"},
+            ], auto_refresh=True
+        )
+        tensor_search.bulk_search(marqo_config=self.config, query=BulkSearchQuery(
+            queries=[
+                BulkSearchQueryEntity(index=self.index_name_1, q="hehehe", limit=2),
+                BulkSearchQueryEntity(index=self.index_name_3, q={"laughter":  1.0, "match": -1.0})
+            ]
+        ))
+
+
+
+    def test_multimodal_tensor_combination_zero_weight(self):
+        documents = [{
+                "text_field": "A rider is riding a horse jumping over the barrier.",
+                # "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+            },{
+                "combo_text_image": {
+                    "text_field" : "A rider is riding a horse jumping over the barrier.",
+                    "image_field" : "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+                },
+        }]
+        try:
+            tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+        except IndexNotFoundError as e:
+            pass
+
+        tensor_search.create_vector_index(
+            index_name=self.index_name_1, config=self.config, index_settings={
+                IndexSettingsField.index_defaults: {
+                    IndexSettingsField.model: "ViT-B/32",
+                    IndexSettingsField.treat_urls_and_pointers_as_images: True,
+                    IndexSettingsField.normalize_embeddings: False
+                }
+            })
+
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=documents, auto_refresh=True,
+            mappings = {"combo_text_image" : {"type":"multimodal_combination", "weights":{"image_field": 0,"text_field": 1}}}
+        )
+
+        res = tensor_search.bulk_search(query=BulkSearchQuery(queries=[
+            BulkSearchQueryEntity(index=self.index_name_1, q="", limit=2),
+        ]), marqo_config=self.config)
+
+        # Get scores [0], [1]
+        assert len(res['result']) == 1
+        assert res['result'][0]["hits"][0]["_score"] == res['result'][0]["hits"][1]["_score"]
+
+    def test_bulk_search_works_on_uncached_field(self):
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=[
+                {"abc": "Exact match hehehe efgh ", "other field": "baaadd efgh ",
+                 "_id": "5678", "finally": "some field efgh "},
+                {"abc": "random text efgh ", "other field": "Close matc efgh h hehehe",
+                 "_id": "1234", "finally": "Random text here efgh "},
+            ], auto_refresh=True)
+        index_meta_cache.empty_cache()
+        tensor_search.bulk_search(
+            query=BulkSearchQuery(queries=[BulkSearchQueryEntity(index=self.index_name_1, q="some text")]),
+            marqo_config=self.config,
+        )
+        assert self.index_name_1 in index_meta_cache.get_cache()
+
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_3)
+        tensor_search.bulk_search(
+            query=BulkSearchQuery(queries=[
+                BulkSearchQueryEntity(index=self.index_name_1, q="some text"),
+                BulkSearchQueryEntity(index=self.index_name_3, q="some text")
+            ]),
+            marqo_config=self.config,
+        )
+        assert self.index_name_1 in index_meta_cache.get_cache()
+        assert self.index_name_3 in index_meta_cache.get_cache()
+
+    def test_bulk_search_query_boosted(self):
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=[
+                {
+                    "Title": "The Travels of Marco Polo",
+                    "Description": "A 13th-century travelogue describing Polo's travels",
+                    "_id": "article_590"
+                },
+                {
+                    "Title": "Extravehicular Mobility Unit (EMU)",
+                    "Description": "The EMU is a spacesuit that provides environmental protection, "
+                                   "mobility, life support, and communications for astronauts",
+                    "_id": "article_591"
+                }
+            ], auto_refresh=True
+        )
+        q = "What is the best outfit to wear on the moon?"
+        resp = tensor_search.bulk_search(
+            query=BulkSearchQuery(queries=[
+                BulkSearchQueryEntity(index=self.index_name_1, q=q),
+                BulkSearchQueryEntity(index=self.index_name_1, q=q, boost={"Title": [5, 1]}),
+                BulkSearchQueryEntity(index=self.index_name_1, q=q, boost={"Title": [-5, -1]}),
+                BulkSearchQueryEntity(index=self.index_name_1, q=q, boost={"Title": [-5], "Description": [-5, -1]})
+            ]),
+            marqo_config=self.config,
+        )
+        assert len(resp['result']) == 4
+
+        score = resp['result'][0]['hits'][0]['_score']
+        score_boosted = resp['result'][1]['hits'][0]['_score']
+        score_half_negative = resp['result'][2]['hits'][0]['_score']
+        score_neg_boosted = resp['result'][3]['hits'][0]['_score']
+
+        self.assertGreater(score_boosted, score)
+        self.assertEqual(score, score_half_negative) # 
+        self.assertGreater(score, score_neg_boosted)
+        self.assertGreater(score_boosted, score_neg_boosted)
+
+    def test_bulk_search_query_invalid_boosted(self):
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=[
+                {
+                    "Title": "The Travels of Marco Polo",
+                    "Description": "A 13th-century travelogue describing Polo's travels",
+                    "_id": "article_590"
+                },
+                {
+                    "Title": "Extravehicular Mobility Unit (EMU)",
+                    "Description": "The EMU is a spacesuit that provides environmental protection, "
+                                   "mobility, life support, and communications for astronauts",
+                    "_id": "article_591"
+                }
+            ], auto_refresh=True
+        )
+        try:
+            tensor_search.bulk_search(
+                query=BulkSearchQuery(queries=[
+                    BulkSearchQueryEntity(index=self.index_name_1, q="moon outfits", searchableAttributes=["Description"], boost={"Title": [5, 1]}),
+                ]),
+                marqo_config=self.config,
+            )
+            raise AssertionError("Boost attributes are not in searchable attributes")
+        except InvalidArgError:
+            pass
 
     def test_bulk_search_multiple_indexes(self):
         tensor_search.add_documents(
@@ -231,6 +394,24 @@ class TestBulkSearch(MarqoTestCase):
 
         self.assertEqual(mock_rerank_search_results.call_count, 1)
         
+    def test_bulk_search_rerank_invalid(self):
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=[
+                {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "id1-first"},
+                {"abc": "random text", "other field": "Close match hehehe", "_id": "id1-second"},
+            ], auto_refresh=True)
+
+        try:
+            tensor_search.bulk_search(
+                query=BulkSearchQuery(queries=[
+                    BulkSearchQueryEntity(index=self.index_name_1, q="match", reRanker='_testing'),
+                ]),
+                marqo_config=self.config,
+            )
+            raise AssertionError("Cannot use reranker with no searchableAttributes")
+        except InvalidArgError:
+            pass
+
 
     def test_each_doc_returned_once(self):
         """TODO: make sure each return only has one doc for each ID,
@@ -1285,3 +1466,42 @@ class TestBulkSearch(MarqoTestCase):
             highlight_field = list(hit['_highlights'].keys())[0]
             assert highlight_field in original_doc
             assert hit[highlight_field] == original_doc[highlight_field]
+
+    @mock.patch('marqo._httprequests.HttpRequests.get')
+    def test_bulk_msearch_invalid_response(self, mock_http_get):
+        # mock_http_get.side_effect = KeyError()
+
+        # response["responses"][0]["error"]["root_cause"][0]["reason"]
+        mock_http_get.return_value = {"responses": [{"error": {"root_cause": [{"reason": "index.max_result_window"}]}}]}
+        try:
+            tensor_search.bulk_msearch(self.config, [])
+            raise AssertionError("With invalid body, msearch should raise error")
+        except IllegalRequestedDocCount:
+            pass
+
+        # elif 'parse_exception' in response["responses"][0]["error"]["root_cause"][0]["reason"]: 
+        mock_http_get.return_value = {"responses": [{"error": {"root_cause": [{"reason": "parse_exception something else"}]}}]}
+        try:
+            tensor_search.bulk_msearch(self.config, [])
+            raise AssertionError("With invalid body, msearch should raise error")
+        except InvalidArgError:
+            pass
+
+        mock_http_get.return_value = {"responses": [{"error": {"root_cause": [{"reason": "parse_not_exception"}]}}]}
+        try:
+            tensor_search.bulk_msearch(self.config, [])
+            raise AssertionError("With invalid body, msearch should raise error")
+        except BackendCommunicationError:
+            pass
+
+        mock_http_get.return_value = {}
+        try:
+            tensor_search.bulk_msearch(self.config, [])
+            raise AssertionError("With invalid body, msearch should raise error")
+        except KeyError:
+            pass
+
+    def test_gather_documents_from_response_remove_no_chunks(self):
+        tensor_search.gather_documents_from_response([
+            [{"_id": "idddd", "inner_hits": {"__chunks": {"hits": {"hits": []}}}}]
+        ])
