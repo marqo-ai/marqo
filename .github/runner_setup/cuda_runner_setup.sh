@@ -1,18 +1,17 @@
 # When setting up a new runner AMI, paste these commands in to install the necessary software
 # Then create an AMI from your instance
 
-# Install and enable docker
-sudo apt-get remove docker docker-engine docker.io containerd runc
-sudo apt-get install     ca-certificates     curl     gnupg     lsb-release
+# Run the AMD setup commands first
+# Then these:
+
 sudo apt-get update
-sudo mkdir -p /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-sudo apt-get update
-sudo apt-get install docker-ce docker-ce-cli containerd.io docker-compose-plugin
+distribution=$(. /etc/os-release;echo $ID$VERSION_ID)       && curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg       && curl -s -L https://nvidia.github.io/libnvidia-container/$distribution/libnvidia-container.list |             sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' |             sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+sudo apt-get install -y nvidia-docker2
 
-sudo systemctl enable docker.service
-sudo systemctl enable containerd.service
+# Check if drivers are properly installed with nvidia-smi
+nvidia-smi
 
-# Install git
-sudo apt-get install git
-
+# If GPU not find, try installing drivers
+sudo apt install nvidia-utils-520
+sudo apt install nvidia-driver-515 nvidia-dkms-515
+sudo reboot
