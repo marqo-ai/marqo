@@ -1,6 +1,7 @@
 """This is the interface for interacting with S2 Inference
 The functions defined here would have endpoints, later on.
 """
+import functools
 import numpy as np
 from marqo.s2_inference.errors import VectoriseError, InvalidModelPropertiesError, ModelLoadError, UnknownModelError, ModelNotInCacheError
 from PIL import UnidentifiedImageError
@@ -51,7 +52,8 @@ def vectorise(model_name: str, content: Union[str, List[str]], model_properties:
             vectorised = []
             batch_size = read_env_vars_and_defaults(EnvVars.MARQO_MAX_VECTORISE_BATCH_SIZE)
             for batch in generate_batches(content, batch_size=batch_size):
-                vectorised += available_models[model_cache_key].encode(batch, normalize=normalize_embeddings, **kwargs)
+                vectorised.append(available_models[model_cache_key].encode(batch, normalize=normalize_embeddings, **kwargs))
+            functools.reduce(lambda x, y: x + y, generate_batches(content, batch_size=batch_size))
     except UnidentifiedImageError as e:
         raise VectoriseError(str(e)) from e
 

@@ -5,7 +5,8 @@ from marqo.s2_inference.errors import InvalidModelPropertiesError, UnknownModelE
 from marqo.tensor_search import tensor_search
 from marqo.s2_inference.processing.custom_clip_utils import download_pretrained_from_url
 from marqo.s2_inference.s2_inference import clear_loaded_models
-
+from marqo.s2_inference import s2_inference
+from unittest import mock
 from marqo.s2_inference.s2_inference import (
     available_models,
     vectorise,
@@ -478,5 +479,46 @@ class TestGenericModelSupport(MarqoTestCase):
         b = vectorise("open_clip/ViT-B-32-quickgelu/laion400m_e32", content=text)
 
         assert np.abs(np.array(a) - np.array(b)).sum() > epsilon
+
+    def test_vectorise_in_batches(self):
+        # tensor_search.add_documents(
+        #     config=self.config, index_name=self.index_name_1, docs=[{'hellow': 'rold'}], auto_refresh=True)
+        # there should be at least one model
+        # real_model_key, real_model = list(available_models.items())[0]
+        from marqo.s2_inference import random_utils
+        mock_model = mock.MagicMock()
+        mock_model.encode = mock.MagicMock()
+
+        random_model = random_utils.Random(model_name='mock_model', embedding_dim=128)
+
+        def func(*args,**kwargs):
+            print('hi')
+            return random_model.encode(*args,**kwargs)
+
+        mock_model.encode.side_effect = func
+        mock_model_props = {
+            "name": "mock_model",
+            "dimensions": random_model.embedding_dimension,
+            "tokens": 128,
+            "type": "sbert"
+        }
+
+        mock_available_models = {
+            s2_inference._create_model_cache_key(
+                model_name='mock_model', device='cpu',
+                model_properties=mock_model_props
+            ): mock_model
+        }
+
+        @mock.patch('marqo.s2_inference.s2_inference.available_models', mock_available_models)
+        @mock.patch('marqo.s2_inference.s2_inference._update_available_models', mock.MagicMock())
+        def run():
+            s2_inference.vectorise(model_name='mock_model', content=['just a single content'],
+                                   model_properties=mock_model_props)
+
+            print('mock_model.encode.call_args_list', mock_model.encode.call_args_list)
+            return True
+        assert run()
+
 
 
