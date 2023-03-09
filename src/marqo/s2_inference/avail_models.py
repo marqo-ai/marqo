@@ -11,12 +11,10 @@ from marqo.s2_inference import constants
 
 logger = get_logger(__name__)
 class AvailableModels:
-    def __init__(self):
-        self.lock = threading.Lock()
 
-
+    @classmethod
     def validate_model_into_device(self, model_name, model_properties, device):
-        with self.lock():
+        with threading.Lock():
             '''
                A function to manage the memory usage in devices when we want to load a new model
                Args:
@@ -49,7 +47,7 @@ class AvailableModels:
                         f"Marqo CANNOT find enough space to load model = `{model_name}` in device = `{device}`.\n"
                         f"Marqo tried to eject all the models on this device = `{device}` but still can't find enough space. \n"
                         f"Please use a smaller model or increase the memory threshold.")
-
+    @classmethod
     def check_memory_threshold_for_model(self, device: str, model_size: Union[float, int]) -> bool:
         '''
         Check the memory usage in the target device and decide whether we can add a new model
@@ -66,7 +64,7 @@ class AvailableModels:
             used_memory = torch.cuda.memory_allocated(device) / 1024 ** 3
             threshold = read_env_vars_and_defaults(EnvVars.MARQO_MAX_CUDA_MODEL_MEMORY)
         elif device.startswith("cpu"):
-            with self.lock():
+            with threading.Lock():
                 used_memory = sum([available_models[key].get("model_size", constants.DEFAULT_MODEL_SIZE) for key, values in
                                    available_models.items() if key.endswith("cpu")])
                 threshold = read_env_vars_and_defaults(EnvVars.MARQO_MAX_CPU_MODEL_MEMORY)
