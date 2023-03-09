@@ -1,9 +1,8 @@
-import json
 import math
 from unittest import mock
 from marqo.s2_inference.s2_inference import vectorise
 import numpy as np
-from requests import get as requests_dot_get
+from marqo.tensor_search import utils
 import typing
 from marqo.tensor_search.enums import TensorField, SearchMethod, EnvVars, IndexSettingsField
 from marqo.errors import (
@@ -1134,9 +1133,8 @@ class TestVectorSearch(MarqoTestCase):
         This checks our batching logic.
         """
         docs = [
-            {
-                "loc a": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
-                "_id": 'realistic_hippo'},
+            {"loc a": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+            "_id": 'realistic_hippo'},
             {"loc a": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png",
              "_id": 'artefact_hippo'}
         ]
@@ -1156,15 +1154,29 @@ class TestVectorSearch(MarqoTestCase):
             {
                 "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png": 2.0,
                 "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png": -1.0,
-                "artefact": 1.0, "photo realistic": -1,
-            }]
+                "artefact": 5.0, "photo realistic": -1,
+            },
+            {
+                "artefact": 5.0,
+                "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png": 2.0,
+                "photo realistic": -1,
+                "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png": -1.0
+            },
+            {
+                "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png": 3,
+                "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png": -1.0,
+            },
+            {
+                "hello": 3, "some thing": -1.0,
+            },
+        ]
+        from marqo.tensor_search.utils import dicts_to_jsonl
 
         for multi_query in multi_queries:
-            mock_get = mock.MagicMock()
-            mock_get.side_effect = lambda *x, **y: requests_dot_get(*x, **y)
+            mock_dicts_to_jsonl = mock.MagicMock()
+            mock_dicts_to_jsonl.side_effect = lambda *x, **y: dicts_to_jsonl(*x, **y)
 
-            @mock.patch('requests.get', mock_get)
-            @mock.patch('marqo._httprequests.ALLOWED_OPERATIONS', {mock_get})
+            @mock.patch('marqo.tensor_search.utils.dicts_to_jsonl', mock_dicts_to_jsonl)
             def run() -> typing.List[float]:
                 tensor_search.search(
                     text=multi_query,
@@ -1172,22 +1184,19 @@ class TestVectorSearch(MarqoTestCase):
                     result_count=5,
                     config=self.config,
                     search_method=SearchMethod.TENSOR)
-                get_args, get_kwargs = mock_get.call_args
-                jsons = get_kwargs['data'].strip().split('\n')
-                assert len(jsons) == 2
-                query_dict = json.loads(jsons[1])
-                from marqo.tensor_search import utils
+                get_args, get_kwargs = mock_dicts_to_jsonl.call_args
+                search_dicts = get_args[0]
+                assert len(search_dicts) == 2
+                query_dict = search_dicts[1]
+
                 query_vec = query_dict['query']['nested']['query']['knn'][
                     f"{TensorField.chunks}.{utils.generate_vector_name('loc a')}"]['vector']
-                print('type(query_vec)', type(query_vec))
-                print('type(query_vec[0])',type(query_vec[0]))
                 return query_vec
             # manually calculate weights:
             weighted_vectors =[]
             for q, weight in multi_query.items():
-                vec = vectorise(model_name="ViT-B/16", content=q)[0]
-                print('type(vec)',type(vec))
-                print('type(vec[0])',type(vec[0]))
+                vec = vectorise(model_name="ViT-B/16", content=[q, ],
+                                image_download_headers=None, normalize_embeddings=True)[0]
                 weighted_vectors.append(np.asarray(vec) * weight)
 
             manually_combined = np.mean(weighted_vectors, axis=0)
@@ -1195,9 +1204,9 @@ class TestVectorSearch(MarqoTestCase):
             if norm > 0:
                 manually_combined /= np.linalg.norm(manually_combined, axis=-1, keepdims=True)
             manually_combined = list(manually_combined)
-            # compare:
+
             combined_query = run()
-            self.assertEqual(combined_query, manually_combined)
+            assert np.allclose(combined_query, manually_combined, atol=1e-6)
 
 
     def test_multi_search_images_edge_cases(self):
