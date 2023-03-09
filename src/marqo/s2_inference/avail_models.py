@@ -14,17 +14,17 @@ class AvailableModels:
 
     @classmethod
     def validate_model_into_device(self, model_name, model_properties, device):
+        '''
+        A function to manage the memory usage in devices when we want to load a new model
+        Args:
+            model_name: The name of the model to load
+            model_properties: The model properties of the model
+            device: The target device to laod the model
+        Returns:
+            True we have enough space for the model
+            Raise an error and return False if we can't find enough space for the model.
+        '''
         with threading.Lock():
-            '''
-               A function to manage the memory usage in devices when we want to load a new model
-               Args:
-                   model_name: The name of the model to load
-                   model_properties: The model properties of the model
-                   device: The target device to laod the model
-               Returns:
-                   True we have enough space for the model
-                   Raise an error and return False if we can't find enough space for the model.
-               '''
             from marqo.s2_inference.s2_inference import available_models
             model_size = self.get_model_size(model_name, model_properties)
             if self.check_memory_threshold_for_model(device, model_size):
