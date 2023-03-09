@@ -70,7 +70,6 @@ class TestAutomaticModelEject(unittest.TestCase):
             except ModelCacheManageError as e:
                 assert "CANNOT find enough space" in e.message
 
-
     def test_get_model_size(self):
         models_and_sizes = {
             "open_clip/ViT-L-14/openai" : 1.5,
