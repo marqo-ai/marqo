@@ -18,7 +18,8 @@ class AvailableModels:
     @classmethod
     def validate_model_into_device(self, model_name, model_properties, device):
         '''
-        A function to manage the memory usage in devices when we want to load a new model
+        A function to detect if the device have enough memory to load the target model.
+        If not, it will try to eject some models to spare the space.
         Args:
             model_name: The name of the model to load
             model_properties: The model properties of the model
