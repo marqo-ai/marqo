@@ -1,14 +1,11 @@
 from functools import partial
 import functools
-import requests
 import validators
-import time
 import uuid
 from collections import defaultdict
 
 import pandas as pd
 pd.options.mode.chained_assignment = None
-from PIL import Image
 import numpy as np
 import torch
 
@@ -18,15 +15,14 @@ from marqo.s2_inference.reranking.model_utils import (
     load_owl_vit,
     _process_owl_inputs,
     _predict_owl,
-    process_owl_results,
     sort_owl_boxes_scores,
     _verify_model_inputs,
     _convert_cross_encoder_output,
     _process_owl_result,
     _keep_top_k
     )
-
-from marqo.s2_inference.clip_utils import _load_image_from_path
+from marqo.s2_inference.errors import RerankerNameError
+from marqo.s2_inference.clip_utils import load_image_from_path
 from marqo.s2_inference.reranking.enums import Columns, ResultsFields
 from marqo.s2_inference.reranking.configs import get_default_text_processing_parameters
 from marqo.s2_inference.processing import text as text_processor
@@ -44,11 +40,12 @@ class FormattedResults:
     output should be a dataframe with all fields required.
     """    
     
-    def __init__(self, results: Dict, highlights_field: str = ResultsFields.highlights):
+    def __init__(self, results: Dict, highlights_field: str = ResultsFields.highlights, searchable_fields: List[str] = None):
 
         self.results = results
         self.highlights_field = highlights_field
-        
+        self.searchable_fields = searchable_fields
+
         # check ids exist and if not create some
         self._fill_doc_ids(self.results)
 
@@ -57,11 +54,15 @@ class FormattedResults:
         self._get_searchable_columns()
 
     def results_to_df(self) -> None:
-        """_summary_
+        """ converts the results dict from search into a dataframe for easier manipulation
 
         Returns:
             _type_: _description_
         """
+
+        if self.searchable_fields is not None and isinstance(self.searchable_fields, list):
+            self.results[ResultsFields.hits] = [r for r in self.results[ResultsFields.hits] if all(s in r for s in self.searchable_fields)]
+
         self.results_df = pd.DataFrame(self.results[ResultsFields.hits])
 
         def _get_highlights(content):
@@ -77,7 +78,6 @@ class FormattedResults:
 
         if self.highlights_field in self.results_df:
             self.results_df[self.highlights_field] = self.results_df[self.highlights_field].apply(_get_highlights)
-
 
     @staticmethod
     def _fill_doc_ids(results: Dict) -> None:
@@ -121,7 +121,6 @@ class FormattedResults:
         if ResultsFields.original_score not in results_df:
             results_df[ResultsFields.original_score] = 1.0
 
-        
         inputs = []
         for field in searchable_fields:
             _inputs_df = results_df[[field, ResultsFields.reranked_id, ResultsFields.original_score]]
@@ -151,13 +150,14 @@ class FormattedResults:
 class ReRanker:
     """base class for the rerankers
     """
+
     def __init__(self, ):
         pass 
 
     def load_model(self):
         pass
 
-    def format_results(self, results: Dict, query: str = None):
+    def format_results(self, results: Dict, query: str = None, searchable_fields: List[str] = None):
         """standardize the way the results are formatted to go to a standard cross-encoder
 
         Args:
@@ -165,7 +165,7 @@ class ReRanker:
             query (str, optional): _description_. Defaults to None.
         """
         self.results = results
-        self.formatted_results = FormattedResults(self.results)
+        self.formatted_results = FormattedResults(self.results, searchable_fields=searchable_fields)
 
     @staticmethod
     def _prepare_inputs(inputs_df: pd.DataFrame, query_column: str = Columns.query, 
@@ -216,12 +216,15 @@ class ReRanker:
 
         self.results[ResultsFields.hits] = sorted(self.results[ResultsFields.hits], key=lambda x:x[ResultsFields.reranker_score], reverse=True)
 
-
     def rerank(self, query, results):
+        # this gets filled on for the task (text/images)
         pass
 
-class ReRankerText(ReRanker):
 
+class ReRankerText(ReRanker):
+    """
+    class for reranking with hf based text models
+    """
     def __init__(self, model_name: str, device: str = 'cpu', max_length: int = 512, num_highlights: int = 1, 
                         split_params: Dict = get_default_text_processing_parameters()):
         super().__init__()
@@ -335,12 +338,10 @@ class ReRankerText(ReRanker):
         self.get_reranked_results()
 
 
-
 class ReRankerOwl(ReRanker):
-    # we might need the index config to get the processing params
-    # "google/owlvit-base-patch32"
-    # "google/owlvit-base-patch16"
-    # "google/owlvit-large-patch14"
+    
+    """reranker for owl based image reranking
+    """
 
     def __init__(self, model_name: str, device: str, image_size: Tuple):
         super().__init__()
@@ -360,7 +361,7 @@ class ReRankerOwl(ReRanker):
         self._get_model_mapping()
 
         if self.model_name not in self._model_map:
-            raise ValueError(f"could not find model_name={self.model_name} in mappings {self._model_map}")
+            raise RerankerNameError(f"could not find model_name={self.model_name} in mappings {list(self._model_map.keys())}")
 
     def _get_model_mapping(self):
 
@@ -371,21 +372,20 @@ class ReRankerOwl(ReRanker):
             "owl/ViT-B/32":"google/owlvit-base-patch32",
             "owl/ViT-B/16":"google/owlvit-base-patch16",
             "owl/ViT-L/14":"google/owlvit-large-patch14",
-
         }
 
     def load_model(self):
         
         self._remapped_name = self._model_map[self.model_name]
-        logger.info(f"loading model={self._remapped_name} from input name={self.model_name}")
-        loaded = load_owl_vit(self._remapped_name, self.device)
+        logger.info(f"loading model={self._remapped_name} from input name={self.model_name} to device {self.device}")
+        loaded = load_owl_vit(self._remapped_name, device=self.device)
         self.model = loaded['model']
         self.processor = loaded['processor']
 
     @staticmethod
     def load_images(content: List[str], size: Tuple[int]) -> Tuple[ImageType, List[Tuple]]:
 
-        # TODO do web urls as well - fast laoding could be hard -
+        # uses same underlying loader as all other image models ffrom clip_utils
         images, original_size = zip(*[_load_image(f, size=size) for f in content])
 
         # use highlights
@@ -395,6 +395,8 @@ class ReRankerOwl(ReRanker):
 
     def rerank(self, query: str, results: Dict, image_attributes: List, num_highlights: int = 1):
         
+        # TODO add image based reranking when it is available
+        # https://github.com/huggingface/transformers/pull/20136
         self.results = results
         self.image_attributes = image_attributes
         self.num_highlights = num_highlights
@@ -409,7 +411,7 @@ class ReRankerOwl(ReRanker):
         if self.model is None:
             self.load_model()
 
-        self.format_results(results)
+        self.format_results(results, searchable_fields=image_attributes)
 
         # first stage of formatting converts results dict to dataframe
         self.inputs_df = self.formatted_results.format_for_model(self.formatted_results.results_df, self.image_attributes, query=query)
@@ -420,14 +422,15 @@ class ReRankerOwl(ReRanker):
         # todo unzip and get image location
         queries, image_names = zip(*self.model_inputs)
 
+        # try:
         self.images, self.original_sizes = self.load_images(image_names, self.image_size)
-
+        
         # # TODO check query type before making a list
         _b, _s, _i, _bo = [], [], [], []
 
         # # TODO find out why batching images does not work 
         for image, content, _query, orig_size in zip(self.images, image_names, queries, self.original_sizes):
-            self.processed_inputs = _process_owl_inputs(self.processor, _query, image)
+            self.processed_inputs = _process_owl_inputs(self.processor, _query, image).to(self.device)
             owl_results = _predict_owl(self.model, self.processed_inputs, 
                                 post_process_function=self.processor.post_process,
                         size=self.image_size)
@@ -455,13 +458,12 @@ class ReRankerOwl(ReRanker):
         # now merge back with original - filed_content is the image pointer and can be used as the identifier
         self.inputs_df = self.boxes_scores_df.merge(self.inputs_df, left_on=Columns.field_content, right_on=Columns.field_content)
 
-
         self.get_reranked_results(highlight_content_column=Columns.bbox_original)
         
 
 @functools.lru_cache
 def _load_image(filename: str, size: Tuple = None) -> ImageType:
-    """loads a PIL image
+    """loads a PIL image with optional resizing
 
     Args:
         filename (str): _description_
@@ -470,8 +472,9 @@ def _load_image(filename: str, size: Tuple = None) -> ImageType:
     Returns:
         ImageType: _description_
     """
-    im = _load_image_from_path(filename)
+    im = load_image_from_path(filename, {})
     original_size = im.size
     if size is not None:
         im = im.resize(size).convert('RGB')
+        
     return im,original_size

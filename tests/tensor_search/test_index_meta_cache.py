@@ -1,7 +1,10 @@
 import copy
+import datetime
 import pprint
+import threading
 import time
 import unittest
+import requests
 from marqo.tensor_search.models.index_info import IndexInfo
 from marqo.tensor_search.models import index_info
 from marqo.tensor_search import tensor_search
@@ -12,6 +15,8 @@ from marqo.tensor_search import utils
 from marqo.tensor_search.enums import TensorField, SearchMethod, IndexSettingsField
 from marqo.tensor_search import configs
 from tests.marqo_test import MarqoTestCase
+from unittest import mock
+from marqo import errors
 
 
 class TestIndexMetaCache(MarqoTestCase):
@@ -199,7 +204,8 @@ class TestIndexMetaCache(MarqoTestCase):
             index_name=self.index_name_1, config=self.config, text="a line of text",
             return_doc_ids=True, search_method=SearchMethod.LEXICAL)
         assert len(result["hits"]) == 0
-        time.sleep(1)
+        # REFRESH INTERVAL IS 2 seconds
+        time.sleep(4)
         result_2 = tensor_search.search(
             index_name=self.index_name_1, config=self.config, text="a line of text",
             return_doc_ids=True, search_method=SearchMethod.LEXICAL)
@@ -296,6 +302,7 @@ class TestIndexMetaCache(MarqoTestCase):
         tensor_search.add_documents(
             config=self.config, index_name=self.index_name_1,
             docs=[{"some field": "Plane 1"}], auto_refresh=True)
+        time.sleep(2.5)
         self._simulate_externally_added_docs(
             self.index_name_1, [{"brand new field": "a line of text", "_id": "1234"}], "brand new field")
         assert "brand new field" not in index_meta_cache.get_cache()
@@ -349,3 +356,224 @@ class TestIndexMetaCache(MarqoTestCase):
         index_meta_cache.refresh_index(config=self.config, index_name=self.index_name_1)
         ix_refreshed_info = index_meta_cache.get_index_info(config=self.config, index_name=self.index_name_1)
         assert ix_refreshed_info.index_settings == expected_index_settings
+
+    def test_index_refresh_on_interval_multi_threaded(self):
+        """ This test involves spinning up 5 threads or so. these threads
+            try to refresh the cache every 0.1 seconds. Despite this, the
+            last_refresh_time ensures we only actually push out a mappings
+            request once per second.
+            Because checking the last_refresh_time isn't threadsafe, this
+            test may occasionally fail. Enabling log output, and allowing
+            more log output increases risk of test failure. However, most
+            the time it should pass.
+
+        """
+        mock_get = mock.MagicMock()
+        @mock.patch('marqo._httprequests.ALLOWED_OPERATIONS', {mock_get})
+        @mock.patch('requests.get', mock_get)
+        def run():
+            N_seconds = 3
+            REFRESH_INTERVAL_SECONDS = 1
+            start_time = datetime.datetime.now()
+            num_threads = 5
+            total_loops = [0] * num_threads
+            sleep_time = 0.1
+
+            def threaded_while(thread_num, loop_record):
+                thread_loops = 0
+                while datetime.datetime.now() - start_time < datetime.timedelta(seconds=N_seconds):
+                    cache_update_thread = threading.Thread(
+                        target=index_meta_cache.refresh_index_info_on_interval,
+                        args=(self.config, self.index_name_1, REFRESH_INTERVAL_SECONDS))
+                    cache_update_thread.start()
+                    time.sleep(sleep_time)
+                    thread_loops += 1
+                loop_record[thread_num] = thread_loops
+
+            threads = [threading.Thread(target=threaded_while, args=(i, total_loops)) for i in range(num_threads)]
+            for th in threads:
+                th.start()
+
+            for th in threads:
+                th.join()
+            estimated_loops = round((N_seconds/sleep_time) * num_threads)
+            assert sum(total_loops) in range(estimated_loops - num_threads, estimated_loops + 1)
+            time.sleep(0.5)  # let remaining thread complete, if needed
+
+            assert mock_get.call_count == N_seconds
+            return True
+        assert run()
+
+    def test_index_refresh_on_interval_multi_threaded_no_index(self):
+        """ If we encounter NonTensorIndexError/ IndexNotExists error
+        while refreshing the index info, it is considered a successful
+        refresh and the refresh happens on the intervals as usual.
+
+        isn't threadsafe, this test may occasionally fail.
+
+        """
+        mock_get = mock.MagicMock()
+        mock_response = requests.Response()
+        mock_response.status_code = 200
+        mock_response.json = lambda: '{"a":"b"}'
+
+        # mock_get.return_value = mock_response
+        @mock.patch('marqo._httprequests.ALLOWED_OPERATIONS', {mock_get})
+        @mock.patch('requests.get', mock_get)
+        def run(error):
+            def use_error(*args, **kwargs):
+                raise error('')
+            mock_get.side_effect = use_error
+
+            N_seconds = 3
+            REFRESH_INTERVAL_SECONDS = 1
+            start_time = datetime.datetime.now()
+            num_threads = 5
+            total_loops = [0] * num_threads
+            sleep_time = 0.1
+
+            def threaded_while(thread_num, loop_record):
+                thread_loops = 0
+                while datetime.datetime.now() - start_time < datetime.timedelta(seconds=N_seconds):
+                    cache_update_thread = threading.Thread(
+                        target=index_meta_cache.refresh_index_info_on_interval,
+                        args=(self.config, self.index_name_1, REFRESH_INTERVAL_SECONDS))
+                    cache_update_thread.start()
+                    time.sleep(sleep_time)
+                    thread_loops += 1
+                loop_record[thread_num] = thread_loops
+
+            threads = [threading.Thread(target=threaded_while, args=(i, total_loops)) for i in range(num_threads)]
+            for th in threads:
+                th.start()
+
+            for th in threads:
+                th.join()
+            estimated_loops = round((N_seconds/sleep_time) * num_threads)
+            assert sum(total_loops) in range(estimated_loops - num_threads, estimated_loops + 1)
+            time.sleep(0.5)  # let remaining thread complete, if needed
+            assert mock_get.call_count == N_seconds
+            return True
+        assert run(error=errors.NonTensorIndexError)
+        mock_get.reset_mock()
+        assert run(error=errors.IndexNotFoundError)
+
+    def test_index_refresh_on_interval_multi_threaded_errors(self):
+        """ If we encounter any error besides
+        NonTensorIndexError/ IndexNotExists we this is considered a
+        failed refresh, which doesn't prevent other threads from
+        trying to update it.
+
+        This is not threadsafe and may occassionally fail
+
+        """
+        mock_get = mock.MagicMock()
+        mock_response = requests.Response()
+        mock_response.status_code = 200
+        mock_response.json = lambda: '{"a":"b"}'
+
+        # mock_get.return_value = mock_response
+        @mock.patch('marqo._httprequests.ALLOWED_OPERATIONS', {mock_get})
+        @mock.patch('requests.get', mock_get)
+        def run(error):
+            def use_error(*args, **kwargs):
+                raise error('')
+
+            mock_get.side_effect = use_error
+
+            N_seconds = 3
+            REFRESH_INTERVAL_SECONDS = 1
+            start_time = datetime.datetime.now()
+            num_threads = 5
+            total_loops = [0] * num_threads
+            sleep_time = 0.1
+
+            def threaded_while(thread_num, loop_record):
+                thread_loops = 0
+                while datetime.datetime.now() - start_time < datetime.timedelta(seconds=N_seconds):
+                    cache_update_thread = threading.Thread(
+                        target=index_meta_cache.refresh_index_info_on_interval,
+                        args=(self.config, self.index_name_1, REFRESH_INTERVAL_SECONDS))
+                    cache_update_thread.start()
+                    time.sleep(sleep_time)
+                    thread_loops += 1
+                loop_record[thread_num] = thread_loops
+
+            threads = [threading.Thread(target=threaded_while, args=(i, total_loops)) for i in range(num_threads)]
+            for th in threads:
+                th.start()
+
+            for th in threads:
+                th.join()
+            estimated_loops = round((N_seconds / sleep_time) * num_threads)
+            assert sum(total_loops) in range(estimated_loops - num_threads, estimated_loops + 1)
+            time.sleep(0.5)  # let remaining thread complete, if needed
+            # because we get these failures we set the last_refresh_time back to the original
+            # allowing other threads to refresh index_info
+            assert mock_get.call_count in range(estimated_loops - num_threads, estimated_loops + 1)
+            return True
+
+        assert run(error=ValueError)
+        mock_get.reset_mock()
+        assert run(error=requests.ConnectionError)
+
+    def test_search_index_refresh_on_interval_multi_threaded(self):
+        """ Same as test_index_refresh_on_interval_multi_threaded() ,
+        but using the search endpoint.
+
+        The same caveat applies: Because checking the last_refresh_time
+        isn't threadsafe, this test may occasionally fail.
+        """
+
+        mock_get = mock.Mock()
+        mock_response = requests.Response()
+        mock_response.status_code = 200
+        mock_response.json = lambda: '{"a":"b"}'
+        mock_get.return_value = mock_response
+
+        # we need to search it once, to to get something in the cache, otherwise
+        # the threads will see an empty cache and try to fill it
+        try:
+            tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[{"hi": "hello"}],
+                                        auto_refresh=False)
+        except IndexNotFoundError:
+            pass
+        @mock.patch('marqo._httprequests.ALLOWED_OPERATIONS', {mock_get})
+        @mock.patch('marqo._httprequests.requests.get', mock_get)
+        def run():
+
+            # requests.get('23456')
+            N_seconds = 4
+            # the following is hard coded in search()
+            REFRESH_INTERVAL_SECONDS = 2
+            start_time = datetime.datetime.now()
+            num_threads = 5
+            total_loops = [0] * num_threads
+            sleep_time = 0.1
+
+            def threaded_while(thread_num, loop_record):
+                thread_loops = 0
+                while datetime.datetime.now() - start_time < datetime.timedelta(seconds=N_seconds):
+                    cache_update_thread = threading.Thread(
+                        target=tensor_search.search,
+                        kwargs={"config": self.config, "index_name": self.index_name_1, "text": "hello" })
+                    cache_update_thread.start()
+                    time.sleep(sleep_time)
+                    thread_loops += 1
+                loop_record[thread_num] = thread_loops
+            threads = [threading.Thread(target=threaded_while, args=(i, total_loops)) for i in range(num_threads)]
+            for th in threads:
+                th.start()
+            for th in threads:
+                th.join()
+
+            estimated_loops = round((N_seconds/sleep_time) * num_threads)
+            assert sum(total_loops) in range(estimated_loops - num_threads, estimated_loops + 1)
+            time.sleep(0.5)  # let remaining thread complete, if needed
+            mappings_call_count = len([c for c in mock_get.mock_calls if '_mapping' in str(c)])
+            # for the refresh interal hardcoded in search(), which is 2 seconds, we expect a total
+            # of only 2 calls to the mappings endpoint, even though there are a lot more search requests
+            assert mappings_call_count == round(N_seconds/REFRESH_INTERVAL_SECONDS)
+            return True
+        assert run()
+

@@ -2,8 +2,7 @@ import pprint
 import requests
 from marqo.tensor_search.enums import IndexSettingsField, EnvVars
 from marqo.errors import MarqoApiError, MarqoError, IndexNotFoundError
-from marqo.tensor_search import tensor_search
-from marqo.tensor_search import configs
+from marqo.tensor_search import tensor_search, configs, backend
 from tests.marqo_test import MarqoTestCase
 from marqo.tensor_search.enums import IndexSettingsField as NsField
 from unittest import mock
@@ -124,6 +123,24 @@ class TestCreateIndex(MarqoTestCase):
             verify=False
         )
         assert default_shard_count == int(resp.json()[self.index_name_1]['settings']['index']['number_of_shards'])
+    
+    def test_autofill_index_defaults(self):
+        """ Does autofill work as intended when index_defaults is not set, but number_of_shards is?"""
+        intended_shard_count = 6
+        tensor_search.create_vector_index(
+            index_name=self.index_name_1, config=self.config,
+            index_settings={
+                NsField.number_of_shards: intended_shard_count        
+            }
+        )
+        
+        default_index_defaults = configs.get_default_index_settings()[NsField.index_defaults]
+        assert default_index_defaults is not None
+        
+        index_info = backend.get_index_info(config=self.config, index_name=self.index_name_1)
+        test_index_defaults = index_info.index_settings[NsField.index_defaults]
+
+        assert default_index_defaults == test_index_defaults
 
     def test_set_number_of_shards(self):
         """ does it work if other params are filled?"""
@@ -243,3 +260,45 @@ class TestCreateIndex(MarqoTestCase):
             raise AssertionError
         except errors.InvalidIndexNameError:
             pass
+
+    def test_index_validation_bad(self):
+        bad_settings = {
+            "index_defaults": {
+                "treat_urls_and_pointers_as_images": False,
+                "model": "hf/all_datasets_v4_MiniLM-L6",
+                "normalize_embeddings": True,
+                "text_preprocessing": {
+                    "split_length": "2",
+                    "split_overlap": "0",
+                    "split_method": "sentence"
+                },
+                "image_preprocessing": {
+                    "patch_method": None
+                }
+            },
+            "number_of_shards": 5
+        }
+        try:
+            tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings=bad_settings)
+            raise AssertionError
+        except errors.InvalidArgError as e:
+            pass
+
+    def test_index_validation_good(self):
+        bad_settings = {
+            "index_defaults": {
+                "treat_urls_and_pointers_as_images": False,
+                "model": "hf/all_datasets_v4_MiniLM-L6",
+                "normalize_embeddings": True,
+                "text_preprocessing": {
+                    "split_length": 2,
+                    "split_overlap": 0,
+                    "split_method": "sentence"
+                },
+                "image_preprocessing": {
+                    "patch_method": None
+                }
+            },
+            "number_of_shards": 5
+        }
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings=bad_settings)

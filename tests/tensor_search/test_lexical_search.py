@@ -6,9 +6,9 @@ import unittest
 import copy
 from marqo.errors import InvalidArgError, IndexNotFoundError
 from tests.marqo_test import MarqoTestCase
+import random
 
-
-class TestlexicalSearch(MarqoTestCase):
+class TestLexicalSearch(MarqoTestCase):
 
     def setUp(self) -> None:
         self.generic_header = {"Content-type": "application/json"}
@@ -223,6 +223,7 @@ class TestlexicalSearch(MarqoTestCase):
         del res_search_entry_point_no_processing_time ['processingTimeMs']
         del res_search_entry_point_no_processing_time ['query']
         del res_search_entry_point_no_processing_time ['limit']
+        del res_search_entry_point_no_processing_time ['offset']
         assert len(res_lexical_search['hits']) > 0
         assert res_search_entry_point_no_processing_time == res_lexical_search
 
@@ -310,3 +311,172 @@ class TestlexicalSearch(MarqoTestCase):
         assert len(res["hits"]) == 2
         assert (res["hits"][0]["_id"] == "alpha alpha") or (res["hits"][0]["_id"] == "Jupyter_12")
         assert (res["hits"][0]["_id"] != "abcdef") and (res["hits"][0]["_id"] != "abcdef")
+
+    def test_lexical_search_double_quotes(self):
+        # 2-tuples of input text, and required terms expected to be in the results.
+        docs = [
+            {
+                "Field 1": "gender is male. gang is cyberpunk. accessory is none.",
+                "Field 2": "",
+                "Field 3": "",
+                "_id": "0"
+            },
+            {
+                "Field 1": "gender is male. gang is cyberpunk. accessory is necklace.",
+                "Field 2": "",
+                "Field 3": "",
+                "_id": "1"
+            },
+            {
+                "Field 1": "gender is male. gang is random. accessory is none.",
+                "Field 2": "",
+                "Field 3": "",
+                "_id": "2"
+            },
+            {
+                "Field 1": "gender is male. gang is random. accessory is necklace.",
+                "Field 2": "",
+                "Field 3": "",
+                "_id": "3"
+            },
+            {
+                "Field 1": "gender is female. gang is cyberpunk. accessory is none.",
+                "Field 2": "",
+                "Field 3": "",
+                "_id": "4"
+            },
+            {
+                "Field 1": "gender is female. gang is cyberpunk. accessory is necklace.",
+                "Field 2": "",
+                "Field 3": "accessory is none.",
+                "_id": "5"
+            },
+            {
+                "Field 1": "gender is female. gang is random. accessory is none.",
+                "Field 2": "",
+                "Field 3": "",
+                "_id": "6"
+            },
+            {
+                "Field 1": "gender is female. gang is random. accessory is necklace.",
+                "Field 2": "accessory is none.",
+                "Field 3": "",
+                "_id": "7"
+            },
+        ]
+        fields = ["Field 1", "Field 2", "Field 3"]
+
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1,
+            docs=docs, auto_refresh=False
+        )
+        tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
+
+        cases = [
+            {"input": '"gender is female"', "required_terms": ["gender is female"]},
+            {"input": '"gender is female" "random"', "required_terms": ["gender is female", "random"]},
+            {"input": 'male cyberpunk none "accessory is necklace"', 
+                "required_terms": ["accessory is necklace"],
+                "first_n_results_ordered": ['5', '1', '3', '7']},
+            {"input": '"cyberpunk1234" necklace', "no_results": True},
+            {"input": 'cyberpunk1234 necklace',
+                "first_n_results_unordered": ['7', '1', '3', '5']},
+            {"input": '"accessory is none"', "required_terms": ["accessory is none"]}, # Multi-field testing
+
+            # Escaped quotes
+            {"input": '\\"fake term\\" not required, this should yield results male',
+                "first_n_results_unordered": ['3', '0', '2', '1']},
+            {"input": '"fake term" is required, this should yield no results', "no_results": True},
+
+            # Syntax errors (should not return errors)
+            {"input": '"gender is fe"male male"',
+                "first_n_results_unordered": ['3', '0', '2', '1']},
+            {"input": '"""', "no_results": True},
+            {"input": '"term1 " term2 "', "no_results": True},
+            {"input": '"AND OR &*) ((', "no_results": True}
+        ]
+
+        for case in cases:
+            res = tensor_search._lexical_search(
+                config=self.config, index_name=self.index_name_1, text=case['input'],
+                return_doc_ids=True, searchable_attributes=fields, result_count=8)
+
+            id_only_hits = [hit["_id"] for hit in res["hits"]]
+
+            if "required_terms" in case:
+                for hit in res["hits"]:
+                    for term in case["required_terms"]:
+                        term_found = False
+
+                        for field in fields:
+                            if term in hit[field]:
+                                term_found = True
+                                break
+                        
+                        assert term_found
+            
+            if "first_n_results_unordered" in case:
+                n = len(case["first_n_results_unordered"])
+                assert set(id_only_hits[:n]) == set(case["first_n_results_unordered"]) 
+            
+            if "first_n_results_ordered" in case:
+                n = len(case["first_n_results_ordered"])
+                assert id_only_hits[:n] == case["first_n_results_ordered"]
+            
+            if "no_results" in case:
+                assert len(id_only_hits) == 0
+
+    def test_lexical_search_list(self):
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=[
+                {"abc": "some text", "other field": "baaadd", "_id": "5678", "my_string": "b"},
+                {"abc": "some text", "other field": "Close match hehehe", "_id": "1234", "an_int": 2},
+                {"abc": "some text", "_id": "1235",  "my_list": ["tag1", "tag2 some"]},
+                {"abc": "some text", "_id": "1001", "my_cool_list": ["b_1", "b2"], "fun list": ['truk', 'car']},
+            ], auto_refresh=True, non_tensor_fields=["my_list", "fun list", "my_cool_list"])
+        base_search_args = {
+            'index_name': self.index_name_1, "config": self.config,
+            "search_method": enums.SearchMethod.LEXICAL
+        }
+        res_exists = tensor_search.search(**{'text': "tag1", **base_search_args})
+        assert len(res_exists['hits']) == 1
+        assert res_exists['hits'][0]['_id'] == '1235'
+
+        res_not_exists = tensor_search.search(**{'text': "tag55", **base_search_args})
+        assert len(res_not_exists['hits']) == 0
+
+        res_filtered_other = tensor_search.search(
+            **{'text': "tag1", 'filter': 'abc:(some text)', **base_search_args})
+        # it will actually return the other docs, as they match the filter, but with scores of 0
+        assert res_filtered_other['hits'][0]['_id'] == '1235'
+
+        res_filtered_same = tensor_search.search(
+            **{'text': "tag1", 'filter': 'my_list:tag2', **base_search_args})
+        assert len(res_filtered_same['hits']) == 1
+        assert res_filtered_same['hits'][0]['_id'] == '1235'
+
+        res_filtered_other_list = tensor_search.search(
+            **{'text': "b_1", 'filter': 'fun\ list:truk', **base_search_args})
+        assert len(res_filtered_other_list['hits']) == 1
+        assert res_filtered_other_list['hits'][0]['_id'] == '1001'
+
+    def test_lexical_search_list_searchable_attr(self):
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=[
+                {"abc": "some text", "other field": "baaadd", "_id": "5678", "my_string": "b"},
+                {"abc": "some text", "other field": "Close match hehehe", "_id": "1234", "an_int": 2},
+                {"abc": "some text", "_id": "1235",  "my_list": ["tag1", "tag2 some"]},
+                {"abc": "some text", "_id": "1001", "my_cool_list": ["b_1", "b2"], "fun list": ['truk', 'car']},
+            ], auto_refresh=True, non_tensor_fields=["my_list", "fun list", "my_cool_list"])
+        base_search_args = {
+            'index_name': self.index_name_1, "config": self.config,
+            "search_method": enums.SearchMethod.LEXICAL, 'text': "tag1"
+        }
+        res_exists = tensor_search.search(
+            **{**base_search_args, "searchable_attributes": ["my_list"]})
+        assert len(res_exists['hits']) == 1
+        assert res_exists['hits'][0]['_id'] == '1235'
+
+        res_wrong_attr = tensor_search.search(
+            **{**base_search_args, "searchable_attributes": ["abc"]})
+        assert len(res_wrong_attr['hits']) == 0

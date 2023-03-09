@@ -42,6 +42,7 @@ class IndexSettingsField:
     index_defaults = "index_defaults"
     treat_urls_and_pointers_as_images = "treat_urls_and_pointers_as_images"
     model = "model"
+    model_properties = "model_properties"
     normalize_embeddings = "normalize_embeddings"
 
     text_preprocessing = "text_preprocessing"
@@ -60,9 +61,12 @@ class SplitMethod:
     sentence = "sentence"
 
 
-class Device (str, Enum):
+class Device(str, Enum):
     cpu = "cpu"
     cuda = "cuda"
+    def __str__(self):
+        # To pass the str(Device.cpu) == "cpu" check in clip
+        return self.value
 
 
 class OpenSearchDataType:
@@ -79,6 +83,26 @@ class EnvVars:
     MARQO_MAX_DOC_BYTES = "MARQO_MAX_DOC_BYTES"
     MARQO_MAX_RETRIEVABLE_DOCS = "MARQO_MAX_RETRIEVABLE_DOCS"
     MARQO_MODELS_TO_PRELOAD = "MARQO_MODELS_TO_PRELOAD"
+    MARQO_MAX_CONCURRENT_INDEX = "MARQO_MAX_CONCURRENT_INDEX"
+    MARQO_MAX_CONCURRENT_SEARCH = "MARQO_MAX_CONCURRENT_SEARCH"
+    MARQO_THREAD_EXPIRY_TIME = "MARQO_THREAD_EXPIRY_TIME"
+    MARQO_ENABLE_THROTTLING = "MARQO_ENABLE_THROTTLING"
+    MARQO_LOG_LEVEL = "MARQO_LOG_LEVEL"
+
+
+class RequestType:
+    INDEX = "INDEX"
+    SEARCH = "SEARCH"
+    DELETE = "DELETE"
+    CREATE = "CREATE"
+
+
+class MappingsObjectType:
+    multimodal_combination = "multimodal_combination"
+
+
+# Perhaps create a ThrottleType to differentiate thread_count and data_size throttling mechanisms
+    
 
 
 

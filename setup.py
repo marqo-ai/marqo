@@ -30,6 +30,9 @@ setup(
         "fastapi",
         "uvicorn[standard]",
         "fastapi_utils",
+        "opencv-python-headless",
+        "psutil",
+        "multilingual_clip"
     ],
     name="marqo-engine",
     version="0.1.10",

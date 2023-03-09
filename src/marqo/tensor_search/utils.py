@@ -5,7 +5,9 @@ import json
 import torch
 from marqo import errors
 from marqo.tensor_search import enums, configs
-from typing import List, Optional, Union, Callable, Iterable, Sequence, Dict
+from typing import (
+    List, Optional, Union, Callable, Iterable, Sequence, Dict, Tuple
+)
 import copy
 import datetime
 
@@ -99,7 +101,11 @@ def contextualise_filter(filter_string: str, simple_properties: typing.Iterable)
     """
     contextualised_filter = filter_string
     for field in simple_properties:
-        contextualised_filter = contextualised_filter.replace(f'{field}:', f'{enums.TensorField.chunks}.{field}:')
+        if ' ' in field:
+            field_with_escaped_space = field.replace(' ', r'\ ') # monitor this: fixed the invalid escape sequence (Deprecation warning).
+            contextualised_filter = contextualised_filter.replace(f'{field_with_escaped_space}:', f'{enums.TensorField.chunks}.{field_with_escaped_space}:')
+        else:
+            contextualised_filter = contextualised_filter.replace(f'{field}:', f'{enums.TensorField.chunks}.{field}:')
     return contextualised_filter
 
 
@@ -179,4 +185,72 @@ def read_env_vars_and_defaults(var: str) -> Optional[str]:
             return None
 
 
+def parse_lexical_query(text: str) -> Tuple[List[str], str]:
+    """Find required terms enclosed within double quotes.
 
+    All other terms go into optional_blob, separated by whitespace.
+
+    Syntax:
+        Required strings must be enclosed by quotes. These quotes must be enclosed by spaces or the start
+        or end of the text
+
+    Notes:
+        Double quote can be either opening, closing, or escaped.
+        Escaped double quotes are interpreted literally.
+        If any double quotes exist that are neither opening, closing, nor escaped,
+        interpret entire string literally instead.
+
+    Users need to escape the backslash itself. (Single \ get ignored) -> q='dwayne \\"the rock\\" johnson'
+
+    Return:
+        2-tuple of <required terms> (for "must" clause) <optional blob> (for "should" clause)
+    """
+    required_terms = []
+    optional_blob = ""
+    opening_quote_idx = None
+
+    if not isinstance(text, str):
+        raise TypeError("parse_lexical_query must have string as input")
+
+    for i in range(len(text)):
+        # Add all characters to blob initially
+        optional_blob += text[i]
+
+        if text[i] == '"':
+            # Check if ESCAPED
+            if i > 0 and text[i-1] == '\\':
+                # Read quote literally. Backslash should be ignored (both blob and required)
+                pass
+            
+            # Check if CLOSING QUOTE
+            # Closing " must have space on the right (or is last character) while opening exists.
+            elif (opening_quote_idx is not None) and (i == len(text) - 1 or text[i+1] == " "):
+                    # Add everything in between the quotes as a required term
+                    new_required_term = text[opening_quote_idx+1:i]
+                    required_terms.append(new_required_term)
+
+                    # Remove this required term from the optional blob
+                    optional_blob = optional_blob[:-(len(new_required_term)+2)]
+                    opening_quote_idx = None
+
+            # Check if OPENING QUOTE
+            # Opening " must have space on the left (or is first character).
+            elif i == 0 or text[i-1] == " ":
+                opening_quote_idx = i
+
+            # None of the above: Syntax error. Interpret text literally instead.
+            else:
+                return([], text)
+
+    if opening_quote_idx is not None:
+        # string parsing finished with a quote still open: syntax error.
+        return ([], text)
+
+    # Remove double/leading white spaces
+    optional_blob = " ".join(optional_blob.split())
+
+    # Remove escape character. `\"` becomes just `"`
+    required_terms = [term.replace('\\"', '"') for term in required_terms]
+    optional_blob = optional_blob.replace('\\"', '"')
+
+    return (required_terms, optional_blob)

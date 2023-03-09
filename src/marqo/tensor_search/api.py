@@ -13,6 +13,9 @@ from marqo.tensor_search.web import api_validation, api_utils
 from marqo.tensor_search import utils
 from marqo.tensor_search.on_start_script import on_start
 from marqo import version
+from marqo.tensor_search.backend import get_index_info
+from marqo.tensor_search.enums import RequestType
+from marqo.tensor_search.throttling.redis_throttle import throttle
 
 def replace_host_localhosts(OPENSEARCH_IS_INTERNAL: str, OS_URL: str):
     """Replaces a host's localhost URL with one that can be referenced from
@@ -36,7 +39,6 @@ def replace_host_localhosts(OPENSEARCH_IS_INTERNAL: str, OS_URL: str):
             if replaced_str != OS_URL:
                 return replaced_str
     return OS_URL
-
 
 OPENSEARCH_URL = replace_host_localhosts(
     os.environ.get("OPENSEARCH_IS_INTERNAL", None),
@@ -108,42 +110,56 @@ def create_index(index_name: str, settings: Dict = None, marqo_config: config.Co
 
 
 @app.post("/indexes/{index_name}/search")
+@throttle(RequestType.SEARCH)
 def search(search_query: SearchQuery, index_name: str, device: str = Depends(api_validation.validate_device),
-                 marqo_config: config.Config = Depends(generate_config)):
+           marqo_config: config.Config = Depends(generate_config)):
     return tensor_search.search(
         config=marqo_config, text=search_query.q,
         index_name=index_name, highlights=search_query.showHighlights,
         searchable_attributes=search_query.searchableAttributes,
         search_method=search_query.searchMethod,
-        result_count=search_query.limit, reranker=search_query.reRanker,
+        result_count=search_query.limit, offset=search_query.offset,
+        reranker=search_query.reRanker, 
         filter=search_query.filter, device=device,
-        attributes_to_retrieve=search_query.attributesToRetrieve
+        attributes_to_retrieve=search_query.attributesToRetrieve, boost=search_query.boost,
+        image_download_headers=search_query.image_download_headers
     )
 
 
 @app.post("/indexes/{index_name}/documents")
+@throttle(RequestType.INDEX)
 def add_or_replace_documents(docs: List[Dict], index_name: str, refresh: bool = True,
                         marqo_config: config.Config = Depends(generate_config),
                         batch_size: int = 0, processes: int = 1,
                         non_tensor_fields: List[str] = Query(default=[]),
-                        device: str = Depends(api_validation.validate_device)):
+                        device: str = Depends(api_validation.validate_device),
+                        use_existing_tensors: bool = False,
+                        image_download_headers: typing.Optional[dict] = Depends(
+                            api_utils.decode_image_download_headers),
+                        mappings: typing.Optional[dict] = Depends(
+                            api_utils.decode_mappings)
+                             ):
     """add_documents endpoint (replace existing docs with the same id)"""
     return tensor_search.add_documents_orchestrator(
         config=marqo_config,
         docs=docs,
         index_name=index_name, auto_refresh=refresh,
         batch_size=batch_size, processes=processes, device=device,
-        non_tensor_fields=non_tensor_fields, update_mode='replace'
+        non_tensor_fields=non_tensor_fields, update_mode='replace',
+        image_download_headers=image_download_headers,
+        use_existing_tensors=use_existing_tensors,
+        mappings=mappings
     )
 
 
 @app.put("/indexes/{index_name}/documents")
+@throttle(RequestType.INDEX)
 def add_or_update_documents(docs: List[Dict], index_name: str, refresh: bool = True,
                         marqo_config: config.Config = Depends(generate_config),
                         batch_size: int = 0, processes: int = 1,
                         non_tensor_fields: List[str] = Query(default=[]),
                         device: str = Depends(api_validation.validate_device)):
-    """update add_documents endpoint"""
+    """WILL BE DEPRECATED SOON. update add_documents endpoint"""
     return tensor_search.add_documents_orchestrator(
         config=marqo_config,
         docs=docs,
@@ -212,6 +228,33 @@ def check_health(marqo_config: config.Config = Depends(generate_config)):
 def get_indexes(marqo_config: config.Config = Depends(generate_config)):
     return tensor_search.get_indexes(config=marqo_config)
 
+
+@app.get("/indexes/{index_name}/settings")
+def get_settings(index_name: str, marqo_config: config.Config = Depends(generate_config)):
+    index_info = get_index_info(config=marqo_config, index_name=index_name)
+    return index_info.index_settings
+
+
+@app.get("/models")
+def get_loaded_models():
+    return tensor_search.get_loaded_models()
+
+
+@app.delete("/models")
+def eject_model(model_name:str, model_device:str):
+    return tensor_search.eject_model(model_name = model_name, device = model_device)
+
+
+@app.get("/device/cpu")
+def get_cpu_info():
+    return tensor_search.get_cpu_info()
+
+
+@app.get("/device/cuda")
+def get_cuda_info():
+    return tensor_search.get_cuda_info()
+
+
 # try these curl commands:
 
 # ADD DOCS:
@@ -265,6 +308,10 @@ curl -XGET http://localhost:8882/indexes/my-irst-ix/documents/honey_facts_119
 curl -XGET http://localhost:8882/indexes/my-irst-ix/stats
 """
 
+# GET index settings
+"""
+curl -XGET http://localhost:8882/indexes/my-irst-ix/settings
+"""
 # POST refresh index
 """
 curl -XPOST  http://localhost:8882/indexes/my-irst-ix/refresh
@@ -282,3 +329,25 @@ curl -XPOST  http://localhost:8882/indexes/my-irst-ix/documents/delete-batch -H 
 curl -XDELETE http://localhost:8882/indexes/my-irst-ix
 """
 
+# check cpu info
+"""
+curl -XGET http://localhost:8882/device/cpu
+"""
+
+# check cuda info
+"""
+curl -XGET http://localhost:8882/device/cuda
+"""
+
+# check the loaded models
+"""
+curl -XGET http://localhost:8882/models
+"""
+
+# eject a model
+"""
+curl -X DELETE 'http://localhost:8882/models?model_name=ViT-L/14&model_device=cuda'
+curl -X DELETE 'http://localhost:8882/models?model_name=ViT-L/14&model_device=cpu'
+curl -X DELETE 'http://localhost:8882/models?model_name=hf/all_datasets_v4_MiniLM-L6&model_device=cuda' 
+curl -X DELETE 'http://localhost:8882/models?model_name=hf/all_datasets_v4_MiniLM-L6&model_device=cpu' 
+"""

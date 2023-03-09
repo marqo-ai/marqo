@@ -11,4 +11,5 @@ from typing import (
     Tuple, 
     Iterable, 
     Type, 
+    Literal
     )

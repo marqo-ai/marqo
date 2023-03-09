@@ -3,6 +3,13 @@ name: dind_os_CI
 
 on:
   workflow_dispatch:
+    inputs:
+      image_to_test:
+        required: false
+        default: marqo_docker_0
+        description: >
+          This is optional. If left as the default value "marqo_docker_0", the docker image built from this branch is tested.
+          Otherwise, the specified docker image is tested. For example "marqoai/marqo:test"
   push:
     branches:
       mainline
@@ -60,7 +67,7 @@ jobs:
       - name: Install Dependencies
         run: |
           #pip install -r requirements.txt
-          pip install tox
+          pip install tox==3.26
           pip install flake8
       
       # linting here
@@ -79,7 +86,11 @@ jobs:
           echo 'export MARQO_API_TESTS_ROOT="${{ github.workspace }}"' >> conf
           
       - name: Run Integration Tests - dind_os
-        run: tox -e py3-dind_os
+        run: |
+          export MQ_API_TEST_BRANCH="${GITHUB_REF##*/}"
+          CUSTOM_TEST_IMG="${{ github.event.inputs.image_to_test }}"
+          export MQ_API_TEST_IMG=${CUSTOM_TEST_IMG:-"marqo_docker_0"}
+          tox -e py3-dind_os
   
   Stop-Runner:
     name: Stop self-hosted EC2 runner

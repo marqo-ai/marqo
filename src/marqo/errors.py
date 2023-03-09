@@ -64,14 +64,13 @@ class MarqoWebError(Exception):
     message: str = None
     code: str = None
     link: str = ""
-
+    base_message = ("Please create an issue on Marqo's GitHub repo"
+                    " (https://github.com/marqo-ai/marqo/issues) "
+                    "if this problem persists.")
     def __init__(self, message: str, status_code: int = None,
                  error_type: str = None, code: str = None,
                  link: str = None) -> None:
-        base_message = ("Please create an issue on Marqo's GitHub repo"
-                        " (https://github.com/marqo-ai/marqo/issues) "
-                        "if this problem persists.")
-        self.message = f"{message}\n{base_message}"
+        self.message = f"{message}\n{self.base_message}"
 
         if self.status_code is None:
             self.status_code = status_code
@@ -87,7 +86,7 @@ class MarqoWebError(Exception):
         super().__init__(self.message)
 
     def __str__(self) -> str:
-        return f'{self.__class__.__name__} Message: {self.message}'
+        return f'{self.__class__.__name__}: {self.message}\n{self.base_message}'
 
 # ---MARQO USER ERRORS---
 
@@ -95,8 +94,9 @@ class MarqoWebError(Exception):
 class __InvalidRequestError(MarqoWebError):
     """abstract error"""
 
-    def __init__(self, message: str):
+    def __init__(self, message: str, link: str = None):
         self.message = message
+        self.link = link
 
     error_type = "invalid_request"
 
@@ -175,6 +175,11 @@ class IndexMaxFieldsError(__InvalidRequestError):
     code = "index_max_fields_error"
     status_code = HTTPStatus.BAD_REQUEST
 
+
+class ModelNotInCacheError(__InvalidRequestError):
+    code = "model_not_in_cache"
+    status_code = HTTPStatus.NOT_FOUND
+
 # ---MARQO INTERNAL ERROR---
 
 
@@ -194,3 +199,10 @@ class BackendTimeoutError(InternalError):
     """Error when Marqo operation takes longer than expected"""
     code = "backend_timeout_error"
     status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+
+
+class BatchInferenceSizeError(InternalError):
+    """Error when batch inference does not return expected size"""
+    code = "batch_inference_size_error"
+    status_code =  HTTPStatus.INTERNAL_SERVER_ERROR
+
