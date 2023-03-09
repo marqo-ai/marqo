@@ -7,7 +7,6 @@ from marqo.tensor_search.utils import read_env_vars_and_defaults
 from marqo.tensor_search.configs import EnvVars
 import torch
 from marqo.s2_inference import constants
-from marqo.s2_inference.s2_inference import get_model_size
 
 
 logger = get_logger(__name__)
@@ -29,7 +28,7 @@ class AvailableModels:
                    Raise an error and return False if we can't find enough space for the model.
                '''
             from marqo.s2_inference.s2_inference import available_models
-            model_size = get_model_size(model_name, model_properties)
+            model_size = self.get_model_size(model_name, model_properties)
             if self.check_memory_threshold_for_model(device, model_size):
                 return True
             else:
@@ -81,6 +80,23 @@ class AvailableModels:
                 f"We CANNOT find enough space for the model. Please change the threshold by setting the environment variables.\n"
                 f"You can check the detailed information at `https://docs.marqo.ai/0.0.16/Advanced-Usage/configuration/`.")
         return used_memory + model_size < threshold
+
+    @staticmethod
+    def get_model_size(model_name: str, model_properties: dict) -> (int, float):
+        '''
+        Return the model size for given model
+        Note that the priorities are size_in_properties -> model_name -> model_type
+        '''
+        if "model_size" in model_properties:
+            return model_properties["model_size"]
+
+        name_info = (model_name + model_properties.get("name", "")).lower().replace("/", "-")
+        for name, size in constants.MODEL_NAME_SIZE_MAPPING.items():
+            if name in name_info:
+                return size
+
+        type = model_properties["type"]
+        return constants.MODEL_TYPE_SIZE_MAPPING.get(type, constants.DEFAULT_MODEL_SIZE)
 
 
 
