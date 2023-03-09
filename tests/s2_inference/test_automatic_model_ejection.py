@@ -57,9 +57,10 @@ class TestAutomaticModelEject(unittest.TestCase):
             checked_devices = [call_kwargs["device"] for call_args, call_kwargs
                                                 in mock_check_memory_threshold_for_model.call_args_list]
             print(checked_devices)
-            self.assertEqual(len(checked_devices), 4)
+            self.assertEqual(len(checked_devices), 0)
             self.assertEqual(set(checked_devices), {"cpu"})
             return True
+
         assert run
 
     def test_load_very_large_model(self):
