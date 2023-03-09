@@ -16,52 +16,36 @@ class TestAutomaticModelEject(unittest.TestCase):
         except Exception:
             pass
 
-    def test_device_memory_manage(self):
-        def pass_through_validate_model_into_device(*arg, **kwargs):
-            return AvailableModels.validate_model_into_device(*arg, **kwargs)
-
-        mock_validate_model_into_device = unittest.mock.MagicMock()
-        mock_validate_model_into_device.side_effect = pass_through_validate_model_into_device
-
+    def test_validate_model_into_device(self):
         small_list_of_models = ['open_clip/convnext_base_w_320/laion_aesthetic_s13b_b82k',
             "sentence-transformers/all-MiniLM-L6-v2", "flax-sentence-embeddings/all_datasets_v4_mpnet-base", 'open_clip/ViT-B-16/laion2b_s34b_b88k']
         content = "Try to kill the cpu"
 
-        @unittest.mock.patch("marqo.s2_inference.AvailableModels.validate_model_into_device",mock_validate_model_into_device)
-        def run():
+        with unittest.mock.patch.object(AvailableModels, "validate_model_into_device") as mock_method:
             for model in small_list_of_models:
                 _ = vectorise(model_name=model, content=content, device="cpu")
-            checked_models = [call_kwargs["device"] for call_args, call_kwargs
-                                                in mock_validate_model_into_device.call_args_list]
 
-            self.assertEqual(small_list_of_models, checked_models)
-            return True
-        assert run
+        checked_models = [call_args[0] for call_args, call_kwargs
+                                            in mock_method.call_args_list]
+
+        self.assertEqual(small_list_of_models, checked_models)
 
     def test_check_memory_threshold_for_model(self):
-        def pass_through_check_memory_threshold_for_model(*arg, **kwargs):
-            return AvailableModels.check_memory_threshold_for_model(*arg, **kwargs)
-
-        mock_check_memory_threshold_for_model= unittest.mock.MagicMock()
-        mock_check_memory_threshold_for_model.side_effect = pass_through_check_memory_threshold_for_model
-
         small_list_of_models = ['open_clip/convnext_base_w_320/laion_aesthetic_s13b_b82k',
             "sentence-transformers/all-MiniLM-L6-v2", "flax-sentence-embeddings/all_datasets_v4_mpnet-base",
                                 'open_clip/ViT-B-16/laion2b_s34b_b88k']
+
         content = "Try to kill the cpu"
 
-        @unittest.mock.patch("marqo.s2_inference.AvailableModels.validate_model_into_device", mock_check_memory_threshold_for_model)
-        def run():
+        with unittest.mock.patch.object(AvailableModels, "check_memory_threshold_for_model") as mock_method:
             for model in small_list_of_models:
                 _ = vectorise(model_name=model, content=content, device="cpu")
-            checked_devices = [call_kwargs["device"] for call_args, call_kwargs
-                                                in mock_check_memory_threshold_for_model.call_args_list]
-            print(checked_devices)
-            self.assertEqual(len(checked_devices), 0)
-            self.assertEqual(set(checked_devices), {"cpu"})
-            return True
 
-        assert run
+            checked_devices = [call_args[0] for call_args, call_kwargs
+                                                in mock_method.call_args_list]
+
+        self.assertEqual(len(checked_devices), len(small_list_of_models))
+        self.assertEqual(set(checked_devices), {"cpu"})
 
     def test_load_very_large_model(self):
         huge_models = ['open_clip/ViT-g-14/laion2b_s12b_b42k']
@@ -118,7 +102,6 @@ class TestAutomaticModelEject(unittest.TestCase):
 
         for model in list_of_models:
             _ = vectorise(model_name = model, content = content, device="cpu")
-
 
 
 
