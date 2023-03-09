@@ -1846,7 +1846,7 @@ def vectorise_multimodal_combination_field(field: str, multimodal_object: Dict[s
     if not len(sub_field_name_list) == len(vectors_list):
         raise errors.BatchInferenceSizeError(message=f"Batch inference size does not match content for multimodal field {field}")
 
-    vector_chunk = np.squeeze(np.sum([np.array(vector) * field_map["weights"][sub_field_name] for sub_field_name, vector in zip(sub_field_name_list, vectors_list)], axis=0))
+    vector_chunk = np.squeeze(np.mean([np.array(vector) * field_map["weights"][sub_field_name] for sub_field_name, vector in zip(sub_field_name_list, vectors_list)], axis=0))
 
     if normalize_embeddings is True:
         vector_chunk = vector_chunk / np.linalg.norm(vector_chunk)
