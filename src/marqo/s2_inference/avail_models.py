@@ -11,7 +11,10 @@ from marqo.s2_inference import constants
 
 logger = get_logger(__name__)
 class AvailableModels:
-
+    '''
+    This is a class to handle the memory check with `available_models()`
+    We need to guarantee the methods are thread safe.
+    '''
     @classmethod
     def validate_model_into_device(self, model_name, model_properties, device):
         '''

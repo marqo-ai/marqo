@@ -14,9 +14,11 @@ from marqo.s2_inference import constants
 from marqo.tensor_search.enums import AvailableModelsKey
 from marqo.s2_inference.avail_models import AvailableModels
 logger = get_logger(__name__)
+
 # The avaiable has the structure:
 # {"model_cache_key_1":{"model" : model_object, "most_recently_used_time": time, "model_size" : model_size}}
 available_models = dict()
+
 MODEL_PROPERTIES = load_model_properties()
 
 
