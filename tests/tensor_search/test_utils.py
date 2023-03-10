@@ -221,9 +221,6 @@ class TestUtils(unittest.TestCase):
             except TypeError as e:
                 assert "string as input" in str(e)
 
-    def test_get_marqo_root(self):
-        print(utils.get_marqo_root())
-
     def test_get_marqo_root_returns_str(self):
         self.assertIsInstance(utils.get_marqo_root(), str)
 
