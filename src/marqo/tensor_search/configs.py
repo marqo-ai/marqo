@@ -19,10 +19,24 @@ def get_default_index_settings():
             # TODO move these into a processing dict with sub-dicts
             NsFields.image_preprocessing: {
                 NsFields.patch_method: None
-            }
+            },
+            NsFields.ann_parameters: get_default_ann_parameters()
         },
         NsFields.number_of_shards: 5,
         NsFields.number_of_replicas : 1,
+    }
+
+def get_default_ann_parameters(): 
+    return {
+        NsFields.ann_method: "hnsw",
+        NsFields.ann_metric: "cosinesimil",
+
+        # `ann_engine` not exposed to customer (via index settings).
+        NsFields.ann_engine: "lucene",
+        NsFields.ann_method_parameters: {
+            NsFields.hnsw_ef_construction: 128,
+            NsFields.hnsw_m: 24
+        }
     }
 
 
