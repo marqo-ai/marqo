@@ -1288,7 +1288,8 @@ def _vector_text_search(
             validation.validate_context_object(context_object=context)
             custom_tensors = context.get("tensor", None)
         elif isinstance(query, str):
-            raise errors.InvalidArgError(f"Marqo received a query = `{query}` with type =`{type(query).__name__}` and a context = `{context}`.\n"
+            raise errors.InvalidArgError(f"Marqo received a query = `{query}` with type =`{type(query).__name__}` "
+                                         f"and a context = `{context}`.\n"
                                          f"This is not supported as the context only works when the query is a dictionary."
                                          f"If you aim to search with your custom vectors, reformat the query as a dictionary.\n"
                                          f"Please check `https://docs.marqo.ai/0.0.16/` for more information.")
