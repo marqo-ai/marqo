@@ -1293,8 +1293,6 @@ def _vector_text_search(
         raise errors.IndexNotFoundError(message="Tried to search a non-existent index: {}".format(index_name))
     selected_device = config.indexing_device if device is None else device
 
-    print(index_info.index_settings["index_defaults"]["model"])
-
     # query, weight pairs, if query is a dict:
     ordered_queries = None
 
