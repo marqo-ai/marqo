@@ -1,7 +1,6 @@
 import unittest
 from marqo.tensor_search.utils import construct_authorized_url
 from marqo import config
-from marqo.tensor_search.on_start_script import SetMarqoRoot
 
 
 class MarqoTestCase(unittest.TestCase):
