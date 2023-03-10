@@ -53,9 +53,6 @@ def validate_query(q: Union[dict, str], search_method: Union[str, SearchMethod])
     return q
 
 
-def validate_context(context:dict=None):
-    pass
-
 def validate_str_against_enum(value: Any, enum_class: Type[Enum], case_sensitive: bool = True):
     """Checks whether a value is found as the value of a str attribute of the
      given enum_class.
@@ -444,7 +441,7 @@ def validate_context_object(context_object: dict):
     except jsonschema.ValidationError as e:
         raise InvalidArgError(
             f"Error validating mappings object. Reason: \n{str(e)}"
-            f"\nRead about the mappings object here: https://docs.marqo.ai/0.0.15/API-Reference/mappings/"
+            f"\nRead about the mappings object here: https://docs.marqo.ai/0.0.16"
         )
 
 
