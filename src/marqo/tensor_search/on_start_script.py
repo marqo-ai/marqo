@@ -26,7 +26,6 @@ def on_start(marqo_os_url: str):
                         DownloadFinishText(),
                         MarqoWelcome(),
                         MarqoPhrase(),
-                        SetMarqoRoot()
                         )
 
     for thing_to_start in to_run_on_start:
@@ -66,12 +65,6 @@ class PopulateCache:
         #     body={
         #         "persistent": {"action.auto_create_index": "false"}
         #     })
-
-
-class SetMarqoRoot:
-
-    def run(self):
-        os.environ[enums.EnvVars.MARQO_ROOT_PATH] = utils.get_marqo_root()
 
 
 class CUDAAvailable:

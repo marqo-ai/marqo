@@ -257,8 +257,31 @@ def parse_lexical_query(text: str) -> Tuple[List[str], str]:
     return (required_terms, optional_blob)
 
 
-def get_marqo_root() -> str:
-    """returns absolute path to marqo root.
+def get_marqo_root_from_env() -> str:
+    """Returns absolute path to Marqo root, first checking the env var.
+
+    If it isn't found, it creates the env var and returns it.
+
+    Returns:
+        str that doesn't end in a forward in forward slash.
+        for example: "/Users/CoolUser/marqo/src/marqo"
+    """
+    try:
+        marqo_root_path = os.environ[enums.EnvVars.MARQO_ROOT_PATH]
+        if marqo_root_path:
+            return marqo_root_path
+    except KeyError:
+        pass
+    mq_root = _get_marqo_root()
+    os.environ[enums.EnvVars.MARQO_ROOT_PATH] = mq_root
+    return mq_root
+
+
+def _get_marqo_root() -> str:
+    """returns absolute path to Marqo root
+
+    Searches for the Marqo by examining its own file path.
+
     Returns:
         str that doesn't end in a forwad in forward slash.
         for example: "/Users/CoolUser/marqo/src/marqo"

@@ -222,25 +222,62 @@ class TestUtils(unittest.TestCase):
                 assert "string as input" in str(e)
 
     def test_get_marqo_root_returns_str(self):
-        self.assertIsInstance(utils.get_marqo_root(), str)
+        self.assertIsInstance(utils._get_marqo_root(), str)
 
     def test_get_marqo_root_returns_correct_path(self):
-        assert utils.get_marqo_root().endswith('marqo/src/marqo')
+        assert utils._get_marqo_root().endswith('marqo/src/marqo')
 
     def test_get_marqo_root_returns_existing_path(self):
-        assert os.path.exists(utils.get_marqo_root())
+        assert os.path.exists(utils._get_marqo_root())
 
     def test_get_marqo_root_cwd_agnostic(self):
         original_dir = os.getcwd()
-        original_marqo_root = utils.get_marqo_root()
+        original_marqo_root = utils._get_marqo_root()
         # change to new dir (home dir)
         os.chdir(os.path.dirname(pathlib.Path.home()))
         new_dir = os.getcwd()
         # ensure we are in a different place
         assert str(new_dir) != str(original_dir)
         # marqo_root should still be equal:
-        self.assertEqual(utils.get_marqo_root(), original_marqo_root)
+        self.assertEqual(utils._get_marqo_root(), original_marqo_root)
         # reset cwd
         os.chdir(original_dir)
 
+    def test_get_marqo_root_from_env_returns_str(self):
+        self.assertIsInstance(utils.get_marqo_root_from_env(), str)
+
+    def test_get_marqo_root_from_env_returns_correct_path(self):
+        assert utils.get_marqo_root_from_env().endswith('marqo/src/marqo')
+
+    def test_get_marqo_root_from_env_returns_existing_path(self):
+        assert os.path.exists(utils.get_marqo_root_from_env())
+
+    def test_get_marqo_root_from_env_cwd_agnostic(self):
+        original_dir = os.getcwd()
+        original_marqo_root = utils.get_marqo_root_from_env()
+        # change to new dir (home dir)
+        os.chdir(os.path.dirname(pathlib.Path.home()))
+        new_dir = os.getcwd()
+        # ensure we are in a different place
+        assert str(new_dir) != str(original_dir)
+        # marqo_root should still be equal:
+        self.assertEqual(utils.get_marqo_root_from_env(), original_marqo_root)
+        # reset cwd
+        os.chdir(original_dir)
+
+    def test_get_marqo_root_from_env_returns_env_var_if_exists(self):
+        expected = "/Users/CoolUser/marqo/src/marqo"
+        with mock.patch.dict('os.environ', {enums.EnvVars.MARQO_ROOT_PATH: expected}):
+            actual = utils.get_marqo_root_from_env()
+        self.assertEqual(actual, expected)
+
+    def test_creates_env_var_if_not_exists(self):
+        @mock.patch("os.environ", dict())
+        def run():
+            assert enums.EnvVars.MARQO_ROOT_PATH not in os.environ
+            marqo_root = utils.get_marqo_root_from_env()
+            assert marqo_root.endswith('marqo/src/marqo')
+            assert os.environ[enums.EnvVars.MARQO_ROOT_PATH] == marqo_root
+            return True
+        assert run()
 
