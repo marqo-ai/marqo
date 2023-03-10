@@ -1,4 +1,6 @@
 import json
+import os
+import pathlib
 import pprint
 import unittest
 from marqo.tensor_search import utils
@@ -218,3 +220,30 @@ class TestUtils(unittest.TestCase):
                 raise AssertionError
             except TypeError as e:
                 assert "string as input" in str(e)
+
+    def test_get_marqo_root(self):
+        print(utils.get_marqo_root())
+
+    def test_get_marqo_root_returns_str(self):
+        self.assertIsInstance(utils.get_marqo_root(), str)
+
+    def test_get_marqo_root_returns_correct_path(self):
+        assert utils.get_marqo_root().endswith('marqo/src/marqo')
+
+    def test_get_marqo_root_returns_existing_path(self):
+        assert os.path.exists(utils.get_marqo_root())
+
+    def test_get_marqo_root_cwd_agnostic(self):
+        original_dir = os.getcwd()
+        original_marqo_root = utils.get_marqo_root()
+        # change to new dir (home dir)
+        os.chdir(os.path.dirname(pathlib.Path.home()))
+        new_dir = os.getcwd()
+        # ensure we are in a different place
+        assert str(new_dir) != str(original_dir)
+        # marqo_root should still be equal:
+        self.assertEqual(utils.get_marqo_root(), original_marqo_root)
+        # reset cwd
+        os.chdir(original_dir)
+
+

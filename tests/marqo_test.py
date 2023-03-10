@@ -1,12 +1,17 @@
 import unittest
 from marqo.tensor_search.utils import construct_authorized_url
 from marqo import config
+from marqo.tensor_search.on_start_script import SetMarqoRoot
 
 
 class MarqoTestCase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
+        # Set up the Marqo root dir (for use in model caches)
+        set_marqo_root_object = SetMarqoRoot()
+        set_marqo_root_object.run()
+
         local_opensearch_settings = {
             "url": 'https://localhost:9200',
             "main_user": "admin",

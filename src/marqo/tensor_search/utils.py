@@ -10,6 +10,7 @@ from typing import (
 )
 import copy
 import datetime
+import pathlib
 
 
 def dicts_to_jsonl(dicts: List[dict]) -> str:
@@ -254,3 +255,17 @@ def parse_lexical_query(text: str) -> Tuple[List[str], str]:
     optional_blob = optional_blob.replace('\\"', '"')
 
     return (required_terms, optional_blob)
+
+
+def get_marqo_root() -> str:
+    """returns path to marqo root.
+    Returns:
+        str that doesn't end in a forwad in forward slash.
+        for example: "/Users/CoolUser/marqo/src/marqo"
+    """
+    # tensor_search/ is the parent dir of this file
+    tensor_search_dir = pathlib.Path(__file__).parent
+    # marqo is the parent of the tensor_search_dir
+    marqo_base_dir = tensor_search_dir.parent.resolve()
+    return str(marqo_base_dir)
+
