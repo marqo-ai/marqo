@@ -55,6 +55,15 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         except InvalidArgError as e:
             assert "This causes the error when we do `numpy.mean()` over" in e.message
 
+    def test_search_with_incorrect_query_format(self):
+        query = "A rider is riding a horse jumping over the barrier"
+        try:
+            res = tensor_search.search(config=self.config, index_name=self.index_name_1, text=query, context=
+            {"tensor": [{"vector": [1, ] * 512, "weight": 0}, {"vector": [2, ] * 512, "weight": 0}], })
+            raise AssertionError
+        except InvalidArgError as e:
+            assert "This is not supported as the context only works when the query is a dictionary." in e.message
+
     def test_search_score(self):
         query ={
             "A rider is riding a horse jumping over the barrier" : 1,
@@ -65,8 +74,6 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                 {"tensor":[{"vector" : [1,] * 512, "weight": 0}, {"vector": [2,] * 512, "weight" : 0}],})
 
         assert res_1["hits"][0]["_score"] == res_2["hits"][0]["_score"]
-
-
 
 
 
