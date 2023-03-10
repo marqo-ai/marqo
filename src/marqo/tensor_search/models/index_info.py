@@ -72,7 +72,7 @@ class IndexInfo(NamedTuple):
     def get_ann_parameters(self) -> Dict[str, Any]:
         """Gets the ANN parameters to use as the default for the index.
 
-        Preferentially use index settings (when present) over generic defaults.
+        Preferentially use index settings over generic defaults, when index settings exist.
 
         Returns:
             Dict of ann parameters. Structure can be seen at `configs.get_default_ann_parameters`.

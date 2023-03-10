@@ -96,7 +96,7 @@ settings_schema = {
                 NsFields.ann_parameters: {
                     "type": "object",
                     "required": [
-                        # None required for backwards compatibility
+                        # Non required for backwards compatibility
                     ],
                     "properties": {
                         NsFields.ann_method: {

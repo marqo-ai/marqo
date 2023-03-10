@@ -103,7 +103,6 @@ def add_customer_field_properties(config: Config, index_name: str,
             }
         }
     }
-    existing_info = get_cached_index_info(config=config, index_name=index_name)
     new_index_properties = existing_info.properties.copy()
 
     # copy fields to the chunk for prefiltering. If it is text, convert it to a keyword type to save space
