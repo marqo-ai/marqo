@@ -258,7 +258,7 @@ def parse_lexical_query(text: str) -> Tuple[List[str], str]:
 
 
 def get_marqo_root() -> str:
-    """returns path to marqo root.
+    """returns absolute path to marqo root.
     Returns:
         str that doesn't end in a forwad in forward slash.
         for example: "/Users/CoolUser/marqo/src/marqo"
