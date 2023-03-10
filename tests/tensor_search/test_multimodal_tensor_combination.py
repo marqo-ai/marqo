@@ -166,7 +166,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             np.array(tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="2",
                                                       show_vectors=True)['_tensor_facets'][0]["_embedding"])
 
-        assert np.sum(combo_tensor - (text_tensor * -1 + image_tensor * 1)) == 0
+        assert np.sum(combo_tensor - np.mean([text_tensor * -1, image_tensor * 1]).tolist()) == 0
 
     def test_multimodal_tensor_combination_zero_weight(self):
         def get_score(document):

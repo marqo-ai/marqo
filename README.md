@@ -338,9 +338,11 @@ Marqo is a community project with the goal of making tensor search accessible to
 
 3. Install requirements from the requirements file: ```pip install -r requirements.txt```.
 
-4. Run tests by running the tox file. CD into this dir and then run "tox".
+4. Ensure you have marqo-os running with `docker run -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" --name marqo-os marqoai/marqo-os:0.0.3`
 
-5. If you update dependencies, make sure to delete the .tox dir and rerun.
+5. Run tests by running the tox file. CD into this dir and then run "tox".
+
+6. If you update dependencies, make sure to delete the .tox dir and rerun.
 
 ## Merge instructions:
 
