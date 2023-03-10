@@ -79,7 +79,11 @@ def add_customer_field_properties(config: Config, index_name: str,
         HTTP Response
     """
     engine = "lucene"
+<<<<<<< HEAD
     existing_info = get_cache()[index_name]
+=======
+    existing_info = get_cached_index_info(config=config, index_name=index_name)
+>>>>>>> 624c1f2 (add hnsw hyperparameters m, ef_construction to default index_settings config)
 
     # check if there is multimodal fie;ds and convert the fields name to a list with the same
     # format of customer_field_names

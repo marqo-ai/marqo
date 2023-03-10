@@ -124,13 +124,21 @@ settings_schema = {
                                 NsFields.hnsw_m: {
                                     "type": "integer",
                                     "examples": [
+<<<<<<< HEAD
                                         16
+=======
+                                        24
+>>>>>>> 624c1f2 (add hnsw hyperparameters m, ef_construction to default index_settings config)
                                     ]
                                 },
                             },
                             "examples": [{
                                 NsFields.hnsw_ef_construction: 128,
+<<<<<<< HEAD
                                 NsFields.hnsw_m: 16
+=======
+                                NsFields.hnsw_m: 24
+>>>>>>> 624c1f2 (add hnsw hyperparameters m, ef_construction to default index_settings config)
                             }]
                         }
                     },
@@ -139,7 +147,11 @@ settings_schema = {
                         NsFields.ann_metric: "cosinesimil",
                         NsFields.ann_method_parameters: {
                             NsFields.hnsw_ef_construction: 128,
+<<<<<<< HEAD
                             NsFields.hnsw_m: 16
+=======
+                            NsFields.hnsw_m: 24
+>>>>>>> 624c1f2 (add hnsw hyperparameters m, ef_construction to default index_settings config)
                         }
                     }]
                 }
@@ -161,7 +173,11 @@ settings_schema = {
                     NsFields.ann_metric: "cosinesimil",
                     NsFields.ann_method_parameters: {
                         NsFields.hnsw_ef_construction: 128,
+<<<<<<< HEAD
                         NsFields.hnsw_m: 16
+=======
+                        NsFields.hnsw_m: 24
+>>>>>>> 624c1f2 (add hnsw hyperparameters m, ef_construction to default index_settings config)
                     }
                 }
             }]
@@ -199,7 +215,11 @@ settings_schema = {
                 NsFields.ann_metric: "cosinesimil",
                 NsFields.ann_method_parameters: {
                     NsFields.hnsw_ef_construction: 128,
+<<<<<<< HEAD
                     NsFields.hnsw_m: 16
+=======
+                    NsFields.hnsw_m: 24
+>>>>>>> 624c1f2 (add hnsw hyperparameters m, ef_construction to default index_settings config)
                 }
             }
         },
