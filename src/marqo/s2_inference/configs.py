@@ -1,10 +1,10 @@
 import os
-from marqo.tensor_search.utils import get_marqo_root
+from marqo.tensor_search import enums
 
 class ModelCache:
-    onnx_cache_path = os.environ.get('ONNX_SAVE_PATH', f'{get_marqo_root()}/cache/models_onnx/')
-    torch_cache_path = os.getenv('SENTENCE_TRANSFORMERS_HOME', f'{get_marqo_root()}/cache/models/')
-    clip_cache_path = os.getenv('CLIP_SAVE_PATH', f'{get_marqo_root()}/cache/clip/')
+    onnx_cache_path = os.environ.get('ONNX_SAVE_PATH', f'{os.environ[enums.EnvVars.MARQO_ROOT_PATH]}/cache/models_onnx/')
+    torch_cache_path = os.getenv('SENTENCE_TRANSFORMERS_HOME', f'{os.environ[enums.EnvVars.MARQO_ROOT_PATH]}/cache/models/')
+    clip_cache_path = os.getenv('CLIP_SAVE_PATH', f'{os.environ[enums.EnvVars.MARQO_ROOT_PATH]}/cache/clip/')
 
 class BaseTransformerModels:
 
