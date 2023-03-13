@@ -32,7 +32,10 @@ class AvailableModels:
 
         with lock:
             if lock.locked():
-                raise ModelCacheManageError("Marqo receives a request when it is loading a model into cache. This is not allowed"
+                from marqo.s2_inference.s2_inference import available_models
+                print(available_models)
+                raise ModelCacheManageError("Request rejected, as this request attempted to update the model cache, while"
+                                            "another request was updating the model cache at the same time.\n"
                                             "Please wait for 10 seconds and send the request again.\n"
                                             "If this problem persists, check `https://docs.marqo.ai/0.0.16/` for more info.")
             else:
