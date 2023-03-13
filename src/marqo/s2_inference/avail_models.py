@@ -10,6 +10,7 @@ from marqo.s2_inference import constants
 
 
 logger = get_logger(__name__)
+lock = threading.Lock()
 class AvailableModels:
     '''
     This is a class to handle the memory check with `available_models()`
@@ -28,29 +29,35 @@ class AvailableModels:
             True we have enough space for the model
             Raise an error and return False if we can't find enough space for the model.
         '''
-        with threading.Lock():
-            from marqo.s2_inference.s2_inference import available_models
-            model_size = self.get_model_size(model_name, model_properties)
-            if self.check_memory_threshold_for_model(device, model_size):
-                return True
-            else:
-                model_cache_key_for_device = [key for key in list(available_models) if key.endswith(device)]
-                sorted_key_for_device = sorted(model_cache_key_for_device,
-                                               key=lambda x: available_models[x][
-                                                   AvailableModelsKey.most_recently_used_time])
-                for key in sorted_key_for_device:
-                    logger.info(
-                        f"Eject model = `{key.split('||')[0]}` with size = `{available_models[key].get('model_size', constants.DEFAULT_MODEL_SIZE)}` from device = `{device}` "
-                        f"to save space for model = `{model_name}`.")
-                    del available_models[key]
-                    if self.check_memory_threshold_for_model(device, model_size):
-                        return True
 
-                if self.check_memory_threshold_for_model(device, model_size) is False:
-                    raise ModelCacheManageError(
-                        f"Marqo CANNOT find enough space to load model = `{model_name}` in device = `{device}`.\n"
-                        f"Marqo tried to eject all the models on this device = `{device}` but still can't find enough space. \n"
-                        f"Please use a smaller model or increase the memory threshold.")
+        with lock:
+            if lock.locked():
+                raise ModelCacheManageError("Marqo receives a request when it is loading a model into cache. This is not allowed"
+                                            "Please wait for 10 seconds and send the request again.\n"
+                                            "If this problem persists, check `https://docs.marqo.ai/0.0.16/` for more info.")
+            else:
+                from marqo.s2_inference.s2_inference import available_models
+                model_size = self.get_model_size(model_name, model_properties)
+                if self.check_memory_threshold_for_model(device, model_size):
+                    return True
+                else:
+                    model_cache_key_for_device = [key for key in list(available_models) if key.endswith(device)]
+                    sorted_key_for_device = sorted(model_cache_key_for_device,
+                                                   key=lambda x: available_models[x][
+                                                       AvailableModelsKey.most_recently_used_time])
+                    for key in sorted_key_for_device:
+                        logger.info(
+                            f"Eject model = `{key.split('||')[0]}` with size = `{available_models[key].get('model_size', constants.DEFAULT_MODEL_SIZE)}` from device = `{device}` "
+                            f"to save space for model = `{model_name}`.")
+                        del available_models[key]
+                        if self.check_memory_threshold_for_model(device, model_size):
+                            return True
+
+                    if self.check_memory_threshold_for_model(device, model_size) is False:
+                        raise ModelCacheManageError(
+                            f"Marqo CANNOT find enough space to load model = `{model_name}` in device = `{device}`.\n"
+                            f"Marqo tried to eject all the models on this device = `{device}` but still can't find enough space. \n"
+                            f"Please use a smaller model or increase the memory threshold.")
 
     @classmethod
     def check_memory_threshold_for_model(self, device: str, model_size: Union[float, int]) -> bool:
@@ -69,10 +76,16 @@ class AvailableModels:
             used_memory = torch.cuda.memory_allocated(device) / 1024 ** 3
             threshold = read_env_vars_and_defaults(EnvVars.MARQO_MAX_CUDA_MODEL_MEMORY)
         elif device.startswith("cpu"):
-            with threading.Lock():
-                used_memory = sum([available_models[key].get("model_size", constants.DEFAULT_MODEL_SIZE) for key, values in
-                                   available_models.items() if key.endswith("cpu")])
-                threshold = read_env_vars_and_defaults(EnvVars.MARQO_MAX_CPU_MODEL_MEMORY)
+            with lock():
+                if lock.locked():
+                    raise ModelCacheManageError(
+                        "Marqo receives a request when it is loading a model into cache. This is not allowed"
+                        "Please wait for 10 seconds and send the request again.\n"
+                        "If this problem persists, check `https://docs.marqo.ai/0.0.16/` for more info.")
+                else:
+                    used_memory = sum([available_models[key].get("model_size", constants.DEFAULT_MODEL_SIZE) for key, values in
+                                       available_models.items() if key.endswith("cpu")])
+                    threshold = read_env_vars_and_defaults(EnvVars.MARQO_MAX_CPU_MODEL_MEMORY)
         else:
             raise ModelCacheManageError(
                 f"Unable to check the device cache for device=`{device}`. The model loading will proceed"
