@@ -29,11 +29,10 @@ class AvailableModels:
             True we have enough space for the model
             Raise an error and return False if we can't find enough space for the model.
         '''
-
+        print("first call", model_name, model_properties, device)
         with lock:
             if lock.locked():
                 from marqo.s2_inference.s2_inference import available_models
-                print(available_models)
                 raise ModelCacheManageError("Request rejected, as this request attempted to update the model cache, while"
                                             "another request was updating the model cache at the same time.\n"
                                             "Please wait for 10 seconds and send the request again.\n"
