@@ -98,7 +98,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
             config=self.config, index_name=self.index_name_1,
             document_id="123", show_vectors=True)
         
-        self.assertEqual(use_existing_tensors_doc, overwritten)
+        self.assertEqual(use_existing_tensors_doc, overwritten_doc)
         
     def test_use_existing_tensors_dupe_ids(self):
         """ 
