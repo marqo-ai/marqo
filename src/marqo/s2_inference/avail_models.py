@@ -79,15 +79,15 @@ class AvailableModels:
             threshold = read_env_vars_and_defaults(EnvVars.MARQO_MAX_CUDA_MODEL_MEMORY)
         elif device.startswith("cpu"):
             with lock():
-                if lock.locked():
-                    raise ModelCacheManageError(
-                        "Marqo receives a request when it is loading a model into cache. This is not allowed"
-                        "Please wait for 10 seconds and send the request again.\n"
-                        "If this problem persists, check `https://docs.marqo.ai/0.0.16/` for more info.")
-                else:
-                    used_memory = sum([available_models[key].get("model_size", constants.DEFAULT_MODEL_SIZE) for key, values in
-                                       available_models.items() if key.endswith("cpu")])
-                    threshold = read_env_vars_and_defaults(EnvVars.MARQO_MAX_CPU_MODEL_MEMORY)
+                # if lock.locked():
+                #     raise ModelCacheManageError(
+                #         "Marqo receives a request when it is loading a model into cache. This is not allowed"
+                #         "Please wait for 10 seconds and send the request again.\n"
+                #         "If this problem persists, check `https://docs.marqo.ai/0.0.16/` for more info.")
+                # else:
+                used_memory = sum([available_models[key].get("model_size", constants.DEFAULT_MODEL_SIZE) for key, values in
+                                   available_models.items() if key.endswith("cpu")])
+                threshold = read_env_vars_and_defaults(EnvVars.MARQO_MAX_CPU_MODEL_MEMORY)
         else:
             raise ModelCacheManageError(
                 f"Unable to check the device cache for device=`{device}`. The model loading will proceed"
