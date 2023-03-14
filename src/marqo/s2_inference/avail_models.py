@@ -11,6 +11,7 @@ from marqo.s2_inference import constants
 
 logger = get_logger(__name__)
 lock = threading.Lock()
+lock_held = False
 class AvailableModels:
     '''
     This is a class to handle the memory check with `available_models()`
@@ -29,7 +30,8 @@ class AvailableModels:
             True we have enough space for the model
             Raise an error and return False if we can't find enough space for the model.
         '''
-        print(lock.locked())
+        global lock_held
+        print("this is locked", lock.locked())
         if lock.locked():
             from marqo.s2_inference.s2_inference import available_models
             raise ModelCacheManageError("Request rejected, as this request attempted to update the model cache, while"
@@ -38,9 +40,19 @@ class AvailableModels:
                                         "If this problem persists, check `https://docs.marqo.ai/0.0.16/` for more info.")
 
         with lock:
+            if lock_held:
+                raise ModelCacheManageError(
+                    "Request rejected, as this request attempted to update the model cache, while"
+                    "another request was updating the model cache at the same time.\n"
+                    "Please wait for 10 seconds and send the request again.\n"
+                    "If this problem persists, check `https://docs.marqo.ai/0.0.16/` for more info.")
+
+            lock_held = True
+
             from marqo.s2_inference.s2_inference import available_models
             model_size = self.get_model_size(model_name, model_properties)
             if self.check_memory_threshold_for_model(device, model_size):
+                loc_held = False
                 return True
             else:
                 model_cache_key_for_device = [key for key in list(available_models) if key.endswith(device)]
