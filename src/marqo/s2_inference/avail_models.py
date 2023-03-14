@@ -78,7 +78,7 @@ class AvailableModels:
             used_memory = torch.cuda.memory_allocated(device) / 1024 ** 3
             threshold = read_env_vars_and_defaults(EnvVars.MARQO_MAX_CUDA_MODEL_MEMORY)
         elif device.startswith("cpu"):
-            with lock():
+            with lock:
                 # if lock.locked():
                 #     raise ModelCacheManageError(
                 #         "Marqo receives a request when it is loading a model into cache. This is not allowed"
