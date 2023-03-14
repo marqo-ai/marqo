@@ -33,6 +33,7 @@ class AvailableModels:
         with lock:
             try:
                 if lock.locked():
+                    print(lock.locked())
                     from marqo.s2_inference.s2_inference import available_models
                     raise ModelCacheManageError("Request rejected, as this request attempted to update the model cache, while"
                                                 "another request was updating the model cache at the same time.\n"
@@ -61,7 +62,7 @@ class AvailableModels:
                                 f"Marqo CANNOT find enough space to load model = `{model_name}` in device = `{device}`.\n"
                                 f"Marqo tried to eject all the models on this device = `{device}` but still can't find enough space. \n"
                                 f"Please use a smaller model or increase the memory threshold.")
-            except Exception as e:
+            except ModelCacheManageError as e:
                 raise e
             finally:
                 lock.release()
