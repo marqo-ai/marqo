@@ -110,5 +110,32 @@ class AvailableModels:
         type = model_properties["type"]
         return constants.MODEL_TYPE_SIZE_MAPPING.get(type, constants.DEFAULT_MODEL_SIZE)
 
+    @classmethod
+    def _load_model(model_name: str, model_properties: dict, device: Optional[str] = None) -> Any:
+        """_summary_
+
+        Args:
+            model_name (str): Actual model_name to be fetched from external library
+                            prefer passing it in the form of model_properties['name']
+            device (str, optional): _description_. Defaults to 'cpu'.
+
+        Returns:
+            Any: _description_
+        """
+
+        print(f"loading for: model_name={model_name} and properties={model_properties}")
+        from marqo.s2_inference.s2_inference import _get_model_loader, get_default_seq_length, get_default_device
+        if device is None: device = get_default_device()
+        loader = _get_model_loader(model_properties['name'], model_properties)
+
+        max_sequence_length = model_properties.get('tokens', get_default_seq_length())
+
+        model = loader(model_properties['name'], device=device, embedding_dim=model_properties['dimensions'],
+                       max_seq_length=max_sequence_length, model_properties=model_properties)
+
+        model.load()
+
+        return model
+
 
 

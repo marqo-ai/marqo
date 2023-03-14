@@ -92,7 +92,7 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
         AvailableModels.validate_model_into_device(model_name, validated_model_properties, device)
         try:
             most_recently_used_time = datetime.datetime.now()
-            available_models[model_cache_key] = {AvailableModelsKey.model:_load_model(model_name,
+            available_models[model_cache_key] = {AvailableModelsKey.model:AvailableModels._load_model(model_name,
                                                             validated_model_properties, device=device),
                                                  AvailableModelsKey.most_recently_used_time: most_recently_used_time,
                                                  AvailableModelsKey.model_size: model_size}
