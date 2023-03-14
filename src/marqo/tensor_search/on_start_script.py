@@ -152,13 +152,10 @@ class ModelsForCacheing:
             for device in self.default_devices:
                 
                 # warm it up
-                print("this is the first call")
                 _ = vectorise(model, test_string, device=device)
-                print("do we have the results?", _)
 
                 t = 0
                 for n in range(N):
-    
                     t0 = time.time()
                     _ = vectorise(model, test_string, device=device)
                     t1 = time.time()

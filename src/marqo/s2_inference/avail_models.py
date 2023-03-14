@@ -29,14 +29,12 @@ class AvailableModels:
             True we have enough space for the model
             Raise an error and return False if we can't find enough space for the model.
         '''
-        if lock.locked():
-            print(lock.locked())
-            from marqo.s2_inference.s2_inference import available_models
-            raise ModelCacheManageError("Request rejected, as this request attempted to update the model cache, while"
-                                        "another request was updating the model cache at the same time.\n"
-                                        "Please wait for 10 seconds and send the request again.\n"
-                                        "If this problem persists, check `https://docs.marqo.ai/0.0.16/` for more info.")
-
+        # if lock.locked():
+        #     from marqo.s2_inference.s2_inference import available_models
+        #     raise ModelCacheManageError("Request rejected, as this request attempted to update the model cache, while"
+        #                                 "another request was updating the model cache at the same time.\n"
+        #                                 "Please wait for 10 seconds and send the request again.\n"
+        #                                 "If this problem persists, check `https://docs.marqo.ai/0.0.16/` for more info.")
         with lock:
             from marqo.s2_inference.s2_inference import available_models
             model_size = self.get_model_size(model_name, model_properties)
