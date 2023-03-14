@@ -66,6 +66,52 @@ class TestAddDocuments(MarqoTestCase):
                 "title 1": "content 1",
                 "desc 2": "content 2. blah blah blah"
             }
+    
+    def test_add_documents_dupe_ids(self):
+        """ 
+        TODO
+        Should only use the latest inserted ID. Make sure it doesn't get the first/middle one
+        """
+
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
+            {
+                "_id": "3",
+                "title": "doc 3b"
+            },
+        
+        ], auto_refresh=True)
+        
+        doc_3_solo = tensor_search.get_document_by_id(
+            config=self.config, index_name=self.index_name_1,
+            document_id="3", show_vectors=True)
+
+        tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
+            {
+                "_id": "1",
+                "title": "doc 1"
+            },
+            {
+                "_id": "2",
+                "title": "doc 2",
+            },
+            {
+                "_id": "3",
+                "title": "doc 3a",
+            },
+            {
+                "_id": "3",
+                "title": "doc 3b"
+            },
+        
+        ], auto_refresh=True)
+        
+        doc_3_duped = tensor_search.get_document_by_id(
+            config=self.config, index_name=self.index_name_1,
+            document_id="3", show_vectors=True)
+        
+        self.assertEqual(doc_3_solo, doc_3_duped)
+    
 
     def test_update_docs_update_chunks(self):
         """Updating a doc needs to update the corresponding chunks"

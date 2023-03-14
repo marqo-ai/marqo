@@ -452,8 +452,12 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                     f"images for {batch_size} docs using {image_download_thread_count} threads ")
 
     if update_mode == 'replace' and use_existing_tensors:
-        # Get existing documents
-        doc_ids = [doc["_id"] for doc in docs if "_id" in doc]
+        doc_ids = []
+
+        # Iterate through the list in reverse, only latest doc with dupe id gets added.
+        for i in range(len(docs)-1, -1, -1):
+            if ("_id" in docs[i]) and (docs[i]["_id"] not in doc_ids):
+                doc_ids.append(docs[i]["_id"])
         existing_docs = _get_documents_for_upsert(config=config, index_name=index_name, document_ids=doc_ids)
 
     for i, doc in enumerate(docs):
@@ -493,6 +497,8 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                 # have IDs:
                 elif len(matching_doc) == 0:
                     existing_doc = {"found": False}
+                else:
+                    raise errors.InternalError(message= f"Upsert: found {len(matching_doc)} matching docs for {doc_id} when only 1 or 0 should have been found.")
         else:
             indexing_instructions["update"]["_id"] = doc_id
 
@@ -915,7 +921,7 @@ def _get_documents_for_upsert(
         if len(result_list) == 0:
             continue
         if len(result_list) not in (2, 0):
-            raise errors.MarqoWebError(f"Bad request for existing documents. "
+            raise errors.InternalError(f"Internal error fetching old documents. "
                                        f"There are {len(result_list)} results for doc id {doc_id}.")
 
         for result in result_list:
