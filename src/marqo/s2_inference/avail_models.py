@@ -111,7 +111,7 @@ class AvailableModels:
         return constants.MODEL_TYPE_SIZE_MAPPING.get(type, constants.DEFAULT_MODEL_SIZE)
 
     @classmethod
-    def _load_model(model_name: str, model_properties: dict, device: Optional[str] = None) -> Any:
+    def _load_model(self, model_name: str, model_properties: dict, device: Optional[str] = None) -> Any:
         """_summary_
 
         Args:
