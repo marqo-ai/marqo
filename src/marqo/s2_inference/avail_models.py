@@ -122,18 +122,25 @@ class AvailableModels:
         Returns:
             Any: _description_
         """
+        if lock.locked():
+            from marqo.s2_inference.s2_inference import available_models
+            raise ModelCacheManageError("Request rejected, as this request attempted to update the model cache, while"
+                                        "another request was updating the model cache at the same time.\n"
+                                        "Please wait for 10 seconds and send the request again.\n"
+                                        "If this problem persists, check `https://docs.marqo.ai/0.0.16/` for more info.")
 
-        print(f"loading for: model_name={model_name} and properties={model_properties}")
-        from marqo.s2_inference.s2_inference import _get_model_loader, get_default_seq_length, get_default_device
-        if device is None: device = get_default_device()
-        loader = _get_model_loader(model_properties['name'], model_properties)
+        with lock:
+            print(f"loading for: model_name={model_name} and properties={model_properties}")
+            from marqo.s2_inference.s2_inference import _get_model_loader, get_default_seq_length, get_default_device
+            if device is None: device = get_default_device()
+            loader = _get_model_loader(model_properties['name'], model_properties)
 
-        max_sequence_length = model_properties.get('tokens', get_default_seq_length())
+            max_sequence_length = model_properties.get('tokens', get_default_seq_length())
 
-        model = loader(model_properties['name'], device=device, embedding_dim=model_properties['dimensions'],
-                       max_seq_length=max_sequence_length, model_properties=model_properties)
+            model = loader(model_properties['name'], device=device, embedding_dim=model_properties['dimensions'],
+                           max_seq_length=max_sequence_length, model_properties=model_properties)
 
-        model.load()
+            model.load()
 
         return model
 
