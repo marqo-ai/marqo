@@ -321,7 +321,8 @@ class TestValidateIndexSettings(unittest.TestCase):
                     "patch_method": None
                 }
             },
-            "number_of_shards": 5
+            "number_of_shards": 5,
+            "number_of_replicas":1
         }
 
     def test_validate_index_settings(self):
@@ -341,7 +342,8 @@ class TestValidateIndexSettings(unittest.TestCase):
                         "patch_method": None
                     }
                 },
-                "number_of_shards": 5
+                "number_of_shards": 5,
+                "number_of_replicas": 1
             },
             {   # extra field in text_preprocessing: OK
                 "index_defaults": {
@@ -358,7 +360,8 @@ class TestValidateIndexSettings(unittest.TestCase):
                         "patch_method": None
                     }
                 },
-                "number_of_shards": 5
+                "number_of_shards": 5,
+                "number_of_replicas": 1
             },
             {  # extra field in image_preprocessing: OK
                 "index_defaults": {
@@ -376,6 +379,7 @@ class TestValidateIndexSettings(unittest.TestCase):
                     }
                 },
                 "number_of_shards": 5,
+                "number_of_replicas": 1
             }
         ]
         for settings in good_settings:
@@ -387,7 +391,24 @@ class TestValidateIndexSettings(unittest.TestCase):
         assert good_settings == validation.validate_settings_object(good_settings)
 
     def test_validate_index_settings_bad(self):
-        bad_settings = {
+        bad_settings = [{
+            "index_defaults": {
+                "treat_urls_and_pointers_as_images": False,
+                "model": "hf/all_datasets_v4_MiniLM-L6",
+                "normalize_embeddings": True,
+                "text_preprocessing": {
+                    "split_length": "2",
+                    "split_overlap": "0",
+                    "split_method": "sentence"
+                },
+                "image_preprocessing": {
+                    "patch_method": None
+                }
+            },
+            "number_of_shards": 5,
+            "number_of_replicas" : 0
+        },
+        {
             "index_defaults": {
                 "treat_urls_and_pointers_as_images": False,
                 "model": "hf/all_datasets_v4_MiniLM-L6",
@@ -402,12 +423,14 @@ class TestValidateIndexSettings(unittest.TestCase):
                 }
             },
             "number_of_shards": 5
-        }
-        try:
-            validation.validate_settings_object(bad_settings)
-            raise AssertionError
-        except InvalidArgError as e:
-            pass
+        },
+        ]
+        for bad_setting in bad_settings:
+            try:
+                validation.validate_settings_object(bad_setting)
+                raise AssertionError
+            except InvalidArgError as e:
+                pass
 
     def test_validate_index_settings_missing_text_preprocessing(self):
         settings = self.get_good_index_settings()
@@ -447,6 +470,17 @@ class TestValidateIndexSettings(unittest.TestCase):
         # base good settings should be OK
         assert settings == validation.validate_settings_object(settings)
         settings['number_of_shards'] = -1
+        try:
+            validation.validate_settings_object(settings)
+            raise AssertionError
+        except InvalidArgError as e:
+            pass
+
+    def test_validate_index_settings_bad_number_replicas(self):
+        settings = self.get_good_index_settings()
+        # base good settings should be OK
+        assert settings == validation.validate_settings_object(settings)
+        settings['number_of_replicas'] = 0
         try:
             validation.validate_settings_object(settings)
             raise AssertionError

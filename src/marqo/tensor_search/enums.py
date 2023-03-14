@@ -54,6 +54,7 @@ class IndexSettingsField:
     patch_method = "patch_method"
 
     number_of_shards = "number_of_shards"
+    number_of_replicas = "number_of_replicas"
 
 
 class SplitMethod:
