@@ -110,6 +110,9 @@ class IndexAlreadyExistsError(__InvalidRequestError):
     code = "index_already_exists"
     status_code = HTTPStatus.CONFLICT
 
+class ModelCacheManageError(__InvalidRequestError):
+    code = "model_cache_manage_error"
+    status_code = HTTPStatus.CONFLICT
 
 class IndexNotFoundError(__InvalidRequestError):
     code = "index_not_found"
@@ -206,9 +209,4 @@ class BatchInferenceSizeError(InternalError):
     """Error when batch inference does not return expected size"""
     code = "batch_inference_size_error"
     status_code =  HTTPStatus.INTERNAL_SERVER_ERROR
-
-
-class ModelCacheManageError(InternalError):
-    code = "model_cache_manage_error"
-    status_code = HTTPStatus.INTERNAL_SERVER_ERROR
 
