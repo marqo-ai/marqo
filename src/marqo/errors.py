@@ -59,7 +59,7 @@ class MarqoApiError(MarqoError):
 
 class MarqoWebError(Exception):
 
-    status_code: int = 500
+    status_code: int = None
     error_type: str = None
     message: str = None
     code: str = None
