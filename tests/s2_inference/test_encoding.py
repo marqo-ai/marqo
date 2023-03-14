@@ -8,10 +8,10 @@ from marqo.s2_inference.model_registry import load_model_properties, _get_open_c
 import numpy as np
 
 from marqo.s2_inference.s2_inference import (
-    _load_model,
     _check_output_type, vectorise,
     _convert_vectorized_output,
 )
+from marqo.s2_inference.avail_models import AvailableModels
 
 
 class TestEncoding(unittest.TestCase):
@@ -36,7 +36,7 @@ class TestEncoding(unittest.TestCase):
 
         for name in names:
             model_properties = get_model_properties_from_registry(name)
-            model = _load_model(model_properties['name'], model_properties=model_properties, device=device, )
+            model = AvailableModels._load_model(model_properties['name'], model_properties=model_properties, device=device, )
 
             for sentence in sentences:
                 output_v = vectorise(name, sentence, model_properties, device, normalize_embeddings=True)
@@ -61,7 +61,7 @@ class TestEncoding(unittest.TestCase):
 
         for name in names:
 
-            model = _load_model(name, model_properties=get_model_properties_from_registry(name), device=device)
+            model = AvailableModels._load_model(name, model_properties=get_model_properties_from_registry(name), device=device)
 
             for text in texts:
                 assert abs(model.encode(text) - model.encode([text])).sum() < eps
@@ -78,7 +78,7 @@ class TestEncoding(unittest.TestCase):
 
         for name in names:
             model_properties = get_model_properties_from_registry(name)
-            model = _load_model(model_properties['name'], model_properties=model_properties, device=device)
+            model = AvailableModels._load_model(model_properties['name'], model_properties=model_properties, device=device)
             assert abs(model.encode('hello') - model.encode(['hello'])).sum() < eps
 
             clear_loaded_models()
@@ -91,7 +91,7 @@ class TestEncoding(unittest.TestCase):
 
         for name in names:
             model_properties = get_model_properties_from_registry(name)
-            model = _load_model(model_properties['name'], model_properties=model_properties, device=device)
+            model = AvailableModels._load_model(model_properties['name'], model_properties=model_properties, device=device)
             assert abs(model.encode('hello') - model.encode(['hello'])).sum() < eps
 
             clear_loaded_models()
@@ -104,7 +104,7 @@ class TestEncoding(unittest.TestCase):
 
         for name in names:
             model_properties = get_model_properties_from_registry(name)
-            model = _load_model(model_properties['name'], model_properties=model_properties, device=device)
+            model = AvailableModels._load_model(model_properties['name'], model_properties=model_properties, device=device)
             assert abs(model.encode('hello') - model.encode(['hello'])).sum() < eps
 
             clear_loaded_models()
@@ -120,10 +120,10 @@ class TestEncoding(unittest.TestCase):
         for name_sbert, name_onnx in names_sbert_onnx:
             for sentence in sentences:
                 model_properties_sbert = get_model_properties_from_registry(name_sbert)
-                model_sbert = _load_model(model_properties_sbert['name'], model_properties=model_properties_sbert, device=device)
+                model_sbert = AvailableModels._load_model(model_properties_sbert['name'], model_properties=model_properties_sbert, device=device)
 
                 model_properties_onnx = get_model_properties_from_registry(name_onnx)
-                model_onnx = _load_model(model_properties_onnx['name'], model_properties=model_properties_onnx, device=device)
+                model_onnx = AvailableModels._load_model(model_properties_onnx['name'], model_properties=model_properties_onnx, device=device)
 
                 assert abs(model_onnx.encode(sentence) - model_sbert.encode(sentence)).sum() < eps
 
@@ -143,7 +143,7 @@ class TestEncoding(unittest.TestCase):
 
         for name in names:
             model_properties = get_model_properties_from_registry(name)
-            model = _load_model(model_properties['name'], model_properties=model_properties, device=device)
+            model = AvailableModels._load_model(model_properties['name'], model_properties=model_properties, device=device)
 
             for sentence in sentences:
                 output = model.encode(sentence)
@@ -164,7 +164,7 @@ class TestEncoding(unittest.TestCase):
 
         for name in names:
             model_properties = get_model_properties_from_registry(name)
-            model = _load_model(model_properties['name'], model_properties=model_properties, device=device)
+            model = AvailableModels._load_model(model_properties['name'], model_properties=model_properties, device=device)
 
             for sentence in sentences:
                 output = model.encode(sentence, normalize=True)
@@ -189,7 +189,7 @@ class TestEncoding(unittest.TestCase):
 
         for name in names:
             model_properties = get_model_properties_from_registry(name)
-            model = _load_model(model_properties['name'], model_properties=model_properties, device=device)
+            model = AvailableModels._load_model(model_properties['name'], model_properties=model_properties, device=device)
 
             for sentence in sentences:
                 output = model.encode(sentence, normalize=False)
@@ -214,7 +214,7 @@ class TestEncoding(unittest.TestCase):
 
         for name in names:
             model_properties = get_model_properties_from_registry(name)
-            model = _load_model(model_properties['name'], model_properties=model_properties, device=device)
+            model = AvailableModels._load_model(model_properties['name'], model_properties=model_properties, device=device)
 
             for sentence in sentences:
                 output_v = vectorise(name, sentence, model_properties, device, normalize_embeddings=True)
@@ -259,7 +259,7 @@ class TestEncoding(unittest.TestCase):
 
         for name in names:
             model_properties = get_model_properties_from_registry(name)
-            model = _load_model(model_properties['name'], model_properties=model_properties, device=device)
+            model = AvailableModels._load_model(model_properties['name'], model_properties=model_properties, device=device)
 
             for sentence in sentences:
                 output_v = vectorise(name, sentence, model_properties, device, normalize_embeddings=True)

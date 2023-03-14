@@ -296,30 +296,6 @@ def _get_model_loader(model_name: str, model_properties: dict) -> Any:
     return MODEL_PROPERTIES['loaders'][model_type]
 
 
-def _load_model(model_name: str, model_properties: dict, device: str = get_default_device()) -> Any:
-    """_summary_
-
-    Args:
-        model_name (str): Actual model_name to be fetched from external library
-                        prefer passing it in the form of model_properties['name']
-        device (str, optional): _description_. Defaults to 'cpu'.
-
-    Returns:
-        Any: _description_
-    """
-    print(f"loading for: model_name={model_name} and properties={model_properties}")
-    loader = _get_model_loader(model_properties['name'], model_properties)
-
-    max_sequence_length = model_properties.get('tokens', get_default_seq_length())
-
-    model = loader(model_properties['name'], device=device, embedding_dim=model_properties['dimensions'],
-                   max_seq_length=max_sequence_length, model_properties = model_properties)
-
-    model.load()
-
-    return model
-
-
 def get_available_models():
     return available_models
 
