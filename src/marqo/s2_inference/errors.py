@@ -59,7 +59,3 @@ class IncompatibleModelDeviceError(S2InferenceError):
 
 class BatchInferenceSizeNotMatchError(S2InferenceError):
     pass
-
-
-class ModelCacheManageError(S2InferenceError):
-    pass

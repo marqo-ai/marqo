@@ -180,6 +180,7 @@ class ModelNotInCacheError(__InvalidRequestError):
     code = "model_not_in_cache"
     status_code = HTTPStatus.NOT_FOUND
 
+
 # ---MARQO INTERNAL ERROR---
 
 
@@ -205,4 +206,9 @@ class BatchInferenceSizeError(InternalError):
     """Error when batch inference does not return expected size"""
     code = "batch_inference_size_error"
     status_code =  HTTPStatus.INTERNAL_SERVER_ERROR
+
+
+class ModelCacheManageError(InternalError):
+    code = "model_cache_manage_error"
+    status_code = HTTPStatus.INTERNAL_SERVER_ERROR
 

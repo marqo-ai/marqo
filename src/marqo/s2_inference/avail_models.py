@@ -2,7 +2,7 @@ import threading
 from marqo.tensor_search.enums import AvailableModelsKey
 from marqo.s2_inference.logger import get_logger
 from marqo.s2_inference.types import *
-from marqo.s2_inference.errors import ModelCacheManageError
+from marqo.errors import ModelCacheManageError
 from marqo.tensor_search.utils import read_env_vars_and_defaults
 from marqo.tensor_search.configs import EnvVars
 import torch
