@@ -29,12 +29,12 @@ class AvailableModels:
             True we have enough space for the model
             Raise an error and return False if we can't find enough space for the model.
         '''
-        # if lock.locked():
-        #     from marqo.s2_inference.s2_inference import available_models
-        #     raise ModelCacheManageError("Request rejected, as this request attempted to update the model cache, while"
-        #                                 "another request was updating the model cache at the same time.\n"
-        #                                 "Please wait for 10 seconds and send the request again.\n"
-        #                                 "If this problem persists, check `https://docs.marqo.ai/0.0.16/` for more info.")
+        if lock.locked():
+            from marqo.s2_inference.s2_inference import available_models
+            raise ModelCacheManageError("Request rejected, as this request attempted to update the model cache, while"
+                                        "another request was updating the model cache at the same time.\n"
+                                        "Please wait for 10 seconds and send the request again.\n"
+                                        "If this problem persists, check `https://docs.marqo.ai/0.0.16/` for more info.")
         with lock:
             from marqo.s2_inference.s2_inference import available_models
             model_size = self.get_model_size(model_name, model_properties)
@@ -76,16 +76,9 @@ class AvailableModels:
             used_memory = torch.cuda.memory_allocated(device) / 1024 ** 3
             threshold = read_env_vars_and_defaults(EnvVars.MARQO_MAX_CUDA_MODEL_MEMORY)
         elif device.startswith("cpu"):
-            with lock:
-                # if lock.locked():
-                #     raise ModelCacheManageError(
-                #         "Marqo receives a request when it is loading a model into cache. This is not allowed"
-                #         "Please wait for 10 seconds and send the request again.\n"
-                #         "If this problem persists, check `https://docs.marqo.ai/0.0.16/` for more info.")
-                # else:
-                used_memory = sum([available_models[key].get("model_size", constants.DEFAULT_MODEL_SIZE) for key, values in
-                                   available_models.items() if key.endswith("cpu")])
-                threshold = read_env_vars_and_defaults(EnvVars.MARQO_MAX_CPU_MODEL_MEMORY)
+            used_memory = sum([available_models[key].get("model_size", constants.DEFAULT_MODEL_SIZE) for key, values in
+                               available_models.items() if key.endswith("cpu")])
+            threshold = read_env_vars_and_defaults(EnvVars.MARQO_MAX_CPU_MODEL_MEMORY)
         else:
             raise ModelCacheManageError(
                 f"Unable to check the device cache for device=`{device}`. The model loading will proceed"
