@@ -52,7 +52,7 @@ class AvailableModels:
             from marqo.s2_inference.s2_inference import available_models
             model_size = self.get_model_size(model_name, model_properties)
             if self.check_memory_threshold_for_model(device, model_size):
-                loc_held = False
+                lock_held = False
                 return True
             else:
                 model_cache_key_for_device = [key for key in list(available_models) if key.endswith(device)]
@@ -65,9 +65,11 @@ class AvailableModels:
                         f"to save space for model = `{model_name}`.")
                     del available_models[key]
                     if self.check_memory_threshold_for_model(device, model_size):
+                        lock_held = False
                         return True
 
                 if self.check_memory_threshold_for_model(device, model_size) is False:
+                    lock_held = False
                     raise ModelCacheManageError(
                         f"Marqo CANNOT find enough space to load model = `{model_name}` in device = `{device}`.\n"
                         f"Marqo tried to eject all the models on this device = `{device}` but still can't find enough space. \n"
