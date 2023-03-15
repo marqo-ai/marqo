@@ -1,7 +1,7 @@
 """The API entrypoint for Tensor Search"""
 import typing
 from fastapi.responses import JSONResponse
-from models.api_models import SearchQuery
+from models.api_models import BulkSearchQuery, SearchQuery
 from fastapi import FastAPI, Request, Depends, HTTPException
 from marqo.errors import MarqoWebError, MarqoError
 from fastapi import FastAPI, Query
@@ -16,6 +16,7 @@ from marqo import version
 from marqo.tensor_search.backend import get_index_info
 from marqo.tensor_search.enums import RequestType
 from marqo.tensor_search.throttling.redis_throttle import throttle
+from marqo.tensor_search.utils import add_timing
 
 def replace_host_localhosts(OPENSEARCH_IS_INTERNAL: str, OS_URL: str):
     """Replaces a host's localhost URL with one that can be referenced from
@@ -108,6 +109,12 @@ def create_index(index_name: str, settings: Dict = None, marqo_config: config.Co
         config=marqo_config, index_name=index_name, index_settings=index_settings
     )
 
+
+@app.post("/indexes/bulk/search")
+@throttle(RequestType.SEARCH)
+@add_timing
+def bulk_search(query: BulkSearchQuery, device: str = Depends(api_validation.validate_device), marqo_config: config.Config = Depends(generate_config)):
+    return tensor_search.bulk_search(query, marqo_config, device=device)
 
 @app.post("/indexes/{index_name}/search")
 @throttle(RequestType.SEARCH)

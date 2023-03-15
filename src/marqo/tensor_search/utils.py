@@ -2,7 +2,9 @@ import os
 import typing
 import functools
 import json
+from timeit import default_timer as timer
 import torch
+
 from marqo import errors
 from marqo.tensor_search import enums, configs
 from typing import (
@@ -87,7 +89,7 @@ def construct_authorized_url(url_base: str, username: str, password: str) -> str
     return f"{http_part}{http_sep}{username}:{password}@{domain_part}"
 
 
-def contextualise_filter(filter_string: str, simple_properties: typing.Iterable) -> str:
+def contextualise_filter(filter_string: Optional[str], simple_properties: typing.Iterable) -> str:
     """adds the chunk prefix to the start of properties found in simple string
 
     This allows for filtering within chunks.
@@ -100,6 +102,8 @@ def contextualise_filter(filter_string: str, simple_properties: typing.Iterable)
     Returns:
         a string where the properties are referenced as children of a chunk.
     """
+    if filter_string is None:
+        return ''
     contextualised_filter = filter_string
     for field in simple_properties:
         if ' ' in field:
@@ -292,3 +296,17 @@ def _get_marqo_root() -> str:
     marqo_base_dir = tensor_search_dir.parent.resolve()
     return str(marqo_base_dir)
 
+def add_timing(f, key: str = "processingTimeMs"):
+    """ Function decorator to add function timing to response payload.
+
+    Decorator for functions that adds the processing time to the return Dict (NOTE: must return value of function must
+    be a dictionary). `key` param denotes what the processing time will be stored against.
+    """
+    @functools.wraps(f)
+    def wrap(*args, **kw):
+        t0 = timer()
+        r = f(*args, **kw)
+        time_taken = timer() - t0
+        r[key] = round(time_taken * 1000)
+        return r
+    return wrap
