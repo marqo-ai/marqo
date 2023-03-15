@@ -484,6 +484,10 @@ def validate_mappings_object(mappings_object: dict):
     """
     try:
         jsonschema.validate(instance=mappings_object, schema=mappings_schema)
+        for field_name, config in mappings_object.items():
+            if config["type"] == enums.MappingsObjectType.multimodal_combination:
+                validate_multimodal_combination_object(config)
+        return mappings_object
     except jsonschema.ValidationError as e:
         raise InvalidArgError(
             f"Error validating mappings object. Reason: \n{str(e)}"
