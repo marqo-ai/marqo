@@ -8,6 +8,8 @@ from marqo.errors import IndexNotFoundError, InvalidArgError
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import TensorField, IndexSettingsField, SearchMethod
 from tests.marqo_test import MarqoTestCase
+from unittest.mock import patch
+import numpy as np
 
 
 class TestMultimodalTensorCombination(MarqoTestCase):
@@ -82,5 +84,35 @@ class TestMultimodalTensorCombination(MarqoTestCase):
 
         assert res_1["hits"][0]["_score"] == res_2["hits"][0]["_score"]
         assert res_1["hits"][0]["_score"] == res_3["hits"][0]["_score"]
+
+    def test_search_vectors(self):
+        with patch("numpy.mean", wraps = np.mean) as mock_mean:
+            query = {
+                "A rider is riding a horse jumping over the barrier": 1,
+            }
+            res_1 = tensor_search.search(config=self.config, index_name=self.index_name_1, text=query)
+
+            weight_1, weight_2, weight_3 = 2.5, 3.4, -1.334
+            vector_2 = [-1,] * 512
+            vector_3 = [1.3,] * 512
+            query = {
+                "A rider is riding a horse jumping over the barrier": weight_1,
+            }
+
+            res_2 = tensor_search.search(config=self.config, index_name=self.index_name_1, text=query, context=
+            {"tensor": [{"vector": vector_2, "weight": weight_2}, {"vector": vector_3, "weight": weight_3}], })
+
+            args_list = [args[0] for args in mock_mean.call_args_list]
+            vectorised_string = args_list[0][0][0]
+            weighted_vectors = args_list[1][0]
+
+            assert np.allclose(vectorised_string * weight_1, weighted_vectors[0], atol=1e-9)
+            assert np.allclose(np.array(vector_2) * weight_2, weighted_vectors[1], atol=1e-9)
+            assert np.allclose(np.array(vector_3) * weight_3, weighted_vectors[2], atol=1e-9)
+
+
+
+
+
 
 
