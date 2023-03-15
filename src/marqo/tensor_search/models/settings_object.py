@@ -6,7 +6,8 @@ settings_schema = {
     "type": "object",
     "required": [
         NsFields.index_defaults,
-        NsFields.number_of_shards
+        NsFields.number_of_shards,
+        NsFields.number_of_replicas
     ],
     "additionalProperties": False,
     "properties": {
@@ -113,7 +114,14 @@ settings_schema = {
             "examples": [
                 5
             ]
-        }
+        },
+        NsFields.number_of_replicas: {
+            "type": "integer",
+            "minimum": 0,
+            "examples": [
+                1
+            ]
+        },
     },
     "examples": [{
         NsFields.index_defaults: {
@@ -129,6 +137,7 @@ settings_schema = {
                 NsFields.patch_method: None
             }
         },
-        NsFields.number_of_shards: 5
+        NsFields.number_of_shards: 5,
+        NsFields.number_of_replicas: 1
     }]
 }

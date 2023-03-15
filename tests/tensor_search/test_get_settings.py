@@ -22,7 +22,8 @@ class TestGetSettings(MarqoTestCase):
                                           'text_preprocessing': {'split_method': 'sentence', 'split_length': 2,
                                                                  'split_overlap': 0},
                                           'model': 'hf/all_datasets_v4_MiniLM-L6', 'normalize_embeddings': True,
-                                          'image_preprocessing': {'patch_method': None}}, 'number_of_shards': 5}
+                                          'image_preprocessing': {'patch_method': None}}, 'number_of_shards': 5
+                                          'number_of_replicas':1}
         """
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name)
 
@@ -33,6 +34,7 @@ class TestGetSettings(MarqoTestCase):
 
         self.assertIn('index_defaults', index_settings)
         self.assertIn('number_of_shards', index_settings)
+        self.assertIn('number_of_replicas', index_settings)
         self.assertTrue(fields.issubset(set(index_settings['index_defaults'])))
 
     def test_custom_settings(self):
@@ -61,4 +63,5 @@ class TestGetSettings(MarqoTestCase):
 
         self.assertIn('index_defaults', index_settings)
         self.assertIn('number_of_shards', index_settings)
+        self.assertIn('number_of_replicas', index_settings)
         self.assertTrue(fields.issubset(set(index_settings['index_defaults'])))
