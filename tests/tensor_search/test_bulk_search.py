@@ -72,12 +72,22 @@ class TestBulkSearch(MarqoTestCase):
                 {"abc": "random text", "other field": "Close match hehehe", "_id": "id3-second"},
             ], auto_refresh=True
         )
-        tensor_search.bulk_search(marqo_config=self.config, query=BulkSearchQuery(
+        response = tensor_search.bulk_search(marqo_config=self.config, query=BulkSearchQuery(
             queries=[
                 BulkSearchQueryEntity(index=self.index_name_1, q="hehehe", limit=2),
                 BulkSearchQueryEntity(index=self.index_name_3, q={"laughter":  1.0, "match": -1.0})
             ]
         ))
+        assert len(response['result']) == 2
+        res1 = response['result'][0]
+        res2 = response['result'][1]
+        
+        assert res1["query"] == "hehehe"
+        assert res2["query"] == {"laughter":  1.0, "match": -1.0}
+
+        assert all([h["_id"].startswith("id1-") for h in res1["hits"]])
+        assert all([h["_id"].startswith("id3-") for h in res2["hits"]])
+        assert len(res2["hits"]) == 2
 
 
 
@@ -353,6 +363,7 @@ class TestBulkSearch(MarqoTestCase):
         assert lexical_result["hits"] != []
         assert lexical_result["hits"][0]["_id"] == "id1-second" # Exact match with Lexical search should be first.
 
+        assert len(tensor_result["hits"]) > 0
     
     def test_bulk_search_highlight_per_search_query(self):
         tensor_search.add_documents(
@@ -376,7 +387,7 @@ class TestBulkSearch(MarqoTestCase):
             assert len(h.get("_highlights", [])) > 0
 
         for h in idx2["hits"]:
-            assert h.get("_highlights", []) == []
+            assert "_highlights" not in h.keys()
 
     @mock.patch("marqo.s2_inference.reranking.rerank.rerank_search_results")
     def test_bulk_search_rerank_per_search_query(self, mock_rerank_search_results):
@@ -388,13 +399,22 @@ class TestBulkSearch(MarqoTestCase):
 
         resp = tensor_search.bulk_search(
             query=BulkSearchQuery(queries=[
-                BulkSearchQueryEntity(index=self.index_name_1, q="match", searchableAttributes=["abc", "other field"], reRanker='_testing'),
+                BulkSearchQueryEntity(index=self.index_name_1, q="match with ranking", searchableAttributes=["abc", "other field"], reRanker='_testing'),
                 BulkSearchQueryEntity(index=self.index_name_1, q="match", searchableAttributes=["abc", "other field"]),
             ]),
             marqo_config=self.config,
         )
 
         self.assertEqual(mock_rerank_search_results.call_count, 1)
+
+        call_args = mock_rerank_search_results.call_args_list
+        assert len(call_args) == 1
+
+        call_arg = call_args[0].kwargs
+        assert call_arg['query'] == "match with ranking"
+        assert call_arg['model_name'] == '_testing'
+        assert call_arg['device'] == self.config.search_device
+        assert call_arg['num_highlights'] == 1
         
     def test_bulk_search_rerank_invalid(self):
         tensor_search.add_documents(
@@ -657,39 +677,30 @@ class TestBulkSearch(MarqoTestCase):
                 {"img": hippo_img, "abc": "some text", "_id": "1235", "my_list": ["tag1", "tag2 some"]}
             ], auto_refresh=True, non_tensor_fields=["my_list"])
 
-        res_img_2_imgs = tensor_search._bulk_vector_text_search(
-            queries=[BulkSearchQueryEntity(index=self.index_name_1, q=hippo_img, filter="my_list:tag1")],
+        response = tensor_search._bulk_vector_text_search(
+            queries=[
+                BulkSearchQueryEntity(index=self.index_name_1, q=hippo_img, filter="my_list:tag1"),
+                BulkSearchQueryEntity(index=self.index_name_1, q=hippo_img, filter="my_list:not_exist"),
+                BulkSearchQueryEntity(index=self.index_name_1, q="some", filter="my_list:tag1"),
+                BulkSearchQueryEntity(index=self.index_name_1, q="some", filter="my_list:not_exist")
+            ],
             config=self.config
         )
-        assert len(res_img_2_imgs) == 1
-        res_img_2_img = res_img_2_imgs[0]
-        assert res_img_2_img["hits"][0]["_id"] == "1235"
-        assert len(res_img_2_img["hits"]) == 1
-        assert res_img_2_img["hits"][0]["_highlights"] == {"img": hippo_img}
 
-        res_img_2_img_none = tensor_search._bulk_vector_text_search(
-            queries=[BulkSearchQueryEntity(index=self.index_name_1, q=hippo_img, filter="my_list:not_exist")],
-            config=self.config
-        )
-        assert len(res_img_2_img_none) == 1
-        assert len(res_img_2_img_none[0]["hits"]) == 0
+        assert len(response) == 4
+        res_img_2_img, res_img_2_img_none, res_txt_2_img, res_txt_2_imgs2 = response
 
-        res_txt_2_imgs = tensor_search._bulk_vector_text_search(
-            queries=[BulkSearchQueryEntity(index=self.index_name_1, q="some", filter="my_list:tag1")],
-            config=self.config
-        )
-        assert len(res_txt_2_imgs) == 1
-        res_txt_2_img = res_txt_2_imgs[0]
+        assert len(res_txt_2_imgs2["hits"]) == 0
+        assert len(res_img_2_img_none["hits"]) == 0
+
         assert res_txt_2_img["hits"][0]["_id"] == "1235"
         assert res_txt_2_img["hits"][0]["_highlights"] == {"abc": "some text"}
         assert len(res_txt_2_img["hits"]) == 1
 
-        res_txt_2_imgs = tensor_search._bulk_vector_text_search(
-            queries=[BulkSearchQueryEntity(index=self.index_name_1, q="some", filter="my_list:not_exist")],
-            config=self.config
-        )
-        assert len(res_txt_2_imgs) == 1
-        assert len(res_txt_2_imgs[0]["hits"]) == 0
+        assert res_img_2_img["hits"][0]["_id"] == "1235"
+        assert len(res_img_2_img["hits"]) == 1
+        assert res_img_2_img["hits"][0]["_highlights"] == {"img": hippo_img}
+
 
     def test_filtering(self):
         tensor_search.add_documents(
@@ -726,16 +737,21 @@ class TestBulkSearch(MarqoTestCase):
             "other\ field:(Close match hehehe)": ['1234', '1233'],
             "(Floaty\ Field:[0 TO 1]) AND (abc:(some text))": ["344"]
         }
-        for f, expected in filter_to_ids.items():
-            result = tensor_search._bulk_vector_text_search(
-                queries=[BulkSearchQueryEntity(index=self.index_name_1, q="some", filter=f)],
-                config=self.config
-            )
-            assert len(result) == 1
-            assert len(result[0]["hits"]) == len(expected)
+        response = tensor_search._bulk_vector_text_search(
+            queries=[BulkSearchQueryEntity(index=self.index_name_1, q="some", filter=f)
+                for f in filter_to_ids.keys()         
+            ],
+            config=self.config
+        )
+
+        assert len(response) == len(filter_to_ids.keys())
+        for i, expected in enumerate(filter_to_ids.values()):
+            result = response[i]
+            assert len(result["hits"]) == len(expected)
             if len(expected) > 0:
-                for j in range(len(result[0]["hits"])):
-                    assert result[0]["hits"][j]["_id"] in expected
+                for j in range(len(result["hits"])):
+                    assert result["hits"][j]["_id"] in expected
+
 
     def test_set_device(self):
         """calling search with a specified device overrides device defined in config"""
@@ -865,7 +881,6 @@ class TestBulkSearch(MarqoTestCase):
                         searchMethod=method
                     )]
                 ))
-                print(search_res)
                 assert len(search_res['result']) > 0
                 search_res = search_res['result'][0]
                 
@@ -1378,8 +1393,8 @@ class TestBulkSearch(MarqoTestCase):
             config=self.config, index_name=self.index_name_1,
             docs=docs, auto_refresh=True
         )
-        invalid_queries = [{}, set(), {"https://marqo_not_real.com/image_1.png": 3}]
-        for q in invalid_queries:
+        invalid_queries = [[{}], [set()], [{"https://marqo_not_real.com/image_1.png": 3}], [{}, set()], [set(), {"https://marqo_not_real.com/image_1.png": 3}]]
+        for qs in invalid_queries:
             try:
                 tensor_search.bulk_search(
                     marqo_config=self.config, query=BulkSearchQuery(
@@ -1388,7 +1403,7 @@ class TestBulkSearch(MarqoTestCase):
                         q=q,
                         limit=5,
                         searchMethod=SearchMethod.TENSOR,
-                    )]
+                    ) for q in qs]
                 ))
                 raise AssertionError(f"Invalid query {q} did not raise error")
             except (InvalidArgError, BadRequestError) as e:

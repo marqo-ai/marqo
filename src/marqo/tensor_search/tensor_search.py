@@ -991,6 +991,20 @@ def refresh_index(config: Config, index_name: str):
 
 @add_timing
 def bulk_search(query: BulkSearchQuery, marqo_config: config.Config, verbose: bool = True, device=None):
+    """Performs a set of search operations in parallel.
+
+    Args:
+        query: Set of search queries
+        marqo_config:
+        verbose: 
+        device: 
+
+    Notes:
+        Current limitations:
+          - Lexical and tensor search done in serial.
+          - A single error (e.g. validation errors) on any one of the search queries returns an error and does not 
+            process non-erroring queries.
+    """
     # TODO: Let non-errored docs to propagate.
     errs = [validation.validate_bulk_query_input(q) for q in query.queries]
     if any(errs):
@@ -1325,7 +1339,7 @@ def construct_vector_input_batches(query: Union[str, Dict], index_info) -> Tuple
     """Splits images from text in a single query (either a query string, or dict of weighted strings).
 
     Args:
-        query: a string query, or a dict of weight strings.
+        query: a string query, or a dict of weighted strings.
         index_info: used to determine whether URLs should be treated as images
 
     Returns:
@@ -1361,7 +1375,7 @@ def get_vector_properties_to_search(searchable_attributes: Union[None, List[str]
 
 
 def construct_msearch_body_elements(vector_properties_to_search: List[str], offset: int, filter_string: str, index_info: IndexInfo, result_count: int, query_vector: List[float], attributes_to_retrieve: List[str], index_name: str, contextualised_filter: str) -> List[Dict[str, Any]]:
-    """Constructs the body payload of a `/_msearch` request for a single search query"""
+    """Constructs the body payload of a `/_msearch` request for a single bulk search query"""
     body = []
 
     # Validation for offset (pagination is single field)
@@ -1626,7 +1640,7 @@ def get_content_vector(possible_jobs: List[VectorisedJobPointer], job_to_vectors
 
     Args:
         possible_jobs: The jobs where the target vector may reside
-        treat_urls_as_images: and index_parameter that indicates whether content should be treated as image,
+        treat_urls_as_images: an index_parameter that indicates whether content should be treated as image,
             if it has a URL structure
         content: The content to search
 
@@ -1653,6 +1667,7 @@ def create_empty_query_response(queries: List[BulkSearchQueryEntity]) -> List[Di
         )
     )
 
+
 def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity], device=None) -> List[Dict]:
     """Resolve a batch of search queries in parallel. 
 
@@ -1676,9 +1691,6 @@ def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity
         create_vector_jobs(queries, config, selected_device)
     )
     qidx_to_jobs, jobs = vector_jobs_tuple
-                    # #     Pandu: create a mapping <VectoriseArguments: Set(content to vectorise)>
-                    # to_be_vectorised_dict: Dict[VectoriseArgs, Set[Content4Vectorising]] = dict()
-
 
     # 2. Vectorise in batches against all queries
     ## TODO: To ensure that we are vectorising in batches, we can mock vectorise (), and see if the number of calls is as expected (if batch_size = 16, and number of docs = 32, and all args are the same, then number of calls = 2)
@@ -1708,7 +1720,7 @@ def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity
         # Must return empty response, per search query
         return create_empty_query_response(queries)
 
-    logger.info(f"search (tensor) pre-processing: took {(timer() - start_preprocessing_time):.3f}s to vectorize and process query.")
+    logger.debug(f"search (tensor) pre-processing: took {(timer() - start_preprocessing_time):.3f}s to vectorize and process query.")
 
     ## 5. POST aggregate  to /_msearch
     responses = bulk_msearch(config, aggregate_body)
@@ -1717,7 +1729,7 @@ def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity
     # 6. Get documents back to each query, perform "gather" operation
     results = create_bulk_search_response(queries, query_to_body_count, responses)
 
-    logger.info(f"bulk search (tensor) post-processing: took {(timer() - start_postprocess_time):.3f}s")
+    logger.debug(f"bulk search (tensor) post-processing: took {(timer() - start_postprocess_time):.3f}s")
     return results
 
 
@@ -1814,9 +1826,6 @@ def _vector_text_search(
         else:
             to_be_vectorised = [[k for k, _ in ordered_queries], ]
     try:
-        # vectorised_text = functools.reduce(lambda x, y: x + y,
-        #
-        #    )
         vectorised_dicts = [
             dict(zip(batch, s2_inference.vectorise(
                 model_name=index_info.model_name, model_properties=_get_model_properties(index_info),
