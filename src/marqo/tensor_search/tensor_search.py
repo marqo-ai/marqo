@@ -34,13 +34,15 @@ import copy
 import json
 import datetime
 from timeit import default_timer as timer
+from collections import defaultdict
 import functools
 import pprint
 import typing
 import uuid
-from typing import List, Optional, Union, Iterable, Sequence, Dict, Any
+from typing import List, Optional, Union, Iterable, Sequence, Dict, Any, Tuple, Set
 import numpy as np
 from PIL import Image
+import marqo.config as config
 from marqo.tensor_search.enums import (
     MediaType, MlModel, TensorField, SearchMethod, OpenSearchDataType,
     EnvVars
@@ -1858,7 +1860,7 @@ def _vector_text_search(
                     if q in batch_dict:
                         vec = batch_dict[q]
                 weighted_vectors.append(np.asarray(vec) * weight)
-                        if custom_tensors:
+            if custom_tensors:
                 weighted_vectors += [np.asarray(v["vector"]) * v["weight"]for v in custom_tensors]
             try:
                 vectorised_text = np.mean(weighted_vectors, axis=0)
