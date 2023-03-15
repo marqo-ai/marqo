@@ -406,7 +406,7 @@ class TestValidateIndexSettings(unittest.TestCase):
                 }
             },
             "number_of_shards": 5,
-            "number_of_replicas" : 0
+            "number_of_replicas" : -1
         },
         {
             "index_defaults": {
@@ -480,7 +480,7 @@ class TestValidateIndexSettings(unittest.TestCase):
         settings = self.get_good_index_settings()
         # base good settings should be OK
         assert settings == validation.validate_settings_object(settings)
-        settings['number_of_replicas'] = 0
+        settings['number_of_replicas'] = -1
         try:
             validation.validate_settings_object(settings)
             raise AssertionError

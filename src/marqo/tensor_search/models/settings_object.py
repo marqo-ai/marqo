@@ -117,7 +117,7 @@ settings_schema = {
         },
         NsFields.number_of_replicas: {
             "type": "integer",
-            "minimum": 1,
+            "minimum": 0,
             "examples": [
                 1
             ]
