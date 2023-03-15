@@ -369,6 +369,7 @@ def _infer_opensearch_data_type(
 
 def _get_chunks_for_field(field_name: str, doc_id: str, doc):
     # Find the chunks with a specific __field_name in a doc
+    # Note: for a chunkless doc (nothing was tensorised) --> doc["_source"]["__chunks"] == []
     return [chunk for chunk in doc["_source"]["__chunks"] if chunk["__field_name"] == field_name]
 
 
@@ -543,7 +544,6 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
             # Check if content of this field changed. If no, skip all chunking and vectorisation
             if ((update_mode == 'replace') and use_existing_tensors and existing_doc["found"]
                     and (field in existing_doc["_source"]) and (existing_doc["_source"][field] == field_content)):
-                # logger.info(f"Using existing vectors for doc {doc_id}, field {field}. Content remains unchanged.")
                 chunks_to_append = _get_chunks_for_field(field_name=field, doc_id=doc_id, doc=existing_doc)
 
             # Chunk and vectorise, since content changed.
@@ -653,9 +653,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                         TensorField.field_content: text_chunk,
                         TensorField.field_name: field
                     })
-
-            # Add chunks_to_append along with doc metadata to total chunks
-
+            
             elif isinstance(field_content, dict):
                 if mappings[field]["type"]=="multimodal_combination":
                     combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add,\
@@ -671,9 +669,11 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                         if field not in new_obj_fields:
                             new_obj_fields[field] = set()
                         new_obj_fields[field] = new_obj_fields[field].union(new_fields_from_multimodal_combination)
+                        # TODO: we may want to use chunks_to_append here to make it uniform with use_existing_tensors and normal vectorisation
                         chunks.append({**combo_chunk, **chunk_values_for_filtering})
                         continue
-
+            
+            # Add chunks_to_append along with doc metadata to total chunks
             for chunk in chunks_to_append:
                 chunks.append({**chunk, **chunk_values_for_filtering})
 
@@ -895,6 +895,7 @@ def _get_documents_for_upsert(
             f"set by the environment variable `{EnvVars.MARQO_MAX_RETRIEVABLE_DOCS}`")
 
     # Chunk Docs (get field name, field content, vectors)
+
     chunk_docs = [
         {"_index": index_name, "_id": doc_id,
          "_source": {"include": [f"__chunks.__field_content", f"__chunks.__field_name", f"__chunks.__vector_*"]}}
@@ -915,9 +916,11 @@ def _get_documents_for_upsert(
 
     # Combine the 2 query results (loop through each doc id)
     combined_result = []
-    for doc_id in document_ids:
+
+    for doc_id in valid_doc_ids:
         # There should always be 2 results per doc.
         result_list = [doc for doc in res["docs"] if doc["_id"] == doc_id]
+
         if len(result_list) == 0:
             continue
         if len(result_list) not in (2, 0):
@@ -927,7 +930,7 @@ def _get_documents_for_upsert(
         for result in result_list:
             if result["found"]:
                 doc_in_results = True
-                if result["_source"]["__chunks"] == []:
+                if ("__chunks" in result["_source"]) and (result["_source"]["__chunks"] == []):
                     res_data = result
                 else:
                     res_chunks = result
@@ -936,12 +939,14 @@ def _get_documents_for_upsert(
                 dummy_res = result
                 break
 
-        # Put the chunks list in res_data, so it's complete
+        # Put the chunks list in res_data, so it contains all doc data
         if doc_in_results:
-            res_data["_source"]["__chunks"] = res_chunks["_source"]["__chunks"]
+            # Only add chunks if not a chunkless doc
+            if res_chunks["_source"]:
+                res_data["_source"]["__chunks"] = res_chunks["_source"]["__chunks"]
             combined_result.append(res_data)
         else:
-            # This result just says that the doc was not found
+            # This result just says that the doc was not found ("found": False)
             combined_result.append(dummy_res)
 
     res["docs"] = combined_result
