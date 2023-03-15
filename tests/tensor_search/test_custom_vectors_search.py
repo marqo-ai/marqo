@@ -109,10 +109,3 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             assert np.allclose(vectorised_string * weight_1, weighted_vectors[0], atol=1e-9)
             assert np.allclose(np.array(vector_2) * weight_2, weighted_vectors[1], atol=1e-9)
             assert np.allclose(np.array(vector_3) * weight_3, weighted_vectors[2], atol=1e-9)
-
-
-
-
-
-
-
