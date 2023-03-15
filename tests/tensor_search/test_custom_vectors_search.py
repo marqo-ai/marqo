@@ -83,3 +83,4 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         assert res_1["hits"][0]["_score"] == res_2["hits"][0]["_score"]
         assert res_1["hits"][0]["_score"] == res_3["hits"][0]["_score"]
 
+
