@@ -816,6 +816,7 @@ class TestValidateIndexSettings(unittest.TestCase):
             },
 
             {
+                # Note we are not validating the vector size here
                 "tensor": [
                     {"vector": [0.2132] * 53, "weight": 1},
                     {"vector": [23,], "weight": 1},
@@ -823,7 +824,6 @@ class TestValidateIndexSettings(unittest.TestCase):
                 ],
                 "addition_field": None
             },
-
             {
                 "tensor": [
                     {"vector": [0.2132] * 53, "weight": 1},
@@ -832,6 +832,11 @@ class TestValidateIndexSettings(unittest.TestCase):
                 ],
                 "addition_field_1": None,
                 "addition_field_2": "random"
+            },
+            {
+                "tensor": [
+                             {"vector": [0.2132] * 512, "weight": 0.32},
+                         ] * 64
             },
         ]
 
@@ -842,7 +847,7 @@ class TestValidateIndexSettings(unittest.TestCase):
         valid_context_list = [
             {
                 # Typo in tensor
-                "tensors":[
+                "tensors": [
                     {"vector" : [0.2132] * 512, "weight" : 0.32},
                     {"vector": [0.2132] * 512, "weight": 0.32},
                     {"vector": [0.2132] * 512, "weight": 0.32},
@@ -870,23 +875,23 @@ class TestValidateIndexSettings(unittest.TestCase):
                 "tensor": [
                     {"vector": [0.2132] * 53, "weight": 1},
                     {"vector": [23, ], "weight": 1},
-                    {"vectors": 3, "weight": 1},
+                    {"vector": 3, "weight": 1},
                 ],
                 "addition_field_1": None,
                 "addition_field_2": "random"
             },
             {
-                # Int instead of list
+                # Str instead of list
                 "tensor": [
-                    {"vector": [0.2132] * 53, "weight": 1},
-                    {"vector": [23, ], "weight": 1},
-                    {"vectors": 3, "weight": 1},
+                    {"vector" : str([0.2132] * 512), "weight": 0.32},
+                    {"vector": [0.2132] * 512, "weight": 0.32},
+                    {"vector": [0.2132] * 512, "weight": 0.32},
                 ],
                 "addition_field_1": None,
                 "addition_field_2": "random"
             },
             {
-                # Int instead of list
+                # None instead of list
                 "tensor": [
                     {"vector": [0.2132] * 53, "weight": 1},
                     {"vector": [23, ], "weight": 1},
@@ -894,6 +899,12 @@ class TestValidateIndexSettings(unittest.TestCase):
                 ],
                 "addition_field_1": None,
                 "addition_field_2": "random"
+            },
+            {
+                # too many vectors, maximum 64
+                "tensor": [
+                    {"vector": [0.2132] * 512, "weight": 0.32},
+                    ] * 65
             },
             {
                 # None

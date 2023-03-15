@@ -5,6 +5,7 @@ context_schema = {
     "tensor": {
       "type": "array",
       "minItems":1,
+      "maxItems" : 64,
       "items":
         {
           "type": "object",
