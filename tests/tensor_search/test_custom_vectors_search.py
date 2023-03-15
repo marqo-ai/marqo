@@ -36,12 +36,18 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                 "_id": "1"
             }], auto_refresh=True)
 
+    def tearDown(self) -> None:
+        try:
+            tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+        except:
+            pass
+
     def test_search(self):
         query = {
             "A rider is riding a horse jumping over the barrier": 1,
         }
         res = tensor_search.search(config=self.config, index_name=self.index_name_1, text=query, context=
-        {"tensor": [{"vector": [1, ] * 512, "weight": 0}, {"vector": [2, ] * 512, "weight": 0}], })
+        {"tensor": [{"vector": [1, ] * 512, "weight": 2}, {"vector": [2, ] * 512, "weight": -1}], })
 
     def test_search_with_incorrect_tensor_dimension(self):
         query = {
@@ -71,5 +77,9 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         res_1 = tensor_search.search(config=self.config, index_name=self.index_name_1, text=query)
         res_2 = tensor_search.search(config=self.config, index_name=self.index_name_1, text=query, context=
         {"tensor": [{"vector": [1, ] * 512, "weight": 0}, {"vector": [2, ] * 512, "weight": 0}], })
+        res_3 = tensor_search.search(config=self.config, index_name=self.index_name_1, text=query, context=
+        {"tensor": [{"vector": [1, ] * 512, "weight": -1}, {"vector": [1, ] * 512, "weight": 1}], })
 
         assert res_1["hits"][0]["_score"] == res_2["hits"][0]["_score"]
+        assert res_1["hits"][0]["_score"] == res_3["hits"][0]["_score"]
+
