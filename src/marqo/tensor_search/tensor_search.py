@@ -33,8 +33,8 @@ Notes on search behaviour with caching and searchable attributes:
 import copy
 import json
 import datetime
-from timeit import default_timer as timer
 from collections import defaultdict
+from timeit import default_timer as timer
 import functools
 import pprint
 import typing
