@@ -104,7 +104,7 @@ def create_vector_index(
                                                  "vex"]
             },
             "number_of_shards": the_index_settings[NsField.number_of_shards],
-
+            "number_of_replicas": the_index_settings[NsField.number_of_replicas],
         },
         "mappings": {
             "_meta": {

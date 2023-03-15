@@ -21,7 +21,8 @@ def get_default_index_settings():
                 NsFields.patch_method: None
             }
         },
-        NsFields.number_of_shards: 5
+        NsFields.number_of_shards: 5,
+        NsFields.number_of_replicas : 1,
     }
 
 
