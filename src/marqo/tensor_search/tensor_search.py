@@ -259,7 +259,7 @@ def add_documents_orchestrator(
         non_tensor_fields = []
 
     if batch_size is None or batch_size == 0:
-        logger.info(f"batch_size={batch_size} and processes={processes} - not doing any marqo side batching")
+        logger.debug(f"batch_size={batch_size} and processes={processes} - not doing any marqo side batching")
         return add_documents(
             config=config, index_name=index_name, docs=docs, auto_refresh=auto_refresh,
             device=device, update_mode=update_mode, non_tensor_fields=non_tensor_fields,
@@ -271,7 +271,7 @@ def add_documents_orchestrator(
         # create beforehand or pull from the cache so it is upto date for the multi-processing
         _check_and_create_index_if_not_exist(config=config, index_name=index_name)
 
-        logger.info(f"batch_size={batch_size} and processes={processes} - using multi-processing")
+        logger.debug(f"batch_size={batch_size} and processes={processes} - using multi-processing")
         results = parallel.add_documents_mp(
             config=config, index_name=index_name, docs=docs,
             auto_refresh=auto_refresh, batch_size=batch_size, processes=processes,
@@ -290,7 +290,7 @@ def add_documents_orchestrator(
     else:
         if batch_size < 0:
             raise errors.InvalidArgError("Batch size can't be less than 1!")
-        logger.info(f"batch_size={batch_size} and processes={processes} - batching using a single process")
+        logger.debug(f"batch_size={batch_size} and processes={processes} - batching using a single process")
         return _batch_request(config=config, index_name=index_name, dataset=docs, device=device,
                               batch_size=batch_size, verbose=False, non_tensor_fields=non_tensor_fields,
                               use_existing_tensors=use_existing_tensors,
@@ -327,7 +327,7 @@ def _batch_request(config: Config, index_name: str, dataset: List[dict],
     def verbosely_add_docs(i, docs):
         t0 = timer()
 
-        logger.info(f"    batch {i}: beginning ingestion. ")
+        logger.debug(f"    batch {i}: beginning ingestion. ")
         res = add_documents(
             config=config, index_name=index_name,
             docs=docs, auto_refresh=False, device=device,
@@ -338,10 +338,10 @@ def _batch_request(config: Config, index_name: str, dataset: List[dict],
         total_batch_time = timer() - t0
         num_docs = len(docs)
 
-        logger.info(f"    batch {i}: ingested {num_docs} docs. Time taken: {(total_batch_time):.3f}. "
+        logger.debug(f"    batch {i}: ingested {num_docs} docs. Time taken: {(total_batch_time):.3f}. "
                     f"Average time per doc {(total_batch_time / num_docs):.3f}")
         if verbose:
-            logger.info(f"        results from indexing batch {i}: {res}")
+            logger.debug(f"        results from indexing batch {i}: {res}")
         return res
 
     results = [verbosely_add_docs(i, docs) for i, docs in enumerate(batched)]
@@ -452,7 +452,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
         ti_0 = timer()
         image_repo = add_docs.download_images(docs=docs, thread_count=20, non_tensor_fields=tuple(non_tensor_fields),
                                               image_download_headers=image_download_headers)
-        logger.info(f"          add_documents image download: took {(timer() - ti_0):.3f}s to concurrently download "
+        logger.debug(f"          add_documents image download: took {(timer() - ti_0):.3f}s to concurrently download "
                     f"images for {batch_size} docs using {image_download_thread_count} threads ")
 
     if update_mode == 'replace' and use_existing_tensors:
@@ -621,9 +621,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                         infer=infer_if_image)
 
                     end_time = timer()
-                    single_vectorise_call = end_time - start_time
-                    total_vectorise_time += single_vectorise_call
-                    logger.debug(f"(4) TIME for single vectorise call: {(single_vectorise_call):.3f}s.")
+                    total_vectorise_time += (end_time - start_time)
                 except (s2_inference_errors.UnknownModelError,
                         s2_inference_errors.InvalidModelPropertiesError,
                         s2_inference_errors.ModelLoadError) as model_error:
@@ -744,10 +742,10 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
     end_time_3 = timer()
     total_preproc_time = end_time_3 - start_time_3
-    logger.info(f"      add_documents pre-processing: took {(total_preproc_time):.3f}s total for {batch_size} docs, "
+    logger.debug(f"      add_documents pre-processing: took {(total_preproc_time):.3f}s total for {batch_size} docs, "
                 f"for an average of {(total_preproc_time / batch_size):.3f}s per doc.")
 
-    logger.info(f"          add_documents vectorise: took {(total_vectorise_time):.3f}s for {batch_size} docs, "
+    logger.debug(f"          add_documents vectorise: took {(total_vectorise_time):.3f}s for {batch_size} docs, "
                 f"for an average of {(total_vectorise_time / batch_size):.3f}s per doc.")
 
     if bulk_parent_dicts:
@@ -763,11 +761,11 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
         end_time_5 = timer()
         total_http_time = end_time_5 - start_time_5
         total_index_time = index_parent_response["took"] * 0.001
-        logger.info(
+        logger.debug(
             f"      add_documents roundtrip: took {(total_http_time):.3f}s to send {batch_size} docs (roundtrip) to Marqo-os, "
             f"for an average of {(total_http_time / batch_size):.3f}s per doc.")
 
-        logger.info(
+        logger.debug(
             f"          add_documents Marqo-os index: took {(total_index_time):.3f}s for Marqo-os to index {batch_size} docs, "
             f"for an average of {(total_index_time / batch_size):.3f}s per doc.")
     else:
@@ -1192,7 +1190,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
                                          num_highlights=1 if simplified_format else num_highlights)
             end_rerank_time = timer()
             total_rerank_time = end_rerank_time - start_rerank_time
-            logger.info(
+            logger.debug(
                 f"search ({search_method.lower()}) reranking using {reranker}: took {(total_rerank_time):.3f}s to rerank results.")
         except Exception as e:
             raise errors.BadRequestError(f"reranking failure due to {str(e)}")
@@ -1207,7 +1205,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
 
     time_taken = timer() - t0
     search_result["processingTimeMs"] = round(time_taken * 1000)
-    logger.info(f"search ({search_method.lower()}) completed with total processing time: {(time_taken):.3f}s.")
+    logger.debug(f"search ({search_method.lower()}) completed with total processing time: {(time_taken):.3f}s.")
 
     return search_result
 
@@ -1302,7 +1300,7 @@ def _lexical_search(
 
     end_preprocess_time = timer()
     total_preprocess_time = end_preprocess_time - start_preprocess_time
-    logger.info(f"search (lexical) pre-processing: took {(total_preprocess_time):.3f}s to process query.")
+    logger.debug(f"search (lexical) pre-processing: took {(total_preprocess_time):.3f}s to process query.")
 
     start_search_http_time = timer()
     search_res = HttpRequests(config).get(path=f"{index_name}/_search", body=body)
@@ -1311,9 +1309,9 @@ def _lexical_search(
     total_search_http_time = end_search_http_time - start_search_http_time
     total_os_process_time = search_res["took"] * 0.001
     num_results = len(search_res['hits']['hits'])
-    logger.info(
+    logger.debug(
         f"search (lexical) roundtrip: took {(total_search_http_time):.3f}s to send search query (roundtrip) to Marqo-os and received {num_results} results.")
-    logger.info(
+    logger.debug(
         f"  search (lexical) Marqo-os processing time: took {(total_os_process_time):.3f}s for Marqo-os to execute the search.")
 
     # SEARCH TIMER-LOGGER (post-processing)
@@ -1329,7 +1327,7 @@ def _lexical_search(
 
     end_postprocess_time = timer()
     total_postprocess_time = end_postprocess_time - start_postprocess_time
-    logger.info(
+    logger.debug(
         f"search (lexical) post-processing: took {(total_postprocess_time):.3f}s to format {len(res_list)} results.")
 
     return {'hits': res_list}
@@ -1956,7 +1954,7 @@ def _vector_text_search(
 
     end_preprocess_time = timer()
     total_preprocess_time = end_preprocess_time - start_preprocess_time
-    logger.info(f"search (tensor) pre-processing: took {(total_preprocess_time):.3f}s to vectorize and process query.")
+    logger.debug(f"search (tensor) pre-processing: took {(total_preprocess_time):.3f}s to vectorize and process query.")
 
     # SEARCH TIMER-LOGGER (roundtrip)
     start_search_http_time = timer()
@@ -1966,7 +1964,7 @@ def _vector_text_search(
     total_search_http_time = end_search_http_time - start_search_http_time
     total_os_process_time = response["took"] * 0.001
     num_responses = len(response["responses"])
-    logger.info(
+    logger.debug(
         f"search (tensor) roundtrip: took {(total_search_http_time):.3f}s to send {num_responses} search queries (roundtrip) to Marqo-os.")
 
     try:
@@ -1976,7 +1974,7 @@ def _vector_text_search(
         for i in range(len(vector_properties_to_search)):
             indiv_responses = response["responses"][i]['hits']['hits']
             indiv_query_time = response["responses"][i]["took"] * 0.001
-            logger.info(
+            logger.debug(
                 f"  search (tensor) Marqo-os processing time (search field = {list(vector_properties_to_search)[i]}): took {(indiv_query_time):.3f}s and received {len(indiv_responses)} hits.")
 
     except KeyError as e:
@@ -1995,7 +1993,7 @@ def _vector_text_search(
         except (KeyError, IndexError) as e2:
             raise e
 
-    logger.info(
+    logger.debug(
         f"  search (tensor) Marqo-os processing time: took {(total_os_process_time):.3f}s for Marqo-os to execute the search.")
 
     # SEARCH TIMER-LOGGER (post-processing)
@@ -2125,7 +2123,7 @@ def _vector_text_search(
 
     end_postprocess_time = timer()
     total_postprocess_time = end_postprocess_time - start_postprocess_time
-    logger.info(
+    logger.debug(
         f"search (tensor) post-processing: took {(total_postprocess_time):.3f}s to sort and format {len(completely_sorted)} results from Marqo-os.")
     return res
 
@@ -2416,9 +2414,7 @@ def vectorise_multimodal_combination_field(field: str, multimodal_object: Dict[s
                 device=selected_device, normalize_embeddings=normalize_embeddings,
                 infer=infer_if_image)
         end_time = timer()
-        multimodal_inference_call = end_time - start_time
-        combo_vectorise_time_to_add += multimodal_inference_call
-        logger.debug(f"(4) TIME for `multimodal_inference_call` call: {(multimodal_inference_call):.3f}s.")
+        combo_vectorise_time_to_add += (end_time - start_time)
     except (s2_inference_errors.UnknownModelError,
             s2_inference_errors.InvalidModelPropertiesError,
             s2_inference_errors.ModelLoadError) as model_error:
@@ -2441,7 +2437,7 @@ def vectorise_multimodal_combination_field(field: str, multimodal_object: Dict[s
     if not len(sub_field_name_list) == len(vectors_list):
         raise errors.BatchInferenceSizeError(message=f"Batch inference size does not match content for multimodal field {field}")
 
-    vector_chunk = np.squeeze(np.sum([np.array(vector) * field_map["weights"][sub_field_name] for sub_field_name, vector in zip(sub_field_name_list, vectors_list)], axis=0))
+    vector_chunk = np.squeeze(np.mean([np.array(vector) * field_map["weights"][sub_field_name] for sub_field_name, vector in zip(sub_field_name_list, vectors_list)], axis=0))
 
     if normalize_embeddings is True:
         vector_chunk = vector_chunk / np.linalg.norm(vector_chunk)

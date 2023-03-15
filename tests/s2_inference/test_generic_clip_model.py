@@ -362,7 +362,6 @@ class TestGenericModelSupport(MarqoTestCase):
 
 
     def test_validate_model_properties_unknown_model_error(self):
-        pass
         """_validate_model_properties should throw an error if model is not in registry,
             and if model_properties have not been given in index
         """
@@ -372,7 +371,6 @@ class TestGenericModelSupport(MarqoTestCase):
             index_settings={
                 "index_defaults": {
                     'model': model_name,
-                    'type' : "clip"
                 }
             }
         )
