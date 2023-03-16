@@ -19,9 +19,11 @@ Check out the usage guide [here](https://docs.marqo.ai/0.0.16/API-Reference/sear
 - Fixed a bug where multimodal search vectors are not combined based on expected weights (https://github.com/marqo-ai/marqo/pull/384).
 - Fixed a bug where multimodal document vectors are not combined in an expected way. `numpy.sum` was used rather than `numpy.mean`.  (https://github.com/marqo-ai/marqo/pull/384).
 - Fixed a bug where an unexpected error is thrown when `using_existing_tensor = True` and documents are added with duplicate IDs (https://github.com/marqo-ai/marqo/pull/390).
+- Added the missing descriptions and requirement files (https://github.com/marqo-ai/marqo/pull/349).  
 
 ## Contributor shout-outs
-- tbd
+- Thank you to our 2.4k stargazers.
+- Thank you to [@ed-muthiah](https://github.com/ed-muthiah) and others for submitting PRs and raising issues.
 
 ## Release 0.0.15
 
