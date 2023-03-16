@@ -14,16 +14,19 @@ Your vectors will be incorporated into the query using a weighted sum approach,
 allowing you to reduce the number of inference requests for duplicated content.
 Check out the usage guide [here](https://docs.marqo.ai/0.0.16/API-Reference/search/#body)
 
-## Bug fixes
+## Bug fixes and minor changes
 - Fixed a bug where some Open CLIP models were unable to load checkpoints from the cache (https://github.com/marqo-ai/marqo/pull/387).
 - Fixed a bug where multimodal search vectors are not combined based on expected weights (https://github.com/marqo-ai/marqo/pull/384).
 - Fixed a bug where multimodal document vectors are not combined in an expected way. `numpy.sum` was used rather than `numpy.mean`.  (https://github.com/marqo-ai/marqo/pull/384).
 - Fixed a bug where an unexpected error is thrown when `using_existing_tensor = True` and documents are added with duplicate IDs (https://github.com/marqo-ai/marqo/pull/390).
+- Fixed a bug where the index settings validation did not catch the `model` field if it is in the incorrect part of the settings json (https://github.com/marqo-ai/marqo/pull/365).
 - Added the missing descriptions and requirement files (https://github.com/marqo-ai/marqo/pull/349).  
+- Updated the instructions to start Marqo-os (https://github.com/marqo-ai/marqo/pull/371).
+- Improved the Marqo start-up time by incorporating the downloading of the punkt tokenizer into the dockerfile (https://github.com/marqo-ai/marqo/pull/346).
 
 ## Contributor shout-outs
 - Thank you to our 2.4k stargazers.
-- Thank you to [@ed-muthiah](https://github.com/ed-muthiah) and others for submitting PRs and raising issues.
+- Thank you to [@ed-muthiah](https://github.com/ed-muthiah) for submitting [PR](https://github.com/marqo-ai/marqo/pull/349).
 
 ## Release 0.0.15
 
