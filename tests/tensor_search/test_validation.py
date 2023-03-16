@@ -9,6 +9,7 @@ from marqo.errors import (
     InvalidDocumentIdError, InvalidArgError, DocTooLargeError,
     InvalidIndexNameError
 )
+import pprint
 
 
 class TestValidation(unittest.TestCase):
@@ -831,3 +832,128 @@ class TestValidateIndexSettings(unittest.TestCase):
             except InvalidArgError as e:
                 pass
 
+    def test_validate_valid_context_object(self):
+        valid_context_list = [
+            {
+                "tensor":[
+                    {"vector" : [0.2132] * 512, "weight" : 0.32},
+                    {"vector": [0.2132] * 512, "weight": 0.32},
+                    {"vector": [0.2132] * 512, "weight": 0.32},
+                ]
+            },
+            {
+                "tensor": [
+                    {"vector": [0.2132] * 512, "weight": 1},
+                    {"vector": [0.2132] * 512, "weight": 1},
+                    {"vector": [0.2132] * 512, "weight": 1},
+                ]
+            },
+
+            {
+                # Note we are not validating the vector size here
+                "tensor": [
+                    {"vector": [0.2132] * 53, "weight": 1},
+                    {"vector": [23,], "weight": 1},
+                    {"vector": [0.2132] * 512, "weight": 1},
+                ],
+                "addition_field": None
+            },
+            {
+                "tensor": [
+                    {"vector": [0.2132] * 53, "weight": 1},
+                    {"vector": [23, ], "weight": 1},
+                    {"vector": [0.2132] * 512, "weight": 1},
+                ],
+                "addition_field_1": None,
+                "addition_field_2": "random"
+            },
+            {
+                "tensor": [
+                             {"vector": [0.2132] * 512, "weight": 0.32},
+                         ] * 64
+            },
+        ]
+
+        for valid_context in valid_context_list:
+            assert valid_context == validation.validate_context_object(valid_context)
+
+    def test_validate_invalid_context_object(self):
+        valid_context_list = [
+            {
+                # Typo in tensor
+                "tensors": [
+                    {"vector" : [0.2132] * 512, "weight" : 0.32},
+                    {"vector": [0.2132] * 512, "weight": 0.32},
+                    {"vector": [0.2132] * 512, "weight": 0.32},
+                ]
+            },
+            {
+                # Typo in vector
+                "tensor": [
+                    {"vectors": [0.2132] * 512, "weight": 1},
+                    {"vector": [0.2132] * 512, "weight": 1},
+                    {"vector": [0.2132] * 512, "weight": 1},
+                ]
+            },
+            {
+                # Typo in weight
+                "tensor": [
+                    {"vector": [0.2132] * 53, "weight": 1},
+                    {"vector": [23,], "weight": 1},
+                    {"vector": [0.2132] * 512, "weights": 1},
+                ],
+                "addition_field": None
+            },
+            {
+                # Int instead of list
+                "tensor": [
+                    {"vector": [0.2132] * 53, "weight": 1},
+                    {"vector": [23, ], "weight": 1},
+                    {"vector": 3, "weight": 1},
+                ],
+                "addition_field_1": None,
+                "addition_field_2": "random"
+            },
+            {
+                # Str instead of list
+                "tensor": [
+                    {"vector" : str([0.2132] * 512), "weight": 0.32},
+                    {"vector": [0.2132] * 512, "weight": 0.32},
+                    {"vector": [0.2132] * 512, "weight": 0.32},
+                ],
+                "addition_field_1": None,
+                "addition_field_2": "random"
+            },
+            {
+                # None instead of list
+                "tensor": [
+                    {"vector": [0.2132] * 53, "weight": 1},
+                    {"vector": [23, ], "weight": 1},
+                    {"vectors": None, "weight": 1},
+                ],
+                "addition_field_1": None,
+                "addition_field_2": "random"
+            },
+            {
+                # too many vectors, maximum 64
+                "tensor": [
+                    {"vector": [0.2132] * 512, "weight": 0.32},
+                    ] * 65
+            },
+            {
+                # None
+                "tensor": None,
+            },
+            {
+                # Empty tensor
+                "tensor": [],
+            },
+        ]
+
+        for invalid_context in valid_context_list:
+            try:
+                validation.validate_context_object(invalid_context)
+                pprint.pprint(invalid_context)
+                raise AssertionError
+            except InvalidArgError:
+                pass

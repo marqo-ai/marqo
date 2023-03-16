@@ -994,13 +994,13 @@ def bulk_search(query: BulkSearchQuery, marqo_config: config.Config, verbose: bo
     Args:
         query: Set of search queries
         marqo_config:
-        verbose: 
-        device: 
+        verbose:
+        device:
 
     Notes:
         Current limitations:
           - Lexical and tensor search done in serial.
-          - A single error (e.g. validation errors) on any one of the search queries returns an error and does not 
+          - A single error (e.g. validation errors) on any one of the search queries returns an error and does not
             process non-erroring queries.
     """
     # TODO: Let non-errored docs to propagate.
@@ -1041,7 +1041,7 @@ def bulk_search(query: BulkSearchQuery, marqo_config: config.Config, verbose: bo
         s["limit"] = q.limit
         s["offset"] = q.offset
 
-        ## TODO: filter out highlights within `_lexical_search` 
+        ## TODO: filter out highlights within `_lexical_search`
         if not q.showHighlights:
             for hit in s["hits"]:
                 del hit["_highlights"]
@@ -1090,7 +1090,8 @@ def search(config: Config, index_name: str, text: Union[str, dict],
            reranker: Union[str, Dict] = None, simplified_format: bool = True, filter: str = None,
            attributes_to_retrieve: Optional[List[str]] = None,
            device=None, boost: Optional[Dict] = None,
-           image_download_headers: Optional[Dict] = None) -> Dict:
+           image_download_headers: Optional[Dict] = None,
+           context: Optional[Dict] = None) -> Dict:
     """The root search method. Calls the specific search method
 
     Validation should go here. Validations include:
@@ -1113,6 +1114,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
         num_highlights: number of highlights to return for each doc
         boost: boosters to re-weight the scores of individual fields
         image_download_headers: headers for downloading images
+        context: a dictionary to allow custom vectors in search, for tensor search only
     Returns:
 
     """
@@ -1164,7 +1166,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
             return_doc_ids=return_doc_ids, searchable_attributes=searchable_attributes, verbose=verbose,
             number_of_highlights=num_highlights, simplified_format=simplified_format,
             filter_string=filter, device=device, attributes_to_retrieve=attributes_to_retrieve, boost=boost,
-            image_download_headers=image_download_headers
+            image_download_headers=image_download_headers, context=context
         )
     elif search_method.upper() == SearchMethod.LEXICAL:
         search_result = _lexical_search(
@@ -1582,7 +1584,7 @@ def get_query_vectors_from_jobs(
     Handles multi-modal queries, by weighting and combining queries into a single vector
 
     Args:
-        - queries: Original search queries. 
+        - queries: Original search queries.
         - qidx_to_job: VectorisedJobPointer for each query
         - job_to_vectors: inference output from each VectorisedJob
         - config: standard Marqo config.
@@ -1667,15 +1669,15 @@ def create_empty_query_response(queries: List[BulkSearchQueryEntity]) -> List[Di
 
 
 def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity], device=None) -> List[Dict]:
-    """Resolve a batch of search queries in parallel. 
+    """Resolve a batch of search queries in parallel.
 
     Args:
-        - config: 
+        - config:
         - queries: A list of independent search queries. Can be across multiple indexes, but are all expected to have `searchMethod = "TENSOR"`
     Returns:
-        A list of search query responses (see `_format_ordered_docs_simple` for structure of individual entities). 
+        A list of search query responses (see `_format_ordered_docs_simple` for structure of individual entities).
     Note:
-        - Search results are in the same order as `queries`. 
+        - Search results are in the same order as `queries`.
     """
     if len(queries) == 0:
         return []
@@ -1765,7 +1767,8 @@ def _vector_text_search(
         verbose=0, raise_on_searchable_attribs=False, hide_vectors=True, k=500,
         simplified_format=True, filter_string: str = None, device=None,
         attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None,
-        image_download_headers: Optional[Dict] = None):
+        image_download_headers: Optional[Dict] = None,
+        context: Optional[Dict] = None,):
     """
     Args:
         config:
@@ -1783,12 +1786,15 @@ def _vector_text_search(
             objects are printed out
         attributes_to_retrieve: if set, only returns these fields
         image_download_headers: headers for downloading images
+        context: a dictionary to allow custom vectors in search
     Returns:
+
     Note:
         - uses multisearch, which returns k results in each attribute. Not that much of a concern unless you have a
         ridiculous number of attributes
         - Should not be directly called by client - the search() method should
         be called. The search() method adds syncing
+
     Output format:
         [
             {
@@ -1802,6 +1808,17 @@ def _vector_text_search(
         - searching a non existent index should return a HTTP-type error
     """
     # SEARCH TIMER-LOGGER (pre-processing)
+    custom_tensors = None
+    if context is not None:
+        if isinstance(query, dict):
+            validation.validate_context_object(context_object=context)
+            custom_tensors = context.get("tensor", None)
+        elif isinstance(query, str):
+            raise errors.InvalidArgError(f"Marqo received a query = `{query}` with type =`{type(query).__name__}` "
+                                         f"and a context = `{context}`.\n"
+                                         f"This is not supported as the context only works when the query is a dictionary."
+                                         f"If you aim to search with your custom vectors, reformat the query as a dictionary.\n"
+                                         f"Please check `https://docs.marqo.ai/0.0.16/` for more information.")
     start_preprocess_time = timer()
     try:
         index_info = get_index_info(config=config, index_name=index_name)
@@ -1843,8 +1860,15 @@ def _vector_text_search(
                     if q in batch_dict:
                         vec = batch_dict[q]
                 weighted_vectors.append(np.asarray(vec) * weight)
-
-            vectorised_text = np.mean(weighted_vectors, axis=0)
+            if custom_tensors:
+                weighted_vectors += [np.asarray(v["vector"]) * v["weight"]for v in custom_tensors]
+            try:
+                vectorised_text = np.mean(weighted_vectors, axis=0)
+            except ValueError as e:
+                raise errors.InvalidArgError(f"The provided vectors are not in the same dimension of the index."
+                                             f"This causes the error when we do `numpy.mean()` over all the vectors.\n"
+                                             f"The original error is `{e}`.\n"
+                                             f"Please check `https://docs.marqo.ai/0.0.15/API-Reference/search/`.")
             if index_info.index_settings['index_defaults']['normalize_embeddings']:
                 norm = np.linalg.norm(vectorised_text, axis=-1, keepdims=True)
                 if norm > 0:
