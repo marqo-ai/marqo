@@ -20,7 +20,7 @@ Check out the usage guide [here]()
 - Fixed a bug where an unexpected error is thrown when `using_existing_tensor =True` and documents are added with duplicate IDs (https://github.com/marqo-ai/marqo/pull/390).
 
 ## Contributor shout-outs
-- 
+- tbd
 
 ## Release 0.0.15
 
