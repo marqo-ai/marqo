@@ -26,7 +26,7 @@ Check out the usage guide [here](https://docs.marqo.ai/0.0.16/API-Reference/sear
 
 ## Contributor shout-outs
 - Thank you to our 2.4k stargazers.
-- Thank you to [@ed-muthiah](https://github.com/ed-muthiah) for submitting [PR](https://github.com/marqo-ai/marqo/pull/349).
+- Thank you to [@ed-muthiah](https://github.com/ed-muthiah) for submitting PR (https://github.com/marqo-ai/marqo/pull/349).
 
 ## Release 0.0.15
 
