@@ -5,7 +5,7 @@
 Conduct multiple searches with just one query. This can reduce the average search time by up to 30%, depending on your devices and models. 
 Check out the usage guide [here]()
 - Configurable `number_of_replicas` (https://github.com/marqo-ai/marqo/pull/391). 
-You can now configure number_of_replicas when creating an index in Marqo. 
+You can now configure `number_of_replicas` when creating an index in Marqo. 
 We recommend having at least one replica to prevent data loss. Replicas also improve search performance, so you might want to add more if you have a read-heavy workload. 
 See the usage guide [here]()
 - Bring your own vectors search (https://github.com/marqo-ai/marqo/pull/381). Enhance your search with custom vectors. 
