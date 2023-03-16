@@ -2,25 +2,24 @@
 
 ## New features
 - Bulk search (https://github.com/marqo-ai/marqo/pull/363, https://github.com/marqo-ai/marqo/pull/373). 
-Conduct multiple searches with just one query. This can reduce the average search time by up to 30%, depending on your devices and models. 
+Conduct multiple searches with just one request. This improves search throughput in Marqo by parallelising multiple search queries in a single API call. 
+The average search time can be decreased up to 30%, depending on your devices and models. 
 Check out the usage guide [here]()
-- Configurable `number_of_replicas` (https://github.com/marqo-ai/marqo/pull/391). 
-You can now configure `number_of_replicas` when creating an index in Marqo. 
+- Configurable number of index replicas (https://github.com/marqo-ai/marqo/pull/391). 
+You can now configure how many replicas to make for an index in Marqo using the `number_of_replicas` parameter. Marqo makes 1 replica by default.
 We recommend having at least one replica to prevent data loss. Replicas also improve search performance, so you might want to add more if you have a read-heavy workload. 
 See the usage guide [here](https://docs.marqo.ai/0.0.16/API-Reference/indexes/#body-parameters)
-- Bring your own vectors search (https://github.com/marqo-ai/marqo/pull/381). Enhance your search with custom vectors. 
+- Use your own vectors during searches (https://github.com/marqo-ai/marqo/pull/381). Use your own vectors as context for your queries. 
 Your vectors will be incorporated into the query using a weighted sum approach, 
-allowing you to avoid vectoring duplicated content and search more accurately.
+allowing you to reduce the number of inference requests for duplicated content.
 Check out the usage guide [here](https://docs.marqo.ai/0.0.16/API-Reference/search/#body)
 
 ## Bug fixes
 - Fixed a bug where some Open CLIP models were unable to load checkpoints from the cache (https://github.com/marqo-ai/marqo/pull/387).
 - Fixed a bug where multimodal search vectors are not combined based on expected weights (https://github.com/marqo-ai/marqo/pull/384).
-- Fixed a bug where multimodal document vectors are not combined in an expected way (https://github.com/marqo-ai/marqo/pull/384).
-- Fixed a bug where an unexpected error is thrown when `using_existing_tensor =True` and documents are added with duplicate IDs (https://github.com/marqo-ai/marqo/pull/390).
+- Fixed a bug where multimodal document vectors are not combined in an expected way. `numpy.sum` was used rather than `numpy.mean`.  (https://github.com/marqo-ai/marqo/pull/384).
+- Fixed a bug where an unexpected error is thrown when `using_existing_tensor = True` and documents are added with duplicate IDs (https://github.com/marqo-ai/marqo/pull/390).
 
-## Contributor shout-outs
-- tbd
 
 ## Release 0.0.15
 
