@@ -7,11 +7,11 @@ Check out the usage guide [here]()
 - Configurable `number_of_replicas` (https://github.com/marqo-ai/marqo/pull/391). 
 You can now configure `number_of_replicas` when creating an index in Marqo. 
 We recommend having at least one replica to prevent data loss. Replicas also improve search performance, so you might want to add more if you have a read-heavy workload. 
-See the usage guide [here]()
+See the usage guide [here](https://docs.marqo.ai/0.0.16/API-Reference/indexes/#body-parameters)
 - Bring your own vectors search (https://github.com/marqo-ai/marqo/pull/381). Enhance your search with custom vectors. 
 Your vectors will be incorporated into the query using a weighted sum approach, 
 allowing you to avoid vectoring duplicated content and search more accurately.
-Check out the usage guide [here]()
+Check out the usage guide [here](https://docs.marqo.ai/0.0.16/API-Reference/search/#body)
 
 ## Bug fixes
 - Fixed a bug where some Open CLIP models were unable to load checkpoints from the cache (https://github.com/marqo-ai/marqo/pull/387).
