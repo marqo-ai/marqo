@@ -12,7 +12,7 @@ See the usage guide [here](https://docs.marqo.ai/0.0.16/API-Reference/indexes/#b
 - Use your own vectors during searches (https://github.com/marqo-ai/marqo/pull/381). Use your own vectors as context for your queries. 
 Your vectors will be incorporated into the query using a weighted sum approach, 
 allowing you to reduce the number of inference requests for duplicated content.
-Check out the usage guide [here](https://docs.marqo.ai/0.0.16/API-Reference/search/#body)
+Check out the usage guide [here](https://docs.marqo.ai/0.0.16/API-Reference/search/#context)
 
 ## Bug fixes and minor changes
 - Fixed a bug where some Open CLIP models were unable to load checkpoints from the cache (https://github.com/marqo-ai/marqo/pull/387).
