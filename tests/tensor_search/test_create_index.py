@@ -82,7 +82,8 @@ class TestCreateIndex(MarqoTestCase):
                 IndexSettingsField.text_preprocessing: default_text_preprocessing,
                 IndexSettingsField.image_preprocessing: default_image_preprocessing
             },
-            IndexSettingsField.number_of_shards: default_settings[IndexSettingsField.number_of_shards]
+            IndexSettingsField.number_of_shards: default_settings[IndexSettingsField.number_of_shards],
+            IndexSettingsField.number_of_replicas: default_settings[IndexSettingsField.number_of_replicas]
         }
 
     def test__autofill_index_settings_fill_missing_text_preprocessing(self):
@@ -123,6 +124,34 @@ class TestCreateIndex(MarqoTestCase):
             verify=False
         )
         assert default_shard_count == int(resp.json()[self.index_name_1]['settings']['index']['number_of_shards'])
+
+    def test_default_number_of_replicas(self):
+        tensor_search.create_vector_index(index_name=self.index_name_1, config=self.config)
+        default_replicas_count = configs.get_default_index_settings()[NsField.number_of_replicas]
+        assert default_replicas_count is not None
+        resp = requests.get(
+            url=self.authorized_url + f"/{self.index_name_1}",
+            verify=False
+        )
+        assert default_replicas_count == int(resp.json()[self.index_name_1]['settings']['index']['number_of_replicas'])
+
+    def test_autofill_number_of_replicas(self):
+        tensor_search.create_vector_index(
+            index_name=self.index_name_1, config=self.config,
+            index_settings={
+                "index_defaults": {
+                    "treat_urls_and_pointers_as_images": True,
+                    "model": "ViT-B/32",
+                }}
+        )
+        default_replicas_count = configs.get_default_index_settings()[NsField.number_of_replicas]
+        assert default_replicas_count is not None
+        resp = requests.get(
+            url=self.authorized_url + f"/{self.index_name_1}",
+            headers=self.generic_header,
+            verify=False
+        )
+        assert default_replicas_count == int(resp.json()[self.index_name_1]['settings']['index']['number_of_replicas'])
     
     def test_autofill_index_defaults(self):
         """ Does autofill work as intended when index_defaults is not set, but number_of_shards is?"""
@@ -161,6 +190,26 @@ class TestCreateIndex(MarqoTestCase):
             verify=False
         )
         assert intended_shard_count == int(resp.json()[self.index_name_1]['settings']['index']['number_of_shards'])
+
+    def test_set_number_of_replicas(self):
+        """ does it work if other params are filled?"""
+        intended_replicas_count = 4
+        res_0 = tensor_search.create_vector_index(
+            index_name=self.index_name_1, config=self.config,
+            index_settings={
+                "index_defaults": {
+                    "treat_urls_and_pointers_as_images": True,
+                    "model": "ViT-B/32",
+                },
+                NsField.number_of_replicas: intended_replicas_count
+            }
+        )
+        resp = requests.get(
+            url=self.authorized_url + f"/{self.index_name_1}",
+            headers=self.generic_header,
+            verify=False
+        )
+        assert intended_replicas_count == int(resp.json()[self.index_name_1]['settings']['index']['number_of_replicas'])
 
     def test_field_limits(self):
         index_limits = [1, 5, 10, 100, 1000]
@@ -276,7 +325,8 @@ class TestCreateIndex(MarqoTestCase):
                     "patch_method": None
                 }
             },
-            "number_of_shards": 5
+            "number_of_shards": 5,
+            "number_of_replicas": 1
         }
         try:
             tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings=bad_settings)
@@ -285,7 +335,7 @@ class TestCreateIndex(MarqoTestCase):
             pass
 
     def test_index_validation_good(self):
-        bad_settings = {
+        good_settings = {
             "index_defaults": {
                 "treat_urls_and_pointers_as_images": False,
                 "model": "hf/all_datasets_v4_MiniLM-L6",
@@ -299,6 +349,7 @@ class TestCreateIndex(MarqoTestCase):
                     "patch_method": None
                 }
             },
-            "number_of_shards": 5
+            "number_of_shards": 5,
+            "number_of_replicas": 1
         }
-        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings=bad_settings)
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings=good_settings)

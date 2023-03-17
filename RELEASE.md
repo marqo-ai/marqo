@@ -1,3 +1,34 @@
+## Release 0.0.16
+
+## New features
+- Bulk search (https://github.com/marqo-ai/marqo/pull/363, https://github.com/marqo-ai/marqo/pull/373). 
+Conduct multiple searches with just one request. This improves search throughput in Marqo by parallelising multiple search queries in a single API call. 
+The average search time can be decreased up to 30%, depending on your devices and models. 
+Check out the usage guide [here](https://docs.marqo.ai/0.0.16/API-Reference/bulk)
+- Configurable number of index replicas (https://github.com/marqo-ai/marqo/pull/391). 
+You can now configure how many replicas to make for an index in Marqo using the `number_of_replicas` parameter. Marqo makes 1 replica by default.
+We recommend having at least one replica to prevent data loss.
+See the usage guide [here](https://docs.marqo.ai/0.0.16/API-Reference/indexes/#body-parameters)
+- Use your own vectors during searches (https://github.com/marqo-ai/marqo/pull/381). Use your own vectors as context for your queries. 
+Your vectors will be incorporated into the query using a weighted sum approach, 
+allowing you to reduce the number of inference requests for duplicated content.
+Check out the usage guide [here](https://docs.marqo.ai/0.0.16/API-Reference/search/#context)
+
+## Bug fixes and minor changes
+- Fixed a bug where some Open CLIP models were unable to load checkpoints from the cache (https://github.com/marqo-ai/marqo/pull/387).
+- Fixed a bug where multimodal search vectors are not combined based on expected weights (https://github.com/marqo-ai/marqo/pull/384).
+- Fixed a bug where multimodal document vectors are not combined in an expected way. `numpy.sum` was used rather than `numpy.mean`.  (https://github.com/marqo-ai/marqo/pull/384).
+- Fixed a bug where an unexpected error is thrown when `using_existing_tensor = True` and documents are added with duplicate IDs (https://github.com/marqo-ai/marqo/pull/390).
+- Fixed a bug where the index settings validation did not catch the `model` field if it is in the incorrect part of the settings json (https://github.com/marqo-ai/marqo/pull/365).
+- Added missing descriptions and requirement files on our [GPT-examples](https://github.com/marqo-ai/marqo/tree/mainline/examples/GPT-examples) (https://github.com/marqo-ai/marqo/pull/349).  
+- Updated the instructions to start Marqo-os (https://github.com/marqo-ai/marqo/pull/371).
+- Improved the Marqo start-up time by incorporating the downloading of the punkt tokenizer into the dockerfile (https://github.com/marqo-ai/marqo/pull/346).
+
+## Contributor shout-outs
+- Thank you to our 2.5k stargazers.
+- Thank you to [@ed-muthiah](https://github.com/ed-muthiah) for submitting a PR (https://github.com/marqo-ai/marqo/pull/349) 
+that added missing descriptions and requirement files on our [GPT-examples](https://github.com/marqo-ai/marqo/tree/mainline/examples/GPT-examples).
+
 ## Release 0.0.15
 
 ## New features 

@@ -9,6 +9,7 @@ from marqo.errors import (
     InvalidDocumentIdError, InvalidArgError, DocTooLargeError,
     InvalidIndexNameError
 )
+import pprint
 
 
 class TestValidation(unittest.TestCase):
@@ -321,7 +322,8 @@ class TestValidateIndexSettings(unittest.TestCase):
                     "patch_method": None
                 }
             },
-            "number_of_shards": 5
+            "number_of_shards": 5,
+            "number_of_replicas":1
         }
 
     def test_validate_index_settings(self):
@@ -341,7 +343,8 @@ class TestValidateIndexSettings(unittest.TestCase):
                         "patch_method": None
                     }
                 },
-                "number_of_shards": 5
+                "number_of_shards": 5,
+                "number_of_replicas": 1
             },
             {   # extra field in text_preprocessing: OK
                 "index_defaults": {
@@ -358,7 +361,8 @@ class TestValidateIndexSettings(unittest.TestCase):
                         "patch_method": None
                     }
                 },
-                "number_of_shards": 5
+                "number_of_shards": 5,
+                "number_of_replicas": 1
             },
             {  # extra field in image_preprocessing: OK
                 "index_defaults": {
@@ -376,6 +380,7 @@ class TestValidateIndexSettings(unittest.TestCase):
                     }
                 },
                 "number_of_shards": 5,
+                "number_of_replicas": 1
             }
         ]
         for settings in good_settings:
@@ -387,7 +392,24 @@ class TestValidateIndexSettings(unittest.TestCase):
         assert good_settings == validation.validate_settings_object(good_settings)
 
     def test_validate_index_settings_bad(self):
-        bad_settings = {
+        bad_settings = [{
+            "index_defaults": {
+                "treat_urls_and_pointers_as_images": False,
+                "model": "hf/all_datasets_v4_MiniLM-L6",
+                "normalize_embeddings": True,
+                "text_preprocessing": {
+                    "split_length": "2",
+                    "split_overlap": "0",
+                    "split_method": "sentence"
+                },
+                "image_preprocessing": {
+                    "patch_method": None
+                }
+            },
+            "number_of_shards": 5,
+            "number_of_replicas" : -1
+        },
+        {
             "index_defaults": {
                 "treat_urls_and_pointers_as_images": False,
                 "model": "hf/all_datasets_v4_MiniLM-L6",
@@ -402,12 +424,14 @@ class TestValidateIndexSettings(unittest.TestCase):
                 }
             },
             "number_of_shards": 5
-        }
-        try:
-            validation.validate_settings_object(bad_settings)
-            raise AssertionError
-        except InvalidArgError as e:
-            pass
+        },
+        ]
+        for bad_setting in bad_settings:
+            try:
+                validation.validate_settings_object(bad_setting)
+                raise AssertionError
+            except InvalidArgError as e:
+                pass
 
     def test_validate_index_settings_missing_text_preprocessing(self):
         settings = self.get_good_index_settings()
@@ -447,6 +471,17 @@ class TestValidateIndexSettings(unittest.TestCase):
         # base good settings should be OK
         assert settings == validation.validate_settings_object(settings)
         settings['number_of_shards'] = -1
+        try:
+            validation.validate_settings_object(settings)
+            raise AssertionError
+        except InvalidArgError as e:
+            pass
+
+    def test_validate_index_settings_bad_number_replicas(self):
+        settings = self.get_good_index_settings()
+        # base good settings should be OK
+        assert settings == validation.validate_settings_object(settings)
+        settings['number_of_replicas'] = -1
         try:
             validation.validate_settings_object(settings)
             raise AssertionError
@@ -797,3 +832,128 @@ class TestValidateIndexSettings(unittest.TestCase):
             except InvalidArgError as e:
                 pass
 
+    def test_validate_valid_context_object(self):
+        valid_context_list = [
+            {
+                "tensor":[
+                    {"vector" : [0.2132] * 512, "weight" : 0.32},
+                    {"vector": [0.2132] * 512, "weight": 0.32},
+                    {"vector": [0.2132] * 512, "weight": 0.32},
+                ]
+            },
+            {
+                "tensor": [
+                    {"vector": [0.2132] * 512, "weight": 1},
+                    {"vector": [0.2132] * 512, "weight": 1},
+                    {"vector": [0.2132] * 512, "weight": 1},
+                ]
+            },
+
+            {
+                # Note we are not validating the vector size here
+                "tensor": [
+                    {"vector": [0.2132] * 53, "weight": 1},
+                    {"vector": [23,], "weight": 1},
+                    {"vector": [0.2132] * 512, "weight": 1},
+                ],
+                "addition_field": None
+            },
+            {
+                "tensor": [
+                    {"vector": [0.2132] * 53, "weight": 1},
+                    {"vector": [23, ], "weight": 1},
+                    {"vector": [0.2132] * 512, "weight": 1},
+                ],
+                "addition_field_1": None,
+                "addition_field_2": "random"
+            },
+            {
+                "tensor": [
+                             {"vector": [0.2132] * 512, "weight": 0.32},
+                         ] * 64
+            },
+        ]
+
+        for valid_context in valid_context_list:
+            assert valid_context == validation.validate_context_object(valid_context)
+
+    def test_validate_invalid_context_object(self):
+        valid_context_list = [
+            {
+                # Typo in tensor
+                "tensors": [
+                    {"vector" : [0.2132] * 512, "weight" : 0.32},
+                    {"vector": [0.2132] * 512, "weight": 0.32},
+                    {"vector": [0.2132] * 512, "weight": 0.32},
+                ]
+            },
+            {
+                # Typo in vector
+                "tensor": [
+                    {"vectors": [0.2132] * 512, "weight": 1},
+                    {"vector": [0.2132] * 512, "weight": 1},
+                    {"vector": [0.2132] * 512, "weight": 1},
+                ]
+            },
+            {
+                # Typo in weight
+                "tensor": [
+                    {"vector": [0.2132] * 53, "weight": 1},
+                    {"vector": [23,], "weight": 1},
+                    {"vector": [0.2132] * 512, "weights": 1},
+                ],
+                "addition_field": None
+            },
+            {
+                # Int instead of list
+                "tensor": [
+                    {"vector": [0.2132] * 53, "weight": 1},
+                    {"vector": [23, ], "weight": 1},
+                    {"vector": 3, "weight": 1},
+                ],
+                "addition_field_1": None,
+                "addition_field_2": "random"
+            },
+            {
+                # Str instead of list
+                "tensor": [
+                    {"vector" : str([0.2132] * 512), "weight": 0.32},
+                    {"vector": [0.2132] * 512, "weight": 0.32},
+                    {"vector": [0.2132] * 512, "weight": 0.32},
+                ],
+                "addition_field_1": None,
+                "addition_field_2": "random"
+            },
+            {
+                # None instead of list
+                "tensor": [
+                    {"vector": [0.2132] * 53, "weight": 1},
+                    {"vector": [23, ], "weight": 1},
+                    {"vectors": None, "weight": 1},
+                ],
+                "addition_field_1": None,
+                "addition_field_2": "random"
+            },
+            {
+                # too many vectors, maximum 64
+                "tensor": [
+                    {"vector": [0.2132] * 512, "weight": 0.32},
+                    ] * 65
+            },
+            {
+                # None
+                "tensor": None,
+            },
+            {
+                # Empty tensor
+                "tensor": [],
+            },
+        ]
+
+        for invalid_context in valid_context_list:
+            try:
+                validation.validate_context_object(invalid_context)
+                pprint.pprint(invalid_context)
+                raise AssertionError
+            except InvalidArgError:
+                pass

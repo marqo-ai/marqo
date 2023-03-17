@@ -3,10 +3,11 @@ import pprint
 import typing
 from marqo.tensor_search import constants
 from marqo.tensor_search import enums, utils
-from typing import Iterable, Container, Union
+from typing import Container, Iterable, List, Optional, Union
 from marqo.errors import (
     MarqoError, InvalidFieldNameError, InvalidArgError, InternalError,
-    InvalidDocumentIdError, DocTooLargeError, InvalidIndexNameError)
+    InvalidDocumentIdError, DocTooLargeError, InvalidIndexNameError,
+    IllegalRequestedDocCount)
 from marqo.tensor_search.enums import TensorField, SearchMethod
 from marqo.tensor_search import constants
 from typing import Any, Type, Sequence
@@ -15,6 +16,7 @@ from enum import Enum
 import jsonschema
 from marqo.tensor_search.models.settings_object import settings_schema
 from marqo.tensor_search.models.mappings_object import mappings_schema, multimodal_combination_schema
+from marqo.tensor_search.models.context_object import context_schema
 
 
 def validate_query(q: Union[dict, str], search_method: Union[str, SearchMethod]):
@@ -51,6 +53,35 @@ def validate_query(q: Union[dict, str], search_method: Union[str, SearchMethod])
         )
     return q
 
+def validate_bulk_query_input(q: 'BulkSearchQueryEntity') -> Optional[MarqoError]:
+    if q.limit <= 0:
+        return IllegalRequestedDocCount("search result limit must be greater than 0!")
+    if q.offset < 0:
+        return IllegalRequestedDocCount("search result offset cannot be less than 0!")
+
+    # validate query
+    validate_query(q=q.q, search_method=q.searchMethod)
+
+    # Validate result_count + offset <= int(max_docs_limit)
+    max_docs_limit = utils.read_env_vars_and_defaults(enums.EnvVars.MARQO_MAX_RETRIEVABLE_DOCS)
+    check_upper = True if max_docs_limit is None else q.limit + q.offset <= int(max_docs_limit)
+    if not check_upper:
+        raise IllegalRequestedDocCount(
+    f"The search result limit + offset must be less than or equal to the MARQO_MAX_RETRIEVABLE_DOCS limit of"
+    f"[{max_docs_limit}]. Marqo received search result limit of `{q.limit}` and offset of `{q.offset}`."
+    )
+
+    validate_boost(boost=q.boost, search_method=q.searchMethod)
+    if q.searchableAttributes is not None:
+        if not isinstance(q.searchableAttributes, (List, typing.Tuple)):
+            raise InvalidArgError("searchableAttributes must be a sequence!")
+        [validate_field_name(attribute) for attribute in q.searchableAttributes]
+    if q.attributesToRetrieve is not None:
+        if not isinstance(q.attributesToRetrieve, (List, typing.Tuple)):
+            raise InvalidArgError("attributesToRetrieve must be a sequence!")
+        [validate_field_name(attribute) for attribute in q.attributesToRetrieve]
+
+    return None
 
 def validate_str_against_enum(value: Any, enum_class: Type[Enum], case_sensitive: bool = True):
     """Checks whether a value is found as the value of a str attribute of the
@@ -425,6 +456,23 @@ def validate_multimodal_combination(field_content, is_non_tensor_field, field_ma
             f"add them as normal fields to fix this problem."
         )
     return True
+
+
+def validate_context_object(context_object: dict):
+    """validates the mappings object.
+        Returns
+            the given context_object if passed the validation
+
+        Raises an InvalidArgError if the context object is badly formatted
+        """
+    try:
+        jsonschema.validate(instance=context_object, schema=context_schema)
+        return context_object
+    except jsonschema.ValidationError as e:
+        raise InvalidArgError(
+            f"Error validating mappings object. Reason: \n{str(e)}"
+            f"\nRead about the mappings object here: https://docs.marqo.ai/0.0.16"
+        )
 
 
 def validate_mappings_object(mappings_object: dict):

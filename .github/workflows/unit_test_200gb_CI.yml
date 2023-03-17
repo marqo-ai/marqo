@@ -1,15 +1,8 @@
-name: arm64_local_os
-# runs Integration Tests on Local OS on an ARM64 Machine
+name: unit_test_200gb_CI
+# runs unit tests on AMD64 machine
+
 on:
   workflow_dispatch:
-    inputs:
-      image_to_test:
-        required: false
-        # This is the name of the docker image that is built by the build script:
-        default: marqo_docker_0
-        description: >
-          This is optional. If left as the default value "marqo_docker_0", the docker image built from this branch is tested.
-          Otherwise, the specified docker image is tested. For example "marqoai/marqo:test"
   push:
     branches:
       mainline
@@ -39,12 +32,10 @@ jobs:
         with:
           mode: start
           github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
-
-          # ARM Runner Image
-          ec2-image-id: ${{ secrets.ARM_EC2_IMAGE_ID }}
-          ec2-instance-type: a1.xlarge
-          subnet-id: ${{ secrets.ARM_SUBNET_ID }}
-          security-group-id: ${{ secrets.ARM_SECURITY_GROUP_ID }}
+          ec2-image-id:  ${{ secrets.AMD_200GB_EC2_IMAGE_ID }}
+          ec2-instance-type: t3.xlarge
+          subnet-id: ${{ secrets.AMD_SUBNET_ID }}
+          security-group-id: ${{ secrets.AMD_SECURITY_GROUP_ID }}
 
   Test-Marqo:
     name: Run Marqo Test Suite
@@ -60,19 +51,37 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up Python 3.9   # TODO: Check if 3.9 is okay instead of 3.8. So far, so good
-        run:  |
-          sudo apt-get -y update
-          sudo apt-get -y install python3.9
-          sudo apt-get -y install pip
-  
+      - name: Set up Python 3.8
+        uses: actions/setup-python@v3
+        with:
+          python-version: "3.8"
+          cache: "pip"
+          
       - name: Install Dependencies
         run: |
           #pip install -r requirements.txt
           pip install tox==3.26
           pip install flake8
       
-      # TODO: linting here
+      # TODO: Figure out how to make linting work on self-hosted runner
+      # usual error: $HOME not set
+      #- name: Get Changed Directories
+      #  id: changed-dir
+      #  uses: tj-actions/changed-files@v29.0.1
+      #  with:
+      #    dir_names: true
+      #  run:  |
+      #    export HOME=$pwd
+      
+      #- name: Lint Changed Directories with flake8
+      #  run: |
+      #    for dir in ${{ steps.changed-dir.outputs.all_changed_files }}; do
+      #      echo "$dir was changed"
+            # stop the build if there are Python syntax errors or undefined names
+      #      flake8 $dir --count --select=E9,F63,F7,F82 --show-source --statistics --filename *.py
+            # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
+      #      flake8 $dir --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics --filename *.py
+      #    done
   
       - name: Checkout marqo-api-tests repo
         uses: actions/checkout@v3
@@ -87,12 +96,10 @@ jobs:
           # Set up conf file
           echo 'export MARQO_API_TESTS_ROOT="${{ github.workspace }}"' >> conf
           
-      - name: Run Integration Tests - ARM64 local_os
+      - name: Run Unit Tests
         run: |
-          export MQ_API_TEST_BRANCH="${GITHUB_REF##*/}"
-          CUSTOM_TEST_IMG="${{ github.event.inputs.image_to_test }}"
-          export MQ_API_TEST_IMG=${CUSTOM_TEST_IMG:-"marqo_docker_0"}
-          tox -e py3-arm64_local_os
+          export MQ_API_TEST_BRANCH=$(echo "${GITHUB_REF}" | cut -d'/' -f3-)
+          tox -e py3-local_os_unit_tests_w_requirements
   
   Stop-Runner:
     name: Stop self-hosted EC2 runner
