@@ -17,11 +17,17 @@ Drivers for connecting to other applications should be put here.
 
 logger = get_logger(__name__)
 
+def generate_redis_warning(skipped_operation: str, exc: Exception):
+    """
+    Returns string warning message when redis has a problem, given the exception encountered and the skipped operation.
+    """
+    return f"There is a problem with your redis connection. Skipping {skipped_operation}. To suppress these warnings, disable throttling with `export MARQO_ENABLE_THROTTLING='FALSE'`. Read more under Redis setup section of the developer guide: https://github.com/marqo-ai/marqo/tree/mainline/src/marqo#developer-guide. Redis error reason: {exc}"
+
+
 class RedisDriver:
     """
     This class enables a persistent connection to redis
     """
-
 
     def __init__(self):
         self.driver: redis.Redis = None
@@ -56,7 +62,7 @@ class RedisDriver:
             logger.info(f"Took {((t1-t0)*1000):.3f}ms to connect to redis and load scripts.")
 
         except Exception as e:
-            logger.warn(f"There is a problem with your redis connection. Could not load throttling scripts onto redis. To suppress these warnings, disable throttling with export MARQO_ENABLE_THROTTLING='FALSE'. Read more under Redis setup section of the developer guide: https://github.com/marqo-ai/marqo/tree/mainline/src/marqo#developer-guide. Redis error reason: {e}")
+            logger.warn(generate_redis_warning(skipped_operation="loading throttling scripts", exc=e))
             self.faulty = True
 
     def connect(self) -> redis.Redis:
