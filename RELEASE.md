@@ -20,13 +20,14 @@ Check out the usage guide [here](https://docs.marqo.ai/0.0.16/API-Reference/sear
 - Fixed a bug where multimodal document vectors are not combined in an expected way. `numpy.sum` was used rather than `numpy.mean`.  (https://github.com/marqo-ai/marqo/pull/384).
 - Fixed a bug where an unexpected error is thrown when `using_existing_tensor = True` and documents are added with duplicate IDs (https://github.com/marqo-ai/marqo/pull/390).
 - Fixed a bug where the index settings validation did not catch the `model` field if it is in the incorrect part of the settings json (https://github.com/marqo-ai/marqo/pull/365).
-- Added the missing descriptions and requirement files (https://github.com/marqo-ai/marqo/pull/349).  
+- Added missing descriptions and requirement files on our [GPT-examples](https://github.com/marqo-ai/marqo/tree/mainline/examples/GPT-examples) (https://github.com/marqo-ai/marqo/pull/349).  
 - Updated the instructions to start Marqo-os (https://github.com/marqo-ai/marqo/pull/371).
 - Improved the Marqo start-up time by incorporating the downloading of the punkt tokenizer into the dockerfile (https://github.com/marqo-ai/marqo/pull/346).
 
 ## Contributor shout-outs
 - Thank you to our 2.5k stargazers.
-- Thank you to [@ed-muthiah](https://github.com/ed-muthiah) for submitting PR (https://github.com/marqo-ai/marqo/pull/349).
+- Thank you to [@ed-muthiah](https://github.com/ed-muthiah) for submitting a PR (https://github.com/marqo-ai/marqo/pull/349) 
+that added missing descriptions and requirement files on our GPT-examples.
 
 ## Release 0.0.15
 
