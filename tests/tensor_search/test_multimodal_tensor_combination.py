@@ -1013,4 +1013,3 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         assert np.allclose(combined_tensor, permuted_tensor_1, atol=1e-9)
         assert np.allclose(combined_tensor, permuted_tensor_2, atol=1e-9)
         assert np.allclose(combined_tensor, permuted_tensor_3, atol=1e-9)
-
