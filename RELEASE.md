@@ -7,7 +7,7 @@ The average search time can be decreased up to 30%, depending on your devices an
 Check out the usage guide [here](https://docs.marqo.ai/0.0.16/API-Reference/bulk)
 - Configurable number of index replicas (https://github.com/marqo-ai/marqo/pull/391). 
 You can now configure how many replicas to make for an index in Marqo using the `number_of_replicas` parameter. Marqo makes 1 replica by default.
-We recommend having at least one replica to prevent data loss. Replicas also improve search performance, so you might want to add more if you have a read-heavy workload. 
+We recommend having at least one replica to prevent data loss.
 See the usage guide [here](https://docs.marqo.ai/0.0.16/API-Reference/indexes/#body-parameters)
 - Use your own vectors during searches (https://github.com/marqo-ai/marqo/pull/381). Use your own vectors as context for your queries. 
 Your vectors will be incorporated into the query using a weighted sum approach, 
