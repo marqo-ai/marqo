@@ -16,6 +16,7 @@ from marqo.s2_inference.s2_inference import vectorise
 import requests
 from marqo.s2_inference.clip_utils import load_image_from_path
 import json
+from unittest.mock import patch
 from marqo.errors import MarqoWebError
 
 
@@ -32,6 +33,11 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         except IndexNotFoundError as e:
             pass
 
+    def tearDown(self) -> None:
+        try:
+            tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+        except:
+            pass
     def test_add_documents(self):
         tensor_search.create_vector_index(
             index_name=self.index_name_1, config=self.config, index_settings={
@@ -944,4 +950,67 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         assert index_info.properties['__chunks']['properties']['my_combination_field']['properties']['image']["type"] == 'keyword'
         assert index_info.properties['__chunks']['properties']['__vector_my_combination_field']['type']  == 'knn_vector'
 
+    def test_multimodal_child_fields_order(self):
+        tensor_search.create_vector_index(
+            index_name=self.index_name_1, config=self.config, index_settings={
+                IndexSettingsField.index_defaults: {
+                    IndexSettingsField.model: "ViT-B/32",
+                    IndexSettingsField.treat_urls_and_pointers_as_images: True,
+                    IndexSettingsField.normalize_embeddings: False
+                }
+            })
+
+        doc ={
+                "combo_text_image": {
+                    "text_field_1": "A rider is riding a horse jumping over the barrier.",
+                    "text_field_2": "What is the best to wear on the moon?",
+                    "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+                    "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+                },
+            }
+
+        doc_1 = {
+                "combo_text_image": {
+                    "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+                    "text_field_1": "A rider is riding a horse jumping over the barrier.",
+                    "text_field_2": "What is the best to wear on the moon?",
+                    "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+                },
+            }
+
+        doc_2 = {
+                "combo_text_image": {
+                    "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+                    "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+                    "text_field_1": "A rider is riding a horse jumping over the barrier.",
+                    "text_field_2": "What is the best to wear on the moon?",
+                },
+            }
+
+        doc_3 = {
+                "combo_text_image": {
+                    "text_field_1": "A rider is riding a horse jumping over the barrier.",
+                    "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+                    "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+                    "text_field_2": "What is the best to wear on the moon?",
+                },
+            }
+
+        with patch("numpy.mean", wraps=np.mean) as mock_mean:
+            tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
+                doc, doc_1, doc_2, doc_3
+            ], mappings={"combo_text_image": {"type": "multimodal_combination",
+                                              "weights": {"image_field_1": 0.5, "image_field_2": 0.5, "text_field_1": 0.5, "text_field_2": 0.5}}}, auto_refresh=True)
+
+            args_list = [args[0] for args in mock_mean.call_args_list]
+
+        combined_tensor = np.squeeze(np.mean(args_list[0][0], axis = 0))
+
+        permuted_tensor_1 = np.squeeze(np.mean(args_list[1][0], axis = 0))
+        permuted_tensor_2 = np.squeeze(np.mean(args_list[2][0], axis=0))
+        permuted_tensor_3 = np.squeeze(np.mean(args_list[3][0], axis=0))
+
+        assert np.allclose(combined_tensor, permuted_tensor_1, atol=1e-9)
+        assert np.allclose(combined_tensor, permuted_tensor_2, atol=1e-9)
+        assert np.allclose(combined_tensor, permuted_tensor_3, atol=1e-9)
 
