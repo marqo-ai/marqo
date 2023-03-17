@@ -27,7 +27,7 @@ Check out the usage guide [here](https://docs.marqo.ai/0.0.16/API-Reference/sear
 ## Contributor shout-outs
 - Thank you to our 2.5k stargazers.
 - Thank you to [@ed-muthiah](https://github.com/ed-muthiah) for submitting a PR (https://github.com/marqo-ai/marqo/pull/349) 
-that added missing descriptions and requirement files on our GPT-examples.
+that added missing descriptions and requirement files on our [GPT-examples](https://github.com/marqo-ai/marqo/tree/mainline/examples/GPT-examples).
 
 ## Release 0.0.15
 
