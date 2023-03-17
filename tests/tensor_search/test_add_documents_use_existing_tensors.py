@@ -20,7 +20,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
         except IndexNotFoundError as s:
             pass
 
-    def test_use_existing_tensors_relience(self):
+    def test_use_existing_tensors_resilience(self):
         """should if one doc fails validation, the rest should still be inserted
         """
         d1 = {
@@ -59,7 +59,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
             assert item['result'] == 'created'
 
     def test_use_existing_tensors_non_existing(self):
-        """check parity between a doc created with and without use_existing_tensors,
+        """check parity between a doc created with and without use_existing_tensors, then overwritten,
         for a newly created doc.
         """
         tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
@@ -68,6 +68,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
                 "title 1": "content 1",
                 "desc 2": "content 2. blah blah blah"
             }], auto_refresh=True, use_existing_tensors=False)
+        
         regular_doc = tensor_search.get_document_by_id(
             config=self.config, index_name=self.index_name_1,
             document_id="123", show_vectors=True)
@@ -84,6 +85,124 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
             config=self.config, index_name=self.index_name_1,
             document_id="123", show_vectors=True)
         self.assertEqual(use_existing_tensors_doc, regular_doc)
+
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
+            {
+                "_id": "123",
+                "title 1": "content 1",
+                "desc 2": "content 2. blah blah blah"
+            }], auto_refresh=True, use_existing_tensors=True)
+        overwritten_doc = tensor_search.get_document_by_id(
+            config=self.config, index_name=self.index_name_1,
+            document_id="123", show_vectors=True)
+        
+        self.assertEqual(use_existing_tensors_doc, overwritten_doc)
+        
+    def test_use_existing_tensors_dupe_ids(self):
+        """ 
+        Should only use the latest inserted ID. Make sure it doesn't get the first/middle one
+        """
+
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
+            {
+                "_id": "3",
+                "title": "doc 3b"
+            },
+        
+        ], auto_refresh=True)
+        
+        doc_3_solo = tensor_search.get_document_by_id(
+            config=self.config, index_name=self.index_name_1,
+            document_id="3", show_vectors=True)
+
+        tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
+            {
+                "_id": "1",
+                "title": "doc 1"
+            },
+            {
+                "_id": "2",
+                "title": "doc 2",
+            },
+            {
+                "_id": "3",
+                "title": "doc 3a",
+            },
+            {
+                "_id": "3",
+                "title": "doc 3b"
+            },
+        
+        ], auto_refresh=True, use_existing_tensors=True)
+        
+        doc_3_duped = tensor_search.get_document_by_id(
+            config=self.config, index_name=self.index_name_1,
+            document_id="3", show_vectors=True)
+        
+        self.assertEqual(doc_3_solo, doc_3_duped)
+
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
+            {
+                "_id": "1",
+                "title": "doc 1"
+            },
+            {
+                "_id": "2",
+                "title": "doc 2",
+            },
+            {
+                "_id": "3",
+                "title": "doc 3a",
+            },
+            {
+                "_id": "3",
+                "title": "doc 3b"
+            },
+        
+        ], auto_refresh=True, use_existing_tensors=True)
+        
+        doc_3_overwritten = tensor_search.get_document_by_id(
+            config=self.config, index_name=self.index_name_1,
+            document_id="3", show_vectors=True)
+
+        # Needs to be 3b, not 3a
+        self.assertEqual(doc_3_duped, doc_3_overwritten)
+    
+    def test_use_existing_tensors_retensorize_fields(self):
+        """
+        During the initial index, some fields are non-tensor fields
+        When we insert the doc again, with use_existing_tensors, we make them tensor fields.
+        They should still have no tensors.
+        """
+        
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
+            {
+                "_id": "123",
+                "title 1": "content 1",
+                "title 2": 2,
+                "title 3": True,
+                "title 4": "content 4"
+            }], auto_refresh=True, use_existing_tensors=True,
+            non_tensor_fields=["title 1", "title 2", "title 3", "title 4"])
+        d1 = tensor_search.get_document_by_id(
+            config=self.config, index_name=self.index_name_1,
+            document_id="123", show_vectors=True)
+        assert len(d1["_tensor_facets"]) == 0
+        
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
+            {
+                "_id": "123",
+                "title 1": "content 1",
+                "title 2": 2,
+                "title 3": True,
+                "title 4": "content 4"
+            }], auto_refresh=True, use_existing_tensors=True)
+        d2 = tensor_search.get_document_by_id(
+            config=self.config, index_name=self.index_name_1,
+            document_id="123", show_vectors=True)
+
+        assert len(d2["_tensor_facets"]) == 0
 
     def test_use_existing_tensors_getting_non_tensorised(self):
         """
@@ -112,6 +231,27 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
         d2 = tensor_search.get_document_by_id(
             config=self.config, index_name=self.index_name_1,
             document_id="123", show_vectors=True)
+        self.assertEqual(d1["_tensor_facets"], d2["_tensor_facets"])
+
+        # The only field is a non-tensor field. This makes a chunkless doc.
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
+            {
+                "_id": "999",
+                "non-tensor-field": "content 2. blah blah blah"
+            }], auto_refresh=True, non_tensor_fields=["non-tensor-field"])
+        d1 = tensor_search.get_document_by_id(
+            config=self.config, index_name=self.index_name_1,
+            document_id="999", show_vectors=True)
+        assert len(d1["_tensor_facets"]) == 0
+
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
+            {
+                "_id": "999",
+                "non-tensor-field": "content 2. blah blah blah"
+            }], auto_refresh=True, use_existing_tensors=True)
+        d2 = tensor_search.get_document_by_id(
+            config=self.config, index_name=self.index_name_1,
+            document_id="999", show_vectors=True)
         self.assertEqual(d1["_tensor_facets"], d2["_tensor_facets"])
 
     def test_use_existing_tensors_check_updates(self):
@@ -357,3 +497,41 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
             return True
 
         assert run()
+
+
+    def test_use_existing_tensors_all_data_types(self):
+        """
+        Ensure no errors occur even with chunkless docs. (only int, only bool, etc)
+        Replacing doc doesn't change the content
+        """
+        doc_args = [
+            # Each doc only has 1 type
+            [{"_id": "1", "title": "hello world"},
+            {"_id": "2", "title": True},
+            {"_id": "3", "title": 12345},
+            {"_id": "4", "title": [1, 2, 3]}],
+
+            # Doc with all types
+            [{"_id": "1", "field1": "hello world", "field2": True, "field3": 12345, "field4": [1, 2, 3]}]
+        ]
+        
+        for doc_arg in doc_args:
+            # Add doc normally without use_existing_tensors
+            add_res = tensor_search.add_documents(
+                config=self.config, index_name=self.index_name_1,
+                docs=doc_arg, auto_refresh=True, update_mode='replace')
+
+            d1 = tensor_search.get_documents_by_ids(
+                config=self.config, index_name=self.index_name_1,
+                document_ids=[doc["_id" ]for doc in doc_arg], show_vectors=True)
+
+            # Then replace doc with use_existing_tensors
+            add_res = tensor_search.add_documents(
+                config=self.config, index_name=self.index_name_1,
+                docs=doc_arg, auto_refresh=True, update_mode='replace', use_existing_tensors=True)
+            
+            d2 = tensor_search.get_documents_by_ids(
+                config=self.config, index_name=self.index_name_1,
+                document_ids=[doc["_id" ]for doc in doc_arg], show_vectors=True)
+            
+            self.assertEqual(d1, d2)
