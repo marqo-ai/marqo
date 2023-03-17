@@ -25,7 +25,7 @@ Check out the usage guide [here](https://docs.marqo.ai/0.0.16/API-Reference/sear
 - Improved the Marqo start-up time by incorporating the downloading of the punkt tokenizer into the dockerfile (https://github.com/marqo-ai/marqo/pull/346).
 
 ## Contributor shout-outs
-- Thank you to our 2.4k stargazers.
+- Thank you to our 2.5k stargazers.
 - Thank you to [@ed-muthiah](https://github.com/ed-muthiah) for submitting PR (https://github.com/marqo-ai/marqo/pull/349).
 
 ## Release 0.0.15
