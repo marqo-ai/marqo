@@ -1000,7 +1000,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
                 doc, doc_1, doc_2, doc_3
             ], mappings={"combo_text_image": {"type": "multimodal_combination",
-                                              "weights": {"image_field_1": 0.5, "image_field_2": 0.5, "text_field_1": 0.5, "text_field_2": 0.5}}}, auto_refresh=True)
+                                              "weights": {"image_field_1": 0.2, "image_field_2": -1, "text_field_1": 0.38, "text_field_2": 0}}}, auto_refresh=True)
 
             args_list = [args[0] for args in mock_mean.call_args_list]
 
