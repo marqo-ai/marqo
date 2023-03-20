@@ -35,7 +35,7 @@ def get_default_ann_parameters():
         NsFields.ann_engine: "lucene",
         NsFields.ann_method_parameters: {
             NsFields.hnsw_ef_construction: 128,
-            NsFields.hnsw_m: 24
+            NsFields.hnsw_m: 16
         }
     }
 

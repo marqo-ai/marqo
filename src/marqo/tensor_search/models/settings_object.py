@@ -96,7 +96,7 @@ settings_schema = {
                 NsFields.ann_parameters: {
                     "type": "object",
                     "required": [
-                        # Non required for backwards compatibility
+                        # None required for backwards compatibility
                     ],
                     "properties": {
                         NsFields.ann_method: {
@@ -124,13 +124,13 @@ settings_schema = {
                                 NsFields.hnsw_m: {
                                     "type": "integer",
                                     "examples": [
-                                        24
+                                        16
                                     ]
                                 },
                             },
                             "examples": [{
                                 NsFields.hnsw_ef_construction: 128,
-                                NsFields.hnsw_m: 24
+                                NsFields.hnsw_m: 16
                             }]
                         }
                     },
@@ -139,7 +139,7 @@ settings_schema = {
                         NsFields.ann_metric: "cosinesimil",
                         NsFields.ann_method_parameters: {
                             NsFields.hnsw_ef_construction: 128,
-                            NsFields.hnsw_m: 24
+                            NsFields.hnsw_m: 16
                         }
                     }]
                 }
@@ -161,7 +161,7 @@ settings_schema = {
                     NsFields.ann_metric: "cosinesimil",
                     NsFields.ann_method_parameters: {
                         NsFields.hnsw_ef_construction: 128,
-                        NsFields.hnsw_m: 24
+                        NsFields.hnsw_m: 16
                     }
                 }
             }]
@@ -199,7 +199,7 @@ settings_schema = {
                 NsFields.ann_metric: "cosinesimil",
                 NsFields.ann_method_parameters: {
                     NsFields.hnsw_ef_construction: 128,
-                    NsFields.hnsw_m: 24
+                    NsFields.hnsw_m: 16
                 }
             }
         },
