@@ -222,8 +222,8 @@ To power image and text search, Marqo allows users to plug and play with CLIP mo
 ```python
 
 settings = {
-"treat_urls_and_pointers_as_images":True,   # allows us to find an image file and index it 
-"model":"ViT-L/14"
+    "treat_urls_and_pointers_as_images":True,   # allows us to find an image file and index it 
+    "model":"ViT-L/14"
 }
 response = mq.create_index("my-multimodal-index", **settings)
 
@@ -410,67 +410,6 @@ results = mq.index("my-first-multimodal-index").search(
 )
 print("\nQuery 3:")
 pprint.pprint(results)
-
-```
-
-## Multi modal and cross modal search
-
-To power image and text search, Marqo allows users to plug and play with CLIP models from HuggingFace. **Note that if you do not configure multi modal search, image urls will be treated as strings.** To start indexing and searching with images, first create an index with a CLIP configuration, as below:
-
-```python
-
-settings = {
-  "treat_urls_and_pointers_as_images":True,   # allows us to find an image file and index it 
-  "model":"ViT-L/14"
-}
-response = mq.create_index("my-multimodal-index", **settings)
-
-```
-
-Images can then be added within documents as follows. You can use urls from the internet (for example S3) or from the disk of the machine:
-
-```python
-
-response = mq.index("my-multimodal-index").add_documents([{
-    "My Image": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f2/Portrait_Hippopotamus_in_the_water.jpg/440px-Portrait_Hippopotamus_in_the_water.jpg",
-    "Description": "The hippopotamus, also called the common hippopotamus or river hippopotamus, is a large semiaquatic mammal native to sub-Saharan Africa",
-    "_id": "hippo-facts"
-}])
-
-```
-
- Setting `searchable_attributes` to the image field `['My Image'] ` ensures only images are searched in this index:
-
-```python
-
-results = mq.index("my-multimodal-index").search('animal',  searchable_attributes=['My Image'])
-
-```
-
-
-You can then search using text as usual. Both text and image fields will be searched:
-
-```python
-
-results = mq.index("my-multimodal-index").search('animal')
-
-```
-
-Setting `searchable_attributes` to the image field `['My Image'] ` ensures only images are searched in this index:
-
-```python
-
-results = mq.index("my-multimodal-index").search('animal', searchable_attributes=['My Image'])
-
-```
-
-### Searching using an image
-
-Searching using an image can be achieved by providing the image link.
-
-```python
-
-results = mq.index("my-multimodal-index").search('https://upload.wikimedia.org/wikipedia/commons/thumb/9/96/Standing_Hippopotamus_MET_DP248993.jpg/440px-Standing_Hippopotamus_MET_DP248993.jpg')
 
 ```
 
