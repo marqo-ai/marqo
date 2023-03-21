@@ -138,11 +138,9 @@ class TestAutomaticModelEject(unittest.TestCase):
 
         threads = []
         q = queue.Queue()
-
         t = threading.Thread(target=first_vectorise_call, args=(test_model, test_content, q))
         threads.append(t)
         t.start()
-
         # for i in range(10):
         #     t = threading.Thread(target=proceeding_vectorise_call, args=(test_model, test_content, q))
         #     threads.append(t)
@@ -150,6 +148,6 @@ class TestAutomaticModelEject(unittest.TestCase):
 
         for t in threads:
             t.join()
-
-        print(q.get())
-        assert q.empty()
+        if not q.empty():
+            print(q.get())
+            raise AssertionError
