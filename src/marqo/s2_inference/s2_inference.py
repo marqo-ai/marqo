@@ -96,8 +96,7 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
     """loads the model if it is not already loaded.
     Note this method assume the model_properties are validated.
     """
-    model_size = validated_model_properties.get("model_size", constants.MODEL_TYPE_SIZE_MAPPING.get(
-        validated_model_properties["type"], 1))
+    model_size = get_model_size(model_name, validated_model_properties)
     if model_cache_key not in available_models:
         if lock.locked():
             raise ModelCacheManageError("Request rejected, as this request attempted to update the model cache, while"
