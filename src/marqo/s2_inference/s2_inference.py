@@ -24,7 +24,7 @@ logger = get_logger(__name__)
 # {"model_cache_key_1":{"model" : model_object, "most_recently_used_time": time, "model_size" : model_size}}
 available_models = dict()
 # A lock to protect the model loading process
-
+lock = threading.Lock()
 MODEL_PROPERTIES = load_model_properties()
 
 
@@ -52,8 +52,7 @@ def vectorise(model_name: str, content: Union[str, List[str]], model_properties:
     validated_model_properties = _validate_model_properties(model_name, model_properties)
     model_cache_key = _create_model_cache_key(model_name, device, validated_model_properties)
 
-    lock = threading.Lock()
-    _update_available_models(model_cache_key, model_name, validated_model_properties, device, normalize_embeddings, lock)
+    _update_available_models(model_cache_key, model_name, validated_model_properties, device, normalize_embeddings)
 
     try:
         vectorised = available_models[model_cache_key][AvailableModelsKey.model].encode(content,
@@ -93,7 +92,7 @@ def _create_model_cache_key(model_name: str, device: str, model_properties: dict
 
 def _update_available_models(model_cache_key: str, model_name: str, validated_model_properties: dict,
                              device: str,
-                             normalize_embeddings: bool, lock) -> None:
+                             normalize_embeddings: bool) -> None:
     """loads the model if it is not already loaded.
     Note this method assume the model_properties are validated.
     """
@@ -106,7 +105,7 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
                                         "Please wait for 10 seconds and send the request again.\n"
                                         "If this problem persists, check `https://docs.marqo.ai/0.0.16/` for more info.")
         with lock:
-            validate_model_into_device(model_name, validated_model_properties, device, lock)
+            validate_model_into_device(model_name, validated_model_properties, device)
             try:
                 most_recently_used_time = datetime.datetime.now()
                 available_models[model_cache_key] = {AvailableModelsKey.model: _load_model(model_name,
@@ -162,7 +161,7 @@ def _validate_model_properties(model_name: str, model_properties: dict) -> dict:
     return model_properties
 
 
-def validate_model_into_device(model_name, model_properties, device, lock):
+def validate_model_into_device(model_name, model_properties, device):
     '''
     A function to detect if the device have enough memory to load the target model.
     If not, it will try to eject some models to spare the space.
@@ -174,28 +173,27 @@ def validate_model_into_device(model_name, model_properties, device, lock):
         True we have enough space for the model
         Raise an error and return False if we can't find enough space for the model.
     '''
-    with lock:
-        model_size = get_model_size(model_name, model_properties)
-        if check_memory_threshold_for_model(device, model_size):
-            return True
-        else:
-            model_cache_key_for_device = [key for key in list(available_models) if key.endswith(device)]
-            sorted_key_for_device = sorted(model_cache_key_for_device,
-                                           key=lambda x: available_models[x][
-                                               AvailableModelsKey.most_recently_used_time])
-            for key in sorted_key_for_device:
-                logger.info(
-                    f"Eject model = `{key.split('||')[0]}` with size = `{available_models[key].get('model_size', constants.DEFAULT_MODEL_SIZE)}` from device = `{device}` "
-                    f"to save space for model = `{model_name}`.")
-                del available_models[key]
-                if check_memory_threshold_for_model(device, model_size):
-                    return True
+    model_size = get_model_size(model_name, model_properties)
+    if check_memory_threshold_for_model(device, model_size):
+        return True
+    else:
+        model_cache_key_for_device = [key for key in list(available_models) if key.endswith(device)]
+        sorted_key_for_device = sorted(model_cache_key_for_device,
+                                       key=lambda x: available_models[x][
+                                           AvailableModelsKey.most_recently_used_time])
+        for key in sorted_key_for_device:
+            logger.info(
+                f"Eject model = `{key.split('||')[0]}` with size = `{available_models[key].get('model_size', constants.DEFAULT_MODEL_SIZE)}` from device = `{device}` "
+                f"to save space for model = `{model_name}`.")
+            del available_models[key]
+            if check_memory_threshold_for_model(device, model_size):
+                return True
 
-            if check_memory_threshold_for_model(device, model_size) is False:
-                raise ModelCacheManageError(
-                    f"Marqo CANNOT find enough space to load model = `{model_name}` in device = `{device}`.\n"
-                    f"Marqo tried to eject all the models on this device = `{device}` but still can't find enough space. \n"
-                    f"Please use a smaller model or increase the memory threshold.")
+        if check_memory_threshold_for_model(device, model_size) is False:
+            raise ModelCacheManageError(
+                f"Marqo CANNOT find enough space to load model = `{model_name}` in device = `{device}`.\n"
+                f"Marqo tried to eject all the models on this device = `{device}` but still can't find enough space. \n"
+                f"Please use a smaller model or increase the memory threshold.")
 
 
 def check_memory_threshold_for_model(device: str, model_size: Union[float, int]) -> bool:

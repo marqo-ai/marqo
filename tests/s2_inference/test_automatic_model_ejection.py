@@ -22,7 +22,8 @@ def proceeding_vectorise_call(test_model, test_content, q):
         _ = vectorise(model_name=test_model, content=test_content)
         q.put(AssertionError)
     except ModelCacheManageError as e:
-        assert "Request rejected, as this request attempted to update the model cache" in e.message
+        if  "Request rejected, as this request attempted to update the model cache" not in e.message:
+            q.put(AssertionError)
         pass
 
 
@@ -141,13 +142,12 @@ class TestAutomaticModelEject(unittest.TestCase):
         t = threading.Thread(target=first_vectorise_call, args=(test_model, test_content, q))
         threads.append(t)
         t.start()
-        # for i in range(10):
-        #     t = threading.Thread(target=proceeding_vectorise_call, args=(test_model, test_content, q))
-        #     threads.append(t)
-        #     t.start()
+        for i in range(3):
+            t = threading.Thread(target=proceeding_vectorise_call, args=(test_model, test_content, q))
+            threads.append(t)
+            t.start()
 
         for t in threads:
             t.join()
-        if not q.empty():
-            print(q.get())
-            raise AssertionError
+
+        assert q.empty()
