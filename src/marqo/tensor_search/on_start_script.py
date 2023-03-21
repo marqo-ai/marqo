@@ -1,4 +1,6 @@
 import json
+import os
+from marqo.tensor_search import enums
 from marqo.tensor_search.tensor_search_logging import get_logger
 import time
 from marqo.tensor_search.enums import EnvVars
@@ -11,6 +13,7 @@ from marqo import errors
 from marqo.tensor_search.throttling.redis_throttle import throttle
 from marqo.connections import redis_driver
 
+
 def on_start(marqo_os_url: str):
         
     to_run_on_start = (
@@ -19,10 +22,9 @@ def on_start(marqo_os_url: str):
                         CUDAAvailable(), 
                         ModelsForCacheing(), 
                         InitializeRedis("localhost", 6379),    # TODO, have these variable
-                        NLTK(), 
                         DownloadFinishText(),
                         MarqoWelcome(),
-                        MarqoPhrase()
+                        MarqoPhrase(),
                         )
 
     for thing_to_start in to_run_on_start:
@@ -92,28 +94,6 @@ class CUDAAvailable:
         for device_id in device_ids:
             device_names.append( {'id':device_id, 'name':id_to_device(device_id)})
         self.logger.info(f"found devices {device_names}")
-
-
-class NLTK:
-    """Pre-downloads the nltk stuff
-    """
-
-    logger = get_logger('NLTK setup')
-
-    def __init__(self):
-
-        pass 
-
-    def run(self):
-        self.logger.info("downloading nltk data....")
-        import nltk
-
-        try:
-            nltk.data.find('tokenizers/punkt')
-        except LookupError:
-            nltk.download('punkt')        
-        self.logger.info("completed loading nltk")
-
 
 class ModelsForCacheing:
     """warms the in-memory model cache by preloading good defaults

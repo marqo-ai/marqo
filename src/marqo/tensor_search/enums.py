@@ -54,6 +54,7 @@ class IndexSettingsField:
     patch_method = "patch_method"
 
     number_of_shards = "number_of_shards"
+    number_of_replicas = "number_of_replicas"
 
 
 class SplitMethod:
@@ -88,6 +89,7 @@ class EnvVars:
     MARQO_THREAD_EXPIRY_TIME = "MARQO_THREAD_EXPIRY_TIME"
     MARQO_ENABLE_THROTTLING = "MARQO_ENABLE_THROTTLING"
     MARQO_LOG_LEVEL = "MARQO_LOG_LEVEL"
+    MARQO_ROOT_PATH = "MARQO_ROOT_PATH"
     MARQO_MAX_CPU_MODEL_MEMORY = "MARQO_MAX_CPU_MODEL_MEMORY"
     MARQO_MAX_CUDA_MODEL_MEMORY = "MARQO_MAX_CUDA_MODEL_MEMORY"
 

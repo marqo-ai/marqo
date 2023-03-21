@@ -2,7 +2,9 @@ import os
 import typing
 import functools
 import json
+from timeit import default_timer as timer
 import torch
+
 from marqo import errors
 from marqo.tensor_search import enums, configs
 from typing import (
@@ -10,6 +12,7 @@ from typing import (
 )
 import copy
 import datetime
+import pathlib
 
 
 def dicts_to_jsonl(dicts: List[dict]) -> str:
@@ -86,7 +89,7 @@ def construct_authorized_url(url_base: str, username: str, password: str) -> str
     return f"{http_part}{http_sep}{username}:{password}@{domain_part}"
 
 
-def contextualise_filter(filter_string: str, simple_properties: typing.Iterable) -> str:
+def contextualise_filter(filter_string: Optional[str], simple_properties: typing.Iterable) -> str:
     """adds the chunk prefix to the start of properties found in simple string
 
     This allows for filtering within chunks.
@@ -99,6 +102,8 @@ def contextualise_filter(filter_string: str, simple_properties: typing.Iterable)
     Returns:
         a string where the properties are referenced as children of a chunk.
     """
+    if filter_string is None:
+        return ''
     contextualised_filter = filter_string
     for field in simple_properties:
         if ' ' in field:
@@ -254,3 +259,54 @@ def parse_lexical_query(text: str) -> Tuple[List[str], str]:
     optional_blob = optional_blob.replace('\\"', '"')
 
     return (required_terms, optional_blob)
+
+
+def get_marqo_root_from_env() -> str:
+    """Returns absolute path to Marqo root, first checking the env var.
+
+    If it isn't found, it creates the env var and returns it.
+
+    Returns:
+        str that doesn't end in a forward in forward slash.
+        for example: "/Users/CoolUser/marqo/src/marqo"
+    """
+    try:
+        marqo_root_path = os.environ[enums.EnvVars.MARQO_ROOT_PATH]
+        if marqo_root_path:
+            return marqo_root_path
+    except KeyError:
+        pass
+    mq_root = _get_marqo_root()
+    os.environ[enums.EnvVars.MARQO_ROOT_PATH] = mq_root
+    return mq_root
+
+
+def _get_marqo_root() -> str:
+    """returns absolute path to Marqo root
+
+    Searches for the Marqo by examining its own file path.
+
+    Returns:
+        str that doesn't end in a forwad in forward slash.
+        for example: "/Users/CoolUser/marqo/src/marqo"
+    """
+    # tensor_search/ is the parent dir of this file
+    tensor_search_dir = pathlib.Path(__file__).parent
+    # marqo is the parent of the tensor_search_dir
+    marqo_base_dir = tensor_search_dir.parent.resolve()
+    return str(marqo_base_dir)
+
+def add_timing(f, key: str = "processingTimeMs"):
+    """ Function decorator to add function timing to response payload.
+
+    Decorator for functions that adds the processing time to the return Dict (NOTE: must return value of function must
+    be a dictionary). `key` param denotes what the processing time will be stored against.
+    """
+    @functools.wraps(f)
+    def wrap(*args, **kw):
+        t0 = timer()
+        r = f(*args, **kw)
+        time_taken = timer() - t0
+        r[key] = round(time_taken * 1000)
+        return r
+    return wrap
