@@ -8,7 +8,7 @@ from marqo.s2_inference import s2_inference
 import threading, queue
 
 
-def first_vectorise_call(test_model, test_content, q):
+def normal_vectorise_call(test_model, test_content, q):
     # Function used to threading test
     try:
         _ = vectorise(model_name=test_model, content=test_content)
@@ -16,7 +16,7 @@ def first_vectorise_call(test_model, test_content, q):
         q.put(e)
 
 
-def proceeding_vectorise_call(test_model, test_content, q):
+def racing_vectorise_call(test_model, test_content, q):
     # Function used to threading test
     try:
         _ = vectorise(model_name=test_model, content=test_content)
@@ -132,18 +132,41 @@ class TestAutomaticModelEject(unittest.TestCase):
         for model in list_of_models:
             _ = vectorise(model_name=model, content=content, device="cpu")
 
-    def test_concurrenty_vectorise_call(self):
+    def test_concurrent_vectorise_call_no_cache(self):
+        # To test error is thrown if multiple threads want to load the model
         clear_loaded_models()
         test_content = "this is a test"
         test_model = "ViT-B/32"
 
         threads = []
         q = queue.Queue()
-        t = threading.Thread(target=first_vectorise_call, args=(test_model, test_content, q))
+        t = threading.Thread(target=normal_vectorise_call, args=(test_model, test_content, q))
         threads.append(t)
         t.start()
         for i in range(3):
-            t = threading.Thread(target=proceeding_vectorise_call, args=(test_model, test_content, q))
+            t = threading.Thread(target=racing_vectorise_call, args=(test_model, test_content, q))
+            threads.append(t)
+            t.start()
+
+        for t in threads:
+            t.join()
+
+        assert q.empty()
+
+    def test_concurrent_vectorise_call_cached(self):
+        # To test error is thrown if multiple threads want to load the model
+        clear_loaded_models()
+        test_content = "this is a test"
+        test_model = "ViT-B/32"
+
+        threads = []
+        q = queue.Queue()
+        t = threading.Thread(target=normal_vectorise_call, args=(test_model, test_content, q))
+        t.start()
+        t.join() # model is loaded into cache
+
+        for i in range(3):
+            t = threading.Thread(target=normal_vectorise_call, args=(test_model, test_content, q))
             threads.append(t)
             t.start()
 

@@ -214,7 +214,7 @@ class TestEncoding(unittest.TestCase):
 
         for name in names:
             model_properties = get_model_properties_from_registry(name)
-            model = AvailableModels._load_model(model_properties['name'], model_properties=model_properties, device=device)
+            model = _load_model(model_properties['name'], model_properties=model_properties, device=device)
 
             for sentence in sentences:
                 output_v = vectorise(name, sentence, model_properties, device, normalize_embeddings=True)
