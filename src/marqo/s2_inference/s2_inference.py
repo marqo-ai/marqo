@@ -23,6 +23,7 @@ logger = get_logger(__name__)
 # The avaiable has the structure:
 # {"model_cache_key_1":{"model" : model_object, "most_recently_used_time": time, "model_size" : model_size}}
 available_models = dict()
+# A lock to protect the model loading process
 
 MODEL_PROPERTIES = load_model_properties()
 lock = threading.Lock()
@@ -51,14 +52,7 @@ def vectorise(model_name: str, content: Union[str, List[str]], model_properties:
 
     validated_model_properties = _validate_model_properties(model_name, model_properties)
     model_cache_key = _create_model_cache_key(model_name, device, validated_model_properties)
-
-    if lock.locked():
-        raise ModelCacheManageError("Request rejected, as this request attempted to update the model cache, while"
-                                    "another request was updating the model cache at the same time.\n"
-                                    "Please wait for 10 seconds and send the request again.\n"
-                                    "If this problem persists, check `https://docs.marqo.ai/0.0.16/` for more info.")
-    with lock.locked():
-        _update_available_models(model_cache_key, model_name, validated_model_properties, device, normalize_embeddings)
+    _update_available_models(model_cache_key, model_name, validated_model_properties, device, normalize_embeddings)
 
     try:
         vectorised = available_models[model_cache_key][AvailableModelsKey.model].encode(content,
@@ -105,22 +99,28 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
     model_size = validated_model_properties.get("model_size", constants.MODEL_TYPE_SIZE_MAPPING.get(
         validated_model_properties["type"], 1))
     if model_cache_key not in available_models:
-        validate_model_into_device(model_name, validated_model_properties, device)
-        try:
-            most_recently_used_time = datetime.datetime.now()
-            available_models[model_cache_key] = {AvailableModelsKey.model: _load_model(model_name,
-                                                                                       validated_model_properties,
-                                                                                       device=device),
-                                                 AvailableModelsKey.most_recently_used_time: most_recently_used_time,
-                                                 AvailableModelsKey.model_size: model_size}
-            logger.info(
-                f'loaded {model_name} on device {device} with normalization={normalize_embeddings} at time={most_recently_used_time}.')
-        except:
-            raise ModelLoadError(
-                f"Unable to load model={model_name} on device={device} with normalization={normalize_embeddings}. "
-                f"If you are trying to load a custom model, "
-                f"please check that model_properties={validated_model_properties} is correct "
-                f"and the model has valid access permission. ")
+        if lock.locked():
+            raise ModelCacheManageError("Request rejected, as this request attempted to update the model cache, while"
+                                        "another request was updating the model cache at the same time.\n"
+                                        "Please wait for 10 seconds and send the request again.\n"
+                                        "If this problem persists, check `https://docs.marqo.ai/0.0.16/` for more info.")
+        with lock:
+            validate_model_into_device(model_name, validated_model_properties, device)
+            try:
+                most_recently_used_time = datetime.datetime.now()
+                available_models[model_cache_key] = {AvailableModelsKey.model: _load_model(model_name,
+                                                                                           validated_model_properties,
+                                                                                           device=device),
+                                                     AvailableModelsKey.most_recently_used_time: most_recently_used_time,
+                                                     AvailableModelsKey.model_size: model_size}
+                logger.info(
+                    f'loaded {model_name} on device {device} with normalization={normalize_embeddings} at time={most_recently_used_time}.')
+            except:
+                raise ModelLoadError(
+                    f"Unable to load model={model_name} on device={device} with normalization={normalize_embeddings}. "
+                    f"If you are trying to load a custom model, "
+                    f"please check that model_properties={validated_model_properties} is correct "
+                    f"and the model has valid access permission. ")
     else:
         most_recently_used_time = datetime.datetime.now()
         logger.debug(f'renew {model_name} on device {device} with new time={most_recently_used_time}.')
@@ -207,6 +207,7 @@ def check_memory_threshold_for_model(device: str, model_size: Union[float, int])
         True if we have enough space
         False if we don't have enough space
     '''
+    #with lock:
     if device.startswith("cuda"):
         torch.cuda.synchronize(device)
         used_memory = torch.cuda.memory_allocated(device) / 1024 ** 3
