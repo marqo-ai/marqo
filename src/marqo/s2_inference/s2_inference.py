@@ -162,6 +162,7 @@ def _validate_model_properties(model_name: str, model_properties: dict) -> dict:
 
 def validate_model_into_device(model_name, model_properties, device):
     '''
+    Note: this function should only be called by `_update_available_models` for threading safeness.
     A function to detect if the device have enough memory to load the target model.
     If not, it will try to eject some models to spare the space.
     Args:
@@ -197,6 +198,7 @@ def validate_model_into_device(model_name, model_properties, device):
 
 def check_memory_threshold_for_model(device: str, model_size: Union[float, int]) -> bool:
     '''
+    Note: this function should only be called by `_update_available_models` for threading safeness.
     Check the memory usage in the target device and decide whether we can add a new model
     Args:
         device: the target device to check
@@ -228,7 +230,7 @@ def check_memory_threshold_for_model(device: str, model_size: Union[float, int])
 def get_model_size(model_name: str, model_properties: dict) -> (int, float):
     '''
     Return the model size for given model
-    Note that the priorities are size_in_properties -> model_name -> model_type
+    Note that the priorities are size_in_properties -> model_name -> model_type -> default size
     '''
     if "model_size" in model_properties:
         return model_properties["model_size"]
