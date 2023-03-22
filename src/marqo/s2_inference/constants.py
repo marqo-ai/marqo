@@ -22,6 +22,6 @@ MODEL_NAME_SIZE_MAPPING = {
 # Set this to be a special number so we can tell the model size is from default
 DEFAULT_MODEL_SIZE = 0.66
 
-MARQO_MAX_CPU_MODEL_MEMORY = read_env_vars_and_defaults('MARQO_MAX_CPU_MODEL_MEMORY')
-MARQO_MAX_CUDA_MODEL_MEMORY = read_env_vars_and_defaults('MARQO_MAX_CUDA_MODEL_MEMORY')
+MARQO_MAX_CPU_MODEL_MEMORY = float(read_env_vars_and_defaults('MARQO_MAX_CPU_MODEL_MEMORY'))
+MARQO_MAX_CUDA_MODEL_MEMORY = float(read_env_vars_and_defaults('MARQO_MAX_CUDA_MODEL_MEMORY'))
 
