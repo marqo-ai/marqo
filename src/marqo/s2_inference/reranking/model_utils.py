@@ -253,7 +253,7 @@ def load_sbert_cross_encoder_model(model_name: str, device: str = 'cpu', max_len
     model_cache_key = _create_model_cache_key(model_name, device)
 
     if model_cache_key in available_models:
-        model = available_models[model_cache_key]["model"]
+        model = available_models[model_cache_key][AvailableModelsKey.model]
     else:
         logger.info(f"loading {model_name} on device {device} and adding to cache...")
         if model_name == '_testing':
@@ -290,7 +290,7 @@ def load_hf_cross_encoder_model(model_name: str, device: str = 'cpu') -> Dict:
     model_cache_key = _create_model_cache_key(model_name, device)
 
     if model_cache_key in available_models:
-        model, tokenizer = available_models[model_cache_key]["model"]
+        model, tokenizer = available_models[model_cache_key][AvailableModelsKey.model]
     else:
         logger.info(f"loading {model_name} on device {device} and adding to cache...")    
         model = AutoModelForSequenceClassification.from_pretrained(model_name).to(device)
@@ -316,7 +316,7 @@ def load_owl_vit(model_name: str, device: str = 'cpu') -> Dict:
 
     if model_cache_key in available_models:
         logger.info(f"loading {model_cache_key} from cache...")
-        model, processor = available_models[model_cache_key]["model"]
+        model, processor = available_models[model_cache_key][AvailableModelsKey.model]
     else:
         processor = OwlViTProcessor.from_pretrained(model_name)
         model = OwlViTForObjectDetection.from_pretrained(model_name).to(device)

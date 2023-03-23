@@ -2,7 +2,7 @@
 The functions defined here would have endpoints, later on.
 """
 import numpy as np
-from marqo.errors import ModelCacheManageError
+from marqo.errors import ModelCacheManagementError
 from marqo.s2_inference.errors import VectoriseError, InvalidModelPropertiesError, ModelLoadError, UnknownModelError, \
     ModelNotInCacheError
 from PIL import UnidentifiedImageError
@@ -99,7 +99,7 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
     model_size = get_model_size(model_name, validated_model_properties)
     if model_cache_key not in available_models:
         if lock.locked():
-            raise ModelCacheManageError("Request rejected, as this request attempted to update the model cache, while"
+            raise ModelCacheManagementError("Request rejected, as this request attempted to update the model cache, while"
                                         "another request was updating the model cache at the same time.\n"
                                         "Please wait for 10 seconds and send the request again.\n"
                                         "If this problem persists, check `https://docs.marqo.ai/0.0.17/` for more info.")
@@ -110,7 +110,8 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
                 most_recently_used_time = datetime.datetime.now()
                 available_models[model_cache_key] = {AvailableModelsKey.model: _load_model(model_name,
                                                                                            validated_model_properties,
-                                                                                           device=device),
+                                                                                           device=device,
+                                                                                           calling_func = _update_available_models.__name__),
                                                      AvailableModelsKey.most_recently_used_time: most_recently_used_time,
                                                      AvailableModelsKey.model_size: model_size}
                 logger.info(
@@ -196,7 +197,7 @@ def _validate_model_into_device(model_name:str, model_properties: dict, device: 
                 return True
 
         if _check_memory_threshold_for_model(device, model_size, calling_func = _validate_model_into_device.__name__) is False:
-            raise ModelCacheManageError(
+            raise ModelCacheManagementError(
                 f"Marqo CANNOT find enough space to load model = `{model_name}` in device = `{device}`.\n"
                 f"Marqo tried to eject all the models on this device = `{device}` but still can't find enough space. \n"
                 f"Please use a smaller model or increase the memory threshold.")
@@ -227,11 +228,11 @@ def _check_memory_threshold_for_model(device: str, model_size: Union[float, int]
                            available_models.items() if key.endswith("cpu")])
         threshold = float(read_env_vars_and_defaults(EnvVars.MARQO_MAX_CPU_MODEL_MEMORY))
     else:
-        raise ModelCacheManageError(
+        raise ModelCacheManagementError(
             f"Unable to check the device cache for device=`{device}`. The model loading will proceed"
             f"without device cache check. This might break down Marqo if too many models are loaded.")
     if model_size > threshold:
-        raise ModelCacheManageError(
+        raise ModelCacheManagementError(
             f"You are trying to load a model with size = `{model_size}` into device = `{device}`, which is larger than the device threshlod = `{threshold}`."
             f"We CANNOT find enough space for the model. Please change the threshold by setting the environment variables.\n"
             f"You can check the detailed information at `https://docs.marqo.ai/0.0.17/Advanced-Usage/configuration/`.")
@@ -251,11 +252,11 @@ def get_model_size(model_name: str, model_properties: dict) -> (int, float):
         if name in name_info:
             return size
 
-    type = model_properties["type"]
+    type = model_properties.get("type", None)
     return constants.MODEL_TYPE_SIZE_MAPPING.get(type, constants.DEFAULT_MODEL_SIZE)
 
 
-def _load_model(model_name: str, model_properties: dict, device: Optional[str] = None) -> Any:
+def _load_model(model_name: str, model_properties: dict, device: Optional[str] = None, calling_func: str = None) -> Any:
     """_summary_
 
     Args:
@@ -266,8 +267,11 @@ def _load_model(model_name: str, model_properties: dict, device: Optional[str] =
     Returns:
         Any: _description_
     """
+    if calling_func not in ["unit_test", "_update_available_models"]:
+        raise RuntimeError(f"The function `{_load_model.__name__}` should only be called by "
+                           f"`unit_test` or `_update_available_models` for threading safeness.")
+
     print(f"loading for: model_name={model_name} and properties={model_properties}")
-    from marqo.s2_inference.s2_inference import _get_model_loader, get_default_seq_length, get_default_device
     if device is None: device = get_default_device()
     loader = _get_model_loader(model_properties['name'], model_properties)
 

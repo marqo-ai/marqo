@@ -1,7 +1,7 @@
 import unittest
 import unittest.mock
 from unittest.mock import patch
-from marqo.errors import ModelCacheManageError
+from marqo.errors import ModelCacheManagementError
 from marqo.tensor_search import tensor_search
 from marqo.s2_inference.s2_inference import clear_loaded_models, vectorise, _validate_model_properties, \
     _validate_model_into_device, _check_memory_threshold_for_model
@@ -22,7 +22,7 @@ def racing_vectorise_call(test_model, test_content, q):
     try:
         _ = vectorise(model_name=test_model, content=test_content)
         q.put(AssertionError)
-    except ModelCacheManageError as e:
+    except ModelCacheManagementError as e:
         if  "Request rejected, as this request attempted to update the model cache" not in e.message:
             q.put(AssertionError)
         pass
@@ -32,9 +32,9 @@ class TestAutomaticModelEject(unittest.TestCase):
     def setUp(self) -> None:
         clear_loaded_models()
 
-        self.inde_name = "test_index"
+        self.index_name = "test_index"
         try:
-            tensor_search.delete_index(config=self.config, index_name=self.inde_name)
+            tensor_search.delete_index(config=self.config, index_name=self.index_name)
         except Exception:
             pass
 
@@ -78,7 +78,7 @@ class TestAutomaticModelEject(unittest.TestCase):
             try:
                 _ = vectorise(model_name=model, content='this is a huge model', device="cpu")
                 raise AssertionError
-            except ModelCacheManageError as e:
+            except ModelCacheManagementError as e:
                 assert "CANNOT find enough space" in e.message
 
     def test_get_model_size(self):

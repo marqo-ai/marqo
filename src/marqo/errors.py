@@ -110,8 +110,8 @@ class IndexAlreadyExistsError(__InvalidRequestError):
     code = "index_already_exists"
     status_code = HTTPStatus.CONFLICT
 
-class ModelCacheManageError(__InvalidRequestError):
-    code = "model_cache_manage_error"
+class ModelCacheManagementError(__InvalidRequestError):
+    code = "model_cache_management_error"
     status_code = HTTPStatus.CONFLICT
 
 class IndexNotFoundError(__InvalidRequestError):

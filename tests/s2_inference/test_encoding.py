@@ -6,13 +6,13 @@ from marqo.s2_inference.types import FloatTensor
 from marqo.s2_inference.s2_inference import clear_loaded_models, get_model_properties_from_registry
 from marqo.s2_inference.model_registry import load_model_properties, _get_open_clip_properties
 import numpy as np
-
+import functools
 from marqo.s2_inference.s2_inference import (
     _check_output_type, vectorise,
-    _convert_vectorized_output, _load_model
+    _convert_vectorized_output,
 )
-
-
+from marqo.s2_inference.s2_inference import _load_model as og_load_model
+_load_model = functools.partial(og_load_model, calling_func = "unit_test")
 
 class TestEncoding(unittest.TestCase):
 

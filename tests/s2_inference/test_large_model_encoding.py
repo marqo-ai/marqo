@@ -9,10 +9,12 @@ from marqo.s2_inference.model_registry import load_model_properties, _get_open_c
 import numpy as np
 
 from marqo.s2_inference.s2_inference import (
-    _load_model,
     _check_output_type, vectorise,
     _convert_vectorized_output,
 )
+import functools
+from marqo.s2_inference.s2_inference import _load_model as og_load_model
+_load_model = functools.partial(og_load_model, calling_func = "unit_test")
 
 
 

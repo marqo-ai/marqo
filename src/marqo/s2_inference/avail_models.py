@@ -2,7 +2,7 @@
 # from marqo.tensor_search.enums import AvailableModelsKey
 # from marqo.s2_inference.logger import get_logger
 # from marqo.s2_inference.types import *
-# from marqo.errors import ModelCacheManageError
+# from marqo.errors import ModelCacheManagementError
 # from marqo.tensor_search.utils import read_env_vars_and_defaults
 # from marqo.tensor_search.configs import EnvVars
 # import torch
@@ -33,7 +33,7 @@
 #
 #         if lock.locked():
 #             from marqo.s2_inference.s2_inference import available_models
-#             raise ModelCacheManageError("Request rejected, as this request attempted to update the model cache, while"
+#             raise ModelCacheManagementError("Request rejected, as this request attempted to update the model cache, while"
 #                                         "another request was updating the model cache at the same time.\n"
 #                                         "Please wait for 10 seconds and send the request again.\n"
 #                                         "If this problem persists, check `https://docs.marqo.ai/0.0.16/` for more info.")
@@ -57,7 +57,7 @@
 #                         return True
 #
 #                 if self.check_memory_threshold_for_model(device, model_size) is False:
-#                     raise ModelCacheManageError(
+#                     raise ModelCacheManagementError(
 #                         f"Marqo CANNOT find enough space to load model = `{model_name}` in device = `{device}`.\n"
 #                         f"Marqo tried to eject all the models on this device = `{device}` but still can't find enough space. \n"
 #                         f"Please use a smaller model or increase the memory threshold.")
@@ -83,11 +83,11 @@
 #                                available_models.items() if key.endswith("cpu")])
 #             threshold = read_env_vars_and_defaults(EnvVars.MARQO_MAX_CPU_MODEL_MEMORY)
 #         else:
-#             raise ModelCacheManageError(
+#             raise ModelCacheManagementError(
 #                 f"Unable to check the device cache for device=`{device}`. The model loading will proceed"
 #                 f"without device cache check. This might break down Marqo if too many models are loaded.")
 #         if model_size > threshold:
-#             raise ModelCacheManageError(
+#             raise ModelCacheManagementError(
 #                 f"You are trying to load a model with size = `{model_size}` into device = `{device}`, which is larger than the device threshlod = `{threshold}`."
 #                 f"We CANNOT find enough space for the model. Please change the threshold by setting the environment variables.\n"
 #                 f"You can check the detailed information at `https://docs.marqo.ai/0.0.16/Advanced-Usage/configuration/`.")
@@ -124,7 +124,7 @@
 #         """
 #         if lock.locked():
 #             from marqo.s2_inference.s2_inference import available_models
-#             raise ModelCacheManageError("Request rejected, as this request attempted to update the model cache, while"
+#             raise ModelCacheManagementError("Request rejected, as this request attempted to update the model cache, while"
 #                                         "another request was updating the model cache at the same time.\n"
 #                                         "Please wait for 10 seconds and send the request again.\n"
 #                                         "If this problem persists, check `https://docs.marqo.ai/0.0.16/` for more info.")

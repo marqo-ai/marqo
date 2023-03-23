@@ -215,7 +215,7 @@ class PatchifyModel:
                                                  AvailableModelsKey.most_recently_used_time : datetime.datetime.now()}
 
         else:
-            self.model, self.preprocess = available_models[model_cache_key]["model"]
+            self.model, self.preprocess = available_models[model_cache_key][AvailableModelsKey.model]
 
     def _load_image(self, image):
         self.image, self.image_pt, self.original_size = load_rcnn_image(image, size=self.size)
