@@ -5,6 +5,8 @@ import threading
 import time
 import unittest
 import requests
+
+import marqo.tensor_search.validation
 from marqo.tensor_search.models.index_info import IndexInfo
 from marqo.tensor_search.models import index_info
 from marqo.tensor_search import tensor_search
@@ -577,3 +579,78 @@ class TestIndexMetaCache(MarqoTestCase):
             return True
         assert run()
 
+    def test_add_documents_to_unknown_index(self):
+        """This happens when: halfway through the add_documents process, another thread deletes the index.
+        When the add_documents process completes, it attempts to update mappings, but when it tries to get
+        the existing info, it is no longer there.
+        """
+        # we need to rename this prevent infinite recursion inside mock_validate_doc
+        from marqo.tensor_search.validation import validate_doc as og_validate_doc
+
+        def mock_validate_doc(*args, **kwargs):
+            # we want to slow this down slightly, so that the other thread can manipulate the index meta cache
+            # validate_doc is between the initial get_index call and
+            time.sleep(0.1)
+            return og_validate_doc(*args, **kwargs)
+
+        def clear_cache():
+            """This will sleep briefly, allowing add_dcuments to start. When it runs it should be between
+            both index_info calls.
+            """
+            time.sleep(0.1)
+            index_meta_cache.empty_cache()
+
+        @mock.patch("marqo.tensor_search.validation.validate_doc", mock_validate_doc)
+        def run():
+            tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1,
+                                              index_settings={"index_defaults": {"model": "random"}})
+            clear_cache_thread = threading.Thread(target=clear_cache)
+            clear_cache_thread.start()
+            tensor_search.add_documents(**{
+                "config": self.config, "index_name": self.index_name_1, "auto_refresh": True,
+                "docs": [
+                    {"Title": "Blah"}, {"Title": "blah2"}, {"Title": "Blah3"}, {"Title": "Blah4"},
+                ]
+            })
+            return True
+        assert run()
+
+    def test_add_documents_to_non_existent_index(self):
+        """Same as test_add_documents_to_unknown_index but the other thread deletes the index.
+        Instead of a 500 error, it should be an "index not found" error
+        """
+        # we need to rename this prevent infinite recursion inside mock_validate_doc
+        from marqo.tensor_search.validation import validate_doc as og_validate_doc
+
+        def mock_validate_doc(*args, **kwargs):
+            # we want to slow this down slightly, so that the other thread can manipulate the index meta cache
+            # validate_doc is between the initial get_index call and
+            time.sleep(0.1)
+            return og_validate_doc(*args, **kwargs)
+
+        def delete_index():
+            """This will sleep briefly, allowing add_documents to start. When it runs it should be between
+            both index_info calls.
+            """
+            time.sleep(0.1)
+            tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+
+        @mock.patch("marqo.tensor_search.validation.validate_doc", mock_validate_doc)
+        def run():
+            tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1,
+                                              index_settings={"index_defaults": {"model": "random"}})
+            clear_cache_thread = threading.Thread(target=delete_index)
+            clear_cache_thread.start()
+            try:
+                tensor_search.add_documents(**{
+                    "config": self.config, "index_name": self.index_name_1, "auto_refresh": True,
+                    "docs": [
+                        {"Title": "Blah"}, {"Title": "blah2"}, {"Title": "Blah3"}, {"Title": "Blah4"},
+                    ]
+                })
+                raise AssertionError
+            except errors.IndexNotFoundError:
+                pass
+            return True
+
+        assert run()
