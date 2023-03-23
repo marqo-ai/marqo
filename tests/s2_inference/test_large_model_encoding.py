@@ -17,7 +17,6 @@ from marqo.s2_inference.s2_inference import _load_model as og_load_model
 _load_model = functools.partial(og_load_model, calling_func = "unit_test")
 
 
-
 @pytest.mark.largemodel
 @pytest.mark.skipif(torch.cuda.is_available() is False, reason="We skip the large model test if we don't have cuda support")
 class TestLargeModelEncoding(unittest.TestCase):
