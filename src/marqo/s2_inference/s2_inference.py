@@ -102,7 +102,7 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
             raise ModelCacheManageError("Request rejected, as this request attempted to update the model cache, while"
                                         "another request was updating the model cache at the same time.\n"
                                         "Please wait for 10 seconds and send the request again.\n"
-                                        "If this problem persists, check `https://docs.marqo.ai/0.0.16/` for more info.")
+                                        "If this problem persists, check `https://docs.marqo.ai/0.0.17/` for more info.")
         with lock:
             validate_model_into_device(model_name, validated_model_properties, device)
             try:
@@ -163,6 +163,7 @@ def _validate_model_properties(model_name: str, model_properties: dict) -> dict:
 def validate_model_into_device(model_name, model_properties, device):
     '''
     Note: this function should only be called by `_update_available_models` for threading safeness.
+
     A function to detect if the device have enough memory to load the target model.
     If not, it will try to eject some models to spare the space.
     Args:
@@ -199,6 +200,7 @@ def validate_model_into_device(model_name, model_properties, device):
 def check_memory_threshold_for_model(device: str, model_size: Union[float, int]) -> bool:
     '''
     Note: this function should only be called by `_update_available_models` for threading safeness.
+
     Check the memory usage in the target device and decide whether we can add a new model
     Args:
         device: the target device to check
@@ -223,7 +225,7 @@ def check_memory_threshold_for_model(device: str, model_size: Union[float, int])
         raise ModelCacheManageError(
             f"You are trying to load a model with size = `{model_size}` into device = `{device}`, which is larger than the device threshlod = `{threshold}`."
             f"We CANNOT find enough space for the model. Please change the threshold by setting the environment variables.\n"
-            f"You can check the detailed information at `https://docs.marqo.ai/0.0.16/Advanced-Usage/configuration/`.")
+            f"You can check the detailed information at `https://docs.marqo.ai/0.0.17/Advanced-Usage/configuration/`.")
     return used_memory + model_size < threshold
 
 
