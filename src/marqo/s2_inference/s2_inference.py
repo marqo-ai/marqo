@@ -192,10 +192,10 @@ def _validate_model_into_device(model_name:str, model_properties: dict, device: 
                 f"Eject model = `{key.split('||')[0]}` with size = `{available_models[key].get('model_size', constants.DEFAULT_MODEL_SIZE)}` from device = `{device}` "
                 f"to save space for model = `{model_name}`.")
             del available_models[key]
-            if _check_memory_threshold_for_model(device, model_size):
+            if _check_memory_threshold_for_model(device, model_size, calling_func = _validate_model_into_device.__name__):
                 return True
 
-        if _check_memory_threshold_for_model(device, model_size) is False:
+        if _check_memory_threshold_for_model(device, model_size, calling_func = _validate_model_into_device.__name__) is False:
             raise ModelCacheManageError(
                 f"Marqo CANNOT find enough space to load model = `{model_name}` in device = `{device}`.\n"
                 f"Marqo tried to eject all the models on this device = `{device}` but still can't find enough space. \n"
