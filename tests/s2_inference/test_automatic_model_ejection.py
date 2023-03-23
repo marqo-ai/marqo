@@ -3,7 +3,8 @@ import unittest.mock
 from unittest.mock import patch
 from marqo.errors import ModelCacheManageError
 from marqo.tensor_search import tensor_search
-from marqo.s2_inference.s2_inference import clear_loaded_models, vectorise, _validate_model_properties
+from marqo.s2_inference.s2_inference import clear_loaded_models, vectorise, _validate_model_properties, \
+    _validate_model_into_device, _check_memory_threshold_for_model
 from marqo.s2_inference import s2_inference
 import threading, queue
 
@@ -44,7 +45,7 @@ class TestAutomaticModelEject(unittest.TestCase):
                                 'open_clip/ViT-B-16/laion2b_s34b_b88k']
         content = "Try to kill the cpu"
 
-        with unittest.mock.patch('marqo.s2_inference.s2_inference.validate_model_into_device') as mock_method:
+        with unittest.mock.patch('marqo.s2_inference.s2_inference._validate_model_into_device') as mock_method:
             for model in small_list_of_models:
                 _ = vectorise(model_name=model, content=content, device="cpu")
 
@@ -61,7 +62,7 @@ class TestAutomaticModelEject(unittest.TestCase):
 
         content = "Try to kill the cpu"
 
-        with unittest.mock.patch('marqo.s2_inference.s2_inference.check_memory_threshold_for_model') as mock_method:
+        with unittest.mock.patch('marqo.s2_inference.s2_inference._check_memory_threshold_for_model') as mock_method:
             for model in small_list_of_models:
                 _ = vectorise(model_name=model, content=content, device="cpu")
 
@@ -131,6 +132,43 @@ class TestAutomaticModelEject(unittest.TestCase):
 
         for model in list_of_models:
             _ = vectorise(model_name=model, content=content, device="cpu")
+
+    def test_thread_safe_function_call(self):
+        model_name = "ViT-B/32"
+        validated_model_properties = _validate_model_properties(model_name, None)
+        device = "cpu"
+        model_size = 1
+
+        _validate_model_into_device(model_name, validated_model_properties, device,
+                                    calling_func="_update_available_models")
+        _validate_model_into_device(model_name, validated_model_properties, device, calling_func="unit_test")
+
+        try:
+            _validate_model_into_device(model_name, validated_model_properties, device)
+            raise AssertionError
+        except RuntimeError:
+            pass
+
+        try:
+            _validate_model_into_device(model_name, validated_model_properties, device, calling_func="void")
+            raise AssertionError
+        except RuntimeError:
+            pass
+
+        _check_memory_threshold_for_model(device, model_size, calling_func="_validate_model_into_device")
+        _check_memory_threshold_for_model(device, model_size, calling_func="unit_test")
+
+        try:
+            _check_memory_threshold_for_model(device, model_size)
+            raise AssertionError
+        except RuntimeError:
+            pass
+
+        try:
+            _check_memory_threshold_for_model(device, model_size, calling_func="void")
+            raise AssertionError
+        except RuntimeError:
+            pass
 
     def test_concurrent_vectorise_call_no_cache(self):
         # To test error is thrown if multiple threads want to load the model

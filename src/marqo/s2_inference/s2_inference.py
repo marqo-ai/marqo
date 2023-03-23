@@ -161,7 +161,7 @@ def _validate_model_properties(model_name: str, model_properties: dict) -> dict:
     return model_properties
 
 
-def _validate_model_into_device(model_name:str, model_properties: dict, device: str, calling_func:str) -> bool:
+def _validate_model_into_device(model_name:str, model_properties: dict, device: str, calling_func: str = None) -> bool:
     '''
     Note: this function should only be called by `_update_available_models` for threading safeness.
 
@@ -180,7 +180,7 @@ def _validate_model_into_device(model_name:str, model_properties: dict, device: 
                            "thread safeness.")
 
     model_size = get_model_size(model_name, model_properties)
-    if check_memory_threshold_for_model(device, model_size, calling_func = _validate_model_properties.__name__):
+    if _check_memory_threshold_for_model(device, model_size, calling_func = _validate_model_into_device.__name__):
         return True
     else:
         model_cache_key_for_device = [key for key in list(available_models) if key.endswith(device)]
@@ -192,17 +192,17 @@ def _validate_model_into_device(model_name:str, model_properties: dict, device: 
                 f"Eject model = `{key.split('||')[0]}` with size = `{available_models[key].get('model_size', constants.DEFAULT_MODEL_SIZE)}` from device = `{device}` "
                 f"to save space for model = `{model_name}`.")
             del available_models[key]
-            if check_memory_threshold_for_model(device, model_size):
+            if _check_memory_threshold_for_model(device, model_size):
                 return True
 
-        if check_memory_threshold_for_model(device, model_size) is False:
+        if _check_memory_threshold_for_model(device, model_size) is False:
             raise ModelCacheManageError(
                 f"Marqo CANNOT find enough space to load model = `{model_name}` in device = `{device}`.\n"
                 f"Marqo tried to eject all the models on this device = `{device}` but still can't find enough space. \n"
                 f"Please use a smaller model or increase the memory threshold.")
 
 
-def check_memory_threshold_for_model(device: str, model_size: Union[float, int], calling_func: str) -> bool:
+def _check_memory_threshold_for_model(device: str, model_size: Union[float, int], calling_func: str =None) -> bool:
     '''
     Note: this function should only be called by `_update_available_models` for threading safeness.
 
@@ -215,7 +215,7 @@ def check_memory_threshold_for_model(device: str, model_size: Union[float, int],
         False if we don't have enough space
     '''
     if calling_func not in ["unit_test", "_validate_model_into_device"]:
-        raise RuntimeError(f"The function `{check_memory_threshold_for_model.__name__}` should only be called by "
+        raise RuntimeError(f"The function `{_check_memory_threshold_for_model.__name__}` should only be called by "
                            f"`unit_test` or `_validate_model_into_device` for threading safeness.")
 
     if device.startswith("cuda"):
