@@ -1973,11 +1973,11 @@ def _vector_text_search(
                     }
                 },
                 "score_mode": "max",
-                "_source": {
-                    "exclude": ["__chunks.__vector_*"]
-                }   
                 }
-            }
+            },
+            "_source": {
+                "exclude": ["__chunks.__vector_*"]
+            }   
         }
 
         random_weight_score: reweight_score_param
