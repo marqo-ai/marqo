@@ -1103,8 +1103,8 @@ def search(config: Config, index_name: str, text: Union[str, dict],
            device=None, boost: Optional[Dict] = None,
            image_download_headers: Optional[Dict] = None,
            context: Optional[Dict] = None,
-           random_weight_score: int = 0,
-           reputation_weight_score: int = 1,
+           random_weight_score: float = 0.0,
+           reputation_weight_score: float = 1.0,
            reweight_score_param: Optional[str] = None) -> Dict:
     """The root search method. Calls the specific search method
 
@@ -1782,8 +1782,8 @@ def _vector_text_search(
         verbose=0, raise_on_searchable_attribs=False, hide_vectors=True, k=500,
         simplified_format=True, filter_string: str = None, device=None,
         attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None,
-        image_download_headers: Optional[Dict] = None, random_weight_score: int = 0,
-        reputation_weight_score: int = 1, context: Optional[Dict] = None, reweight_score_param: Optional[str] = None):
+        image_download_headers: Optional[Dict] = None, random_weight_score: float = 0.0,
+           reputation_weight_score: float = 1.0, context: Optional[Dict] = None, reweight_score_param: Optional[str] = None):
     """
     Args:
         config:

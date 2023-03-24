@@ -119,7 +119,7 @@ def bulk_search(query: BulkSearchQuery, device: str = Depends(api_validation.val
 @app.post("/indexes/{index_name}/search")
 @throttle(RequestType.SEARCH)
 def search(search_query: SearchQuery, index_name: str, device: str = Depends(api_validation.validate_device),
-           marqo_config: config.Config = Depends(generate_config), reweight_score_param: Optional[str] = None, random_weight_score: int = 0, reputation_weight_score: int = 1):
+           marqo_config: config.Config = Depends(generate_config), reweight_score_param: Optional[str] = None, random_weight_score: float = 0.0, reputation_weight_score: float = 1.0):
     return tensor_search.search(
         config=marqo_config, text=search_query.q,
         index_name=index_name, highlights=search_query.showHighlights,
