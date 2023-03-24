@@ -142,37 +142,52 @@ class TestMultimodalTensorCombination(MarqoTestCase):
 
         tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
             {
-                 "combo_text_image": {
-                "text_field" : "A rider is riding a horse jumping over the barrier.",
-                "image_field" : "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
-                    },
-
-                "_id": "0"
+                "combo_text_image": {
+                    "text_field_1": "A rider is riding a horse jumping over the barrier.",
+                    "text_field_2": "What is the best to wear on the moon?",
+                    "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+                    "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+                },
+                "_id":"0"
             },
 
             {
-                "text_field": "A rider is riding a horse jumping over the barrier.",
+                "text_field_1": "A rider is riding a horse jumping over the barrier.",
                 "_id": "1"
             },
             {
-                "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+                "text_field_2": "What is the best to wear on the moon?",
                 "_id": "2"
+            },
+            {
+                "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+                "_id": "3"
+            },
+            {
+                "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+                "_id": "4"
             },
 
         ], auto_refresh=True, mappings = {"combo_text_image" : {"type":"multimodal_combination",
-            "weights":{"image_field": 1,"text_field": -1}}})
+            "weights":{"text_field_1": 0.32,"text_field_2": 0, "image_field_1" : -0.48, "image_field_2": 1.34}}})
 
         combo_tensor = np.array(tensor_search.get_document_by_id(config=self.config,
                                                                  index_name=self.index_name_1, document_id="0",
                                                                  show_vectors=True)['_tensor_facets'][0]["_embedding"])
-        text_tensor = \
+        text_tensor_1 = \
             np.array(tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="1",
                                                       show_vectors=True)['_tensor_facets'][0]["_embedding"])
-        image_tensor = \
+        text_tensor_2 = \
             np.array(tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="2",
                                                       show_vectors=True)['_tensor_facets'][0]["_embedding"])
+        image_tensor_1 = \
+            np.array(tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="3",
+                                                      show_vectors=True)['_tensor_facets'][0]["_embedding"])
+        image_tensor_2 = \
+            np.array(tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="4",
+                                                      show_vectors=True)['_tensor_facets'][0]["_embedding"])
 
-        assert np.sum(combo_tensor - np.mean([text_tensor * -1, image_tensor * 1]).tolist()) == 0
+        assert np.allclose(combo_tensor, np.mean([text_tensor_1 * 0.32, text_tensor_2 * 0, image_tensor_1 * -0.48, image_tensor_2 * 1.34], axis = 0).tolist(), atol=1e-9)
 
     def test_multimodal_tensor_combination_zero_weight(self):
         def get_score(document):
