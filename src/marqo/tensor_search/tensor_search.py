@@ -1102,7 +1102,10 @@ def search(config: Config, index_name: str, text: Union[str, dict],
            attributes_to_retrieve: Optional[List[str]] = None,
            device=None, boost: Optional[Dict] = None,
            image_download_headers: Optional[Dict] = None,
-           context: Optional[Dict] = None) -> Dict:
+           context: Optional[Dict] = None,
+           random_weight_score: int = 0,
+           reputation_weight_score: int = 1,
+           reweight_score_param: Optional[str] = None) -> Dict:
     """The root search method. Calls the specific search method
 
     Validation should go here. Validations include:
@@ -1177,7 +1180,8 @@ def search(config: Config, index_name: str, text: Union[str, dict],
             return_doc_ids=return_doc_ids, searchable_attributes=searchable_attributes, verbose=verbose,
             number_of_highlights=num_highlights, simplified_format=simplified_format,
             filter_string=filter, device=device, attributes_to_retrieve=attributes_to_retrieve, boost=boost,
-            image_download_headers=image_download_headers, context=context
+            image_download_headers=image_download_headers, context=context, reweight_score_param=reweight_score_param,
+            reputation_weight_score=reputation_weight_score,random_weight_score=random_weight_score
         )
     elif search_method.upper() == SearchMethod.LEXICAL:
         search_result = _lexical_search(
@@ -1778,8 +1782,8 @@ def _vector_text_search(
         verbose=0, raise_on_searchable_attribs=False, hide_vectors=True, k=500,
         simplified_format=True, filter_string: str = None, device=None,
         attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None,
-        image_download_headers: Optional[Dict] = None,
-        context: Optional[Dict] = None,):
+        image_download_headers: Optional[Dict] = None, random_weight_score: int = 0,
+        reputation_weight_score: int = 1, context: Optional[Dict] = None, reweight_score_param: Optional[str] = None):
     """
     Args:
         config:
@@ -1930,34 +1934,55 @@ def _vector_text_search(
         contextualised_filter = ''
 
     for vector_field in vector_properties_to_search:
+        scoring = "return (_score * params.og_score_weight)"
+        if reweight_score_param is not None:
+            scoring += f" + (params.rating_weight * doc['__chunks.{reweight_score_param}'].value) + (params.random_weight_score * randomScore(100))"
+
         search_query = {
             "size": result_count,
             "from": offset,
             "query": {
                 "nested": {
-                    "path": TensorField.chunks,
-                    "inner_hits": {
-                        "_source": {
-                            "include": ["__chunks.__field_content", "__chunks.__field_name"]
-                        }
-                    },
+                "path": TensorField.chunks,
+                "inner_hits": {
+                   "_source": {
+                        "include": ["__chunks.__field_content", "__chunks.__field_name"]
+                    }
+                },
+                "query": {
+                    "function_score": {
                     "query": {
                         "knn": {
-                            f"{TensorField.chunks}.{vector_field}": {
-                                "vector": vectorised_text,
-                                "k": result_count + offset
-                            }
+                        f"{TensorField.chunks}.{vector_field}": {
+                            "vector": vectorised_text,
+                            "k": result_count + offset
+                        }
                         }
                     },
-                    "score_mode": "max"
+                # TODO: add back/
+                #   "_source": {
+                #     "exclude": ["__chunks.__vector_*"]
+                #     },
+                    "script_score": {
+                        "script": {
+                            "lang":   "painless",
+                            "source": scoring,
+                            "params": {
+                                "og_score_weight": 1.0,
+                                "rating_weight": reputation_weight_score,
+                                "random_weight_score": random_weight_score
+                            }
+                        }
+                    }
+                    }
+                },
+                "score_mode": "max"
                 }
-            },
-            "_source": {
-                "exclude": ["__chunks.__vector_*"]
             }
         }
 
-        field_names = list(index_info.get_text_properties().keys())
+        random_weight_score: reweight_score_param
+        
         if attributes_to_retrieve is not None:
             search_query["_source"] = {"include": attributes_to_retrieve} if len(attributes_to_retrieve) > 0 else False
 
@@ -1967,7 +1992,6 @@ def _vector_text_search(
                 "query_string": {"query": f"{contextualised_filter}"}
             }
         body += [{"index": index_name}, search_query]
-
     if verbose:
         print("vector search body:")
         if verbose == 1:

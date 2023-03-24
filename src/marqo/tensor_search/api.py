@@ -7,7 +7,7 @@ from marqo.errors import MarqoWebError, MarqoError
 from fastapi import FastAPI, Query
 from marqo.tensor_search import tensor_search
 from marqo import config
-from typing import List, Dict
+from typing import Dict, List, Optional
 import os
 from marqo.tensor_search.web import api_validation, api_utils
 from marqo.tensor_search import utils
@@ -119,7 +119,7 @@ def bulk_search(query: BulkSearchQuery, device: str = Depends(api_validation.val
 @app.post("/indexes/{index_name}/search")
 @throttle(RequestType.SEARCH)
 def search(search_query: SearchQuery, index_name: str, device: str = Depends(api_validation.validate_device),
-           marqo_config: config.Config = Depends(generate_config)):
+           marqo_config: config.Config = Depends(generate_config), reweight_score_param: Optional[str] = None, random_weight_score: int = 0, reputation_weight_score: int = 1):
     return tensor_search.search(
         config=marqo_config, text=search_query.q,
         index_name=index_name, highlights=search_query.showHighlights,
@@ -130,7 +130,10 @@ def search(search_query: SearchQuery, index_name: str, device: str = Depends(api
         filter=search_query.filter, device=device,
         attributes_to_retrieve=search_query.attributesToRetrieve, boost=search_query.boost,
         image_download_headers=search_query.image_download_headers,
-        context=search_query.context
+        context=search_query.context,
+        reweight_score_param=reweight_score_param,
+        random_weight_score=random_weight_score,
+        reputation_weight_score=reputation_weight_score
     )
 
 
