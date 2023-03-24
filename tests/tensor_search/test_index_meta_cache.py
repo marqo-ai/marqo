@@ -184,7 +184,8 @@ class TestIndexMetaCache(MarqoTestCase):
             )
         # set cache to t0 state:
         index_meta_cache.index_info_cache = copy.deepcopy(cache_t0)
-        time.sleep(1)
+        # search refreshes index cache every 2 seconds
+        time.sleep(2.1)
         if check_only_in_external_cache is not None:
             assert check_only_in_external_cache not in \
                    index_meta_cache.get_cache()[index_name].properties[TensorField.chunks]["properties"]
