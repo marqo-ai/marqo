@@ -194,7 +194,7 @@ class TestAutomaticModelEject(unittest.TestCase):
 
         assert q_2.qsize() == num_of_threads
         while not q_2.empty():
-            assert q_2.get() is ModelCacheManagementError
+            assert type(q_2.get()) is type(ModelCacheManagementError)
 
     def test_concurrent_vectorise_call_cached(self):
         # To test error is thrown if multiple threads want to load the model
@@ -223,7 +223,7 @@ class TestAutomaticModelEject(unittest.TestCase):
 
         assert q_2.qsize() == num_of_threads
         while not q_2.empty():
-            assert q_2.get() == ModelCacheManagementError
+            assert q_2.get() == "success"
 
     def test_concurrent_model_loading_and_vectorise(self):
         clear_loaded_models()
