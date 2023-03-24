@@ -1959,10 +1959,6 @@ def _vector_text_search(
                         }
                         }
                     },
-                # TODO: add back/
-                #   "_source": {
-                #     "exclude": ["__chunks.__vector_*"]
-                #     },
                     "script_score": {
                         "script": {
                             "lang":   "painless",
@@ -1976,7 +1972,10 @@ def _vector_text_search(
                     }
                     }
                 },
-                "score_mode": "max"
+                "score_mode": "max",
+                "_source": {
+                    "exclude": ["__chunks.__vector_*"]
+                }   
                 }
             }
         }
