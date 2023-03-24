@@ -236,8 +236,9 @@ class TestAutomaticModelEject(unittest.TestCase):
         t.start()
         t.join() # load test_model_1 into cache
 
-        # load test_model_2 in
+        # thread 1 needs to load a new model into cache
         t_1 = threading.Thread(target=normal_vectorise_call, args=(test_model_2, test_content, q_1))
+        # thread 2 uses the model in cache to vectorise
         t_2 = threading.Thread(target=normal_vectorise_call, args=(test_model_1, test_content, q_1))
         t_1.start()
         t_2.start()
