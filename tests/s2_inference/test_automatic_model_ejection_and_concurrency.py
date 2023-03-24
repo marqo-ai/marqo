@@ -11,10 +11,8 @@ import threading, queue
 
 def normal_vectorise_call(test_model, test_content, q):
     # Function used to threading test
-    try:
-        _ = vectorise(model_name=test_model, content=test_content)
-    except Exception as e:
-        q.put(e)
+    _ = vectorise(model_name=test_model, content=test_content)
+    q.put("success")
 
 
 def racing_vectorise_call(test_model, test_content, q):
@@ -23,8 +21,7 @@ def racing_vectorise_call(test_model, test_content, q):
         _ = vectorise(model_name=test_model, content=test_content)
         q.put(AssertionError)
     except ModelCacheManagementError as e:
-        if  "Request rejected, as this request attempted to update the model cache" not in e.message:
-            q.put(AssertionError)
+        q.put(e)
         pass
 
 
@@ -177,19 +174,27 @@ class TestAutomaticModelEject(unittest.TestCase):
         test_model = "ViT-B/32"
 
         threads = []
-        q = queue.Queue()
-        t = threading.Thread(target=normal_vectorise_call, args=(test_model, test_content, q))
+        q_1 = queue.Queue()
+        q_2 = queue.Queue()
+        t = threading.Thread(target=normal_vectorise_call, args=(test_model, test_content, q_1))
         threads.append(t)
         t.start()
-        for i in range(3):
-            t = threading.Thread(target=racing_vectorise_call, args=(test_model, test_content, q))
+
+        num_of_threads = 3
+        for i in range(num_of_threads):
+            t = threading.Thread(target=racing_vectorise_call, args=(test_model, test_content, q_2))
             threads.append(t)
             t.start()
 
         for t in threads:
             t.join()
 
-        assert q.empty()
+        assert len(q_1) == 1
+        assert q_1.get() == "success"
+
+        assert len(q_2) == num_of_threads
+        for e in q_2:
+            assert e is ModelCacheManagementError
 
     def test_concurrent_vectorise_call_cached(self):
         # To test error is thrown if multiple threads want to load the model
@@ -198,17 +203,49 @@ class TestAutomaticModelEject(unittest.TestCase):
         test_model = "ViT-B/32"
 
         threads = []
-        q = queue.Queue()
-        t = threading.Thread(target=normal_vectorise_call, args=(test_model, test_content, q))
+        q_1 = queue.Queue()
+        t = threading.Thread(target=normal_vectorise_call, args=(test_model, test_content, q_1))
         t.start()
-        t.join() # model is loaded into cache
+        t.join()
+        # model is loaded into cache
+        assert len(q_1) == 1
+        assert q_1.get() == "success"
 
-        for i in range(3):
-            t = threading.Thread(target=normal_vectorise_call, args=(test_model, test_content, q))
+        q_2 = queue.Queue()
+        num_of_threads = 3
+        for i in range(num_of_threads):
+            t = threading.Thread(target=normal_vectorise_call, args=(test_model, test_content, q_2))
             threads.append(t)
             t.start()
 
         for t in threads:
             t.join()
 
-        assert q.empty()
+        assert len(q_2) == num_of_threads
+        for e in q_2:
+            assert e is ModelCacheManagementError
+
+    def test_concurrent_model_loading_and_vectorise(self):
+        clear_loaded_models()
+        test_content = "this is a test"
+        test_model_1 = "ViT-B/32"
+        test_model_2 = "sentence-transformers/all-MiniLM-L6-v2"
+
+        q_1 = queue.Queue()
+        t = threading.Thread(target=normal_vectorise_call, args=(test_model_1, test_content, q_1))
+        t.start()
+        t.join() # load test_model_1 into cache
+
+        # load test_model_2 in
+        t_1 = threading.Thread(target=normal_vectorise_call, args=(test_model_2, test_content, q_1))
+        t_2 = threading.Thread(target=normal_vectorise_call, args=(test_model_1, test_content, q_1))
+        t_1.start()
+        t_2.start()
+
+        t_1.join()
+        t_2.join()
+
+        assert len(q_1) == 3
+        for message in q_1:
+            assert message == "success"
+
