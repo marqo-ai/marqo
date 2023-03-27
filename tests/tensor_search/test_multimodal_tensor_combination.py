@@ -230,6 +230,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                                                       show_vectors=True)['_tensor_facets'][0]["_embedding"])
 
         expected_tensor = np.mean([text_tensor_1 * 0.32, text_tensor_2 * 0, image_tensor_1 * -0.48, image_tensor_2 * 1.34], axis = 0)
+        print(np.mean(np.abs(expected_tensor - combo_tensor_1)))
         assert np.allclose(combo_tensor_1, expected_tensor, atol=1e-9)
         assert np.allclose(combo_tensor_2, expected_tensor, atol=1e-9)
         assert np.allclose(combo_tensor_3, expected_tensor, atol=1e-9)
