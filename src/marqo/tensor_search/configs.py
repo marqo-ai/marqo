@@ -21,7 +21,8 @@ def get_default_index_settings():
                 NsFields.patch_method: None
             }
         },
-        NsFields.number_of_shards: 5
+        NsFields.number_of_shards: 5,
+        NsFields.number_of_replicas : 1,
     }
 
 
@@ -34,7 +35,7 @@ def default_env_vars() -> dict:
         EnvVars.MARQO_MAX_INDEX_FIELDS: None,
         EnvVars.MARQO_MAX_DOC_BYTES: 100000,
         EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: 10000,
-        EnvVars.MARQO_MODELS_TO_PRELOAD: ['hf/all_datasets_v4_MiniLM-L6', "ViT-L/14"],
+        EnvVars.MARQO_MODELS_TO_PRELOAD: ["hf/all_datasets_v4_MiniLM-L6", "ViT-L/14"],
         EnvVars.MARQO_MAX_CONCURRENT_INDEX: 8,
         EnvVars.MARQO_MAX_CONCURRENT_SEARCH: 8,
         EnvVars.MARQO_THREAD_EXPIRY_TIME: 1800,     # 30 minutes

@@ -66,6 +66,51 @@ class TestAddDocuments(MarqoTestCase):
                 "title 1": "content 1",
                 "desc 2": "content 2. blah blah blah"
             }
+    
+    def test_add_documents_dupe_ids(self):
+        """ 
+        Should only use the latest inserted ID. Make sure it doesn't get the first/middle one
+        """
+
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
+            {
+                "_id": "3",
+                "title": "doc 3b"
+            },
+        
+        ], auto_refresh=True)
+        
+        doc_3_solo = tensor_search.get_document_by_id(
+            config=self.config, index_name=self.index_name_1,
+            document_id="3", show_vectors=True)
+
+        tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
+            {
+                "_id": "1",
+                "title": "doc 1"
+            },
+            {
+                "_id": "2",
+                "title": "doc 2",
+            },
+            {
+                "_id": "3",
+                "title": "doc 3a",
+            },
+            {
+                "_id": "3",
+                "title": "doc 3b"
+            },
+        
+        ], auto_refresh=True)
+        
+        doc_3_duped = tensor_search.get_document_by_id(
+            config=self.config, index_name=self.index_name_1,
+            document_id="3", show_vectors=True)
+        
+        self.assertEqual(doc_3_solo, doc_3_duped)
+    
 
     def test_update_docs_update_chunks(self):
         """Updating a doc needs to update the corresponding chunks"
@@ -259,15 +304,73 @@ class TestAddDocuments(MarqoTestCase):
              {"_id": "to_fail_567", "some other obj": AssertionError}],
             [{"_id": "to_fail_567", "blahblah": max}]
         ]
-        for update_mode in ('replace', 'update'):
+
+        # For update
+        for bad_doc_arg in bad_doc_args:
+            add_res = tensor_search.add_documents(
+                config=self.config, index_name=self.index_name_1,
+                docs=bad_doc_arg, auto_refresh=True, update_mode='update')
+            assert add_res['errors'] is True
+            assert all(['error' in item for item in add_res['items'] if item['_id'].startswith('to_fail')])
+            assert all(['result' in item
+                        for item in add_res['items'] if item['_id'].startswith('to_pass')])
+        
+        # For replace, check with use_existing_tensors True and False
+        for use_existing_tensors_flag in (True, False):
             for bad_doc_arg in bad_doc_args:
                 add_res = tensor_search.add_documents(
                     config=self.config, index_name=self.index_name_1,
-                    docs=bad_doc_arg, auto_refresh=True, update_mode=update_mode)
+                    docs=bad_doc_arg, auto_refresh=True, update_mode='replace', use_existing_tensors=use_existing_tensors_flag)
                 assert add_res['errors'] is True
                 assert all(['error' in item for item in add_res['items'] if item['_id'].startswith('to_fail')])
                 assert all(['result' in item
                             for item in add_res['items'] if item['_id'].startswith('to_pass')])
+
+
+    def test_add_documents_id_validation(self):
+        """These bad docs should return errors"""
+        bad_doc_args = [
+            # Wrong data types for ID
+            # Tuple: (doc_list, number of docs that should succeed)
+            ([{"_id": {}, "field_1": 1234}], 0),
+            ([{"_id": dict(), "field_1": 1234}], 0),
+            ([{"_id": [1, 2, 3], "field_1": 1234}], 0),
+            ([{"_id": 4, "field_1": 1234}], 0),
+            ([{"_id": None, "field_1": 1234}], 0),
+
+            ([{"_id": "proper id", "field_1": 5678},
+            {"_id": ["bad", "id"], "field_1": "zzz"},
+            {"_id": "proper id 2", "field_1": 90}], 2)
+        ]
+
+        # For update
+        for bad_doc_arg in bad_doc_args:
+            add_res = tensor_search.add_documents(
+                config=self.config, index_name=self.index_name_1,
+                docs=bad_doc_arg[0], auto_refresh=True, update_mode='update')
+
+            assert add_res['errors'] is True
+
+            succeeded_count = 0
+            for item in add_res['items']:
+                if 'result' in item:
+                    succeeded_count += 1
+            
+            assert succeeded_count == bad_doc_arg[1]
+
+        # For replace, check with use_existing_tensors True and False
+        for use_existing_tensors_flag in (True, False):
+            for bad_doc_arg in bad_doc_args:
+                add_res = tensor_search.add_documents(
+                    config=self.config, index_name=self.index_name_1,
+                    docs=bad_doc_arg[0], auto_refresh=True, update_mode='replace', use_existing_tensors=use_existing_tensors_flag)
+                assert add_res['errors'] is True
+                succeeded_count = 0
+                for item in add_res['items']:
+                    if 'result' in item:
+                        succeeded_count += 1
+                
+                assert succeeded_count == bad_doc_arg[1]
 
     def test_add_documents_list_non_tensor_validation(self):
         """This doc is valid but should return error because my_field is not marked non-tensor"""

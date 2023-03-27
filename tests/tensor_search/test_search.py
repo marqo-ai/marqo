@@ -1,5 +1,9 @@
 import math
 from unittest import mock
+from marqo.s2_inference.s2_inference import vectorise
+import numpy as np
+from marqo.tensor_search import utils
+import typing
 from marqo.tensor_search.enums import TensorField, SearchMethod, EnvVars, IndexSettingsField
 from marqo.errors import (
     MarqoApiError, MarqoError, IndexNotFoundError, InvalidArgError,
@@ -1066,6 +1070,7 @@ class TestVectorSearch(MarqoTestCase):
             ({"Dogs": -2.0, "Poodles": 2}, ['poodle_doc', 'irrelevant_doc', 'dog_doc']),
         ]
         for query, expected_ordering in queries_expected_ordering:
+            
             res = tensor_search.search(
                 text=query,
                 index_name=self.index_name_1,
@@ -1121,6 +1126,88 @@ class TestVectorSearch(MarqoTestCase):
             # the poodle doc should be lower ranked than the irrelevant doc
             for hit_position, _ in enumerate(res['hits']):
                 assert res['hits'][hit_position]['_id'] == expected_ordering[hit_position]
+
+    def test_multi_search_check_vector(self):
+        """check the result vector in the body is the same as one we manually calculate
+
+        This checks our batching logic.
+        """
+        docs = [
+            {"loc a": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+            "_id": 'realistic_hippo'},
+            {"loc a": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png",
+             "_id": 'artefact_hippo'}
+        ]
+        image_index_config = {
+            IndexSettingsField.index_defaults: {
+                IndexSettingsField.model: "ViT-B/16",
+                IndexSettingsField.treat_urls_and_pointers_as_images: True
+            }
+        }
+        tensor_search.create_vector_index(
+            config=self.config, index_name=self.index_name_1, index_settings=image_index_config)
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1,
+            docs=docs, auto_refresh=True
+        )
+        multi_queries = [
+            {
+                "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png": 2.0,
+                "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png": -1.0,
+                "artefact": 5.0, "photo realistic": -1,
+            },
+            {
+                "artefact": 5.0,
+                "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png": 2.0,
+                "photo realistic": -1,
+                "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png": -1.0
+            },
+            {
+                "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png": 3,
+                "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png": -1.0,
+            },
+            {
+                "hello": 3, "some thing": -1.0,
+            },
+        ]
+        from marqo.tensor_search.utils import dicts_to_jsonl
+
+        for multi_query in multi_queries:
+            mock_dicts_to_jsonl = mock.MagicMock()
+            mock_dicts_to_jsonl.side_effect = lambda *x, **y: dicts_to_jsonl(*x, **y)
+
+            @mock.patch('marqo.tensor_search.utils.dicts_to_jsonl', mock_dicts_to_jsonl)
+            def run() -> typing.List[float]:
+                tensor_search.search(
+                    text=multi_query,
+                    index_name=self.index_name_1,
+                    result_count=5,
+                    config=self.config,
+                    search_method=SearchMethod.TENSOR)
+                get_args, get_kwargs = mock_dicts_to_jsonl.call_args
+                search_dicts = get_args[0]
+                assert len(search_dicts) == 2
+                query_dict = search_dicts[1]
+
+                query_vec = query_dict['query']['nested']['query']['knn'][
+                    f"{TensorField.chunks}.{utils.generate_vector_name('loc a')}"]['vector']
+                return query_vec
+            # manually calculate weights:
+            weighted_vectors =[]
+            for q, weight in multi_query.items():
+                vec = vectorise(model_name="ViT-B/16", content=[q, ],
+                                image_download_headers=None, normalize_embeddings=True)[0]
+                weighted_vectors.append(np.asarray(vec) * weight)
+
+            manually_combined = np.mean(weighted_vectors, axis=0)
+            norm = np.linalg.norm(manually_combined, axis=-1, keepdims=True)
+            if norm > 0:
+                manually_combined /= np.linalg.norm(manually_combined, axis=-1, keepdims=True)
+            manually_combined = list(manually_combined)
+
+            combined_query = run()
+            assert np.allclose(combined_query, manually_combined, atol=1e-6)
+
 
     def test_multi_search_images_edge_cases(self):
         docs = [
