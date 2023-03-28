@@ -13,7 +13,9 @@ from marqo import errors
 #
 from typing import Iterable, List, Union, Optional, Tuple, Dict
 from marqo.tensor_search.index_meta_cache import get_cache
+from marqo.tensor_search.index_meta_cache import get_index_info as get_cached_index_info
 import pprint
+
 
 def get_index_info(config: Config, index_name: str) -> IndexInfo:
     """Gets useful information about the index. Also updates the IndexInfo cache
@@ -108,7 +110,7 @@ def add_customer_field_properties(config: Config, index_name: str,
             }
         }
     }
-    existing_info = get_cache()[index_name]
+    existing_info = get_cached_index_info(config=config, index_name=index_name)
     new_index_properties = existing_info.properties.copy()
 
     # copy fields to the chunk for prefiltering. If it is text, convert it to a keyword type to save space
