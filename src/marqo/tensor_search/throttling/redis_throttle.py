@@ -1,4 +1,4 @@
-from marqo.connections import redis_driver
+from marqo.connections import redis_driver, generate_redis_warning
 from marqo.tensor_search.enums import RequestType, EnvVars
 from marqo.tensor_search import utils
 from marqo.tensor_search.tensor_search_logging import get_logger
@@ -51,7 +51,7 @@ def throttle(request_type: str):
                 try:
                     redis.zrem(key, name)
                 except Exception as e:
-                    logger.warn(f"There is a problem with your redis instance. Skipping throttling decrement. Reason: {e}")
+                    logger.warn(generate_redis_warning(skipped_operation="throttling thread count decrement", exc=e))
                     redis_driver.set_faulty(True)
 
             # Check current thread count / increment using LUA script
@@ -65,7 +65,7 @@ def throttle(request_type: str):
                     utils.read_env_vars_and_defaults(EnvVars.MARQO_THREAD_EXPIRY_TIME)  # expire_time
                 )
             except Exception as e:
-                logger.warn(f"Could not load throttling scripts onto Redis. There is likely a problem with your redis instance or connection. Skipping throttling check. Reason: {e}")
+                logger.warn(generate_redis_warning(skipped_operation="throttling thread count check", exc=e))
                 redis_driver.set_faulty(True)
                 return function(*args, **kwargs)
 

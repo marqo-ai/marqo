@@ -16,6 +16,13 @@ RUN apt-get install python3.8-distutils -y # python3-distutils
 RUN apt-get  install python3.8 python3-pip -y # pip is 276 MB!
 # opencv requirements
 RUN apt-get install ffmpeg libsm6 libxext6 -y
+
+# Punkt Tokenizer
+RUN apt-get install unzip -y
+RUN mkdir -p /root/nltk_data/tokenizers
+RUN curl https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/tokenizers/punkt.zip -o /root/nltk_data/tokenizers/punkt.zip
+RUN unzip /root/nltk_data/tokenizers/punkt.zip  -d /root/nltk_data/tokenizers/
+
 # TODO: up the RAM
 RUN echo Target platform is "$TARGETPLATFORM"
 COPY requirements.txt requirements.txt

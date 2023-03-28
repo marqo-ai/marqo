@@ -33,14 +33,16 @@ Notes on search behaviour with caching and searchable attributes:
 import copy
 import json
 import datetime
+from collections import defaultdict
 from timeit import default_timer as timer
 import functools
 import pprint
 import typing
 import uuid
-from typing import List, Optional, Union, Iterable, Sequence, Dict, Any
+from typing import List, Optional, Union, Iterable, Sequence, Dict, Any, Tuple, Set
 import numpy as np
 from PIL import Image
+import marqo.config as config
 from marqo.tensor_search.enums import (
     MediaType, MlModel, TensorField, SearchMethod, OpenSearchDataType,
     EnvVars
@@ -50,8 +52,10 @@ from marqo.tensor_search import utils, backend, validation, configs, parallel, a
 from marqo.tensor_search.formatting import _clean_doc
 from marqo.tensor_search.index_meta_cache import get_cache, get_index_info
 from marqo.tensor_search import index_meta_cache
+from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQueryEntity
+from marqo.tensor_search.models.search import VectorisedJobs, VectorisedJobPointer, Qidx, JHash
 from marqo.tensor_search.models.index_info import IndexInfo
-from marqo.tensor_search import constants
+from marqo.tensor_search.utils import add_timing
 from marqo.s2_inference.processing import text as text_processor
 from marqo.s2_inference.processing import image as image_processor
 from marqo.s2_inference.clip_utils import _is_image
@@ -100,7 +104,7 @@ def create_vector_index(
                                                  "vex"]
             },
             "number_of_shards": the_index_settings[NsField.number_of_shards],
-
+            "number_of_replicas": the_index_settings[NsField.number_of_replicas],
         },
         "mappings": {
             "_meta": {
@@ -369,6 +373,7 @@ def _infer_opensearch_data_type(
 
 def _get_chunks_for_field(field_name: str, doc_id: str, doc):
     # Find the chunks with a specific __field_name in a doc
+    # Note: for a chunkless doc (nothing was tensorised) --> doc["_source"]["__chunks"] == []
     return [chunk for chunk in doc["_source"]["__chunks"] if chunk["__field_name"] == field_name]
 
 
@@ -452,8 +457,12 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                     f"images for {batch_size} docs using {image_download_thread_count} threads ")
 
     if update_mode == 'replace' and use_existing_tensors:
-        # Get existing documents
-        doc_ids = [doc["_id"] for doc in docs if "_id" in doc]
+        doc_ids = []
+
+        # Iterate through the list in reverse, only latest doc with dupe id gets added.
+        for i in range(len(docs)-1, -1, -1):
+            if ("_id" in docs[i]) and (docs[i]["_id"] not in doc_ids):
+                doc_ids.append(docs[i]["_id"])
         existing_docs = _get_documents_for_upsert(config=config, index_name=index_name, document_ids=doc_ids)
 
     for i, doc in enumerate(docs):
@@ -493,6 +502,8 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                 # have IDs:
                 elif len(matching_doc) == 0:
                     existing_doc = {"found": False}
+                else:
+                    raise errors.InternalError(message= f"Upsert: found {len(matching_doc)} matching docs for {doc_id} when only 1 or 0 should have been found.")
         else:
             indexing_instructions["update"]["_id"] = doc_id
 
@@ -537,7 +548,6 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
             # Check if content of this field changed. If no, skip all chunking and vectorisation
             if ((update_mode == 'replace') and use_existing_tensors and existing_doc["found"]
                     and (field in existing_doc["_source"]) and (existing_doc["_source"][field] == field_content)):
-                # logger.info(f"Using existing vectors for doc {doc_id}, field {field}. Content remains unchanged.")
                 chunks_to_append = _get_chunks_for_field(field_name=field, doc_id=doc_id, doc=existing_doc)
 
             # Chunk and vectorise, since content changed.
@@ -647,9 +657,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                         TensorField.field_content: text_chunk,
                         TensorField.field_name: field
                     })
-
-            # Add chunks_to_append along with doc metadata to total chunks
-
+            
             elif isinstance(field_content, dict):
                 if mappings[field]["type"]=="multimodal_combination":
                     combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add,\
@@ -665,9 +673,11 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                         if field not in new_obj_fields:
                             new_obj_fields[field] = set()
                         new_obj_fields[field] = new_obj_fields[field].union(new_fields_from_multimodal_combination)
+                        # TODO: we may want to use chunks_to_append here to make it uniform with use_existing_tensors and normal vectorisation
                         chunks.append({**combo_chunk, **chunk_values_for_filtering})
                         continue
-
+            
+            # Add chunks_to_append along with doc metadata to total chunks
             for chunk in chunks_to_append:
                 chunks.append({**chunk, **chunk_values_for_filtering})
 
@@ -889,6 +899,7 @@ def _get_documents_for_upsert(
             f"set by the environment variable `{EnvVars.MARQO_MAX_RETRIEVABLE_DOCS}`")
 
     # Chunk Docs (get field name, field content, vectors)
+
     chunk_docs = [
         {"_index": index_name, "_id": doc_id,
          "_source": {"include": [f"__chunks.__field_content", f"__chunks.__field_name", f"__chunks.__vector_*"]}}
@@ -909,19 +920,21 @@ def _get_documents_for_upsert(
 
     # Combine the 2 query results (loop through each doc id)
     combined_result = []
-    for doc_id in document_ids:
+
+    for doc_id in valid_doc_ids:
         # There should always be 2 results per doc.
         result_list = [doc for doc in res["docs"] if doc["_id"] == doc_id]
+
         if len(result_list) == 0:
             continue
         if len(result_list) not in (2, 0):
-            raise errors.MarqoWebError(f"Bad request for existing documents. "
+            raise errors.InternalError(f"Internal error fetching old documents. "
                                        f"There are {len(result_list)} results for doc id {doc_id}.")
 
         for result in result_list:
             if result["found"]:
                 doc_in_results = True
-                if result["_source"]["__chunks"] == []:
+                if ("__chunks" in result["_source"]) and (result["_source"]["__chunks"] == []):
                     res_data = result
                 else:
                     res_chunks = result
@@ -930,12 +943,14 @@ def _get_documents_for_upsert(
                 dummy_res = result
                 break
 
-        # Put the chunks list in res_data, so it's complete
+        # Put the chunks list in res_data, so it contains all doc data
         if doc_in_results:
-            res_data["_source"]["__chunks"] = res_chunks["_source"]["__chunks"]
+            # Only add chunks if not a chunkless doc
+            if res_chunks["_source"]:
+                res_data["_source"]["__chunks"] = res_chunks["_source"]["__chunks"]
             combined_result.append(res_data)
         else:
-            # This result just says that the doc was not found
+            # This result just says that the doc was not found ("found": False)
             combined_result.append(dummy_res)
 
     res["docs"] = combined_result
@@ -983,6 +998,102 @@ def refresh_index(config: Config, index_name: str):
     return HttpRequests(config).post(path=F"{index_name}/_refresh")
 
 
+@add_timing
+def bulk_search(query: BulkSearchQuery, marqo_config: config.Config, verbose: bool = True, device=None):
+    """Performs a set of search operations in parallel.
+
+    Args:
+        query: Set of search queries
+        marqo_config:
+        verbose:
+        device:
+
+    Notes:
+        Current limitations:
+          - Lexical and tensor search done in serial.
+          - A single error (e.g. validation errors) on any one of the search queries returns an error and does not
+            process non-erroring queries.
+    """
+    # TODO: Let non-errored docs to propagate.
+    errs = [validation.validate_bulk_query_input(q) for q in query.queries]
+    if any(errs):
+        err = next(e for e in errs if e is not None)
+        raise err
+
+    if len(query.queries) == 0:
+        return {"result": []}
+
+    refresh_indexes_in_background(marqo_config, [q.index for q in query.queries])
+
+    selected_device = marqo_config.indexing_device if device is None else device
+
+    tensor_queries: Dict[int, BulkSearchQueryEntity] = dict(filter(lambda e: e[1].searchMethod == SearchMethod.TENSOR, enumerate(query.queries)))
+    lexical_queries: Dict[int, BulkSearchQueryEntity] = dict(filter(lambda e: e[1].searchMethod == SearchMethod.LEXICAL, enumerate(query.queries)))
+
+    tensor_search_results = dict(zip(tensor_queries.keys(), _bulk_vector_text_search(
+            marqo_config, list(tensor_queries.values()), device=selected_device,
+        )))
+
+    # TODO: combine lexical + tensor queries into /_msearch
+    lexical_search_results = dict(zip(lexical_queries.keys(), [_lexical_search(
+        config=marqo_config, index_name=q.index, text=q.q, result_count=q.limit, offset=q.offset,
+        return_doc_ids=True, searchable_attributes=q.searchableAttributes, verbose=verbose,
+        filter_string=q.filter, attributes_to_retrieve=q.attributesToRetrieve
+    ) for q in lexical_queries.values()]))
+
+    # Recombine lexical and tensor in order
+    combined_results = list({**tensor_search_results, **lexical_search_results}.items())
+    combined_results.sort()
+    search_results = [r[1] for r in combined_results]
+
+    for i, s in enumerate(search_results):
+        q = query.queries[i]
+        s["query"] = q.q
+        s["limit"] = q.limit
+        s["offset"] = q.offset
+
+        ## TODO: filter out highlights within `_lexical_search`
+        if not q.showHighlights:
+            for hit in s["hits"]:
+                del hit["_highlights"]
+
+        if q.reRanker is not None:
+            logger.debug(f"reranking {i}th query using {q.reRanker}")
+            rerank_query(q, s, q.reRanker, selected_device, 1)
+
+    return {
+        "result": search_results
+    }
+
+
+def rerank_query(query: BulkSearchQueryEntity, result: Dict[str, Any], reranker: Union[str, Dict], device: str, num_highlights: int):
+    if query.searchableAttributes is None:
+        raise errors.InvalidArgError(f"searchable_attributes cannot be None when re-ranking. Specify which fields to search and rerank over.")
+    try:
+        start_rerank_time = timer()
+        rerank.rerank_search_results(search_result=result, query=query.q,
+                                     model_name=reranker, device=device,
+                                     searchable_attributes=query.searchableAttributes, num_highlights=num_highlights)
+        logger.debug(f"search ({query.searchMethod.lower()}) reranking using {reranker}: took {(timer() - start_rerank_time):.3f}s to rerank results.")
+    except Exception as e:
+        raise errors.BadRequestError(f"reranking failure due to {str(e)}")
+
+
+def refresh_indexes_in_background(config: Config, index_names: List[str]) -> None:
+    """Refresh indices to index meta cache.
+    """
+    for idx in index_names:
+        if idx not in index_meta_cache.get_cache():
+            backend.get_index_info(config=config, index_name=idx)
+
+        REFRESH_INTERVAL_SECONDS = 2
+        # update cache in the background
+        cache_update_thread = threading.Thread(
+            target=index_meta_cache.refresh_index_info_on_interval,
+            args=(config, idx, REFRESH_INTERVAL_SECONDS))
+        cache_update_thread.start()
+
+
 def search(config: Config, index_name: str, text: Union[str, dict],
            result_count: int = 3, offset: int = 0, highlights=True, return_doc_ids=True,
            search_method: Union[str, SearchMethod, None] = SearchMethod.TENSOR,
@@ -990,7 +1101,8 @@ def search(config: Config, index_name: str, text: Union[str, dict],
            reranker: Union[str, Dict] = None, simplified_format: bool = True, filter: str = None,
            attributes_to_retrieve: Optional[List[str]] = None,
            device=None, boost: Optional[Dict] = None,
-           image_download_headers: Optional[Dict] = None) -> Dict:
+           image_download_headers: Optional[Dict] = None,
+           context: Optional[Dict] = None) -> Dict:
     """The root search method. Calls the specific search method
 
     Validation should go here. Validations include:
@@ -1013,6 +1125,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
         num_highlights: number of highlights to return for each doc
         boost: boosters to re-weight the scores of individual fields
         image_download_headers: headers for downloading images
+        context: a dictionary to allow custom vectors in search, for tensor search only
     Returns:
 
     """
@@ -1064,7 +1177,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
             return_doc_ids=return_doc_ids, searchable_attributes=searchable_attributes, verbose=verbose,
             number_of_highlights=num_highlights, simplified_format=simplified_format,
             filter_string=filter, device=device, attributes_to_retrieve=attributes_to_retrieve, boost=boost,
-            image_download_headers=image_download_headers
+            image_download_headers=image_download_headers, context=context
         )
     elif search_method.upper() == SearchMethod.LEXICAL:
         search_result = _lexical_search(
@@ -1233,13 +1346,440 @@ def _lexical_search(
     return {'hits': res_list}
 
 
+def construct_vector_input_batches(query: Union[str, Dict], index_info) -> Tuple[List[str], List[str]]:
+    """Splits images from text in a single query (either a query string, or dict of weighted strings).
+
+    Args:
+        query: a string query, or a dict of weighted strings.
+        index_info: used to determine whether URLs should be treated as images
+
+    Returns:
+        A tuple of string batches. The first is text content the second is image content.
+    """
+    treat_urls_as_images = index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]
+    if isinstance(query, str):
+        if treat_urls_as_images and _is_image(query):
+            return [], [query, ]
+        else:
+            return [query, ], []
+    else:  # is dict:
+        ordered_queries = list(query.items())
+        if treat_urls_as_images:
+            text_queries = [k for k, _ in ordered_queries if not _is_image(k)]
+            image_queries = [k for k, _ in ordered_queries if _is_image(k)]
+            return text_queries, image_queries
+        else:
+            return [k for k, _ in ordered_queries], []
+
+
+def get_vector_properties_to_search(searchable_attributes: Union[None, List[str]], index_info: IndexInfo) -> List[str]:
+    if searchable_attributes is None:
+        return index_info.get_vector_properties().keys()
+    else:
+        searchable_attributes_as_vectors = {
+            utils.generate_vector_name(field_name=attribute) for attribute in searchable_attributes
+        }
+        # discard searchable attributes that aren't found in the cache:
+        return list(searchable_attributes_as_vectors.intersection(
+            index_info.get_vector_properties().keys()
+        ))
+
+
+def construct_msearch_body_elements(vector_properties_to_search: List[str], offset: int, filter_string: str, index_info: IndexInfo, result_count: int, query_vector: List[float], attributes_to_retrieve: List[str], index_name: str, contextualised_filter: str) -> List[Dict[str, Any]]:
+    """Constructs the body payload of a `/_msearch` request for a single bulk search query"""
+    body = []
+
+    # Validation for offset (pagination is single field)
+    if len(vector_properties_to_search) != 1 and offset > 0:
+        human_readable_vector_properties = [v.replace(TensorField.vector_prefix, "") for v in list(vector_properties_to_search)]
+        raise errors.InvalidArgError(f"Pagination (offset > 0) is only supported for single field searches! Your search currently has {len(vector_properties_to_search)} vectorisable fields: {human_readable_vector_properties}")
+
+    for vector_field in vector_properties_to_search:
+        search_query = {
+            "size": result_count,
+            "from": offset,
+            "query": {
+                "nested": {
+                    "path": TensorField.chunks,
+                    "inner_hits": {
+                        "_source": {
+                            "include": ["__chunks.__field_content", "__chunks.__field_name"]
+                        }
+                    },
+                    "query": {
+                        "knn": {
+                            f"{TensorField.chunks}.{vector_field}": {
+                                "vector": query_vector,
+                                "k": result_count + offset
+                            }
+                        }
+                    },
+                    "score_mode": "max"
+                }
+            },
+            "_source": {
+                "exclude": ["__chunks.__vector_*"]
+            }
+        }
+
+        if attributes_to_retrieve is not None:
+            search_query["_source"] = {"include": attributes_to_retrieve} if len(attributes_to_retrieve) > 0 else False
+
+        if filter_string is not None:
+            search_query["query"]["nested"]["query"]["knn"][f"{TensorField.chunks}.{vector_field}"][
+                "filter"] = {
+                "query_string": {"query": f"{contextualised_filter}"}
+            }
+        body += [{"index": index_name}, search_query]
+    return body
+
+
+def bulk_msearch(config: Config, body: List[Dict]) -> List[Dict]:
+    """Send an `/_msearch` request to MarqoOS and translate errors into a user-friendly format."""
+    start_search_http_time = timer()
+    try:
+        response = HttpRequests(config).get(path=F"_msearch", body=utils.dicts_to_jsonl(body))
+        end_search_http_time = timer()
+        total_search_http_time = end_search_http_time - start_search_http_time
+        total_os_process_time = response["took"] * 0.001
+        num_responses = len(response["responses"])
+        logger.debug(f"search (tensor) roundtrip: took {total_search_http_time:.3f}s to send {num_responses} search queries (roundtrip) to Marqo-os.")
+
+        responses = [r['hits']['hits'] for r in response["responses"]]
+
+    except KeyError as e:
+        # KeyError indicates we have received a non-successful result
+        try:
+            if "index.max_result_window" in response["responses"][0]["error"]["root_cause"][0]["reason"]:
+                raise errors.IllegalRequestedDocCount(
+            "Marqo-OS rejected the response due to too many requested results. "
+            "Try reducing the query's limit parameter") from e
+            elif 'parse_exception' in response["responses"][0]["error"]["root_cause"][0]["reason"]:
+                raise errors.InvalidArgError("Syntax error, could not parse filter string") from e
+            raise errors.BackendCommunicationError(f"Error communicating with Marqo-OS backend:\n{response}")
+        except (KeyError, IndexError) as e2:
+            raise e
+
+    logger.debug(f"  search (tensor) Marqo-os processing time: took {total_os_process_time:.3f}s for Marqo-os to execute the search.")
+    return responses
+
+def gather_documents_from_response(resp: List[List[Dict[str, Any]]]) -> Dict[str, Any]:
+    """
+        For the specific responses to a query, gather correct responses. This is used to aggregate documents, for cases
+        where the same document is retrieved for multiple field-queries.
+    """
+    gathered_docs = dict()
+
+    for i, query_res in enumerate(resp):
+        for doc in query_res:
+            doc_chunks = doc["inner_hits"][TensorField.chunks]["hits"]["hits"]
+            if doc["_id"] in gathered_docs:
+                gathered_docs[doc["_id"]]["doc"] = doc
+                gathered_docs[doc["_id"]]["chunks"].extend(doc_chunks)
+            else:
+                gathered_docs[doc["_id"]] = {
+                    "_id": doc["_id"],
+                    "doc": doc,
+                    "chunks": doc_chunks
+                }
+
+        # Filter out docs with no inner hits:
+        for doc_id in list(gathered_docs.keys()):
+            if not gathered_docs[doc_id]["chunks"]:
+                del gathered_docs[doc_id]
+
+    return gathered_docs
+
+
+def assign_query_to_vector_job(
+        q: BulkSearchQueryEntity, jobs: Dict[JHash, VectorisedJobs], grouped_content: Tuple[List[str], List[str]],
+        index_info: IndexInfo, device: str) -> List[VectorisedJobPointer]:
+    """
+    For a individual query, assign its content (to be vectorised) to a vector job. If none exist with the correct
+    specifications, create a new job.
+
+    Mutates entries in, and adds values to, the `jobs` param.
+
+    Args:
+        q:
+        jobs:
+        grouped_content: a 2-tuple of content, belonging to a single query, the first element is a list of text content.
+            The second is a list of image URLs. Either element can be an empty list
+        index_info:
+        device:
+
+    Returns:
+        A list of pointers to the location in a vector job that will have its vectorised content.
+    """
+    if len(grouped_content) != 2:
+        raise RuntimeError(
+            "assign_query_to_vector_job() expects param `grouped_content` with 2 elems. Instead received"
+            f" `grouped_content` with {len(grouped_content)} elems")
+    ptrs = []
+    for i, grouped_content in enumerate(grouped_content):
+        content_type = 'text' if i == 0 else 'image'
+        vector_job = VectorisedJobs(
+            model_name=index_info.model_name,
+            model_properties=_get_model_properties(index_info),
+            content=grouped_content,
+            device=device,
+            normalize_embeddings=index_info.index_settings['index_defaults']['normalize_embeddings'],
+            image_download_headers=q.image_download_headers,
+            content_type=content_type
+        )
+        # If exists, add content to vector job. Otherwise create new
+        if jobs.get(vector_job.groupby_key()) is not None:
+            j = jobs.get(vector_job.groupby_key())
+            ptrs.append(j.add_content(grouped_content))
+        else:
+            jobs[vector_job.groupby_key()] = vector_job
+            ptrs.append(VectorisedJobPointer(
+                job_hash=vector_job.groupby_key(),
+                start_idx=0,
+                end_idx=len(vector_job.content)
+            ))
+    return ptrs
+
+
+def create_vector_jobs(queries: List[BulkSearchQueryEntity], config: Config, selected_device: str) -> Tuple[Dict[Qidx, List[VectorisedJobPointer]], Dict[JHash, VectorisedJobs]]:
+    """
+        For each query:
+            - Find what needs to be vectorised
+            - Group content (across search requests), that could be vectorised together
+            - Keep track of the Job related to a search query
+
+        Returns:
+            - A mapping of the query index to the VectorisedJobPointer that points to the VectorisedJobs that will process its content.
+            - A mapping of job key to job (for fast access).
+    """
+    qidx_to_job: Dict[Qidx, List[VectorisedJobPointer]] = dict()
+    jobs: Dict[JHash, VectorisedJobs] = {}
+    for i, q in enumerate(queries):
+        q = queries[i]
+        index_info = get_index_info(config=config, index_name=q.index)
+        # split images from text:
+        to_be_vectorised: Tuple[List[str], List[str]] = construct_vector_input_batches(q.q, index_info)
+        qidx_to_job[i] = assign_query_to_vector_job(q, jobs, to_be_vectorised, index_info, selected_device)
+    return qidx_to_job, jobs
+
+
+def vectorise_jobs(jobs: List[VectorisedJobs]) -> Dict[JHash, Dict[str, List[float]]]:
+    """ Run s2_+inference.vectorise() on against each vector jobs.
+    TODO: return a mapping of mapping: <JHash: <content: vector> >
+    """
+    result: Dict[JHash, Dict[str, List[float]]] = dict()
+    for v in jobs:
+        # TODO: Handle exception for single job, and allow others to run.
+        try:
+            if v.content:
+                vectors = s2_inference.vectorise(
+                    model_name=v.model_name, model_properties=v.model_properties,
+                    content=v.content, device=v.device,
+                    normalize_embeddings=v.normalize_embeddings,
+                    image_download_headers=v.image_download_headers
+                )
+                result[v.groupby_key()] = dict(zip(v.content, vectors))
+        except s2_inference_errors.S2InferenceError:
+            # TODO: differentiate image processing errors from other types of vectorise errors
+            raise errors.InvalidArgError(message=f'Could not process given image in: {v.content}')
+    return result
+
+
+def get_query_vectors_from_jobs(
+        queries: List[BulkSearchQueryEntity], qidx_to_job: Dict[Qidx, List[VectorisedJobPointer]],
+        job_to_vectors: Dict[JHash, Dict[str, List[float]]], config: Config,
+        jobs: Dict[JHash, VectorisedJobs]
+) -> Dict[Qidx, List[float]]:
+    """
+    Retrieve the vectorised content associated to each query from the set of batch vectorise jobs.
+    Handles multi-modal queries, by weighting and combining queries into a single vector
+
+    Args:
+        - queries: Original search queries.
+        - qidx_to_job: VectorisedJobPointer for each query
+        - job_to_vectors: inference output from each VectorisedJob
+        - config: standard Marqo config.
+
+    """
+    result: Dict[Qidx, List[float]] = defaultdict(list)
+    for qidx, ptrs in qidx_to_job.items():
+
+        # vectors = job_to_vectors[ptrs.job_hash][ptrs.start_idx: ptrs.end_idx]
+
+        # qidx_to_vectors[qidx].append(vectors)
+        q = queries[qidx]
+        index_info = get_index_info(config=config, index_name=q.index)
+
+        ordered_queries = list(q.q.items()) if isinstance(q.q, dict) else None
+        if ordered_queries:
+            # multiple queries. We have to weight and combine them:
+            vectorised_ordered_queries = [
+                (get_content_vector(
+                    possible_jobs=qidx_to_job[qidx],
+                    jobs=jobs,
+                    job_to_vectors=job_to_vectors,
+                    treat_urls_as_images=index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images],
+                    content=content),
+                 weight,
+                 content
+                ) for content, weight in ordered_queries
+            ]
+            # TODO how doe we ensure order?
+            weighted_vectors = [np.asarray(vec) * weight for vec, weight, content in vectorised_ordered_queries]
+            merged_vector = np.mean(weighted_vectors, axis=0)
+            if index_info.index_settings['index_defaults']['normalize_embeddings']:
+                norm = np.linalg.norm(merged_vector, axis=-1, keepdims=True)
+                if norm > 0:
+                    merged_vector /= np.linalg.norm(merged_vector, axis=-1, keepdims=True)
+            result[qidx] = list(merged_vector)
+        else:
+            # result[qidx] = vectors[0]
+            result[qidx] = get_content_vector(
+                possible_jobs=qidx_to_job[qidx],
+                jobs=jobs,
+                job_to_vectors= job_to_vectors,
+                treat_urls_as_images=index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images],
+                content=q.q
+            )
+    return result
+
+
+def get_content_vector(possible_jobs: List[VectorisedJobPointer], job_to_vectors: Dict[JHash, Dict[str, List[float]]],
+                       jobs: Dict[JHash, VectorisedJobs],
+                       treat_urls_as_images: bool, content: str) -> List[float]:
+    """finds the vector associated with a piece of content
+
+    Args:
+        possible_jobs: The jobs where the target vector may reside
+        treat_urls_as_images: an index_parameter that indicates whether content should be treated as image,
+            if it has a URL structure
+        content: The content to search
+
+    Returns:
+        Associated vector, if it is found.
+
+    Raises runtime error if is not found
+    """
+    content_type = 'image' if treat_urls_as_images and _is_image(content) else 'text'
+    not_found_error = RuntimeError(f"get_content_vector(): could not find corresponding vector for content `{content}`")
+    for vec_job_pointer in possible_jobs:
+        if jobs[vec_job_pointer.job_hash].content_type == content_type:
+            try:
+                return job_to_vectors[vec_job_pointer.job_hash][content]
+            except KeyError:
+                raise not_found_error
+    raise not_found_error
+
+
+def create_empty_query_response(queries: List[BulkSearchQueryEntity]) -> List[Dict]:
+    return list(
+        map(
+            lambda x: {"hits": []}, queries
+        )
+    )
+
+
+def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity], device=None) -> List[Dict]:
+    """Resolve a batch of search queries in parallel.
+
+    Args:
+        - config:
+        - queries: A list of independent search queries. Can be across multiple indexes, but are all expected to have `searchMethod = "TENSOR"`
+    Returns:
+        A list of search query responses (see `_format_ordered_docs_simple` for structure of individual entities).
+    Note:
+        - Search results are in the same order as `queries`.
+    """
+    if len(queries) == 0:
+        return []
+
+    start_preprocessing_time = timer()
+    selected_device = config.indexing_device if device is None else device
+
+    # 1. Pre-process inputs ready for s2_inference.vectorise
+    # we can still use qidx_to_job. But the jobs structure may need to be different
+    vector_jobs_tuple: Tuple[Dict[Qidx, List[VectorisedJobPointer]], Dict[JHash, VectorisedJobs]] = (
+        create_vector_jobs(queries, config, selected_device)
+    )
+    qidx_to_jobs, jobs = vector_jobs_tuple
+
+    # 2. Vectorise in batches against all queries
+    ## TODO: To ensure that we are vectorising in batches, we can mock vectorise (), and see if the number of calls is as expected (if batch_size = 16, and number of docs = 32, and all args are the same, then number of calls = 2)
+    # TODO: we need to enable str/PIL image structure:
+    job_ptr_to_vectors: Dict[JHash, Dict[str, List[float]]] = vectorise_jobs(list(jobs.values()))
+
+    # 3. For each query, get associated vectors
+    qidx_to_vectors: Dict[Qidx, List[float]] = get_query_vectors_from_jobs(
+        queries, qidx_to_jobs, job_ptr_to_vectors, config, jobs
+    )
+
+    ## 4. Create msearch request bodies and combine to aggregate.
+    query_to_body_parts: Dict[Qidx, List[Dict]] = dict()
+    query_to_body_count: Dict[Qidx, int] = dict() # Keep track of count, so we can separate after msearch call.
+    for qidx, q in enumerate(queries):
+        index_info = get_index_info(config=config, index_name=q.index)
+        contextualised_filter = utils.contextualise_filter(filter_string=q.filter, simple_properties=index_info.get_text_properties())
+        vector_properties_to_search = get_vector_properties_to_search(q.searchableAttributes, index_info)
+        body = construct_msearch_body_elements(vector_properties_to_search, q.offset, q.filter, index_info, q.limit, qidx_to_vectors[qidx], q.attributesToRetrieve, q.index, contextualised_filter)
+
+        query_to_body_parts[qidx] = body
+        query_to_body_count[qidx] = len(body)
+
+    # Combine all msearch request bodies into one request body.
+    aggregate_body = functools.reduce(lambda x, y: x + y, query_to_body_parts.values())
+    if not aggregate_body:
+        # Must return empty response, per search query
+        return create_empty_query_response(queries)
+
+    logger.debug(f"search (tensor) pre-processing: took {(timer() - start_preprocessing_time):.3f}s to vectorize and process query.")
+
+    ## 5. POST aggregate  to /_msearch
+    responses = bulk_msearch(config, aggregate_body)
+    start_postprocess_time = timer()
+
+    # 6. Get documents back to each query, perform "gather" operation
+    results = create_bulk_search_response(queries, query_to_body_count, responses)
+
+    logger.debug(f"bulk search (tensor) post-processing: took {(timer() - start_postprocess_time):.3f}s")
+    return results
+
+
+def create_bulk_search_response(queries: List[BulkSearchQueryEntity], query_to_body_count: Dict[Qidx, int], responses) -> List[Dict]:
+    """
+        Create Marqo search responses by extracting the appropriate elements from the batched /_msearch response. Also handles:
+            - Boosting score (optional)
+            - Sorting chunks
+            - Formatting style
+            - (no) highlights
+        Does not mutate `responses` param.
+
+    """
+    results = []
+    msearch_resp = copy.deepcopy(responses)
+    for qidx, count in query_to_body_count.items():
+        num_of_docs = count // 2
+        result = msearch_resp[:num_of_docs]
+        msearch_resp = msearch_resp[num_of_docs:]  # remove docs from response for next query
+
+        query = queries[qidx]
+        gathered_docs = gather_documents_from_response(result)
+        if query.boost is not None:
+            gathered_docs = boost_score(gathered_docs, query.boost, query.searchableAttributes)
+        docs_chunks_sorted = sort_chunks(gathered_docs)
+        results.append(
+            _format_ordered_docs_simple(ordered_docs_w_chunks=docs_chunks_sorted, result_count=query.limit)
+        )
+
+    return results
+
 def _vector_text_search(
         config: Config, index_name: str, query: Union[str, dict], result_count: int = 5, offset: int = 0,
         return_doc_ids=False, searchable_attributes: Iterable[str] = None, number_of_highlights=3,
         verbose=0, raise_on_searchable_attribs=False, hide_vectors=True, k=500,
         simplified_format=True, filter_string: str = None, device=None,
         attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None,
-        image_download_headers: Optional[Dict] = None):
+        image_download_headers: Optional[Dict] = None,
+        context: Optional[Dict] = None,):
     """
     Args:
         config:
@@ -1257,6 +1797,7 @@ def _vector_text_search(
             objects are printed out
         attributes_to_retrieve: if set, only returns these fields
         image_download_headers: headers for downloading images
+        context: a dictionary to allow custom vectors in search
     Returns:
 
     Note:
@@ -1278,6 +1819,17 @@ def _vector_text_search(
         - searching a non existent index should return a HTTP-type error
     """
     # SEARCH TIMER-LOGGER (pre-processing)
+    custom_tensors = None
+    if context is not None:
+        if isinstance(query, dict):
+            validation.validate_context_object(context_object=context)
+            custom_tensors = context.get("tensor", None)
+        elif isinstance(query, str):
+            raise errors.InvalidArgError(f"Marqo received a query = `{query}` with type =`{type(query).__name__}` "
+                                         f"and a parameter `context`.\n" # do not return true {context} here as it might be huge.
+                                         f"This is not supported as the context only works when the query is a dictionary."
+                                         f"If you aim to search with your custom vectors, reformat the query as a dictionary.\n"
+                                         f"Please check `https://docs.marqo.ai/0.0.16/API-Reference/search/#context` for more information.")
     start_preprocess_time = timer()
     try:
         index_info = get_index_info(config=config, index_name=index_name)
@@ -1289,37 +1841,52 @@ def _vector_text_search(
     ordered_queries = None
 
     if isinstance(query, str):
-        to_be_vectorised = [query, ]
+        # one batch with one element in the batch:
+        to_be_vectorised = [[query]]
     else:  # is dict:
         ordered_queries = list(query.items())
         if index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]:
-            text_queries = [k for k, _ in ordered_queries if _is_image(k)]
-            image_queries = [k for k, _ in ordered_queries if not _is_image(k)]
+            text_queries = [k for k, _ in ordered_queries if not _is_image(k)]
+            image_queries = [k for k, _ in ordered_queries if _is_image(k)]
             to_be_vectorised = [batch for batch in [text_queries, image_queries] if batch]
         else:
             to_be_vectorised = [[k for k, _ in ordered_queries], ]
     try:
-        vectorised_text = functools.reduce(lambda x, y: x + y,
-           [s2_inference.vectorise(
-               model_name=index_info.model_name, model_properties=_get_model_properties(index_info),
-               content=batch, device=selected_device,
-               normalize_embeddings=index_info.index_settings['index_defaults']['normalize_embeddings'],
-               image_download_headers=image_download_headers
-               )
-               for batch in to_be_vectorised]
-           )
+        vectorised_dicts = [
+            dict(zip(batch, s2_inference.vectorise(
+                model_name=index_info.model_name, model_properties=_get_model_properties(index_info),
+                content=batch, device=selected_device,
+                normalize_embeddings=index_info.index_settings['index_defaults']['normalize_embeddings'],
+                image_download_headers=image_download_headers
+            )))
+            for batch in to_be_vectorised
+        ]
+
         if ordered_queries:
             # multiple queries. We have to weight and combine them:
-            weighted_vectors = [np.asarray(vec) * weight for vec, weight in
-                                zip(vectorised_text, [w for _, w in ordered_queries])]
-            vectorised_text = np.mean(weighted_vectors, axis=0)
+            weighted_vectors = []
+            for q, weight in ordered_queries:
+                vec = None
+                for batch_dict in vectorised_dicts:
+                    if q in batch_dict:
+                        vec = batch_dict[q]
+                weighted_vectors.append(np.asarray(vec) * weight)
+            if custom_tensors:
+                weighted_vectors += [np.asarray(v["vector"]) * v["weight"]for v in custom_tensors]
+            try:
+                vectorised_text = np.mean(weighted_vectors, axis=0)
+            except ValueError as e:
+                raise errors.InvalidArgError(f"The provided vectors are not in the same dimension of the index."
+                                             f"This causes the error when we do `numpy.mean()` over all the vectors.\n"
+                                             f"The original error is `{e}`.\n"
+                                             f"Please check `https://docs.marqo.ai/0.0.16/API-Reference/search/#context`.")
             if index_info.index_settings['index_defaults']['normalize_embeddings']:
                 norm = np.linalg.norm(vectorised_text, axis=-1, keepdims=True)
                 if norm > 0:
                     vectorised_text /= np.linalg.norm(vectorised_text, axis=-1, keepdims=True)
             vectorised_text = list(vectorised_text)
         else:
-            vectorised_text = vectorised_text[0]
+            vectorised_text = vectorised_dicts[0][query]
     except (s2_inference_errors.UnknownModelError,
             s2_inference_errors.InvalidModelPropertiesError,
             s2_inference_errors.ModelLoadError) as model_error:
@@ -1595,6 +2162,65 @@ def _vector_text_search(
         f"search (tensor) post-processing: took {(total_postprocess_time):.3f}s to sort and format {len(completely_sorted)} results from Marqo-os.")
     return res
 
+def _format_ordered_docs_simple(ordered_docs_w_chunks: List[dict], result_count: int) -> dict:
+    """Only one highlight is returned
+    Args:
+        ordered_docs_w_chunks:
+    Returns:
+    """
+    simple_results = []
+
+    for d in ordered_docs_w_chunks:
+        if "_source" in d['doc']:
+            cleaned = _clean_doc(d['doc']["_source"], doc_id=d['_id'])
+        else:
+            cleaned = _clean_doc(dict(), doc_id=d['_id'])
+
+        cleaned["_highlights"] = {
+            d["chunks"][0]["_source"][TensorField.field_name]: d["chunks"][0]["_source"][
+                TensorField.field_content]
+        }
+        cleaned["_score"] = d["chunks"][0]["_score"]
+        simple_results.append(cleaned)
+    return {"hits": simple_results[:result_count]}
+
+def boost_score(docs: dict, boosters: dict, searchable_attributes) -> dict:
+    """ re-weighs the scores of individual fields
+        Args:
+            docs:
+            boosters: {'field_to_be_boosted': (int, int)}
+        """
+    to_be_boosted = docs.copy()
+    boosted_fields = set()
+    if searchable_attributes and boosters:
+        if not set(boosters).issubset(set(searchable_attributes)):
+            raise errors.InvalidArgError(
+        "Boost fieldnames must be a subset of searchable attributes. "
+        f"\nSearchable attributes: {searchable_attributes}"
+        f"\nBoost: {boosters}"
+        )
+
+    for doc_id in list(to_be_boosted.keys()):
+        for chunk in to_be_boosted[doc_id]["chunks"]:
+            field_name = chunk['_source']['__field_name']
+            if field_name in boosters.keys():
+                booster = boosters[field_name]
+                if len(booster) == 2:
+                    chunk['_score'] = chunk['_score'] * booster[0] + booster[1]
+                else:
+                    chunk['_score'] = chunk['_score'] * booster[0]
+                boosted_fields.add(field_name)
+    return to_be_boosted
+
+def sort_chunks(docs: dict) -> List:
+    to_be_sorted = docs.copy()
+    for doc_id in list(to_be_sorted.keys()):
+        to_be_sorted[doc_id]["chunks"] = sorted(
+            to_be_sorted[doc_id]["chunks"], key=lambda x: x["_score"], reverse=True)
+
+    as_list = list(docs.values())
+    return sorted(as_list, key=lambda x: x["chunks"][0]["_score"], reverse=True)
+
 
 def check_health(config: Config):
     TIMEOUT = 3
@@ -1846,7 +2472,7 @@ def vectorise_multimodal_combination_field(field: str, multimodal_object: Dict[s
     if not len(sub_field_name_list) == len(vectors_list):
         raise errors.BatchInferenceSizeError(message=f"Batch inference size does not match content for multimodal field {field}")
 
-    vector_chunk = np.squeeze(np.sum([np.array(vector) * field_map["weights"][sub_field_name] for sub_field_name, vector in zip(sub_field_name_list, vectors_list)], axis=0))
+    vector_chunk = np.squeeze(np.mean([np.array(vector) * field_map["weights"][sub_field_name] for sub_field_name, vector in zip(sub_field_name_list, vectors_list)], axis=0))
 
     if normalize_embeddings is True:
         vector_chunk = vector_chunk / np.linalg.norm(vector_chunk)
