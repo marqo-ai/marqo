@@ -1779,7 +1779,8 @@ def _vector_text_search(
         simplified_format=True, filter_string: str = None, device=None,
         attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None,
         image_download_headers: Optional[Dict] = None,
-        context: Optional[Dict] = None,):
+        context: Optional[Dict] = None,
+        field_score: Optional[Dict] = None):
     """
     Args:
         config:
@@ -1934,22 +1935,58 @@ def _vector_text_search(
             "size": result_count,
             "from": offset,
             "query": {
-                "nested": {
-                    "path": TensorField.chunks,
-                    "inner_hits": {
-                        "_source": {
-                            "include": ["__chunks.__field_content", "__chunks.__field_name"]
+                "function_score": {
+                    "query": {
+                        "nested": {
+                            "path": TensorField.chunks,
+                            "inner_hits": {
+                                "_source": {
+                                    "include": ["__chunks.__field_content", "__chunks.__field_name",
+                                                "__chunks.reputation"]
+                                }
+                            },
+                            "query": {
+                                "function_score": {
+                                    "query": {
+                                        "knn": {
+                                            f"{TensorField.chunks}.{vector_field}": {
+                                                "vector": vectorised_text,
+                                                "k": result_count + offset
+                                            }
+                                        }
+                                    },
+                                    "functions": [
+                                        {
+                                            "script_score": {
+                                                "script": {
+                                                    "source": """
+                                                        if (doc['__chunks.reputation'].size() > 0 &&
+                                                            (doc['__chunks.reputation'].value instanceof java.lang.Number)) {
+                                                            return _score * doc['__chunks.reputation'].value;
+                                                        } else {
+                                                            return _score;
+                                                        }
+                                                    """
+                                                }
+                                            }
+                                        }
+                                    ],
+                                    "boost_mode": "replace"
+                                }
+                            },
+                            "score_mode": "max"
                         }
                     },
-                    "query": {
-                        "knn": {
-                            f"{TensorField.chunks}.{vector_field}": {
-                                "vector": vectorised_text,
-                                "k": result_count + offset
+                    "functions": [
+                        {
+                            "script_score": {
+                                "script": {
+                                    "source": "Math.log(1 + _score)"
+                                }
                             }
                         }
-                    },
-                    "score_mode": "max"
+                    ],
+                    "boost_mode": "replace"
                 }
             },
             "_source": {
@@ -1957,7 +1994,7 @@ def _vector_text_search(
             }
         }
 
-        field_names = list(index_info.get_text_properties().keys())
+        #field_names = list(index_info.get_text_properties().keys())
         if attributes_to_retrieve is not None:
             search_query["_source"] = {"include": attributes_to_retrieve} if len(attributes_to_retrieve) > 0 else False
 
@@ -1967,7 +2004,6 @@ def _vector_text_search(
                 "query_string": {"query": f"{contextualised_filter}"}
             }
         body += [{"index": index_name}, search_query]
-
     if verbose:
         print("vector search body:")
         if verbose == 1:
@@ -1980,8 +2016,8 @@ def _vector_text_search(
                         readable_body[i]["query"]["nested"]["query"]["knn"][vec]["vector"][:5]
             pprint.pprint(readable_body)
         if verbose == 2:
+            print("==" * 30)
             pprint.pprint(body, compact=True)
-
     if not body:
         # empty body means that there are no vector fields associated with the index.
         # This probably means the index is emtpy
@@ -1994,8 +2030,8 @@ def _vector_text_search(
     # SEARCH TIMER-LOGGER (roundtrip)
     start_search_http_time = timer()
     response = HttpRequests(config).get(path=F"{index_name}/_msearch", body=utils.dicts_to_jsonl(body))
-
     end_search_http_time = timer()
+
     total_search_http_time = end_search_http_time - start_search_http_time
     total_os_process_time = response["took"] * 0.001
     num_responses = len(response["responses"])
@@ -2104,7 +2140,6 @@ def _vector_text_search(
         return sorted(as_list, key=lambda x: x["chunks"][0]["_score"], reverse=True)
 
     completely_sorted = sort_docs(docs_chunks_sorted)
-
     if verbose:
         print("Chunk vector search, sorted result:")
         if verbose == 1:
@@ -2155,7 +2190,6 @@ def _vector_text_search(
     else:
         res = format_ordered_docs_preserving(ordered_docs_w_chunks=completely_sorted,
                                              num_highlights=number_of_highlights)
-
     end_postprocess_time = timer()
     total_postprocess_time = end_postprocess_time - start_postprocess_time
     logger.debug(
