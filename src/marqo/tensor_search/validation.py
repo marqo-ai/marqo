@@ -577,5 +577,3 @@ def validate_custom_score_fields(custom_score_fields: List[dict]):
                 f"Please revise your custom_score_fields based on the provided error."
                 f"\n Check `https://docs.marqo.ai/0.0.17/` for more info."
             )
-
-        field_name = object["field_name"]

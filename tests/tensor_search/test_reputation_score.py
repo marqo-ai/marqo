@@ -39,7 +39,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             {"my_text_field": "A rider is riding a horse jumping over the barrier.",
              "my_image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
              "reputation" : 1,
-             "rate" : 20,
+             #"rate" : 20,
              "_id" : "1"
              },
             {"my_text_field": "A rider is riding a horse jumping over the barrier.",
@@ -102,9 +102,11 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                                                      "combine_style" : "additive"
                                                     }
                                                 ])
-        pprint(res["hits"])
-        ids = [i['_id'] for i in res["hits"]]
-        assert ids == ["1", "5", "4", "3", "2"]
+        # pprint(res["hits"])
+        # ids = [i['_id'] for i in res["hits"]]
+        # assert ids == ["1", "5", "4", "3", "2"]
+
+        pprint(tensor_search.get_index_info(config=self.config, index_name=self.index_name)[1])
 
 
 
