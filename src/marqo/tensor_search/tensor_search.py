@@ -2265,8 +2265,10 @@ def boost_score(docs: dict, boosters: dict, searchable_attributes) -> dict:
 
 
 def convert_validated_score_modifiers_to_script_score(validated_score_modifiers: Dict = None) -> str:
-    script_parts = ["double additive = 0.001;"]
-
+    '''
+    A function that converts the validated score modifiers to a painless script to modify the score.
+    '''
+    script_parts = ["double additive = 0;"]
     for config in validated_score_modifiers.get("multiply_score_by"):
         field_name = config["field_name"]
         weight = config.get("weight", 1)
@@ -2296,7 +2298,6 @@ def convert_validated_score_modifiers_to_script_score(validated_score_modifiers:
     script_parts.append("return (_score + additive);")
     script = "\n".join(script_parts)
     return f"""{script}"""
-
 
 
 def sort_chunks(docs: dict) -> List:
