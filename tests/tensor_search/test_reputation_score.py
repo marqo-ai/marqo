@@ -39,6 +39,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             {"my_text_field": "A rider is riding a horse jumping over the barrier.",
              "my_image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
              "reputation" : 1,
+             "rate" : 20,
              "_id" : "1"
              },
             {"my_text_field": "A rider is riding a horse jumping over the barrier.",
@@ -91,22 +92,33 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         #pprint(tensor_search.get_index_info(config=self.config, index_name=self.index_name)[1])
         res = tensor_search._vector_text_search(config=self.config, index_name=self.index_name,
                                                 query="what is the rider doing?",
-                                                field_score = [
+                                                custom_score_fields = [
                                                     {"field_name" : "reputation" ,
-                                                     "weight" : 0.1,
-                                                     "combine_stype" : "multiply"
-                                                     }
+                                                     "weight" : 1,
+                                                     "combine_style" : "multiply"
+                                                     },
+                                                    {"field_name" : "rate" ,
+                                                     "weight" : 1,
+                                                     "combine_style" : "additive"
+                                                    }
                                                 ])
-        #
-        res = HttpRequests(self.config).get(
-            f'{self.index_name}/_doc/1'
-        )
-
-        pprint(res)
-        # pprint(res["hits"])
-        # ids = [i['_id'] for i in res["hits"]]
-        #
-        # assert ids == ["5", "4", "3", "2", "1"]
+        pprint(res["hits"])
+        ids = [i['_id'] for i in res["hits"]]
+        assert ids == ["1", "5", "4", "3", "2"]
 
 
 
+"""
+    double additive = 0;
+    if (doc['__chunks.reputation'].size() > 0 &&
+        (doc['__chunks.reputation'].value instanceof java.lang.Number)) {
+        copy_score = copy_score * doc['__chunks.reputation'].value * 1;
+    }
+    
+    if (doc['__chunks.rate'].size() > 0 &&
+    (doc['__chunks.rate'].value instanceof java.lang.Number)) {
+    additive = additive + doc['__chunks.rate'].value * 1;
+    }
+    
+    return _score + additive;
+"""

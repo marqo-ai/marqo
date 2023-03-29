@@ -1780,7 +1780,7 @@ def _vector_text_search(
         attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None,
         image_download_headers: Optional[Dict] = None,
         context: Optional[Dict] = None,
-        field_score: Optional[Dict] = None):
+        custom_score_fields: Optional[Dict] = None):
     """
     Args:
         config:
@@ -1930,6 +1930,8 @@ def _vector_text_search(
     else:
         contextualised_filter = ''
 
+    script_score = convert_custom_score_fields_to_script_score(custom_score_fields)
+    print(script_score)
     for vector_field in vector_properties_to_search:
         search_query = {
             "size": result_count,
@@ -1959,14 +1961,16 @@ def _vector_text_search(
                                         {
                                             "script_score": {
                                                 "script": {
-                                                    "source": """
-                                                        if (doc['__chunks.reputation'].size() > 0 &&
-                                                            (doc['__chunks.reputation'].value instanceof java.lang.Number)) {
-                                                            return _score * doc['__chunks.reputation'].value;
-                                                        } else {
-                                                            return _score;
-                                                        }
-                                                    """
+                                                    # "source": """
+                                                    #             double copy_score = _score;
+                                                    #             double additive = 0;
+                                                    #             if (doc['__chunks.reputation'].size() > 0 &&
+                                                    #                 (doc['__chunks.reputation'].value instanceof java.lang.Number)) {
+                                                    #                 copy_score = copy_score * doc['__chunks.reputation'].value;
+                                                    #             }
+                                                    #             return copy_score;
+                                                    #         """
+                                                    "source" : script_score
                                                 }
                                             }
                                         }
@@ -2031,7 +2035,7 @@ def _vector_text_search(
     start_search_http_time = timer()
     response = HttpRequests(config).get(path=F"{index_name}/_msearch", body=utils.dicts_to_jsonl(body))
     end_search_http_time = timer()
-
+    # pprint.pprint(response)
     total_search_http_time = end_search_http_time - start_search_http_time
     total_os_process_time = response["took"] * 0.001
     num_responses = len(response["responses"])
@@ -2245,6 +2249,38 @@ def boost_score(docs: dict, boosters: dict, searchable_attributes) -> dict:
                     chunk['_score'] = chunk['_score'] * booster[0]
                 boosted_fields.add(field_name)
     return to_be_boosted
+
+
+def convert_custom_score_fields_to_script_score(custom_score_fields: List[Dict] = None) -> str:
+    script_parts = ["double additive = 0.001;"]
+
+    for config in custom_score_fields:
+        field_name = config["field_name"]
+        weight = config["weight"]
+        combine_style = config["combine_style"]
+
+        if combine_style.lower() == "multiply":
+            script_parts.append(f"""
+                if (doc['__chunks.{field_name}'].size() > 0 &&
+                    (doc['__chunks.{field_name}'].value instanceof java.lang.Number)) {{
+                    _score = _score * doc['__chunks.{field_name}'].value * {weight};
+                }}
+            """)
+        elif combine_style.lower() == "additive":
+            script_parts.append(f"""
+                if (doc['__chunks.{field_name}'].size() > 0 &&
+                    (doc['__chunks.{field_name}'].value instanceof java.lang.Number)) {{
+                    additive = additive + doc['__chunks.{field_name}'].value * {weight};
+                }}
+            """)
+        else:
+            raise ValueError(f"Unsupported combine_style '{combine_style}' for field '{field_name}'.")
+
+    script_parts.append("return (_score + additive);")
+    script = "\n".join(script_parts)
+    return f"""{script}"""
+
+
 
 def sort_chunks(docs: dict) -> List:
     to_be_sorted = docs.copy()
