@@ -959,22 +959,44 @@ class TestValidateIndexSettings(unittest.TestCase):
 
     def test_invalid_custom_score_fields(self):
         invalid_custom_score_fields_list = [
-            # {"field_name": "reputation",
-            #  "weight": 1,
-            #  "combine_style": "multiply"
-            #  },
-            [
-                {"field_names": "reputation",
-                 "weight": 1,
-                 "combine_style": "multiply"
-                 },
-                {"field_name": "rate",
-                 "weight": 1,
-                 "combine_style": "additive"
-                 }
-            ]
+            {
+                "multiply_scores_by":   #typo
+                    [{"field_name": "reputation",
+                      "weight": 1,
+                      },
+                     {
+                         "field_name": "reputation-test",
+                     }, ],
+
+                "add_to_score": [
+                    {"field_name": "rate",
+                     }]
+            },
 
         ]
-
         for invalid_custom_score_fields in invalid_custom_score_fields_list:
-            validation.validate_custom_score_fields(invalid_custom_score_fields)
+            try:
+                validation.validate_custom_score_fields(invalid_custom_score_fields)
+                raise AssertionError
+            except InvalidArgError as e:
+                pass
+
+    def test_valid_custom_score_fields(self):
+        valid_custom_score_fields_list = [
+            {
+                "multiply_score_by":
+                    [{"field_name": "reputation",
+                      "weight": 1,
+                      },
+                     {
+                         "field_name": "reputation-test",
+                     }, ],
+
+                "add_to_score": [
+                    {"field_name": "rate",
+                     }]
+            },
+        ]
+
+        for valid_custom_score_fields in valid_custom_score_fields_list:
+            validation.validate_custom_score_fields(valid_custom_score_fields)

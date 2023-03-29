@@ -1102,7 +1102,8 @@ def search(config: Config, index_name: str, text: Union[str, dict],
            attributes_to_retrieve: Optional[List[str]] = None,
            device=None, boost: Optional[Dict] = None,
            image_download_headers: Optional[Dict] = None,
-           context: Optional[Dict] = None) -> Dict:
+           context: Optional[Dict] = None,
+           score_modifiers: Optional[Dict] = None) -> Dict:
     """The root search method. Calls the specific search method
 
     Validation should go here. Validations include:
@@ -1126,6 +1127,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
         boost: boosters to re-weight the scores of individual fields
         image_download_headers: headers for downloading images
         context: a dictionary to allow custom vectors in search, for tensor search only
+        score_modifiers: a dictionary to modify the score based on field values, for tensor search only
     Returns:
 
     """
@@ -1177,7 +1179,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
             return_doc_ids=return_doc_ids, searchable_attributes=searchable_attributes, verbose=verbose,
             number_of_highlights=num_highlights, simplified_format=simplified_format,
             filter_string=filter, device=device, attributes_to_retrieve=attributes_to_retrieve, boost=boost,
-            image_download_headers=image_download_headers, context=context
+            image_download_headers=image_download_headers, context=context, score_modifiers=score_modifiers
         )
     elif search_method.upper() == SearchMethod.LEXICAL:
         search_result = _lexical_search(
@@ -1780,7 +1782,7 @@ def _vector_text_search(
         attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None,
         image_download_headers: Optional[Dict] = None,
         context: Optional[Dict] = None,
-        custom_score_fields: Optional[Dict] = None):
+        score_modifiers: Optional[Dict] = None):
     """
     Args:
         config:
@@ -1820,6 +1822,7 @@ def _vector_text_search(
         - searching a non existent index should return a HTTP-type error
     """
     # SEARCH TIMER-LOGGER (pre-processing)
+    start_preprocess_time = timer()
     custom_tensors = None
     if context is not None:
         if isinstance(query, dict):
@@ -1831,7 +1834,7 @@ def _vector_text_search(
                                          f"This is not supported as the context only works when the query is a dictionary."
                                          f"If you aim to search with your custom vectors, reformat the query as a dictionary.\n"
                                          f"Please check `https://docs.marqo.ai/0.0.16/API-Reference/search/#context` for more information.")
-    start_preprocess_time = timer()
+
     try:
         index_info = get_index_info(config=config, index_name=index_name)
     except KeyError as e:
@@ -1930,65 +1933,85 @@ def _vector_text_search(
     else:
         contextualised_filter = ''
 
-    script_score = convert_custom_score_fields_to_script_score(custom_score_fields)
-    print(script_score)
+    script_score = None
+    if score_modifiers is not None:
+        validated_score_modifiers = validation.validate_score_modifiers_object(score_modifiers)
+        script_score = convert_validated_score_modifiers_to_script_score(validated_score_modifiers)
     for vector_field in vector_properties_to_search:
-        search_query = {
-            "size": result_count,
-            "from": offset,
-            "query": {
-                "function_score": {
-                    "query": {
-                        "nested": {
-                            "path": TensorField.chunks,
-                            "inner_hits": {
-                                "_source": {
-                                    "include": ["__chunks.__field_content", "__chunks.__field_name",
-                                                "__chunks.reputation"]
+        if script_score is None:
+            search_query = {
+                "size": result_count,
+                "from": offset,
+                "query": {
+                    "nested": {
+                        "path": TensorField.chunks,
+                        "inner_hits": {
+                            "_source": {
+                                "include": ["__chunks.__field_content", "__chunks.__field_name"]
+                            }
+                        },
+                        "query": {
+                            "knn": {
+                                f"{TensorField.chunks}.{vector_field}": {
+                                    "vector": vectorised_text,
+                                    "k": result_count + offset
                                 }
-                            },
-                            "query": {
-                                "function_score": {
-                                    "query": {
-                                        "knn": {
-                                            f"{TensorField.chunks}.{vector_field}": {
-                                                "vector": vectorised_text,
-                                                "k": result_count + offset
-                                            }
-                                        }
-                                    },
-                                    "functions": [
-                                        {
-                                            "script_score": {
-                                                "script": {
-                                                    # "source": """
-                                                    #             double copy_score = _score;
-                                                    #             double additive = 0;
-                                                    #             if (doc['__chunks.reputation'].size() > 0 &&
-                                                    #                 (doc['__chunks.reputation'].value instanceof java.lang.Number)) {
-                                                    #                 copy_score = copy_score * doc['__chunks.reputation'].value;
-                                                    #             }
-                                                    #             return copy_score;
-                                                    #         """
-                                                    "source" : script_score
+                            }
+                        },
+                        "score_mode": "max"
+                    }
+                },
+                "_source": {
+                    "exclude": ["__chunks.__vector_*"]
+                }
+            }
+        else:
+            search_query = {
+                "size": result_count,
+                "from": offset,
+                "query": {
+                    "function_score": {
+                        "query": {
+                            "nested": {
+                                "path": TensorField.chunks,
+                                "inner_hits": {
+                                    "_source": {
+                                        "include": ["__chunks.__field_content", "__chunks.__field_name",
+                                                    "__chunks.reputation"]
+                                    }
+                                },
+                                "query": {
+                                    "function_score": {
+                                        "query": {
+                                            "knn": {
+                                                f"{TensorField.chunks}.{vector_field}": {
+                                                    "vector": vectorised_text,
+                                                    "k": result_count + offset
                                                 }
                                             }
-                                        }
-                                    ],
-                                    "boost_mode": "replace"
-                                }
-                            },
-                            "score_mode": "max"
-                        }
-                    },
+                                        },
+                                        "functions": [
+                                            {
+                                                "script_score": {
+                                                    "script": {
+                                                        "source" : script_score
+                                                    }
+                                                }
+                                            }
+                                        ],
+                                        "boost_mode": "replace"
+                                    }
+                                },
+                                "score_mode": "max"
+                            }
+                        },
+                    }
+                },
+                "_source": {
+                    "exclude": ["__chunks.__vector_*"]
                 }
-            },
-            "_source": {
-                "exclude": ["__chunks.__vector_*"]
             }
-        }
 
-        #field_names = list(index_info.get_text_properties().keys())
         if attributes_to_retrieve is not None:
             search_query["_source"] = {"include": attributes_to_retrieve} if len(attributes_to_retrieve) > 0 else False
 
@@ -2241,34 +2264,34 @@ def boost_score(docs: dict, boosters: dict, searchable_attributes) -> dict:
     return to_be_boosted
 
 
-def convert_custom_score_fields_to_script_score(custom_score_fields: List[Dict] = None) -> str:
+def convert_validated_score_modifiers_to_script_score(validated_score_modifiers: Dict = None) -> str:
     script_parts = ["double additive = 0.001;"]
 
-    for config in custom_score_fields:
+    for config in validated_score_modifiers.get("multiply_score_by"):
         field_name = config["field_name"]
-        weight = config["weight"]
-        combine_style = config["combine_style"]
+        weight = config.get("weight", 1)
+        # doc.containsKey check if the field is in the mappings.
+        # doc[].size() >0 and doc[].value instanceof java.lang.Number check if the field has a valid value
+        script_parts.append(f"""
+        if (doc.containsKey('__chunks.{field_name}')) {{
+            if (doc['__chunks.{field_name}'].size() > 0 &&
+                (doc['__chunks.{field_name}'].value instanceof java.lang.Number)) {{
+                _score = _score * doc['__chunks.{field_name}'].value * {weight};
+            }}
+        }}
+        """)
 
-        if combine_style.lower() == "multiply":
-            # doc.containsKey check if the field is in the mappings.
-            # doc[].size() >0 and doc[].value instanceof java.lang.Number check if the field has a valid value
-            script_parts.append(f"""
-            if (doc.containsKey('__chunks.{field_name}')) {{
-                if (doc['__chunks.{field_name}'].size() > 0 &&
-                    (doc['__chunks.{field_name}'].value instanceof java.lang.Number)) {{
-                    _score = _score * doc['__chunks.{field_name}'].value * {weight};
-                }}
+    for config in validated_score_modifiers.get("add_to_score"):
+        field_name = config["field_name"]
+        weight = config.get("weight", 1)
+        script_parts.append(f""" 
+        if (doc.containsKey('__chunks.{field_name}')) {{     
+            if (doc['__chunks.{field_name}'].size() > 0 &&
+                (doc['__chunks.{field_name}'].value instanceof java.lang.Number)) {{
+                additive = additive + doc['__chunks.{field_name}'].value * {weight};
             }}
-            """)
-        elif combine_style.lower() == "additive":
-            script_parts.append(f""" 
-            if (doc.containsKey('__chunks.{field_name}')) {{     
-                if (doc['__chunks.{field_name}'].size() > 0 &&
-                    (doc['__chunks.{field_name}'].value instanceof java.lang.Number)) {{
-                    additive = additive + doc['__chunks.{field_name}'].value * {weight};
-                }}
-            }}
-            """)
+        }}
+        """)
 
     script_parts.append("return (_score + additive);")
     script = "\n".join(script_parts)

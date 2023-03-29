@@ -39,7 +39,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             {"my_text_field": "A rider is riding a horse jumping over the barrier.",
              "my_image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
              "reputation" : 1,
-             #"rate" : 20,
+             "rate" : 20,
              "_id" : "1"
              },
             {"my_text_field": "A rider is riding a horse jumping over the barrier.",
@@ -88,25 +88,27 @@ class TestMultimodalTensorCombination(MarqoTestCase):
 
     def test_search_results(self):
 
-
-        #pprint(tensor_search.get_index_info(config=self.config, index_name=self.index_name)[1])
+        # pprint(tensor_search.get_index_info(config=self.config, index_name=self.index_name)[1])
         res = tensor_search._vector_text_search(config=self.config, index_name=self.index_name,
                                                 query="what is the rider doing?",
-                                                custom_score_fields = [
-                                                    {"field_name" : "reputation" ,
-                                                     "weight" : 1,
-                                                     "combine_style" : "multiply"
-                                                     },
-                                                    {"field_name" : "rate" ,
-                                                     "weight" : 1,
-                                                     "combine_style" : "additive"
-                                                    }
-                                                ])
-        # pprint(res["hits"])
-        # ids = [i['_id'] for i in res["hits"]]
-        # assert ids == ["1", "5", "4", "3", "2"]
+                                                score_modifiers={
+                                                    "multiply_score_by":
+                                                        [{"field_name": "reputation",
+                                                          "weight": 1,
+                                                          },
+                                                         {
+                                                             "field_name": "reputation-test",
+                                                         }, ],
 
-        pprint(tensor_search.get_index_info(config=self.config, index_name=self.index_name)[1])
+                                                    "add_to_score": [
+                                                        {"field_name": "rate",
+                                                         }]
+                                                }, attributes_to_retrieve=["_id", "_score"])
+        pprint(res["hits"])
+        ids = [i['_id'] for i in res["hits"]]
+        assert ids == ["1", "5", "4", "3", "2"]
+
+        #pprint(tensor_search.get_index_info(config=self.config, index_name=self.index_name)[1])
 
 
 

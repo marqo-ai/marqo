@@ -130,7 +130,8 @@ def search(search_query: SearchQuery, index_name: str, device: str = Depends(api
         filter=search_query.filter, device=device,
         attributes_to_retrieve=search_query.attributesToRetrieve, boost=search_query.boost,
         image_download_headers=search_query.image_download_headers,
-        context=search_query.context
+        context=search_query.context,
+        score_modifiers=search_query.score_modifiers,
     )
 
 

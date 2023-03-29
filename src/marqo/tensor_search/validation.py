@@ -17,7 +17,7 @@ import jsonschema
 from marqo.tensor_search.models.settings_object import settings_schema
 from marqo.tensor_search.models.mappings_object import mappings_schema, multimodal_combination_schema
 from marqo.tensor_search.models.context_object import context_schema
-from marqo.tensor_search.models.custom_score_fields_object import custom_score_fiedls_schema
+from marqo.tensor_search.models.custom_score_fields_object import score_modifiers_object_schema
 
 
 def validate_query(q: Union[dict, str], search_method: Union[str, SearchMethod]):
@@ -54,6 +54,7 @@ def validate_query(q: Union[dict, str], search_method: Union[str, SearchMethod])
         )
     return q
 
+
 def validate_bulk_query_input(q: 'BulkSearchQueryEntity') -> Optional[MarqoError]:
     if q.limit <= 0:
         return IllegalRequestedDocCount("search result limit must be greater than 0!")
@@ -68,9 +69,9 @@ def validate_bulk_query_input(q: 'BulkSearchQueryEntity') -> Optional[MarqoError
     check_upper = True if max_docs_limit is None else q.limit + q.offset <= int(max_docs_limit)
     if not check_upper:
         raise IllegalRequestedDocCount(
-    f"The search result limit + offset must be less than or equal to the MARQO_MAX_RETRIEVABLE_DOCS limit of"
-    f"[{max_docs_limit}]. Marqo received search result limit of `{q.limit}` and offset of `{q.offset}`."
-    )
+            f"The search result limit + offset must be less than or equal to the MARQO_MAX_RETRIEVABLE_DOCS limit of"
+            f"[{max_docs_limit}]. Marqo received search result limit of `{q.limit}` and offset of `{q.offset}`."
+        )
 
     validate_boost(boost=q.boost, search_method=q.searchMethod)
     if q.searchableAttributes is not None:
@@ -83,6 +84,7 @@ def validate_bulk_query_input(q: 'BulkSearchQueryEntity') -> Optional[MarqoError
         [validate_field_name(attribute) for attribute in q.attributesToRetrieve]
 
     return None
+
 
 def validate_str_against_enum(value: Any, enum_class: Type[Enum], case_sensitive: bool = True):
     """Checks whether a value is found as the value of a str attribute of the
@@ -216,16 +218,16 @@ def validate_field_name(field_name) -> str:
         raise InvalidFieldNameError("field name must be str!")
     if field_name.startswith(enums.TensorField.vector_prefix):
         raise InvalidFieldNameError(F"can't start field name with protected prefix {enums.TensorField.vector_prefix}."
-                            F" Error raised for field name: {field_name}")
+                                    F" Error raised for field name: {field_name}")
     if field_name.startswith(enums.TensorField.chunks):
         raise InvalidFieldNameError(F"can't name field with protected field name {enums.TensorField.chunks}."
-                            F" Error raised for field name: {field_name}")
+                                    F" Error raised for field name: {field_name}")
     char_validation = [(c, c not in constants.ILLEGAL_CUSTOMER_FIELD_NAME_CHARS)
-                        for c in field_name]
+                       for c in field_name]
     char_validation_failures = [c for c in char_validation if not c[1]]
     if char_validation_failures:
         raise InvalidFieldNameError(F"Illegal character '{char_validation_failures[0][0]}' "
-                               F"detected in field name {field_name}")
+                                    F"detected in field name {field_name}")
     if field_name not in enums.TensorField.__dict__.values():
         return field_name
     else:
@@ -381,7 +383,7 @@ def validate_settings_object(settings_object):
         )
 
 
-def validate_dict(field: str, field_content: typing.Dict, is_non_tensor_field: bool, mappings:dict):
+def validate_dict(field: str, field_content: typing.Dict, is_non_tensor_field: bool, mappings: dict):
     '''
 
     Args:
@@ -433,9 +435,9 @@ def validate_multimodal_combination(field_content, is_non_tensor_field, field_ma
             f"If you aim to use multimodal_combination, it must contain at least 1 field. "
             f"please check `https://docs.marqo.ai/0.0.15/Advanced-Usage/document_fields/#multimodal-combination-object` for more info.")
 
-
     for key, value in field_content.items():
-        if not ((type(key) in constants.ALLOWED_MULTIMODAL_FIELD_TYPES) and (type(value) in constants.ALLOWED_MULTIMODAL_FIELD_TYPES)):
+        if not ((type(key) in constants.ALLOWED_MULTIMODAL_FIELD_TYPES) and (
+                type(value) in constants.ALLOWED_MULTIMODAL_FIELD_TYPES)):
             raise InvalidArgError(
                 f"Multimodal-combination field content `{key}:{value}` \n  "
                 f"of type `{type(key).__name__} : {type(value).__name__}` is not of valid content type (one of {constants.ALLOWED_MULTIMODAL_FIELD_TYPES})."
@@ -448,10 +450,9 @@ def validate_multimodal_combination(field_content, is_non_tensor_field, field_ma
                 f"Please add the `{key}` to the mappings."
                 f"please check `https://docs.marqo.ai/0.0.15/Advanced-Usage/document_fields/#multimodal-combination-object` for more info.")
 
-
     if is_non_tensor_field:
         raise InvalidArgError(
-            f"Field content `{field_content}` \n  " 
+            f"Field content `{field_content}` \n  "
             f"of type `{type(field_content).__name__}` is the content for a multimodal_combination."
             f"It CANNOT be a `non_tensor_field`. Remove this field from `non_tensor_field` or"
             f"add them as normal fields to fix this problem."
@@ -559,21 +560,13 @@ def validate_multimodal_combination_mapping(field_mapping: dict):
             )
 
 
-def validate_custom_score_fields(custom_score_fields: List[dict]):
-    if not isinstance(custom_score_fields, list):
+def validate_score_modifiers_object(score_modifiers: List[dict]):
+    try:
+        jsonschema.validate(instance=score_modifiers, schema=score_modifiers_object_schema)
+        return score_modifiers
+    except jsonschema.ValidationError as e:
         raise InvalidArgError(
-                f"The `custom_score_fields` must be a list of dictionaries. Marqo received a `{custom_score_fields}` of type "
-                f"{type(custom_score_fields).__name__}, which is not valid. \n"
-                f"Please reformat your `custom_score_fields` as a list of dictionary and retry."
-                f"\n  "
-            )
-
-    for object in custom_score_fields:
-        try:
-            jsonschema.validate(instance=object, schema=custom_score_fiedls_schema)
-        except jsonschema.ValidationError as e:
-            raise InvalidArgError(
-                f"Error validating custom_score_fields object = `{object}`. Reason: \n{str(e)} "
-                f"Please revise your custom_score_fields based on the provided error."
-                f"\n Check `https://docs.marqo.ai/0.0.17/` for more info."
-            )
+            f"Error validating custom_score_fields object = `{object}`. Reason: \n{str(e)} "
+            f"Please revise your custom_score_fields based on the provided error."
+            f"\n Check `https://docs.marqo.ai/0.0.17/` for more info."
+        )
