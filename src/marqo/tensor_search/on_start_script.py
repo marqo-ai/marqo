@@ -1,4 +1,6 @@
 import json
+import os
+from marqo.tensor_search import enums
 from marqo.tensor_search.tensor_search_logging import get_logger
 import time
 from marqo.tensor_search.enums import EnvVars
@@ -11,6 +13,7 @@ from marqo import errors
 from marqo.tensor_search.throttling.redis_throttle import throttle
 from marqo.connections import redis_driver
 
+
 def on_start(marqo_os_url: str):
         
     to_run_on_start = (
@@ -19,10 +22,9 @@ def on_start(marqo_os_url: str):
                         CUDAAvailable(), 
                         ModelsForCacheing(), 
                         InitializeRedis("localhost", 6379),    # TODO, have these variable
-                        NLTK(), 
                         DownloadFinishText(),
                         MarqoWelcome(),
-                        MarqoPhrase()
+                        MarqoPhrase(),
                         )
 
     for thing_to_start in to_run_on_start:

@@ -1,11 +1,11 @@
-name: cuda_dind_os_CI
-# runs GPU-enabled Integration Tests on DIND OS on AMD64 machine
-
+name: arm64_local_os_CI
+# runs Integration Tests on Local OS on an ARM64 Machine
 on:
   workflow_dispatch:
     inputs:
       image_to_test:
         required: false
+        # This is the name of the docker image that is built by the build script:
         default: marqo_docker_0
         description: >
           This is optional. If left as the default value "marqo_docker_0", the docker image built from this branch is tested.
@@ -40,11 +40,11 @@ jobs:
           mode: start
           github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
 
-          # CUDA AMD64 instance
-          ec2-image-id: ${{ secrets.CUDA_EC2_IMAGE_ID }}
-          ec2-instance-type: g4dn.xlarge
-          subnet-id: ${{ secrets.CUDA_SUBNET_ID }}
-          security-group-id: ${{ secrets.CUDA_SECURITY_GROUP_ID }}
+          # ARM Runner Image
+          ec2-image-id: ${{ secrets.ARM_EC2_IMAGE_ID }}
+          ec2-instance-type: a1.xlarge
+          subnet-id: ${{ secrets.ARM_SUBNET_ID }}
+          security-group-id: ${{ secrets.ARM_SECURITY_GROUP_ID }}
 
   Test-Marqo:
     name: Run Marqo Test Suite
@@ -60,12 +60,12 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up Python 3.8
-        uses: actions/setup-python@v3
-        with:
-          python-version: "3.8"
-          cache: "pip"
-          
+      - name: Set up Python 3.9   # TODO: Check if 3.9 is okay instead of 3.8. So far, so good
+        run:  |
+          apt-get -y update
+          apt-get -y install python3.9
+          apt-get -y install pip
+  
       - name: Install Dependencies
         run: |
           #pip install -r requirements.txt
@@ -87,12 +87,12 @@ jobs:
           # Set up conf file
           echo 'export MARQO_API_TESTS_ROOT="${{ github.workspace }}"' >> conf
           
-      - name: Run CUDA Integration Tests - dind_os
+      - name: Run Integration Tests - ARM64 local_os
         run: |
           export MQ_API_TEST_BRANCH=$(echo "${GITHUB_REF}" | cut -d'/' -f3-)
           CUSTOM_TEST_IMG="${{ github.event.inputs.image_to_test }}"
           export MQ_API_TEST_IMG=${CUSTOM_TEST_IMG:-"marqo_docker_0"}
-          tox -e py3-cuda_dind_os
+          tox -e py3-arm64_local_os
   
   Stop-Runner:
     name: Stop self-hosted EC2 runner

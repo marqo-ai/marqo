@@ -16,6 +16,7 @@ from marqo.s2_inference.s2_inference import vectorise
 import requests
 from marqo.s2_inference.clip_utils import load_image_from_path
 import json
+from unittest.mock import patch
 from marqo.errors import MarqoWebError
 
 
@@ -32,6 +33,11 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         except IndexNotFoundError as e:
             pass
 
+    def tearDown(self) -> None:
+        try:
+            tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+        except:
+            pass
     def test_add_documents(self):
         tensor_search.create_vector_index(
             index_name=self.index_name_1, config=self.config, index_settings={
@@ -136,37 +142,98 @@ class TestMultimodalTensorCombination(MarqoTestCase):
 
         tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
             {
-                 "combo_text_image": {
-                "text_field" : "A rider is riding a horse jumping over the barrier.",
-                "image_field" : "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
-                    },
-
-                "_id": "0"
+                "combo_text_image": {
+                    "text_field_1": "A rider is riding a horse jumping over the barrier.",
+                    "text_field_2": "What is the best to wear on the moon?",
+                    "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+                    "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+                },
+                "_id":"c1"
             },
 
             {
-                "text_field": "A rider is riding a horse jumping over the barrier.",
+                "combo_text_image": {
+                    "text_field_1": "A rider is riding a horse jumping over the barrier.",
+                    "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+                    "text_field_2": "What is the best to wear on the moon?",
+                    "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+                },
+                "_id": "c2"
+            },
+
+            {
+                "combo_text_image": {
+                    "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+                    "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+                    "text_field_1": "A rider is riding a horse jumping over the barrier.",
+                    "text_field_2": "What is the best to wear on the moon?",
+                },
+                "_id": "c3"
+            },
+
+            {
+                "combo_text_image": {
+                    "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+                    "text_field_1": "A rider is riding a horse jumping over the barrier.",
+                    "text_field_2": "What is the best to wear on the moon?",
+                    "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+                },
+                "_id": "c4"
+            },
+
+            {
+                "text_field_1": "A rider is riding a horse jumping over the barrier.",
                 "_id": "1"
             },
             {
-                "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+                "text_field_2": "What is the best to wear on the moon?",
                 "_id": "2"
+            },
+            {
+                "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+                "_id": "3"
+            },
+            {
+                "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+                "_id": "4"
             },
 
         ], auto_refresh=True, mappings = {"combo_text_image" : {"type":"multimodal_combination",
-            "weights":{"image_field": 1,"text_field": -1}}})
+            "weights":{"text_field_1": 0.32,"text_field_2": 0, "image_field_1" : -0.48, "image_field_2": 1.34}}})
 
-        combo_tensor = np.array(tensor_search.get_document_by_id(config=self.config,
-                                                                 index_name=self.index_name_1, document_id="0",
+        combo_tensor_1 = np.array(tensor_search.get_document_by_id(config=self.config,
+                                                                 index_name=self.index_name_1, document_id="c1",
                                                                  show_vectors=True)['_tensor_facets'][0]["_embedding"])
-        text_tensor = \
+
+        combo_tensor_2 = np.array(tensor_search.get_document_by_id(config=self.config,
+                                                                 index_name=self.index_name_1, document_id="c2",
+                                                                 show_vectors=True)['_tensor_facets'][0]["_embedding"])
+
+        combo_tensor_3 = np.array(tensor_search.get_document_by_id(config=self.config,
+                                                                 index_name=self.index_name_1, document_id="c3",
+                                                                 show_vectors=True)['_tensor_facets'][0]["_embedding"])
+
+        combo_tensor_4 = np.array(tensor_search.get_document_by_id(config=self.config,
+                                                                 index_name=self.index_name_1, document_id="c4",
+                                                                 show_vectors=True)['_tensor_facets'][0]["_embedding"])
+        text_tensor_1 = \
             np.array(tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="1",
                                                       show_vectors=True)['_tensor_facets'][0]["_embedding"])
-        image_tensor = \
+        text_tensor_2 = \
             np.array(tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="2",
                                                       show_vectors=True)['_tensor_facets'][0]["_embedding"])
+        image_tensor_1 = \
+            np.array(tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="3",
+                                                      show_vectors=True)['_tensor_facets'][0]["_embedding"])
+        image_tensor_2 = \
+            np.array(tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="4",
+                                                      show_vectors=True)['_tensor_facets'][0]["_embedding"])
 
-        assert np.sum(combo_tensor - (text_tensor * -1 + image_tensor * 1)) == 0
+        expected_tensor = np.mean([text_tensor_1 * 0.32, text_tensor_2 * 0, image_tensor_1 * -0.48, image_tensor_2 * 1.34], axis = 0)
+        assert np.allclose(combo_tensor_1, expected_tensor, atol=1e-7)
+        assert np.allclose(combo_tensor_2, expected_tensor, atol=1e-7)
+        assert np.allclose(combo_tensor_3, expected_tensor, atol=1e-7)
+        assert np.allclose(combo_tensor_4, expected_tensor, atol=1e-7)
 
     def test_multimodal_tensor_combination_zero_weight(self):
         def get_score(document):
@@ -944,4 +1011,136 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         assert index_info.properties['__chunks']['properties']['my_combination_field']['properties']['image']["type"] == 'keyword'
         assert index_info.properties['__chunks']['properties']['__vector_my_combination_field']['type']  == 'knn_vector'
 
+    def test_multimodal_child_fields_order(self):
+        tensor_search.create_vector_index(
+            index_name=self.index_name_1, config=self.config, index_settings={
+                IndexSettingsField.index_defaults: {
+                    IndexSettingsField.model: "ViT-B/32",
+                    IndexSettingsField.treat_urls_and_pointers_as_images: True,
+                    IndexSettingsField.normalize_embeddings: True
+                }
+            })
 
+        doc ={
+                "combo_text_image": {
+                    "text_field_1": "A rider is riding a horse jumping over the barrier.",
+                    "text_field_2": "What is the best to wear on the moon?",
+                    "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+                    "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+                },
+            }
+
+        doc_1 = {
+                "combo_text_image": {
+                    "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+                    "text_field_1": "A rider is riding a horse jumping over the barrier.",
+                    "text_field_2": "What is the best to wear on the moon?",
+                    "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+                },
+            }
+
+        doc_2 = {
+                "combo_text_image": {
+                    "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+                    "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+                    "text_field_1": "A rider is riding a horse jumping over the barrier.",
+                    "text_field_2": "What is the best to wear on the moon?",
+                },
+            }
+
+        doc_3 = {
+                "combo_text_image": {
+                    "text_field_1": "A rider is riding a horse jumping over the barrier.",
+                    "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+                    "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+                    "text_field_2": "What is the best to wear on the moon?",
+                },
+            }
+
+        with patch("numpy.mean", wraps=np.mean) as mock_mean:
+            tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
+                doc, doc_1, doc_2, doc_3
+            ], mappings={"combo_text_image": {"type": "multimodal_combination",
+                                              "weights": {"image_field_1": 0.2, "image_field_2": -1, "text_field_1": 0.38, "text_field_2": 0}}}, auto_refresh=True)
+
+            args_list = [args[0] for args in mock_mean.call_args_list]
+
+        combined_tensor = np.squeeze(np.mean(args_list[0][0], axis = 0))
+
+        permuted_tensor_1 = np.squeeze(np.mean(args_list[1][0], axis = 0))
+        permuted_tensor_2 = np.squeeze(np.mean(args_list[2][0], axis=0))
+        permuted_tensor_3 = np.squeeze(np.mean(args_list[3][0], axis=0))
+
+        assert np.allclose(combined_tensor, permuted_tensor_1, atol=1e-9)
+        assert np.allclose(combined_tensor, permuted_tensor_2, atol=1e-9)
+        assert np.allclose(combined_tensor, permuted_tensor_3, atol=1e-9)
+
+    def test_multimodal_child_fields_order_from_os(self):
+        tensor_search.create_vector_index(
+            index_name=self.index_name_1, config=self.config, index_settings={
+                IndexSettingsField.index_defaults: {
+                    IndexSettingsField.model: "ViT-B/32",
+                    IndexSettingsField.treat_urls_and_pointers_as_images: True,
+                    IndexSettingsField.normalize_embeddings: False
+                }
+            })
+
+        doc = {
+            "_id":"d0",
+            "combo_text_image": {
+                "text_field_1": "A rider is riding a horse jumping over the barrier.",
+                "text_field_2": "What is the best to wear on the moon?",
+                "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+                "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+            },
+        }
+
+        doc_1 = {
+            "_id": "d1",
+            "combo_text_image": {
+                "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+                "text_field_1": "A rider is riding a horse jumping over the barrier.",
+                "text_field_2": "What is the best to wear on the moon?",
+                "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+            },
+        }
+
+        doc_2 = {
+            "_id": "d2",
+            "combo_text_image": {
+                "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+                "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+                "text_field_1": "A rider is riding a horse jumping over the barrier.",
+                "text_field_2": "What is the best to wear on the moon?",
+            },
+        }
+
+        doc_3 = {
+            "_id": "d3",
+            "combo_text_image": {
+                "text_field_1": "A rider is riding a horse jumping over the barrier.",
+                "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+                "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+                "text_field_2": "What is the best to wear on the moon?",
+            },
+        }
+
+        with patch("numpy.mean", wraps=np.mean) as mock_mean:
+            tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
+                doc, doc_1, doc_2, doc_3
+            ], mappings={"combo_text_image": {"type": "multimodal_combination",
+                                              "weights": {"image_field_1": 0.2, "image_field_2": -1,
+                                                          "text_field_1": 0.38, "text_field_2": 0}}}, auto_refresh=True)
+            docs = tensor_search.get_documents_by_ids(
+                config=self.config, document_ids=["d0", "d1", "d2", "d3"],
+                index_name=self.index_name_1, show_vectors=True)
+
+            args_list = [args[0] for args in mock_mean.call_args_list]
+
+        combined_tensor = np.squeeze(np.mean(args_list[0][0], axis=0))
+        os0, os1, os2, os3 = [res["_tensor_facets"][0]["_embedding"] for res in docs['results']]
+
+        assert np.allclose(combined_tensor, os0, atol=1e-9)
+        assert np.allclose(combined_tensor, os1, atol=1e-9)
+        assert np.allclose(combined_tensor, os2, atol=1e-9)
+        assert np.allclose(combined_tensor, os3, atol=1e-9)

@@ -6,8 +6,10 @@ settings_schema = {
     "type": "object",
     "required": [
         NsFields.index_defaults,
-        NsFields.number_of_shards
+        NsFields.number_of_shards,
+        NsFields.number_of_replicas
     ],
+    "additionalProperties": False,
     "properties": {
         NsFields.index_defaults: {
             "type": "object",
@@ -18,6 +20,7 @@ settings_schema = {
                 NsFields.text_preprocessing,
                 NsFields.image_preprocessing
             ],
+            "additionalProperties": False,
             "properties": {
                 NsFields.treat_urls_and_pointers_as_images: {
                     "type": "boolean",
@@ -111,7 +114,14 @@ settings_schema = {
             "examples": [
                 5
             ]
-        }
+        },
+        NsFields.number_of_replicas: {
+            "type": "integer",
+            "minimum": 0,
+            "examples": [
+                1
+            ]
+        },
     },
     "examples": [{
         NsFields.index_defaults: {
@@ -127,6 +137,7 @@ settings_schema = {
                 NsFields.patch_method: None
             }
         },
-        NsFields.number_of_shards: 5
+        NsFields.number_of_shards: 5,
+        NsFields.number_of_replicas: 1
     }]
 }

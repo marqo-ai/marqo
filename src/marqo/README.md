@@ -36,6 +36,39 @@ __Notes__:
 - This is for marqo-os (Marqo OpenSearch) running locally. You can alternatively set
 `OPENSEARCH_URL` to  a remote Marqo OpenSearch cluster 
 
+## Redis setup (Applicable for Options A and E)
+Marqo uses redis to handle concurrency throttling. Redis is automatically set up when running Marqo in docker (Options B-D), but if you are running Marqo locally on your machine (Options A and E), you will have to set redis up yourself to enable throttling.
+
+Note: This setup is optional. If you do not have redis set up properly, Marqo will still run as normal, but throttling will be disabled (you will see warnings containing `There is a problem with your redis connection...`). To suppress these warnings, disable throttling completely with:
+```
+export MARQO_ENABLE_THROTTLING='FALSE'
+```
+
+### Installation
+The redis-server version to install is redis 7.0.8. Install it using this command for Ubuntu 22.0.4:
+```
+apt-get update
+apt-get install redis-server -y
+```
+
+If you are using an older version of Ubuntu, this may install an older version of redis. To get the latest redis version, run these commands instead:
+```
+apt install lsb-release
+curl -fsSL https://packages.redis.io/gpg | gpg --dearmor -o /usr/share/keyrings/redis-archive-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/redis-archive-keyring.gpg] https://packages.redis.io/deb $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/redis.list
+apt-get update
+apt-get install redis-server -y
+``` 
+
+### Running redis
+To start up redis, simply run the command:
+```
+redis-server /etc/redis/redis.conf
+```
+
+The `/etc/redis/redis.conf` configuration file should have been automatically created upon the redis installation step.
+
+
 ### Option B. Build and run the Marqo as a Docker container, that creates and manages its own internal Marqo-OS 
 1. `cd` into the marqo root directory
 2. Run the following command:
@@ -98,17 +131,19 @@ brew install protobuf;
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs/ | sh;
 ```
 
-6. Install marqo dependencies,
+6. Set up redis (follow instructions in Option A)
+
+7. Install marqo dependencies,
 ```
 pip install -r requirements.txt
 ```
 
-7. Change into the tensor search directory,
+8. Change into the tensor search directory,
 ```
 CWD=$(pwd)
 cd src/marqo/tensor_search/
 ```
-8. Run Marqo,
+9. Run Marqo,
 ```
 export OPENSEARCH_URL="https://localhost:9200" && 
     export PYTHONPATH="${PYTHONPATH}:${CWD}/src" &&

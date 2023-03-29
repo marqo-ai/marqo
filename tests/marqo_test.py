@@ -7,6 +7,8 @@ class MarqoTestCase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
+        # Set up the Marqo root dir (for use in model caches)
+
         local_opensearch_settings = {
             "url": 'https://localhost:9200',
             "main_user": "admin",
