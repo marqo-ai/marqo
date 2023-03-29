@@ -953,7 +953,6 @@ class TestValidateIndexSettings(unittest.TestCase):
         for invalid_context in valid_context_list:
             try:
                 validation.validate_context_object(invalid_context)
-                pprint.pprint(invalid_context)
                 raise AssertionError
             except InvalidArgError:
                 pass
