@@ -1826,10 +1826,10 @@ def _vector_text_search(
             custom_tensors = context.get("tensor", None)
         elif isinstance(query, str):
             raise errors.InvalidArgError(f"Marqo received a query = `{query}` with type =`{type(query).__name__}` "
-                                         f"and a context = `{context}`.\n"
+                                         f"and a parameter `context`.\n" # do not return true {context} here as it might be huge.
                                          f"This is not supported as the context only works when the query is a dictionary."
                                          f"If you aim to search with your custom vectors, reformat the query as a dictionary.\n"
-                                         f"Please check `https://docs.marqo.ai/0.0.16/` for more information.")
+                                         f"Please check `https://docs.marqo.ai/0.0.16/API-Reference/search/#context` for more information.")
     start_preprocess_time = timer()
     try:
         index_info = get_index_info(config=config, index_name=index_name)
@@ -1879,7 +1879,7 @@ def _vector_text_search(
                 raise errors.InvalidArgError(f"The provided vectors are not in the same dimension of the index."
                                              f"This causes the error when we do `numpy.mean()` over all the vectors.\n"
                                              f"The original error is `{e}`.\n"
-                                             f"Please check `https://docs.marqo.ai/0.0.15/API-Reference/search/`.")
+                                             f"Please check `https://docs.marqo.ai/0.0.16/API-Reference/search/#context`.")
             if index_info.index_settings['index_defaults']['normalize_embeddings']:
                 norm = np.linalg.norm(vectorised_text, axis=-1, keepdims=True)
                 if norm > 0:
