@@ -1933,39 +1933,10 @@ def _vector_text_search(
     else:
         contextualised_filter = ''
 
-    script_score = None
     if score_modifiers is not None:
         validated_score_modifiers = validation.validate_score_modifiers_object(score_modifiers)
         script_score = convert_validated_score_modifiers_to_script_score(validated_score_modifiers)
-    for vector_field in vector_properties_to_search:
-        if script_score is None:
-            search_query = {
-                "size": result_count,
-                "from": offset,
-                "query": {
-                    "nested": {
-                        "path": TensorField.chunks,
-                        "inner_hits": {
-                            "_source": {
-                                "include": ["__chunks.__field_content", "__chunks.__field_name"]
-                            }
-                        },
-                        "query": {
-                            "knn": {
-                                f"{TensorField.chunks}.{vector_field}": {
-                                    "vector": vectorised_text,
-                                    "k": result_count + offset
-                                }
-                            }
-                        },
-                        "score_mode": "max"
-                    }
-                },
-                "_source": {
-                    "exclude": ["__chunks.__vector_*"]
-                }
-            }
-        else:
+        for vector_field in vector_properties_to_search:
             search_query = {
                 "size": result_count,
                 "from": offset,
@@ -1994,7 +1965,7 @@ def _vector_text_search(
                                             {
                                                 "script_score": {
                                                     "script": {
-                                                        "source" : script_score
+                                                        "source": script_score
                                                     }
                                                 }
                                             }
@@ -2005,6 +1976,45 @@ def _vector_text_search(
                                 "score_mode": "max"
                             }
                         },
+                    }
+                },
+                "_source": {
+                    "exclude": ["__chunks.__vector_*"]
+                }
+            }
+
+        if attributes_to_retrieve is not None:
+            search_query["_source"] = {"include": attributes_to_retrieve} if len(attributes_to_retrieve) > 0 else False
+
+        if filter_string is not None:
+            search_query["query"]["function_score"]["query"]["nested"]["query"]["function_score"]["query"]\
+            ["query"]["knn"][f"{TensorField.chunks}.{vector_field}"][
+                "filter"] = {
+                "query_string": {"query": f"{contextualised_filter}"}
+            }
+        body += [{"index": index_name}, search_query]
+    else:
+        for vector_field in vector_properties_to_search:
+            search_query = {
+                "size": result_count,
+                "from": offset,
+                "query": {
+                    "nested": {
+                        "path": TensorField.chunks,
+                        "inner_hits": {
+                            "_source": {
+                                "include": ["__chunks.__field_content", "__chunks.__field_name"]
+                            }
+                        },
+                        "query": {
+                            "knn": {
+                                f"{TensorField.chunks}.{vector_field}": {
+                                    "vector": vectorised_text,
+                                    "k": result_count + offset
+                                }
+                            }
+                        },
+                        "score_mode": "max"
                     }
                 },
                 "_source": {
@@ -2048,7 +2058,7 @@ def _vector_text_search(
     start_search_http_time = timer()
     response = HttpRequests(config).get(path=F"{index_name}/_msearch", body=utils.dicts_to_jsonl(body))
     end_search_http_time = timer()
-    # pprint.pprint(response)
+    pprint.pprint(response)
     total_search_http_time = end_search_http_time - start_search_http_time
     total_os_process_time = response["took"] * 0.001
     num_responses = len(response["responses"])
@@ -2060,6 +2070,7 @@ def _vector_text_search(
 
         # SEARCH TIMER-LOGGER (Log number of results and time for each search in multisearch)
         for i in range(len(vector_properties_to_search)):
+            print(i)
             indiv_responses = response["responses"][i]['hits']['hits']
             indiv_query_time = response["responses"][i]["took"] * 0.001
             logger.debug(

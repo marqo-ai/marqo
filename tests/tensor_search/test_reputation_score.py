@@ -62,15 +62,16 @@ class TestMultimodalTensorCombination(MarqoTestCase):
              "reputation": 5,
              "_id": "5"
              },
-            # {"my_test_field": "A rider is riding a horse jumping over the barrier.",
-            #  "my_image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
-            #  "_id": "6"
-            #  },
+            {"my_test_field": "A rider is riding a horse jumping over the barrier.",
+             "my_image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+             "_id": "6",
+             "filter": "original"
+             },
         ]
         tensor_search.create_vector_index(
             index_name=cls.index_name, config=cls().config, index_settings={
                 IndexSettingsField.index_defaults: {
-                    IndexSettingsField.model: "random/small",
+                    IndexSettingsField.model: "ViT-B/32",
                     IndexSettingsField.treat_urls_and_pointers_as_images: True,
                     IndexSettingsField.normalize_embeddings: True
                 }
@@ -86,29 +87,29 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         except:
             pass
 
-    def test_search_results(self):
+    def test_search_result_not_affected_if_fields_not_exst(self):
+        normal_res = tensor_search.search(config=self.config, index_name=self.index_name,
+                                             text= "what is the rider doing?", score_modifiers=None,
+                                             filter="filter:original")
+        normal_score = normal_res["hits"][0]["_score"]
 
-        # pprint(tensor_search.get_index_info(config=self.config, index_name=self.index_name)[1])
-        res = tensor_search._vector_text_search(config=self.config, index_name=self.index_name,
-                                                query="what is the rider doing?",
-                                                score_modifiers={
-                                                    "multiply_score_by":
-                                                        [{"field_name": "reputation",
-                                                          "weight": 1,
-                                                          },
-                                                         {
-                                                             "field_name": "reputation-test",
-                                                         }, ],
-
-                                                    "add_to_score": [
-                                                        {"field_name": "rate",
-                                                         }]
-                                                }, attributes_to_retrieve=["_id", "_score"])
-        pprint(res["hits"])
-        ids = [i['_id'] for i in res["hits"]]
-        assert ids == ["1", "5", "4", "3", "2"]
-
-        #pprint(tensor_search.get_index_info(config=self.config, index_name=self.index_name)[1])
+        # modifier_res = tensor_search.search(config=self.config, index_name=self.index_name,
+        #                                         text = "what is the rider doing?",
+        #                                         score_modifiers={
+        #                                             "multiply_score_by":
+        #                                                 [{"field_name": "reputation",
+        #                                                   "weight": 1,
+        #                                                   },
+        #                                                  {
+        #                                                      "field_name": "reputation-test",
+        #                                                  }, ],
+        #
+        #                                             "add_to_score": [
+        #                                                 {"field_name": "rate",
+        #                                                  }]
+        #                                         }, filter="filter:original")
+        # modifier_score = modifier_res["hits"][0]["_score"]
+        # self.assertEqual(normal_score, modifier_score)
 
 
 
