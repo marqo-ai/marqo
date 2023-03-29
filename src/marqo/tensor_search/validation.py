@@ -17,6 +17,7 @@ import jsonschema
 from marqo.tensor_search.models.settings_object import settings_schema
 from marqo.tensor_search.models.mappings_object import mappings_schema, multimodal_combination_schema
 from marqo.tensor_search.models.context_object import context_schema
+from marqo.tensor_search.models.custom_score_fields_object import custom_score_fiedls_schema
 
 
 def validate_query(q: Union[dict, str], search_method: Union[str, SearchMethod]):
@@ -556,3 +557,25 @@ def validate_multimodal_combination_mapping(field_mapping: dict):
                 f"In multimodal_combination fields, weight must be an int or float."
                 f"Please check `https://docs.marqo.ai/0.0.15/Advanced-Usage/document_fields/#multimodal-combination-object` for more info."
             )
+
+
+def validate_custom_score_fields(custom_score_fields: List[dict]):
+    if not isinstance(custom_score_fields, list):
+        raise InvalidArgError(
+                f"The `custom_score_fields` must be a list of dictionaries. Marqo received a `{custom_score_fields}` of type "
+                f"{type(custom_score_fields).__name__}, which is not valid. \n"
+                f"Please reformat your `custom_score_fields` as a list of dictionary and retry."
+                f"\n  "
+            )
+
+    for object in custom_score_fields:
+        try:
+            jsonschema.validate(instance=object, schema=custom_score_fiedls_schema)
+        except jsonschema.ValidationError as e:
+            raise InvalidArgError(
+                f"Error validating custom_score_fields object = `{object}`. Reason: \n{str(e)} "
+                f"Please revise your custom_score_fields based on the provided error."
+                f"\n Check `https://docs.marqo.ai/0.0.17/` for more info."
+            )
+
+        field_name = object["field_name"]

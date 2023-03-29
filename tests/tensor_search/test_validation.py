@@ -956,3 +956,25 @@ class TestValidateIndexSettings(unittest.TestCase):
                 raise AssertionError
             except InvalidArgError:
                 pass
+
+    def test_invalid_custom_score_fields(self):
+        invalid_custom_score_fields_list = [
+            # {"field_name": "reputation",
+            #  "weight": 1,
+            #  "combine_style": "multiply"
+            #  },
+            [
+                {"field_names": "reputation",
+                 "weight": 1,
+                 "combine_style": "multiply"
+                 },
+                {"field_name": "rate",
+                 "weight": 1,
+                 "combine_style": "additive"
+                 }
+            ]
+
+        ]
+
+        for invalid_custom_score_fields in invalid_custom_score_fields_list:
+            validation.validate_custom_score_fields(invalid_custom_score_fields)

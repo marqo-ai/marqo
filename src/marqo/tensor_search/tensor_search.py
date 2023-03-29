@@ -1981,16 +1981,6 @@ def _vector_text_search(
                             "score_mode": "max"
                         }
                     },
-                    "functions": [
-                        {
-                            "script_score": {
-                                "script": {
-                                    "source": "Math.log(1 + _score)"
-                                }
-                            }
-                        }
-                    ],
-                    "boost_mode": "replace"
                 }
             },
             "_source": {
@@ -2260,21 +2250,25 @@ def convert_custom_score_fields_to_script_score(custom_score_fields: List[Dict] 
         combine_style = config["combine_style"]
 
         if combine_style.lower() == "multiply":
+            # doc.containsKey check if the field is in the mappings.
+            # doc[].size() >0 and doc[].value instanceof java.lang.Number check if the field has a valid value
             script_parts.append(f"""
+            if (doc.containsKey('__chunks.{field_name}')) {{
                 if (doc['__chunks.{field_name}'].size() > 0 &&
                     (doc['__chunks.{field_name}'].value instanceof java.lang.Number)) {{
                     _score = _score * doc['__chunks.{field_name}'].value * {weight};
                 }}
+            }}
             """)
         elif combine_style.lower() == "additive":
-            script_parts.append(f"""
+            script_parts.append(f""" 
+            if (doc.containsKey('__chunks.{field_name}')) {{     
                 if (doc['__chunks.{field_name}'].size() > 0 &&
                     (doc['__chunks.{field_name}'].value instanceof java.lang.Number)) {{
                     additive = additive + doc['__chunks.{field_name}'].value * {weight};
                 }}
+            }}
             """)
-        else:
-            raise ValueError(f"Unsupported combine_style '{combine_style}' for field '{field_name}'.")
 
     script_parts.append("return (_score + additive);")
     script = "\n".join(script_parts)
