@@ -215,6 +215,204 @@ result = mq.index("my-first-index").search('adventure', searchable_attributes=['
 
 ```
 
+### Multi modal and cross modal search
+
+To power image and text search, Marqo allows users to plug and play with CLIP models from HuggingFace. **Note that if you do not configure multi modal search, image urls will be treated as strings.** To start indexing and searching with images, first create an index with a CLIP configuration, as below:
+
+```python
+
+settings = {
+    "treat_urls_and_pointers_as_images":True,   # allows us to find an image file and index it 
+    "model":"ViT-L/14"
+}
+response = mq.create_index("my-multimodal-index", **settings)
+
+```
+
+Images can then be added within documents as follows. You can use urls from the internet (for example S3) or from the disk of the machine:
+
+```python
+
+response = mq.index("my-multimodal-index").add_documents([{
+    "My Image": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+    "Description": "The hippopotamus, also called the common hippopotamus or river hippopotamus, is a large semiaquatic mammal native to sub-Saharan Africa",
+    "_id": "hippo-facts"
+}])
+
+```
+
+You can then search using text as usual. Both text and image fields will be searched:
+
+```python
+
+results = mq.index("my-multimodal-index").search('animal')
+
+```
+ Setting `searchable_attributes` to the image field `['My Image'] ` ensures only images are searched in this index:
+
+```python
+
+results = mq.index("my-multimodal-index").search('animal',  searchable_attributes=['My Image'])
+
+```
+
+### Searching using an image
+Searching using an image can be achieved by providing the image link.
+
+```python
+
+results = mq.index("my-multimodal-index").search('https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png')
+
+```
+
+### Searching using weights in queries
+Queries can also be provided as dictionaries where each key is a query and their corresponding values are weights. This allows for more advanced queries consisting of multiple components with weightings towards or against them, queries can have negations via negative weighting.
+
+The example below shows the application of this to a scenario where a user may want to ask a question but also negate results that match a certain semantic criterion. 
+
+```python
+
+import marqo
+import pprint
+
+mq = marqo.Client(url="http://localhost:8882")
+
+mq.index("my-weighted-query-index").add_documents(
+    [
+        {
+            "Title": "Smartphone",
+            "Description": "A smartphone is a portable computer device that combines mobile telephone "
+            "functions and computing functions into one unit.",
+        },
+        {
+            "Title": "Telephone",
+            "Description": "A telephone is a telecommunications device that permits two or more users to"
+            "conduct a conversation when they are too far apart to be easily heard directly.",
+        },
+        {
+            "Title": "Thylacine",
+            "Description": "The thylacine, also commonly known as the Tasmanian tiger or Tasmanian wolf, "
+            "is an extinct carnivorous marsupial."
+            "The last known of its species died in 1936.",
+        },
+    ]
+)
+
+# initially we ask for a type of communications device which is popular in the 21st century
+query = {
+    # a weighting of 1.1 gives this query slightly more importance
+    "I need to buy a communications device, what should I get?": 1.1,
+    # a weighting of 1 gives this query a neutral importance
+    "Technology that became prevelant in the 21st century": 1.0,
+}
+
+results = mq.index("my-weighted-query-index").search(
+    q=query, searchable_attributes=["Title", "Description"]
+)
+
+print("Query 1:")
+pprint.pprint(results)
+
+# now we ask for a type of communications which predates the 21st century
+query = {
+    # a weighting of 1 gives this query a neutral importance
+    "I need to buy a communications device, what should I get?": 1.0,
+    # a weighting of -1 gives this query a negation effect
+    "Technology that became prevelant in the 21st century": -1.0,
+}
+
+results = mq.index("my-weighted-query-index").search(
+    q=query, searchable_attributes=["Title", "Description"]
+)
+
+print("\nQuery 2:")
+pprint.pprint(results)
+
+```
+
+### Creating and searching indexes with multimodal combination fields
+Marqo lets you have indexes with multimodal combination fields. Multimodal combination fields can combine text and images into one field. This allows scoring of documents across the combined text and image fields together. It also allows for a single vector representation instead of needing many which saves on storage. The relative weighting of each component can be set per document.
+
+The example below demonstrates this with retrival of caption and image pairs using multiple types of queries.
+
+```python
+
+import marqo
+import pprint
+
+mq = marqo.Client(url="http://localhost:8882")
+
+settings = {"treat_urls_and_pointers_as_images": True, "model": "ViT-L/14"}
+
+mq.create_index("my-first-multimodal-index", **settings)
+
+mq.index("my-first-multimodal-index").add_documents(
+    [
+        {
+            "Title": "Flying Plane",
+            "captioned_image": {
+                "caption": "An image of a passenger plane flying in front of the moon.",
+                "image": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+            },
+        },
+        {
+            "Title": "Red Bus",
+            "captioned_image": {
+                "caption": "A red double decker London bus traveling to Aldwych",
+                "image": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg",
+            },
+        },
+        {
+            "Title": "Horse Jumping",
+            "captioned_image": {
+                "caption": "A person riding a horse over a jump in a competition.",
+                "image": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+            },
+        },
+    ],
+    # Create the mappings, here we define our captioned_image mapping 
+    # which weights the image more heavily than the caption - these pairs 
+    # will be represented by a single vector in the index
+    mappings={
+        "captioned_image": {
+            "type": "multimodal_combination",
+            "weights": {
+                "caption": 0.3,
+                "image": 0.7,
+            },
+        }
+    },
+)
+
+# Search this index with a simple text query
+results = mq.index("my-first-multimodal-index").search(
+    q="Give me some images of vehicles and modes of transport. I am especially interested in air travel and commercial aeroplanes.",
+    searchable_attributes=["captioned_image"],
+)
+
+print("Query 1:")
+pprint.pprint(results)
+
+# search the index with a query that uses weighted components
+results = mq.index("my-first-multimodal-index").search(
+    q={
+        "What are some vehicles and modes of transport?": 1.0,
+        "Aeroplanes and other things that fly": -1.0,
+    },
+    searchable_attributes=["captioned_image"],
+)
+print("\nQuery 2:")
+pprint.pprint(results)
+
+results = mq.index("my-first-multimodal-index").search(
+    q={"Animals of the Perissodactyla order": -1.0},
+    searchable_attributes=["captioned_image"],
+)
+print("\nQuery 3:")
+pprint.pprint(results)
+
+```
+
 ### Delete documents
 
 Delete documents.
@@ -232,67 +430,6 @@ Delete an index.
 ```python
 
 results = mq.index("my-first-index").delete()
-
-```
-
-## Multi modal and cross modal search
-
-To power image and text search, Marqo allows users to plug and play with CLIP models from HuggingFace. **Note that if you do not configure multi modal search, image urls will be treated as strings.** To start indexing and searching with images, first create an index with a CLIP configuration, as below:
-
-```python
-
-settings = {
-  "treat_urls_and_pointers_as_images":True,   # allows us to find an image file and index it 
-  "model":"ViT-L/14"
-}
-response = mq.create_index("my-multimodal-index", **settings)
-
-```
-
-Images can then be added within documents as follows. You can use urls from the internet (for example S3) or from the disk of the machine:
-
-```python
-
-response = mq.index("my-multimodal-index").add_documents([{
-    "My Image": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f2/Portrait_Hippopotamus_in_the_water.jpg/440px-Portrait_Hippopotamus_in_the_water.jpg",
-    "Description": "The hippopotamus, also called the common hippopotamus or river hippopotamus, is a large semiaquatic mammal native to sub-Saharan Africa",
-    "_id": "hippo-facts"
-}])
-
-```
-
- Setting `searchable_attributes` to the image field `['My Image'] ` ensures only images are searched in this index:
-
-```python
-
-results = mq.index("my-multimodal-index").search('animal',  searchable_attributes=['My Image'])
-
-```
-
-
-You can then search using text as usual. Both text and image fields will be searched:
-
-```python
-
-results = mq.index("my-multimodal-index").search('animal')
-
-```
-
-Setting `searchable_attributes` to the image field `['My Image'] ` ensures only images are searched in this index:
-
-```python
-
-results = mq.index("my-multimodal-index").search('animal', searchable_attributes=['My Image'])
-
-```
-
-### Searching using an image
-
-Searching using an image can be achieved by providing the image link.
-
-```python
-
-results = mq.index("my-multimodal-index").search('https://upload.wikimedia.org/wikipedia/commons/thumb/9/96/Standing_Hippopotamus_MET_DP248993.jpg/440px-Standing_Hippopotamus_MET_DP248993.jpg')
 
 ```
 
