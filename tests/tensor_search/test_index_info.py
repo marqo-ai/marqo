@@ -99,11 +99,7 @@ class TestIndexInfo(unittest.TestCase):
         )
         assert {"some_text_prop": {1:2334}, "cat": {"hat": "ter"}} == ii.get_text_properties()
 
-<<<<<<< HEAD
     def test_get_ann_parameters__default_index_param(self):
-=======
-    def test_get_ann_parameters_default_index_param(self):
->>>>>>> 624c1f2 (add hnsw hyperparameters m, ef_construction to default index_settings config)
         ii = IndexInfo(
             model_name='some model',
             properties={},
@@ -111,11 +107,7 @@ class TestIndexInfo(unittest.TestCase):
         )
         assert ii.get_ann_parameters() == configs.get_default_ann_parameters()
 
-<<<<<<< HEAD
     def test_get_ann_parameters__without_default_ann_parameters__use_defaults(self):
-=======
-    def test_get_ann_parameters_without_default_ann_parameters_use_defaults(self):
->>>>>>> 624c1f2 (add hnsw hyperparameters m, ef_construction to default index_settings config)
         index_settings = configs.get_default_index_settings()
         del index_settings[NsFields.index_defaults][NsFields.ann_parameters]
 
@@ -126,15 +118,9 @@ class TestIndexInfo(unittest.TestCase):
         )
         assert ii.get_ann_parameters() == configs.get_default_ann_parameters()
 
-<<<<<<< HEAD
     def test_get_ann_parameters__use_specified_index_settings__overide_defaults(self):
         index_settings = configs.get_default_index_settings()
         index_settings[NsFields.index_defaults][NsFields.ann_parameters][NsFields.ann_method_name] = "not-hnsw"
-=======
-    def test_get_ann_parameters_use_specified_index_settings(self):
-        index_settings = configs.get_default_index_settings()
-        index_settings[NsFields.index_defaults][NsFields.ann_parameters][NsFields.ann_method] = "not-hnsw"
->>>>>>> 624c1f2 (add hnsw hyperparameters m, ef_construction to default index_settings config)
 
         ii = IndexInfo(
             model_name='some model',
@@ -143,7 +129,6 @@ class TestIndexInfo(unittest.TestCase):
         )
         actual = ii.get_ann_parameters()
         default = configs.get_default_ann_parameters()
-<<<<<<< HEAD
         assert actual[NsFields.ann_method_name] == "not-hnsw"
         
         del actual[NsFields.ann_method_name]
@@ -152,16 +137,6 @@ class TestIndexInfo(unittest.TestCase):
         assert actual == default
 
     def test_get_ann_parameters__use_specified_ann_method_parameters__default_unspecified_values(self):
-=======
-        assert actual[NsFields.ann_method] == "not-hnsw"
-        
-        del actual[NsFields.ann_method]
-        del default[NsFields.ann_method]
-
-        assert actual == default
-
-    def test_get_ann_parameters_use_specified_ann_method_parameters(self):
->>>>>>> 624c1f2 (add hnsw hyperparameters m, ef_construction to default index_settings config)
         index_settings = configs.get_default_index_settings()
         index_settings[NsFields.index_defaults][NsFields.ann_parameters][NsFields.ann_method_parameters] = {
             NsFields.hnsw_ef_construction: 1,
