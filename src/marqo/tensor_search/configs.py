@@ -28,7 +28,7 @@ def get_default_index_settings():
 
 def get_default_ann_parameters(): 
     return {
-        NsFields.ann_method: "hnsw",
+        NsFields.ann_method_name: "hnsw",
         NsFields.ann_metric: "cosinesimil",
 
         # `ann_engine` not exposed to customer (via index settings).

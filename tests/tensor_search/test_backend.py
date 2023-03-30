@@ -115,7 +115,7 @@ class TestBackend(MarqoTestCase):
         args, kwargs0 = mock__put.call_args_list[0]
         sent_dict = json.loads(kwargs0["body"])
         assert sent_dict["properties"][enums.TensorField.chunks]["properties"][utils.generate_vector_name(field_name="f1")]["method"]['engine'] == "lucene"
-        assert sent_dict["properties"][enums.TensorField.chunks]["properties"][utils.generate_vector_name(field_name="f1")]["method"]["method_parameters"] == {
+        assert sent_dict["properties"][enums.TensorField.chunks]["properties"][utils.generate_vector_name(field_name="f1")]["method"]["parameters"] == {
                             enums.IndexSettingsField.hnsw_ef_construction: 1,
                             enums.IndexSettingsField.hnsw_m: 2
                         }

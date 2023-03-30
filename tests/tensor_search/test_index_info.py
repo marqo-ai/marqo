@@ -120,7 +120,7 @@ class TestIndexInfo(unittest.TestCase):
 
     def test_get_ann_parameters__use_specified_index_settings__overide_defaults(self):
         index_settings = configs.get_default_index_settings()
-        index_settings[NsFields.index_defaults][NsFields.ann_parameters][NsFields.ann_method] = "not-hnsw"
+        index_settings[NsFields.index_defaults][NsFields.ann_parameters][NsFields.ann_method_name] = "not-hnsw"
 
         ii = IndexInfo(
             model_name='some model',
@@ -129,10 +129,10 @@ class TestIndexInfo(unittest.TestCase):
         )
         actual = ii.get_ann_parameters()
         default = configs.get_default_ann_parameters()
-        assert actual[NsFields.ann_method] == "not-hnsw"
+        assert actual[NsFields.ann_method_name] == "not-hnsw"
         
-        del actual[NsFields.ann_method]
-        del default[NsFields.ann_method]
+        del actual[NsFields.ann_method_name]
+        del default[NsFields.ann_method_name]
 
         assert actual == default
 

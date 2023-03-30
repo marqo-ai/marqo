@@ -58,9 +58,10 @@ class IndexSettingsField:
 
     ann_parameters = "ann_parameters"
     ann_method = "method"
+    ann_method_name = "name"
     ann_metric = "space_type"
     ann_engine = "engine"
-    ann_method_parameters = "method_parameters"
+    ann_method_parameters = "parameters"
 
     # method_parameters keys for "method"="hnsw"
     hnsw_ef_construction = "ef_construction"
