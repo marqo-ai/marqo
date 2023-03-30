@@ -1,26 +1,7 @@
-import time
-import unittest.mock
-import pprint
-
-import torch
-
-import marqo.tensor_search.backend
 from marqo.errors import IndexNotFoundError, InvalidArgError
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import TensorField, IndexSettingsField, SearchMethod
 from tests.marqo_test import MarqoTestCase
-from marqo.tensor_search.tensor_search import add_documents, vectorise_multimodal_combination_field
-from marqo.errors import DocumentNotFoundError
-import numpy as np
-from marqo.tensor_search.validation import validate_dict
-from marqo.s2_inference.s2_inference import vectorise
-import requests
-from marqo.s2_inference.clip_utils import load_image_from_path
-import json
-from unittest.mock import patch
-from marqo.errors import MarqoWebError
-from pprint import pprint
-from marqo._httprequests import HttpRequests
 
 class TestMultimodalTensorCombination(MarqoTestCase):
 
