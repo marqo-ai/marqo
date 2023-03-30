@@ -23,7 +23,7 @@ class SearchQuery(BaseModel):
     boost: Optional[Dict] = None
     image_download_headers: Optional[Dict] = None
     context: Optional[Dict] = None
-    score_modifiers: Optional[Dict] = None
+    scoreModifiers: Optional[Dict] = None
 
     @pydantic.validator('searchMethod')
     def validate_search_method(cls, value):
