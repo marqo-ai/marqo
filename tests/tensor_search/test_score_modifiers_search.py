@@ -427,6 +427,86 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         assert len(modifier_res["hits"]) == 1
         assert modifier_res["hits"][0]["_id"] == "0"
 
+    def test_searchable_attributes_work(self):
+        documents = [
+            {"my_text_field": "A rider is riding a horse jumping over the barrier.",
+             "my_image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+             # 4 fields
+             "multiply_1": 1,
+             "multiply_2": 20.0,
+             "add_1": 1.0,
+             "add_2": 30.0,
+             "_id": "1"
+             },
+        ]
+
+        tensor_search.add_documents(config=self.config, index_name=self.index_name, docs=documents,
+                                    non_tensor_fields=["multiply_1", "multiply_2", "add_1", "add_2",
+                                                       "filter"], auto_refresh=True)
+
+        score_modifiers = {
+                # miss one weight
+                "multiply_score_by":
+                    [{"field_name": "multiply_1",
+                      "weight": 1, },
+                     {"field_name": "multiply_2", }],
+                "add_to_score": [
+                    {"field_name": "add_1", "weight": -3,
+                     },
+                    {"field_name": "add_2", "weight": 1,
+                     }]
+            }
+
+        modifier_res = tensor_search.search(config=self.config, index_name=self.index_name,
+                                                text = "what is the rider doing?",
+                                                score_modifiers=score_modifiers, result_count=10,
+                                                searchable_attributes=["my_text_field"])
+
+        assert len(modifier_res["hits"]) == 1
+        assert modifier_res["hits"][0]["_id"] == "1"
+
+    def test_attributes_to_retrieve(self):
+        documents = [
+            {"my_text_field": "A rider is riding a horse jumping over the barrier.",
+             "my_image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+             # 4 fields
+             "multiply_1": 1,
+             "multiply_2": 20.0,
+             "add_1": 1.0,
+             "add_2": 30.0,
+             "_id": "1"
+             },
+        ]
+
+        tensor_search.add_documents(config=self.config, index_name=self.index_name, docs=documents,
+                                    non_tensor_fields=["multiply_1", "multiply_2", "add_1", "add_2",
+                                                       "filter"], auto_refresh=True)
+
+        score_modifiers = {
+                # miss one weight
+                "multiply_score_by":
+                    [{"field_name": "multiply_1",
+                      "weight": 1, },
+                     {"field_name": "multiply_2", }],
+                "add_to_score": [
+                    {"field_name": "add_1", "weight": -3,
+                     },
+                    {"field_name": "add_2", "weight": 1,
+                     }]
+            }
+
+        modifier_res = tensor_search.search(config=self.config, index_name=self.index_name,
+                                                text = "what is the rider doing?",
+                                                score_modifiers=score_modifiers, result_count=10,
+                                                attributes_to_retrieve=["_id"])
+
+
+        assert len(modifier_res["hits"]) == 1
+        assert modifier_res["hits"][0]["_id"] == "1"
+        doc = documents[0]
+        del doc["_id"]
+        for field in list(doc):
+            assert field not in modifier_res["hits"][0]
 
 
 

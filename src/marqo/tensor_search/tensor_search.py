@@ -1938,52 +1938,7 @@ def _vector_text_search(
         validated_score_modifiers = validation.validate_score_modifiers_object(score_modifiers)
         script_score = convert_validated_score_modifiers_to_script_score(validated_score_modifiers)
         for vector_field in vector_properties_to_search:
-            search_query = {
-                "size": result_count,
-                "from": offset,
-                "query": {
-                    "function_score": {
-                        "query": {
-                            "nested": {
-                                "path": TensorField.chunks,
-                                "inner_hits": {
-                                    "_source": {
-                                        "include": ["__chunks.__field_content", "__chunks.__field_name",
-                                                    "__chunks.reputation"]
-                                    }
-                                },
-                                "query": {
-                                    "function_score": {
-                                        "query": {
-                                            "knn": {
-                                                f"{TensorField.chunks}.{vector_field}": {
-                                                    "vector": vectorised_text,
-                                                    "k": result_count + offset
-                                                }
-                                            }
-                                        },
-                                        "functions": [
-                                            {
-                                                "script_score": {
-                                                    "script": {
-                                                        "source": script_score
-                                                    }
-                                                }
-                                            }
-                                        ],
-                                        "boost_mode": "replace"
-                                    }
-                                },
-                                "score_mode": "max"
-                            }
-                        },
-                    }
-                },
-                "_source": {
-                    "exclude": ["__chunks.__vector_*"]
-                }
-            }
-
+            search_query = _create_score_modifiers_tensor_search_query(result_count, offset, vector_field, vectorised_text, script_score)
             if attributes_to_retrieve is not None:
                 search_query["_source"] = {"include": attributes_to_retrieve} if len(attributes_to_retrieve) > 0 else False
 
@@ -1996,33 +1951,7 @@ def _vector_text_search(
             body += [{"index": index_name}, search_query]
     else:
         for vector_field in vector_properties_to_search:
-            search_query = {
-                "size": result_count,
-                "from": offset,
-                "query": {
-                    "nested": {
-                        "path": TensorField.chunks,
-                        "inner_hits": {
-                            "_source": {
-                                "include": ["__chunks.__field_content", "__chunks.__field_name"]
-                            }
-                        },
-                        "query": {
-                            "knn": {
-                                f"{TensorField.chunks}.{vector_field}": {
-                                    "vector": vectorised_text,
-                                    "k": result_count + offset
-                                }
-                            }
-                        },
-                        "score_mode": "max"
-                    }
-                },
-                "_source": {
-                    "exclude": ["__chunks.__vector_*"]
-                }
-            }
-
+            search_query = _create_normal_tensor_search_query(result_count, offset, vector_field, vectorised_text)
             if attributes_to_retrieve is not None:
                 search_query["_source"] = {"include": attributes_to_retrieve} if len(attributes_to_retrieve) > 0 else False
 
@@ -2588,3 +2517,81 @@ def vectorise_multimodal_combination_field(field: str, multimodal_object: Dict[s
         TensorField.field_name: field,
     })
     return combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add, new_fields_from_multimodal_combination
+
+def _create_normal_tensor_search_query(result_count, offset, vector_field, vectorised_text) -> dict:
+    search_query = {
+        "size": result_count,
+        "from": offset,
+        "query": {
+            "nested": {
+                "path": TensorField.chunks,
+                "inner_hits": {
+                    "_source": {
+                        "include": ["__chunks.__field_content", "__chunks.__field_name"]
+                    }
+                },
+                "query": {
+                    "knn": {
+                        f"{TensorField.chunks}.{vector_field}": {
+                            "vector": vectorised_text,
+                            "k": result_count + offset
+                        }
+                    }
+                },
+                "score_mode": "max"
+            }
+        },
+        "_source": {
+            "exclude": ["__chunks.__vector_*"]
+        }
+    }
+    return search_query
+
+
+def _create_score_modifiers_tensor_search_query(result_count, offset, vector_field, vectorised_text, script_score) -> dict:
+    search_query = {
+        "size": result_count,
+        "from": offset,
+        "query": {
+            "function_score": {
+                "query": {
+                    "nested": {
+                        "path": TensorField.chunks,
+                        "inner_hits": {
+                            "_source": {
+                                "include": ["__chunks.__field_content", "__chunks.__field_name",
+                                            "__chunks.reputation"]
+                            }
+                        },
+                        "query": {
+                            "function_score": {
+                                "query": {
+                                    "knn": {
+                                        f"{TensorField.chunks}.{vector_field}": {
+                                            "vector": vectorised_text,
+                                            "k": result_count + offset
+                                        }
+                                    }
+                                },
+                                "functions": [
+                                    {
+                                        "script_score": {
+                                            "script": {
+                                                "source": script_score
+                                            }
+                                        }
+                                    }
+                                ],
+                                "boost_mode": "replace"
+                            }
+                        },
+                        "score_mode": "max"
+                    }
+                },
+            }
+        },
+        "_source": {
+            "exclude": ["__chunks.__vector_*"]
+        }
+    }
+    return search_query
