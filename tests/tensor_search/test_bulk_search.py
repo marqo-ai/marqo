@@ -52,7 +52,7 @@ class TestBulkSearch(MarqoTestCase):
                 {"abc": "random text", "other field": "Close match hehehe", "_id": "id1-second"},
             ], auto_refresh=True
         ) 
-        with self.assertRaises(RequestValidationError):
+        with self.assertRaises(pydantic.ValidationError):
             api.bulk_search(BulkSearchQuery(queries=[{
                 "index": self.index_name_1,
                 "q": "title about some doc",
