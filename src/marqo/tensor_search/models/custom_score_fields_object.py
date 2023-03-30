@@ -1,5 +1,3 @@
-from marqo.tensor_search.constants import ALLOWED_CUSTOM_SCORE_FIELDS_OPERATIONS
-
 score_modifiers_object_schema = {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
