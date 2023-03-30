@@ -2,6 +2,8 @@ from marqo.errors import IndexNotFoundError, InvalidArgError
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import TensorField, IndexSettingsField, SearchMethod
 from tests.marqo_test import MarqoTestCase
+from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQueryEntity
+from pprint import pprint
 
 class TestMultimodalTensorCombination(MarqoTestCase):
 
@@ -488,6 +490,37 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         del doc["_id"]
         for field in list(doc):
             assert field not in modifier_res["hits"][0]
+
+    def test_bulk_search_multiple_indexes_and_queries(self):
+        index_name = "bulk_test"
+        score_modifiers = {
+                # miss one weight
+                "multiply_score_by":
+                    [{"field_name": "multiply_1",
+                      "weight": 1, },
+                     {"field_name": "multiply_2", }],
+                "add_to_score": [
+                    {"field_name": "add_1", "weight": -3,
+                     },
+                    {"field_name": "add_2", "weight": 1,
+                     }]
+            }
+        tensor_search.add_documents(
+            config=self.config, index_name=index_name, docs=[
+                {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "id1-first"},
+                {"abc": "random text", "other field": "Close match hehehe", "_id": "id1-second"},
+            ], auto_refresh=True
+        )
+        try:
+            response = tensor_search.bulk_search(marqo_config=self.config, query=BulkSearchQuery(
+                queries=[
+                    BulkSearchQueryEntity(index=index_name, q="hehehe", limit=2, score_modifiers = score_modifiers),
+                ]
+            ))
+            raise AssertionError
+        except InvalidArgError:
+            pass
+
 
 
 
