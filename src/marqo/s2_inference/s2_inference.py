@@ -53,7 +53,11 @@ def vectorise(model_name: str, content: Union[str, List[str]], model_properties:
             batch_size = read_env_vars_and_defaults(EnvVars.MARQO_MAX_VECTORISE_BATCH_SIZE)
             for batch in generate_batches(content, batch_size=batch_size):
                 vector_batches.append(available_models[model_cache_key].encode(batch, normalize=normalize_embeddings, **kwargs))
-            vectorised = functools.reduce(lambda x, y: numpy.concatenate(x, y), vector_batches)
+            if not vector_batches or all(
+                    len(batch) == 0 for batch in vector_batches):  # Check for empty vector_batches or empty arrays
+                vectorised = np.array([])  # Return an empty array
+            else:
+                vectorised = np.concatenate(vector_batches, axis=0)
     except UnidentifiedImageError as e:
         raise VectoriseError(str(e)) from e
 
