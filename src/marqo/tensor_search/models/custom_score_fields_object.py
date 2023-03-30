@@ -19,7 +19,8 @@ score_modifiers_object_schema = {
         },
         "required": [
           "field_name"
-        ]
+        ],
+        "additionalProperties": False
       }
     },
     "add_to_score": {
@@ -37,7 +38,8 @@ score_modifiers_object_schema = {
         },
         "required": [
           "field_name"
-        ]
+        ],
+        "additionalProperties": False
       }
     }
   },

@@ -367,6 +367,7 @@ def _infer_opensearch_data_type(
                                      "to check.")
     elif isinstance(to_check, str):
         return OpenSearchDataType.text
+
     else:
         return None
 
@@ -1983,16 +1984,16 @@ def _vector_text_search(
                 }
             }
 
-        if attributes_to_retrieve is not None:
-            search_query["_source"] = {"include": attributes_to_retrieve} if len(attributes_to_retrieve) > 0 else False
+            if attributes_to_retrieve is not None:
+                search_query["_source"] = {"include": attributes_to_retrieve} if len(attributes_to_retrieve) > 0 else False
 
-        if filter_string is not None:
-            search_query["query"]["function_score"]["query"]["nested"]["query"]["function_score"]["query"]\
-            ["query"]["knn"][f"{TensorField.chunks}.{vector_field}"][
-                "filter"] = {
-                "query_string": {"query": f"{contextualised_filter}"}
-            }
-        body += [{"index": index_name}, search_query]
+            if filter_string is not None:
+                search_query["query"]["function_score"]["query"]["nested"]["query"]["function_score"]["query"]\
+                    ["knn"][f"{TensorField.chunks}.{vector_field}"][
+                    "filter"] = {
+                    "query_string": {"query": f"{contextualised_filter}"}
+                }
+            body += [{"index": index_name}, search_query]
     else:
         for vector_field in vector_properties_to_search:
             search_query = {
@@ -2022,15 +2023,15 @@ def _vector_text_search(
                 }
             }
 
-        if attributes_to_retrieve is not None:
-            search_query["_source"] = {"include": attributes_to_retrieve} if len(attributes_to_retrieve) > 0 else False
+            if attributes_to_retrieve is not None:
+                search_query["_source"] = {"include": attributes_to_retrieve} if len(attributes_to_retrieve) > 0 else False
 
-        if filter_string is not None:
-            search_query["query"]["nested"]["query"]["knn"][f"{TensorField.chunks}.{vector_field}"][
-                "filter"] = {
-                "query_string": {"query": f"{contextualised_filter}"}
-            }
-        body += [{"index": index_name}, search_query]
+            if filter_string is not None:
+                search_query["query"]["nested"]["query"]["knn"][f"{TensorField.chunks}.{vector_field}"][
+                    "filter"] = {
+                    "query_string": {"query": f"{contextualised_filter}"}
+                }
+            body += [{"index": index_name}, search_query]
     if verbose:
         print("vector search body:")
         if verbose == 1:
@@ -2058,7 +2059,6 @@ def _vector_text_search(
     start_search_http_time = timer()
     response = HttpRequests(config).get(path=F"{index_name}/_msearch", body=utils.dicts_to_jsonl(body))
     end_search_http_time = timer()
-    pprint.pprint(response)
     total_search_http_time = end_search_http_time - start_search_http_time
     total_os_process_time = response["took"] * 0.001
     num_responses = len(response["responses"])
@@ -2067,10 +2067,8 @@ def _vector_text_search(
 
     try:
         responses = [r['hits']['hits'] for r in response["responses"]]
-
         # SEARCH TIMER-LOGGER (Log number of results and time for each search in multisearch)
         for i in range(len(vector_properties_to_search)):
-            print(i)
             indiv_responses = response["responses"][i]['hits']['hits']
             indiv_query_time = response["responses"][i]["took"] * 0.001
             logger.debug(
@@ -2306,8 +2304,9 @@ def convert_validated_score_modifiers_to_script_score(validated_score_modifiers:
         }}
         """)
 
-    script_parts.append("return (_score + additive);")
+    script_parts.append(f"return Math.max(0.0, (_score + additive));")
     script = "\n".join(script_parts)
+    #print(script)
     return f"""{script}"""
 
 
