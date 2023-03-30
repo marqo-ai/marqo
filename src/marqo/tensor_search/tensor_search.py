@@ -367,7 +367,6 @@ def _infer_opensearch_data_type(
                                      "to check.")
     elif isinstance(to_check, str):
         return OpenSearchDataType.text
-
     else:
         return None
 
@@ -1802,6 +1801,7 @@ def _vector_text_search(
         attributes_to_retrieve: if set, only returns these fields
         image_download_headers: headers for downloading images
         context: a dictionary to allow custom vectors in search
+        score_modifiers: a dictionary to modify the score based on field values, for tensor search only
     Returns:
 
     Note:
@@ -2044,8 +2044,8 @@ def _vector_text_search(
                         readable_body[i]["query"]["nested"]["query"]["knn"][vec]["vector"][:5]
             pprint.pprint(readable_body)
         if verbose == 2:
-            print("==" * 30)
             pprint.pprint(body, compact=True)
+
     if not body:
         # empty body means that there are no vector fields associated with the index.
         # This probably means the index is emtpy
@@ -2057,7 +2057,9 @@ def _vector_text_search(
 
     # SEARCH TIMER-LOGGER (roundtrip)
     start_search_http_time = timer()
-    response = HttpRequests(config).get(path=F"{index_name}/_msearch", body=utils.dicts_to_jsonl(body))
+    response = HttpRequests(config).get(path=F"{index_name}/_msearch",
+                                        body=utils.dicts_to_jsonl(body))
+
     end_search_http_time = timer()
     total_search_http_time = end_search_http_time - start_search_http_time
     total_os_process_time = response["took"] * 0.001
@@ -2067,6 +2069,7 @@ def _vector_text_search(
 
     try:
         responses = [r['hits']['hits'] for r in response["responses"]]
+
         # SEARCH TIMER-LOGGER (Log number of results and time for each search in multisearch)
         for i in range(len(vector_properties_to_search)):
             indiv_responses = response["responses"][i]['hits']['hits']
@@ -2166,6 +2169,7 @@ def _vector_text_search(
         return sorted(as_list, key=lambda x: x["chunks"][0]["_score"], reverse=True)
 
     completely_sorted = sort_docs(docs_chunks_sorted)
+
     if verbose:
         print("Chunk vector search, sorted result:")
         if verbose == 1:
@@ -2216,6 +2220,7 @@ def _vector_text_search(
     else:
         res = format_ordered_docs_preserving(ordered_docs_w_chunks=completely_sorted,
                                              num_highlights=number_of_highlights)
+
     end_postprocess_time = timer()
     total_postprocess_time = end_postprocess_time - start_postprocess_time
     logger.debug(
