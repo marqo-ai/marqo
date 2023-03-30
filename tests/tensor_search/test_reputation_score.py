@@ -225,6 +225,166 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                 if abs(expected_score - result["_score"]) > epsilon:
                     raise AssertionError
 
+    def test_search_score_modified_as_expected_with_skipped_fieds(self):
+        # multiply_1 is string here, which should be skipped in modification
+        documents = [
+            {"my_text_field": "A rider is riding a horse jumping over the barrier.",
+             "my_image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+             # 4 fields
+             "multiply_1": "1",
+             "multiply_2": 20.0,
+             "add_1": 1.0,
+             "add_2": 30.0,
+             "_id": "1"
+             },
+            {"my_text_field": "A rider is riding a horse jumping over the barrier.",
+             "my_image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+             # let's multiply by 0
+             "multiply_1": "0",
+             "multiply_2": 20.0,
+             "add_1": 1.0,
+             "add_2": 3.0,
+             "_id": "2"
+             },
+            {"my_text_field": "A rider is riding a horse jumping over the barrier.",
+             "my_image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+             # 2 fields
+             "multiply_2": 20.3,
+             "add_1": 1.2,
+             "_id": "3"
+             },
+            {"my_text_field": "A rider is riding a horse jumping over the barrier.",
+             "my_image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+             # change order
+             "add_1": 1.0,
+             "add_2": 3.0,
+             "multiply_1": "1",
+             "multiply_2": -20.0,
+             "_id": "4"
+             },
+            {"my_text_field": "A rider is riding a horse jumping over the barrier.",
+             "my_image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+             # float
+             "multiply_1": "1",
+             "multiply_2": 2.531,
+             "add_1": 1.454,
+             "add_2": -3.692,
+             "_id": "5"
+             },
+            {"my_text_field": "A rider is riding a horse jumping over the barrier.",
+             "my_image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+             "_id": "0",
+             "filter": "original"
+             },
+        ]
+
+        tensor_search.add_documents(config=self.config, index_name=self.index_name, docs=documents,
+                                    non_tensor_fields=["multiply_1", "multiply_2", "add_1", "add_2",
+                                                       "filter"], auto_refresh=True)
+
+        normal_res = tensor_search.search(config=self.config, index_name=self.index_name,
+                                          text="what is the rider doing?", score_modifiers=None, result_count=10)
+        normal_score = normal_res["hits"][0]["_score"]
+
+        epsilon = 1e-5
+        score_modifiers_list = [
+            {
+                # miss one weight
+                "multiply_score_by":
+                    [{"field_name": "multiply_1",
+                      "weight": 1,},
+                     {"field_name": "multiply_2",}],
+                "add_to_score": [
+                    {"field_name": "add_1", "weight" : -3,
+                     },
+                    {"field_name": "add_2", "weight": 1,
+                     }]
+            },
+            {
+                # 0 weight
+                "multiply_score_by":
+                    [{"field_name": "multiply_1",
+                      "weight": 1.0, },
+                     {"field_name": "multiply_2",
+                      "weight": 0}],
+                "add_to_score": [
+                    {"field_name": "add_1", "weight": -3,
+                     },
+                    {"field_name": "add_2", "weight": 1,
+                     }]
+            },
+            {
+                # remove one field
+                "multiply_score_by":
+                    [
+                     {"field_name": "multiply_2",
+                      "weight": 1.2}],
+                "add_to_score": [
+                    {"field_name": "add_1", "weight": -3,
+                     },
+                    {"field_name": "add_2", "weight": 1,
+                     }]
+            },
+            {  # one part to be none
+                "multiply_score_by": [],
+                "add_to_score": [
+                    {"field_name": "add_1", "weight": -3,
+                     },
+                    {"field_name": "add_2", "weight": 1,
+                     }]
+            },
+        ]
+
+        for score_modifiers in score_modifiers_list:
+            modifier_res = tensor_search.search(config=self.config, index_name=self.index_name,
+                                                    text = "what is the rider doing?",
+                                                    score_modifiers=score_modifiers, result_count=10)
+
+            assert len(modifier_res["hits"]) == len(documents)
+            for result in modifier_res["hits"]:
+                expected_score = self.get_expected_score(result, normal_score, score_modifiers)
+                if abs(expected_score - result["_score"]) > epsilon:
+                    raise AssertionError
+
+    def test_expected_error_raised(self):
+        documents = [
+            {"my_text_field": "A rider is riding a horse jumping over the barrier.",
+             "my_image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+             # 4 fields
+             "multiply_1": 1,
+             "multiply_2": 20.0,
+             "add_1": 1.0,
+             "add_2": 30.0,
+             "_id": "1"
+             },
+        ]
+
+        invalid_score_modifiers =             {
+                # typo in multiply_score_by
+                "multiply_scores_by":
+                    [{"field_name": "reputation",
+                      "weight": 1,
+                      },
+                     {
+                         "field_name": "reputation-test",
+                     }, ],
+                "add_to_score": [
+                    {"field_name": "rate",
+                     }],
+            },
+
+        tensor_search.add_documents(config=self.config, index_name=self.index_name, docs=documents,
+                                    non_tensor_fields=["multiply_1", "multiply_2", "add_1", "add_2",
+                                                       "filter"], auto_refresh=True)
+        try:
+            modifier_res = tensor_search.search(config=self.config, index_name=self.index_name,
+                                                text = "what is the rider doing?",
+                                                score_modifiers=invalid_score_modifiers, result_count=10)
+            raise AssertionError
+        except InvalidArgError:
+            pass
+
+
 
 
 
