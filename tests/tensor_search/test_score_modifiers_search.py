@@ -520,17 +520,3 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             raise AssertionError
         except InvalidArgError:
             pass
-
-
-
-
-
-
-
-
-
-
-
-
-
-
