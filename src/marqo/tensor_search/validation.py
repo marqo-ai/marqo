@@ -17,7 +17,7 @@ import jsonschema
 from marqo.tensor_search.models.settings_object import settings_schema
 from marqo.tensor_search.models.mappings_object import mappings_schema, multimodal_combination_schema
 from marqo.tensor_search.models.context_object import context_schema
-from marqo.tensor_search.models.custom_score_fields_object import score_modifiers_object_schema
+from marqo.tensor_search.models.score_modifiers_object import score_modifiers_object_schema
 
 
 def validate_query(q: Union[dict, str], search_method: Union[str, SearchMethod]):

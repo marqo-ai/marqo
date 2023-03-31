@@ -1,9 +1,12 @@
+import unittest.mock
+from unittest.mock import patch
 from marqo.errors import IndexNotFoundError, InvalidArgError
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import TensorField, IndexSettingsField, SearchMethod
 from tests.marqo_test import MarqoTestCase
 from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQueryEntity
 from pprint import pprint
+from marqo.tensor_search.tensor_search import _create_normal_tensor_search_query
 
 class TestMultimodalTensorCombination(MarqoTestCase):
 
@@ -342,7 +345,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
              },
         ]
 
-        invalid_score_modifiers =             {
+        invalid_score_modifiers = {
                 # typo in multiply_score_by
                 "multiply_scores_by":
                     [{"field_name": "reputation",
@@ -490,6 +493,32 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         del doc["_id"]
         for field in list(doc):
             assert field not in modifier_res["hits"][0]
+
+    def test_normal_query_body_is_called(self):
+        documents = [
+            {"my_text_field": "A rider is riding a horse jumping over the barrier.",
+             "my_image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+             "_id": "0",
+             "filter": "original"
+             },
+        ]
+        tensor_search.add_documents(config=self.config, index_name=self.index_name, docs=documents,
+                                    non_tensor_fields=["multiply_1", "multiply_2", "add_1", "add_2",
+                                                       "filter"], auto_refresh=True)
+        def pass_create_normal_tensor_search_query(*arg, **kwargs):
+            return _create_normal_tensor_search_query(*arg, **kwargs)
+
+        mock_create_normal_tensor_search_query = unittest.mock.MagicMock()
+        mock_create_normal_tensor_search_query.side_effect = pass_create_normal_tensor_search_query
+
+        @unittest.mock.patch("marqo.tensor_search.tensor_search._create_normal_tensor_search_query", mock_create_normal_tensor_search_query)
+        def run():
+            normal_res = tensor_search.search(config=self.config, index_name=self.index_name,
+                                              text="what is the rider doing?", score_modifiers=None, result_count=10)
+            mock_create_normal_tensor_search_query.assert_called()
+
+            return True
+        assert run()
 
     def test_bulk_search_multiple_indexes_and_queries(self):
         index_name = "bulk_test"

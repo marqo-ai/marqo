@@ -4,6 +4,7 @@ score_modifiers_object_schema = {
   "properties": {
     "multiply_score_by": {
       "type": "array",
+      "minItems": 1,
       "items": {
         "type": "object",
         "properties": {
@@ -23,6 +24,7 @@ score_modifiers_object_schema = {
     },
     "add_to_score": {
       "type": "array",
+      "minItems": 1,
       "items": {
         "type": "object",
         "properties": {

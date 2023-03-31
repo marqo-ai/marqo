@@ -1065,6 +1065,18 @@ class TestValidateIndexSettings(unittest.TestCase):
 
                 "add_to_score": None
             },
+            {  # one part to be empty
+                "multiply_score_by": [],
+                "add_to_score": [
+                    {"field_name": "rate",
+                     }]
+            },
+            {  # two parts to be empty
+                "multiply_score_by": [],
+                "add_to_score": [],
+            },
+
+
         ]
         for invalid_custom_score_fields in invalid_custom_score_fields_list:
             try:
@@ -1105,16 +1117,6 @@ class TestValidateIndexSettings(unittest.TestCase):
                 "add_to_score": [
                     {"field_name": "rate",
                      }]
-            },
-            {   # one part to be empty
-                "multiply_score_by": [],
-                "add_to_score": [
-                    {"field_name": "rate",
-                     }]
-            },
-            {  # two parts to be empty
-                "multiply_score_by": [],
-                "add_to_score": [],
             },
         ]
 
