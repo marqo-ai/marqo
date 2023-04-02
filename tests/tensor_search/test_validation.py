@@ -2,15 +2,12 @@ from marqo.tensor_search import validation
 from enum import Enum
 from marqo.tensor_search import enums
 import unittest
-import copy
 from unittest import mock
 from marqo.errors import (
     MarqoError, InvalidFieldNameError, InternalError,
     InvalidDocumentIdError, InvalidArgError, DocTooLargeError,
     InvalidIndexNameError
 )
-import pprint
-
 
 class TestValidation(unittest.TestCase):
 
@@ -1033,6 +1030,20 @@ class TestValidateIndexSettings(unittest.TestCase):
                      {
                          "field_name": "reputation-test",
                      },],
+                "add_to_score": [
+                    {"field_name": "rate",
+                     }]
+            },
+            {
+                # field name can't be "_id"
+                "multiply_score_by":
+                    [{"field_name": "_id",
+                      "weight": 1,
+                      },
+                     {
+                         "field_name": "reputation-test",
+                     }, ],
+
                 "add_to_score": [
                     {"field_name": "rate",
                      }]
