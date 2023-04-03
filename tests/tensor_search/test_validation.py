@@ -1086,8 +1086,6 @@ class TestValidateIndexSettings(unittest.TestCase):
                 "multiply_score_by": [],
                 "add_to_score": [],
             },
-
-
         ]
         for invalid_custom_score_fields in invalid_custom_score_fields_list:
             try:
