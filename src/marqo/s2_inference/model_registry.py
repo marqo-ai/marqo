@@ -506,7 +506,44 @@ def _get_hf_properties() -> Dict:
                 "dimensions": 768,
                 "tokens":128,
                 "type":"hf",
-                "notes": ""}
+                "notes": ""},
+
+            "hf/e5-small":
+                {"name": 'intfloat/e5-small',
+                 "dimensions": 384,
+                 "tokens": 192,
+                 "type": "hf",
+                 "notes": ""},
+            "hf/e5-base":
+                {"name": 'intfloat/e5-base',
+                 "dimensions": 768,
+                 "tokens": 192,
+                 "type": "hf",
+                 "notes": ""},
+            "hf/e5-large":
+                {"name": 'intfloat/e5-large',
+                 "dimensions": 1024,
+                 "tokens": 192,
+                 "type": "hf",
+                 "notes": ""},
+            "hf/e5-large-unsupervised":
+                {"name": 'intfloat/e5-large-unsupervised',
+                 "dimensions": 1024,
+                 "tokens": 128,
+                 "type": "hf",
+                 "notes": ""},
+            "hf/e5-base-unsupervised":
+                {"name": 'intfloat/e5-base-unsupervised',
+                 "dimensions": 768,
+                 "tokens": 128,
+                 "type": "hf",
+                 "notes": ""},
+            "hf/e5-small-unsupervised":
+                {"name": 'intfloat/e5-small-unsupervised',
+                 "dimensions": 384,
+                 "tokens": 128,
+                 "type": "hf",
+                 "notes": ""},
     }
     return HF_MODEL_PROPERTIES
 
