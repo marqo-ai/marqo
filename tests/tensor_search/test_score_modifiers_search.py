@@ -8,6 +8,7 @@ from tests.marqo_test import MarqoTestCase
 from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQueryEntity
 from pprint import pprint
 from marqo.tensor_search.tensor_search import _create_normal_tensor_search_query
+from pydantic.error_wrappers import ValidationError
 
 class TestScoreModifiersSearch(MarqoTestCase):
 
@@ -586,5 +587,5 @@ class TestScoreModifiersSearch(MarqoTestCase):
                 ]
             ))
             raise AssertionError
-        except InvalidArgError:
+        except ValidationError:
             pass
