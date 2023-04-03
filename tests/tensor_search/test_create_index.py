@@ -1,4 +1,6 @@
 import pprint
+from typing import Any, Dict
+import pytest
 import requests
 from marqo.tensor_search.enums import IndexSettingsField, EnvVars
 from marqo.errors import MarqoApiError, MarqoError, IndexNotFoundError
@@ -10,7 +12,7 @@ from marqo import errors
 
 class TestCreateIndex(MarqoTestCase):
 
-    def setUp(self) -> None:
+    def setUp(self, custom_index_defaults: Dict[str, Any] = {}) -> None:
         self.endpoint = self.authorized_url
         self.generic_header = {"Content-type": "application/json"}
         self.index_name_1 = "my-test-create-index-1"
@@ -44,6 +46,48 @@ class TestCreateIndex(MarqoTestCase):
         
         assert settings[self.index_name_1]["mappings"]["_meta"][IndexSettingsField.index_settings] \
             == tensor_search.configs.get_default_index_settings()
+
+    def test_create_vector_index__invalid_settings(self):
+        custom_index_defaults = [
+            {IndexSettingsField.ann_parameters: {
+                    IndexSettingsField.ann_method: "fancy-new-ann-method",
+            }},
+            {IndexSettingsField.ann_parameters: {
+                    IndexSettingsField.ann_method: "ivf",
+            }},
+            {IndexSettingsField.ann_parameters: {
+                IndexSettingsField.ann_engine: "faiss",
+            }},
+            {IndexSettingsField.ann_parameters: {
+                IndexSettingsField.ann_metric: "innerproduct",
+            }},
+            {IndexSettingsField.ann_method_parameters: {
+                IndexSettingsField.hnsw_ef_construction: 0,
+                IndexSettingsField.hnsw_m: 16
+            }},
+            {IndexSettingsField.ann_method_parameters: {
+                IndexSettingsField.hnsw_ef_construction: 128,
+                IndexSettingsField.hnsw_m: -1
+            }},
+        ]
+        for idx_defaults in custom_index_defaults:
+            with self.subTest(custom_index_defaults=idx_defaults):
+                try:
+                    tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+                except IndexNotFoundError as s:
+                    pass
+                
+                try:
+                    tensor_search.create_vector_index(
+                        config=self.config,
+                        index_name=self.index_name_1,
+                        index_settings={
+                            NsField.index_defaults: idx_defaults
+                        }
+                    )
+                    raise AssertionError(f"Invalid custom index defaults, {self.custom_index_defaults} , did not cause exception ")
+                except errors.InvalidArgError as e:
+                    pass
 
     def test_create_vector_index_custom_index_settings(self):
         try:
