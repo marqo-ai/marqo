@@ -39,7 +39,9 @@ class SearchQuery(BaseMarqoModel):
 
 class BulkSearchQueryEntity(SearchQuery):
     index: str
-
+    # Attributes that are not supported in bulk search
+    context: None = None
+    scoreModifiers: None = None
     def to_search_query(self):
         return SearchQuery(**self.dict())
 

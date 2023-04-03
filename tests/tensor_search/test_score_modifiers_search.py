@@ -583,9 +583,11 @@ class TestScoreModifiersSearch(MarqoTestCase):
         try:
             response = tensor_search.bulk_search(marqo_config=self.config, query=BulkSearchQuery(
                 queries=[
-                    BulkSearchQueryEntity(index=index_name, q="hehehe", limit=2, score_modifiers = score_modifiers),
+                    BulkSearchQueryEntity(index=index_name, q="hehehe", limit=2, scoreModifiers = score_modifiers),
                 ]
             ))
             raise AssertionError
         except ValidationError:
             pass
+
+
