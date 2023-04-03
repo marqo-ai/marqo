@@ -92,6 +92,56 @@ settings_schema = {
                     "examples": [{
                         NsFields.patch_method: None
                     }]
+                },
+                NsFields.ann_parameters: {
+                    "type": "object",
+                    "required": [
+                        # Non required for backwards compatibility
+                    ],
+                    "properties": {
+                        NsFields.ann_method: {
+                            "type": "string",
+                            "examples": [
+                                "hnsw"
+                            ]
+                        },
+                        NsFields.ann_metric: {
+                            "type": "string",
+                            "examples": [
+                                "cosinesimil"
+                            ]
+                        },
+                        NsFields.ann_method_parameters: {
+                            "type": "object",
+                            "required": [],
+                            "properties": {
+                                NsFields.hnsw_ef_construction: {
+                                    "type": "integer",
+                                    "examples": [
+                                        128
+                                    ]
+                                },
+                                NsFields.hnsw_m: {
+                                    "type": "integer",
+                                    "examples": [
+                                        16
+                                    ]
+                                },
+                            },
+                            "examples": [{
+                                NsFields.hnsw_ef_construction: 128,
+                                NsFields.hnsw_m: 16
+                            }]
+                        }
+                    },
+                    "examples": [{
+                        NsFields.ann_method: "hnsw",
+                        NsFields.ann_metric: "cosinesimil",
+                        NsFields.ann_method_parameters: {
+                            NsFields.hnsw_ef_construction: 128,
+                            NsFields.hnsw_m: 16
+                        }
+                    }]
                 }
             },
             "examples": [{
@@ -105,6 +155,14 @@ settings_schema = {
                 },
                 NsFields.image_preprocessing: {
                     NsFields.patch_method: None
+                },
+                NsFields.ann_parameters: {
+                    NsFields.ann_method: "hnsw",
+                    NsFields.ann_metric: "cosinesimil",
+                    NsFields.ann_method_parameters: {
+                        NsFields.hnsw_ef_construction: 128,
+                        NsFields.hnsw_m: 16
+                    }
                 }
             }]
         },
@@ -135,6 +193,14 @@ settings_schema = {
             },
             NsFields.image_preprocessing: {
                 NsFields.patch_method: None
+            },
+            NsFields.ann_parameters: {
+                NsFields.ann_method: "hnsw",
+                NsFields.ann_metric: "cosinesimil",
+                NsFields.ann_method_parameters: {
+                    NsFields.hnsw_ef_construction: 128,
+                    NsFields.hnsw_m: 16
+                }
             }
         },
         NsFields.number_of_shards: 5,

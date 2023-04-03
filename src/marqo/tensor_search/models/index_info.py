@@ -1,7 +1,8 @@
 import pprint
-from typing import NamedTuple, Any
+from typing import NamedTuple, Any, Dict
 from marqo.tensor_search import enums
-
+from marqo.tensor_search.enums import IndexSettingsField as NsFields
+from marqo.tensor_search import configs
 
 class IndexInfo(NamedTuple):
     """
@@ -67,3 +68,27 @@ class IndexInfo(NamedTuple):
             except KeyError:
                 continue
         return true_text_props
+    
+    def get_ann_parameters(self) -> Dict[str, Any]:
+        """Gets the ANN parameters to use as the default for the index.
+
+        Preferentially use index settings over generic defaults, when index settings exist.
+
+        Returns:
+            Dict of ann parameters. Structure can be seen at `configs.get_default_ann_parameters`.
+        
+        """
+        ann_default = configs.get_default_ann_parameters()
+        index_ann_defaults = self.index_settings[NsFields.index_defaults].get(NsFields.ann_parameters, {})
+
+        # index defaults override generic defaults
+        ann_params = {
+            **ann_default,
+            **index_ann_defaults
+        }
+        ann_params[NsFields.ann_method_parameters] = {
+            **ann_default[NsFields.ann_method_parameters],
+            **index_ann_defaults.get(NsFields.ann_method_parameters, {})
+        }
+
+        return ann_params
