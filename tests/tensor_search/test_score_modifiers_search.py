@@ -560,7 +560,7 @@ class TestScoreModifiersSearch(MarqoTestCase):
             return True
         assert run()
 
-    def test_bulk_search_multiple_indexes_and_queries(self):
+    def test_bulk_search_not_support_score_modifiers(self):
         index_name = "bulk_test"
         score_modifiers = {
                 # miss one weight
