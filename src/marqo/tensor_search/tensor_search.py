@@ -2240,7 +2240,6 @@ def convert_validated_score_modifiers_to_script_score(validated_score_modifiers:
 
     script_parts.append(f"return Math.max(0.0, (_score + additive));")
     script = "\n".join(script_parts)
-    #print(script)
     return f"""{script}"""
 
 
