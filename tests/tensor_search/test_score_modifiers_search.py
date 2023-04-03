@@ -587,7 +587,7 @@ class TestScoreModifiersSearch(MarqoTestCase):
                 ]
             ))
             raise AssertionError
-        except ValidationError:
+        except (ValidationError, InvalidArgError):
             pass
 
 
