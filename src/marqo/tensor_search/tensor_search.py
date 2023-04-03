@@ -2212,7 +2212,7 @@ def convert_validated_score_modifiers_to_script_score(validated_score_modifiers:
     A function that converts the validated score modifiers to a painless script to modify the score.
     '''
     script_parts = ["double additive = 0;"]
-    for config in validated_score_modifiers.get("multiply_score_by"):
+    for config in validated_score_modifiers.get("multiply_score_by", []):
         field_name = config["field_name"]
         weight = config.get("weight", 1)
         # doc.containsKey check if the field is in the mappings.
@@ -2226,7 +2226,7 @@ def convert_validated_score_modifiers_to_script_score(validated_score_modifiers:
         }}
         """)
 
-    for config in validated_score_modifiers.get("add_to_score"):
+    for config in validated_score_modifiers.get("add_to_score", []):
         field_name = config["field_name"]
         weight = config.get("weight", 1)
         script_parts.append(f""" 
