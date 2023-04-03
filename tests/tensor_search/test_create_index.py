@@ -80,7 +80,16 @@ class TestCreateIndex(MarqoTestCase):
                 IndexSettingsField.treat_urls_and_pointers_as_images: True,
                 IndexSettingsField.normalize_embeddings: False,
                 IndexSettingsField.text_preprocessing: default_text_preprocessing,
-                IndexSettingsField.image_preprocessing: default_image_preprocessing
+                IndexSettingsField.image_preprocessing: default_image_preprocessing,
+                IndexSettingsField.ann_parameters: {
+                    IndexSettingsField.ann_engine: 'lucene',
+                    IndexSettingsField.ann_method_name: 'hnsw',
+                    IndexSettingsField.ann_method_parameters: {
+                        IndexSettingsField.hnsw_ef_construction: 128,
+                        IndexSettingsField.hnsw_m: 16
+                    },
+                    IndexSettingsField.ann_metric: 'cosinesimil'
+                },
             },
             IndexSettingsField.number_of_shards: default_settings[IndexSettingsField.number_of_shards],
             IndexSettingsField.number_of_replicas: default_settings[IndexSettingsField.number_of_replicas]

@@ -9,8 +9,12 @@ from typing import Union, List, Dict, Optional
 from marqo.tensor_search.enums import SearchMethod, Device
 from marqo.tensor_search import validation
 
+class BaseMarqoModel(BaseModel):
+     class Config:
+         extra: str = "forbid"
+     pass
 
-class SearchQuery(BaseModel):
+class SearchQuery(BaseMarqoModel):
     q: Union[str, Dict[str, float]]
     searchableAttributes: Union[None, List[str]] = None
     searchMethod: Union[None, str] = "TENSOR"
@@ -40,7 +44,7 @@ class BulkSearchQueryEntity(SearchQuery):
         return SearchQuery(**self.dict())
 
 
-class BulkSearchQuery(BaseModel):
+class BulkSearchQuery(BaseMarqoModel):
     queries: List[BulkSearchQueryEntity]
 
 
