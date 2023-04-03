@@ -142,3 +142,5 @@ __pycache__/
 src/marqo/tensor_search/test_throttle_timing.txt
 src/marqo/tensor_search/test_throttle_timing.csv
 dump.rdb
+
+alan_experiment/*
