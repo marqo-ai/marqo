@@ -27,6 +27,7 @@ class SearchQuery(BaseMarqoModel):
     boost: Optional[Dict] = None
     image_download_headers: Optional[Dict] = None
     context: Optional[Dict] = None
+    scoreModifiers: Optional[Dict] = None
 
     @pydantic.validator('searchMethod')
     def validate_search_method(cls, value):
@@ -38,7 +39,9 @@ class SearchQuery(BaseMarqoModel):
 
 class BulkSearchQueryEntity(SearchQuery):
     index: str
-
+    # Attributes that are not supported in bulk search
+    context: None = None
+    scoreModifiers: None = None
     def to_search_query(self):
         return SearchQuery(**self.dict())
 
