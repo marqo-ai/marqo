@@ -298,8 +298,6 @@ class TestScoreModifiersSearch(MarqoTestCase):
                 original_doc = [doc for doc in documents if doc["_id"] == result["_id"]][0]
                 expected_score = self.get_expected_score(original_doc, normal_score, score_modifiers)
                 if abs(expected_score - result["_score"]) > epsilon:
-                    pprint(expected_score)
-                    pprint(result)
                     raise AssertionError
 
     def test_search_score_modified_as_expected_with_skipped_fields(self):
