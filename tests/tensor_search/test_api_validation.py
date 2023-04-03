@@ -1,6 +1,3 @@
-import requests
-from marqo.tensor_search import enums, backend
-from marqo.tensor_search import tensor_search
 from marqo.tensor_search.web import api_validation
 from marqo.errors import InvalidArgError
 from tests.marqo_test import MarqoTestCase
