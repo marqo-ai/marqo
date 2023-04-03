@@ -568,5 +568,5 @@ def validate_score_modifiers_object(score_modifiers: List[dict]):
         raise InvalidArgError(
             f"Error validating score_modifiers = `{score_modifiers}`. Reason: \n{str(e)} "
             f"Please revise your score_modifiers based on the provided error."
-            f"\n Check `https://docs.marqo.ai/0.0.17/` for more info."
+            f"\n Check `https://docs.marqo.ai/0.0.17/API-Reference/search/#score-modifiers` for more info."
         )
