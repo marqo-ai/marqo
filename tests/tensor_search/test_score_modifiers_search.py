@@ -9,7 +9,7 @@ from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQue
 from pprint import pprint
 from marqo.tensor_search.tensor_search import _create_normal_tensor_search_query
 
-class TestMultimodalTensorCombination(MarqoTestCase):
+class TestScoreModifiersSearch(MarqoTestCase):
 
     def setUp(self):
         self.index_name = "test-index"
