@@ -164,7 +164,6 @@ class TestCreateIndex(MarqoTestCase):
             url=self.endpoint + "/" + self.index_name_1 + "/_mapping",
             verify=False
         ).json()
-        pprint.pprint(mappings)
         params = mappings[self.index_name_1]['mappings']['properties']['__chunks']['properties']['__vector_Title']['method']
         assert params['space_type'] == 'cosinesimil'
         assert params['parameters'] == {'ef_construction': 128, 'm': 16}
@@ -201,7 +200,6 @@ class TestCreateIndex(MarqoTestCase):
             url=self.endpoint + "/" + self.index_name_1 + "/_mapping",
             verify=False
         ).json()
-        pprint.pprint(mappings)
         params = mappings[self.index_name_1]['mappings']['properties']['__chunks']['properties']['__vector_Title']['method']
         assert params['space_type'] == 'l2'
         assert params['parameters'] == {'ef_construction': 133, 'm': 17}
