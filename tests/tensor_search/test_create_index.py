@@ -165,6 +165,7 @@ class TestCreateIndex(MarqoTestCase):
             verify=False
         ).json()
         params = mappings[self.index_name_1]['mappings']['properties']['__chunks']['properties']['__vector_Title']['method']
+        assert params['engine'] == 'lucene'
         assert params['space_type'] == 'cosinesimil'
         assert params['parameters'] == {'ef_construction': 128, 'm': 16}
 
@@ -201,6 +202,7 @@ class TestCreateIndex(MarqoTestCase):
             verify=False
         ).json()
         params = mappings[self.index_name_1]['mappings']['properties']['__chunks']['properties']['__vector_Title']['method']
+        assert params['engine'] == 'lucene'
         assert params['space_type'] == 'l2'
         assert params['parameters'] == {'ef_construction': 133, 'm': 17}
 
