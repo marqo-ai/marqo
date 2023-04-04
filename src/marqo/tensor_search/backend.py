@@ -78,7 +78,6 @@ def add_customer_field_properties(config: Config, index_name: str,
     Returns:
         HTTP Response
     """
-    engine = "lucene"
     existing_info = get_cached_index_info(config=config, index_name=index_name)
 
     # check if there is multimodal fie;ds and convert the fields name to a list with the same
