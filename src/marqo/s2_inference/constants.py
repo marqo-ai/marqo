@@ -11,6 +11,7 @@ MODEL_TYPE_SIZE_MAPPING = {
     "multilingual_clip" : 5,
     "clip_onnx":1,
     'sbert_onnx' : 0.7,
+    'hf' : 1,
 }
 MODEL_NAME_SIZE_MAPPING = {
     # This mapping represents the default sizes for the precise model names.
