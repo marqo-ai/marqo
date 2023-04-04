@@ -1,10 +1,12 @@
 import pprint
 from typing import Any, Dict
 import pytest
+import os
 import requests
 from marqo.tensor_search.enums import IndexSettingsField, EnvVars
 from marqo.errors import MarqoApiError, MarqoError, IndexNotFoundError
 from marqo.tensor_search import tensor_search, configs, backend
+from marqo.tensor_search.utils import read_env_vars_and_defaults
 from tests.marqo_test import MarqoTestCase
 from marqo.tensor_search.enums import IndexSettingsField as NsField
 from unittest import mock
@@ -61,14 +63,25 @@ class TestCreateIndex(MarqoTestCase):
             {IndexSettingsField.ann_parameters: {
                 IndexSettingsField.ann_metric: "innerproduct",
             }},
-            {IndexSettingsField.ann_method_parameters: {
+            {IndexSettingsField.ann_parameters: {
+                IndexSettingsField.ann_method_parameters: {
                 IndexSettingsField.hnsw_ef_construction: 0,
                 IndexSettingsField.hnsw_m: 16
-            }},
-            {IndexSettingsField.ann_method_parameters: {
+            }}},
+            {IndexSettingsField.ann_parameters: {
+                IndexSettingsField.ann_method_parameters: {
+                IndexSettingsField.hnsw_ef_construction: 128,
+                IndexSettingsField.hnsw_m: 101
+            }}},
+            {IndexSettingsField.ann_parameters: {
+                IndexSettingsField.ann_method_parameters: {
+                IndexSettingsField.hnsw_ef_construction: 1 + int(read_env_vars_and_defaults(EnvVars.EF_CONSTRUCTION_MAXIMUM_VALUE)),
+                IndexSettingsField.hnsw_m: 16
+            }}},
+            {IndexSettingsField.ann_parameters: {IndexSettingsField.ann_method_parameters: {
                 IndexSettingsField.hnsw_ef_construction: 128,
                 IndexSettingsField.hnsw_m: -1
-            }},
+            }}},
         ]
         for idx_defaults in custom_index_defaults:
             with self.subTest(custom_index_defaults=idx_defaults):
@@ -77,7 +90,8 @@ class TestCreateIndex(MarqoTestCase):
                 except IndexNotFoundError as s:
                     pass
                 
-                try:
+                with self.assertRaises(errors.InvalidArgError):
+                    print(f"index settings={idx_defaults}")
                     tensor_search.create_vector_index(
                         config=self.config,
                         index_name=self.index_name_1,
@@ -85,9 +99,7 @@ class TestCreateIndex(MarqoTestCase):
                             NsField.index_defaults: idx_defaults
                         }
                     )
-                    raise AssertionError(f"Invalid custom index defaults, {self.custom_index_defaults} , did not cause exception ")
-                except errors.InvalidArgError as e:
-                    pass
+                    print(tensor_search.get_index_info(self.config, self.index_name_1))
 
     def test_create_vector_index_custom_index_settings(self):
         try:
