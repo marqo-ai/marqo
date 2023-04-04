@@ -101,12 +101,21 @@ settings_schema = {
                     "properties": {
                         NsFields.ann_method: {
                             "type": "string",
+                            "enum": ["hnsw"],
                             "examples": [
                                 "hnsw"
                             ]
                         },
+                        NsFields.ann_engine: {
+                            "type": "string",
+                            "enum": ["lucene"],
+                            "examples": [
+                                "lucene"
+                            ]
+                        },
                         NsFields.ann_metric: {
                             "type": "string",
+                            "enum": ["l1", "l2", "linf", "cosinesimil"],
                             "examples": [
                                 "cosinesimil"
                             ]
@@ -117,12 +126,14 @@ settings_schema = {
                             "properties": {
                                 NsFields.hnsw_ef_construction: {
                                     "type": "integer",
+                                    "minimum": 1,
                                     "examples": [
                                         128
                                     ]
                                 },
                                 NsFields.hnsw_m: {
                                     "type": "integer",
+                                    "minimum": 1,
                                     "examples": [
                                         16
                                     ]
@@ -136,6 +147,7 @@ settings_schema = {
                     },
                     "examples": [{
                         NsFields.ann_method: "hnsw",
+                        NsFields.ann_engine: "lucene",
                         NsFields.ann_metric: "cosinesimil",
                         NsFields.ann_method_parameters: {
                             NsFields.hnsw_ef_construction: 128,
@@ -158,6 +170,7 @@ settings_schema = {
                 },
                 NsFields.ann_parameters: {
                     NsFields.ann_method: "hnsw",
+                    NsFields.ann_engine: "lucene",
                     NsFields.ann_metric: "cosinesimil",
                     NsFields.ann_method_parameters: {
                         NsFields.hnsw_ef_construction: 128,
@@ -196,6 +209,7 @@ settings_schema = {
             },
             NsFields.ann_parameters: {
                 NsFields.ann_method: "hnsw",
+                NsFields.ann_engine: "lucene",
                 NsFields.ann_metric: "cosinesimil",
                 NsFields.ann_method_parameters: {
                     NsFields.hnsw_ef_construction: 128,

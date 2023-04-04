@@ -39,7 +39,6 @@ def get_default_ann_parameters():
         }
     }
 
-
 def default_env_vars() -> dict:
     """Returns a dict of default env vars.
     This is used by utils.read_env_vars_and_defaults() as the source for
