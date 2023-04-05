@@ -1,14 +1,16 @@
 """The API entrypoint for Tensor Search"""
 import typing
 from fastapi.responses import JSONResponse
-from models.api_models import BulkSearchQuery, SearchQuery
 from fastapi import FastAPI, Request, Depends, HTTPException
-from marqo.errors import MarqoWebError, MarqoError
+from fastapi.exceptions import RequestValidationError
+from marqo.errors import InvalidArgError, MarqoWebError, MarqoError
 from fastapi import FastAPI, Query
+import json
 from marqo.tensor_search import tensor_search
 from marqo import config
 from typing import List, Dict
 import os
+from marqo.tensor_search.models.api_models import BulkSearchQuery, SearchQuery
 from marqo.tensor_search.web import api_validation, api_utils
 from marqo.tensor_search import utils
 from marqo.tensor_search.on_start_script import on_start
@@ -17,6 +19,8 @@ from marqo.tensor_search.backend import get_index_info
 from marqo.tensor_search.enums import RequestType
 from marqo.tensor_search.throttling.redis_throttle import throttle
 from marqo.tensor_search.utils import add_timing
+import pydantic
+
 
 def replace_host_localhosts(OPENSEARCH_IS_INTERNAL: str, OS_URL: str):
     """Replaces a host's localhost URL with one that can be referenced from
@@ -41,12 +45,13 @@ def replace_host_localhosts(OPENSEARCH_IS_INTERNAL: str, OS_URL: str):
                 return replaced_str
     return OS_URL
 
-OPENSEARCH_URL = replace_host_localhosts(
-    os.environ.get("OPENSEARCH_IS_INTERNAL", None),
-    os.environ["OPENSEARCH_URL"])
+if __name__ in ["__main__", "api"]:
+    OPENSEARCH_URL = replace_host_localhosts(
+        os.environ.get("OPENSEARCH_IS_INTERNAL", None),
+        os.environ["OPENSEARCH_URL"]
+    )
+    on_start(OPENSEARCH_URL)
 
-
-on_start(OPENSEARCH_URL)
 app = FastAPI(
     title="Marqo",
     version=version.get_version()
@@ -60,7 +65,7 @@ def generate_config() -> config.Config:
 
 
 @app.exception_handler(MarqoWebError)
-def marqo_user_exception_handler(request, exc: MarqoWebError):
+def marqo_user_exception_handler(request: Request, exc: MarqoWebError) -> JSONResponse:
     """ Catch a MarqoWebError and return an appropriate HTTP response.
 
     We can potentially catch any type of Marqo exception. We can do isinstance() calls
@@ -79,6 +84,23 @@ def marqo_user_exception_handler(request, exc: MarqoWebError):
     else:
         return JSONResponse(content=body, status_code=exc.status_code)
 
+
+@app.exception_handler(pydantic.ValidationError)
+async def validation_exception_handler(request: Request, exc: pydantic.ValidationError) -> JSONResponse:
+    """Catch pydantic validation errors and rewrite as an InvalidArgError whilst keeping error messages from the ValidationError."""
+    error_messages = [{
+        'loc': error.get('loc', ''),
+        'msg': error.get('msg', ''),
+        'type': error.get('type', '')
+    } for error in exc.errors()]
+
+    body = {
+        "message": json.dumps(error_messages),
+        "code": InvalidArgError.code,
+        "type": InvalidArgError.error_type,
+        "link": InvalidArgError.link
+    }
+    return JSONResponse(content=body, status_code=InvalidArgError.status_code)
 
 @app.exception_handler(MarqoError)
 def marqo_internal_exception_handler(request, exc: MarqoError):
@@ -130,7 +152,8 @@ def search(search_query: SearchQuery, index_name: str, device: str = Depends(api
         filter=search_query.filter, device=device,
         attributes_to_retrieve=search_query.attributesToRetrieve, boost=search_query.boost,
         image_download_headers=search_query.image_download_headers,
-        context=search_query.context
+        context=search_query.context,
+        score_modifiers=search_query.scoreModifiers,
     )
 
 

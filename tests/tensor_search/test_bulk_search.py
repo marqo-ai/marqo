@@ -9,11 +9,14 @@ from marqo.tensor_search.enums import TensorField, SearchMethod, EnvVars, IndexS
 from marqo.errors import (
     BackendCommunicationError, IndexNotFoundError, InvalidArgError, IllegalRequestedDocCount, BadRequestError
 )
+from marqo.tensor_search import api
 from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQueryEntity
 from marqo.tensor_search import tensor_search, constants, index_meta_cache, utils
+from fastapi.exceptions import RequestValidationError
 import numpy as np
 from tests.marqo_test import MarqoTestCase
 from typing import List
+import pydantic
 
 
 def pass_through_vectorise(*arg, **kwargs):
@@ -42,6 +45,19 @@ class TestBulkSearch(MarqoTestCase):
             except IndexNotFoundError as s:
                 pass
 
+    def test_bulk_search_w_extra_parameters__raise_exception(self):
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=[
+                {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "id1-first"},
+                {"abc": "random text", "other field": "Close match hehehe", "_id": "id1-second"},
+            ], auto_refresh=True
+        ) 
+        with self.assertRaises(pydantic.ValidationError):
+            api.bulk_search(BulkSearchQuery(queries=[{
+                "index": self.index_name_1,
+                "q": "title about some doc",
+                "parameter-not-expected": 1,
+            }]))
 
     def test_bulk_search_no_queries_return_early(self):
         tensor_search.add_documents(
@@ -809,7 +825,7 @@ class TestBulkSearch(MarqoTestCase):
             results = tensor_search.bulk_search(
                 marqo_config=self.config, query=BulkSearchQuery(
                     queries=[BulkSearchQueryEntity(
-                        index=self.index_name_1, q=str(to_search), search_method=SearchMethod.LEXICAL,
+                        index=self.index_name_1, q=str(to_search), searchMethod=SearchMethod.LEXICAL,
                         filter=f"{field}:{to_search}")])
             )
             assert "hits" in results["result"][0]

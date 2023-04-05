@@ -19,12 +19,25 @@ def get_default_index_settings():
             # TODO move these into a processing dict with sub-dicts
             NsFields.image_preprocessing: {
                 NsFields.patch_method: None
-            }
+            },
+            NsFields.ann_parameters: get_default_ann_parameters()
         },
         NsFields.number_of_shards: 5,
         NsFields.number_of_replicas : 1,
     }
 
+def get_default_ann_parameters(): 
+    return {
+        NsFields.ann_method_name: "hnsw",
+        NsFields.ann_metric: "cosinesimil",
+
+        # `ann_engine` not exposed to customer (via index settings).
+        NsFields.ann_engine: "lucene",
+        NsFields.ann_method_parameters: {
+            NsFields.hnsw_ef_construction: 128,
+            NsFields.hnsw_m: 16
+        }
+    }
 
 def default_env_vars() -> dict:
     """Returns a dict of default env vars.
@@ -40,6 +53,7 @@ def default_env_vars() -> dict:
         EnvVars.MARQO_MAX_CONCURRENT_SEARCH: 8,
         EnvVars.MARQO_THREAD_EXPIRY_TIME: 1800,     # 30 minutes
         EnvVars.MARQO_ENABLE_THROTTLING: "TRUE",
-        EnvVars.MARQO_LOG_LEVEL: "info"             # This env variable is set to "info" by default in run_marqo.sh, which overrides this value
+        EnvVars.MARQO_LOG_LEVEL: "info",             # This env variable is set to "info" by default in run_marqo.sh, which overrides this value
+        EnvVars.MARQO_EF_CONSTRUCTION_MAX_VALUE: 4096,
     }
 

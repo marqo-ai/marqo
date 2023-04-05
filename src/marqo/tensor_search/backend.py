@@ -78,7 +78,7 @@ def add_customer_field_properties(config: Config, index_name: str,
     Returns:
         HTTP Response
     """
-    engine = "lucene"
+    existing_info = get_cached_index_info(config=config, index_name=index_name)
 
     # check if there is multimodal fie;ds and convert the fields name to a list with the same
     # format of customer_field_names
@@ -96,21 +96,12 @@ def add_customer_field_properties(config: Config, index_name: str,
                         utils.generate_vector_name(field_name[0])): {
                         "type": "knn_vector",
                         "dimension": model_properties["dimensions"],
-                        "method": {
-                            "name": "hnsw",
-                            "space_type": "cosinesimil",
-                            "engine": engine,
-                            "parameters": {
-                                "ef_construction": 128,
-                                "m": 16
-                            }
-                        }
+                        "method": existing_info.get_ann_parameters()
                     } for field_name in knn_field_names
                 }
             }
         }
     }
-    existing_info = get_cached_index_info(config=config, index_name=index_name)
     new_index_properties = existing_info.properties.copy()
 
     # copy fields to the chunk for prefiltering. If it is text, convert it to a keyword type to save space
