@@ -128,7 +128,7 @@ settings_schema = {
                                 NsFields.hnsw_ef_construction: {
                                     "type": "integer",
                                     "minimum": 1,
-                                    "maximum": int(read_env_vars_and_defaults(EnvVars.EF_CONSTRUCTION_MAXIMUM_VALUE)),
+                                    "maximum": int(read_env_vars_and_defaults(EnvVars.MARQO_EF_CONSTRUCTION_MAX_VALUE)),
                                     "examples": [
                                         128
                                     ]

@@ -75,7 +75,7 @@ class TestCreateIndex(MarqoTestCase):
             }}},
             {IndexSettingsField.ann_parameters: {
                 IndexSettingsField.ann_method_parameters: {
-                IndexSettingsField.hnsw_ef_construction: 1 + int(read_env_vars_and_defaults(EnvVars.EF_CONSTRUCTION_MAXIMUM_VALUE)),
+                IndexSettingsField.hnsw_ef_construction: 1 + int(read_env_vars_and_defaults(EnvVars.MARQO_EF_CONSTRUCTION_MAX_VALUE)),
                 IndexSettingsField.hnsw_m: 16
             }}},
             {IndexSettingsField.ann_parameters: {IndexSettingsField.ann_method_parameters: {
