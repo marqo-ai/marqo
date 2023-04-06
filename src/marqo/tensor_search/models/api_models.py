@@ -9,8 +9,12 @@ from typing import Union, List, Dict, Optional
 from marqo.tensor_search.enums import SearchMethod, Device
 from marqo.tensor_search import validation
 
+class BaseMarqoModel(BaseModel):
+     class Config:
+         extra: str = "forbid"
+     pass
 
-class SearchQuery(BaseModel):
+class SearchQuery(BaseMarqoModel):
     q: Union[str, Dict[str, float]]
     searchableAttributes: Union[None, List[str]] = None
     searchMethod: Union[None, str] = "TENSOR"
@@ -23,6 +27,7 @@ class SearchQuery(BaseModel):
     boost: Optional[Dict] = None
     image_download_headers: Optional[Dict] = None
     context: Optional[Dict] = None
+    scoreModifiers: Optional[Dict] = None
 
     @pydantic.validator('searchMethod')
     def validate_search_method(cls, value):
@@ -34,12 +39,14 @@ class SearchQuery(BaseModel):
 
 class BulkSearchQueryEntity(SearchQuery):
     index: str
-
+    # Attributes that are not supported in bulk search
+    context: None = None
+    scoreModifiers: None = None
     def to_search_query(self):
         return SearchQuery(**self.dict())
 
 
-class BulkSearchQuery(BaseModel):
+class BulkSearchQuery(BaseMarqoModel):
     queries: List[BulkSearchQueryEntity]
 
 

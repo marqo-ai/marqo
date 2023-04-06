@@ -1102,7 +1102,8 @@ def search(config: Config, index_name: str, text: Union[str, dict],
            attributes_to_retrieve: Optional[List[str]] = None,
            device=None, boost: Optional[Dict] = None,
            image_download_headers: Optional[Dict] = None,
-           context: Optional[Dict] = None) -> Dict:
+           context: Optional[Dict] = None,
+           score_modifiers: Optional[Dict] = None) -> Dict:
     """The root search method. Calls the specific search method
 
     Validation should go here. Validations include:
@@ -1126,6 +1127,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
         boost: boosters to re-weight the scores of individual fields
         image_download_headers: headers for downloading images
         context: a dictionary to allow custom vectors in search, for tensor search only
+        score_modifiers: a dictionary to modify the score based on field values, for tensor search only
     Returns:
 
     """
@@ -1177,7 +1179,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
             return_doc_ids=return_doc_ids, searchable_attributes=searchable_attributes, verbose=verbose,
             number_of_highlights=num_highlights, simplified_format=simplified_format,
             filter_string=filter, device=device, attributes_to_retrieve=attributes_to_retrieve, boost=boost,
-            image_download_headers=image_download_headers, context=context
+            image_download_headers=image_download_headers, context=context, score_modifiers=score_modifiers
         )
     elif search_method.upper() == SearchMethod.LEXICAL:
         search_result = _lexical_search(
@@ -1779,7 +1781,8 @@ def _vector_text_search(
         simplified_format=True, filter_string: str = None, device=None,
         attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None,
         image_download_headers: Optional[Dict] = None,
-        context: Optional[Dict] = None,):
+        context: Optional[Dict] = None,
+        score_modifiers: Optional[Dict] = None):
     """
     Args:
         config:
@@ -1798,6 +1801,7 @@ def _vector_text_search(
         attributes_to_retrieve: if set, only returns these fields
         image_download_headers: headers for downloading images
         context: a dictionary to allow custom vectors in search
+        score_modifiers: a dictionary to modify the score based on field values, for tensor search only
     Returns:
 
     Note:
@@ -1819,6 +1823,7 @@ def _vector_text_search(
         - searching a non existent index should return a HTTP-type error
     """
     # SEARCH TIMER-LOGGER (pre-processing)
+    start_preprocess_time = timer()
     custom_tensors = None
     if context is not None:
         if isinstance(query, dict):
@@ -1830,7 +1835,7 @@ def _vector_text_search(
                                          f"This is not supported as the context only works when the query is a dictionary."
                                          f"If you aim to search with your custom vectors, reformat the query as a dictionary.\n"
                                          f"Please check `https://docs.marqo.ai/0.0.16/API-Reference/search/#context` for more information.")
-    start_preprocess_time = timer()
+
     try:
         index_info = get_index_info(config=config, index_name=index_name)
     except KeyError as e:
@@ -1929,45 +1934,33 @@ def _vector_text_search(
     else:
         contextualised_filter = ''
 
-    for vector_field in vector_properties_to_search:
-        search_query = {
-            "size": result_count,
-            "from": offset,
-            "query": {
-                "nested": {
-                    "path": TensorField.chunks,
-                    "inner_hits": {
-                        "_source": {
-                            "include": ["__chunks.__field_content", "__chunks.__field_name"]
-                        }
-                    },
-                    "query": {
-                        "knn": {
-                            f"{TensorField.chunks}.{vector_field}": {
-                                "vector": vectorised_text,
-                                "k": result_count + offset
-                            }
-                        }
-                    },
-                    "score_mode": "max"
+    if score_modifiers is not None:
+        validated_score_modifiers = validation.validate_score_modifiers_object(score_modifiers)
+        script_score = convert_validated_score_modifiers_to_script_score(validated_score_modifiers)
+        for vector_field in vector_properties_to_search:
+            search_query = _create_score_modifiers_tensor_search_query(result_count, offset, vector_field, vectorised_text, script_score)
+            if attributes_to_retrieve is not None:
+                search_query["_source"] = {"include": attributes_to_retrieve} if len(attributes_to_retrieve) > 0 else False
+
+            if filter_string is not None:
+                search_query["query"]["function_score"]["query"]["nested"]["query"]["function_score"]["query"]\
+                    ["knn"][f"{TensorField.chunks}.{vector_field}"][
+                    "filter"] = {
+                    "query_string": {"query": f"{contextualised_filter}"}
                 }
-            },
-            "_source": {
-                "exclude": ["__chunks.__vector_*"]
-            }
-        }
+            body += [{"index": index_name}, search_query]
+    else:
+        for vector_field in vector_properties_to_search:
+            search_query = _create_normal_tensor_search_query(result_count, offset, vector_field, vectorised_text)
+            if attributes_to_retrieve is not None:
+                search_query["_source"] = {"include": attributes_to_retrieve} if len(attributes_to_retrieve) > 0 else False
 
-        field_names = list(index_info.get_text_properties().keys())
-        if attributes_to_retrieve is not None:
-            search_query["_source"] = {"include": attributes_to_retrieve} if len(attributes_to_retrieve) > 0 else False
-
-        if filter_string is not None:
-            search_query["query"]["nested"]["query"]["knn"][f"{TensorField.chunks}.{vector_field}"][
-                "filter"] = {
-                "query_string": {"query": f"{contextualised_filter}"}
-            }
-        body += [{"index": index_name}, search_query]
-
+            if filter_string is not None:
+                search_query["query"]["nested"]["query"]["knn"][f"{TensorField.chunks}.{vector_field}"][
+                    "filter"] = {
+                    "query_string": {"query": f"{contextualised_filter}"}
+                }
+            body += [{"index": index_name}, search_query]
     if verbose:
         print("vector search body:")
         if verbose == 1:
@@ -1993,7 +1986,8 @@ def _vector_text_search(
 
     # SEARCH TIMER-LOGGER (roundtrip)
     start_search_http_time = timer()
-    response = HttpRequests(config).get(path=F"{index_name}/_msearch", body=utils.dicts_to_jsonl(body))
+    response = HttpRequests(config).get(path=F"{index_name}/_msearch",
+                                        body=utils.dicts_to_jsonl(body))
 
     end_search_http_time = timer()
     total_search_http_time = end_search_http_time - start_search_http_time
@@ -2211,6 +2205,43 @@ def boost_score(docs: dict, boosters: dict, searchable_attributes) -> dict:
                     chunk['_score'] = chunk['_score'] * booster[0]
                 boosted_fields.add(field_name)
     return to_be_boosted
+
+
+def convert_validated_score_modifiers_to_script_score(validated_score_modifiers: Dict = None) -> str:
+    '''
+    A function that converts the validated score modifiers to a painless script to modify the score.
+    '''
+    script_parts = ["double additive = 0;"]
+    for config in validated_score_modifiers.get("multiply_score_by", []):
+        field_name = config["field_name"]
+        weight = config.get("weight", 1)
+        # doc.containsKey check if the field is in the mappings.
+        # doc[].size() >0 and doc[].value instanceof java.lang.Number check if the field has a valid value
+        script_parts.append(f"""
+        if (doc.containsKey('__chunks.{field_name}')) {{
+            if (doc['__chunks.{field_name}'].size() > 0 &&
+                (doc['__chunks.{field_name}'].value instanceof java.lang.Number)) {{
+                _score = _score * doc['__chunks.{field_name}'].value * {weight};
+            }}
+        }}
+        """)
+
+    for config in validated_score_modifiers.get("add_to_score", []):
+        field_name = config["field_name"]
+        weight = config.get("weight", 1)
+        script_parts.append(f""" 
+        if (doc.containsKey('__chunks.{field_name}')) {{     
+            if (doc['__chunks.{field_name}'].size() > 0 &&
+                (doc['__chunks.{field_name}'].value instanceof java.lang.Number)) {{
+                additive = additive + doc['__chunks.{field_name}'].value * {weight};
+            }}
+        }}
+        """)
+
+    script_parts.append(f"return Math.max(0.0, (_score + additive));")
+    script = "\n".join(script_parts)
+    return f"""{script}"""
+
 
 def sort_chunks(docs: dict) -> List:
     to_be_sorted = docs.copy()
@@ -2485,3 +2516,81 @@ def vectorise_multimodal_combination_field(field: str, multimodal_object: Dict[s
         TensorField.field_name: field,
     })
     return combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add, new_fields_from_multimodal_combination
+
+def _create_normal_tensor_search_query(result_count, offset, vector_field, vectorised_text) -> dict:
+    search_query = {
+        "size": result_count,
+        "from": offset,
+        "query": {
+            "nested": {
+                "path": TensorField.chunks,
+                "inner_hits": {
+                    "_source": {
+                        "include": ["__chunks.__field_content", "__chunks.__field_name"]
+                    }
+                },
+                "query": {
+                    "knn": {
+                        f"{TensorField.chunks}.{vector_field}": {
+                            "vector": vectorised_text,
+                            "k": result_count + offset
+                        }
+                    }
+                },
+                "score_mode": "max"
+            }
+        },
+        "_source": {
+            "exclude": ["__chunks.__vector_*"]
+        }
+    }
+    return search_query
+
+
+def _create_score_modifiers_tensor_search_query(result_count, offset, vector_field, vectorised_text, script_score) -> dict:
+    search_query = {
+        "size": result_count,
+        "from": offset,
+        "query": {
+            "function_score": {
+                "query": {
+                    "nested": {
+                        "path": TensorField.chunks,
+                        "inner_hits": {
+                            "_source": {
+                                "include": ["__chunks.__field_content", "__chunks.__field_name",
+                                            "__chunks.reputation"]
+                            }
+                        },
+                        "query": {
+                            "function_score": {
+                                "query": {
+                                    "knn": {
+                                        f"{TensorField.chunks}.{vector_field}": {
+                                            "vector": vectorised_text,
+                                            "k": result_count + offset
+                                        }
+                                    }
+                                },
+                                "functions": [
+                                    {
+                                        "script_score": {
+                                            "script": {
+                                                "source": script_score
+                                            }
+                                        }
+                                    }
+                                ],
+                                "boost_mode": "replace"
+                            }
+                        },
+                        "score_mode": "max"
+                    }
+                },
+            }
+        },
+        "_source": {
+            "exclude": ["__chunks.__vector_*"]
+        }
+    }
+    return search_query

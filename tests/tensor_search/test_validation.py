@@ -2,15 +2,12 @@ from marqo.tensor_search import validation
 from enum import Enum
 from marqo.tensor_search import enums
 import unittest
-import copy
 from unittest import mock
 from marqo.errors import (
     MarqoError, InvalidFieldNameError, InternalError,
     InvalidDocumentIdError, InvalidArgError, DocTooLargeError,
     InvalidIndexNameError
 )
-import pprint
-
 
 class TestValidation(unittest.TestCase):
 
@@ -956,3 +953,181 @@ class TestValidateIndexSettings(unittest.TestCase):
                 raise AssertionError
             except InvalidArgError:
                 pass
+
+    def test_invalid_custom_score_fields(self):
+        invalid_custom_score_fields_list = [
+            {
+                # typo in multiply_score_by
+                "multiply_scores_by":
+                    [{"field_name": "reputation",
+                      "weight": 1,
+                      },
+                     {
+                         "field_name": "reputation-test",
+                     }, ],
+                "add_to_score": [
+                    {"field_name": "rate",
+                     }],
+            },
+            {
+                # typo in add_to_score
+                "multiply_score_by":
+                    [{"field_name": "reputation",
+                      "weight": 1,
+                      },
+                     {
+                         "field_name": "reputation-test",
+                     }, ],
+                "add_ssto_score": [
+                    {"field_name": "rate",
+                     }],
+            },
+            {
+                # typo in field_name
+                "multiply_score_by":
+                    [{"field_names": "reputation",
+                      "weight": 1,
+                      },
+                     {
+                         "field_name": "reputation-test",
+                     }, ],
+                "add_to_score": [
+                    {"field_name": "rate",
+                     }],
+            },
+            {
+                # typo in weight
+                "multiply_score_by":
+                    [{"field_names": "reputation",
+                      "weight": 1,
+                      },
+                     {
+                         "field_name": "reputation-test",
+                     }, ],
+                "add_to_score": [
+                    {"field_name": "rate",
+                     }],
+            },
+            {
+                # no field name
+                "multiply_scores_by":
+                    [{"field_names": "reputation",
+                      "weights": 1,
+                      },
+                     {
+                         "field_name": "reputation-test",
+                     }, ],
+                "add_ssto_score": [
+                    {"field_name": "rate",
+                     }],
+            },
+            {
+                # list in field_name value
+                "multiply_score_by":
+                    [{"field_name": ["repuation", "reputation-test"],
+                      "weight": 1,
+                      },
+                     {
+                         "field_name": "reputation-test",
+                     },],
+                "add_to_score": [
+                    {"field_name": "rate",
+                     }]
+            },
+            {
+                # field name can't be "_id"
+                "multiply_score_by":
+                    [{"field_name": "_id",
+                      "weight": 1,
+                      },
+                     {
+                         "field_name": "reputation-test",
+                     }, ],
+
+                "add_to_score": [
+                    {"field_name": "rate",
+                     }]
+            },
+            {
+                # weight to be str
+                "multiply_score_by":
+                    [{"field_name": "reputation",
+                      "weight": "1",
+                      },
+                     {
+                         "field_name": "reputation-test",
+                     }, ],
+
+                "add_to_score": [
+                    {"field_name": "rate",
+                     }]
+            },
+            { # empty
+            },
+            {
+                # one part to be None
+                "multiply_score_by":
+                    [{"field_name": "reputation",
+                      "weight": 1,
+                      },
+                     {
+                         "field_name": "reputation-test",
+                     }, ],
+
+                "add_to_score": None
+            },
+            {  # one part to be empty
+                "multiply_score_by": [],
+                "add_to_score": [
+                    {"field_name": "rate",
+                     }]
+            },
+            {  # two parts to be empty
+                "multiply_score_by": [],
+                "add_to_score": [],
+            },
+        ]
+        for invalid_custom_score_fields in invalid_custom_score_fields_list:
+            try:
+                validation.validate_score_modifiers_object(invalid_custom_score_fields)
+                raise AssertionError
+            except InvalidArgError as e:
+                pass
+
+    def test_valid_custom_score_fields(self):
+        valid_custom_score_fields_list = [
+            {
+                "multiply_score_by":
+                    [{"field_name": "reputation",
+                      "weight": 1,
+                      },
+                     {
+                         "field_name": "reputation-test",
+                     }, ],
+
+                "add_to_score": [
+                    {"field_name": "rate",
+                     }]
+            },
+            {
+                "multiply_score_by":
+                    [{"field_name": "reputation",
+                      },
+                     {
+                         "field_name": "reputation-test",
+                     }, ],
+
+                "add_to_score": [
+                    {"field_name": "rate",
+                     }]
+            },
+            {
+                # miss one part
+                "add_to_score": [
+                    {"field_name": "rate",
+                     }]
+            },
+        ]
+
+        for valid_custom_score_fields in valid_custom_score_fields_list:
+            validation.validate_score_modifiers_object(valid_custom_score_fields)
