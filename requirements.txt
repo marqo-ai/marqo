@@ -10,8 +10,8 @@ tox
 # s2_inference:
 more_itertools
 nltk==3.7
-torch==1.12.1
-torchvision==0.13.1
+torch
+torchvision
 Pillow==9.3.0
 numpy==1.23.4
 validators==0.20.0
