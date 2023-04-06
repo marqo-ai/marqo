@@ -2,6 +2,8 @@ import marqo
 import pprint
 import pandas as pd
 
+import marqo.tensor_search.delete_docs
+
 mq = marqo.Client(url='http://localhost:8882') # Connection to Marqo Docker Container
 
 dataset_path = "http://localhost:8222/" # Place your file path here (directory where http server is setup)
@@ -46,7 +48,7 @@ def delete_index(index_name: str):
 
 
 def delete_doc_from_index(index_name:str, doc_ids:list[str]):
-    results = mq.index(index_name).delete_documents(ids=doc_ids)
+    results = marqo.tensor_search.delete_docs.delete_documents(ids=doc_ids)
     return results
 
 def search_index_text(index_name:str, query_text: str, search_method: str):

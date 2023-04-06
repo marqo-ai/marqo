@@ -3,6 +3,8 @@ import typing
 from fastapi.responses import JSONResponse
 from fastapi import FastAPI, Request, Depends, HTTPException
 from fastapi.exceptions import RequestValidationError
+
+import marqo.tensor_search.delete_docs
 from marqo.errors import InvalidArgError, MarqoWebError, MarqoError
 from fastapi import FastAPI, Query
 import json
@@ -237,7 +239,7 @@ def delete_index(index_name: str, marqo_config: config.Config = Depends(generate
 @app.post("/indexes/{index_name}/documents/delete-batch")
 def delete_docs(index_name: str, documentIds: List[str], refresh: bool = True,
                       marqo_config: config.Config = Depends(generate_config)):
-    return tensor_search.delete_documents(
+    return marqo.tensor_search.delete_docs.delete_documents(
         index_name=index_name, config=marqo_config, doc_ids=documentIds,
         auto_refresh=refresh
     )

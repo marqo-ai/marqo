@@ -156,7 +156,9 @@ result = mq.index("my-first-index").search('adventure', searchable_attributes=['
 删除一些文件。
 
 ```python
-results = mq.index("my-first-index").delete_documents(ids=["article_591", "article_602"])
+import marqo.tensor_search.delete_docs
+
+results = marqo.tensor_search.delete_docs.delete_documents(ids=["article_591", "article_602"])
 ```
 
 ### 删除索引

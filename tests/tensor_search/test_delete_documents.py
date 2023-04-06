@@ -1,5 +1,6 @@
 import pprint
 
+import marqo.tensor_search.delete_docs
 from marqo.tensor_search import tensor_search
 from marqo.config import Config
 from marqo.errors import IndexNotFoundError
@@ -49,8 +50,8 @@ class TestDeleteDocuments(MarqoTestCase):
             timeout=self.config.timeout,
             verify=False
         ).json()["count"]
-        tensor_search.delete_documents(config=self.config, index_name=self.index_name_1, doc_ids=["455", "at-at"],
-                                       auto_refresh=True)
+        marqo.tensor_search.delete_docs.delete_documents(config=self.config, index_name=self.index_name_1, doc_ids=["455", "at-at"],
+                                                         auto_refresh=True)
         count_post_delete = requests.post(
             F"{self.endpoint}/{self.index_name_1}/_count",
             timeout=self.config.timeout,
@@ -65,9 +66,8 @@ class TestDeleteDocuments(MarqoTestCase):
                 {"f1": "cat dog sat mat", "Sydney": "Australia contains Sydney", "_id": "1234"},
                 {"Lime": "Tree tee", "Magnificent": "Waterfall out yonder", "_id": "5678"},
             ], auto_refresh=True)
-        res = tensor_search.delete_documents(config=self.config, doc_ids=["5678", "491"], index_name=self.index_name_1
-                                             , auto_refresh=False)
-        pprint.pprint(res)
+        res = marqo.tensor_search.delete_docs.delete_documents(config=self.config, doc_ids=["5678", "491"], index_name=self.index_name_1
+                                                               , auto_refresh=False)
         assert res["index_name"] == self.index_name_1
         assert res["type"] == "documentDeletion"
         assert res["status"] == "succeeded"
