@@ -53,15 +53,7 @@ class HttpRequests:
                 warnings.simplefilter('ignore', InsecureRequestWarning)
             try:
                 request_path = self.config.url + '/' + path
-                if isinstance(body, bytes):
-                    response = http_method(
-                        request_path,
-                        timeout=self.config.timeout,
-                        headers=req_headers,
-                        data=body,
-                        verify=to_verify
-                    )
-                elif isinstance(body, str):
+                if isinstance(body, (bytes, str)):
                     response = http_method(
                         request_path,
                         timeout=self.config.timeout,
