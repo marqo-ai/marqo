@@ -1,10 +1,12 @@
 import pprint
 from typing import Any, Dict
 import pytest
+import os
 import requests
 from marqo.tensor_search.enums import IndexSettingsField, EnvVars
 from marqo.errors import MarqoApiError, MarqoError, IndexNotFoundError
 from marqo.tensor_search import tensor_search, configs, backend
+from marqo.tensor_search.utils import read_env_vars_and_defaults
 from tests.marqo_test import MarqoTestCase
 from marqo.tensor_search.enums import IndexSettingsField as NsField
 from unittest import mock
@@ -61,14 +63,25 @@ class TestCreateIndex(MarqoTestCase):
             {IndexSettingsField.ann_parameters: {
                 IndexSettingsField.ann_metric: "innerproduct",
             }},
-            {IndexSettingsField.ann_method_parameters: {
+            {IndexSettingsField.ann_parameters: {
+                IndexSettingsField.ann_method_parameters: {
                 IndexSettingsField.hnsw_ef_construction: 0,
                 IndexSettingsField.hnsw_m: 16
-            }},
-            {IndexSettingsField.ann_method_parameters: {
+            }}},
+            {IndexSettingsField.ann_parameters: {
+                IndexSettingsField.ann_method_parameters: {
+                IndexSettingsField.hnsw_ef_construction: 128,
+                IndexSettingsField.hnsw_m: 101
+            }}},
+            {IndexSettingsField.ann_parameters: {
+                IndexSettingsField.ann_method_parameters: {
+                IndexSettingsField.hnsw_ef_construction: 1 + int(read_env_vars_and_defaults(EnvVars.MARQO_EF_CONSTRUCTION_MAX_VALUE)),
+                IndexSettingsField.hnsw_m: 16
+            }}},
+            {IndexSettingsField.ann_parameters: {IndexSettingsField.ann_method_parameters: {
                 IndexSettingsField.hnsw_ef_construction: 128,
                 IndexSettingsField.hnsw_m: -1
-            }},
+            }}},
         ]
         for idx_defaults in custom_index_defaults:
             with self.subTest(custom_index_defaults=idx_defaults):
@@ -77,7 +90,8 @@ class TestCreateIndex(MarqoTestCase):
                 except IndexNotFoundError as s:
                     pass
                 
-                try:
+                with self.assertRaises(errors.InvalidArgError):
+                    print(f"index settings={idx_defaults}")
                     tensor_search.create_vector_index(
                         config=self.config,
                         index_name=self.index_name_1,
@@ -85,9 +99,7 @@ class TestCreateIndex(MarqoTestCase):
                             NsField.index_defaults: idx_defaults
                         }
                     )
-                    raise AssertionError(f"Invalid custom index defaults, {self.custom_index_defaults} , did not cause exception ")
-                except errors.InvalidArgError as e:
-                    pass
+                    print(tensor_search.get_index_info(self.config, self.index_name_1))
 
     def test_create_vector_index_custom_index_settings(self):
         try:
@@ -138,6 +150,73 @@ class TestCreateIndex(MarqoTestCase):
             IndexSettingsField.number_of_shards: default_settings[IndexSettingsField.number_of_shards],
             IndexSettingsField.number_of_replicas: default_settings[IndexSettingsField.number_of_replicas]
         }
+
+    def test_create_vector_index_default_knn_settings(self):
+        """Do the Marqo-OS settings correspond to the Marqo index settings? For default HNSW params"""
+        try:
+            tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+        except IndexNotFoundError as s:
+            pass
+        # test that index is deleted:
+        try:
+            tensor_search.search(config=self.config, index_name=self.index_name_1, text="some text")
+            raise AssertionError
+        except IndexNotFoundError as e:
+            pass
+        custom_settings = {
+            IndexSettingsField.treat_urls_and_pointers_as_images: True,
+            IndexSettingsField.normalize_embeddings: False
+        }
+        tensor_search.create_vector_index(
+            config=self.config, index_name=self.index_name_1, index_settings={
+                NsField.index_defaults: custom_settings})
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=[{"Title": "wowow"}], auto_refresh=True)
+        mappings = requests.get(
+            url=self.endpoint + "/" + self.index_name_1 + "/_mapping",
+            verify=False
+        ).json()
+        params = mappings[self.index_name_1]['mappings']['properties']['__chunks']['properties']['__vector_Title']['method']
+        assert params['engine'] == 'lucene'
+        assert params['space_type'] == 'cosinesimil'
+        assert params['parameters'] == {'ef_construction': 128, 'm': 16}
+
+    def test_create_vector_index_custom_knn_settings(self):
+        """Do the Marqo-OS settings correspond to the Marqo index settings? For custom HNSW params"""
+        try:
+            tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+        except IndexNotFoundError as s:
+            pass
+        # test that index is deleted:
+        try:
+            tensor_search.search(config=self.config, index_name=self.index_name_1, text="some text")
+            raise AssertionError
+        except IndexNotFoundError as e:
+            pass
+        custom_settings = {
+            IndexSettingsField.treat_urls_and_pointers_as_images: True,
+            IndexSettingsField.normalize_embeddings: False,
+            IndexSettingsField.ann_parameters: {
+                IndexSettingsField.ann_metric: "l2",
+                IndexSettingsField.ann_method_parameters: {
+                    IndexSettingsField.hnsw_m: 17,
+                    IndexSettingsField.hnsw_ef_construction: 133,
+                }
+            }
+        }
+        tensor_search.create_vector_index(
+            config=self.config, index_name=self.index_name_1, index_settings={
+                NsField.index_defaults: custom_settings})
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=[{"Title": "wowow"}], auto_refresh=True)
+        mappings = requests.get(
+            url=self.endpoint + "/" + self.index_name_1 + "/_mapping",
+            verify=False
+        ).json()
+        params = mappings[self.index_name_1]['mappings']['properties']['__chunks']['properties']['__vector_Title']['method']
+        assert params['engine'] == 'lucene'
+        assert params['space_type'] == 'l2'
+        assert params['parameters'] == {'ef_construction': 133, 'm': 17}
 
     def test__autofill_index_settings_fill_missing_text_preprocessing(self):
         modified_settings = tensor_search.configs.get_default_index_settings()
