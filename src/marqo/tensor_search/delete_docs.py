@@ -1,6 +1,6 @@
 import datetime
 from typing import List, NamedTuple, Literal
-
+import json
 from marqo import errors
 from marqo._httprequests import HttpRequests
 from marqo.config import Config
@@ -32,34 +32,48 @@ def format_delete_docs_response(marqo_response: MqDeleteDocsResponse) -> dict:
     }
 
 
+class MqDeleteDocsRequest(NamedTuple):
+    index_name: str
+    document_ids: List[str]
+    auto_refresh: bool
+
+
+def delete_documents(config: Config, del_request: MqDeleteDocsRequest):
+    """entrypoint function for deleting documents"""
+    if not del_request.document_ids:
+        raise errors.InvalidDocumentIdError("doc_ids can't be empty!")
+
+    for _id in del_request.document_ids:
+        validation.validate_id(_id)
+
+    # TODO
 # -- Marqo-OS-specific deletion implementation: --
 
 
-def delete_documents(config: Config, index_name: str, doc_ids: List[str], auto_refresh):
+def delete_documents_marqo_os(config: Config, index_name: str, doc_ids: List[str], auto_refresh: bool):
     """Deletes documents """
-    if not doc_ids:
-        raise errors.InvalidDocumentIdError("doc_ids can't be empty!")
 
-    for _id in doc_ids:
-        validation.validate_id(_id)
+    # Prepare bulk delete request body
+    bulk_request_body = ""
+    for doc_id in doc_ids:
+        bulk_request_body += json.dumps({"delete": {"_index": index_name, "_id": doc_id}}) + "\n"
 
-    # TODO: change to timer()
+    # Send bulk delete request
     t0 = datetime.datetime.utcnow()
     delete_res_backend = HttpRequests(config=config).post(
-        path=f"{index_name}/_delete_by_query", body={
-            "query": {
-                "terms": {
-                    "_id": doc_ids
-                }
-            }
-        }
+        path="_bulk",
+        body=bulk_request_body,
     )
+
     if auto_refresh:
-        refresh_response = HttpRequests(config).post(path=F"{index_name}/_refresh")
+        refresh_response = HttpRequests(config).post(path=f"{index_name}/_refresh")
+
     t1 = datetime.datetime.utcnow()
+    deleted_documents_count = sum(1 for item in delete_res_backend["items"] if "delete" in item and item["delete"]["status"] == 200)
+
     mq_delete_res = MqDeleteDocsResponse(
         index_name=index_name, status_string='succeeded', document_ids=doc_ids,
-        deleted_docments_count=delete_res_backend["deleted"], deletion_start=t0,
+        deleted_docments_count=deleted_documents_count, deletion_start=t0,
         deletion_end=t1
     )
     return format_delete_docs_response(mq_delete_res)

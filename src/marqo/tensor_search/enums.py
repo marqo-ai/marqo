@@ -114,6 +114,9 @@ class MappingsObjectType:
     multimodal_combination = "multimodal_combination"
 
 
+class SearchDb:
+    opensearch = 'opensearch'
+
 # Perhaps create a ThrottleType to differentiate thread_count and data_size throttling mechanisms
     
 
