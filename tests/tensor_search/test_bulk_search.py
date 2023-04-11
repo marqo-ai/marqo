@@ -717,7 +717,6 @@ class TestBulkSearch(MarqoTestCase):
         assert len(res_img_2_img["hits"]) == 1
         assert res_img_2_img["hits"][0]["_highlights"] == {"img": hippo_img}
 
-
     def test_filtering(self):
         tensor_search.add_documents(
             config=self.config, index_name=self.index_name_1, docs=[
@@ -768,6 +767,39 @@ class TestBulkSearch(MarqoTestCase):
                 for j in range(len(result["hits"])):
                     assert result["hits"][j]["_id"] in expected
 
+    def test_filter_escaped_chars(self):
+        """
+        Not yet supported (for filtering): ":", "."
+
+        """
+        # TODO: add all special chars
+        for special_char, filter_char in [('#', '#'), (' ', '\ '), ('_', '_'), ('|', '|')]:
+
+            self._delete_test_indices(indices=[self.index_name_1])
+            field_to_search = f"tensorise{special_char}me"
+            filter_field = f"filter{special_char}me"
+            docs = [{
+                field_to_search: "quarterly earnings report",
+                filter_field: "Walrus",
+                "red herring": "Dog",
+                "_id": f"id_{special_char}"
+            }, {
+                field_to_search: "Dog",
+                filter_field: "Alpaca"
+            }
+            ]
+            add_res = tensor_search.add_documents(
+                index_name=self.index_name_1, docs=docs, auto_refresh=True, config=self.config
+            )
+            print('add_resadd_res',  add_res)
+            search_filter_field = f"filter{filter_char}me"
+            print('search_filter_fieldsearch_filter_field', search_filter_field)
+            search1_res = tensor_search.search(
+                text="Dog", searchable_attributes=[field_to_search],
+                filter=f'{search_filter_field}:Walrus', config=self.config, index_name=self.index_name_1
+            )
+            assert len(search1_res['hits']) == 1
+            assert search1_res['hits'][0]['_id'] == f"id_{special_char}"
 
     def test_set_device(self):
         """calling search with a specified device overrides device defined in config"""
