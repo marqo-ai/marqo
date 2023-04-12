@@ -2,7 +2,7 @@ import pprint
 import unittest
 from marqo.tensor_search.models.index_info import IndexInfo
 from marqo.tensor_search.models import index_info
-from marqo.tensor_search.enums import TensorField
+from marqo.tensor_search.enums import IndexSettingsField as NsFields, TensorField
 from marqo.tensor_search import configs
 
 
@@ -98,3 +98,63 @@ class TestIndexInfo(unittest.TestCase):
             index_settings=configs.get_default_index_settings()
         )
         assert {"some_text_prop": {1:2334}, "cat": {"hat": "ter"}} == ii.get_text_properties()
+
+    def test_get_ann_parameters__default_index_param(self):
+        ii = IndexInfo(
+            model_name='some model',
+            properties={},
+            index_settings=configs.get_default_index_settings()
+        )
+        assert ii.get_ann_parameters() == configs.get_default_ann_parameters()
+
+    def test_get_ann_parameters__without_default_ann_parameters__use_defaults(self):
+        index_settings = configs.get_default_index_settings()
+        del index_settings[NsFields.index_defaults][NsFields.ann_parameters]
+
+        ii = IndexInfo(
+            model_name='some model',
+            properties={},
+            index_settings=index_settings
+        )
+        assert ii.get_ann_parameters() == configs.get_default_ann_parameters()
+
+    def test_get_ann_parameters__use_specified_index_settings__overide_defaults(self):
+        index_settings = configs.get_default_index_settings()
+        index_settings[NsFields.index_defaults][NsFields.ann_parameters][NsFields.ann_method_name] = "not-hnsw"
+
+        ii = IndexInfo(
+            model_name='some model',
+            properties={},
+            index_settings=index_settings
+        )
+        actual = ii.get_ann_parameters()
+        default = configs.get_default_ann_parameters()
+        assert actual[NsFields.ann_method_name] == "not-hnsw"
+        
+        del actual[NsFields.ann_method_name]
+        del default[NsFields.ann_method_name]
+
+        assert actual == default
+
+    def test_get_ann_parameters__use_specified_ann_method_parameters__default_unspecified_values(self):
+        index_settings = configs.get_default_index_settings()
+        index_settings[NsFields.index_defaults][NsFields.ann_parameters][NsFields.ann_method_parameters] = {
+            NsFields.hnsw_ef_construction: 1,
+            NsFields.hnsw_m: 2
+        }
+
+        ii = IndexInfo(
+            model_name='some model',
+            properties={},
+            index_settings=index_settings
+        )
+        default = configs.get_default_ann_parameters()
+        actual = ii.get_ann_parameters()
+        assert actual[NsFields.ann_method_parameters] == {
+            NsFields.hnsw_ef_construction: 1,
+            NsFields.hnsw_m: 2
+        }
+        del actual[NsFields.ann_method_parameters]
+        del default[NsFields.ann_method_parameters]
+        
+        assert actual == default

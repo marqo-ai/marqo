@@ -1,5 +1,6 @@
 from marqo.tensor_search import enums as ns_enums
 from marqo.tensor_search.enums import IndexSettingsField as NsFields, EnvVars
+from marqo.tensor_search.utils import read_env_vars_and_defaults
 
 settings_schema = {
     "$schema": "https://json-schema.org/draft/2019-09/schema",
@@ -92,6 +93,70 @@ settings_schema = {
                     "examples": [{
                         NsFields.patch_method: None
                     }]
+                },
+                NsFields.ann_parameters: {
+                    "type": "object",
+                    "required": [
+                        # Non required for backwards compatibility
+                    ],
+                    "properties": {
+                        NsFields.ann_method: {
+                            "type": "string",
+                            "enum": ["hnsw"],
+                            "examples": [
+                                "hnsw"
+                            ]
+                        },
+                        NsFields.ann_engine: {
+                            "type": "string",
+                            "enum": ["lucene"],
+                            "examples": [
+                                "lucene"
+                            ]
+                        },
+                        NsFields.ann_metric: {
+                            "type": "string",
+                            "enum": ["l1", "l2", "linf", "cosinesimil"],
+                            "examples": [
+                                "cosinesimil"
+                            ]
+                        },
+                        NsFields.ann_method_parameters: {
+                            "type": "object",
+                            "required": [],
+                            "properties": {
+                                NsFields.hnsw_ef_construction: {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": int(read_env_vars_and_defaults(EnvVars.MARQO_EF_CONSTRUCTION_MAX_VALUE)),
+                                    "examples": [
+                                        128
+                                    ]
+                                },
+                                NsFields.hnsw_m: {
+                                    "type": "integer",
+                                    "minimum": 2,
+                                    "maximum": 100,
+                                    "examples": [
+                                        16
+                                    ]
+                                },
+                            },
+                            "examples": [{
+                                NsFields.hnsw_ef_construction: 128,
+                                NsFields.hnsw_m: 16
+                            }]
+                        }
+                    },
+                    "examples": [{
+                        NsFields.ann_method: "hnsw",
+                        NsFields.ann_engine: "lucene",
+                        NsFields.ann_metric: "cosinesimil",
+                        NsFields.ann_method_parameters: {
+                            NsFields.hnsw_ef_construction: 128,
+                            NsFields.hnsw_m: 16
+                        }
+                    }]
                 }
             },
             "examples": [{
@@ -105,6 +170,15 @@ settings_schema = {
                 },
                 NsFields.image_preprocessing: {
                     NsFields.patch_method: None
+                },
+                NsFields.ann_parameters: {
+                    NsFields.ann_method: "hnsw",
+                    NsFields.ann_engine: "lucene",
+                    NsFields.ann_metric: "cosinesimil",
+                    NsFields.ann_method_parameters: {
+                        NsFields.hnsw_ef_construction: 128,
+                        NsFields.hnsw_m: 16
+                    }
                 }
             }]
         },
@@ -135,6 +209,15 @@ settings_schema = {
             },
             NsFields.image_preprocessing: {
                 NsFields.patch_method: None
+            },
+            NsFields.ann_parameters: {
+                NsFields.ann_method: "hnsw",
+                NsFields.ann_engine: "lucene",
+                NsFields.ann_metric: "cosinesimil",
+                NsFields.ann_method_parameters: {
+                    NsFields.hnsw_ef_construction: 128,
+                    NsFields.hnsw_m: 16
+                }
             }
         },
         NsFields.number_of_shards: 5,
