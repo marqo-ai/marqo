@@ -12,6 +12,7 @@ from marqo.s2_inference.logger import get_logger
 import torch
 from marqo.tensor_search.utils import read_env_vars_and_defaults, generate_batches
 from marqo.tensor_search.configs import EnvVars
+from marqo.errors import ConfigurationError
 
 logger = get_logger(__name__)
 
@@ -50,7 +51,7 @@ def vectorise(model_name: str, content: Union[str, List[str]], model_properties:
             vectorised = available_models[model_cache_key].encode(content, normalize=normalize_embeddings, **kwargs)
         else:
             vector_batches = []
-            batch_size = read_env_vars_and_defaults(EnvVars.MARQO_MAX_VECTORISE_BATCH_SIZE)
+            batch_size = _get_max_vectorise_batch_size()
             for batch in generate_batches(content, batch_size=batch_size):
                 vector_batches.append(available_models[model_cache_key].encode(batch, normalize=normalize_embeddings, **kwargs))
             if not vector_batches or all(
@@ -62,6 +63,27 @@ def vectorise(model_name: str, content: Union[str, List[str]], model_properties:
         raise VectoriseError(str(e)) from e
 
     return _convert_vectorized_output(vectorised)
+
+
+def _get_max_vectorise_batch_size() -> int:
+    """Gets MARQO_MAX_VECTORISE_BATCH_SIZE from the environment, validates it before returning it."""
+
+    max_batch_size_value = read_env_vars_and_defaults(EnvVars.MARQO_MAX_VECTORISE_BATCH_SIZE)
+    validation_error_msg = (
+        "Could not properly read env var `MARQO_MAX_VECTORISE_BATCH_SIZE`. "
+        "`MARQO_MAX_VECTORISE_BATCH_SIZE` must be an int greater than or equal to 1."
+    )
+    try:
+        batch_size = int(max_batch_size_value)
+    except (ValueError, TypeError) as e:
+        value_error_msg = f"`{validation_error_msg} Current value: `{max_batch_size_value}`. Reason: {e}"
+        logger.error(value_error_msg)
+        raise ConfigurationError(value_error_msg)
+    if batch_size < 1:
+        batch_size_too_small_msg = f"`{validation_error_msg} Current value: `{max_batch_size_value}`."
+        logger.error(batch_size_too_small_msg)
+        raise ConfigurationError(batch_size_too_small_msg)
+    return batch_size
 
 
 def _create_model_cache_key(model_name: str, device: str, model_properties: dict = None) -> str:

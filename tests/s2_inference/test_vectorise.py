@@ -2,6 +2,7 @@ import PIL
 from marqo.s2_inference import random_utils, s2_inference
 import unittest
 from unittest import mock
+from marqo.errors import ConfigurationError
 
 
 class TestVectorise(unittest.TestCase):
@@ -104,7 +105,6 @@ class TestVectorise(unittest.TestCase):
 
         @mock.patch('marqo.s2_inference.s2_inference.available_models', mock_available_models)
         @mock.patch('marqo.s2_inference.s2_inference._update_available_models', mock.MagicMock())
-        # @mock.patch('marqo.tensor_search.utils.read_env_vars_and_defaults', side_effect=[2, 3])
         @mock.patch('marqo.s2_inference.s2_inference.read_env_vars_and_defaults', side_effect=[2, 3, 10])
         def run(mock_read_env_vars_and_defaults):
             # Test with batch size 2
@@ -229,4 +229,26 @@ class TestVectoriseBatching(unittest.TestCase):
         with self.assertRaises(s2_inference.VectoriseError):
             s2_inference.vectorise(model_name='mock_model', content=self.content_list,
                                    model_properties=self.mock_model_props)
+
+    @mock.patch('marqo.s2_inference.s2_inference.read_env_vars_and_defaults',
+                side_effect=[1, "1", "100", 10])
+    def test__get_max_vectorise_batch_size(self, mock_read_env_vars_and_defaults):
+        for expected in (1, 1, 100, 10):
+            assert expected == s2_inference._get_max_vectorise_batch_size()
+
+    def test__get_max_vectorise_batch_size_invalid(self):
+        invalid_batch_sizes = [0, "0", "1.2", "dinosaur", None, -1, "-4", '']
+        @mock.patch('marqo.s2_inference.s2_inference.read_env_vars_and_defaults',
+                    side_effect=invalid_batch_sizes)
+        def run(read_env_vars_and_defaults):
+            for _ in invalid_batch_sizes:
+                try:
+                    s2_inference._get_max_vectorise_batch_size()
+                    raise AssertionError("incorrectly passing at value ", _)
+                except ConfigurationError as e:
+                    print(e)
+                    print('')
+                    pass
+            return True
+        assert run()
 

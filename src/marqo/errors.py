@@ -86,7 +86,7 @@ class MarqoWebError(Exception):
         super().__init__(self.message)
 
     def __str__(self) -> str:
-        return f'{self.__class__.__name__}: {self.message}\n{self.base_message}'
+        return f'{self.__class__.__name__}: {self.message}'
 
 # ---MARQO USER ERRORS---
 
@@ -204,5 +204,10 @@ class BackendTimeoutError(InternalError):
 class BatchInferenceSizeError(InternalError):
     """Error when batch inference does not return expected size"""
     code = "batch_inference_size_error"
-    status_code =  HTTPStatus.INTERNAL_SERVER_ERROR
+    status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+
+
+class ConfigurationError(InternalError):
+    code = "server_configuration_error"
+    status_code = HTTPStatus.INTERNAL_SERVER_ERROR
 

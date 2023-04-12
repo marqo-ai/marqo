@@ -311,7 +311,10 @@ def add_timing(f, key: str = "processingTimeMs"):
     return wrap
 
 
-def generate_batches(seq: Sequence, batch_size):
+def generate_batches(seq: Sequence, batch_size: int):
     """Yields batches of length k from the sequence."""
+    if batch_size < 1:
+        raise ValueError("Batch size must be greater than 0")
+
     for i in range(0, len(seq), batch_size):
         yield seq[i:i + batch_size]
