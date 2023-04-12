@@ -55,7 +55,7 @@ def vectorise(model_name: str, content: Union[str, List[str]], model_properties:
                 vector_batches.append(available_models[model_cache_key].encode(batch, normalize=normalize_embeddings, **kwargs))
             if not vector_batches or all(
                     len(batch) == 0 for batch in vector_batches):  # Check for empty vector_batches or empty arrays
-                vectorised = np.array([])  # Return an empty array
+                raise RuntimeError(f"Vectorise created an empty list of batches! Content: {content}")
             else:
                 vectorised = np.concatenate(vector_batches, axis=0)
     except UnidentifiedImageError as e:
