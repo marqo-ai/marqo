@@ -1,3 +1,20 @@
+## Release 0.0.17 
+
+## New features
+- New parameters that allow tweaking of Marqo indexes' underlying HNSW graph. `ef_construction` and `m`  can be defined at index time (https://github.com/marqo-ai/marqo/pull/386, https://github.com/marqo-ai/marqo/pull/420, https://github.com/marqo-ai/marqo/pull/421), giving you more control over the relevancy/speed tradeoff. See usage and more details [here](https://docs.marqo.ai/0.0.17/API-Reference/indexes/#example_1).
+- Score modification fields (https://github.com/marqo-ai/marqo/pull/414). Rank documents using knn similarity in addition to document metadata ( https://github.com/marqo-ai/marqo/pull/414). This allows integer or float fields from a document to bias a document's score during the knn search and allows additional ranking signals to be used. Use cases include giving more reputable documents higher weighting and de-duplicating search results. See usage [here](https://docs.marqo.ai/0.0.17/API-Reference/search/#score-modifiers).
+
+## Bug fixes and minor changes
+- Added validation for unknown parameters during bulk search (https://github.com/marqo-ai/marqo/pull/413).
+- Improved concurrency handling when adding documents to an index as it's being deleted (https://github.com/marqo-ai/marqo/pull/407).
+- Better error messages for multimodal combination fields (https://github.com/marqo-ai/marqo/pull/395).
+- Examples of recently added features added to README (https://github.com/marqo-ai/marqo/pull/403).
+
+## Contributor shout-outs
+- Thank you to our 2.6k stargazers.
+- Thank you to [@anlrde](https://github.com/anlrde), [@strich](https://github.com/strich), [@feature-hope](https://github.com/feature-hope), [@bazuker](https://github.com/bazuker) for raising issues!
+
+
 ## Release 0.0.16
 
 ## New features

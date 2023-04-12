@@ -26,13 +26,15 @@ class TestLargeModelEncoding(unittest.TestCase):
 
         self.multilingual_models = ["multilingual-clip/XLM-Roberta-Large-Vit-L-14"]
 
+        self.e5_models = ["hf/e5-large", "hf/e5-large-unsupervised"]
+
 
     def tearDown(self) -> None:
         clear_loaded_models()
 
 
     def test_vectorize(self):
-        names = self.large_clip_models
+        names = self.large_clip_models + self.e5_models
         sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
         device = "cuda"
         eps = 1e-9
@@ -47,6 +49,10 @@ class TestLargeModelEncoding(unittest.TestCase):
                 assert _check_output_type(output_v)
 
                 output_m = model.encode(sentence, normalize=True)
+
+                # Converting output_m to numpy if it is cuda.
+                if type(output_m) == torch.Tensor:
+                    output_m = output_m.cpu().numpy()
 
                 assert abs(torch.FloatTensor(output_m) - torch.FloatTensor(output_v)).sum() < eps
 
@@ -72,7 +78,7 @@ class TestLargeModelEncoding(unittest.TestCase):
 
 
     def test_model_outputs(self):
-        names = ["onnx16/open_clip/ViT-B-32/laion400m_e32"]
+        names = ["onnx16/open_clip/ViT-B-32/laion400m_e32"] + self.e5_models
         sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
         device = "cuda"
 
@@ -88,7 +94,7 @@ class TestLargeModelEncoding(unittest.TestCase):
 
 
     def test_model_normalization(self):
-        names = self.large_clip_models
+        names = self.large_clip_models + self.e5_models
         sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
         device = "cuda"
         eps = 1e-6
