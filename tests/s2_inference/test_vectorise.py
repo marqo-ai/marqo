@@ -70,6 +70,7 @@ class TestVectorise(unittest.TestCase):
             try:
                 s2_inference.vectorise(model_name='mock_model', content=[],
                                        model_properties=mock_model_props)
+                raise AssertionError
             except RuntimeError as e:
                 assert 'empty list of batches' in str(e).lower()
             return True
