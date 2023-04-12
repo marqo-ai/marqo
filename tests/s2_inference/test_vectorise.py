@@ -128,8 +128,65 @@ class TestVectorise(unittest.TestCase):
             assert len(call_args_list) == 2
             assert call_args_list[0][0][0] == content_list[:3]
             assert call_args_list[1][0][0] == content_list[3:]
+            return True
+        assert run()
 
-        run()
+    def test_vectorise_in_batches_with_different_batch_sizes_strs(self):
+        """like the above test, but read_env_vars_and_defaults returns strings rather than ints
+        which is more likely in a real scenario
+        """
+        mock_model = mock.MagicMock()
+        mock_model.encode = mock.MagicMock()
+
+        random_model = random_utils.Random(model_name='mock_model', embedding_dim=128)
+
+        def func(*args, **kwargs):
+            return random_model.encode(*args, **kwargs)
+
+        mock_model.encode.side_effect = func
+        mock_model_props = {
+            "name": "mock_model",
+            "dimensions": random_model.embedding_dimension,
+            "tokens": 128,
+            "type": "sbert"
+        }
+
+        mock_available_models = {
+            s2_inference._create_model_cache_key(
+                model_name='mock_model', device='cpu',
+                model_properties=mock_model_props
+            ): mock_model
+        }
+
+        content_list = ['content1', 'content2', 'content3', 'content4', 'content5']
+
+        @mock.patch('marqo.s2_inference.s2_inference.available_models', mock_available_models)
+        @mock.patch('marqo.s2_inference.s2_inference._update_available_models', mock.MagicMock())
+        @mock.patch('marqo.s2_inference.s2_inference.read_env_vars_and_defaults', side_effect=['2', '3', '10'])
+        def run(mock_read_env_vars_and_defaults):
+            # Test with batch size 2
+            s2_inference.vectorise(model_name='mock_model', content=content_list,
+                                   model_properties=mock_model_props)
+
+            call_args_list = mock_model.encode.call_args_list
+            assert len(call_args_list) == 3
+            assert call_args_list[0][0][0] == content_list[:2]
+            assert call_args_list[1][0][0] == content_list[2:4]
+            assert call_args_list[2][0][0] == content_list[4:]
+
+            # Reset mock_model.encode call_args_list for the next test
+            mock_model.encode.reset_mock()
+
+            # Test with batch size 3
+            s2_inference.vectorise(model_name='mock_model', content=content_list,
+                                   model_properties=mock_model_props)
+
+            call_args_list = mock_model.encode.call_args_list
+            assert len(call_args_list) == 2
+            assert call_args_list[0][0][0] == content_list[:3]
+            assert call_args_list[1][0][0] == content_list[3:]
+            return True
+        assert run()
 
 
 class TestVectoriseBatching(unittest.TestCase):
@@ -246,8 +303,6 @@ class TestVectoriseBatching(unittest.TestCase):
                     s2_inference._get_max_vectorise_batch_size()
                     raise AssertionError("incorrectly passing at value ", _)
                 except ConfigurationError as e:
-                    print(e)
-                    print('')
                     pass
             return True
         assert run()
