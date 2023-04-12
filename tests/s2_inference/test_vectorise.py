@@ -1,5 +1,5 @@
 import PIL
-from marqo.s2_inference import clip_utils, types, random_utils, s2_inference
+from marqo.s2_inference import random_utils, s2_inference
 import unittest
 from unittest import mock
 
