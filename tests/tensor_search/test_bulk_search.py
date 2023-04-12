@@ -1,4 +1,5 @@
 import copy
+import os
 import math
 import requests
 import random
@@ -57,6 +58,22 @@ class TestBulkSearch(MarqoTestCase):
                 "index": self.index_name_1,
                 "q": "title about some doc",
                 "parameter-not-expected": 1,
+            }]))
+
+    @mock.patch.dict('os.environ', {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': '0'}})
+    def test_bulk_search_with_excessive_searchable_attributes(self):
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=[
+                {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "id1-first"},
+                {"abc": "random text", "other field": "Close match hehehe", "_id": "id1-second"},
+            ], auto_refresh=True
+        ) 
+        with self.assertRaises(pydantic.ValidationError):
+            api.bulk_search(BulkSearchQuery(queries=[{
+                "index": self.index_name_1,
+                "q": "title about some doc",
+                "parameter-not-expected": 1,
+                "searchableAttributes": ["abc"]
             }]))
 
     def test_bulk_search_no_queries_return_early(self):

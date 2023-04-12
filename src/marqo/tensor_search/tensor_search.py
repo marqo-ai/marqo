@@ -1014,16 +1014,19 @@ def bulk_search(query: BulkSearchQuery, marqo_config: config.Config, verbose: bo
           - A single error (e.g. validation errors) on any one of the search queries returns an error and does not
             process non-erroring queries.
     """
+    refresh_indexes_in_background(marqo_config, [q.index for q in query.queries])
+
     # TODO: Let non-errored docs to propagate.
-    errs = [validation.validate_bulk_query_input(q) for q in query.queries]
+    errs = [
+        validation.validate_bulk_query_input(q, config, get_index_info(config=config, index_name=q.index))
+        for q in query.queries
+    ]
     if any(errs):
         err = next(e for e in errs if e is not None)
         raise err
 
     if len(query.queries) == 0:
         return {"result": []}
-
-    refresh_indexes_in_background(marqo_config, [q.index for q in query.queries])
 
     selected_device = marqo_config.indexing_device if device is None else device
 
@@ -1172,6 +1175,10 @@ def search(config: Config, index_name: str, text: Union[str, dict],
         target=index_meta_cache.refresh_index_info_on_interval,
         args=(config, index_name, REFRESH_INTERVAL_SECONDS))
     cache_update_thread.start()
+
+    # Must do after cache refresh to get field names.
+    field_names = get_index_info(config=config, index_name=index_name)
+    validation.validate_searchable_attributes(field_names=field_names, searchable_attributes=searchable_attributes, search_method=search_method)
 
     if search_method.upper() == SearchMethod.TENSOR:
         search_result = _vector_text_search(

@@ -1,10 +1,13 @@
+import os
 from marqo.tensor_search import validation
 from enum import Enum
 from marqo.tensor_search import enums
 import unittest
 from unittest import mock
+from unittest.mock import patch
+
 from marqo.errors import (
-    MarqoError, InvalidFieldNameError, InternalError,
+    InvalidFieldNameError, InternalError,
     InvalidDocumentIdError, InvalidArgError, DocTooLargeError,
     InvalidIndexNameError
 )
@@ -299,6 +302,62 @@ class TestValidation(unittest.TestCase):
     def test_boost_validation_None_ok(self):
         for search_method in ('', 'LEXICAL', 'OTHER', 'TENSOR'):
             assert None is validation.validate_boost(boost=None, search_method=search_method)
+
+
+class TestValidateSearchableAttributes(unittest.TestCase):
+    
+    def setUp(self) -> None:
+        self.field_names = [f"field{i}" for i in range(10)]
+        self.searchable_attributes = [f"field{i}" for i in range(5)]
+
+    def test_search_method_not_tensor(self):
+        validation.validate_searchable_attributes(
+            self.field_names,
+            self.searchable_attributes,
+            search_method=enums.SearchMethod.LEXICAL
+        )
+
+    def test_maximum_searchable_attributes_not_set(self):
+        validation.validate_searchable_attributes(
+            self.field_names,
+            self.searchable_attributes,
+            search_method=enums.SearchMethod.TENSOR
+        )
+
+    @patch.dict('os.environ', {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': '6'}})
+    def test_searchable_attributes_not_set__use_field_names(self):
+        with self.assertRaises(InvalidArgError):
+            validation.validate_searchable_attributes(
+                self.field_names,
+                searchable_attributes=None,
+                search_method=enums.SearchMethod.TENSOR
+            )
+        
+
+    @patch.dict('os.environ', {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': '1'}})
+    def test_searchable_attributes_set__use_searchable_attributes(self):
+        with self.assertRaises(InvalidArgError):
+            validation.validate_searchable_attributes(
+                self.field_names,
+                searchable_attributes=self.searchable_attributes,
+                search_method=enums.SearchMethod.TENSOR
+            )
+
+    @patch.dict('os.environ', {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': '6'}})
+    def test_searchable_attributes_below_limit(self):
+        validation.validate_searchable_attributes(
+            self.field_names,
+            searchable_attributes=self.searchable_attributes,
+            search_method=enums.SearchMethod.TENSOR
+        )
+
+    @patch.dict('os.environ', {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': '11'}})
+    def test_searchable_attributes_not_set_use_field_names_below_limit(self):
+        validation.validate_searchable_attributes(
+            self.field_names,
+            searchable_attributes=None,
+            search_method=enums.SearchMethod.TENSOR
+        )
 
 
 class TestValidateIndexSettings(unittest.TestCase):

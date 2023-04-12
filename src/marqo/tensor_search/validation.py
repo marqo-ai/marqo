@@ -1,6 +1,7 @@
 import json
 import pprint
 import typing
+from marqo.config import Config
 from marqo.tensor_search import constants
 from marqo.tensor_search import enums, utils
 from typing import Container, Iterable, List, Optional, Union
@@ -11,7 +12,7 @@ from marqo.errors import (
 from marqo.tensor_search.enums import TensorField, SearchMethod
 from marqo.tensor_search import constants
 from typing import Any, Type, Sequence
-import inspect
+
 from enum import Enum
 import jsonschema
 from marqo.tensor_search.models.settings_object import settings_schema
@@ -55,7 +56,7 @@ def validate_query(q: Union[dict, str], search_method: Union[str, SearchMethod])
     return q
 
 
-def validate_bulk_query_input(q: 'BulkSearchQueryEntity') -> Optional[MarqoError]:
+def validate_bulk_query_input(q: 'BulkSearchQueryEntity', config: Config, field_names: List[str]) -> Optional[MarqoError]:
     if q.limit <= 0:
         return IllegalRequestedDocCount("search result limit must be greater than 0!")
     if q.offset < 0:
@@ -63,6 +64,10 @@ def validate_bulk_query_input(q: 'BulkSearchQueryEntity') -> Optional[MarqoError
 
     # validate query
     validate_query(q=q.q, search_method=q.searchMethod)
+    try:
+        validate_searchable_attributes(field_names, searchable_attributes=q.searchableAttributes, search_method=q.searchMethod)
+    except Exception as e:
+        return e
 
     # Validate result_count + offset <= int(max_docs_limit)
     max_docs_limit = utils.read_env_vars_and_defaults(enums.EnvVars.MARQO_MAX_RETRIEVABLE_DOCS)
@@ -85,6 +90,21 @@ def validate_bulk_query_input(q: 'BulkSearchQueryEntity') -> Optional[MarqoError
 
     return None
 
+def validate_searchable_attributes(field_names: List[str], searchable_attributes: Optional[List[str]], search_method: SearchMethod):
+    if search_method != SearchMethod.TENSOR:
+        return
+    
+    maximum_searchable_attributes = int(utils.read_env_vars_and_defaults(enums.EnvVars.MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES))
+    if searchable_attributes is not None:
+        num_searchable_attributes = len(searchable_attributes)
+    else:
+        num_searchable_attributes = len(field_names)
+
+    if num_searchable_attributes > maximum_searchable_attributes:
+        raise InvalidArgError(
+            f"Maximum searchable attributes for tensor search is {maximum_searchable_attributes}, received {num_searchable_attributes}."
+        )
+    
 
 def validate_str_against_enum(value: Any, enum_class: Type[Enum], case_sensitive: bool = True):
     """Checks whether a value is found as the value of a str attribute of the
