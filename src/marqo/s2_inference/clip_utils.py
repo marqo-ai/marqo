@@ -438,8 +438,12 @@ class OPEN_CLIP(CLIP):
 
         text = self.tokenizer(sentence).to(self.device)
 
-        with torch.no_grad(), torch.autocast(device_type="cuda" if self.device.startswith("cuda") else "cpu"):
-            outputs = self.model.encode_text(text).to(torch.float32)
+        if self.device.startswith("cuda"):
+            with torch.no_grad(), torch.autocast(device_type="cuda"):
+                outputs = self.model.encode_text(text).to(torch.float32)
+        else:
+            with torch.no_grad():
+                     outputs = self.model.encode_text(text).to(torch.float32)
 
         if normalize:
             _shape_before = outputs.shape
