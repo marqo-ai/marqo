@@ -93,14 +93,22 @@ def validate_bulk_query_input(q: 'BulkSearchQueryEntity', config: Config, field_
 def validate_searchable_attributes(field_names: List[str], searchable_attributes: Optional[List[str]], search_method: SearchMethod):
     if search_method != SearchMethod.TENSOR:
         return
-    
-    maximum_searchable_attributes = int(utils.read_env_vars_and_defaults(enums.EnvVars.MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES))
+
+    maximum_searchable_attributes: Optional[str] = utils.read_env_vars_and_defaults(enums.EnvVars.MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES)
+    if maximum_searchable_attributes is None:
+        return 
+
+    if searchable_attributes is None:
+        raise InvalidArgError(
+            f"No searchable_attributes provided, but environment variable `MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES` is set."
+        )
+
     if searchable_attributes is not None:
         num_searchable_attributes = len(searchable_attributes)
     else:
         num_searchable_attributes = len(field_names)
 
-    if num_searchable_attributes > maximum_searchable_attributes:
+    if num_searchable_attributes > int(maximum_searchable_attributes):
         raise InvalidArgError(
             f"Maximum searchable attributes for tensor search is {maximum_searchable_attributes}, received {num_searchable_attributes}."
         )

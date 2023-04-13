@@ -56,6 +56,19 @@ class TestVectorSearch(MarqoTestCase):
         )
         assert len(search_res['hits']) == 2
 
+    @mock.patch.dict('os.environ', {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': '2'}})
+    def test_search_with_excessive_searchable_attributes(self):
+        with self.assertRaises(InvalidArgError):
+            tensor_search.add_documents(
+                config=self.config, index_name=self.index_name_1, docs=[
+                    {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "5678"},
+                    {"abc": "random text", "other field": "Close match hehehe", "_id": "1234"},
+                ], auto_refresh=True)
+            tensor_search.search(
+                config=self.config, index_name=self.index_name_1, text="Exact match hehehe",
+                searchable_attributes=["abc", "def", "other field"], return_doc_ids=True
+            )
+
     @mock.patch.dict('os.environ', {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': '0'}})
     def test_search_with_excessive_searchable_attributes(self):
         with self.assertRaises(InvalidArgError):
@@ -70,7 +83,7 @@ class TestVectorSearch(MarqoTestCase):
             )
 
     @mock.patch.dict('os.environ', {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': '2'}})
-    def test_search_with_excessive_fields_no_searchable_attributes(self):
+    def test_search_with_no_searchable_attributes_but_max_searchable_attributes_env_set(self):
         with self.assertRaises(InvalidArgError):
             tensor_search.add_documents(
                 config=self.config, index_name=self.index_name_1, docs=[

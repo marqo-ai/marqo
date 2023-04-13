@@ -59,5 +59,5 @@ def default_env_vars() -> dict:
         EnvVars.MARQO_LOG_LEVEL: "info",             # This env variable is set to "info" by default in run_marqo.sh, which overrides this value
         EnvVars.MARQO_EF_CONSTRUCTION_MAX_VALUE: 4096,
         EnvVars.MARQO_MAX_VECTORISE_BATCH_SIZE: 16,
-        EnvVars.MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES: None,
+        EnvVars.MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES: None
     }
