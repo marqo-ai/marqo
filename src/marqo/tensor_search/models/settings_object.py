@@ -18,7 +18,8 @@ settings_schema = {
                 NsFields.model,
                 NsFields.normalize_embeddings,
                 NsFields.text_preprocessing,
-                NsFields.image_preprocessing
+                NsFields.image_preprocessing,
+                NsFields.mappings
             ],
             "additionalProperties": False,
             "properties": {
@@ -27,6 +28,10 @@ settings_schema = {
                     "examples": [
                         False
                     ]
+                },
+                NsFields.mappings:{
+                # TODO - add schema for mappings
+                    "type":"object"
                 },
                 NsFields.model: {
                     "type": "string",

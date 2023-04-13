@@ -18,6 +18,7 @@ from marqo.tensor_search.models.settings_object import settings_schema
 from marqo.tensor_search.models.mappings_object import mappings_schema, multimodal_combination_schema
 from marqo.tensor_search.models.context_object import context_schema
 from marqo.tensor_search.models.score_modifiers_object import score_modifiers_object_schema
+from marqo.tensor_search.models.index_mappings import IndexMappings
 
 
 def validate_query(q: Union[dict, str], search_method: Union[str, SearchMethod]):
@@ -570,3 +571,8 @@ def validate_score_modifiers_object(score_modifiers: List[dict]):
             f"Please revise your score_modifiers based on the provided error."
             f"\n Check `https://docs.marqo.ai/0.0.17/API-Reference/search/#score-modifiers` for more info."
         )
+
+
+def validate_index_mappings(index_mappings: dict= None):
+    # TODO add validation for index mappings
+    return IndexMappings(index_mappings)

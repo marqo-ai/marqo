@@ -44,6 +44,7 @@ class IndexSettingsField:
     model = "model"
     model_properties = "model_properties"
     normalize_embeddings = "normalize_embeddings"
+    mappings = "mappings"
 
     text_preprocessing = "text_preprocessing"
     split_length = "split_length"

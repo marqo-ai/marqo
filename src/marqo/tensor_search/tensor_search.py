@@ -78,7 +78,7 @@ logger = get_logger(__name__)
 
 def create_vector_index(
         config: Config, index_name: str, media_type: Union[str, MediaType] = MediaType.default,
-        refresh_interval: str = "1s", index_settings=None):
+        refresh_interval: str = "1s", index_settings = None, mappings: Optional[Dict] = None):
     """
     Args:
         media_type: 'text'|'image'
@@ -433,6 +433,9 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
     if mappings is not None:
         validate_mappings = validation.validate_mappings(mappings)
 
+    if index_info.index_settings[NsField.index_defaults][NsField.mappings]:
+        index_mappings = validation.validate_index_mappings(index_info.index_settings[NsField.index_defaults][NsField.mappings])
+
     existing_fields = set(index_info.properties.keys())
     new_fields = set()
 
@@ -506,6 +509,8 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                     raise errors.InternalError(message= f"Upsert: found {len(matching_doc)} matching docs for {doc_id} when only 1 or 0 should have been found.")
         else:
             indexing_instructions["update"]["_id"] = doc_id
+
+        vector_to_append = index_mappings.generate_appending_vectors(docs=docs)
 
         # Metadata can be calculated here at the doc level.
         # Only add chunk values which are string, boolean, numeric or dictionary.
