@@ -66,8 +66,8 @@ class TestEncoding(unittest.TestCase):
                 try:
                     clip_utils.load_image_from_path(good_url, {})
                     raise AssertionError
-                except PIL.UnidentifiedImageError:
-                    pass
+                except PIL.UnidentifiedImageError as e:
+                    assert str(status_code) in str(e)
                 return True
 
             run()
