@@ -1,8 +1,6 @@
 import copy
 from typing import List
 
-
-
 class IndexMappings:
     def __init__(self, index_mappings: dict):
         self.index_mappings = copy.deepcopy(index_mappings)
