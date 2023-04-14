@@ -21,7 +21,7 @@ from marqo.s2_inference.s2_inference import (
 class TestLargeModelEncoding(unittest.TestCase):
 
     def setUp(self) -> None:
-        self.large_clip_models = ["open_clip/ViT-L-14/openai", "ViT-L/14"]
+        self.large_clip_models = ["onnx32/openai/ViT-L/14", "open_clip/ViT-L-14/openai", "ViT-L/14"]
 
         self.multilingual_models = ["multilingual-clip/XLM-Roberta-Large-Vit-L-14"]
 
@@ -43,7 +43,11 @@ class TestLargeModelEncoding(unittest.TestCase):
             model = _load_model(model_properties['name'], model_properties=model_properties, device=device, )
 
             for sentence in sentences:
-                output_v = vectorise(name, sentence, model_properties, device, normalize_embeddings=True)
+                try:
+                    output_v = vectorise(name, sentence, model_properties, device, normalize_embeddings=True)
+                except TypeError:
+                    print(name)
+                    raise TypeError
 
                 assert _check_output_type(output_v)
 
@@ -140,7 +144,9 @@ class TestLargeModelEncoding(unittest.TestCase):
             del similarity_score
 
     def test_cuda_encode_type(self):
-        names = ["fp16/ViT-B/32", "open_clip/convnext_base_w/laion2b_s13b_b82k",
+        names = self.large_clip_models + self.e5_models
+
+        names += ["fp16/ViT-B/32", "open_clip/convnext_base_w/laion2b_s13b_b82k",
                  "open_clip/convnext_base_w_320/laion_aesthetic_s13b_b82k_augreg",
                  "onnx16/open_clip/ViT-B-32/laion400m_e32", 'onnx32/open_clip/ViT-B-32-quickgelu/laion400m_e32',
                  "all-MiniLM-L6-v1", "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6",
@@ -158,7 +164,9 @@ class TestLargeModelEncoding(unittest.TestCase):
 
             for sentence in sentences:
                 output_v = _convert_tensor_to_numpy(model.encode(sentence, normalize=True))
-                assert isinstance(output_v, np.ndarray)
+                if not isinstance(output_v, np.ndarray):
+                    print(name)
+                    assert isinstance(output_v, np.ndarray)
 
             clear_loaded_models()
 
