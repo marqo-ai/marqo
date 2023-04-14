@@ -116,7 +116,9 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
                                                      AvailableModelsKey.model_size: model_size}
                 logger.info(
                     f'loaded {model_name} on device {device} with normalization={normalize_embeddings} at time={most_recently_used_time}.')
-            except:
+            except Exception as e:
+                logger.error(f"Error loading model {model_name} on device {device} with normalization={normalize_embeddings}. \n"
+                             f"Error message is {str(e)}")
                 raise ModelLoadError(
                     f"Unable to load model={model_name} on device={device} with normalization={normalize_embeddings}. "
                     f"If you are trying to load a custom model, "
@@ -205,7 +207,8 @@ def _validate_model_into_device(model_name:str, model_properties: dict, device: 
 
 def _check_memory_threshold_for_model(device: str, model_size: Union[float, int], calling_func: str =None) -> bool:
     '''
-    Note: this function should only be called by `_update_available_models` for threading safeness.
+    Note: this function should only be called by `_validate_model_into_device` for threading safeness.
+    `_validate_model_into_device` is calle by `_update_available_models` which is already thread safe.
 
     Check the memory usage in the target device and decide whether we can add a new model
     Args:
