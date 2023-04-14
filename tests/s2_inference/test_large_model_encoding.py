@@ -43,11 +43,7 @@ class TestLargeModelEncoding(unittest.TestCase):
             model = _load_model(model_properties['name'], model_properties=model_properties, device=device, )
 
             for sentence in sentences:
-                try:
-                    output_v = vectorise(name, sentence, model_properties, device, normalize_embeddings=True)
-                except TypeError:
-                    print(name)
-                    raise TypeError
+                output_v = vectorise(name, sentence, model_properties, device, normalize_embeddings=True)
 
                 assert _check_output_type(output_v)
 
@@ -164,9 +160,7 @@ class TestLargeModelEncoding(unittest.TestCase):
 
             for sentence in sentences:
                 output_v = _convert_tensor_to_numpy(model.encode(sentence, normalize=True))
-                if not isinstance(output_v, np.ndarray):
-                    print(name)
-                    assert isinstance(output_v, np.ndarray)
+                assert isinstance(output_v, np.ndarray)
 
             clear_loaded_models()
 
