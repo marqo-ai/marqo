@@ -53,10 +53,12 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
         r2 = tensor_search.add_documents(
             config=self.config, index_name=self.index_name_1, docs=[d1, d1],
             auto_refresh=True, use_existing_tensors=True)
+
         for item in r1['items']:
             assert item['result'] == 'created'
         for item in r2['items']:
             assert item['result'] == 'created'
+        
 
     def test_use_existing_tensors_non_existing(self):
         """check parity between a doc created with and without use_existing_tensors, then overwritten,
@@ -504,17 +506,20 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
         Ensure no errors occur even with chunkless docs. (only int, only bool, etc)
         Replacing doc doesn't change the content
         """
+        self.maxDiff = None
+
         doc_args = [
             # Each doc only has 1 type
-            [{"_id": "1", "title": "hello world"},
-            {"_id": "2", "title": True},
-            {"_id": "3", "title": 12345},
-            {"_id": "4", "title": [1, 2, 3]}],
+            [{"_id": "1", "field1": "hello world"},
+            {"_id": "2", "field2": True},
+            {"_id": "3", "field3": 12345},
+            {"_id": "4", "field4": [1, 2, 3]}],
 
             # Doc with all types
-            [{"_id": "1", "field1": "hello world", "field2": True, "field3": 12345, "field4": [1, 2, 3]}]
+            [{"_id": "1", "field1": "hello world", "field2": True, "field3": 12345, "field4": [1, 2, 3]}],
         ]
-        
+
+
         for doc_arg in doc_args:
             # Add doc normally without use_existing_tensors
             add_res = tensor_search.add_documents(
@@ -534,4 +539,4 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
                 config=self.config, index_name=self.index_name_1,
                 document_ids=[doc["_id" ]for doc in doc_arg], show_vectors=True)
             
-            self.assertEqual(d1, d2)
+            self.assertAlmostEqual(d1, d2)
