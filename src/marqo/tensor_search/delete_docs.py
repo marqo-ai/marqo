@@ -44,6 +44,9 @@ class MqDeleteDocsRequest(NamedTuple):
     auto_refresh: bool
 
 
+# -- Data-layer agnostic logic --
+
+
 def delete_documents(config: Config, del_request: MqDeleteDocsRequest) -> dict:
     """entrypoint function for deleting documents"""
     if not del_request.document_ids:
