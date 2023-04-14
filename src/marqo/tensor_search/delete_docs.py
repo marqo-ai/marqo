@@ -1,3 +1,6 @@
+"""
+This module handles the delete documents endpoint
+"""
 import datetime
 from typing import List, NamedTuple, Literal
 import json
@@ -11,6 +14,7 @@ from marqo.tensor_search import validation, utils, enums
 
 
 class MqDeleteDocsResponse(NamedTuple):
+    """An object that holds the data we send back to users"""
     index_name: str
     status_string: Literal["succeeded"]
     document_ids: List[str]
@@ -20,6 +24,7 @@ class MqDeleteDocsResponse(NamedTuple):
 
 
 def format_delete_docs_response(marqo_response: MqDeleteDocsResponse) -> dict:
+    """This formats the delete response for users """
     return {
         "index_name": marqo_response.index_name, "status": marqo_response.status_string,
         "type": "documentDeletion", "details": {
@@ -33,6 +38,7 @@ def format_delete_docs_response(marqo_response: MqDeleteDocsResponse) -> dict:
 
 
 class MqDeleteDocsRequest(NamedTuple):
+    """An object that holds the data from users for a delete request"""
     index_name: str
     document_ids: List[str]
     auto_refresh: bool

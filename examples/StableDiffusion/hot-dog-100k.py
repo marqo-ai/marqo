@@ -2,6 +2,7 @@
 ### STEP 0. Import and define any helper functions
 #####################################################
 import marqo.tensor_search.delete_docs
+import marqo.tensor_search.tensor_search
 from marqo import Client
 from marqo.errors import MarqoApiError
 import torch
@@ -118,7 +119,7 @@ results = client.index(index_name).search(results['hits'][0]['image_docker'], li
 # we check the results - scores of very close to 1 are duplicated (this value can change depending on the task)
 documents_delete = [r['_id'] for r in results['hits'] if r['_score'] > 0.99999]
 
-marqo.tensor_search.delete_docs.delete_documents(documents_delete)
+marqo.tensor_search.tensor_search.delete_documents(documents_delete)
 
 
 #####################################################
@@ -139,7 +140,7 @@ ordered_documents = [current_document['_id']]
 for i in range(len(documents)):
 
     # remove current document
-    marqo.tensor_search.delete_docs.delete_documents([current_document['_id']])
+    marqo.tensor_search.tensor_search.delete_documents([current_document['_id']])
 
     # now search with it to get next best
     results = client.index(index_name).search(current_document['image_docker'],

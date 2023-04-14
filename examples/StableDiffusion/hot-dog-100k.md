@@ -92,6 +92,7 @@ results = client.index("hot-dogs-100k").search("a black image")
 Now we have a black image, we can search using that and find all the other duplicate black images and remove them from the dataset.
 
 ```python
+import marqo.tensor_search.tensor_search
 import marqo.tensor_search.delete_docs
 
 query = 'a black image'
@@ -104,7 +105,7 @@ results = client.index(index_name).search(results['hits'][0]['image_docker'], li
 # we check the results - scores of very close to 1 are duplicated (this value can change depending on the task)
 documents_delete = [r['_id'] for r in results['hits'] if r['_score'] > 0.99999]
 
-marqo.tensor_search.delete_docs.delete_documents(documents_delete)
+marqo.tensor_search.tensor_search.delete_documents(documents_delete)
 ```
 
 Now our dataset should be free from images that do not contain hot dogs.
@@ -181,6 +182,7 @@ To animate the images based on their sorted vectors we can take an image as a st
 
 ```python
 # pick one to start
+import marqo.tensor_search.tensor_search
 import marqo.tensor_search.delete_docs
 
 results = client.index("hot-dogs-100k").search('a photo of a smiling face',
@@ -194,7 +196,7 @@ ordered_documents = [current_document['_id']]
 
 for i in range(len(documents)):
     # remove current document
-    marqo.tensor_search.delete_docs.delete_documents([current_document['_id']])
+    marqo.tensor_search.tensor_search.delete_documents([current_document['_id']])
 
     # now search with it to get next best
     results = client.index(index_name).search(current_document['image_docker'], filter_string="a_face:[0.58 TO 0.99]",

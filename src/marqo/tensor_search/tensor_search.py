@@ -55,6 +55,7 @@ from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQue
 from marqo.tensor_search.models.search import VectorisedJobs, VectorisedJobPointer, Qidx, JHash
 from marqo.tensor_search.models.index_info import IndexInfo
 from marqo.tensor_search.utils import add_timing
+from marqo.tensor_search import delete_docs
 from marqo.s2_inference.processing import text as text_processor
 from marqo.s2_inference.processing import image as image_processor
 from marqo.s2_inference.clip_utils import _is_image
@@ -2558,3 +2559,14 @@ def _create_score_modifiers_tensor_search_query(result_count, offset, vector_fie
         }
     }
     return search_query
+
+
+def delete_documents(config: Config, index_name: str, doc_ids: List[str], auto_refresh):
+    """Delete documents from the Marqo index with the given doc_ids """
+    return delete_docs.delete_documents(
+        config=config,
+        del_request=delete_docs.MqDeleteDocsRequest(
+            index_name=index_name,
+            document_ids=doc_ids,
+            auto_refresh=auto_refresh)
+    )
