@@ -77,8 +77,6 @@ class TestEncoding(unittest.TestCase):
 
             clear_loaded_models()
 
-
-
     def test_load_clip_text_model(self):
         names = ["fp16/ViT-B/32", "onnx16/open_clip/ViT-B-32/laion400m_e32", 'onnx32/open_clip/ViT-B-32-quickgelu/laion400m_e32',
                   'RN50', "ViT-B/16", "open_clip/convnext_base_w/laion2b_s13b_b82k",
