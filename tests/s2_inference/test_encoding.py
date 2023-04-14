@@ -54,7 +54,7 @@ class TestEncoding(unittest.TestCase):
 
             clear_loaded_models()
 
-    def test_cuda_encode_type(self):
+    def test_cpu_encode_type(self):
         names = ["fp16/ViT-B/32", "open_clip/convnext_base_w/laion2b_s13b_b82k",
                  "open_clip/convnext_base_w_320/laion_aesthetic_s13b_b82k_augreg",
                  "onnx16/open_clip/ViT-B-32/laion400m_e32", 'onnx32/open_clip/ViT-B-32-quickgelu/laion400m_e32',
