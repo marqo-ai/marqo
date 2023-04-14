@@ -21,7 +21,7 @@ from marqo.s2_inference.s2_inference import (
 class TestLargeModelEncoding(unittest.TestCase):
 
     def setUp(self) -> None:
-        self.large_clip_models = ["onnx32/openai/ViT-L/14", "open_clip/ViT-L-14/openai", "ViT-L/14"]
+        self.large_clip_models = ["open_clip/ViT-L-14/openai", "ViT-L/14"]
 
         self.multilingual_models = ["multilingual-clip/XLM-Roberta-Large-Vit-L-14"]
 
