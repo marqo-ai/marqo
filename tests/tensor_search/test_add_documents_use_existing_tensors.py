@@ -538,5 +538,5 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
             d2 = tensor_search.get_documents_by_ids(
                 config=self.config, index_name=self.index_name_1,
                 document_ids=[doc["_id" ]for doc in doc_arg], show_vectors=True)
-            
-            self.assertAlmostEqual(d1, d2)
+
+            self.assertEqual(d1, d2)
