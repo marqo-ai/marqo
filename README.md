@@ -418,10 +418,8 @@ pprint.pprint(results)
 Delete documents.
 
 ```python
-import marqo.tensor_search.tensor_search
-import marqo.tensor_search.delete_docs
 
-results = marqo.tensor_search.tensor_search.delete_documents(ids=["article_591", "article_602"])
+results = mq.index("my-first-index").delete_documents(ids=["article_591", "article_602"])
 
 ```
 
