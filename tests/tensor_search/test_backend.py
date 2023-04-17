@@ -1,14 +1,16 @@
 import copy
 import json
 import pprint
+from unittest import mock
 
 import requests
+
 from marqo.tensor_search import enums, backend, utils
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.configs import get_default_ann_parameters
+from marqo.tensor_search.models.index_info import IndexInfo
 from marqo.errors import MarqoApiError, IndexNotFoundError
 from tests.marqo_test import MarqoTestCase
-from unittest import mock
 
 
 class TestBackend(MarqoTestCase):
@@ -46,17 +48,47 @@ class TestBackend(MarqoTestCase):
         except IndexNotFoundError as s:
             pass
 
-    @mock.patch('marqo._httprequests.HttpRequests.get', side_effect=[
-        [{"shard": f"{i}"} for i in range(10)],
-        {"my-test-index-1": {"mappings": {"_meta": {"model": "", "index_settings": {}}, "properties": {}}}}
-    ])
-    def test_get_index_info_ensure_shard_count_call(self, mock_http_get):
+    @mock.patch("marqo.tensor_search.backend.get_index_info", return_value=IndexInfo(
+            index_settings={"number_of_shards": 5}, model_name="model_name", properties={}
+        ))
+    @mock.patch('marqo._httprequests.HttpRequests.get', side_effect=[[{"shard": f"{i}"} for i in range(10)]])
+    def test_get_settings_ensure_shard_count_call(self, mock_http_get, mock_get_index_info):
         tensor_search.create_vector_index(
             config=self.config, index_name=self.index_name_1
         )
-        index_info = backend.get_index_info(
-            config=self.config, index_name=self.index_name_1)
-        assert index_info.index_settings["number_of_shards"] == 10 
+        index_settings = backend.get_settings(
+            marqo_config=self.config, index_name=self.index_name_1)
+
+        assert index_settings["number_of_shards"] == 10 
+
+    @mock.patch('marqo._httprequests.HttpRequests.get', side_effect=[
+        [
+            {
+                "index": "my-test-index-1",
+                "shard": f"{i}",
+                "prirep": "r",
+                "state": "UNASSIGNED",
+                "docs": None,
+                "store": None,
+                "ip": None,
+                "node": None
+            } for i in range(10)
+        ] + [
+            {
+                "index": "my-test-index-1",
+                "shard": f"{i}",
+                "prirep": "p",
+                "state": "UNASSIGNED",
+                "docs": None,
+                "store": None,
+                "ip": None,
+                "node": None
+            } for i in range(10)
+        ]
+    ])
+    def test_get_num_shards(self, mock_http_get):
+        assert backend.get_num_shards(config=self.config, index_name=self.index_name_1) == 10
+        mock_http_get.assert_called_with(path=F"_cat/shards/{self.index_name_1}?format=json")
 
     def test_get_cluster_indices(self):
         tensor_search.create_vector_index(

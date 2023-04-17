@@ -1,16 +1,34 @@
 """Communication with Marqo's persistence and search layer (OpenSearch)"""
 import copy
 import json
-from typing import Iterable, Tuple, Dict
-
-from marqo import errors
+import typing
+from marqo.tensor_search.models.index_info import IndexInfo
+# client-specific modules - we may want to replace these:
 from marqo._httprequests import HttpRequests
 from marqo.config import Config
-from marqo.tensor_search import validation, constants, enums, utils
-from marqo.tensor_search.enums import IndexSettingsField
+from marqo.errors import MarqoError
+from marqo.tensor_search import validation, constants, enums
+from marqo.tensor_search import utils
+from marqo import errors
+#
+from typing import Iterable, List, Union, Optional, Tuple, Dict
 from marqo.tensor_search.index_meta_cache import get_cache
 from marqo.tensor_search.index_meta_cache import get_index_info as get_cached_index_info
-from marqo.tensor_search.models.index_info import IndexInfo
+import pprint
+
+def get_settings(index_name: str, marqo_config: Config):
+    """Get the settings for a specific index."""
+    shards = get_num_shards(config=marqo_config, index_name=index_name)
+
+    index_info = get_index_info(config=marqo_config, index_name=index_name)
+    index_info.index_settings["number_of_shards"] = shards
+
+    return index_info.index_settings
+    
+def get_num_shards(config: Config, index_name: str) -> int:
+    """Returns the number of shards assigned to an index from Opensearch"""
+    resp  = HttpRequests(config).get(path=F"_cat/shards/{index_name}?format=json")
+    return len(set(d["shard"] for d in resp))
 
 
 def get_index_info(config: Config, index_name: str) -> IndexInfo:
@@ -27,25 +45,28 @@ def get_index_info(config: Config, index_name: str) -> IndexInfo:
         NonTensorIndexError, if the index's mapping doesn't conform to a Tensor Search index
 
     """
-    shards  = HttpRequests(config).get(path=F"_cat/shards/{index_name}?format=json")
-    mapping = HttpRequests(config).get(path=F"{index_name}/_mapping")
-    num_shards = len(set(d["shard"] for d in shards))
+    res = HttpRequests(config).get(path=F"{index_name}/_mapping")
 
-    if not (mapping.get(index_name, {}).get("mappings", {}).get("_meta")):
-        raise errors.NonTensorIndexError(f"Error retrieving index info for index {index_name}")
-
-    model_name = mapping[index_name]["mappings"]["_meta"].get("model")
-    if not model_name:
+    if not (index_name in res and "mappings" in res[index_name]
+            and "_meta" in res[index_name]["mappings"]):
         raise errors.NonTensorIndexError(
-            f"get_index_info: couldn't identify embedding model name in index mappings! Mapping: {mapping}")
+            f"Error retrieving index info for index {index_name}")
 
-    index_settings = mapping[index_name]["mappings"]["_meta"].get("index_settings")
-    if not index_settings:
+    if "model" in res[index_name]["mappings"]["_meta"]:
+        model_name = res[index_name]["mappings"]["_meta"]["model"]
+    else:
         raise errors.NonTensorIndexError(
-            f"get_index_info: couldn't identify index_settings in index mappings! Mapping: {mapping}")
-    index_settings[IndexSettingsField.number_of_shards] = num_shards
+            "get_index_info: couldn't identify embedding model name "
+            F"in index mappings! Mapping: {res}")
 
-    index_properties = mapping[index_name]["mappings"]["properties"]
+    if "index_settings" in res[index_name]["mappings"]["_meta"]:
+        index_settings = res[index_name]["mappings"]["_meta"]["index_settings"]
+    else:
+        raise errors.NonTensorIndexError(
+            "get_index_info: couldn't identify index_settings "
+            F"in index mappings! Mapping: {res}")
+
+    index_properties = res[index_name]["mappings"]["properties"]
 
     index_info = IndexInfo(model_name=model_name, properties=index_properties,
                            index_settings=index_settings)
@@ -165,7 +186,7 @@ def get_cluster_indices(config: Config):
     return _remove_system_indices(res.keys())
 
 
-def _remove_system_indices(index_names: Iterable) -> set:
+def _remove_system_indices(index_names: typing.Iterable) -> set:
     """Removes system indices from the set of indices
 
     Args:
