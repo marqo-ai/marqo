@@ -1017,10 +1017,7 @@ def bulk_search(query: BulkSearchQuery, marqo_config: config.Config, verbose: bo
     refresh_indexes_in_background(marqo_config, [q.index for q in query.queries])
 
     # TODO: Let non-errored docs to propagate.
-    errs = [
-        validation.validate_bulk_query_input(q, config, get_index_info(config=config, index_name=q.index))
-        for q in query.queries
-    ]
+    errs = [ validation.validate_bulk_query_input(q) for q in query.queries ]
     if any(errs):
         err = next(e for e in errs if e is not None)
         raise err
@@ -1157,6 +1154,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
 
     t0 = timer()
     validation.validate_boost(boost=boost, search_method=search_method)
+    validation.validate_searchable_attributes(searchable_attributes=searchable_attributes, search_method=search_method)
     if searchable_attributes is not None:
         [validation.validate_field_name(attribute) for attribute in searchable_attributes]
     if attributes_to_retrieve is not None:
@@ -1176,9 +1174,6 @@ def search(config: Config, index_name: str, text: Union[str, dict],
         args=(config, index_name, REFRESH_INTERVAL_SECONDS))
     cache_update_thread.start()
 
-    # Must do after cache refresh to get field names.
-    field_names = get_index_info(config=config, index_name=index_name)
-    validation.validate_searchable_attributes(field_names=field_names, searchable_attributes=searchable_attributes, search_method=search_method)
 
     if search_method.upper() == SearchMethod.TENSOR:
         search_result = _vector_text_search(

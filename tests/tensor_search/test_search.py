@@ -69,6 +69,19 @@ class TestVectorSearch(MarqoTestCase):
                 searchable_attributes=["abc", "def", "other field"], return_doc_ids=True
             )
 
+
+    @mock.patch.dict('os.environ', {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': '2'}})
+    def test_search_with_allowable_num_searchable_attributes(self):
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=[
+                {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "5678"},
+                {"abc": "random text", "other field": "Close match hehehe", "_id": "1234"},
+            ], auto_refresh=True)
+        tensor_search.search(
+            config=self.config, index_name=self.index_name_1, text="Exact match hehehe",
+            searchable_attributes=["other field"], return_doc_ids=True
+        )
+
     @mock.patch.dict('os.environ', {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': '0'}})
     def test_search_with_excessive_searchable_attributes(self):
         with self.assertRaises(InvalidArgError):
@@ -81,6 +94,26 @@ class TestVectorSearch(MarqoTestCase):
                 config=self.config, index_name=self.index_name_1, text="Exact match hehehe",
                 searchable_attributes=["other field"], return_doc_ids=True
             )
+    
+    def test_search_with_searchable_attributes_max_attributes_is_none(self):
+        # Cannot set {'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': None} in mock.patch.dict
+        if os.environ.get("MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES", None) is not None:
+            MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES = os.environ.pop("MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES")
+        else:
+            MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES = None
+
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=[
+                {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "5678"},
+                {"abc": "random text", "other field": "Close match hehehe", "_id": "1234"},
+            ], auto_refresh=True)
+        tensor_search.search(
+            config=self.config, index_name=self.index_name_1, text="Exact match hehehe",
+            searchable_attributes=["other field"], return_doc_ids=True
+        )
+
+        if MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES is not None:
+            os.environ["MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES"] = MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES
 
     @mock.patch.dict('os.environ', {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': '2'}})
     def test_search_with_no_searchable_attributes_but_max_searchable_attributes_env_set(self):

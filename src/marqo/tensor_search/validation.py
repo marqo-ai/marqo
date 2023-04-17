@@ -56,7 +56,7 @@ def validate_query(q: Union[dict, str], search_method: Union[str, SearchMethod])
     return q
 
 
-def validate_bulk_query_input(q: 'BulkSearchQueryEntity', config: Config, field_names: List[str]) -> Optional[MarqoError]:
+def validate_bulk_query_input(q: 'BulkSearchQueryEntity') -> Optional[MarqoError]:
     if q.limit <= 0:
         return IllegalRequestedDocCount("search result limit must be greater than 0!")
     if q.offset < 0:
@@ -65,7 +65,7 @@ def validate_bulk_query_input(q: 'BulkSearchQueryEntity', config: Config, field_
     # validate query
     validate_query(q=q.q, search_method=q.searchMethod)
     try:
-        validate_searchable_attributes(field_names, searchable_attributes=q.searchableAttributes, search_method=q.searchMethod)
+        validate_searchable_attributes(searchable_attributes=q.searchableAttributes, search_method=q.searchMethod)
     except Exception as e:
         return e
 
@@ -90,7 +90,12 @@ def validate_bulk_query_input(q: 'BulkSearchQueryEntity', config: Config, field_
 
     return None
 
-def validate_searchable_attributes(field_names: List[str], searchable_attributes: Optional[List[str]], search_method: SearchMethod):
+def validate_searchable_attributes(searchable_attributes: Optional[List[str]], search_method: SearchMethod):
+    """Validate the searchable_attributes of an operation is not above the maximum number of attributes allowed.
+    
+    NOTE: There is only a maximum number of searchable attributes allowed for tensor search methods.
+
+    """
     if search_method != SearchMethod.TENSOR:
         return
 
@@ -103,14 +108,9 @@ def validate_searchable_attributes(field_names: List[str], searchable_attributes
             f"No searchable_attributes provided, but environment variable `MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES` is set."
         )
 
-    if searchable_attributes is not None:
-        num_searchable_attributes = len(searchable_attributes)
-    else:
-        num_searchable_attributes = len(field_names)
-
-    if num_searchable_attributes > int(maximum_searchable_attributes):
+    if len(searchable_attributes) > int(maximum_searchable_attributes):
         raise InvalidArgError(
-            f"Maximum searchable attributes for tensor search is {maximum_searchable_attributes}, received {num_searchable_attributes}."
+            f"Maximum searchable attributes (set via `MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES`) for tensor search is {maximum_searchable_attributes}, received {len(searchable_attributes)}."
         )
     
 
