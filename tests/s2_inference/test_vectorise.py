@@ -218,11 +218,11 @@ class TestVectoriseBatching(unittest.TestCase):
             "type": "sbert"
         }
 
-        mock_available_models = {
+        self.mock_available_models = {
             s2_inference._create_model_cache_key(
                 model_name='mock_model', device='cpu',
-                model_properties=mock_model_props
-            ): {AvailableModelsKey.model:mock_model,
+                model_properties=self.mock_model_props
+            ): {AvailableModelsKey.model: self.mock_model,
                 AvailableModelsKey.model_size: 1,
                 AvailableModelsKey.most_recently_used_time: datetime.datetime.now(),}
         }
