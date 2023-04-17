@@ -1920,7 +1920,17 @@ def _vector_text_search(
         )
 
     if move_toward is not None:
-        pass
+        if index_info.index_settings[NsField.index_defaults][NsField.mappings] is None:
+            # TODO: revise the error message
+            raise AssertionError
+        else:
+            index_mappings = validation.validate_index_mappings(index_info.index_settings[NsField.index_defaults][NsField.mappings])
+            if len(move_toward) != len(index_mappings.score_modifiers_fields):
+                raise AssertionError
+            else:
+                appending_vectors = index_mappings.generate_appending_vectors(doc=move_toward)
+
+    vectorised_text = vectorised_text + appending_vectors
 
     body = []
 

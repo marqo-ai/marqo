@@ -7,6 +7,7 @@ from tests.marqo_test import MarqoTestCase
 from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQueryEntity
 from marqo.tensor_search.tensor_search import _create_normal_tensor_search_query
 from pydantic.error_wrappers import ValidationError
+from pprint import pprint
 
 
 class TestScoreModifiersSearch(MarqoTestCase):
@@ -27,7 +28,7 @@ class TestScoreModifiersSearch(MarqoTestCase):
 
     def test_index_with_mappings(self):
         documents = [{
-            "my_image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image0.jpg",
+            "my_image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
             "my_text_fied": "Marqo is good",
             "Reputation": 3.8,
             "Rate": 5.9,
@@ -65,18 +66,21 @@ class TestScoreModifiersSearch(MarqoTestCase):
         tensor_search.create_vector_index(
             index_name=self.index_name, config=self.config, index_settings={
                 IndexSettingsField.index_defaults: {
-                    IndexSettingsField.model: "random/small",
+                    IndexSettingsField.model: "ViT-B/32",
                     IndexSettingsField.treat_urls_and_pointers_as_images: True,
                     IndexSettingsField.normalize_embeddings: True,
                     IndexSettingsField.mappings: mappings,
                 }
             })
 
-        tensor_search.add_documents(config=self.config, index_name=self.index_name, docs=documents, auto_refresh=True)
+        res = tensor_search.add_documents(config=self.config, index_name=self.index_name, docs=documents, auto_refresh=True)
+
 
 
         res = tensor_search._vector_text_search(config=self.config, index_name=self.index_name, query= "A man on a horse", move_toward =
         {"Reputation": 0.0, "Rate": 1.0, "Price": 3.0, "Warranty": 4.0})
+
+        pprint(res["hits"])
 
 
 

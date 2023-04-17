@@ -16,8 +16,8 @@ class IndexMappings:
     def generate_appending_vectors(self, doc) -> List:
         appending_vector = [0.0,] * len(self.score_modifiers_fields)
         for field_name in list(doc):
-            if field_name in self. score_modifiers_fields and isinstance(doc[field_name],  (int, float)):
+            if field_name in self.score_modifiers_fields and isinstance(doc[field_name],  (int, float)):
                 appending_vector[self.index_mappings[field_name]["appending_vector_position"]] = \
-                    doc[field_name] * self.index_mappings[field_name]["scale_factor"]
+                    doc[field_name] * self.index_mappings[field_name].get("scale_factor", 1.0)
 
         return appending_vector

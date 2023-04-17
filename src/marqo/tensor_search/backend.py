@@ -95,7 +95,7 @@ def add_customer_field_properties(config: Config, index_name: str,
                     validation.validate_vector_name(
                         utils.generate_vector_name(field_name[0])): {
                         "type": "knn_vector",
-                        "dimension": model_properties["dimensions"],
+                        "dimension": model_properties["dimensions"] + 4,
                         "method": existing_info.get_ann_parameters()
                     } for field_name in knn_field_names
                 }
