@@ -52,6 +52,11 @@ class SBERT(Model):
         else:
             self.model.max_seq_length = self.max_seq_length
 
+    def _convert_output(self, output):
+        if self.device == 'cpu':
+            return output.numpy()
+        elif self.device.startswith('cuda'):
+            return output.cpu().numpy()
 
     def encode(self, sentence: Union[str, List[str]], normalize = True, **kwargs) -> Union[FloatTensor, np.ndarray]:
 
@@ -68,7 +73,7 @@ class SBERT(Model):
         if normalize:
             embeddings = nn.functional.normalize(embeddings, p=2, dim=1)
 
-        return embeddings
+        return self._convert_output(embeddings)
 
 class TEST(Model):
     """class for SBERT models
