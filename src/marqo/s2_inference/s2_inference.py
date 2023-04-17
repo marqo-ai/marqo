@@ -60,7 +60,7 @@ def vectorise(model_name: str, content: Union[str, List[str]], model_properties:
 
     try:
         if isinstance(content, str):
-            vectorised = available_models[model_cache_key][AvailableModelsKey].encode(content, normalize=normalize_embeddings, **kwargs)
+            vectorised = available_models[model_cache_key][AvailableModelsKey.model].encode(content, normalize=normalize_embeddings, **kwargs)
         else:
             vector_batches = []
             batch_size = _get_max_vectorise_batch_size()
