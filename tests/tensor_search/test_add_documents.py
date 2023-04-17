@@ -714,6 +714,7 @@ class TestAddDocuments(MarqoTestCase):
             updated_doc = tensor_search.get_document_by_id(
                 config=self.config, index_name=self.index_name_1, document_id=doc_id
             )
+
             for field, expected_value in check_dict.items():
                 assert updated_doc[field] == expected_value
 

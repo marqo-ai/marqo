@@ -5,7 +5,9 @@ import torch
 from marqo.s2_inference.types import FloatTensor
 from marqo.s2_inference.s2_inference import clear_loaded_models, get_model_properties_from_registry
 from marqo.s2_inference.model_registry import load_model_properties, _get_open_clip_properties
+from marqo.s2_inference.s2_inference import _convert_tensor_to_numpy
 import numpy as np
+from unittest.mock import MagicMock
 
 from marqo.s2_inference.s2_inference import (
     _load_model,
@@ -52,6 +54,28 @@ class TestEncoding(unittest.TestCase):
 
             clear_loaded_models()
 
+    def test_cpu_encode_type(self):
+        names = ["fp16/ViT-B/32", "open_clip/convnext_base_w/laion2b_s13b_b82k",
+                 "open_clip/convnext_base_w_320/laion_aesthetic_s13b_b82k_augreg",
+                 "onnx16/open_clip/ViT-B-32/laion400m_e32", 'onnx32/open_clip/ViT-B-32-quickgelu/laion400m_e32',
+                 "all-MiniLM-L6-v1", "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6",
+                 "onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]
+
+        names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised",     "hf/e5-base-unsupervised"]
+        names += names_e5
+
+        sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
+        device = 'cpu'
+
+        for name in names:
+            model_properties = get_model_properties_from_registry(name)
+            model = _load_model(model_properties['name'], model_properties=model_properties, device=device, )
+
+            for sentence in sentences:
+                output_v = _convert_tensor_to_numpy(model.encode(sentence, normalize=True))
+                assert isinstance(output_v, np.ndarray)
+
+            clear_loaded_models()
 
     def test_load_clip_text_model(self):
         names = ["fp16/ViT-B/32", "onnx16/open_clip/ViT-B-32/laion400m_e32", 'onnx32/open_clip/ViT-B-32-quickgelu/laion400m_e32',

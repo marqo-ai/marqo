@@ -53,7 +53,7 @@ def vectorise(model_name: str, content: Union[str, List[str]], model_properties:
             vector_batches = []
             batch_size = _get_max_vectorise_batch_size()
             for batch in generate_batches(content, batch_size=batch_size):
-                vector_batches.append(available_models[model_cache_key].encode(batch, normalize=normalize_embeddings, **kwargs))
+                vector_batches.append(_convert_tensor_to_numpy(available_models[model_cache_key].encode(batch, normalize=normalize_embeddings, **kwargs)))
             if not vector_batches or all(
                     len(batch) == 0 for batch in vector_batches):  # Check for empty vector_batches or empty arrays
                 raise RuntimeError(f"Vectorise created an empty list of batches! Content: {content}")
@@ -246,6 +246,18 @@ def _nd_array_to_list(output: ndarray) -> Union[List[List[float]], List[float]]:
     """
 
     return output.tolist()
+
+
+def _convert_tensor_to_numpy(output:Union[FloatTensor, Tensor]) -> ndarray:
+    """
+    A function that convert tensors to numpy arrays
+    """
+    if isinstance(output, (torch.Tensor, torch.FloatTensor)):
+        return output.to('cpu').detach().numpy()
+    elif isinstance(output, ndarray):
+        return output
+    else:
+        raise ValueError(f"Marqo received an unexpected output type=`{type(output).__name__}`from encode function.")
 
 
 def _convert_vectorized_output(output: Union[FloatTensor, ndarray, List[List[float]]], fp16: bool = False) -> List[
