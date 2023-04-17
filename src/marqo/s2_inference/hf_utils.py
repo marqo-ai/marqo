@@ -36,7 +36,13 @@ class HF_MODEL(Model):
         inputs = self.tokenizer(sentence, padding=True, truncation=True, max_length=self.max_seq_length, return_tensors="pt").to(self.device)
 
         with torch.no_grad():
-            return self.model.forward(**inputs)
+            return self._convert_output(self.model.forward(**inputs))
+
+    def _convert_output(self, output):
+        if self.device == 'cpu':
+            return output.numpy()
+        elif self.device.startswith('cuda'):
+            return output.cpu().numpy()
 
 class AutoModelForSentenceEmbedding(nn.Module):
 

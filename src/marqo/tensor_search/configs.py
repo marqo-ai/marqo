@@ -26,7 +26,7 @@ def get_default_index_settings():
         NsFields.number_of_replicas : 1,
     }
 
-def get_default_ann_parameters(): 
+def get_default_ann_parameters():
     return {
         NsFields.ann_method_name: "hnsw",
         NsFields.ann_metric: "cosinesimil",
@@ -58,5 +58,6 @@ def default_env_vars() -> dict:
         EnvVars.MARQO_MAX_CPU_MODEL_MEMORY: 4,
         EnvVars.MARQO_MAX_CUDA_MODEL_MEMORY: 4,
         EnvVars.MARQO_EF_CONSTRUCTION_MAX_VALUE: 4096,
+        EnvVars.MARQO_MAX_VECTORISE_BATCH_SIZE: 16
     }
 

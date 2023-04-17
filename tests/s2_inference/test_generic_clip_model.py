@@ -1,16 +1,13 @@
 import numpy as np
 
 from marqo.errors import IndexNotFoundError
-from marqo.s2_inference.errors import InvalidModelPropertiesError, UnknownModelError, ModelLoadError
+from marqo.s2_inference.errors import UnknownModelError, ModelLoadError
 from marqo.tensor_search import tensor_search
 from marqo.s2_inference.processing.custom_clip_utils import download_pretrained_from_url
 from marqo.s2_inference.s2_inference import clear_loaded_models
-
 from marqo.s2_inference.s2_inference import (
-    available_models,
     vectorise,
-    _validate_model_properties,
-    _update_available_models
+    _validate_model_properties
 )
 
 from tests.marqo_test import MarqoTestCase
@@ -478,5 +475,6 @@ class TestGenericModelSupport(MarqoTestCase):
         b = vectorise("open_clip/ViT-B-32-quickgelu/laion400m_e32", content=text)
 
         assert np.abs(np.array(a) - np.array(b)).sum() > epsilon
+
 
 
