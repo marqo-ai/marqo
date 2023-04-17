@@ -1113,7 +1113,8 @@ def search(config: Config, index_name: str, text: Union[str, dict],
            device=None, boost: Optional[Dict] = None,
            image_download_headers: Optional[Dict] = None,
            context: Optional[Dict] = None,
-           score_modifiers: Optional[Dict] = None) -> Dict:
+           score_modifiers: Optional[Dict] = None,
+           move_toward: Optional[Dict] = None) -> Dict:
     """The root search method. Calls the specific search method
 
     Validation should go here. Validations include:
@@ -1138,6 +1139,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
         image_download_headers: headers for downloading images
         context: a dictionary to allow custom vectors in search, for tensor search only
         score_modifiers: a dictionary to modify the score based on field values, for tensor search only
+        move_toward: a dictionary to modify the score based on field values by appending vectors, for tensor search only
     Returns:
 
     """
@@ -1189,7 +1191,8 @@ def search(config: Config, index_name: str, text: Union[str, dict],
             return_doc_ids=return_doc_ids, searchable_attributes=searchable_attributes, verbose=verbose,
             number_of_highlights=num_highlights, simplified_format=simplified_format,
             filter_string=filter, device=device, attributes_to_retrieve=attributes_to_retrieve, boost=boost,
-            image_download_headers=image_download_headers, context=context, score_modifiers=score_modifiers
+            image_download_headers=image_download_headers, context=context, score_modifiers=score_modifiers,
+            move_toward=move_toward,
         )
     elif search_method.upper() == SearchMethod.LEXICAL:
         search_result = _lexical_search(
@@ -1792,7 +1795,8 @@ def _vector_text_search(
         attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None,
         image_download_headers: Optional[Dict] = None,
         context: Optional[Dict] = None,
-        score_modifiers: Optional[Dict] = None):
+        score_modifiers: Optional[Dict] = None,
+        move_toward: Optional[Dict] = None):
     """
     Args:
         config:
@@ -1812,6 +1816,7 @@ def _vector_text_search(
         image_download_headers: headers for downloading images
         context: a dictionary to allow custom vectors in search
         score_modifiers: a dictionary to modify the score based on field values, for tensor search only
+        move_toward: a dictionary to modify the score based on field values by appending vectors, for tensor search only
     Returns:
 
     Note:
@@ -1913,6 +1918,10 @@ def _vector_text_search(
         raise errors.BadRequestError(
             message=f"Problem vectorising query. Reason: {str(s2_error)}"
         )
+
+    if move_toward is not None:
+        pass
+
     body = []
 
     if searchable_attributes is None:

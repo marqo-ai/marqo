@@ -75,3 +75,9 @@ class TestScoreModifiersSearch(MarqoTestCase):
         tensor_search.add_documents(config=self.config, index_name=self.index_name, docs=documents, auto_refresh=True)
 
 
+        res = tensor_search._vector_text_search(config=self.config, index_name=self.index_name, query= "A man on a horse", move_toward =
+        {"Reputation": 0.0, "Rate": 1.0, "Price": 3.0, "Warranty": 4.0})
+
+
+
+
