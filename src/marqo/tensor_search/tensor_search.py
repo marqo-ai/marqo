@@ -78,7 +78,7 @@ logger = get_logger(__name__)
 
 def create_vector_index(
         config: Config, index_name: str, media_type: Union[str, MediaType] = MediaType.default,
-        refresh_interval: str = "1s", index_settings=None):
+        refresh_interval: str = "1s", index_settings = None, mappings: Optional[Dict] = None):
     """
     Args:
         media_type: 'text'|'image'
@@ -433,6 +433,9 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
     if mappings is not None:
         validate_mappings = validation.validate_mappings(mappings)
 
+    if index_info.index_settings[NsField.index_defaults][NsField.mappings]:
+        index_mappings = validation.validate_index_mappings(index_info.index_settings[NsField.index_defaults][NsField.mappings])
+
     existing_fields = set(index_info.properties.keys())
     new_fields = set()
 
@@ -506,6 +509,9 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                     raise errors.InternalError(message= f"Upsert: found {len(matching_doc)} matching docs for {doc_id} when only 1 or 0 should have been found.")
         else:
             indexing_instructions["update"]["_id"] = doc_id
+
+        if index_mappings.score_modifiers_fields:
+            vector_to_append = index_mappings.generate_appending_vectors(doc=doc)
 
         # Metadata can be calculated here at the doc level.
         # Only add chunk values which are string, boolean, numeric or dictionary.
@@ -651,6 +657,8 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                         f"check the preprocessing functions and try again. ")
 
                 for text_chunk, vector_chunk in zip(text_chunks, vector_chunks):
+                    if index_mappings:
+                        vector_chunk = vector_chunk + vector_to_append
                     # We do not put in metadata yet at this stage.
                     chunks_to_append.append({
                         utils.generate_vector_name(field): vector_chunk,
@@ -659,7 +667,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                     })
             
             elif isinstance(field_content, dict):
-                if mappings[field]["type"]=="multimodal_combination":
+                if mappings[field]["type"] == "multimodal_combination":
                     combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add,\
                         new_fields_from_multimodal_combination= \
                         vectorise_multimodal_combination_field(field, field_content, copied,
@@ -670,6 +678,8 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                         unsuccessful_docs.append(unsuccessful_doc_to_append)
                         break
                     else:
+                        if index_mappings:
+                            combo_chunk = combo_chunk + vector_to_append
                         if field not in new_obj_fields:
                             new_obj_fields[field] = set()
                         new_obj_fields[field] = new_obj_fields[field].union(new_fields_from_multimodal_combination)
