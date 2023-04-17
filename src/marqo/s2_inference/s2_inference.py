@@ -65,7 +65,7 @@ def vectorise(model_name: str, content: Union[str, List[str]], model_properties:
             vector_batches = []
             batch_size = _get_max_vectorise_batch_size()
             for batch in generate_batches(content, batch_size=batch_size):
-                vector_batches.append(_convert_tensor_to_numpy(available_models[model_cache_key][AvailableModelsKey].encode(batch, normalize=normalize_embeddings, **kwargs)))
+                vector_batches.append(_convert_tensor_to_numpy(available_models[model_cache_key][AvailableModelsKey.model].encode(batch, normalize=normalize_embeddings, **kwargs)))
             if not vector_batches or all(
                     len(batch) == 0 for batch in vector_batches):  # Check for empty vector_batches or empty arrays
                 raise RuntimeError(f"Vectorise created an empty list of batches! Content: {content}")
@@ -273,7 +273,7 @@ def _check_memory_threshold_for_model(device: str, model_size: Union[float, int]
             f"You are trying to load a model with size = `{model_size}` into device = `{device}`, which is larger than the device threshlod = `{threshold}`."
             f"Marqo CANNOT find enough space for the model. Please change the threshold by adjusting the environment variables.\n"
             f"You can find more detailed information at `https://docs.marqo.ai/0.0.17/Advanced-Usage/configuration/`.")
-    return used_memory + model_size < threshold
+    return (used_memory + model_size) < threshold
 
 
 def get_model_size(model_name: str, model_properties: dict) -> (int, float):
