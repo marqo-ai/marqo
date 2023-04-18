@@ -16,15 +16,7 @@ from marqo.tensor_search.index_meta_cache import get_cache
 from marqo.tensor_search.index_meta_cache import get_index_info as get_cached_index_info
 import pprint
 
-def get_settings(index_name: str, marqo_config: Config):
-    """Get the settings for a specific index."""
-    shards = get_num_shards(config=marqo_config, index_name=index_name)
 
-    index_info = get_index_info(config=marqo_config, index_name=index_name)
-    index_info.index_settings["number_of_shards"] = shards
-
-    return index_info.index_settings
-    
 def get_num_shards(config: Config, index_name: str) -> int:
     """Returns the number of shards assigned to an index from Opensearch"""
     resp  = HttpRequests(config).get(path=F"_cat/shards/{index_name}?format=json")

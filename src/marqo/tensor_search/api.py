@@ -15,7 +15,6 @@ from marqo.tensor_search.web import api_validation, api_utils
 from marqo.tensor_search import utils
 from marqo.tensor_search.on_start_script import on_start
 from marqo import version
-import marqo.tensor_search.backend as backend
 from marqo.tensor_search.enums import RequestType
 from marqo.tensor_search.throttling.redis_throttle import throttle
 from marqo.tensor_search.utils import add_timing
@@ -262,7 +261,7 @@ def get_indexes(marqo_config: config.Config = Depends(generate_config)):
 
 @app.get("/indexes/{index_name}/settings")
 def get_settings(index_name: str, marqo_config: config.Config = Depends(generate_config)):
-    return backend.get_settings(index_name, marqo_config)
+    return tensor_search.get_settings(index_name, marqo_config)
 
 @app.get("/models")
 def get_loaded_models():

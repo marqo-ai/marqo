@@ -2594,3 +2594,13 @@ def _create_score_modifiers_tensor_search_query(result_count, offset, vector_fie
         }
     }
     return search_query
+
+def get_settings(index_name: str, marqo_config: Config):
+    """Get the settings for a specific index."""
+    shards = backend.get_num_shards(config=marqo_config, index_name=index_name)
+
+    index_info = backend.get_index_info(config=marqo_config, index_name=index_name)
+    index_info.index_settings["number_of_shards"] = shards
+
+    return index_info.index_settings
+    

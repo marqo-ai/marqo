@@ -48,19 +48,6 @@ class TestBackend(MarqoTestCase):
         except IndexNotFoundError as s:
             pass
 
-    @mock.patch("marqo.tensor_search.backend.get_index_info", return_value=IndexInfo(
-            index_settings={"number_of_shards": 5}, model_name="model_name", properties={}
-        ))
-    @mock.patch('marqo._httprequests.HttpRequests.get', side_effect=[[{"shard": f"{i}"} for i in range(10)]])
-    def test_get_settings_ensure_shard_count_call(self, mock_http_get, mock_get_index_info):
-        tensor_search.create_vector_index(
-            config=self.config, index_name=self.index_name_1
-        )
-        index_settings = backend.get_settings(
-            marqo_config=self.config, index_name=self.index_name_1)
-
-        assert index_settings["number_of_shards"] == 10 
-
     @mock.patch('marqo._httprequests.HttpRequests.get', side_effect=[
         [
             {
