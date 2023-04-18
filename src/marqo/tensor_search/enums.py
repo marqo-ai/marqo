@@ -68,6 +68,8 @@ class IndexSettingsField:
     hnsw_ef_construction = "ef_construction"
     hnsw_m = "m"
 
+    cache_info = "cache_info"
+
 
 class SplitMethod:
     # consider moving this enum into processing

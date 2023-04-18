@@ -70,6 +70,7 @@ from marqo.config import Config
 from marqo import errors
 from marqo.s2_inference import errors as s2_inference_errors
 import threading
+from marqo.tensor_search.models.index_mappings import IndexMappings
 
 from marqo.tensor_search.tensor_search_logging import get_logger
 
@@ -95,7 +96,8 @@ def create_vector_index(
     validation.validate_settings_object(settings_object=the_index_settings)
 
     if the_index_settings[NsField.index_defaults][NsField.mappings] is not None:
-        pass
+        the_index_settings[NsField.index_defaults][NsField.cache_info][NsField.mappings] = \
+            IndexMappings(the_index_settings[NsField.index_defaults][NsField.cache_info][NsField.mappings])
 
     vector_index_settings = {
         "settings": {
