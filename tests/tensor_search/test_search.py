@@ -1,5 +1,6 @@
 import math
 import os
+import sys 
 
 from unittest import mock
 from marqo.s2_inference.s2_inference import vectorise
@@ -94,7 +95,7 @@ class TestVectorSearch(MarqoTestCase):
             searchable_attributes=["other field"], return_doc_ids=True
         )
 
-    @mock.patch('os.environ', {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': '2'}})
+    @mock.patch('os.environ', {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': f"{sys.maxsize}"}})
     def test_search_with_no_searchable_attributes_but_max_searchable_attributes_env_set(self):
         with self.assertRaises(InvalidArgError):
             tensor_search.add_documents(
