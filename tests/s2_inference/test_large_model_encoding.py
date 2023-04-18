@@ -5,7 +5,7 @@ from marqo.s2_inference.types import FloatTensor
 from marqo.s2_inference.s2_inference import clear_loaded_models, get_model_properties_from_registry, _convert_tensor_to_numpy
 from unittest.mock import patch
 import numpy as np
-
+import unittest
 from marqo.s2_inference.s2_inference import (
     _check_output_type, vectorise,
     _convert_vectorized_output,
