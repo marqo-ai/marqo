@@ -258,6 +258,7 @@ def _check_memory_threshold_for_model(device: str, model_size: Union[float, int]
 
     if device.startswith("cuda"):
         torch.cuda.synchronize(device)
+        torch.cuda.empty_cache(device)
         used_memory = torch.cuda.memory_allocated(device) / 1024 ** 3
         threshold = float(read_env_vars_and_defaults(EnvVars.MARQO_MAX_CUDA_MODEL_MEMORY))
     elif device.startswith("cpu"):
@@ -329,7 +330,6 @@ def clear_loaded_models() -> None:
             expose cache related functions to the client
     """
     available_models.clear()
-    torch.cuda.synchronize()
 
 
 def get_model_properties_from_registry(model_name: str) -> dict:
