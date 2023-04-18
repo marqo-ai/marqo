@@ -116,9 +116,6 @@ class TestImageDownloadHeaders(MarqoTestCase):
         def pass_through_load_image_from_path(*args, **kwargs):
             return load_image_from_path(*args, **kwargs)
 
-        # this renaming stops infinite recursion
-        from requests import get as requests_get
-
         def pass_through_requests_get(url, *args, **kwargs):
             if url == test_image_url:
                 assert kwargs.get('headers', None) == image_download_headers
