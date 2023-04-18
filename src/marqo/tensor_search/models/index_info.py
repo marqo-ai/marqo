@@ -13,6 +13,7 @@ class IndexInfo(NamedTuple):
     model_name: str
     properties: dict
     index_settings: dict
+    mapping_object:
 
     def get_index_settings(self) -> dict:
         return self.index_settings.copy()

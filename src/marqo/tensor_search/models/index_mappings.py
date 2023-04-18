@@ -1,8 +1,9 @@
 import copy
 from typing import List
+from typing import NamedTuple
 
-class IndexMappings:
-    def __init__(self, index_mappings: dict):
+class IndexMappings(NamedTuple):
+    def __init__(self, index_mappings: dict = None):
         self.index_mappings = copy.deepcopy(index_mappings)
         self.score_modifiers_fields = self.get_score_modifier_fields()
 
