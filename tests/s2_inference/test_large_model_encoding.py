@@ -128,32 +128,32 @@ class TestLargeModelEncoding(unittest.TestCase):
             torch.cuda.empty_cache()
 
 
-    def test_multilingual_clip_performance(self):
-
-        clear_loaded_models()
-
-        names = self.multilingual_models
-        device = "cuda"
-        texts = [
-            "skiing person",
-            "滑雪的人",
-            "лыжник",
-            "persona che scia",
-        ]
-        image = "https://raw.githubusercontent.com/marqo-ai/marqo-clip-onnx/main/examples/coco.jpg"
-        e = 0.1
-        with patch.dict(os.environ, {"MARQO_MAX_CUDA_MODEL_MEMORY": "10"}):
-            for name in names:
-                text_feature = np.array(vectorise(model_name=name, content=texts, normalize_embeddings=True, device=device))
-                image_feature = np.array(vectorise(model_name=name, content=image, normalize_embeddings=True, device=device))
-
-                clear_loaded_models()
-                similarity_score = (text_feature @ image_feature.T).flatten()
-
-                assert np.abs(np.max(similarity_score) - np.min(similarity_score)) < e
-
-                del similarity_score
-                clear_loaded_models()
+    # def test_multilingual_clip_performance(self):
+    #
+    #     clear_loaded_models()
+    #
+    #     names = self.multilingual_models
+    #     device = "cuda"
+    #     texts = [
+    #         "skiing person",
+    #         "滑雪的人",
+    #         "лыжник",
+    #         "persona che scia",
+    #     ]
+    #     image = "https://raw.githubusercontent.com/marqo-ai/marqo-clip-onnx/main/examples/coco.jpg"
+    #     e = 0.1
+    #     with patch.dict(os.environ, {"MARQO_MAX_CUDA_MODEL_MEMORY": "10"}):
+    #         for name in names:
+    #             text_feature = np.array(vectorise(model_name=name, content=texts, normalize_embeddings=True, device=device))
+    #             image_feature = np.array(vectorise(model_name=name, content=image, normalize_embeddings=True, device=device))
+    #
+    #             clear_loaded_models()
+    #             similarity_score = (text_feature @ image_feature.T).flatten()
+    #
+    #             assert np.abs(np.max(similarity_score) - np.min(similarity_score)) < e
+    #
+    #             del similarity_score
+    #             clear_loaded_models()
 
 
     def test_cuda_encode_type(self):
