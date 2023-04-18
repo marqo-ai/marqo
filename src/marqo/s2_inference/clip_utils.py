@@ -489,6 +489,8 @@ class MULTILINGUAL_CLIP(CLIP):
         with torch.no_grad():
             outputs = self.textual_model.forward(sentence, self.tokenizer)
 
+        print(outputs.device)
+
         if normalize:
             _shape_before = outputs.shape
             outputs /= self.normalize(outputs)
