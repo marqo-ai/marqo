@@ -59,7 +59,7 @@ class TestLargeModelEncoding(unittest.TestCase):
                     # delete the model to free up memory,
                     # it is hacked loading from _load_model, so we need to delete it manually
                     del model
-                    torch.cuda.synchronize(device)
+                    torch.cuda.empty_cache()
 
                 return True
 
