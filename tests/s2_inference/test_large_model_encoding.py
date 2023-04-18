@@ -155,7 +155,6 @@ class TestLargeModelEncoding(unittest.TestCase):
     #             del similarity_score
     #             clear_loaded_models()
 
-
     def test_cuda_encode_type(self):
         names = self.large_clip_models + self.e5_models
 
@@ -180,7 +179,3 @@ class TestLargeModelEncoding(unittest.TestCase):
             del model
             clear_loaded_models()
             torch.cuda.empty_cache()
-
-
-
-
