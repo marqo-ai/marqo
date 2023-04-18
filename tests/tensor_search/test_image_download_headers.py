@@ -8,9 +8,9 @@ from marqo.tensor_search.models.api_models import BulkSearchQuery
 from unittest import mock
 import requests
 from marqo.s2_inference.clip_utils import load_image_from_path
-from marqo.tensor_search.enums import TensorField, IndexSettingsField, SearchMethod
-from marqo.errors import IndexNotFoundError, InvalidArgError, BadRequestError
-from marqo.tensor_search import tensor_search, index_meta_cache, backend
+from marqo.tensor_search.enums import IndexSettingsField
+from marqo.errors import IndexNotFoundError
+from marqo.tensor_search import tensor_search
 from tests.marqo_test import MarqoTestCase
 
 
