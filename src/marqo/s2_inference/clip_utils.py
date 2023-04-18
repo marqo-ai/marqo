@@ -474,7 +474,7 @@ class MULTILINGUAL_CLIP(CLIP):
             self.visual_model, _, self.preprocess = open_clip.create_model_and_transforms(model_name=clip_name.split("/")[0], pretrained= clip_name.split("/")[1], device = self.device)
             self.visual_model = self.visual_model.visual
 
-        self.textual_model = pt_multilingual_clip.MultilingualCLIP.from_pretrained(self.textual_name).to("cuda")
+        self.textual_model = pt_multilingual_clip.MultilingualCLIP.from_pretrained(self.textual_name).to(self.device)
         self.tokenizer = transformers.AutoTokenizer.from_pretrained(self.textual_name, device = self.device)
 
         self.textual_model.eval()
