@@ -94,6 +94,9 @@ def create_vector_index(
 
     validation.validate_settings_object(settings_object=the_index_settings)
 
+    if the_index_settings[NsField.index_defaults][NsField.mappings] is not None:
+        pass
+
     vector_index_settings = {
         "settings": {
             "index": {
