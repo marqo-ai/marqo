@@ -20,7 +20,7 @@ _load_model = functools.partial(og_load_model, calling_func = "unit_test")
 class TestLargeModelEncoding(unittest.TestCase):
 
     def setUp(self) -> None:
-        self.large_clip_models = ["onnx32/openai/ViT-L/14", "open_clip/ViT-L-14/openai", "open_clip/ViT-L/14"]
+        self.large_clip_models = ["onnx32/openai/ViT-L/14", "open_clip/ViT-L-14/openai", "ViT-L/14"]
 
         self.multilingual_models = ["multilingual-clip/XLM-Roberta-Large-Vit-L-14"]
 
