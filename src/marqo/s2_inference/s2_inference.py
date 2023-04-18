@@ -57,7 +57,6 @@ def vectorise(model_name: str, content: Union[str, List[str]], model_properties:
     model_cache_key = _create_model_cache_key(model_name, device, validated_model_properties)
 
     _update_available_models(model_cache_key, model_name, validated_model_properties, device, normalize_embeddings)
-    print("available_models", available_models)
 
     try:
         if isinstance(content, str):

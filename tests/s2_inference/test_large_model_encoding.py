@@ -53,7 +53,7 @@ class TestLargeModelEncoding(unittest.TestCase):
                     output_m = output_m.cpu().numpy()
 
                 assert abs(torch.FloatTensor(output_m) - torch.FloatTensor(output_v)).sum() < eps
-
+            print("Memory", torch.cuda.memory_allocated(device) / 1024 ** 3)
             clear_loaded_models()
 
 
