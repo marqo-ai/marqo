@@ -220,14 +220,12 @@ def _validate_model_into_device(model_name:str, model_properties: dict, device: 
     if _check_memory_threshold_for_model(device, model_size, calling_func = _validate_model_into_device.__name__):
         return True
     else:
-        print("available_models", list(available_models))
         model_cache_key_for_device = [key for key in list(available_models) if key.endswith(device)]
-        print(model_cache_key_for_device)
         sorted_key_for_device = sorted(model_cache_key_for_device,
                                        key=lambda x: available_models[x][
                                            AvailableModelsKey.most_recently_used_time])
         for key in sorted_key_for_device:
-            print(
+            logger.info(
                 f"Eject model = `{key.split('||')[0]}` with size = `{available_models[key].get('model_size', constants.DEFAULT_MODEL_SIZE)}` from device = `{device}` "
                 f"to save space for model = `{model_name}`.")
             del available_models[key]
@@ -261,7 +259,6 @@ def _check_memory_threshold_for_model(device: str, model_size: Union[float, int]
     if device.startswith("cuda"):
         torch.cuda.synchronize(device)
         used_memory = torch.cuda.memory_allocated(device) / 1024 ** 3
-        print("used_memory", used_memory)
         threshold = float(read_env_vars_and_defaults(EnvVars.MARQO_MAX_CUDA_MODEL_MEMORY))
     elif device.startswith("cpu"):
         used_memory = sum([available_models[key].get("model_size", constants.DEFAULT_MODEL_SIZE) for key, values in
