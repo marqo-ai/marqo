@@ -55,6 +55,7 @@ class TestLargeModelEncoding(unittest.TestCase):
 
                         assert abs(torch.FloatTensor(output_m) - torch.FloatTensor(output_v)).sum() < eps
                     clear_loaded_models()
+                    del model
                 return True
 
             assert run()
