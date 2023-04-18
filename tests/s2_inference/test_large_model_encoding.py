@@ -36,7 +36,7 @@ class TestLargeModelEncoding(unittest.TestCase):
         sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
         device = "cuda"
         eps = 1e-9
-        with patch.dict(os.environ, {"MARQO_MAX_CUDA_MODEL_MEMORY": "6"}):
+        with patch.dict(os.environ, {"MARQO_MAX_CUDA_MODEL_MEMORY": "10"}):
             def run():
                 for name in names:
                     model_properties = get_model_properties_from_registry(name)
@@ -142,7 +142,7 @@ class TestLargeModelEncoding(unittest.TestCase):
         ]
         image = "https://raw.githubusercontent.com/marqo-ai/marqo-clip-onnx/main/examples/coco.jpg"
         e = 0.1
-        with patch.dict(os.environ, {"MARQO_MAX_CUDA_MODEL_MEMORY": "6"}):
+        with patch.dict(os.environ, {"MARQO_MAX_CUDA_MODEL_MEMORY": "10"}):
             def run():
                 for name in names:
                     text_feature = np.array(vectorise(model_name=name, content=texts, normalize_embeddings=True, device=device))
