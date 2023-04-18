@@ -54,7 +54,10 @@ class TestLargeModelEncoding(unittest.TestCase):
                             output_m = output_m.cpu().numpy()
 
                         assert abs(torch.FloatTensor(output_m) - torch.FloatTensor(output_v)).sum() < eps
+
                     clear_loaded_models()
+                    # delete the model to free up memory,
+                    # it is hacked loading from _load_model, so we need to delete it manually
                     del model
                 return True
 
@@ -76,6 +79,7 @@ class TestLargeModelEncoding(unittest.TestCase):
                 assert abs(model.encode_text(text) - model.encode([text])).sum() < eps
                 assert abs(model.encode(text) - model.encode_text([text])).sum() < eps
 
+            del model
             clear_loaded_models()
 
 
@@ -92,6 +96,7 @@ class TestLargeModelEncoding(unittest.TestCase):
                 output = model.encode(sentence)
                 assert _check_output_type(_convert_vectorized_output(output))
 
+            del model
             clear_loaded_models()
 
 
@@ -114,6 +119,7 @@ class TestLargeModelEncoding(unittest.TestCase):
                 assert abs(max_output_norm - 1) < eps, f"{name}, {sentence}"
                 assert abs(min_output_norm - 1) < eps, f"{name}, {sentence}"
 
+            del model
             clear_loaded_models()
 
 
@@ -171,6 +177,7 @@ class TestLargeModelEncoding(unittest.TestCase):
                 output_v = _convert_tensor_to_numpy(model.encode(sentence, normalize=True))
                 assert isinstance(output_v, np.ndarray)
 
+            del model
             clear_loaded_models()
 
 
