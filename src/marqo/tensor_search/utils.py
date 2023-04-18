@@ -4,7 +4,6 @@ import functools
 import json
 from timeit import default_timer as timer
 import torch
-
 from marqo import errors
 from marqo.tensor_search import enums, configs
 from typing import (
@@ -310,3 +309,12 @@ def add_timing(f, key: str = "processingTimeMs"):
         r[key] = round(time_taken * 1000)
         return r
     return wrap
+
+
+def generate_batches(seq: Sequence, batch_size: int):
+    """Yields batches of length k from the sequence."""
+    if batch_size < 1:
+        raise ValueError("Batch size must be greater than 0")
+
+    for i in range(0, len(seq), batch_size):
+        yield seq[i:i + batch_size]

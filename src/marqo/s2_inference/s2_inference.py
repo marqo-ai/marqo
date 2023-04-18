@@ -1,6 +1,7 @@
 """This is the interface for interacting with S2 Inference
 The functions defined here would have endpoints, later on.
 """
+import functools
 import numpy as np
 from marqo.s2_inference.errors import VectoriseError, InvalidModelPropertiesError, ModelLoadError, UnknownModelError, ModelNotInCacheError
 from PIL import UnidentifiedImageError
@@ -9,6 +10,9 @@ from marqo.s2_inference.configs import get_default_device, get_default_normaliza
 from marqo.s2_inference.types import *
 from marqo.s2_inference.logger import get_logger
 import torch
+from marqo.tensor_search.utils import read_env_vars_and_defaults, generate_batches
+from marqo.tensor_search.configs import EnvVars
+from marqo.errors import ConfigurationError
 
 logger = get_logger(__name__)
 
@@ -43,11 +47,43 @@ def vectorise(model_name: str, content: Union[str, List[str]], model_properties:
     _update_available_models(model_cache_key, model_name, validated_model_properties, device, normalize_embeddings)
 
     try:
-        vectorised = available_models[model_cache_key].encode(content, normalize=normalize_embeddings, **kwargs)
+        if isinstance(content, str):
+            vectorised = available_models[model_cache_key].encode(content, normalize=normalize_embeddings, **kwargs)
+        else:
+            vector_batches = []
+            batch_size = _get_max_vectorise_batch_size()
+            for batch in generate_batches(content, batch_size=batch_size):
+                vector_batches.append(_convert_tensor_to_numpy(available_models[model_cache_key].encode(batch, normalize=normalize_embeddings, **kwargs)))
+            if not vector_batches or all(
+                    len(batch) == 0 for batch in vector_batches):  # Check for empty vector_batches or empty arrays
+                raise RuntimeError(f"Vectorise created an empty list of batches! Content: {content}")
+            else:
+                vectorised = np.concatenate(vector_batches, axis=0)
     except UnidentifiedImageError as e:
         raise VectoriseError(str(e)) from e
 
     return _convert_vectorized_output(vectorised)
+
+
+def _get_max_vectorise_batch_size() -> int:
+    """Gets MARQO_MAX_VECTORISE_BATCH_SIZE from the environment, validates it before returning it."""
+
+    max_batch_size_value = read_env_vars_and_defaults(EnvVars.MARQO_MAX_VECTORISE_BATCH_SIZE)
+    validation_error_msg = (
+        "Could not properly read env var `MARQO_MAX_VECTORISE_BATCH_SIZE`. "
+        "`MARQO_MAX_VECTORISE_BATCH_SIZE` must be an int greater than or equal to 1."
+    )
+    try:
+        batch_size = int(max_batch_size_value)
+    except (ValueError, TypeError) as e:
+        value_error_msg = f"`{validation_error_msg} Current value: `{max_batch_size_value}`. Reason: {e}"
+        logger.error(value_error_msg)
+        raise ConfigurationError(value_error_msg)
+    if batch_size < 1:
+        batch_size_too_small_msg = f"`{validation_error_msg} Current value: `{max_batch_size_value}`."
+        logger.error(batch_size_too_small_msg)
+        raise ConfigurationError(batch_size_too_small_msg)
+    return batch_size
 
 
 def _create_model_cache_key(model_name: str, device: str, model_properties: dict = None) -> str:
@@ -210,6 +246,18 @@ def _nd_array_to_list(output: ndarray) -> Union[List[List[float]], List[float]]:
     """
 
     return output.tolist()
+
+
+def _convert_tensor_to_numpy(output:Union[FloatTensor, Tensor]) -> ndarray:
+    """
+    A function that convert tensors to numpy arrays
+    """
+    if isinstance(output, (torch.Tensor, torch.FloatTensor)):
+        return output.to('cpu').detach().numpy()
+    elif isinstance(output, ndarray):
+        return output
+    else:
+        raise ValueError(f"Marqo received an unexpected output type=`{type(output).__name__}`from encode function.")
 
 
 def _convert_vectorized_output(output: Union[FloatTensor, ndarray, List[List[float]]], fp16: bool = False) -> List[
