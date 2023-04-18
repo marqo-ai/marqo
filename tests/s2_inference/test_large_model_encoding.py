@@ -2,7 +2,6 @@ import unittest
 import os
 import torch
 import pytest
-
 from marqo.s2_inference.types import FloatTensor
 from marqo.s2_inference.s2_inference import clear_loaded_models, get_model_properties_from_registry, _convert_tensor_to_numpy
 from marqo.s2_inference.model_registry import load_model_properties, _get_open_clip_properties
@@ -13,7 +12,6 @@ from marqo.s2_inference.s2_inference import (
     _check_output_type, vectorise,
     _convert_vectorized_output,
 )
-
 
 
 @pytest.mark.largemodel
