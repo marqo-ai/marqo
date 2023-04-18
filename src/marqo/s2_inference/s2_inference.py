@@ -239,7 +239,7 @@ def _validate_model_into_device(model_name:str, model_properties: dict, device: 
                 f"Please use a smaller model or increase the memory threshold.")
 
 
-def _check_memory_threshold_for_model(device: str, model_size: Union[float, int], calling_func: str =None) -> bool:
+def _check_memory_threshold_for_model(device: str, model_size: Union[float, int], calling_func: str = None) -> bool:
     '''
     Note: this function should only be called by `_validate_model_into_device` for threading safeness.
     `_validate_model_into_device` is calle by `_update_available_models` which is already thread safe.
@@ -259,6 +259,7 @@ def _check_memory_threshold_for_model(device: str, model_size: Union[float, int]
     if device.startswith("cuda"):
         torch.cuda.synchronize(device)
         used_memory = torch.cuda.memory_allocated(device) / 1024 ** 3
+        print("used_memory", used_memory)
         threshold = float(read_env_vars_and_defaults(EnvVars.MARQO_MAX_CUDA_MODEL_MEMORY))
     elif device.startswith("cpu"):
         used_memory = sum([available_models[key].get("model_size", constants.DEFAULT_MODEL_SIZE) for key, values in
