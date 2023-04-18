@@ -83,7 +83,7 @@ class TestLargeModelEncoding(unittest.TestCase):
 
             del model
             clear_loaded_models()
-            torch.cuda.synchronize(device)
+            torch.cuda.empty_cache()
 
 
     def test_model_outputs(self):
@@ -101,7 +101,7 @@ class TestLargeModelEncoding(unittest.TestCase):
 
             del model
             clear_loaded_models()
-            torch.cuda.synchronize(device)
+            torch.cuda.empty_cache()
 
 
     def test_model_normalization(self):
@@ -125,7 +125,7 @@ class TestLargeModelEncoding(unittest.TestCase):
 
             del model
             clear_loaded_models()
-            torch.cuda.synchronize(device)
+            torch.cuda.empty_cache()
 
 
     def test_multilingual_clip_performance(self):
@@ -185,7 +185,7 @@ class TestLargeModelEncoding(unittest.TestCase):
 
             del model
             clear_loaded_models()
-            torch.cuda.synchronize(device)
+            torch.cuda.empty_cache()
 
 
 
