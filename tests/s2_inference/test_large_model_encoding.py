@@ -20,7 +20,7 @@ _load_model = functools.partial(og_load_model, calling_func = "unit_test")
 class TestLargeModelEncoding(unittest.TestCase):
 
     def setUp(self) -> None:
-        self.large_clip_models = ["onnx32/openai/ViT-L/14", "open_clip/ViT-L-14/openai", "ViT-L/14"]
+        self.large_clip_models = ["onnx32/openai/ViT-L/14", "open_clip/ViT-L-14/openai", "open_clip/ViT-L/14"]
 
         self.multilingual_models = ["multilingual-clip/XLM-Roberta-Large-Vit-L-14"]
 
@@ -36,25 +36,28 @@ class TestLargeModelEncoding(unittest.TestCase):
         sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
         device = "cuda"
         eps = 1e-9
+        with patch.dict(os.environ, {"MARQO_MAX_CUDA_MODEL_MEMORY": "8"}):
+            def run():
+                for name in names:
+                    model_properties = get_model_properties_from_registry(name)
+                    model = _load_model(model_properties['name'], model_properties=model_properties, device=device, )
 
-        for name in names:
-            model_properties = get_model_properties_from_registry(name)
-            model = _load_model(model_properties['name'], model_properties=model_properties, device=device, )
+                    for sentence in sentences:
+                        output_v = vectorise(name, sentence, model_properties, device, normalize_embeddings=True)
 
-            for sentence in sentences:
-                output_v = vectorise(name, sentence, model_properties, device, normalize_embeddings=True)
+                        assert _check_output_type(output_v)
 
-                assert _check_output_type(output_v)
+                        output_m = model.encode(sentence, normalize=True)
 
-                output_m = model.encode(sentence, normalize=True)
+                        # Converting output_m to numpy if it is cuda.
+                        if type(output_m) == torch.Tensor:
+                            output_m = output_m.cpu().numpy()
 
-                # Converting output_m to numpy if it is cuda.
-                if type(output_m) == torch.Tensor:
-                    output_m = output_m.cpu().numpy()
+                        assert abs(torch.FloatTensor(output_m) - torch.FloatTensor(output_v)).sum() < eps
+                    clear_loaded_models()
+                return True
 
-                assert abs(torch.FloatTensor(output_m) - torch.FloatTensor(output_v)).sum() < eps
-            print("Memory", torch.cuda.memory_allocated(device) / 1024 ** 3)
-            clear_loaded_models()
+            assert run()
 
 
     def test_load_clip_text_model(self):
