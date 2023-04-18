@@ -87,7 +87,7 @@ class TestLargeModelEncoding(unittest.TestCase):
 
 
     def test_model_outputs(self):
-        names = ["onnx16/open_clip/ViT-B-32/laion400m_e32"] + self.e5_models
+        names = self.large_clip_models+ self.e5_models
         sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
         device = "cuda"
 
