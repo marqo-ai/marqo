@@ -20,7 +20,7 @@ open_clip_torch==2.11.1
 clip-marqo==1.0.2
 protobuf==3.20.1
 onnx==1.12.0
-onnxruntime==1.13.1
+onnxruntime==1.14
 pandas==1.5.1
 optimum==1.4.1
 opencv-python-headless==4.6.0.66
