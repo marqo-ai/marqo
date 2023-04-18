@@ -258,7 +258,7 @@ def _check_memory_threshold_for_model(device: str, model_size: Union[float, int]
 
     if device.startswith("cuda"):
         torch.cuda.synchronize(device)
-        torch.cuda.empty_cache(device)
+        torch.cuda.empty_cache()
         used_memory = torch.cuda.memory_allocated(device) / 1024 ** 3
         threshold = float(read_env_vars_and_defaults(EnvVars.MARQO_MAX_CUDA_MODEL_MEMORY))
     elif device.startswith("cpu"):
