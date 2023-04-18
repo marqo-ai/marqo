@@ -220,7 +220,7 @@ def _validate_model_into_device(model_name:str, model_properties: dict, device: 
     if _check_memory_threshold_for_model(device, model_size, calling_func = _validate_model_into_device.__name__):
         return True
     else:
-        print(list(available_models))
+        print("available_models", list(available_models))
         model_cache_key_for_device = [key for key in list(available_models) if key.endswith(device)]
         print(model_cache_key_for_device)
         sorted_key_for_device = sorted(model_cache_key_for_device,
