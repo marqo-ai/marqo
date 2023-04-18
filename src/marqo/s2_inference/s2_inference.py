@@ -225,7 +225,7 @@ def _validate_model_into_device(model_name:str, model_properties: dict, device: 
                                        key=lambda x: available_models[x][
                                            AvailableModelsKey.most_recently_used_time])
         for key in sorted_key_for_device:
-            logger.info(
+            print(
                 f"Eject model = `{key.split('||')[0]}` with size = `{available_models[key].get('model_size', constants.DEFAULT_MODEL_SIZE)}` from device = `{device}` "
                 f"to save space for model = `{model_name}`.")
             del available_models[key]
