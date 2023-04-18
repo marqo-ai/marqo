@@ -220,7 +220,7 @@ def _validate_model_into_device(model_name:str, model_properties: dict, device: 
     if _check_memory_threshold_for_model(device, model_size, calling_func = _validate_model_into_device.__name__):
         return True
     else:
-        model_cache_key_for_device = [key for key in list(available_models) if device in key]
+        model_cache_key_for_device = [key for key in list(available_models) if key.endswith(device)]
         sorted_key_for_device = sorted(model_cache_key_for_device,
                                        key=lambda x: available_models[x][
                                            AvailableModelsKey.most_recently_used_time])
@@ -259,7 +259,8 @@ def _check_memory_threshold_for_model(device: str, model_size: Union[float, int]
     if device.startswith("cuda"):
         torch.cuda.synchronize(device)
         torch.cuda.empty_cache()
-        used_memory = torch.cuda.memory_allocated(device) / 1024 ** 3
+        used_memory = sum([available_models[key].get("model_size", constants.DEFAULT_MODEL_SIZE) for key, values in
+                           available_models.items() if key.endswith(device)])
         threshold = float(read_env_vars_and_defaults(EnvVars.MARQO_MAX_CUDA_MODEL_MEMORY))
     elif device.startswith("cpu"):
         used_memory = sum([available_models[key].get("model_size", constants.DEFAULT_MODEL_SIZE) for key, values in
