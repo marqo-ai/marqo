@@ -1,17 +1,18 @@
-import unittest
 import os
 import torch
 import pytest
 from marqo.s2_inference.types import FloatTensor
 from marqo.s2_inference.s2_inference import clear_loaded_models, get_model_properties_from_registry, _convert_tensor_to_numpy
-from marqo.s2_inference.model_registry import load_model_properties, _get_open_clip_properties
+from unittest.mock import patch
 import numpy as np
-
+import unittest
 from marqo.s2_inference.s2_inference import (
-    _load_model,
     _check_output_type, vectorise,
     _convert_vectorized_output,
 )
+import functools
+from marqo.s2_inference.s2_inference import _load_model as og_load_model
+_load_model = functools.partial(og_load_model, calling_func = "unit_test")
 
 
 @pytest.mark.largemodel
@@ -126,16 +127,22 @@ class TestLargeModelEncoding(unittest.TestCase):
         ]
         image = "https://raw.githubusercontent.com/marqo-ai/marqo-clip-onnx/main/examples/coco.jpg"
         e = 0.1
-        for name in names:
-            text_feature = np.array(vectorise(model_name=name, content=texts, normalize_embeddings=True, device=device))
-            image_feature = np.array(vectorise(model_name=name, content=image, normalize_embeddings=True, device=device))
+        with patch.dict(os.environ, {"MARQO_MAX_CUDA_MODEL_MEMORY": "8"}):
+            def run():
+                for name in names:
+                    text_feature = np.array(vectorise(model_name=name, content=texts, normalize_embeddings=True, device=device))
+                    image_feature = np.array(vectorise(model_name=name, content=image, normalize_embeddings=True, device=device))
 
-            clear_loaded_models()
-            similarity_score = (text_feature @ image_feature.T).flatten()
+                    clear_loaded_models()
+                    similarity_score = (text_feature @ image_feature.T).flatten()
 
-            assert np.abs(np.max(similarity_score) - np.min(similarity_score)) < e
+                    assert np.abs(np.max(similarity_score) - np.min(similarity_score)) < e
 
-            del similarity_score
+                    del similarity_score
+
+                return True
+            assert run()
+
 
     def test_cuda_encode_type(self):
         names = self.large_clip_models + self.e5_models
