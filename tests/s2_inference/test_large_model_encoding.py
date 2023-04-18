@@ -59,7 +59,6 @@ class TestLargeModelEncoding(unittest.TestCase):
                     # delete the model to free up memory,
                     # it is hacked loading from _load_model, so we need to delete it manually
                     del model
-                    torch.cuda.empty_cache()
 
                 return True
 
@@ -83,7 +82,6 @@ class TestLargeModelEncoding(unittest.TestCase):
 
             del model
             clear_loaded_models()
-            torch.cuda.empty_cache()
 
 
     def test_model_outputs(self):
@@ -101,7 +99,6 @@ class TestLargeModelEncoding(unittest.TestCase):
 
             del model
             clear_loaded_models()
-            torch.cuda.empty_cache()
 
 
     def test_model_normalization(self):
@@ -125,9 +122,9 @@ class TestLargeModelEncoding(unittest.TestCase):
 
             del model
             clear_loaded_models()
-            torch.cuda.empty_cache()
 
-
+    # This block is commented out due to its memory issue.
+    # The visual part can be loaded into the target device, but the textual part is always loaded into the cpu device.
     # def test_multilingual_clip_performance(self):
     #
     #     clear_loaded_models()
@@ -178,4 +175,3 @@ class TestLargeModelEncoding(unittest.TestCase):
 
             del model
             clear_loaded_models()
-            torch.cuda.empty_cache()

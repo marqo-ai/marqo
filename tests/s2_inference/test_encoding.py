@@ -53,7 +53,6 @@ class TestEncoding(unittest.TestCase):
 
                 assert abs(torch.FloatTensor(output_m) - torch.FloatTensor(output_v)).sum() < eps
 
-            del model
             clear_loaded_models()
 
     def test_cpu_encode_type(self):
@@ -77,7 +76,6 @@ class TestEncoding(unittest.TestCase):
                 output_v = _convert_tensor_to_numpy(model.encode(sentence, normalize=True))
                 assert isinstance(output_v, np.ndarray)
 
-            del model
             clear_loaded_models()
 
     def test_load_clip_text_model(self):
@@ -98,7 +96,6 @@ class TestEncoding(unittest.TestCase):
                 assert abs(model.encode_text(text) - model.encode([text])).sum() < eps
                 assert abs(model.encode(text) - model.encode_text([text])).sum() < eps
 
-            del model
             clear_loaded_models()
 
 
@@ -112,7 +109,6 @@ class TestEncoding(unittest.TestCase):
             model = _load_model(model_properties['name'], model_properties=model_properties, device=device)
             assert abs(model.encode('hello') - model.encode(['hello'])).sum() < eps
 
-            del model
             clear_loaded_models()
 
 
@@ -130,7 +126,6 @@ class TestEncoding(unittest.TestCase):
             model = _load_model(model_properties['name'], model_properties=model_properties, device=device)
             assert abs(model.encode('hello') - model.encode(['hello'])).sum() < eps
 
-            del model
             clear_loaded_models()
 
 
@@ -144,7 +139,6 @@ class TestEncoding(unittest.TestCase):
             model = _load_model(model_properties['name'], model_properties=model_properties, device=device)
             assert abs(model.encode('hello') - model.encode(['hello'])).sum() < eps
 
-            del model
             clear_loaded_models()
 
 
@@ -165,7 +159,6 @@ class TestEncoding(unittest.TestCase):
 
                 assert abs(model_onnx.encode(sentence) - model_sbert.encode(sentence)).sum() < eps
 
-            del model_onnx
             clear_loaded_models()
 
 
@@ -191,7 +184,6 @@ class TestEncoding(unittest.TestCase):
                 output = model.encode(sentence)
                 assert _check_output_type(_convert_vectorized_output(output))
 
-            del model
             clear_loaded_models()
 
 
@@ -221,7 +213,6 @@ class TestEncoding(unittest.TestCase):
                 assert abs(max_output_norm - 1) < eps, f"{name}, {sentence}"
                 assert abs(min_output_norm - 1) < eps, f"{name}, {sentence}"
 
-            del model
             clear_loaded_models()
 
 
@@ -251,7 +242,6 @@ class TestEncoding(unittest.TestCase):
                 assert abs(max_output_norm - 1) > eps, f"{name}, {sentence}"
                 assert abs(min_output_norm - 1) > eps, f"{name}, {sentence}"
 
-            del model
             clear_loaded_models()
 
 
@@ -277,7 +267,6 @@ class TestEncoding(unittest.TestCase):
 
                 assert abs(torch.FloatTensor(output_m) - torch.FloatTensor(output_v)).sum() < eps
 
-            del model
             clear_loaded_models()
 
 
@@ -323,5 +312,4 @@ class TestEncoding(unittest.TestCase):
 
                 assert abs(torch.FloatTensor(output_m) - torch.FloatTensor(output_v)).sum() < eps
 
-            del model
             clear_loaded_models()
