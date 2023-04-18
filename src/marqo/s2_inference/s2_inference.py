@@ -329,6 +329,7 @@ def clear_loaded_models() -> None:
             expose cache related functions to the client
     """
     available_models.clear()
+    torch.cuda.synchronize()
 
 
 def get_model_properties_from_registry(model_name: str) -> dict:
