@@ -1421,7 +1421,7 @@ class TestBulkSearch(MarqoTestCase):
                         searchMethod=SearchMethod.TENSOR,
                     ) for q in qs]
                 ))
-                raise AssertionError(f"Invalid query {q} did not raise error")
+                raise AssertionError(f"Invalid query {qs} did not raise error")
             except (InvalidArgError, BadRequestError) as e:
                 pass
 
