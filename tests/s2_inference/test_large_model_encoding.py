@@ -154,8 +154,9 @@ class TestLargeModelEncoding(unittest.TestCase):
                     assert np.abs(np.max(similarity_score) - np.min(similarity_score)) < e
 
                     del similarity_score
-
+                    clear_loaded_models()
                 return True
+
             assert run()
 
 
