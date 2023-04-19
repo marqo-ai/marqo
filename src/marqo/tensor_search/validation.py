@@ -1,6 +1,7 @@
 import json
 import pprint
 import typing
+from marqo.config import Config
 from marqo.tensor_search import constants
 from marqo.tensor_search import enums, utils
 from typing import Container, Iterable, List, Optional, Union
@@ -11,7 +12,7 @@ from marqo.errors import (
 from marqo.tensor_search.enums import TensorField, SearchMethod
 from marqo.tensor_search import constants
 from typing import Any, Type, Sequence
-import inspect
+
 from enum import Enum
 import jsonschema
 from marqo.tensor_search.models.settings_object import settings_schema
@@ -63,6 +64,10 @@ def validate_bulk_query_input(q: 'BulkSearchQueryEntity') -> Optional[MarqoError
 
     # validate query
     validate_query(q=q.q, search_method=q.searchMethod)
+    try:
+        validate_searchable_attributes(searchable_attributes=q.searchableAttributes, search_method=q.searchMethod)
+    except Exception as e:
+        return e
 
     # Validate result_count + offset <= int(max_docs_limit)
     max_docs_limit = utils.read_env_vars_and_defaults(enums.EnvVars.MARQO_MAX_RETRIEVABLE_DOCS)
@@ -85,6 +90,29 @@ def validate_bulk_query_input(q: 'BulkSearchQueryEntity') -> Optional[MarqoError
 
     return None
 
+def validate_searchable_attributes(searchable_attributes: Optional[List[str]], search_method: SearchMethod):
+    """Validate the searchable_attributes of an operation is not above the maximum number of attributes allowed.
+    
+    NOTE: There is only a maximum number of searchable attributes allowed for tensor search methods.
+
+    """
+    if search_method != SearchMethod.TENSOR:
+        return
+
+    maximum_searchable_attributes: Optional[str] = utils.read_env_vars_and_defaults(enums.EnvVars.MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES)
+    if maximum_searchable_attributes is None:
+        return 
+
+    if searchable_attributes is None:
+        raise InvalidArgError(
+            f"No searchable_attributes provided, but environment variable `MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES` is set."
+        )
+
+    if len(searchable_attributes) > int(maximum_searchable_attributes):
+        raise InvalidArgError(
+            f"Maximum searchable attributes (set via `MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES`) for tensor search is {maximum_searchable_attributes}, received {len(searchable_attributes)}."
+        )
+    
 
 def validate_str_against_enum(value: Any, enum_class: Type[Enum], case_sensitive: bool = True):
     """Checks whether a value is found as the value of a str attribute of the
