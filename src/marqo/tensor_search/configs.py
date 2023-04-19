@@ -59,7 +59,7 @@ def default_env_vars() -> dict:
         EnvVars.MARQO_ENABLE_THROTTLING: "TRUE",
         EnvVars.MARQO_LOG_LEVEL: "info",           # This env variable is set to "info" by default in run_marqo.sh, which overrides this value
         EnvVars.MARQO_MAX_CPU_MODEL_MEMORY: 4,
-        EnvVars.MARQO_MAX_CUDA_MODEL_MEMORY: 4,
+        EnvVars.MARQO_MAX_CUDA_MODEL_MEMORY: 4,  # For multi-GPU, this is the max memory for each GPU.
         EnvVars.MARQO_EF_CONSTRUCTION_MAX_VALUE: 4096,
         EnvVars.MARQO_MAX_VECTORISE_BATCH_SIZE: 16,
         EnvVars.MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES: None

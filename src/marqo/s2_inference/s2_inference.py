@@ -4,8 +4,8 @@ The functions defined here would have endpoints, later on.
 import functools
 import numpy as np
 from marqo.errors import ModelCacheManagementError
-from marqo.s2_inference.errors import VectoriseError, InvalidModelPropertiesError, ModelLoadError, UnknownModelError, \
-    ModelNotInCacheError
+from marqo.s2_inference.errors import (VectoriseError, InvalidModelPropertiesError, ModelLoadError,
+                                       UnknownModelError, ModelNotInCacheError)
 from PIL import UnidentifiedImageError
 from marqo.s2_inference.model_registry import load_model_properties
 from marqo.s2_inference.configs import get_default_device, get_default_normalization, get_default_seq_length
@@ -130,8 +130,8 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
     """loads the model if it is not already loaded.
     Note this method assume the model_properties are validated.
     """
-    model_size = get_model_size(model_name, validated_model_properties)
     if model_cache_key not in available_models:
+        model_size = get_model_size(model_name, validated_model_properties)
         if lock.locked():
             raise ModelCacheManagementError("Request rejected, as this request attempted to update the model cache, while"
                                             "another request was updating the model cache at the same time.\n"
@@ -161,7 +161,12 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
     else:
         most_recently_used_time = datetime.datetime.now()
         logger.debug(f'renew {model_name} on device {device} with new time={most_recently_used_time}.')
-        available_models[model_cache_key][AvailableModelsKey.most_recently_used_time] = most_recently_used_time
+        try:
+            available_models[model_cache_key][AvailableModelsKey.most_recently_used_time] = most_recently_used_time
+        except KeyError:
+            raise ModelNotInCacheError(f"Marqo cannot renew model {model_name} on device {device} with normalization={normalize_embeddings}. "
+                                       f"Maybe another thread is updating the model cache at the same time."
+                                       f"Please wait for 10 seconds and send the request again.\n")
 
 
 def _validate_model_properties(model_name: str, model_properties: dict) -> dict:
