@@ -62,8 +62,6 @@ def threaded_download_images(allocated_docs: List[dict], image_repo: dict,
                             continue
 
 
-
-
 def download_images(docs: List[dict], thread_count: int, non_tensor_fields: Tuple, image_download_headers: dict) -> dict:
     """Concurrently downloads images from each doc, storing them into the image_repo dict
     Args:
