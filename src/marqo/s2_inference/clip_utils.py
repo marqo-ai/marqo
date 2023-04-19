@@ -475,7 +475,7 @@ class MULTILINGUAL_CLIP(CLIP):
             self.visual_model = self.visual_model.visual
 
         self.textual_model = pt_multilingual_clip.MultilingualCLIP.from_pretrained(self.textual_name, self.device)
-        self.tokenizer = transformers.AutoTokenizer.from_pretrained(self.textual_name, device = self.device)
+        self.tokenizer = transformers.AutoTokenizer.from_pretrained(self.textual_name)
 
         self.textual_model.eval()
         self.visual_model.eval()
