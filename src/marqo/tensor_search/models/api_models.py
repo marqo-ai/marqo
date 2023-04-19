@@ -5,7 +5,7 @@ https://pydantic-docs.helpmanual.io/usage/types/#enums-and-choices
 """
 import pydantic
 from pydantic import BaseModel
-from typing import Union, List, Dict, Optional
+from typing import Union, List, Dict, Optional, Any
 from marqo.tensor_search.enums import SearchMethod, Device
 from marqo.tensor_search import validation
 
@@ -35,7 +35,6 @@ class SearchQuery(BaseMarqoModel):
             value=value, enum_class=SearchMethod,
             case_sensitive=False
         )
-
 
 class BulkSearchQueryEntity(SearchQuery):
     index: str
