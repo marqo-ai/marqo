@@ -1,14 +1,16 @@
 import copy
 import json
 import pprint
+from unittest import mock
 
 import requests
+
 from marqo.tensor_search import enums, backend, utils
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.configs import get_default_ann_parameters
+from marqo.tensor_search.models.index_info import IndexInfo
 from marqo.errors import MarqoApiError, IndexNotFoundError
 from tests.marqo_test import MarqoTestCase
-from unittest import mock
 
 
 class TestBackend(MarqoTestCase):
@@ -45,6 +47,35 @@ class TestBackend(MarqoTestCase):
                 config=self.config, index_name=self.index_name_1)
         except IndexNotFoundError as s:
             pass
+
+    @mock.patch('marqo._httprequests.HttpRequests.get', side_effect=[
+        [
+            {
+                "index": "my-test-index-1",
+                "shard": f"{i}",
+                "prirep": "r",
+                "state": "UNASSIGNED",
+                "docs": None,
+                "store": None,
+                "ip": None,
+                "node": None
+            } for i in range(10)
+        ] + [
+            {
+                "index": "my-test-index-1",
+                "shard": f"{i}",
+                "prirep": "p",
+                "state": "UNASSIGNED",
+                "docs": None,
+                "store": None,
+                "ip": None,
+                "node": None
+            } for i in range(10)
+        ]
+    ])
+    def test_get_num_shards(self, mock_http_get):
+        assert backend.get_num_shards(config=self.config, index_name=self.index_name_1) == 10
+        mock_http_get.assert_called_with(path=F"_cat/shards/{self.index_name_1}?format=json")
 
     def test_get_cluster_indices(self):
         tensor_search.create_vector_index(
