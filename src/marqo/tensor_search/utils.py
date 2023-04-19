@@ -9,6 +9,7 @@ from marqo.tensor_search import enums, configs
 from typing import (
     List, Optional, Union, Callable, Iterable, Sequence, Dict, Tuple
 )
+from marqo.marqo_logging import logger
 import copy
 import datetime
 import pathlib
@@ -187,6 +188,22 @@ def read_env_vars_and_defaults(var: str) -> Optional[str]:
             return configs.default_env_vars()[var]
         except KeyError:
             return None
+
+
+def read_env_vars_and_defaults_ints(var: str) -> Optional[int]:
+    """Gets env var from read_env_vars_and_defaults() and attempts to coerce it to an int
+    """
+    str_val = read_env_vars_and_defaults(var)
+    validation_error_msg = (
+        f"Could not properly read env var `{var}`. `{var}` must be able to be parsed as an int."
+    )
+    try:
+        as_int = int(str_val)
+    except (ValueError, TypeError) as e:
+        value_error_msg = f"`{validation_error_msg} Current value: `{str_val}`. Reason: {e}"
+        logger.error(value_error_msg)
+        raise errors.ConfigurationError(value_error_msg)
+    return as_int
 
 
 def parse_lexical_query(text: str) -> Tuple[List[str], str]:

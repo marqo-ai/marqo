@@ -14,6 +14,7 @@ from typing import Any, Type, Sequence
 import inspect
 from enum import Enum
 import jsonschema
+from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest
 from marqo.tensor_search.models.settings_object import settings_schema
 from marqo.tensor_search.models.mappings_object import mappings_schema, multimodal_combination_schema
 from marqo.tensor_search.models.context_object import context_schema
@@ -570,3 +571,39 @@ def validate_score_modifiers_object(score_modifiers: List[dict]):
             f"Please revise your score_modifiers based on the provided error."
             f"\n Check `https://docs.marqo.ai/0.0.17/API-Reference/search/#score-modifiers` for more info."
         )
+
+
+def validate_delete_docs_request(delete_request: MqDeleteDocsRequest, max_delete_docs_count: int):
+    """Validates a delete docs request from the user.
+
+    Args:
+        delete_request: A deletion request from the user
+        max_delete_docs_count: the maximum allowed docs to delete. Should be
+            set by the env var MARQO_MAX_DELETE_DOCS_COUNT
+    Returns:
+        del_request, if nothing is raised
+    """
+    if not isinstance(delete_request, MqDeleteDocsRequest):
+        raise RuntimeError("Deletion request must be a MqDeleteDocsRequest object")
+
+    if not isinstance(max_delete_docs_count, int):
+        raise RuntimeError("max_delete_docs_count must be an int!")
+
+    if not delete_request.document_ids:
+        # TODO: refactor doc_ids to be the API parameter (documentIds)
+        raise InvalidDocumentIdError("doc_ids can't be empty!")
+
+    if not isinstance(delete_request.document_ids, Sequence) or isinstance(delete_request.document_ids, str):
+        raise InvalidArgError("documentIds param must be an array of strings.")
+
+    if len(delete_request.document_ids) > max_delete_docs_count:
+        raise InvalidArgError(
+            f"The documentIds param length `{len(delete_request.document_ids)}` is "
+            f"greater than the limit `{max_delete_docs_count}` set by the env var "
+            f"`{enums.EnvVars.MARQO_MAX_DELETE_DOCS_COUNT}`. ")
+
+    for _id in delete_request.document_ids:
+        validate_id(_id)
+
+    return delete_request
+

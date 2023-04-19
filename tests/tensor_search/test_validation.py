@@ -3,6 +3,7 @@ from enum import Enum
 from marqo.tensor_search import enums
 import unittest
 from unittest import mock
+from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest
 from marqo.errors import (
     MarqoError, InvalidFieldNameError, InternalError,
     InvalidDocumentIdError, InvalidArgError, DocTooLargeError,
@@ -1131,3 +1132,49 @@ class TestValidateIndexSettings(unittest.TestCase):
 
         for valid_custom_score_fields in valid_custom_score_fields_list:
             validation.validate_score_modifiers_object(valid_custom_score_fields)
+
+
+class TestValidateDeleteDocsRequest(unittest.TestCase):
+
+    def setUp(self) -> None:
+        self.max_delete_docs_count = 10
+
+    def test_valid_delete_request(self):
+        delete_request = MqDeleteDocsRequest(index_name="my_index", document_ids=["id1", "id2", "id3"], auto_refresh=True)
+        result = validation.validate_delete_docs_request(delete_request, self.max_delete_docs_count)
+        self.assertEqual(delete_request, result)
+
+    def test_invalid_delete_request_not_instance(self):
+        delete_request = {"index_name": "my_index", "document_ids": ["id1", "id2", "id3"], "auto_refresh": True}
+        with self.assertRaises(RuntimeError):
+            validation.validate_delete_docs_request(delete_request, self.max_delete_docs_count)
+
+    def test_invalid_max_delete_docs_count(self):
+        delete_request = MqDeleteDocsRequest(index_name="my_index", document_ids=["id1", "id2", "id3"], auto_refresh=True)
+        with self.assertRaises(RuntimeError):
+            validation.validate_delete_docs_request(delete_request, "10")
+
+    def test_empty_document_ids(self):
+        delete_request = MqDeleteDocsRequest(index_name="my_index", document_ids=[], auto_refresh=True)
+        with self.assertRaises(InvalidDocumentIdError):
+            validation.validate_delete_docs_request(delete_request, self.max_delete_docs_count)
+
+    def test_document_ids_not_sequence(self):
+        delete_request = MqDeleteDocsRequest(index_name="my_index", document_ids="id1", auto_refresh=True)
+        with self.assertRaises(InvalidArgError):
+            validation.validate_delete_docs_request(delete_request, self.max_delete_docs_count)
+
+    def test_exceed_max_delete_docs_count(self):
+        delete_request = MqDeleteDocsRequest(index_name="my_index", document_ids=["id{}".format(i) for i in range(1, 12)], auto_refresh=True)
+        with self.assertRaises(InvalidArgError):
+            validation.validate_delete_docs_request(delete_request, self.max_delete_docs_count)
+
+    def test_invalid_document_id_type(self):
+        delete_request = MqDeleteDocsRequest(index_name="my_index", document_ids=["id1", 2, "id3"], auto_refresh=True)
+        with self.assertRaises(InvalidDocumentIdError):
+            validation.validate_delete_docs_request(delete_request, self.max_delete_docs_count)
+
+    def test_empty_document_id(self):
+        delete_request = MqDeleteDocsRequest(index_name="my_index", document_ids=["id1", "", "id3"], auto_refresh=True)
+        with self.assertRaises(InvalidDocumentIdError):
+            validation.validate_delete_docs_request(delete_request, self.max_delete_docs_count)

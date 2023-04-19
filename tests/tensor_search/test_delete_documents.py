@@ -1,6 +1,7 @@
 import datetime
 from copy import deepcopy
 import marqo.tensor_search.delete_docs
+from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest, MqDeleteDocsResponse
 from marqo.tensor_search import delete_docs
 import marqo.tensor_search.tensor_search
 from marqo.tensor_search import tensor_search
@@ -288,7 +289,7 @@ class TestDeleteDocumentsEndpoint(MarqoTestCase):
                 pass
 
     def test_format_delete_docs_response(self):
-        response = delete_docs.MqDeleteDocsResponse(
+        response = MqDeleteDocsResponse(
             index_name=self.index_name_1,
             status_string="succeeded",
             document_ids=["1", "2", "3"],
@@ -311,12 +312,12 @@ class TestDeleteDocumentsEndpoint(MarqoTestCase):
     def test_delete_documents_valid_request(self):
         config_copy = deepcopy(self.config)
         config_copy.backend = enums.SearchDb.opensearch
-        request = delete_docs.MqDeleteDocsRequest(
+        request = MqDeleteDocsRequest(
             index_name=self.index_name_1, document_ids=["1", "2", "3"], auto_refresh=True
         )
 
         with patch("marqo.tensor_search.delete_docs.delete_documents_marqo_os") as mock_delete_documents_marqo_os:
-            mock_delete_documents_marqo_os.return_value = delete_docs.MqDeleteDocsResponse(
+            mock_delete_documents_marqo_os.return_value = MqDeleteDocsResponse(
                 index_name=self.index_name_1,
                 status_string="succeeded",
                 document_ids=["1", "2", "3"],
@@ -332,7 +333,7 @@ class TestDeleteDocumentsEndpoint(MarqoTestCase):
     def test_delete_documents_empty_document_ids(self):
         config_copy = deepcopy(self.config)
         config_copy.backend = enums.SearchDb.opensearch
-        request = delete_docs.MqDeleteDocsRequest(
+        request = MqDeleteDocsRequest(
             index_name=self.index_name_1, document_ids=[], auto_refresh=False
         )
 
@@ -342,7 +343,7 @@ class TestDeleteDocumentsEndpoint(MarqoTestCase):
     def test_delete_documents_invalid_backend(self):
         config_copy = deepcopy(self.config)
         config_copy.backend = "unknown_backend"
-        request = delete_docs.MqDeleteDocsRequest(
+        request = MqDeleteDocsRequest(
             index_name=self.index_name_1, document_ids=["1", "2", "3"], auto_refresh=False
         )
 
@@ -352,7 +353,7 @@ class TestDeleteDocumentsEndpoint(MarqoTestCase):
     def test_delete_documents_marqo_os(self):
         config_copy = deepcopy(self.config)
         config_copy.backend = enums.SearchDb.opensearch
-        request = delete_docs.MqDeleteDocsRequest(
+        request = MqDeleteDocsRequest(
             index_name=self.index_name_1, document_ids=["1", "2", "3"], auto_refresh=False
         )
 
@@ -375,7 +376,7 @@ class TestDeleteDocumentsEndpoint(MarqoTestCase):
             self.assertEqual(response.deleted_docments_count, 3)
 
     def test_format_delete_docs_response_valid_input(self):
-        mq_delete_res = delete_docs.MqDeleteDocsResponse(
+        mq_delete_res = MqDeleteDocsResponse(
             index_name="test_index",
             status_string="succeeded",
             document_ids=["1", "2", "3"],
@@ -403,7 +404,7 @@ class TestDeleteDocumentsEndpoint(MarqoTestCase):
     def test_delete_documents_invalid_document_id(self):
         config_copy = deepcopy(self.config)
         config_copy.backend = enums.SearchDb.opensearch
-        request = delete_docs.MqDeleteDocsRequest(
+        request = MqDeleteDocsRequest(
             index_name=self.index_name_1, document_ids=['hello', None, 123], auto_refresh=True
         )
 

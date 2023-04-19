@@ -2,25 +2,13 @@
 This module handles the delete documents endpoint
 """
 import datetime
-from typing import List, NamedTuple, Literal
 import json
-from marqo import errors
 from marqo._httprequests import HttpRequests
 from marqo.config import Config
 from marqo.tensor_search import validation, utils, enums
-
+from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsResponse, MqDeleteDocsRequest
 
 # -- Marqo delete endpoint interface: --
-
-
-class MqDeleteDocsResponse(NamedTuple):
-    """An object that holds the data we send back to users"""
-    index_name: str
-    status_string: Literal["succeeded"]
-    document_ids: List[str]
-    deleted_docments_count: int
-    deletion_start: datetime.datetime
-    deletion_end: datetime.datetime
 
 
 def format_delete_docs_response(marqo_response: MqDeleteDocsResponse) -> dict:
@@ -37,23 +25,16 @@ def format_delete_docs_response(marqo_response: MqDeleteDocsResponse) -> dict:
     }
 
 
-class MqDeleteDocsRequest(NamedTuple):
-    """An object that holds the data from users for a delete request"""
-    index_name: str
-    document_ids: List[str]
-    auto_refresh: bool
-
-
 # -- Data-layer agnostic logic --
 
 
 def delete_documents(config: Config, del_request: MqDeleteDocsRequest) -> dict:
     """entrypoint function for deleting documents"""
-    if not del_request.document_ids:
-        raise errors.InvalidDocumentIdError("doc_ids can't be empty!")
 
-    for _id in del_request.document_ids:
-        validation.validate_id(_id)
+    validation.validate_delete_docs_request(
+        delete_request=del_request,
+        max_delete_docs_count=utils.read_env_vars_and_defaults_ints(enums.EnvVars.MARQO_MAX_DELETE_DOCS_COUNT)
+    )
 
     if config.backend == enums.SearchDb.opensearch:
         del_response: MqDeleteDocsResponse = delete_documents_marqo_os(config=config, deletion_instruction=del_request)

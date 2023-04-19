@@ -42,6 +42,7 @@ from typing import List, Optional, Union, Iterable, Sequence, Dict, Any, Tuple
 import numpy as np
 from PIL import Image
 import marqo.config as config
+from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest
 from marqo.tensor_search.enums import (
     MediaType, MlModel, TensorField, SearchMethod, OpenSearchDataType,
     EnvVars
@@ -2565,7 +2566,7 @@ def delete_documents(config: Config, index_name: str, doc_ids: List[str], auto_r
     """Delete documents from the Marqo index with the given doc_ids """
     return delete_docs.delete_documents(
         config=config,
-        del_request=delete_docs.MqDeleteDocsRequest(
+        del_request=MqDeleteDocsRequest(
             index_name=index_name,
             document_ids=doc_ids,
             auto_refresh=auto_refresh)
