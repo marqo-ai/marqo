@@ -980,6 +980,8 @@ def bulk_search(query: BulkSearchQuery, marqo_config: config.Config, verbose: bo
           - A single error (e.g. validation errors) on any one of the search queries returns an error and does not
             process non-erroring queries.
     """
+    refresh_indexes_in_background(marqo_config, [q.index for q in query.queries])
+
     # TODO: Let non-errored docs to propagate.
     errs = [validation.validate_bulk_query_input(q) for q in query.queries]
     if any(errs):
@@ -988,8 +990,6 @@ def bulk_search(query: BulkSearchQuery, marqo_config: config.Config, verbose: bo
 
     if len(query.queries) == 0:
         return {"result": []}
-
-    refresh_indexes_in_background(marqo_config, [q.index for q in query.queries])
 
     selected_device = marqo_config.indexing_device if device is None else device
 
@@ -1120,6 +1120,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
 
     t0 = timer()
     validation.validate_boost(boost=boost, search_method=search_method)
+    validation.validate_searchable_attributes(searchable_attributes=searchable_attributes, search_method=search_method)
     if searchable_attributes is not None:
         [validation.validate_field_name(attribute) for attribute in searchable_attributes]
     if attributes_to_retrieve is not None:
@@ -2571,3 +2572,13 @@ def delete_documents(config: Config, index_name: str, doc_ids: List[str], auto_r
             document_ids=doc_ids,
             auto_refresh=auto_refresh)
     )
+
+
+def get_settings(index_name: str, marqo_config: Config):
+    """Get the settings for a specific index."""
+    shards = backend.get_num_shards(config=marqo_config, index_name=index_name)
+
+    index_info = backend.get_index_info(config=marqo_config, index_name=index_name)
+    index_info.index_settings["number_of_shards"] = shards
+
+    return index_info.index_settings

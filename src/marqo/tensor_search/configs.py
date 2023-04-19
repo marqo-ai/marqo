@@ -1,6 +1,5 @@
 from marqo.tensor_search import enums as ns_enums
 from marqo.tensor_search.enums import IndexSettingsField as NsFields, EnvVars
-from torch import multiprocessing as mp
 
 
 def get_default_index_settings():
@@ -53,13 +52,10 @@ def default_env_vars() -> dict:
         EnvVars.MARQO_MAX_CONCURRENT_SEARCH: 8,
         EnvVars.MARQO_THREAD_EXPIRY_TIME: 1800,     # 30 minutes
         EnvVars.MARQO_ENABLE_THROTTLING: "TRUE",
-
-        # This env variable is set to "info" by default in run_marqo.sh, which overrides this value
-        EnvVars.MARQO_LOG_LEVEL: "info",
-
+        EnvVars.MARQO_LOG_LEVEL: "info",             # This env variable is set to "info" by default in run_marqo.sh, which overrides this value
         EnvVars.MARQO_EF_CONSTRUCTION_MAX_VALUE: 4096,
         EnvVars.MARQO_MAX_VECTORISE_BATCH_SIZE: 16,
-        EnvVars.MARQO_MAX_DELETE_DOCS_COUNT: 10000
-
+        EnvVars.MARQO_MAX_DELETE_DOCS_COUNT: 10000,
+        EnvVars.MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES: None
     }
 
