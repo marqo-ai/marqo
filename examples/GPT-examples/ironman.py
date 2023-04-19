@@ -6,11 +6,12 @@ from utilities import (
     get_extra_data,
     reformat_npcs
 )
-
+from dotenv import load_dotenv
 from langchain.llms import OpenAI 
 from langchain.docstore.document import Document
 from langchain.chains import LLMChain
 
+load_dotenv()
 
 if __name__ == "__main__":
 
@@ -68,7 +69,7 @@ if __name__ == "__main__":
     print(df.head())
 
     # make the data python dicts
-    documents = df.to_dict(orient='record')
+    documents = df.to_dict(orient='records')
 
     #############################################################
     #       2. Setup Marqo                                          
@@ -91,13 +92,13 @@ if __name__ == "__main__":
     index_settings = {
         "index_defaults": {
                 "normalize_embeddings": True,
-                "text_preprocessing": {
-                    "split_length": 5,
-                    "split_overlap": 1,
-                    "split_method": "sentence"
-                                        },
+            "text_preprocessing": {
+                "split_length": 5,
+                "split_overlap": 1,
+                "split_method": "sentence"
+            },
         }
-        }
+    }
 
     # create the index - if no settings are present then sensible deffaults are used    
     mq.create_index(index_name, settings_dict=index_settings)

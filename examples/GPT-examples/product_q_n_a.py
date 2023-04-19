@@ -6,6 +6,8 @@ from langchain.llms import OpenAI
 from langchain.docstore.document import Document
 from langchain.chains import LLMChain
 
+from dotenv import load_dotenv
+
 from utilities import (
     load_data,
     extract_text_from_highlights,
@@ -13,6 +15,8 @@ from utilities import (
     predict_ce,
     get_sorted_inds
 )
+
+load_dotenv()
 
 if __name__ == "__main__":
 
@@ -45,11 +49,11 @@ if __name__ == "__main__":
         "index_defaults": {
             "model": "flax-sentence-embeddings/all_datasets_v4_MiniLM-L6",
             "normalize_embeddings": True,
-                "text_preprocessing": {
-                    "split_length": 3,
-                    "split_overlap": 1,
-                    "split_method": "sentence"
-                                },
+            "text_preprocessing": {
+                "split_length": 3,
+                "split_overlap": 1,
+                "split_method": "sentence"
+            },
         },
     }
 
@@ -64,7 +68,7 @@ if __name__ == "__main__":
     df = load_data()
 
     # turn the data into a dict for indexing
-    documents = df.to_dict(orient='record')
+    documents = df.to_dict(orient='records')
 
     #############################################################
     #       3. Index the data                                          
