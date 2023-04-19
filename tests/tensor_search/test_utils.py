@@ -157,6 +157,10 @@ class TestUtils(unittest.TestCase):
             ("SOME_VAR", {"SOME_VAR": "1234"}, dict(), "1234"),
             ("SOME_VAR", dict(), {"SOME_VAR": "1234"}, "1234"),
             ("SOME_VAR", {"SOME_VAR": "111"}, {"SOME_VAR": "333"}, "111"),
+
+            #OK for default vals to be ints:
+            ("SOME_VAR", {"SOME_VAR": "111"}, {"SOME_VAR": 333}, "111"),
+            ("SOME_VAR", dict(), {"SOME_VAR": 1234}, 1234),
         ]:
             mock_default_env_vars = mock.MagicMock()
             mock_default_env_vars.return_value = default_vars
@@ -180,6 +184,10 @@ class TestUtils(unittest.TestCase):
             ("SOME_INT_VAR", {"SOME_INT_VAR": "111"}, {"SOME_INT_VAR": "333"}, 111),
             ("SOME_INT_VAR", dict(), {"SOME_INT_VAR": " 123 "}, 123),
             ("SOME_INT_VAR", {"SOME_INT_VAR": " 123 "}, dict(), 123),
+
+            # OK for default vals to be ints:
+            ("SOME_VAR", {"SOME_VAR": "111"}, {"SOME_VAR": 333}, 111),
+            ("SOME_VAR", dict(), {"SOME_VAR": 1234}, 1234),
         ]:
             mock_default_env_vars = mock.MagicMock()
             mock_default_env_vars.return_value = default_vars

@@ -190,7 +190,11 @@ def read_env_vars_and_defaults(var: str) -> Optional[str]:
         return none_if_empty(os.environ[var])
     except KeyError:
         try:
-            return none_if_empty(configs.default_env_vars()[var])
+            default_val = configs.default_env_vars()[var]
+            if isinstance(default_val, str):
+                return none_if_empty(default_val)
+            else:
+                return default_val
         except KeyError:
             return None
 

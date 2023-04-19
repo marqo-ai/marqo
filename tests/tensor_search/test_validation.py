@@ -1178,3 +1178,11 @@ class TestValidateDeleteDocsRequest(unittest.TestCase):
         delete_request = MqDeleteDocsRequest(index_name="my_index", document_ids=["id1", "", "id3"], auto_refresh=True)
         with self.assertRaises(InvalidDocumentIdError):
             validation.validate_delete_docs_request(delete_request, self.max_delete_docs_count)
+
+    def test_no_limit(self):
+        # the default limit is 10000,
+        delete_request = MqDeleteDocsRequest(
+            index_name="my_index", document_ids=["id{}".format(i) for i in range(1, 20000)], auto_refresh=True)
+        with self.assertRaises(RuntimeError):
+            validation.validate_delete_docs_request(delete_request, None)
+

@@ -590,15 +590,15 @@ def validate_delete_docs_request(delete_request: MqDeleteDocsRequest, max_delete
         raise RuntimeError("max_delete_docs_count must be an int!")
 
     if not delete_request.document_ids:
-        # TODO: refactor doc_ids to be the API parameter (documentIds)
+        # TODO: refactor doc_ids to use the correct API parameter name (documentIds)
         raise InvalidDocumentIdError("doc_ids can't be empty!")
 
     if not isinstance(delete_request.document_ids, Sequence) or isinstance(delete_request.document_ids, str):
         raise InvalidArgError("documentIds param must be an array of strings.")
 
-    if len(delete_request.document_ids) > max_delete_docs_count:
+    if (len(delete_request.document_ids) > max_delete_docs_count) and max_delete_docs_count is not None:
         raise InvalidArgError(
-            f"The documentIds param length `{len(delete_request.document_ids)}` is "
+            f"The number of documentIds to delete `{len(delete_request.document_ids)}` is "
             f"greater than the limit `{max_delete_docs_count}` set by the env var "
             f"`{enums.EnvVars.MARQO_MAX_DELETE_DOCS_COUNT}`. ")
 

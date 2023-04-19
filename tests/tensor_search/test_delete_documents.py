@@ -337,7 +337,7 @@ class TestDeleteDocumentsEndpoint(MarqoTestCase):
             index_name=self.index_name_1, document_ids=[], auto_refresh=False
         )
 
-        with self.assertRaises(delete_docs.errors.InvalidDocumentIdError):
+        with self.assertRaises(errors.InvalidDocumentIdError):
             delete_docs.delete_documents(config_copy, request)
 
     def test_delete_documents_invalid_backend(self):
@@ -410,3 +410,45 @@ class TestDeleteDocumentsEndpoint(MarqoTestCase):
 
         with self.assertRaises(errors.InvalidDocumentIdError):
             delete_docs.delete_documents(config_copy, request)
+
+    def test_max_doc_delete_limit(self):
+        max_delete_docs = 100
+        mock_environ = {enums.EnvVars.MARQO_MAX_DELETE_DOCS_COUNT: str(max_delete_docs)}
+
+        doc_ids = [f"id_{x}" for x in range(max_delete_docs + 5)]
+
+        @patch("os.environ", mock_environ)
+        def run():
+            tensor_search.create_vector_index(
+                index_name=self.index_name_1, index_settings={"index_defaults": {"model": 'random'}}, config=self.config)
+            # over the limit:
+            tensor_search.add_documents(
+                config=self.config, index_name=self.index_name_1, docs=[
+                    {"_id": x, 'Bad field': "blh "} for x in doc_ids
+                ],
+                auto_refresh=True, update_mode='update')
+            try:
+                tensor_search.delete_documents(config=self.config, index_name=self.index_name_1, doc_ids=doc_ids, auto_refresh=True)
+                raise AssertionError
+            except errors.InvalidArgError as e:
+                pass
+            # under the limit
+            update_res = tensor_search.delete_documents(
+                config=self.config, index_name=self.index_name_1, doc_ids=doc_ids[:90],
+                auto_refresh=True)
+            assert update_res['details']['receivedDocumentIds'] == update_res['details']['deletedDocuments']
+            assert update_res['details']['receivedDocumentIds'] == 90
+            return True
+
+        assert run()
+
+    def test_max_doc_delete_default_limit(self):
+        default_limit = 10000
+
+        @patch("os.environ", dict())
+        def run():
+            assert default_limit == tensor_search.utils.read_env_vars_and_defaults_ints(
+                enums.EnvVars.MARQO_MAX_DELETE_DOCS_COUNT)
+            return True
+
+        assert run()
