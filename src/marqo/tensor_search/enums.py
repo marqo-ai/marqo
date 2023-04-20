@@ -106,6 +106,8 @@ class EnvVars:
     MARQO_EF_CONSTRUCTION_MAX_VALUE = "MARQO_EF_CONSTRUCTION_MAX_VALUE"
     MARQO_MAX_VECTORISE_BATCH_SIZE = "MARQO_MAX_VECTORISE_BATCH_SIZE"
     MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES = "MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES"
+    MARQO_MAX_DELETE_DOCS_COUNT = "MARQO_MAX_DELETE_DOCS_COUNT"
+
 
 class RequestType:
     INDEX = "INDEX"
@@ -116,6 +118,10 @@ class RequestType:
 
 class MappingsObjectType:
     multimodal_combination = "multimodal_combination"
+
+
+class SearchDb:
+    opensearch = 'opensearch'
 
 
 class AvailableModelsKey:
