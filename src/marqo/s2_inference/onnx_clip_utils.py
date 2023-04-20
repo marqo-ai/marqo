@@ -122,7 +122,7 @@ class CLIP_ONNX(object):
 
     def encode_image(self, images, normalize=True):
         if isinstance(images, list):
-            image_input = format_and_load_CLIP_images(images)
+            image_input = format_and_load_CLIP_images(images, {})
         else:
             image_input = [format_and_load_CLIP_image(images, {})]
 
