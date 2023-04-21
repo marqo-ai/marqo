@@ -1,9 +1,6 @@
-from unittest import mock
-
-from marqo.errors import IndexNotFoundError
 from tests.marqo_test import MarqoTestCase
-from marqo.tensor_search.models.index_info import IndexInfo
 from marqo.tensor_search import tensor_search, backend
+from marqo.errors import IndexNotFoundError
 
 
 class TestGetSettings(MarqoTestCase):
@@ -68,17 +65,3 @@ class TestGetSettings(MarqoTestCase):
         self.assertIn('number_of_shards', index_settings)
         self.assertIn('number_of_replicas', index_settings)
         self.assertTrue(fields.issubset(set(index_settings['index_defaults'])))
-
-
-    @mock.patch("marqo.tensor_search.backend.get_index_info", return_value=IndexInfo(
-        index_settings={"number_of_shards": 5}, model_name="model_name", properties={}
-    ))
-    @mock.patch('marqo._httprequests.HttpRequests.get', side_effect=[[{"shard": f"{i}"} for i in range(10)]])
-    def test_get_settings_ensure_shard_count_call(self, mock_http_get, mock_get_index_info):
-        tensor_search.create_vector_index(
-            config=self.config, index_name=self.index_name
-        )
-        index_settings = tensor_search.get_settings(
-            marqo_config=self.config, index_name=self.index_name)
-
-        assert index_settings["number_of_shards"] == 10 

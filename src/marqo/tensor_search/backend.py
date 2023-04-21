@@ -17,12 +17,6 @@ from marqo.tensor_search.index_meta_cache import get_index_info as get_cached_in
 import pprint
 
 
-def get_num_shards(config: Config, index_name: str) -> int:
-    """Returns the number of shards assigned to an index from Opensearch"""
-    resp  = HttpRequests(config).get(path=F"_cat/shards/{index_name}?format=json")
-    return len(set(d["shard"] for d in resp))
-
-
 def get_index_info(config: Config, index_name: str) -> IndexInfo:
     """Gets useful information about the index. Also updates the IndexInfo cache
 
