@@ -1,7 +1,6 @@
 """This is the interface for interacting with S2 Inference
 The functions defined here would have endpoints, later on.
 """
-import functools
 import numpy as np
 from marqo.errors import ModelCacheManagementError
 from marqo.s2_inference.errors import (VectoriseError, InvalidModelPropertiesError, ModelLoadError,
@@ -14,13 +13,13 @@ from marqo.s2_inference.logger import get_logger
 import torch
 import datetime
 from marqo.s2_inference import constants
-from marqo.tensor_search.utils import read_env_vars_and_defaults
 from marqo.tensor_search.enums import AvailableModelsKey
-from marqo.tensor_search.configs import EnvVars
 import threading
 from marqo.tensor_search.utils import read_env_vars_and_defaults, generate_batches
 from marqo.tensor_search.configs import EnvVars
 from marqo.errors import ConfigurationError
+import gc
+import time
 
 logger = get_logger(__name__)
 
@@ -235,6 +234,9 @@ def _validate_model_into_device(model_name:str, model_properties: dict, device: 
                 f"to save space for model = `{model_name}`.")
             del available_models[key]
             if _check_memory_threshold_for_model(device, model_size, calling_func = _validate_model_into_device.__name__):
+                logger.info("Marqo eject enough models to load the target model. We wait for 5 seconds to release the memory")
+                gc.collect()
+                time.sleep(5)
                 return True
 
         if _check_memory_threshold_for_model(device, model_size, calling_func = _validate_model_into_device.__name__) is False:
