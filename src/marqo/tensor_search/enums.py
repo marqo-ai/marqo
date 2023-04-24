@@ -124,12 +124,6 @@ class SearchDb:
     opensearch = 'opensearch'
 
 
-class AvailableModelsKey:
-    model = "model"
-    most_recently_used_time = "most_recently_used_time"
-    model_size = "model_size"
-
-
 # Perhaps create a ThrottleType to differentiate thread_count and data_size throttling mechanisms
     
 

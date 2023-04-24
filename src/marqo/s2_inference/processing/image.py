@@ -1,16 +1,16 @@
-import datetime
 from functools import partial
 
 import PIL
 import numpy as np
 import torch
 import torchvision
+
 from marqo.s2_inference.s2_inference import available_models,_create_model_cache_key
 from marqo.s2_inference.s2_inference import get_logger
 from marqo.s2_inference.types import Dict, List, Union, ImageType, Tuple, ndarray, Literal
 from marqo.s2_inference.clip_utils import format_and_load_CLIP_image
 from marqo.s2_inference.errors import ChunkerError
-from marqo.tensor_search.enums import AvailableModelsKey
+
 from marqo.s2_inference.processing.DINO_utils import _load_DINO_model,attention_to_bboxs,DINO_inference
 from marqo.s2_inference.processing.pytorch_utils import load_pytorch
 from marqo.s2_inference.processing.yolox_utils import (
@@ -211,11 +211,9 @@ class PatchifyModel:
 
             self.model, self.preprocess = func(self.model_name, self.device)
 
-            available_models[model_cache_key] = {AvailableModelsKey.model: (self.model, self.preprocess),
-                                                 AvailableModelsKey.most_recently_used_time : datetime.datetime.now()}
-
+            available_models[model_cache_key] = self.model, self.preprocess
         else:
-            self.model, self.preprocess = available_models[model_cache_key][AvailableModelsKey.model]
+            self.model, self.preprocess = available_models[model_cache_key]
 
     def _load_image(self, image):
         self.image, self.image_pt, self.original_size = load_rcnn_image(image, size=self.size)

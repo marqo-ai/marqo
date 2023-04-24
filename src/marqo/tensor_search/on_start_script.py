@@ -133,9 +133,9 @@ class ModelsForCacheing:
                 
                 # warm it up
                 _ = vectorise(model, test_string, device=device)
-
                 t = 0
                 for n in range(N):
+    
                     t0 = time.time()
                     _ = vectorise(model, test_string, device=device)
                     t1 = time.time()

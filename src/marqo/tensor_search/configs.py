@@ -38,7 +38,6 @@ def get_default_ann_parameters():
         }
     }
 
-
 def default_env_vars() -> dict:
     """Returns a dict of default env vars.
     This is used by utils.read_env_vars_and_defaults() as the source for
@@ -53,9 +52,7 @@ def default_env_vars() -> dict:
         EnvVars.MARQO_MAX_CONCURRENT_SEARCH: 8,
         EnvVars.MARQO_THREAD_EXPIRY_TIME: 1800,     # 30 minutes
         EnvVars.MARQO_ENABLE_THROTTLING: "TRUE",
-        EnvVars.MARQO_LOG_LEVEL: "info",           # This env variable is set to "info" by default in run_marqo.sh, which overrides this value
-        EnvVars.MARQO_MAX_CPU_MODEL_MEMORY: 4,
-        EnvVars.MARQO_MAX_CUDA_MODEL_MEMORY: 4,  # For multi-GPU, this is the max memory for each GPU.
+        EnvVars.MARQO_LOG_LEVEL: "info",             # This env variable is set to "info" by default in run_marqo.sh, which overrides this value
         EnvVars.MARQO_EF_CONSTRUCTION_MAX_VALUE: 4096,
         EnvVars.MARQO_MAX_VECTORISE_BATCH_SIZE: 16,
         EnvVars.MARQO_MAX_DELETE_DOCS_COUNT: 10000,

@@ -3,7 +3,7 @@ import numpy as np
 from marqo.errors import IndexNotFoundError
 from marqo.s2_inference.errors import InvalidModelPropertiesError, UnknownModelError, ModelLoadError
 from marqo.tensor_search import tensor_search
-from marqo.s2_inference.s2_inference import clear_loaded_models
+
 from marqo.s2_inference.s2_inference import (
     available_models,
     vectorise,
@@ -25,7 +25,7 @@ class TestGenericModelSupport(MarqoTestCase):
             pass
 
     def tearDown(self) -> None:
-        clear_loaded_models()
+        pass
 
     def test_create_index_with_custom_model_properties(self):
         """index should get created with custom model_properties
