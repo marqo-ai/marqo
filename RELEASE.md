@@ -1,7 +1,7 @@
 # Release 0.0.18
 
 ## New features
-- New E5 model type is available (https://github.com/marqo-ai/marqo/pull/419). E5 models are state of the art general-purpose text embedding model that obtained the best results on the MTEB benchmark when it was released in Dec 2022. Read more about these models [here](https://docs.marqo.ai/0.0.18/Models-Reference/dense_retrieval/#text).
+- New E5 model type is available (https://github.com/marqo-ai/marqo/pull/419). E5 models are state of the art general-purpose text embedding models that obtained the best results on the MTEB benchmark when it was released in Dec 2022. Read more about these models [here](https://docs.marqo.ai/0.0.18/Models-Reference/dense_retrieval/#text).
 - Automatic model ejection (https://github.com/marqo-ai/marqo/pull/372). Automatic model ejection helps prevent out-of-memory (OOM) errors on machines with a larger amount of CPU memory (16GB+) by ejecting the least recently used model. 
 - Speech processing article and example (https://github.com/marqo-ai/marqo/pull/431). [@OwenPendrighElliott](https://github.com/OwenPendrighElliott) demonstrates how you can build and query a Marqo index from audio clips. 
 
