@@ -1,4 +1,30 @@
-## Release 0.0.17 
+# Release 0.0.18
+
+## New features
+- New E5 model type is available (https://github.com/marqo-ai/marqo/pull/419)
+- Automatic model ejection (https://github.com/marqo-ai/marqo/pull/372). Automatic model ejection helps prevent out-of-memory (OOM) errors on machines with a larger amount of CPU memory (16GB+). 
+- Speech processing article and example (https://github.com/marqo-ai/marqo/pull/431). [@OwenPendrighElliott](https://github.com/OwenPendrighElliott) demonstrates how you can build and query a Marqo index from audio clips. 
+
+## Optimisations 
+- Delete optimisation (https://github.com/marqo-ai/marqo/pull/436). The `/delete` endpoint can now handle a higher volume of requests.
+- Inference calls can now execute in batches, with batch size configurable by an environment variable (https://github.com/marqo-ai/marqo/pull/376).
+
+
+## Bug fixes and minor changes
+- Additional image download tests (https://github.com/marqo-ai/marqo/pull/402, https://github.com/marqo-ai/marqo/pull/442)
+- Max value validation for HNSW graph parameters (https://github.com/marqo-ai/marqo/pull/424)
+- Configurable maximum number of tensor search attributes (https://github.com/marqo-ai/marqo/pull/430)
+- Unification of vectorise output type (https://github.com/marqo-ai/marqo/pull/432)
+- Improved test pipeline reliability (https://github.com/marqo-ai/marqo/pull/438, https://github.com/marqo-ai/marqo/pull/439)
+- Minor fix iron manual example (https://github.com/marqo-ai/marqo/pull/440/files)
+- Refactored HTTP requests wrapper (https://github.com/marqo-ai/marqo/pull/367)
+
+## Contributor shout-outs
+- Thank you to our 2.8k stargazers!
+- Thank you community members raising issues and discussions in our Slack channel. 
+- Thank you [@jess-lord](https://github.com/jess-lord) and others for raising issues
+
+# Release 0.0.17 
 
 ## New features
 - New parameters that allow tweaking of Marqo indexes' underlying HNSW graph. `ef_construction` and `m`  can be defined at index time (https://github.com/marqo-ai/marqo/pull/386, https://github.com/marqo-ai/marqo/pull/420, https://github.com/marqo-ai/marqo/pull/421), giving you more control over the relevancy/speed tradeoff. See usage and more details [here](https://docs.marqo.ai/0.0.17/API-Reference/indexes/#example_1).
@@ -46,7 +72,7 @@ Check out the usage guide [here](https://docs.marqo.ai/0.0.16/API-Reference/sear
 - Thank you to [@ed-muthiah](https://github.com/ed-muthiah) for submitting a PR (https://github.com/marqo-ai/marqo/pull/349) 
 that added missing descriptions and requirement files on our [GPT-examples](https://github.com/marqo-ai/marqo/tree/mainline/examples/GPT-examples).
 
-## Release 0.0.15
+# Release 0.0.15
 
 ## New features 
 - Multimodal tensor combination (https://github.com/marqo-ai/marqo/pull/332, https://github.com/marqo-ai/marqo/pull/355). Combine image and text data into a single vector! Multimodal combination objects can be added as Marqo document fields. For example, this can be used to encode text metadata into image vectors. See usage [here](https://docs.marqo.ai/0.0.15/Advanced-Usage/document_fields/#multimodal-combination-object).
