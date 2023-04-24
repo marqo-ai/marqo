@@ -2,7 +2,7 @@
 
 ## New features
 - New E5 model type is available (https://github.com/marqo-ai/marqo/pull/419)
-- Automatic model ejection (https://github.com/marqo-ai/marqo/pull/372). Automatic model ejection helps prevent out-of-memory (OOM) errors on machines with a larger amount of CPU memory (16GB+). 
+- Automatic model ejection (https://github.com/marqo-ai/marqo/pull/372). Automatic model ejection helps prevent out-of-memory (OOM) errors on machines with a larger amount of CPU memory (16GB+) by ejecting the least recently used model. 
 - Speech processing article and example (https://github.com/marqo-ai/marqo/pull/431). [@OwenPendrighElliott](https://github.com/OwenPendrighElliott) demonstrates how you can build and query a Marqo index from audio clips. 
 
 ## Optimisations 
