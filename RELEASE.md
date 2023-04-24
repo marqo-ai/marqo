@@ -12,8 +12,8 @@
 
 ## Bug fixes and minor changes
 - Additional image download tests (https://github.com/marqo-ai/marqo/pull/402, https://github.com/marqo-ai/marqo/pull/442)
-- Max value validation for HNSW graph parameters (https://github.com/marqo-ai/marqo/pull/424)
-- Configurable maximum number of tensor search attributes (https://github.com/marqo-ai/marqo/pull/430)
+- Configurable max value validation for HNSW graph parameters (https://github.com/marqo-ai/marqo/pull/424). See [here](https://docs.marqo.ai/0.0.18/Advanced-Usage/configuration/#other-configurations) for how to configure.
+- Configurable maximum number of tensor search attributes (https://github.com/marqo-ai/marqo/pull/430). See [here](https://docs.marqo.ai/0.0.18/Advanced-Usage/configuration/#other-configurations) for how to configure.
 - Unification of vectorise output type (https://github.com/marqo-ai/marqo/pull/432)
 - Improved test pipeline reliability (https://github.com/marqo-ai/marqo/pull/438, https://github.com/marqo-ai/marqo/pull/439)
 - Minor fix iron manual example (https://github.com/marqo-ai/marqo/pull/440/files)
