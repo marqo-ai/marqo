@@ -16,7 +16,7 @@
 - Configurable maximum number of tensor search attributes (https://github.com/marqo-ai/marqo/pull/430). See [here](https://docs.marqo.ai/0.0.18/Advanced-Usage/configuration/#other-configurations) for how to configure.
 - Unification of vectorise output type (https://github.com/marqo-ai/marqo/pull/432)
 - Improved test pipeline reliability (https://github.com/marqo-ai/marqo/pull/438, https://github.com/marqo-ai/marqo/pull/439)
-- Minor fix iron manual example (https://github.com/marqo-ai/marqo/pull/440/files)
+- Minor fix iron manual example (https://github.com/marqo-ai/marqo/pull/440)
 - Refactored HTTP requests wrapper (https://github.com/marqo-ai/marqo/pull/367)
 
 ## Contributor shout-outs
