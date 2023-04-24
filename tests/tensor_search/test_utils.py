@@ -5,6 +5,7 @@ import pprint
 import unittest
 from marqo.tensor_search import utils
 from marqo.tensor_search import enums
+from marqo import errors
 from unittest import mock
 
 
@@ -151,9 +152,15 @@ class TestUtils(unittest.TestCase):
         (environment vars > defaults else None) """
         for key, mock_real_environ, default_vars, expected in [
             ("SOME_VAR", dict(), dict(), None),
+            ("SOME_INT_VAR", {"SOME_INT_VAR": ""}, dict(), None),
+            ("SOME_INT_VAR", dict(), {"SOME_INT_VAR": ""}, None),
             ("SOME_VAR", {"SOME_VAR": "1234"}, dict(), "1234"),
             ("SOME_VAR", dict(), {"SOME_VAR": "1234"}, "1234"),
             ("SOME_VAR", {"SOME_VAR": "111"}, {"SOME_VAR": "333"}, "111"),
+
+            #OK for default vals to be ints:
+            ("SOME_VAR", {"SOME_VAR": "111"}, {"SOME_VAR": 333}, "111"),
+            ("SOME_VAR", dict(), {"SOME_VAR": 1234}, 1234),
         ]:
             mock_default_env_vars = mock.MagicMock()
             mock_default_env_vars.return_value = default_vars
@@ -163,6 +170,55 @@ class TestUtils(unittest.TestCase):
             def run():
                 assert expected == utils.read_env_vars_and_defaults(var=key)
                 return True
+            assert run()
+
+    def test_read_env_vars_and_defaults_ints(self):
+        """Make sure the priority order is expected
+        (environment vars > defaults else None) """
+        for key, mock_real_environ, default_vars, expected in [
+            ("SOME_INT_VAR", dict(), dict(), None),
+            ("SOME_INT_VAR", {"SOME_INT_VAR": "1234"}, dict(), 1234),
+            ("SOME_INT_VAR", {"SOME_INT_VAR": ""}, dict(), None),
+            ("SOME_INT_VAR", dict(), {"SOME_INT_VAR": "1234"}, 1234),
+            ("SOME_INT_VAR", dict(), {"SOME_INT_VAR": ""}, None),
+            ("SOME_INT_VAR", {"SOME_INT_VAR": "111"}, {"SOME_INT_VAR": "333"}, 111),
+            ("SOME_INT_VAR", dict(), {"SOME_INT_VAR": " 123 "}, 123),
+            ("SOME_INT_VAR", {"SOME_INT_VAR": " 123 "}, dict(), 123),
+
+            # OK for default vals to be ints:
+            ("SOME_VAR", {"SOME_VAR": "111"}, {"SOME_VAR": 333}, 111),
+            ("SOME_VAR", dict(), {"SOME_VAR": 1234}, 1234),
+        ]:
+            mock_default_env_vars = mock.MagicMock()
+            mock_default_env_vars.return_value = default_vars
+
+            @mock.patch("marqo.tensor_search.configs.default_env_vars", mock_default_env_vars)
+            @mock.patch("os.environ", mock_real_environ)
+            def run():
+                result = utils.read_env_vars_and_defaults_ints(var=key)
+                assert result == expected, f"Expected {expected}, got {result}"
+                return True
+
+            assert run()
+
+    def test_read_env_vars_and_defaults_ints_invalid_values(self):
+        """Make sure a ConfigurationError is raised when the value cannot be parsed into an int."""
+        for key, mock_real_environ, default_vars in [
+            ("SOME_INT_VAR", {"SOME_INT_VAR": "not_an_int"}, dict()),
+            ("SOME_INT_VAR", {"SOME_INT_VAR": '1.3'}, dict()),
+            ("SOME_INT_VAR", dict(), {"SOME_INT_VAR": "not_an_int"}),
+            ("SOME_INT_VAR", dict(), {"SOME_INT_VAR": "4.5"}),
+        ]:
+            mock_default_env_vars = mock.MagicMock()
+            mock_default_env_vars.return_value = default_vars
+
+            @mock.patch("marqo.tensor_search.configs.default_env_vars", mock_default_env_vars)
+            @mock.patch("os.environ", mock_real_environ)
+            def run():
+                with self.assertRaises(errors.ConfigurationError):
+                    utils.read_env_vars_and_defaults_ints(var=key)
+                return True
+
             assert run()
 
     def test_parse_lexical_query(self):

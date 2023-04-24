@@ -1,8 +1,9 @@
 """The API entrypoint for Tensor Search"""
 import typing
 from fastapi.responses import JSONResponse
-from fastapi import FastAPI, Request, Depends, HTTPException
-from fastapi.exceptions import RequestValidationError
+from fastapi import Request, Depends
+import marqo.tensor_search.delete_docs
+import marqo.tensor_search.tensor_search
 from marqo.errors import InvalidArgError, MarqoWebError, MarqoError
 from fastapi import FastAPI, Query
 import json
@@ -12,7 +13,6 @@ from typing import List, Dict
 import os
 from marqo.tensor_search.models.api_models import BulkSearchQuery, SearchQuery
 from marqo.tensor_search.web import api_validation, api_utils
-from marqo.tensor_search import utils
 from marqo.tensor_search.on_start_script import on_start
 from marqo import version
 from marqo.tensor_search.backend import get_index_info

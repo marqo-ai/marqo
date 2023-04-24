@@ -7,14 +7,15 @@ from marqo.s2_inference.s2_inference import clear_loaded_models, get_model_prope
 from marqo.s2_inference.model_registry import load_model_properties, _get_open_clip_properties
 from marqo.s2_inference.s2_inference import _convert_tensor_to_numpy
 import numpy as np
+import functools
 from unittest.mock import MagicMock
 
 from marqo.s2_inference.s2_inference import (
-    _load_model,
     _check_output_type, vectorise,
     _convert_vectorized_output,
 )
-
+from marqo.s2_inference.s2_inference import _load_model as og_load_model
+_load_model = functools.partial(og_load_model, calling_func = "unit_test")
 
 class TestEncoding(unittest.TestCase):
 
@@ -88,7 +89,7 @@ class TestEncoding(unittest.TestCase):
 
         for name in names:
 
-            model = _load_model(name, model_properties=get_model_properties_from_registry(name), device=device)
+            model =  _load_model(name, model_properties=get_model_properties_from_registry(name), device=device)
 
             for text in texts:
                 assert abs(model.encode(text) - model.encode([text])).sum() < eps

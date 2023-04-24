@@ -9,6 +9,7 @@ from marqo.tensor_search import enums, configs
 from typing import (
     List, Optional, Union, Callable, Iterable, Sequence, Dict, Tuple
 )
+from marqo.marqo_logging import logger
 import copy
 import datetime
 import pathlib
@@ -175,18 +176,50 @@ def read_env_vars_and_defaults(var: str) -> Optional[str]:
     """Attempts to read an environment variable.
     If none is found, it will attempt to retrieve it from
     configs.default_env_vars(). If still unsuccessful, None is returned.
+    If it's an empty string, None is returned.
     """
-    try:
-        var = os.environ[var]
-        if var is not None and len(var) == 0:
+
+    def none_if_empty(value: Optional[str]) -> Optional[str]:
+        """Returns None if value is an empty string"""
+        if value is not None and len(value) == 0:
             return None
         else:
-            return var
+            return value
+
+    try:
+        return none_if_empty(os.environ[var])
     except KeyError:
         try:
-            return configs.default_env_vars()[var]
+            default_val = configs.default_env_vars()[var]
+            if isinstance(default_val, str):
+                return none_if_empty(default_val)
+            else:
+                return default_val
         except KeyError:
             return None
+
+
+def read_env_vars_and_defaults_ints(var: str) -> Optional[int]:
+    """Gets env var from read_env_vars_and_defaults() and attempts to coerce it to an int
+
+    Returns
+        the coerced int value, or None if the key is not found.
+    """
+    str_val = read_env_vars_and_defaults(var)
+
+    if str_val is None:
+        return None
+
+    validation_error_msg = (
+        f"Could not properly read env var `{var}`. `{var}` must be able to be parsed as an int."
+    )
+    try:
+        as_int = int(str_val)
+    except (ValueError, TypeError) as e:
+        value_error_msg = f"`{validation_error_msg} Current value: `{str_val}`. Reason: {e}"
+        logger.error(value_error_msg)
+        raise errors.ConfigurationError(value_error_msg)
+    return as_int
 
 
 def parse_lexical_query(text: str) -> Tuple[List[str], str]:

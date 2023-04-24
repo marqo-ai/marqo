@@ -76,3 +76,25 @@ class TestConfig(MarqoTestCase):
 
     def test_device_for_clip(self):
         assert str(enums.Device.cpu) == "cpu"
+
+
+class TestConfigBackend(MarqoTestCase):
+
+    def setUp(self) -> None:
+        self.endpoint = self.authorized_url
+
+    class CustomSearchDb:
+        opensearch = "opensearch"
+        elasticsearch = "elasticsearch"
+
+    def test_init_default_backend(self):
+        c = config.Config(url=self.endpoint)
+        assert c.backend == enums.SearchDb.opensearch
+
+    def test_init_custom_backend(self):
+        c = config.Config(url=self.endpoint, backend=self.CustomSearchDb.elasticsearch)
+        assert c.backend == "elasticsearch"
+
+    def test_init_custom_backend_as_string(self):
+        c = config.Config(url=self.endpoint, backend="elasticsearch")
+        assert c.backend == "elasticsearch"

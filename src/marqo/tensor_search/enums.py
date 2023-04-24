@@ -101,8 +101,13 @@ class EnvVars:
     MARQO_ENABLE_THROTTLING = "MARQO_ENABLE_THROTTLING"
     MARQO_LOG_LEVEL = "MARQO_LOG_LEVEL"
     MARQO_ROOT_PATH = "MARQO_ROOT_PATH"
+    MARQO_MAX_CPU_MODEL_MEMORY = "MARQO_MAX_CPU_MODEL_MEMORY"
+    MARQO_MAX_CUDA_MODEL_MEMORY = "MARQO_MAX_CUDA_MODEL_MEMORY"
     MARQO_EF_CONSTRUCTION_MAX_VALUE = "MARQO_EF_CONSTRUCTION_MAX_VALUE"
     MARQO_MAX_VECTORISE_BATCH_SIZE = "MARQO_MAX_VECTORISE_BATCH_SIZE"
+    MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES = "MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES"
+    MARQO_MAX_DELETE_DOCS_COUNT = "MARQO_MAX_DELETE_DOCS_COUNT"
+
 
 class RequestType:
     INDEX = "INDEX"
@@ -113,6 +118,16 @@ class RequestType:
 
 class MappingsObjectType:
     multimodal_combination = "multimodal_combination"
+
+
+class SearchDb:
+    opensearch = 'opensearch'
+
+
+class AvailableModelsKey:
+    model = "model"
+    most_recently_used_time = "most_recently_used_time"
+    model_size = "model_size"
 
 
 # Perhaps create a ThrottleType to differentiate thread_count and data_size throttling mechanisms

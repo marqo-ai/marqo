@@ -3,6 +3,8 @@ from marqo.s2_inference import random_utils, s2_inference
 import unittest
 from unittest import mock
 from marqo.errors import ConfigurationError
+from marqo.tensor_search.enums import AvailableModelsKey
+import datetime
 
 
 class TestVectorise(unittest.TestCase):
@@ -29,7 +31,9 @@ class TestVectorise(unittest.TestCase):
             s2_inference._create_model_cache_key(
                 model_name='mock_model', device='cpu',
                 model_properties=mock_model_props
-            ): mock_model
+            ): {AvailableModelsKey.model:mock_model,
+                AvailableModelsKey.model_size: 1,
+                AvailableModelsKey.most_recently_used_time: datetime.datetime.now(),}
         }
 
         @mock.patch('marqo.s2_inference.s2_inference.available_models', mock_available_models)
@@ -62,7 +66,9 @@ class TestVectorise(unittest.TestCase):
             s2_inference._create_model_cache_key(
                 model_name='mock_model', device='cpu',
                 model_properties=mock_model_props
-            ): mock_model
+            ): {AvailableModelsKey.model:mock_model,
+                AvailableModelsKey.model_size: 1,
+                AvailableModelsKey.most_recently_used_time: datetime.datetime.now(),}
         }
 
         @mock.patch('marqo.s2_inference.s2_inference.available_models', mock_available_models)
@@ -98,7 +104,9 @@ class TestVectorise(unittest.TestCase):
             s2_inference._create_model_cache_key(
                 model_name='mock_model', device='cpu',
                 model_properties=mock_model_props
-            ): mock_model
+            ): {AvailableModelsKey.model:mock_model,
+                AvailableModelsKey.model_size: 1,
+                AvailableModelsKey.most_recently_used_time: datetime.datetime.now(),}
         }
 
         content_list = ['content1', 'content2', 'content3', 'content4', 'content5']
@@ -155,7 +163,9 @@ class TestVectorise(unittest.TestCase):
             s2_inference._create_model_cache_key(
                 model_name='mock_model', device='cpu',
                 model_properties=mock_model_props
-            ): mock_model
+            ): {AvailableModelsKey.model:mock_model,
+                AvailableModelsKey.model_size: 1,
+                AvailableModelsKey.most_recently_used_time: datetime.datetime.now(),}
         }
 
         content_list = ['content1', 'content2', 'content3', 'content4', 'content5']
@@ -212,7 +222,9 @@ class TestVectoriseBatching(unittest.TestCase):
             s2_inference._create_model_cache_key(
                 model_name='mock_model', device='cpu',
                 model_properties=self.mock_model_props
-            ): self.mock_model
+            ): {AvailableModelsKey.model: self.mock_model,
+                AvailableModelsKey.model_size: 1,
+                AvailableModelsKey.most_recently_used_time: datetime.datetime.now(),}
         }
 
         self.content_list = ['content1', 'content2', 'content3', 'content4', 'content5']

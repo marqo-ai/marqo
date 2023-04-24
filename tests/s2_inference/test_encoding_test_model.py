@@ -5,12 +5,13 @@ from marqo.s2_inference.s2_inference import (
     _convert_vectorized_output, 
     available_models,
     clear_loaded_models,
-    _load_model,
     get_model_properties_from_registry
     )
-
 from torch import FloatTensor
 import numpy as np
+import functools
+from marqo.s2_inference.s2_inference import _load_model as og_load_model
+_load_model = functools.partial(og_load_model, calling_func = "unit_test")
 
 class TestTestModelOutputs(unittest.TestCase):
 

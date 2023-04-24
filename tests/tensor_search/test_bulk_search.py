@@ -1,4 +1,5 @@
 import copy
+import os
 import math
 import requests
 import random
@@ -21,7 +22,7 @@ import pydantic
 
 def pass_through_vectorise(*arg, **kwargs):
     """Vectorise will behave as usual, but we will be able to see the call list
-    via mock
+     via mock
     """
     return vectorise(*arg, **kwargs)
 
@@ -58,6 +59,79 @@ class TestBulkSearch(MarqoTestCase):
                 "q": "title about some doc",
                 "parameter-not-expected": 1,
             }]))
+
+    @mock.patch('os.environ', {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': '0'}})
+    def test_bulk_search_with_excessive_searchable_attributes(self):
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=[
+                {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "id1-first"},
+                {"abc": "random text", "other field": "Close match hehehe", "_id": "id1-second"},
+            ], auto_refresh=True
+        ) 
+        with self.assertRaises(pydantic.ValidationError):
+            api.bulk_search(BulkSearchQuery(queries=[{
+                "index": self.index_name_1,
+                "q": "title about some doc",
+                "parameter-not-expected": 1,
+                "searchableAttributes": ["abc"]
+            }]), marqo_config=self.config)
+    
+    @mock.patch('os.environ', {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': '100'}})
+    def test_bulk_search_with_max_searchable_attributes_no_searchable_attributes_field(self):
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=[
+                {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "id1-first"},
+                {"abc": "random text", "other field": "Close match hehehe", "_id": "id1-second"},
+            ], auto_refresh=True
+        ) 
+        with self.assertRaises(InvalidArgError):
+            api.bulk_search(BulkSearchQuery(queries=[{
+                "index": self.index_name_1,
+                "q": "title about some doc",
+            }]), marqo_config=self.config)
+
+    @mock.patch('os.environ', {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': '1'}})
+    def test_bulk_search_with_excessive_searchable_attributes(self):
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=[
+                {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "id1-first"},
+                {"abc": "random text", "other field": "Close match hehehe", "_id": "id1-second"},
+            ], auto_refresh=True
+        ) 
+        with self.assertRaises(InvalidArgError):
+            api.bulk_search(BulkSearchQuery(queries=[{
+                "index": self.index_name_1,
+                "q": "title about some doc",
+                "searchableAttributes": ["abc", "other field"]
+            }]), marqo_config=self.config)
+
+    @mock.patch('os.environ', {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': None}})
+    def test_bulk_search_with_no_max_searchable_attributes(self):
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=[
+                {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "id1-first"},
+                {"abc": "random text", "other field": "Close match hehehe", "_id": "id1-second"},
+            ], auto_refresh=True
+        ) 
+        api.bulk_search(BulkSearchQuery(queries=[{
+            "index": self.index_name_1,
+            "q": "title about some doc",
+            "searchableAttributes": ["abc", "other field"]
+        }]), marqo_config=self.config, device="cpu")
+
+    @mock.patch('os.environ', {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': None}})
+    def test_bulk_search_with_no_max_searchable_attributes_no_searchable_attributes_field(self):
+        tensor_search.add_documents(
+            config=self.config, index_name=self.index_name_1, docs=[
+                {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "id1-first"},
+                {"abc": "random text", "other field": "Close match hehehe", "_id": "id1-second"},
+            ], auto_refresh=True
+        ) 
+        api.bulk_search(BulkSearchQuery(queries=[{
+            "index": self.index_name_1,
+            "q": "title about some doc",
+        }]), marqo_config=self.config, device="cpu")
+
 
     def test_bulk_search_no_queries_return_early(self):
         tensor_search.add_documents(
@@ -1421,7 +1495,7 @@ class TestBulkSearch(MarqoTestCase):
                         searchMethod=SearchMethod.TENSOR,
                     ) for q in qs]
                 ))
-                raise AssertionError(f"Invalid query {q} did not raise error")
+                raise AssertionError(f"Invalid query {qs} did not raise error")
             except (InvalidArgError, BadRequestError) as e:
                 pass
 

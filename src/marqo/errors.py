@@ -110,6 +110,9 @@ class IndexAlreadyExistsError(__InvalidRequestError):
     code = "index_already_exists"
     status_code = HTTPStatus.CONFLICT
 
+class ModelCacheManagementError(__InvalidRequestError):
+    code = "model_cache_management_error"
+    status_code = HTTPStatus.CONFLICT
 
 class IndexNotFoundError(__InvalidRequestError):
     code = "index_not_found"
@@ -179,6 +182,7 @@ class IndexMaxFieldsError(__InvalidRequestError):
 class ModelNotInCacheError(__InvalidRequestError):
     code = "model_not_in_cache"
     status_code = HTTPStatus.NOT_FOUND
+
 
 # ---MARQO INTERNAL ERROR---
 

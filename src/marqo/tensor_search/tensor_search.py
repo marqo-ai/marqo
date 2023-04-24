@@ -32,17 +32,17 @@ Notes on search behaviour with caching and searchable attributes:
 """
 import copy
 import json
-import datetime
 from collections import defaultdict
 from timeit import default_timer as timer
 import functools
 import pprint
 import typing
 import uuid
-from typing import List, Optional, Union, Iterable, Sequence, Dict, Any, Tuple, Set
+from typing import List, Optional, Union, Iterable, Sequence, Dict, Any, Tuple
 import numpy as np
 from PIL import Image
 import marqo.config as config
+from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest
 from marqo.tensor_search.enums import (
     MediaType, MlModel, TensorField, SearchMethod, OpenSearchDataType,
     EnvVars
@@ -56,6 +56,7 @@ from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQue
 from marqo.tensor_search.models.search import VectorisedJobs, VectorisedJobPointer, Qidx, JHash
 from marqo.tensor_search.models.index_info import IndexInfo
 from marqo.tensor_search.utils import add_timing
+from marqo.tensor_search import delete_docs
 from marqo.s2_inference.processing import text as text_processor
 from marqo.s2_inference.processing import image as image_processor
 from marqo.s2_inference.clip_utils import _is_image
@@ -959,41 +960,6 @@ def _get_documents_for_upsert(
     return res
 
 
-def delete_documents(config: Config, index_name: str, doc_ids: List[str], auto_refresh):
-    """Deletes documents """
-    if not doc_ids:
-        raise errors.InvalidDocumentIdError("doc_ids can't be empty!")
-
-    for _id in doc_ids:
-        validation.validate_id(_id)
-
-    # TODO: change to timer()
-    t0 = datetime.datetime.utcnow()
-    delete_res_backend = HttpRequests(config=config).post(
-        path=f"{index_name}/_delete_by_query", body={
-            "query": {
-                "terms": {
-                    "_id": doc_ids
-                }
-            }
-        }
-    )
-    if auto_refresh:
-        refresh_response = HttpRequests(config).post(path=F"{index_name}/_refresh")
-    t1 = datetime.datetime.utcnow()
-    delete_res = {
-        "index_name": index_name, "status": "succeeded",
-        "type": "documentDeletion", "details": {
-            "receivedDocumentIds": len(doc_ids),
-            "deletedDocuments": delete_res_backend["deleted"],
-        },
-        "duration": utils.create_duration_string(t1 - t0),
-        "startedAt": utils.format_timestamp(t0),
-        "finishedAt": utils.format_timestamp(t1),
-    }
-    return delete_res
-
-
 def refresh_index(config: Config, index_name: str):
     return HttpRequests(config).post(path=F"{index_name}/_refresh")
 
@@ -1014,6 +980,8 @@ def bulk_search(query: BulkSearchQuery, marqo_config: config.Config, verbose: bo
           - A single error (e.g. validation errors) on any one of the search queries returns an error and does not
             process non-erroring queries.
     """
+    refresh_indexes_in_background(marqo_config, [q.index for q in query.queries])
+
     # TODO: Let non-errored docs to propagate.
     errs = [validation.validate_bulk_query_input(q) for q in query.queries]
     if any(errs):
@@ -1022,8 +990,6 @@ def bulk_search(query: BulkSearchQuery, marqo_config: config.Config, verbose: bo
 
     if len(query.queries) == 0:
         return {"result": []}
-
-    refresh_indexes_in_background(marqo_config, [q.index for q in query.queries])
 
     selected_device = marqo_config.indexing_device if device is None else device
 
@@ -1154,6 +1120,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
 
     t0 = timer()
     validation.validate_boost(boost=boost, search_method=search_method)
+    validation.validate_searchable_attributes(searchable_attributes=searchable_attributes, search_method=search_method)
     if searchable_attributes is not None:
         [validation.validate_field_name(attribute) for attribute in searchable_attributes]
     if attributes_to_retrieve is not None:
@@ -2594,3 +2561,14 @@ def _create_score_modifiers_tensor_search_query(result_count, offset, vector_fie
         }
     }
     return search_query
+
+
+def delete_documents(config: Config, index_name: str, doc_ids: List[str], auto_refresh):
+    """Delete documents from the Marqo index with the given doc_ids """
+    return delete_docs.delete_documents(
+        config=config,
+        del_request=MqDeleteDocsRequest(
+            index_name=index_name,
+            document_ids=doc_ids,
+            auto_refresh=auto_refresh)
+    )
