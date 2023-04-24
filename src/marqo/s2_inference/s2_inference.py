@@ -235,7 +235,7 @@ def _validate_model_into_device(model_name:str, model_properties: dict, device: 
             del available_models[key]
             if _check_memory_threshold_for_model(device, model_size, calling_func = _validate_model_into_device.__name__):
                 logger.info("Marqo eject enough models to load the target model. We wait for 5 seconds to release the memory.")
-                gc.collect()
+                # gc.collect()
                 time.sleep(5)
                 return True
 
