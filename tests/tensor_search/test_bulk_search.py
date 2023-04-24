@@ -22,7 +22,7 @@ import pydantic
 
 def pass_through_vectorise(*arg, **kwargs):
     """Vectorise will behave as usual, but we will be able to see the call list
-    via mock
+     via mock
     """
     return vectorise(*arg, **kwargs)
 
