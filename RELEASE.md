@@ -10,11 +10,11 @@
 - Inference calls can now execute in batches, with batch size configurable by an environment variable (https://github.com/marqo-ai/marqo/pull/376).
 
 ## Bug fixes and minor changes
-- Additional image download tests (https://github.com/marqo-ai/marqo/pull/402, https://github.com/marqo-ai/marqo/pull/442)
 - Configurable max value validation for HNSW graph parameters (https://github.com/marqo-ai/marqo/pull/424). See [here](https://docs.marqo.ai/0.0.18/Advanced-Usage/configuration/#other-configurations) for how to configure.
 - Configurable maximum number of tensor search attributes (https://github.com/marqo-ai/marqo/pull/430). See [here](https://docs.marqo.ai/0.0.18/Advanced-Usage/configuration/#other-configurations) for how to configure.
 - Unification of vectorise output type (https://github.com/marqo-ai/marqo/pull/432)
 - Improved test pipeline reliability (https://github.com/marqo-ai/marqo/pull/438, https://github.com/marqo-ai/marqo/pull/439)
+- Additional image download tests (https://github.com/marqo-ai/marqo/pull/402, https://github.com/marqo-ai/marqo/pull/442)
 - Minor fix in the Iron Manual example (https://github.com/marqo-ai/marqo/pull/440)
 - Refactored HTTP requests wrapper (https://github.com/marqo-ai/marqo/pull/367)
 
