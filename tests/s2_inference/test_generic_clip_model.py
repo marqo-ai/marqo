@@ -9,7 +9,7 @@ from marqo.s2_inference.s2_inference import (
     vectorise,
     _validate_model_properties
 )
-
+from pprint import pprint
 from tests.marqo_test import MarqoTestCase
 
 
@@ -18,22 +18,23 @@ class TestGenericModelSupport(MarqoTestCase):
     def setUp(self):
         self.index_name_1 = "my-test-index-1"
         self.index_name_2 = "my-test-index-2"
-        try:
-            tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
-        except IndexNotFoundError as e:
-            pass
+        # try:
+        #     tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+        # except IndexNotFoundError as e:
+        #     pass
 
 
     def tearDown(self) -> None:
-        try:
-            tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
-        except IndexNotFoundError as e:
-            pass
-        try:
-            tensor_search.delete_index(config=self.config, index_name=self.index_name_2)
-        except IndexNotFoundError as e:
-            pass
-        clear_loaded_models()
+        # try:
+        #     tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+        # except IndexNotFoundError as e:
+        #     pass
+        # try:
+        #     tensor_search.delete_index(config=self.config, index_name=self.index_name_2)
+        # except IndexNotFoundError as e:
+        #     pass
+        # clear_loaded_models()
+        pass
 
 
     def test_create_index_and_add_documents_with_generic_open_clip_model_properties_url(self):
@@ -476,5 +477,76 @@ class TestGenericModelSupport(MarqoTestCase):
 
         assert np.abs(np.array(a) - np.array(b)).sum() > epsilon
 
+
+    def test_authentication(self):
+
+        epsilon = 1e-7
+
+        image = "https://raw.githubusercontent.com/marqo-ai/marqo-clip-onnx/main/examples/coco.jpg"
+
+        model_name = "test-model"
+        model_properties = {
+                            "name": "ViT-B-32-quickgelu",
+                            "dimensions": 512,
+                            "model_location":{"hf":{
+                                "repo_id": "Marqo/test-private",
+                                "filename": "dummy_model.pt",
+                            }
+                            },
+
+                            "authentication": {
+                                "hf": {"token": "********************"}
+                            },
+                            "type": "open_clip",
+                            "jit" : False
+                            }
+
+        a = vectorise(model_name, content = image, model_properties = model_properties)
+        b = vectorise("open_clip/ViT-B-32-quickgelu/laion400m_e31", content = image)
+
+        assert np.abs(np.array(a) - np.array(b)).sum() < epsilon
+
+    def test_generic_clip_model_settings(self):
+        try:
+            tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+        except IndexNotFoundError:
+            pass
+
+        model_name = "dummy_model"
+        model_properties = {
+                            "name": "ViT-B-32-quickgelu",
+                            "dimensions": 512,
+                            "model_location":
+                                {
+                                    "hf":{
+                                        "repo_id": "Marqo/test-private",
+                                        "filename": "dummy_model.pt",
+                                         }
+                                },
+
+                            "authentication": {
+                                "hf": {"token": "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"}
+                            },
+                            "type": "open_clip",
+                            "jit" : False
+                            }
+
+        tensor_search.create_vector_index(
+            index_name=self.index_name_1, config=self.config,
+            index_settings={
+                "index_defaults": {
+                    'model': model_name,
+                    'model_properties': model_properties
+                }
+            }
+        )
+
+        pprint(tensor_search.get_index_info(config=self.config, index_name=self.index_name_1).index_settings)
+        pprint(tensor_search.get_index_info(config=self.config, index_name=self.index_name_1).index_meta_data)
+
+        # tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs = [{
+        #         "_id": "123",
+        #         "title 1": "what is this?",
+        #     }], auto_refresh=True)
 
 

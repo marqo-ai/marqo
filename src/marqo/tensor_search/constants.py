@@ -17,3 +17,7 @@ ALLOWED_CUSTOMER_FIELD_TYPES = [str, int, float, bool, list, dict]
 NON_TENSORISABLE_FIELD_TYPES = [int, float, bool, list]
 
 ALLOWED_MULTIMODAL_FIELD_TYPES = [str]
+
+INDEX_SETTINGS_TO_HIDE = ["index_defaults.model_properties.authentication.hf.token"]
+
+MARQO_ENCRYPTION_SALT = b"marqo-encryption-salt"

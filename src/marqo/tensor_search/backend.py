@@ -55,7 +55,7 @@ def get_index_info(config: Config, index_name: str) -> IndexInfo:
     index_properties = res[index_name]["mappings"]["properties"]
 
     index_info = IndexInfo(model_name=model_name, properties=index_properties,
-                           index_settings=index_settings)
+                           index_settings=index_settings, index_meta_data=get_cache()[index_name].index_meta_data)
     get_cache()[index_name] = index_info
     return index_info
 

@@ -13,9 +13,11 @@ class IndexInfo(NamedTuple):
     model_name: str
     properties: dict
     index_settings: dict
+    index_meta_data: dict
 
     def get_index_settings(self) -> dict:
-        return self.index_settings.copy()
+        # return self.index_settings.copy()
+        return self.index_meta_data.copy()
 
     def get_vector_properties(self) -> dict:
         """returns a dict containing only names and properties of vector fields

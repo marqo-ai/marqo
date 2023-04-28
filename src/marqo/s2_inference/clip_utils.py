@@ -15,7 +15,7 @@ from marqo.s2_inference.types import *
 from marqo.s2_inference.logger import get_logger
 from marqo.s2_inference.errors import IncompatibleModelDeviceError, InvalidModelPropertiesError
 from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize
-from marqo.s2_inference.processing.custom_clip_utils import HFTokenizer, download_pretrained_from_url
+from marqo.s2_inference.processing.custom_clip_utils import HFTokenizer, download_pretrained_from_url, download_pretrained_from_dict
 from torchvision.transforms import InterpolationMode
 from marqo.s2_inference.configs import ModelCache
 
@@ -354,9 +354,10 @@ class OPEN_CLIP(CLIP):
 
     def load(self) -> None:
         # https://github.com/mlfoundations/open_clip
-        path = self.model_properties.get("localpath", None) or self.model_properties.get("url", None)
+        # Note that the model_properties are already validation. Only one of the following entries can be present.
+        model_location = self.model_properties.get("localpath", None) or self.model_properties.get("url", None) or self.model_properties.get("model_location", None)
 
-        if path is None:
+        if model_location  is None:
             self.model, _, self.preprocess = open_clip.create_model_and_transforms(self.model_name,
                                                                                    pretrained=self.pretrained,
                                                                                    device=self.device, jit=False, cache_dir=ModelCache.clip_cache_path)
@@ -364,13 +365,16 @@ class OPEN_CLIP(CLIP):
             self.model.eval()
         else:
             logger.info("Detecting custom clip model path. We use generic clip model loading.")
-            if os.path.isfile(path):
-                self.model_path = path
-            elif validators.url(path):
-                self.model_path = download_pretrained_from_url(path)
+            if isinstance(model_location , str):
+                if os.path.isfile(model_location ):
+                    self.model_path = model_location
+                elif validators.url(model_location ):
+                    self.model_path = download_pretrained_from_url(model_location )
+            elif isinstance(model_location , dict):
+                self.model_path = download_pretrained_from_dict(model_location, self.model_properties["authentication"])
             else:
                 raise InvalidModelPropertiesError(f"Marqo can not load the custom clip model."
-                                                  f"The provided model path `{path}` is neither a local file nor a valid url."
+                                                  f"The provided model path `{model_location}` is neither a local file nor a valid url."
                                                   f"Please check your provided model url and retry."
                                                   f"Check `https://docs.marqo.ai/0.0.13/Models-Reference/dense_retrieval/#generic-clip-models` for more info.")
 

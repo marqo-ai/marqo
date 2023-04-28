@@ -7,6 +7,7 @@ import os
 import urllib
 from tqdm import tqdm
 from marqo.s2_inference.configs import ModelCache
+from huggingface_hub import hf_hub_download
 
 
 def whitespace_clean(text):
@@ -70,5 +71,17 @@ def download_pretrained_from_url(
 
                 output.write(buffer)
                 loop.update(len(buffer))
+
+    return download_target
+
+def download_pretrained_from_dict(model_location: dict, authentication: dict):
+    # TODO finish this for s3
+    print(model_location)
+    if "hf" in model_location:
+        download_target = hf_hub_download(**model_location["hf"], token=authentication["hf"]["token"], cache_dir=ModelCache.clip_cache_path)
+    elif "s3" in model_location:
+        pass
+    else:
+        raise ValueError("Invalid model location")
 
     return download_target

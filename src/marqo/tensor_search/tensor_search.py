@@ -64,6 +64,7 @@ from marqo.s2_inference.reranking import rerank
 from marqo.s2_inference import s2_inference
 import torch.cuda
 import psutil
+from marqo.tensor_search.constants import INDEX_SETTINGS_TO_HIDE
 # We depend on _httprequests.py for now, but this may be replaced in the future, as
 # _httprequests.py is designed for the client
 from marqo._httprequests import HttpRequests
@@ -94,6 +95,8 @@ def create_vector_index(
         the_index_settings = configs.get_default_index_settings()
 
     validation.validate_settings_object(settings_object=the_index_settings)
+
+    the_index_settings, index_meta_data = split_index_settings_and_meta_data(the_index_settings)
 
     vector_index_settings = {
         "settings": {
@@ -149,7 +152,7 @@ def create_vector_index(
 
     get_cache()[index_name] = IndexInfo(
         model_name=model_name, properties=vector_index_settings["mappings"]["properties"].copy(),
-        index_settings=the_index_settings
+        index_settings=the_index_settings, index_meta_data = index_meta_data,
     )
     return response
 
@@ -2572,3 +2575,55 @@ def delete_documents(config: Config, index_name: str, doc_ids: List[str], auto_r
             document_ids=doc_ids,
             auto_refresh=auto_refresh)
     )
+
+
+def split_index_settings_and_meta_data(validated_index_settings: dict):
+    '''
+    This function splits the validated index settings to two parts: index settings and meta data.
+    index_settings will be visible to the users
+    meta data will be hidden from the users and encryption may be needed
+    Args:
+        validated_index_settings: A dictionary containing the validated index settings.
+
+    Returns:
+        A tuple of two dictionaries: index_settings and index_meta_data.
+    '''
+    # TODO do we still need index_meata_data if the field is encrypted?
+    index_meta_data = dict()
+
+    for hidden_field in INDEX_SETTINGS_TO_HIDE:
+        hidden_field_list = hidden_field.split('.')
+        if hidden_field_list[0] in validated_index_settings:
+            # Get the value of the hidden field
+            hidden_field_value = validated_index_settings
+            for field_name in hidden_field_list:
+                hidden_field_value = hidden_field_value.get(field_name)
+                if hidden_field_value is None:
+                    break
+            # If the value is not None, remove the field from the validated_index_settings and store it in index_meta_data
+            if hidden_field_value is not None:
+                current_dict = index_meta_data
+                for field_name in hidden_field_list[:-1]:
+                    if field_name not in current_dict:
+                        current_dict[field_name] = {}
+                    current_dict = current_dict[field_name]
+                current_dict[hidden_field_list[-1]] = hidden_field_value
+                del_field_dict(validated_index_settings, hidden_field_list)
+
+    return validated_index_settings, index_meta_data
+
+
+def del_field_dict(d: dict, keys: list) -> None:
+    """
+    This function deletes a field from a nested dictionary based on a list of keys representing the path to the field.
+    Args:
+        d: A nested dictionary.
+        keys: A list of strings representing the path to the field.
+
+    Returns:
+        None
+    """
+    for key in keys[:-1]:
+        d = d[key]
+    del d[keys[-1]]
+
