@@ -64,6 +64,7 @@ from marqo.s2_inference.reranking import rerank
 from marqo.s2_inference import s2_inference
 import torch.cuda
 import psutil
+from marqo.encryption import encrypt_string
 from marqo.tensor_search.constants import INDEX_SETTINGS_TO_HIDE
 # We depend on _httprequests.py for now, but this may be replaced in the future, as
 # _httprequests.py is designed for the client
@@ -2591,8 +2592,8 @@ def split_index_settings_and_meta_data(validated_index_settings: dict):
     # TODO do we still need index_meata_data if the field is encrypted?
     index_meta_data = dict()
 
-    for hidden_field in INDEX_SETTINGS_TO_HIDE:
-        hidden_field_list = hidden_field.split('.')
+    for hidden_field_object in INDEX_SETTINGS_TO_HIDE:
+        hidden_field_list = hidden_field_object["field_name"].split('.')
         if hidden_field_list[0] in validated_index_settings:
             # Get the value of the hidden field
             hidden_field_value = validated_index_settings
@@ -2607,7 +2608,7 @@ def split_index_settings_and_meta_data(validated_index_settings: dict):
                     if field_name not in current_dict:
                         current_dict[field_name] = {}
                     current_dict = current_dict[field_name]
-                current_dict[hidden_field_list[-1]] = hidden_field_value
+                current_dict[hidden_field_list[-1]] = encrypt_string(hidden_field_value)
                 del_field_dict(validated_index_settings, hidden_field_list)
 
     return validated_index_settings, index_meta_data

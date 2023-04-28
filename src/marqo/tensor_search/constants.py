@@ -18,6 +18,8 @@ NON_TENSORISABLE_FIELD_TYPES = [int, float, bool, list]
 
 ALLOWED_MULTIMODAL_FIELD_TYPES = [str]
 
-INDEX_SETTINGS_TO_HIDE = ["index_defaults.model_properties.authentication.hf.token"]
+INDEX_SETTINGS_TO_HIDE = [
+    {"field_name": "index_defaults.model_properties.authentication.hf.token", "encryption": True},
+]
 
 MARQO_ENCRYPTION_SALT = b"marqo-encryption-salt"
