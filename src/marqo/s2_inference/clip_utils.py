@@ -346,11 +346,12 @@ class FP16_CLIP(CLIP):
 
 
 class OPEN_CLIP(CLIP):
-    def __init__(self, model_type: str = "open_clip/ViT-B-32-quickgelu/laion400m_e32", device: str = 'cpu',  embedding_dim: int = None,
-                            truncate: bool = True, **kwargs) -> None:
+    def __init__(self, model_type: str = "open_clip/ViT-B-32-quickgelu/laion400m_e32", device: str = 'cpu',
+                 embedding_dim: int = None, truncate: bool = True, authentication: dict = dict(), **kwargs) -> None:
         super().__init__(model_type, device,  embedding_dim, truncate , **kwargs)
         self.model_name = model_type.split("/", 3)[1] if model_type.startswith("open_clip/") else model_type
         self.pretrained = model_type.split("/", 3)[2] if model_type.startswith("open_clip/") else model_type
+        self.authentication = authentication
 
     def load(self) -> None:
         # https://github.com/mlfoundations/open_clip
@@ -371,7 +372,7 @@ class OPEN_CLIP(CLIP):
                 elif validators.url(model_location ):
                     self.model_path = download_pretrained_from_url(model_location )
             elif isinstance(model_location , dict):
-                self.model_path = download_pretrained_from_dict(model_location, self.model_properties["authentication"])
+                self.model_path = download_pretrained_from_dict(model_location, self.authentication)
             else:
                 raise InvalidModelPropertiesError(f"Marqo can not load the custom clip model."
                                                   f"The provided model path `{model_location}` is neither a local file nor a valid url."

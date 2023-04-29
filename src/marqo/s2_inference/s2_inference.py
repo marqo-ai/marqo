@@ -34,7 +34,7 @@ MODEL_PROPERTIES = load_model_properties()
 
 def vectorise(model_name: str, content: Union[str, List[str]], model_properties: dict = None,
               device: str = get_default_device(), normalize_embeddings: bool = get_default_normalization(),
-              **kwargs) -> List[List[float]]:
+              authentication: dict = dict(), **kwargs) -> List[List[float]]:
     """vectorizes the content by model name
 
     Args:
@@ -56,7 +56,8 @@ def vectorise(model_name: str, content: Union[str, List[str]], model_properties:
     validated_model_properties = _validate_model_properties(model_name, model_properties)
     model_cache_key = _create_model_cache_key(model_name, device, validated_model_properties)
 
-    _update_available_models(model_cache_key, model_name, validated_model_properties, device, normalize_embeddings)
+    _update_available_models(model_cache_key, model_name, validated_model_properties, device, normalize_embeddings,
+                             authentication)
 
     try:
         if isinstance(content, str):
@@ -125,8 +126,7 @@ def _create_model_cache_key(model_name: str, device: str, model_properties: dict
 
 
 def _update_available_models(model_cache_key: str, model_name: str, validated_model_properties: dict,
-                             device: str,
-                             normalize_embeddings: bool) -> None:
+                             device: str, normalize_embeddings: bool, authentication:dict) -> None:
     """loads the model if it is not already loaded.
     Note this method assume the model_properties are validated.
     """
@@ -145,6 +145,7 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
                 available_models[model_cache_key] = {AvailableModelsKey.model: _load_model(model_name,
                                                                                            validated_model_properties,
                                                                                            device=device,
+                                                                                           authentication=authentication,
                                                                                            calling_func = _update_available_models.__name__),
                                                      AvailableModelsKey.most_recently_used_time: most_recently_used_time,
                                                      AvailableModelsKey.model_size: model_size}
@@ -300,7 +301,8 @@ def get_model_size(model_name: str, model_properties: dict) -> (int, float):
     return constants.MODEL_TYPE_SIZE_MAPPING.get(type, constants.DEFAULT_MODEL_SIZE)
 
 
-def _load_model(model_name: str, model_properties: dict, device: Optional[str] = None, calling_func: str = None) -> Any:
+def _load_model(model_name: str, model_properties: dict, device: Optional[str] = None, authentication:dict = dict(),
+                calling_func: str = None) -> Any:
     """_summary_
 
     Args:
@@ -322,7 +324,7 @@ def _load_model(model_name: str, model_properties: dict, device: Optional[str] =
     max_sequence_length = model_properties.get('tokens', get_default_seq_length())
 
     model = loader(model_properties['name'], device=device, embedding_dim=model_properties['dimensions'],
-                   max_seq_length=max_sequence_length, model_properties=model_properties)
+                   max_seq_length=max_sequence_length, model_properties=model_properties, authentication=authentication)
 
     model.load()
 

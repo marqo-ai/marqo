@@ -16,7 +16,9 @@ class IndexInfo(NamedTuple):
     index_meta_data: dict
 
     def get_index_settings(self) -> dict:
-        # return self.index_settings.copy()
+        return self.index_settings.copy()
+
+    def get_index_meta_data(self) -> dict:
         return self.index_meta_data.copy()
 
     def get_vector_properties(self) -> dict:

@@ -629,7 +629,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                         model_name=index_info.model_name,
                         model_properties=_get_model_properties(index_info), content=content_chunks,
                         device=selected_device, normalize_embeddings=normalize_embeddings,
-                        infer=infer_if_image)
+                        infer=infer_if_image, authentication = _get_model_authentication_token(index_info))
 
                     end_time = timer()
                     total_vectorise_time += (end_time - start_time)
@@ -2303,6 +2303,15 @@ def _get_model_properties(index_info):
                 f"Please provide model_properties if the model is a custom model and is not supported by default")
 
     return model_properties
+
+
+def _get_model_authentication_token(index_info):
+    index_meta_data = index_info.get_index_meta_data()
+    try:
+        authentication_token = index_meta_data["index_defaults"]["model_properties"]["authentication"]
+    except KeyError:
+        return dict()
+    return authentication_token
 
 
 def get_loaded_models() -> dict:

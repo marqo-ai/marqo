@@ -74,11 +74,16 @@ def download_pretrained_from_url(
 
     return download_target
 
+
 def download_pretrained_from_dict(model_location: dict, authentication: dict):
     # TODO finish this for s3
-    print(model_location)
     if "hf" in model_location:
-        download_target = hf_hub_download(**model_location["hf"], token=authentication["hf"]["token"], cache_dir=ModelCache.clip_cache_path)
+        if "hf" in authentication and "token" in authentication["hf"]:
+            token = authentication["hf"]["token"]
+        else:
+            token = None
+        download_target = hf_hub_download(**model_location["hf"], token=token, cache_dir=ModelCache.clip_cache_path)
+
     elif "s3" in model_location:
         pass
     else:
