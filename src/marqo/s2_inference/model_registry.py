@@ -320,6 +320,7 @@ def _get_open_clip_properties() -> Dict:
             'type': 'open_clip',
             'pretrained': 'laion2b_s29b_b131k_ft_soup'},
         # Comment out as they are not currently available in open_clip release 2.18.1
+        # It is discussed here https: // github.com / mlfoundations / open_clip / issues / 477
         # 'open_clip/convnext_xxlarge/laion2b_s34b_b82k_augreg': {
         #     'name': 'open_clip/convnext_xxlarge/laion2b_s34b_b82k_augreg',
         #     'dimensions': 1024,
