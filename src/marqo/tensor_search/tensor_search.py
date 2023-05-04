@@ -55,6 +55,9 @@ from marqo.tensor_search import index_meta_cache
 from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQueryEntity
 from marqo.tensor_search.models.search import VectorisedJobs, VectorisedJobPointer, Qidx, JHash
 from marqo.tensor_search.models.index_info import IndexInfo
+from marqo.tensor_search.models.vectorise_params import VectoriseParams
+from marqo.tensor_search.models.external_apis.abstract_classes import ExternalAuth
+from marqo.tensor_search.inference import vectorise_from_params
 from marqo.tensor_search.utils import add_timing
 from marqo.tensor_search import delete_docs
 from marqo.s2_inference.processing import text as text_processor
@@ -2342,7 +2345,6 @@ def get_cuda_info() -> dict:
         ))
 
 
-
 def vectorise_multimodal_combination_field(field: str, multimodal_object: Dict[str, dict], doc: dict, doc_index: int,
                                             doc_id:str, selected_device:str, index_info, image_repo, field_map:dict):
     '''
@@ -2406,7 +2408,7 @@ def vectorise_multimodal_combination_field(field: str, multimodal_object: Dict[s
             else:
                 try:
                     if isinstance(sub_content, str) and index_info.index_settings[NsField.index_defaults][
-                        NsField.treat_urls_and_pointers_as_images]:
+                            NsField.treat_urls_and_pointers_as_images]:
                         if not isinstance(image_repo[sub_content], Exception):
                             image_data = image_repo[sub_content]
                         else:

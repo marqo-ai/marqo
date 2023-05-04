@@ -76,3 +76,36 @@ class TestModelAuth(MarqoTestCase):
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings=s3_settings)
         # TODO: mock call to HF
         raise NotImplementedError
+
+    def test_model_loads_from_search(self):
+        """The other ones load from add_docs, we have to make sure it works for
+         search"""
+
+    def test_model_loads_from_all_add_docs_derivatives(self):
+        """Does it work from add_docs, add_docs orchestrator and add_documents_mp?
+        """
+
+    def test_model_loads_from_multi_search(self):
+        pass
+
+    def test_model_loads_from_multimodal_combination(self):
+        pass
+
+
+    ################## TESTS FOR VECTORISE PARAMS
+
+    def test_as_dict_discards_nones_expected_dict(self):
+        """assert the dict is structured as expected"""
+
+        """Assert __pydantic_initialised__ is not in the dict
+        
+        test both k and value staring with __ 
+        """
+
+
+
+
+
+
+
+
