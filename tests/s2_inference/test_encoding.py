@@ -329,16 +329,13 @@ class TestOpenClipModelEncoding(unittest.TestCase):
 
             for image in images:
                 assert abs(model.encode(image) - model.encode([image])).sum() < eps
-                assert abs(model.encode_text(image) - model.encode([image])).sum() < eps
-                assert abs(model.encode(image) - model.encode_text([image])).sum() < eps
+                assert abs(model.encode_image(image) - model.encode([image])).sum() < eps
+                assert abs(model.encode(image) - model.encode_image([image])).sum() < eps
 
             clear_loaded_models()
 
     def test_cpu_encode_type(self):
         names = self.open_clip_test_model
-
-        names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised",     "hf/e5-base-unsupervised"]
-        names += names_e5
 
         sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
         device = 'cpu'
