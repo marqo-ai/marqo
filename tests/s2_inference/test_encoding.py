@@ -408,7 +408,7 @@ class TestOpenClipModelEncoding(unittest.TestCase):
             clear_loaded_models()
 
     def test_model_un_normalization(self):
-        names = self.open_clip_test_model -
+        names = self.open_clip_test_model
 
         sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
         device = 'cpu'
