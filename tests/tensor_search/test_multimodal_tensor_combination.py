@@ -24,9 +24,9 @@ class TestMultimodalTensorCombination(MarqoTestCase):
 
     def setUp(self):
         self.index_name_1 = "my-test-index-1"
-        self.mappings = {"combo_text_image" :{"type": "multimodal_combination", "weights" : {
-            "text" : 0.5, "image" : 0.8}
-        }}
+        self.mappings = {"combo_text_image": {"type": "multimodal_combination", "weights": {
+            "text": 0.5, "image": 0.8}
+                                              }}
         self.endpoint = self.authorized_url
         try:
             tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
@@ -38,6 +38,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         except:
             pass
+
     def test_add_documents(self):
         tensor_search.create_vector_index(
             index_name=self.index_name_1, config=self.config, index_settings={
@@ -66,9 +67,9 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                 "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
                 "_id": "1"
             },
-        ], mappings = {"combo_text_image" :{"type": "multimodal_combination", "weights" : {
-            "text" : 0.5, "image" : 0.8}
-        }},auto_refresh=True)
+        ], mappings={"combo_text_image": {"type": "multimodal_combination", "weights": {
+            "text": 0.5, "image": 0.8}
+                                          }}, auto_refresh=True)
 
         added_doc = tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="0",
                                                      show_vectors=True)
@@ -102,8 +103,10 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                 })
 
             tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[document],
-                                        auto_refresh=True, mappings = {"combo_text_image" : {"type":"multimodal_combination",
-            "weights":{"image_field":0.5,"text_field":0.5}}})
+                                        auto_refresh=True,
+                                        mappings={"combo_text_image": {"type": "multimodal_combination",
+                                                                       "weights": {"image_field": 0.5,
+                                                                                   "text_field": 0.5}}})
             self.assertEqual(1, tensor_search.get_stats(config=self.config, index_name=self.index_name_1)[
                 "numberOfDocuments"])
             res = tensor_search.search(config=self.config, index_name=self.index_name_1,
@@ -123,9 +126,9 @@ class TestMultimodalTensorCombination(MarqoTestCase):
 
         score_3 = get_score({
             "combo_text_image": {
-                "text_field" : "A rider is riding a horse jumping over the barrier.",
-                "image_field" : "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
-        },
+                "text_field": "A rider is riding a horse jumping over the barrier.",
+                "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+            },
         })
 
         assert (score_3 >= min(score_1, score_2)) and (score_3 <= max(score_1, score_2))
@@ -148,7 +151,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                     "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
                     "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
                 },
-                "_id":"c1"
+                "_id": "c1"
             },
 
             {
@@ -198,24 +201,30 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                 "_id": "4"
             },
 
-        ], auto_refresh=True, mappings = {"combo_text_image" : {"type":"multimodal_combination",
-            "weights":{"text_field_1": 0.32,"text_field_2": 0, "image_field_1" : -0.48, "image_field_2": 1.34}}})
+        ], auto_refresh=True, mappings={"combo_text_image": {"type": "multimodal_combination",
+                                                             "weights": {"text_field_1": 0.32, "text_field_2": 0,
+                                                                         "image_field_1": -0.48,
+                                                                         "image_field_2": 1.34}}})
 
         combo_tensor_1 = np.array(tensor_search.get_document_by_id(config=self.config,
-                                                                 index_name=self.index_name_1, document_id="c1",
-                                                                 show_vectors=True)['_tensor_facets'][0]["_embedding"])
+                                                                   index_name=self.index_name_1, document_id="c1",
+                                                                   show_vectors=True)['_tensor_facets'][0][
+                                      "_embedding"])
 
         combo_tensor_2 = np.array(tensor_search.get_document_by_id(config=self.config,
-                                                                 index_name=self.index_name_1, document_id="c2",
-                                                                 show_vectors=True)['_tensor_facets'][0]["_embedding"])
+                                                                   index_name=self.index_name_1, document_id="c2",
+                                                                   show_vectors=True)['_tensor_facets'][0][
+                                      "_embedding"])
 
         combo_tensor_3 = np.array(tensor_search.get_document_by_id(config=self.config,
-                                                                 index_name=self.index_name_1, document_id="c3",
-                                                                 show_vectors=True)['_tensor_facets'][0]["_embedding"])
+                                                                   index_name=self.index_name_1, document_id="c3",
+                                                                   show_vectors=True)['_tensor_facets'][0][
+                                      "_embedding"])
 
         combo_tensor_4 = np.array(tensor_search.get_document_by_id(config=self.config,
-                                                                 index_name=self.index_name_1, document_id="c4",
-                                                                 show_vectors=True)['_tensor_facets'][0]["_embedding"])
+                                                                   index_name=self.index_name_1, document_id="c4",
+                                                                   show_vectors=True)['_tensor_facets'][0][
+                                      "_embedding"])
         text_tensor_1 = \
             np.array(tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="1",
                                                       show_vectors=True)['_tensor_facets'][0]["_embedding"])
@@ -229,7 +238,8 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             np.array(tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="4",
                                                       show_vectors=True)['_tensor_facets'][0]["_embedding"])
 
-        expected_tensor = np.mean([text_tensor_1 * 0.32, text_tensor_2 * 0, image_tensor_1 * -0.48, image_tensor_2 * 1.34], axis = 0)
+        expected_tensor = np.mean(
+            [text_tensor_1 * 0.32, text_tensor_2 * 0, image_tensor_1 * -0.48, image_tensor_2 * 1.34], axis=0)
         assert np.allclose(combo_tensor_1, expected_tensor, atol=1e-5)
         assert np.allclose(combo_tensor_2, expected_tensor, atol=1e-5)
         assert np.allclose(combo_tensor_3, expected_tensor, atol=1e-5)
@@ -245,11 +255,13 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                 }
             })
 
-        mappings_1 = {"combo_text_image" : {"type":"multimodal_combination",
-            "weights":{"text_field_1": 0.32,"text_field_2": 0, "image_field_1" : -0.48, "image_field_2": 1.34}}}
+        mappings_1 = {"combo_text_image": {"type": "multimodal_combination",
+                                           "weights": {"text_field_1": 0.32, "text_field_2": 0, "image_field_1": -0.48,
+                                                       "image_field_2": 1.34}}}
 
-        mappings_2 =  {"combo_text_image" : {"type":"multimodal_combination",
-            "weights":{"text_field_1": 0.12,"text_field_2": 0, "image_field_1" : -0.96, "image_field_2": 2.33}}}
+        mappings_2 = {"combo_text_image": {"type": "multimodal_combination",
+                                           "weights": {"text_field_1": 0.12, "text_field_2": 0, "image_field_1": -0.96,
+                                                       "image_field_2": 2.33}}}
 
         tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
             {
@@ -259,7 +271,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                     "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
                     "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
                 },
-                "_id":"c1"
+                "_id": "c1"
             },
 
             {
@@ -288,8 +300,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                 "_id": "4"
             },
 
-        ], auto_refresh=True, mappings = mappings_1)
-
+        ], auto_refresh=True, mappings=mappings_1)
 
         tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
             {
@@ -311,23 +322,27 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                 },
                 "_id": "c4"
             },
-        ], auto_refresh=True, mappings = mappings_2)
+        ], auto_refresh=True, mappings=mappings_2)
 
         combo_tensor_1 = np.array(tensor_search.get_document_by_id(config=self.config,
-                                                                 index_name=self.index_name_1, document_id="c1",
-                                                                 show_vectors=True)['_tensor_facets'][0]["_embedding"])
+                                                                   index_name=self.index_name_1, document_id="c1",
+                                                                   show_vectors=True)['_tensor_facets'][0][
+                                      "_embedding"])
 
         combo_tensor_2 = np.array(tensor_search.get_document_by_id(config=self.config,
-                                                                 index_name=self.index_name_1, document_id="c2",
-                                                                 show_vectors=True)['_tensor_facets'][0]["_embedding"])
+                                                                   index_name=self.index_name_1, document_id="c2",
+                                                                   show_vectors=True)['_tensor_facets'][0][
+                                      "_embedding"])
 
         combo_tensor_3 = np.array(tensor_search.get_document_by_id(config=self.config,
-                                                                 index_name=self.index_name_1, document_id="c3",
-                                                                 show_vectors=True)['_tensor_facets'][0]["_embedding"])
+                                                                   index_name=self.index_name_1, document_id="c3",
+                                                                   show_vectors=True)['_tensor_facets'][0][
+                                      "_embedding"])
 
         combo_tensor_4 = np.array(tensor_search.get_document_by_id(config=self.config,
-                                                                 index_name=self.index_name_1, document_id="c4",
-                                                                 show_vectors=True)['_tensor_facets'][0]["_embedding"])
+                                                                   index_name=self.index_name_1, document_id="c4",
+                                                                   show_vectors=True)['_tensor_facets'][0][
+                                      "_embedding"])
         text_tensor_1 = \
             np.array(tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="1",
                                                       show_vectors=True)['_tensor_facets'][0]["_embedding"])
@@ -341,19 +356,20 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             np.array(tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="4",
                                                       show_vectors=True)['_tensor_facets'][0]["_embedding"])
 
-        mappings_1 = {"combo_text_image" : {"type":"multimodal_combination",
-            "weights":{"text_field_1": 0.32,"text_field_2": 0, "image_field_1" : -0.48, "image_field_2": 1.34}}}
+        mappings_1 = {"combo_text_image": {"type": "multimodal_combination",
+                                           "weights": {"text_field_1": 0.32, "text_field_2": 0, "image_field_1": -0.48,
+                                                       "image_field_2": 1.34}}}
 
         expected_tensor_1 = np.mean([text_tensor_1 * mappings_1["combo_text_image"]["weights"]["text_field_1"],
                                      text_tensor_2 * mappings_1["combo_text_image"]["weights"]["text_field_2"],
                                      image_tensor_1 * mappings_1["combo_text_image"]["weights"]["image_field_1"],
                                      image_tensor_2 * mappings_1["combo_text_image"]["weights"]["image_field_2"]
-                                     ], axis = 0)
+                                     ], axis=0)
         expected_tensor_2 = np.mean([text_tensor_1 * mappings_2["combo_text_image"]["weights"]["text_field_1"],
                                      text_tensor_2 * mappings_2["combo_text_image"]["weights"]["text_field_2"],
                                      image_tensor_1 * mappings_2["combo_text_image"]["weights"]["image_field_1"],
                                      image_tensor_2 * mappings_2["combo_text_image"]["weights"]["image_field_2"]
-                                     ], axis = 0)
+                                     ], axis=0)
 
         assert np.allclose(combo_tensor_1, expected_tensor_1, atol=1e-5)
         assert np.allclose(combo_tensor_2, expected_tensor_1, atol=1e-5)
@@ -377,8 +393,9 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                 })
 
             tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[document],
-                                        auto_refresh=True, mappings = {"combo_text_image" : {"type":"multimodal_combination",
-            "weights":{"image_field": 0,"text_field": 1}}})
+                                        auto_refresh=True,
+                                        mappings={"combo_text_image": {"type": "multimodal_combination",
+                                                                       "weights": {"image_field": 0, "text_field": 1}}})
 
             self.assertEqual(1, tensor_search.get_stats(config=self.config, index_name=self.index_name_1)[
                 "numberOfDocuments"])
@@ -394,9 +411,9 @@ class TestMultimodalTensorCombination(MarqoTestCase):
 
         score_3 = get_score({
             "combo_text_image": {
-            "text_field" : "A rider is riding a horse jumping over the barrier.",
-            "image_field" : "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
-                },
+                "text_field": "A rider is riding a horse jumping over the barrier.",
+                "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+            },
         })
 
         self.assertEqual(score_1, score_3)
@@ -435,8 +452,8 @@ class TestMultimodalTensorCombination(MarqoTestCase):
 
                 {
                     "combo_text_image": {
-                        "text_field" : "test-text-two.",
-                        "image_field":"https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+                        "text_field": "test-text-two.",
+                        "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
                     },
                     "_id": "234",
                 },
@@ -445,34 +462,38 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                     "combo_text_image_test": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
                     "_id": "534",
                 }
-            ], mappings = {"combo_text_image" : {"type":"multimodal_combination",
-            "weights":{"image_field": 0.5,"text_field": 0.5}}}, auto_refresh=True)
+            ], mappings={"combo_text_image": {"type": "multimodal_combination",
+                                              "weights": {"image_field": 0.5, "text_field": 0.5}}}, auto_refresh=True)
 
             # first multimodal-doc
             real_fied_0, field_content_0 = [call_args for call_args, call_kwargs
                                             in mock_multimodal_combination.call_args_list][0][0:2]
             assert real_fied_0 == "combo_text_image"
-            assert field_content_0 ==    {
-                        "text_field": "A rider is riding a horse jumping over the barrier.",
-                        "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
-                    }
+            assert field_content_0 == {
+                "text_field": "A rider is riding a horse jumping over the barrier.",
+                "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+            }
 
             # second multimodal=doc
             real_fied_1, field_content_1 = [call_args for call_args, call_kwargs
                                             in mock_multimodal_combination.call_args_list][1][0:2]
             assert real_fied_1 == "combo_text_image"
-            assert field_content_1 =={
-                        "text_field" : "test-text-two.",
-                        "image_field":"https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
-                    }
+            assert field_content_1 == {
+                "text_field": "test-text-two.",
+                "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+            }
             # ensure we only call multimodal-combination twice
             assert len(mock_multimodal_combination.call_args_list) == 2
 
-            assert json.loads(requests.get(url = f"{self.endpoint}/{self.index_name_1}/_doc/123", verify=False).text)["found"] == True
-            assert json.loads(requests.get(url = f"{self.endpoint}/{self.index_name_1}/_doc/234", verify=False).text)["found"] == True
-            assert json.loads(requests.get(url = f"{self.endpoint}/{self.index_name_1}/_doc/534", verify=False).text)["found"] == True
+            assert json.loads(requests.get(url=f"{self.endpoint}/{self.index_name_1}/_doc/123", verify=False).text)[
+                       "found"] == True
+            assert json.loads(requests.get(url=f"{self.endpoint}/{self.index_name_1}/_doc/234", verify=False).text)[
+                       "found"] == True
+            assert json.loads(requests.get(url=f"{self.endpoint}/{self.index_name_1}/_doc/534", verify=False).text)[
+                       "found"] == True
 
             return True
+
         assert run()
 
     def test_multimodal_field_content_dictionary_validation(self):
@@ -489,13 +510,14 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         res_0 = tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
             {
                 "combo_text_image": {
-                    "A rider is riding a horse jumping over the barrier." : 0.5,
-                    "image_field" : 0.5,
+                    "A rider is riding a horse jumping over the barrier.": 0.5,
+                    "image_field": 0.5,
                 },
                 "_id": "123",
             }, ], mappings=self.mappings, auto_refresh=True)
         assert res_0["errors"]
-        assert not json.loads(requests.get(url = f"{self.endpoint}/{self.index_name_1}/_doc/123", verify=False).text)["found"]
+        assert not json.loads(requests.get(url=f"{self.endpoint}/{self.index_name_1}/_doc/123", verify=False).text)[
+            "found"]
 
         try:
             tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="123")
@@ -508,13 +530,15 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             {
                 "combo_text_image": {
                     "text_field": "A rider is riding a horse jumping over the barrier.",
-                    "image_field": {"image_url" : "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
-                   },
+                    "image_field": {
+                        "image_url": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+                        },
                 },
                 "_id": "123",
             }, ], mappings=self.mappings, auto_refresh=True)
         assert res_1["errors"]
-        assert not json.loads(requests.get(url = f"{self.endpoint}/{self.index_name_1}/_doc/123", verify=False).text)["found"]
+        assert not json.loads(requests.get(url=f"{self.endpoint}/{self.index_name_1}/_doc/123", verify=False).text)[
+            "found"]
         try:
             tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="123")
             raise AssertionError
@@ -525,14 +549,15 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         res_2 = tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
             {
                 "combo_text_image": {
-                    "text_field" : "A rider is riding a horse jumping over the barrier.",
-                    934343 : "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+                    "text_field": "A rider is riding a horse jumping over the barrier.",
+                    934343: "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
 
                 },
                 "_id": "123",
-            }, ], mappings = self.mappings, auto_refresh=True)
+            }, ], mappings=self.mappings, auto_refresh=True)
         assert res_2["errors"]
-        assert not json.loads(requests.get(url = f"{self.endpoint}/{self.index_name_1}/_doc/123", verify=False).text)["found"]
+        assert not json.loads(requests.get(url=f"{self.endpoint}/{self.index_name_1}/_doc/123", verify=False).text)[
+            "found"]
         try:
             tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="123")
             raise AssertionError
@@ -540,8 +565,8 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             pass
 
     def test_validate_dict(self):
-        test_mappings = {"my_combo_field":{"type":"multimodal_combination", "weights":{
-            "test_1":0.5, "test_2":0.5
+        test_mappings = {"my_combo_field": {"type": "multimodal_combination", "weights": {
+            "test_1": 0.5, "test_2": 0.5
         }}}
         field = "my_combo_field"
         valid_dict = {"test_1": "test", "test_2": "test_test"}
@@ -552,13 +577,14 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         # invalid str:str format
         # str:list
         try:
-            validate_dict(field, {"test_1": ["my","test"], "test_2": "test_test"}, is_non_tensor_field=False, mappings=test_mappings)
+            validate_dict(field, {"test_1": ["my", "test"], "test_2": "test_test"}, is_non_tensor_field=False,
+                          mappings=test_mappings)
             raise AssertionError
         except InvalidArgError as e:
             assert "is not of valid content type" in e.message
         # str:tuple
         try:
-            validate_dict(field, {"test_1": ("my","test"), "test_2": "test_test"}, is_non_tensor_field=False,
+            validate_dict(field, {"test_1": ("my", "test"), "test_2": "test_test"}, is_non_tensor_field=False,
                           mappings=test_mappings)
             raise AssertionError
         except InvalidArgError as e:
@@ -566,7 +592,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
 
         # str:dict
         try:
-            validate_dict(field, {"test_1": {"my":"test"}, "test_2": "test_test"}, is_non_tensor_field=False,
+            validate_dict(field, {"test_1": {"my": "test"}, "test_2": "test_test"}, is_non_tensor_field=False,
                           mappings=test_mappings)
             raise AssertionError
         except InvalidArgError as e:
@@ -604,7 +630,8 @@ class TestMultimodalTensorCombination(MarqoTestCase):
 
         # sub_fields not in mappings["weight"]
         try:
-            validate_dict(field, {"test_void": "test", "test_2": "test_test"}, is_non_tensor_field=False, mappings=test_mappings)
+            validate_dict(field, {"test_void": "test", "test_2": "test_test"}, is_non_tensor_field=False,
+                          mappings=test_mappings)
             raise AssertionError
         except InvalidArgError as e:
             assert "Each sub_field requires a weights" in e.message
@@ -648,22 +675,22 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                 {
                     "combo_text_image": {
                         "text_0": "A rider is riding a horse jumping over the barrier_0.",
-                        "text_1":"A rider is riding a horse jumping over the barrier_1.",
-                        "text_2":"A rider is riding a horse jumping over the barrier_2.",
-                        "text_3":"A rider is riding a horse jumping over the barrier_3.",
-                        "text_4":"A rider is riding a horse jumping over the barrier_4.",
-                        "image_0" :  "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image0.jpg",
-                        "image_1" : "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
-                        "image_2" : "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
-                        "image_3" : "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image3.jpg",
-                        "image_4" : "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg",
+                        "text_1": "A rider is riding a horse jumping over the barrier_1.",
+                        "text_2": "A rider is riding a horse jumping over the barrier_2.",
+                        "text_3": "A rider is riding a horse jumping over the barrier_3.",
+                        "text_4": "A rider is riding a horse jumping over the barrier_4.",
+                        "image_0": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image0.jpg",
+                        "image_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+                        "image_2": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+                        "image_3": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image3.jpg",
+                        "image_4": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg",
                     },
                     "_id": "111",
                 },
 
-            ], mappings = {"combo_text_image" :{"type":"multimodal_combination", "weights":{
-                "text_0" : 0.1, "text_1" : 0.1, "text_2" : 0.1, "text_3" : 0.1, "text_4" : 0.1,
-                "image_0" : 0.1,"image_1" : 0.1,"image_2" : 0.1,"image_3" : 0.1,"image_4" : 0.1,
+            ], mappings={"combo_text_image": {"type": "multimodal_combination", "weights": {
+                "text_0": 0.1, "text_1": 0.1, "text_2": 0.1, "text_3": 0.1, "text_4": 0.1,
+                "image_0": 0.1, "image_1": 0.1, "image_2": 0.1, "image_3": 0.1, "image_4": 0.1,
             }}}, auto_refresh=True)
             # Ensure the doc is added
             assert tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="111")
@@ -706,22 +733,22 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                 {
                     "combo_text_image": {
                         "text_0": "A rider is riding a horse jumping over the barrier_0.",
-                        "text_1":"A rider is riding a horse jumping over the barrier_1.",
-                        "text_2":"A rider is riding a horse jumping over the barrier_2.",
-                        "text_3":"A rider is riding a horse jumping over the barrier_3.",
-                        "text_4":"A rider is riding a horse jumping over the barrier_4.",
-                        "image_0" :  "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image0.jpg",
-                        "image_1" : "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
-                        "image_2" : "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
-                        "image_3" : "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image3.jpg",
-                        "image_4" : "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg",
+                        "text_1": "A rider is riding a horse jumping over the barrier_1.",
+                        "text_2": "A rider is riding a horse jumping over the barrier_2.",
+                        "text_3": "A rider is riding a horse jumping over the barrier_3.",
+                        "text_4": "A rider is riding a horse jumping over the barrier_4.",
+                        "image_0": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image0.jpg",
+                        "image_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+                        "image_2": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+                        "image_3": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image3.jpg",
+                        "image_4": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg",
                     },
                     "_id": "111",
                 },
 
-            ], mappings = {"combo_text_image" :{"type":"multimodal_combination", "weights":{
-                "text_0" : 0.1, "text_1" : 0.1, "text_2" : 0.1, "text_3" : 0.1, "text_4" : 0.1,
-                "image_0" : 0.1,"image_1" : 0.1,"image_2" : 0.1,"image_3" : 0.1,"image_4" : 0.1,
+            ], mappings={"combo_text_image": {"type": "multimodal_combination", "weights": {
+                "text_0": 0.1, "text_1": 0.1, "text_2": 0.1, "text_3": 0.1, "text_4": 0.1,
+                "image_0": 0.1, "image_1": 0.1, "image_2": 0.1, "image_3": 0.1, "image_4": 0.1,
             }}}, auto_refresh=True)
             # Ensure the doc is added
             assert tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="111")
@@ -729,7 +756,9 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             assert len(mock_vectorise.call_args_list) == 1
 
             text_content = [f"A rider is riding a horse jumping over the barrier_{i}." for i in range(5)]
-            text_content = text_content  + [f"https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image{i}.jpg" for i in range(5)]
+            text_content = text_content + [
+                f"https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image{i}.jpg"
+                for i in range(5)]
 
             real_text_content = [call_kwargs['content'] for call_args, call_kwargs
                                  in mock_vectorise.call_args_list][0]
@@ -806,7 +835,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
              "my_combination_field": {
                  "my_image": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg",
                  "some_text": "hello there",
-                 "lexical_field": "search me please",}},],
+                 "lexical_field": "search me please", }}, ],
                                     mappings={
                                         "my_combination_field": {
                                             "type": "multimodal_combination",
@@ -814,7 +843,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                                                 "my_image": 0.5,
                                                 "some_text": 0.5,
                                                 "lexical_field": 0.1,
-                                                "additional_field" : 0.2,
+                                                "additional_field": 0.2,
                                             }
                                         }}
                                     , auto_refresh=True)
@@ -828,20 +857,19 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                  "my_image_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg",
                  "some_text_1": "hello there",
                  "lexical_field_1": "no no no",
-                 "additional_field_1" : "test_search here"}}
-            ],
-            mappings={
-                "my_combination_field": {
-                    "type": "multimodal_combination",
-                    "weights": {
-                        "my_image_1": 0.5,
-                        "some_text_1": 0.5,
-                        "lexical_field_1": 0.1,
-                        "additional_field_1" : 0.2,
-                    }
-                }}
-                ,auto_refresh=True)
-
+                 "additional_field_1": "test_search here"}}
+        ],
+                                    mappings={
+                                        "my_combination_field": {
+                                            "type": "multimodal_combination",
+                                            "weights": {
+                                                "my_image_1": 0.5,
+                                                "some_text_1": 0.5,
+                                                "lexical_field_1": 0.1,
+                                                "additional_field_1": 0.2,
+                                            }
+                                        }}
+                                    , auto_refresh=True)
 
         res = tensor_search._lexical_search(config=self.config, index_name=self.index_name_1, text="search me please")
         assert res["hits"][0]["_id"] == "article_591"
@@ -865,7 +893,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
              "_id": "article_591",
              "Genre": "Science",
              "my_combination_field": "dummy"
-             },]
+             }, ]
                                     , auto_refresh=True)
 
         try:
@@ -878,19 +906,19 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                      "my_image_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg",
                      "some_text_1": "hello there",
                      "lexical_field_1": "no no no",
-                     "additional_field_1" : "test_search here"}}
-                ],
-                mappings={
-                    "my_combination_field": {
-                        "type": "multimodal_combination",
-                        "weights": {
-                            "my_image_1": 0.5,
-                            "some_text_1": 0.5,
-                            "lexical_field_1": 0.1,
-                            "additional_field_1" : 0.2,
-                        }
-                    }}
-                    ,auto_refresh=True)
+                     "additional_field_1": "test_search here"}}
+            ],
+                                        mappings={
+                                            "my_combination_field": {
+                                                "type": "multimodal_combination",
+                                                "weights": {
+                                                    "my_image_1": 0.5,
+                                                    "some_text_1": 0.5,
+                                                    "lexical_field_1": 0.1,
+                                                    "additional_field_1": 0.2,
+                                                }
+                                            }}
+                                        , auto_refresh=True)
 
             raise AssertionError
         except MarqoWebError:
@@ -941,7 +969,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             , auto_refresh=True)
 
         res_exist_0 = tensor_search.search(index_name=self.index_name_1, config=self.config,
-                                           text = "", filter="my_combination_field.filter_field: test_this_0")
+                                           text="", filter="my_combination_field.filter_field: test_this_0")
 
         assert res_exist_0["hits"][0]["_id"] == "0"
 
@@ -951,7 +979,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         assert res_exist_2["hits"][0]["_id"] == "2"
 
         res_nonexist_1 = tensor_search.search(index_name=self.index_name_1, config=self.config,
-                                           text="", filter="my_combination_field.filter_field: test_this_5")
+                                              text="", filter="my_combination_field.filter_field: test_this_5")
 
         assert res_nonexist_1["hits"] == []
 
@@ -1000,17 +1028,17 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             , auto_refresh=True)
 
         pre_res_0 = tensor_search.search(index_name=self.index_name_1, config=self.config,
-                                           text = "", filter="my_combination_field.filter_field: test_this_0")
+                                         text="", filter="my_combination_field.filter_field: test_this_0")
         pre_res_1 = tensor_search.search(index_name=self.index_name_1, config=self.config,
                                          text="hello there")
-        pre_res_2 = tensor_search._lexical_search(index_name=self.index_name_1, config=self.config,text="have a test")
+        pre_res_2 = tensor_search._lexical_search(index_name=self.index_name_1, config=self.config, text="have a test")
 
         index_info = tensor_search.get_index_info(config=self.config, index_name=self.index_name_1)
 
         post_res_0 = tensor_search.search(index_name=self.index_name_1, config=self.config,
-                                         text="", filter="my_combination_field.filter_field: test_this_0")
+                                          text="", filter="my_combination_field.filter_field: test_this_0")
         post_res_1 = tensor_search.search(index_name=self.index_name_1, config=self.config,
-                                         text="hello there")
+                                          text="hello there")
         post_res_2 = tensor_search._lexical_search(index_name=self.index_name_1, config=self.config, text="have a test")
 
         assert pre_res_2["hits"] == post_res_2["hits"]
@@ -1070,7 +1098,8 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                                         }}
                                     , auto_refresh=True)
 
-        true_text_fields = tensor_search.get_index_info(self.config, index_name=self.index_name_1).get_true_text_properties()
+        true_text_fields = tensor_search.get_index_info(self.config,
+                                                        index_name=self.index_name_1).get_true_text_properties()
         # 3 from multimodal_field_0, 4 from multimodal_field_1, 3 common fields
         assert len(true_text_fields) == 10
 
@@ -1081,12 +1110,12 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         assert res["hits"][0]["_id"] == "article_592"
 
     def test_multimodal_combination_open_search_chunks(self):
-        test_doc ={
-                 "my_combination_field": {
-                     "image": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg",
-                     "text": "marqo is good" },
-                   "_id": "123",
-                   }
+        test_doc = {
+            "my_combination_field": {
+                "image": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg",
+                "text": "marqo is good"},
+            "_id": "123",
+        }
         tensor_search.create_vector_index(
             index_name=self.index_name_1, config=self.config, index_settings={
                 IndexSettingsField.index_defaults: {
@@ -1098,10 +1127,10 @@ class TestMultimodalTensorCombination(MarqoTestCase):
 
         res = tensor_search.add_documents(
             self.config,
-            docs = [test_doc],
+            docs=[test_doc],
             auto_refresh=True, index_name=self.index_name_1,
-            mappings={"my_combination_field": {"type":"multimodal_combination", "weights":{
-                "text":0.5, "image":0.5
+            mappings={"my_combination_field": {"type": "multimodal_combination", "weights": {
+                "text": 0.5, "image": 0.5
             }}}
         )
 
@@ -1112,7 +1141,8 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         assert 'my_combination_field' in doc_w_facets[TensorField.tensor_facets][0]
 
         assert doc_w_facets['my_combination_field'] == test_doc['my_combination_field']
-        assert doc_w_facets[TensorField.tensor_facets][0]['my_combination_field'] == json.dumps(test_doc['my_combination_field'])
+        assert doc_w_facets[TensorField.tensor_facets][0]['my_combination_field'] == json.dumps(
+            test_doc['my_combination_field'])
 
         # check OpenSearch, to ensure the list got added as a filter field
         original_doc = requests.get(
@@ -1132,9 +1162,11 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         index_info = tensor_search.backend.get_index_info(config=self.config, index_name=self.index_name_1)
         assert index_info.properties['my_combination_field']['properties']['image']["type"] == 'text'
         assert index_info.properties['my_combination_field']['properties']['text']["type"] == 'text'
-        assert index_info.properties['__chunks']['properties']['my_combination_field']['properties']['text']["type"]   == 'keyword'
-        assert index_info.properties['__chunks']['properties']['my_combination_field']['properties']['image']["type"] == 'keyword'
-        assert index_info.properties['__chunks']['properties']['__vector_my_combination_field']['type']  == 'knn_vector'
+        assert index_info.properties['__chunks']['properties']['my_combination_field']['properties']['text'][
+                   "type"] == 'keyword'
+        assert index_info.properties['__chunks']['properties']['my_combination_field']['properties']['image'][
+                   "type"] == 'keyword'
+        assert index_info.properties['__chunks']['properties']['__vector_my_combination_field']['type'] == 'knn_vector'
 
     def test_multimodal_child_fields_order(self):
         tensor_search.create_vector_index(
@@ -1146,53 +1178,54 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                 }
             })
 
-        doc ={
-                "combo_text_image": {
-                    "text_field_1": "A rider is riding a horse jumping over the barrier.",
-                    "text_field_2": "What is the best to wear on the moon?",
-                    "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
-                    "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
-                },
-            }
+        doc = {
+            "combo_text_image": {
+                "text_field_1": "A rider is riding a horse jumping over the barrier.",
+                "text_field_2": "What is the best to wear on the moon?",
+                "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+                "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+            },
+        }
 
         doc_1 = {
-                "combo_text_image": {
-                    "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
-                    "text_field_1": "A rider is riding a horse jumping over the barrier.",
-                    "text_field_2": "What is the best to wear on the moon?",
-                    "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
-                },
-            }
+            "combo_text_image": {
+                "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+                "text_field_1": "A rider is riding a horse jumping over the barrier.",
+                "text_field_2": "What is the best to wear on the moon?",
+                "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+            },
+        }
 
         doc_2 = {
-                "combo_text_image": {
-                    "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
-                    "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
-                    "text_field_1": "A rider is riding a horse jumping over the barrier.",
-                    "text_field_2": "What is the best to wear on the moon?",
-                },
-            }
+            "combo_text_image": {
+                "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+                "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+                "text_field_1": "A rider is riding a horse jumping over the barrier.",
+                "text_field_2": "What is the best to wear on the moon?",
+            },
+        }
 
         doc_3 = {
-                "combo_text_image": {
-                    "text_field_1": "A rider is riding a horse jumping over the barrier.",
-                    "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
-                    "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
-                    "text_field_2": "What is the best to wear on the moon?",
-                },
-            }
+            "combo_text_image": {
+                "text_field_1": "A rider is riding a horse jumping over the barrier.",
+                "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+                "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+                "text_field_2": "What is the best to wear on the moon?",
+            },
+        }
 
         with patch("numpy.mean", wraps=np.mean) as mock_mean:
             tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
                 doc, doc_1, doc_2, doc_3
             ], mappings={"combo_text_image": {"type": "multimodal_combination",
-                                              "weights": {"image_field_1": 0.2, "image_field_2": -1, "text_field_1": 0.38, "text_field_2": 0}}}, auto_refresh=True)
+                                              "weights": {"image_field_1": 0.2, "image_field_2": -1,
+                                                          "text_field_1": 0.38, "text_field_2": 0}}}, auto_refresh=True)
 
             args_list = [args[0] for args in mock_mean.call_args_list]
 
-        combined_tensor = np.squeeze(np.mean(args_list[0][0], axis = 0))
+        combined_tensor = np.squeeze(np.mean(args_list[0][0], axis=0))
 
-        permuted_tensor_1 = np.squeeze(np.mean(args_list[1][0], axis = 0))
+        permuted_tensor_1 = np.squeeze(np.mean(args_list[1][0], axis=0))
         permuted_tensor_2 = np.squeeze(np.mean(args_list[2][0], axis=0))
         permuted_tensor_3 = np.squeeze(np.mean(args_list[3][0], axis=0))
 
@@ -1211,7 +1244,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             })
 
         doc = {
-            "_id":"d0",
+            "_id": "d0",
             "combo_text_image": {
                 "text_field_1": "A rider is riding a horse jumping over the barrier.",
                 "text_field_2": "What is the best to wear on the moon?",
@@ -1269,3 +1302,82 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         assert np.allclose(combined_tensor, os1, atol=1e-9)
         assert np.allclose(combined_tensor, os2, atol=1e-9)
         assert np.allclose(combined_tensor, os3, atol=1e-9)
+
+    def test_searchable_attributes(self):
+        tensor_search.create_vector_index(
+            index_name=self.index_name_1, config=self.config, index_settings={
+                IndexSettingsField.index_defaults: {
+                    IndexSettingsField.model: "random/small",
+                    IndexSettingsField.treat_urls_and_pointers_as_images: False,
+                    IndexSettingsField.normalize_embeddings: True
+                }
+            })
+
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
+            {"Title": "Extravehicular Mobility Unit (EMU)",
+             "Description": "The EMU is a spacesuit that provides environmental protection",
+             "_id": "article_591",
+             "Genre": "Science",
+             "my_combination_field_0": {
+                 "my_image": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg",
+                 "some_text": "hello there",
+                 "lexical_field": "search me please", }}],
+                                    mappings={
+                                        "my_combination_field_0": {
+                                            "type": "multimodal_combination",
+                                            "weights": {
+                                                "my_image": 0.5,
+                                                "some_text": 0.5,
+                                                "lexical_field": 0.1,
+                                            }
+                                        }}
+                                    , auto_refresh=True)
+
+        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
+            {"Title": "text",
+             "Description": "text_2",
+             "_id": "article_592",
+             "Genre": "text",
+             "my_combination_field_1": {
+                 "my_image": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image3.jpg",
+                 "some_text": "marqo is good",
+                 "lexical_field": "no no no",
+                 "additional_field": "i can hear you"}}],
+                                    mappings={
+                                        "my_combination_field_1": {
+                                            "type": "multimodal_combination",
+                                            "weights": {
+                                                "my_image": 0.5,
+                                                "some_text": 0.5,
+                                                "lexical_field": 0.1,
+                                                "additional_field": 0.2,
+                                            }
+                                        }}
+                                    , auto_refresh=True)
+
+        true_text_fields = tensor_search.get_index_info(self.config,
+                                                        index_name=self.index_name_1).get_true_text_properties()
+        # 3 from multimodal_field_0, 4 from multimodal_field_1, 3 common fields
+        # Lexical Search
+        assert len(true_text_fields) == 10
+        res = tensor_search._lexical_search(config=self.config, index_name=self.index_name_1, text="hello there",
+                                            searchable_attributes=["my_combination_field_0.some_text"])
+        assert res["hits"][0]["_id"] == "article_591"
+        res = tensor_search._lexical_search(config=self.config, index_name=self.index_name_1, text="hello there",
+                                            searchable_attributes=["my_combination_field_0.lexical_field"])
+        assert len(res["hits"]) == 0
+
+        # Tensor Search
+        res = tensor_search._vector_text_search(config=self.config, index_name=self.index_name_1, query="hello there",
+                                            searchable_attributes=["my_combination_field_0.some_text"])
+        assert len(res["hits"]) == 0
+
+        res = tensor_search._vector_text_search(config=self.config, index_name=self.index_name_1,
+                                                query="The EMU is a spacesuit that provides environmental protection",
+                                            searchable_attributes=["Description"])
+        assert res["hits"][0]["_id"] == "article_591"
+
+
+
+
+
