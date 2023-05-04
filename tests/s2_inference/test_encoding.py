@@ -415,6 +415,7 @@ class TestOpenClipModelEncoding(unittest.TestCase):
         eps = 1e-3
 
         for name in names:
+            # this model always give normalized output
             if name in ['open_clip/coca_ViT-B-32/mscoco_finetuned_laion2b_s13b_b90k',]:
                 continue
             model_properties = get_model_properties_from_registry(name)
