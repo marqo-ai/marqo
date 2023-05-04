@@ -1376,8 +1376,3 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                                                 query="The EMU is a spacesuit that provides environmental protection",
                                             searchable_attributes=["Description"])
         assert res["hits"][0]["_id"] == "article_591"
-
-
-
-
-
