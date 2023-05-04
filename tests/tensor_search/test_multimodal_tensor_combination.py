@@ -1506,7 +1506,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                                             filter_string="Genre: void")
         assert len(res["hits"]) == 0
 
-        # Tensor Search wit searchable_attributes
+        # Searchable attributes in vector search
         res = tensor_search._vector_text_search(config=self.config, index_name=self.index_name_1, query="hello there",
                                             searchable_attributes=["my_combination_field_0.some_text"])
         assert len(res["hits"]) == 0
