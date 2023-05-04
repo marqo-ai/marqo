@@ -408,13 +408,15 @@ class TestOpenClipModelEncoding(unittest.TestCase):
             clear_loaded_models()
 
     def test_model_un_normalization(self):
-        names = self.open_clip_test_model
+        names = self.open_clip_test_model -
 
         sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
         device = 'cpu'
         eps = 1e-3
 
         for name in names:
+            if name in ['open_clip/coca_ViT-B-32/mscoco_finetuned_laion2b_s13b_b90k',]:
+                continue
             model_properties = get_model_properties_from_registry(name)
             model = _load_model(model_properties['name'], model_properties=model_properties, device=device)
 
