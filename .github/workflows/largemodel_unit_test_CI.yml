@@ -30,6 +30,7 @@ jobs:
           ec2-instance-type: g4dn.xlarge
           subnet-id: ${{ secrets.CUDA_SUBNET_ID }}
           security-group-id: ${{ secrets.CUDA_SECURITY_GROUP_ID }}
+          ec2-instance-volume-size: 200
 
   Test-Marqo:
     name: Run Marqo Test Suite
