@@ -319,24 +319,25 @@ def _get_open_clip_properties() -> Dict:
             'note': 'open_clip models',
             'type': 'open_clip',
             'pretrained': 'laion2b_s29b_b131k_ft_soup'},
-        'open_clip/convnext_xxlarge/laion2b_s34b_b82k_augreg': {
-            'name': 'open_clip/convnext_xxlarge/laion2b_s34b_b82k_augreg',
-            'dimensions': 1024,
-            'note': 'open_clip models',
-            'type': 'open_clip',
-            'pretrained': 'laion2b_s34b_b82k_augreg'},
-        'open_clip/convnext_xxlarge/laion2b_s34b_b82k_augreg_rewind': {
-            'name': 'open_clip/convnext_xxlarge/laion2b_s34b_b82k_augreg_rewind',
-            'dimensions': 1024,
-            'note': 'open_clip models',
-            'type': 'open_clip',
-            'pretrained': 'laion2b_s34b_b82k_augreg_rewind'},
-        'open_clip/convnext_xxlarge/laion2b_s34b_b82k_augreg_soup': {
-            'name': 'open_clip/convnext_xxlarge/laion2b_s34b_b82k_augreg_soup',
-            'dimensions': 1024,
-            'note': 'open_clip models',
-            'type': 'open_clip',
-            'pretrained': 'laion2b_s34b_b82k_augreg_soup'},
+        # Comment out as they are not currently available in open_clip release 2.18.1
+        # 'open_clip/convnext_xxlarge/laion2b_s34b_b82k_augreg': {
+        #     'name': 'open_clip/convnext_xxlarge/laion2b_s34b_b82k_augreg',
+        #     'dimensions': 1024,
+        #     'note': 'open_clip models',
+        #     'type': 'open_clip',
+        #     'pretrained': 'laion2b_s34b_b82k_augreg'},
+        # 'open_clip/convnext_xxlarge/laion2b_s34b_b82k_augreg_rewind': {
+        #     'name': 'open_clip/convnext_xxlarge/laion2b_s34b_b82k_augreg_rewind',
+        #     'dimensions': 1024,
+        #     'note': 'open_clip models',
+        #     'type': 'open_clip',
+        #     'pretrained': 'laion2b_s34b_b82k_augreg_rewind'},
+        # 'open_clip/convnext_xxlarge/laion2b_s34b_b82k_augreg_soup': {
+        #     'name': 'open_clip/convnext_xxlarge/laion2b_s34b_b82k_augreg_soup',
+        #     'dimensions': 1024,
+        #     'note': 'open_clip models',
+        #     'type': 'open_clip',
+        #     'pretrained': 'laion2b_s34b_b82k_augreg_soup'},
         'open_clip/coca_ViT-B-32/laion2b_s13b_b90k': {'name': 'open_clip/coca_ViT-B-32/laion2b_s13b_b90k',
                                                       'dimensions': 512,
                                                       'note': 'open_clip models',
