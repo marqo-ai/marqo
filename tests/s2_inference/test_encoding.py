@@ -424,8 +424,8 @@ class TestOpenClipModelEncoding(unittest.TestCase):
                 max_output_norm = max(torch.linalg.norm(FloatTensor(output), dim=1))
                 min_output_norm = min(torch.linalg.norm(FloatTensor(output), dim=1))
 
-                assert abs(max_output_norm - 1) > eps, f"{name}, {sentence}"
-                assert abs(min_output_norm - 1) > eps, f"{name}, {sentence}"
+                assert abs(max_output_norm - 1) > eps, f"{name}, {sentence},{max_output_norm}"
+                assert abs(min_output_norm - 1) > eps, f"{name}, {sentence},{min_output_norm}"
 
             clear_loaded_models()
 
