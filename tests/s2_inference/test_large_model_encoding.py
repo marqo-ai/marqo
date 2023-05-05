@@ -13,7 +13,22 @@ from marqo.s2_inference.s2_inference import (
 import functools
 from marqo.s2_inference.s2_inference import _load_model as og_load_model
 _load_model = functools.partial(og_load_model, calling_func = "unit_test")
+from marqo.s2_inference.configs import ModelCache
+import shutil
 
+
+def remove_cached_clip_files():
+    '''
+    This function removes all the cached models from the clip cache path to save disk space
+    '''
+    clip_cache_path = ModelCache.clip_cache_path
+    for item in os.listdir(clip_cache_path):
+        item_path = os.path.join(clip_cache_path, item)
+        # Check if the item is a file or directory
+        if os.path.isfile(item_path):
+            os.remove(item_path)
+        elif os.path.isdir(item_path):
+            shutil.rmtree(item_path)
 
 @pytest.mark.largemodel
 @pytest.mark.skipif(torch.cuda.is_available() is False, reason="We skip the large model test if we don't have cuda support")
@@ -34,6 +49,13 @@ class TestLargeModelEncoding(unittest.TestCase):
     def tearDown(self) -> None:
         clear_loaded_models()
 
+    def setUpClass(cls) -> None:
+        super.setUpClass()
+        remove_cached_clip_files()
+
+    def tearDownClass(cls) -> None:
+        super.tearDownClass()
+        remove_cached_clip_files()
 
     def test_vectorize(self):
         names = self.large_clip_models + self.e5_models
