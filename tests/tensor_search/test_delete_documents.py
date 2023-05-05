@@ -11,7 +11,7 @@ import requests
 from unittest.mock import patch
 from marqo import errors
 from marqo.tensor_search import enums
-
+from tests.utils.transition import add_docs_caller
 
 class TestDeleteDocuments(MarqoTestCase):
     """module that has tests at the tensor_search level"""
@@ -33,7 +33,7 @@ class TestDeleteDocuments(MarqoTestCase):
 
     def test_delete_documents(self):
         # first batch:
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1,
             docs=[
                 {"f1": "cat dog sat mat", "Sydney": "Australia contains Sydney"},
@@ -44,7 +44,7 @@ class TestDeleteDocuments(MarqoTestCase):
             timeout=self.config.timeout,
             verify=False
         ).json()["count"]
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1,
             docs=[
                 {"hooped": "absolutely ridic", "Darling": "A harbour in Sydney", "_id": "455"},
@@ -65,7 +65,7 @@ class TestDeleteDocuments(MarqoTestCase):
         assert count_post_delete == count0_res
 
     def test_delete_docs_format(self):
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1,
             docs=[
                 {"f1": "cat dog sat mat", "Sydney": "Australia contains Sydney", "_id": "1234"},
@@ -85,7 +85,7 @@ class TestDeleteDocuments(MarqoTestCase):
 
     def test_only_specified_documents_are_deleted(self):
         # Add multiple documents
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1,
             docs=[
                 {"sample_field": "sample value", "_id": "unique_id_1"},
@@ -114,7 +114,7 @@ class TestDeleteDocuments(MarqoTestCase):
     def test_delete_multiple_documents(self):
         # Create an index and add documents
         tensor_search.create_vector_index(index_name=self.index_name_1, config=self.config)
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1,
             docs=[
                 {"field1": "value1", "_id": "doc_id_1"},
@@ -141,7 +141,7 @@ class TestDeleteDocuments(MarqoTestCase):
 
     def test_document_is_actually_deleted(self):
         # Add a document
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1,
             docs=[{"sample_field": "sample value", "_id": "unique_id"}], auto_refresh=True
         )
@@ -157,7 +157,7 @@ class TestDeleteDocuments(MarqoTestCase):
 
     def test_multiple_documents_are_actually_deleted(self):
         # Add multiple documents
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1,
             docs=[
                 {"sample_field": "sample value", "_id": "unique_id_1"},
@@ -215,7 +215,7 @@ class TestDeleteDocuments(MarqoTestCase):
     def test_delete_already_deleted_document(self):
         # Create an index and add a document
         tensor_search.create_vector_index(index_name=self.index_name_1, config=self.config)
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1,
             docs=[
                 {"field1": "value1", "_id": "doc_id_1"},
@@ -246,7 +246,7 @@ class TestDeleteDocuments(MarqoTestCase):
     def test_delete_documents_mixed_valid_invalid_ids(self):
         # Create an index and add documents
         tensor_search.create_vector_index(index_name=self.index_name_1, config=self.config)
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1,
             docs=[
                 {"field1": "value1", "_id": "doc_id_1"},
@@ -422,7 +422,7 @@ class TestDeleteDocumentsEndpoint(MarqoTestCase):
             tensor_search.create_vector_index(
                 index_name=self.index_name_1, index_settings={"index_defaults": {"model": 'random'}}, config=self.config)
             # over the limit:
-            tensor_search.add_documents(
+            add_docs_caller(
                 config=self.config, index_name=self.index_name_1, docs=[
                     {"_id": x, 'Bad field': "blh "} for x in doc_ids
                 ],
