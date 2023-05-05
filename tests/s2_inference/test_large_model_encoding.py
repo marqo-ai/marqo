@@ -50,12 +50,10 @@ class TestLargeModelEncoding(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
-        super.setUpClass()
         remove_cached_clip_files()
 
     @classmethod
     def tearDownClass(cls) -> None:
-        super.tearDownClass()
         remove_cached_clip_files()
 
     def test_vectorize(self):
