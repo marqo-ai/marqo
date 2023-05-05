@@ -22,13 +22,14 @@ def remove_cached_clip_files():
     This function removes all the cached models from the clip cache path to save disk space
     '''
     clip_cache_path = ModelCache.clip_cache_path
-    for item in os.listdir(clip_cache_path):
-        item_path = os.path.join(clip_cache_path, item)
-        # Check if the item is a file or directory
-        if os.path.isfile(item_path):
-            os.remove(item_path)
-        elif os.path.isdir(item_path):
-            shutil.rmtree(item_path)
+    if os.path.exists(clip_cache_path):
+        for item in os.listdir(clip_cache_path):
+            item_path = os.path.join(clip_cache_path, item)
+            # Check if the item is a file or directory
+            if os.path.isfile(item_path):
+                os.remove(item_path)
+            elif os.path.isdir(item_path):
+                shutil.rmtree(item_path)
 
 @pytest.mark.largemodel
 @pytest.mark.skipif(torch.cuda.is_available() is False, reason="We skip the large model test if we don't have cuda support")
