@@ -1,6 +1,6 @@
 import functools
 import pprint
-
+from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.tensor_search import enums
 from marqo.errors import IndexNotFoundError, InvalidDocumentIdError
 from marqo.tensor_search import tensor_search
@@ -25,12 +25,14 @@ class TestGetDocument(MarqoTestCase):
     def test_get_document(self):
         """Also ensures that the _id is returned"""
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
-        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
-            {
-                "_id": "123",
-                "title 1": "content 1",
-                "desc 2": "content 2. blah blah blah"
-            }], auto_refresh=True)
+        tensor_search.add_documents(
+            config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1, docs=[
+                {
+                    "_id": "123",
+                    "title 1": "content 1",
+                    "desc 2": "content 2. blah blah blah"
+                }], auto_refresh=True)
+        )
         assert tensor_search.get_document_by_id(
             config=self.config, index_name=self.index_name_1,
             document_id="123") == {
@@ -72,8 +74,10 @@ class TestGetDocument(MarqoTestCase):
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
         keys = ("title 1", "desc 2")
         vals = ("content 1", "content 2. blah blah blah")
-        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
-            {"_id": "123", **dict(zip(keys, vals))}], auto_refresh=True)
+        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+            index_name=self.index_name_1, docs=[{"_id": "123", **dict(zip(keys, vals))}],
+            auto_refresh=True)
+        )
         res = tensor_search.get_document_by_id(
             config=self.config, index_name=self.index_name_1,
             document_id="123", show_vectors=True)
