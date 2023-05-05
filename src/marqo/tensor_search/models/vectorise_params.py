@@ -10,7 +10,7 @@ class VectoriseParams:
     Don't include any attributes that start with '__' as these are discarded by
     as_dict_discards_none()
     """
-    model_name: str
+    model_name: Optional[str] = None
     model_properties: Optional[dict] = None
     device: Optional[str] = None
     normalize_embeddings: Optional[bool] = None
