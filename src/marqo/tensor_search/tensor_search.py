@@ -1,13 +1,13 @@
-"""tensor search logic. In the future this will be accessible to the client via an API
+"""tensor search logic
 
 API Notes:
-    - Fields beginning with a double underscore "__" are protected and used for our internal purposes.
+    - Some fields beginning with a double underscore "__" are protected and used for our internal purposes.
     - Examples include:
-        __embedding_vector
         __field_name
         __field_content
         __doc_chunk_relation
         __chunk_ids
+        fields beginning with "__vector_"
     - The "_id" field isn't a real field. It's a way to declare an ID. Internally we use it as the ID
         for the doc. The doc is stored without this field in its body
 
