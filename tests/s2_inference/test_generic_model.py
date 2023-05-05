@@ -1,5 +1,5 @@
 import numpy as np
-
+from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.errors import IndexNotFoundError
 from marqo.s2_inference.errors import InvalidModelPropertiesError, UnknownModelError, ModelLoadError
 from marqo.tensor_search import tensor_search
@@ -92,7 +92,8 @@ class TestGenericModelSupport(MarqoTestCase):
             }]
         auto_refresh = True
 
-        tensor_search.add_documents(config=config, index_name=index_name, docs=docs, auto_refresh=auto_refresh)
+        tensor_search.add_documents(config=config, add_docs_params=AddDocsParams(
+            index_name=index_name, docs=docs, auto_refresh=auto_refresh))
 
     def test_validate_model_properties_missing_required_keys(self):
         """_validate_model_properties should throw an exception if required keys are not given.
@@ -141,7 +142,8 @@ class TestGenericModelSupport(MarqoTestCase):
                                           "type": "test",
                                           "notes": ""}
 
-        validated_model_properties = _validate_model_properties(model_name=model_name, model_properties=None)
+        validated_model_properties = _validate_model_properties(
+            model_name=model_name, model_properties=None)
 
         self.assertEqual(registry_test_model_properties, validated_model_properties)
 

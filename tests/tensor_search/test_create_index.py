@@ -357,11 +357,13 @@ class TestCreateIndex(MarqoTestCase):
             @mock.patch("os.environ", {EnvVars.MARQO_MAX_INDEX_FIELDS: str(lim)})
             def run():
                 res_1 = tensor_search.add_documents(
-                    index_name=self.index_name_1, docs=[
-                        {f"f{i}": "some content" for i in range(lim)},
-                        {"_id": "1234", **{f"f{i}": "new content" for i in range(lim)}},
-                    ],
-                    auto_refresh=True, config=self.config
+                    add_docs_params=AddDocsParams(
+                        index_name=self.index_name_1, docs=[
+                            {f"f{i}": "some content" for i in range(lim)},
+                            {"_id": "1234", **{f"f{i}": "new content" for i in range(lim)}},
+                        ],
+                        auto_refresh=True),
+                    config=self.config
                 )
                 assert not res_1['errors']
                 res_1_2 = tensor_search.add_documents(

@@ -81,9 +81,11 @@ class TestIndexMetaCache(MarqoTestCase):
         # reset cache:
         index_meta_cache.empty_cache()
         add_doc_res_3 = tensor_search.add_documents(
-            config=self.config, index_name=self.index_name_1, docs=[{"newer field": "ndewr content",
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1, docs=[{"newer field": "ndewr content",
                                                                      "goblin": "paradise"}],
-            auto_refresh=True
+                auto_refresh=True
+            )
         )
         for field in ["newer field", "goblin", "cool field", "abc", "haha"]:
             assert utils.generate_vector_name(field) \
@@ -176,8 +178,8 @@ class TestIndexMetaCache(MarqoTestCase):
         cache_t0 = copy.deepcopy(index_meta_cache.get_cache())
         # mock external party indexing something:
         tensor_search.add_documents(
-            config=self.config, index_name=self.index_name_1,
-            docs=docs, auto_refresh=True)
+            config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1,
+                docs=docs, auto_refresh=True))
 
         if check_only_in_external_cache is not None:
             assert (

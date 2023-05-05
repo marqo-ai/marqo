@@ -25,7 +25,9 @@ class AddDocsParams:
         update_mode: {'replace' | 'update'}. If set to replace (default) just
         image_download_thread_count: number of threads used to concurrently download images
         image_download_headers: headers to authenticate image download
-        mappings: a dictionary used to handle all the object field content in the doc, e.g., multimodal_combination field
+        mappings: a dictionary used to handle all the object field content in the doc,
+            e.g., multimodal_combination field
+        model_auth: an object used to authorise downloading an object from a datastore
 
     """
 
@@ -41,3 +43,4 @@ class AddDocsParams:
     image_download_headers: dict = Field(default_factory=dict)
     use_existing_tensors: bool = False
     mappings: Optional[dict] = None
+    model_auth: Optional[ExternalAuth] = None
