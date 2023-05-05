@@ -45,14 +45,15 @@ class TestLargeModelEncoding(unittest.TestCase):
 
         self.e5_models = ["hf/e5-large", "hf/e5-large-unsupervised"]
 
-
     def tearDown(self) -> None:
         clear_loaded_models()
 
+    @classmethod
     def setUpClass(cls) -> None:
         super.setUpClass()
         remove_cached_clip_files()
 
+    @classmethod
     def tearDownClass(cls) -> None:
         super.tearDownClass()
         remove_cached_clip_files()
