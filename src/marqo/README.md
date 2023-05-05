@@ -237,3 +237,8 @@ curl http://localhost:8882/openapi.json
 ```
 To get the human readable spec, visit `http://localhost:8882/docs`
 
+## IDE tips
+
+## PyCharm
+Pydantic dataclasses are used in this project. By default, PyCharm can't parse initialisations of these dataclasses. 
+[This plugin](https://plugins.jetbrains.com/plugin/12861-pydantic) can help.
