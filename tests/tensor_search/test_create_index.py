@@ -10,7 +10,7 @@ from tests.marqo_test import MarqoTestCase
 from marqo.tensor_search.enums import IndexSettingsField as NsField
 from unittest import mock
 from marqo import errors
-from marqo.tensor_search import enums
+from marqo.errors import InvalidArgError
 
 class TestCreateIndex(MarqoTestCase):
 
@@ -324,13 +324,9 @@ class TestCreateIndex(MarqoTestCase):
         assert intended_shard_count == int(resp.json()[self.index_name_1]['settings']['index']['number_of_shards'])
 
     def test_set_number_of_replicas(self):
-        """ does it work if other params are filled?"""
         intended_replicas_count = 4
-        with mock.patch("marqo.tensor_search.configs.default_env_vars",
-                        return_value = {enums.EnvVars.MARQO_MAX_NUMBER_OF_REPLICAS: int(intended_replicas_count)}):
-            print(read_env_vars_and_defaults(EnvVars.MARQO_MAX_NUMBER_OF_REPLICAS))
-            from marqo.tensor_search.models.settings_object import settings_schema
-            print(settings_schema["properties"][NsField.number_of_replicas]["maximum"])
+        from marqo.tensor_search.models.settings_object import settings_schema
+        with patch.dict(settings_schema["properties"][NsField.number_of_replicas], maximum=10):
             res_0 = tensor_search.create_vector_index(
                 index_name=self.index_name_1, config=self.config,
                 index_settings={
@@ -347,6 +343,86 @@ class TestCreateIndex(MarqoTestCase):
             verify=False
         )
         assert intended_replicas_count == int(resp.json()[self.index_name_1]['settings']['index']['number_of_replicas'])
+
+    def test_configurable_max_number_of_replicas(self):
+        maximum_number_of_replicas = 5
+        large_intended_replicas_count = 10
+        small_intended_replicas_count = 3
+        from marqo.tensor_search.models.settings_object import settings_schema
+
+        with patch.dict(settings_schema["properties"][NsField.number_of_replicas], maximum=maximum_number_of_replicas):
+            # a large value exceeding limits should not work
+            try:
+                res_0 = tensor_search.create_vector_index(
+                    index_name=self.index_name_1, config=self.config,
+                    index_settings={
+                        "index_defaults": {
+                            "treat_urls_and_pointers_as_images": True,
+                            "model": "ViT-B/32",
+                        },
+                        NsField.number_of_replicas: large_intended_replicas_count
+                    }
+                )
+                raise AssertionError
+            except InvalidArgError as e:
+                pass
+
+            # a small value should work
+            res_1 = tensor_search.create_vector_index(
+                index_name=self.index_name_1, config=self.config,
+                index_settings={
+                    "index_defaults": {
+                        "treat_urls_and_pointers_as_images": True,
+                        "model": "ViT-B/32",
+                    },
+                    NsField.number_of_replicas: small_intended_replicas_count
+                }
+            )
+            resp = requests.get(
+                url=self.authorized_url + f"/{self.index_name_1}",
+                headers=self.generic_header,
+                verify=False
+            )
+            assert small_intended_replicas_count == int(
+                resp.json()[self.index_name_1]['settings']['index']['number_of_replicas'])
+
+    def test_default_max_number_of_replicas(self):
+        large_intended_replicas_count = 2
+        small_intended_replicas_count = 0
+        # a large value exceeding limits should not work
+        try:
+            res_0 = tensor_search.create_vector_index(
+                index_name=self.index_name_1, config=self.config,
+                index_settings={
+                    "index_defaults": {
+                        "treat_urls_and_pointers_as_images": True,
+                        "model": "ViT-B/32",
+                    },
+                    NsField.number_of_replicas: large_intended_replicas_count
+                }
+            )
+            raise AssertionError
+        except InvalidArgError as e:
+            pass
+
+        # a small value should work
+        res_1 = tensor_search.create_vector_index(
+            index_name=self.index_name_1, config=self.config,
+            index_settings={
+                "index_defaults": {
+                    "treat_urls_and_pointers_as_images": True,
+                    "model": "ViT-B/32",
+                },
+                NsField.number_of_replicas: small_intended_replicas_count
+            }
+        )
+        resp = requests.get(
+            url=self.authorized_url + f"/{self.index_name_1}",
+            headers=self.generic_header,
+            verify=False
+        )
+        assert small_intended_replicas_count == int(
+            resp.json()[self.index_name_1]['settings']['index']['number_of_replicas'])
 
     def test_field_limits(self):
         index_limits = [1, 5, 10, 100, 1000]
