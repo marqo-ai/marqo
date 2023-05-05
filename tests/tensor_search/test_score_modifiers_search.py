@@ -1,6 +1,6 @@
 import copy
 import unittest.mock
-from unittest.mock import patch
+from tests.utils.transition import add_docs_caller
 from marqo.errors import IndexNotFoundError, InvalidArgError
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import TensorField, IndexSettingsField, SearchMethod
@@ -150,7 +150,7 @@ class TestScoreModifiersSearch(MarqoTestCase):
              },
         ]
 
-        tensor_search.add_documents(config=self.config, index_name=self.index_name, docs=documents,
+        add_docs_caller(config=self.config, index_name=self.index_name, docs=documents,
                                     non_tensor_fields=["multiply_1", "multiply_2", "add_1", "add_2",
                                                        "filter"], auto_refresh=True)
 
@@ -199,7 +199,7 @@ class TestScoreModifiersSearch(MarqoTestCase):
     def test_search_score_modified_as_expected(self):
         documents = self.test_score_documents
 
-        tensor_search.add_documents(config=self.config, index_name=self.index_name, docs=documents,
+        add_docs_caller(config=self.config, index_name=self.index_name, docs=documents,
                                     non_tensor_fields=["multiply_1", "multiply_2", "add_1", "add_2",
                                                        "filter"], auto_refresh=True)
         normal_res = tensor_search.search(config=self.config, index_name=self.index_name,
@@ -223,7 +223,7 @@ class TestScoreModifiersSearch(MarqoTestCase):
     def test_search_score_modified_as_expected_with_filter(self):
         documents = self.test_score_documents
 
-        tensor_search.add_documents(config=self.config, index_name=self.index_name, docs=documents,
+        add_docs_caller(config=self.config, index_name=self.index_name, docs=documents,
                                     non_tensor_fields=["multiply_1", "multiply_2", "add_1", "add_2",
                                                        "filter"], auto_refresh=True)
         normal_res = tensor_search.search(config=self.config, index_name=self.index_name,
@@ -248,7 +248,7 @@ class TestScoreModifiersSearch(MarqoTestCase):
     def test_search_score_modified_as_expected_with_searchable_attributes(self):
         documents = self.test_score_documents
 
-        tensor_search.add_documents(config=self.config, index_name=self.index_name, docs=documents,
+        add_docs_caller(config=self.config, index_name=self.index_name, docs=documents,
                                     non_tensor_fields=["multiply_1", "multiply_2", "add_1", "add_2",
                                                        "filter"], auto_refresh=True)
         normal_res = tensor_search.search(config=self.config, index_name=self.index_name,
@@ -275,7 +275,7 @@ class TestScoreModifiersSearch(MarqoTestCase):
         invalid_fields = copy.deepcopy(documents[0])
         del invalid_fields["_id"]
 
-        tensor_search.add_documents(config=self.config, index_name=self.index_name, docs=documents,
+        add_docs_caller(config=self.config, index_name=self.index_name, docs=documents,
                                     non_tensor_fields=["multiply_1", "multiply_2", "add_1", "add_2",
                                                        "filter"], auto_refresh=True)
         normal_res = tensor_search.search(config=self.config, index_name=self.index_name,
@@ -353,7 +353,7 @@ class TestScoreModifiersSearch(MarqoTestCase):
              },
         ]
 
-        tensor_search.add_documents(config=self.config, index_name=self.index_name, docs=documents,
+        add_docs_caller(config=self.config, index_name=self.index_name, docs=documents,
                                     non_tensor_fields=["multiply_1", "multiply_2", "add_1", "add_2",
                                                        "filter"], auto_refresh=True)
 
@@ -520,7 +520,7 @@ class TestScoreModifiersSearch(MarqoTestCase):
             },
         ]
 
-        tensor_search.add_documents(config=self.config, index_name=self.index_name, docs=documents,
+        add_docs_caller(config=self.config, index_name=self.index_name, docs=documents,
                                     non_tensor_fields=["multiply_1", "multiply_2", "add_1", "add_2",
                                                        "filter"], auto_refresh=True)
         for invalid_score_modifiers in invalid_score_modifiers_list:
@@ -540,7 +540,7 @@ class TestScoreModifiersSearch(MarqoTestCase):
              "filter": "original"
              },
         ]
-        tensor_search.add_documents(config=self.config, index_name=self.index_name, docs=documents,
+        add_docs_caller(config=self.config, index_name=self.index_name, docs=documents,
                                     non_tensor_fields=["multiply_1", "multiply_2", "add_1", "add_2",
                                                        "filter"], auto_refresh=True)
         def pass_create_normal_tensor_search_query(*arg, **kwargs):
@@ -572,7 +572,7 @@ class TestScoreModifiersSearch(MarqoTestCase):
                     {"field_name": "add_2", "weight": 1,
                      }]
             }
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=index_name, docs=[
                 {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "id1-first"},
                 {"abc": "random text", "other field": "Close match hehehe", "_id": "id1-second"},

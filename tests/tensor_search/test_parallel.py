@@ -1,11 +1,9 @@
 from marqo.errors import IndexNotFoundError
-import unittest
-import copy
 from marqo.tensor_search import parallel
 import torch
 from tests.marqo_test import MarqoTestCase
 from marqo.tensor_search import tensor_search
-
+from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 
 class TestAddDocumentsPara(MarqoTestCase):
     """
@@ -44,6 +42,7 @@ class TestAddDocumentsPara(MarqoTestCase):
 
         data = [{'text':f'something {str(i)}', '_id': str(i)} for i in range(100)]
 
-        res = tensor_search.add_documents_orchestrator(config=self.config, index_name=self.index_name_1, docs=data,
-                                                       batch_size=10, processes=1, auto_refresh=True)
+        res = tensor_search.add_documents_orchestrator(config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1, docs=data, auto_refresh=True),
+            batch_size=10, processes=1)
         res = tensor_search.search(config=self.config, text='something', index_name=self.index_name_1)
