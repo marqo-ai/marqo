@@ -192,6 +192,7 @@ settings_schema = {
         NsFields.number_of_replicas: {
             "type": "integer",
             "minimum": 0,
+            "maximum": int(read_env_vars_and_defaults(EnvVars.MARQO_MAX_NUMBER_OF_REPLICAS)),
             "examples": [
                 1
             ]

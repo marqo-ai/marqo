@@ -1,7 +1,6 @@
 import pprint
 from typing import Any, Dict
-import pytest
-import os
+from unittest.mock import patch
 import requests
 from marqo.tensor_search.enums import IndexSettingsField, EnvVars
 from marqo.errors import MarqoApiError, MarqoError, IndexNotFoundError
@@ -11,6 +10,7 @@ from tests.marqo_test import MarqoTestCase
 from marqo.tensor_search.enums import IndexSettingsField as NsField
 from unittest import mock
 from marqo import errors
+from marqo.tensor_search import enums
 
 class TestCreateIndex(MarqoTestCase):
 
@@ -326,16 +326,21 @@ class TestCreateIndex(MarqoTestCase):
     def test_set_number_of_replicas(self):
         """ does it work if other params are filled?"""
         intended_replicas_count = 4
-        res_0 = tensor_search.create_vector_index(
-            index_name=self.index_name_1, config=self.config,
-            index_settings={
-                "index_defaults": {
-                    "treat_urls_and_pointers_as_images": True,
-                    "model": "ViT-B/32",
-                },
-                NsField.number_of_replicas: intended_replicas_count
-            }
-        )
+        with mock.patch("marqo.tensor_search.configs.default_env_vars",
+                        return_value = {enums.EnvVars.MARQO_MAX_NUMBER_OF_REPLICAS: int(intended_replicas_count)}):
+            print(read_env_vars_and_defaults(EnvVars.MARQO_MAX_NUMBER_OF_REPLICAS))
+            from marqo.tensor_search.models.settings_object import settings_schema
+            print(settings_schema["properties"][NsField.number_of_replicas]["maximum"])
+            res_0 = tensor_search.create_vector_index(
+                index_name=self.index_name_1, config=self.config,
+                index_settings={
+                    "index_defaults": {
+                        "treat_urls_and_pointers_as_images": True,
+                        "model": "ViT-B/32",
+                    },
+                    NsField.number_of_replicas: intended_replicas_count
+                }
+            )
         resp = requests.get(
             url=self.authorized_url + f"/{self.index_name_1}",
             headers=self.generic_header,
