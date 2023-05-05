@@ -4,6 +4,7 @@ import math
 import requests
 import random
 from unittest import mock
+from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.s2_inference.s2_inference import vectorise
 import unittest
 from marqo.tensor_search.enums import TensorField, SearchMethod, EnvVars, IndexSettingsField
@@ -13,11 +14,11 @@ from marqo.errors import (
 from marqo.tensor_search import api
 from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQueryEntity
 from marqo.tensor_search import tensor_search, constants, index_meta_cache, utils
-from fastapi.exceptions import RequestValidationError
 import numpy as np
 from tests.marqo_test import MarqoTestCase
 from typing import List
 import pydantic
+from tests.utils.transition import add_docs_caller
 
 
 def pass_through_vectorise(*arg, **kwargs):
@@ -47,7 +48,7 @@ class TestBulkSearch(MarqoTestCase):
                 pass
 
     def test_bulk_search_w_extra_parameters__raise_exception(self):
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1, docs=[
                 {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "id1-first"},
                 {"abc": "random text", "other field": "Close match hehehe", "_id": "id1-second"},
@@ -62,7 +63,7 @@ class TestBulkSearch(MarqoTestCase):
 
     @mock.patch('os.environ', {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': '0'}})
     def test_bulk_search_with_excessive_searchable_attributes(self):
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1, docs=[
                 {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "id1-first"},
                 {"abc": "random text", "other field": "Close match hehehe", "_id": "id1-second"},
@@ -78,7 +79,7 @@ class TestBulkSearch(MarqoTestCase):
     
     @mock.patch('os.environ', {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': '100'}})
     def test_bulk_search_with_max_searchable_attributes_no_searchable_attributes_field(self):
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1, docs=[
                 {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "id1-first"},
                 {"abc": "random text", "other field": "Close match hehehe", "_id": "id1-second"},
@@ -92,7 +93,7 @@ class TestBulkSearch(MarqoTestCase):
 
     @mock.patch('os.environ', {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': '1'}})
     def test_bulk_search_with_excessive_searchable_attributes(self):
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1, docs=[
                 {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "id1-first"},
                 {"abc": "random text", "other field": "Close match hehehe", "_id": "id1-second"},
@@ -107,7 +108,7 @@ class TestBulkSearch(MarqoTestCase):
 
     @mock.patch('os.environ', {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': None}})
     def test_bulk_search_with_no_max_searchable_attributes(self):
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1, docs=[
                 {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "id1-first"},
                 {"abc": "random text", "other field": "Close match hehehe", "_id": "id1-second"},
@@ -121,7 +122,7 @@ class TestBulkSearch(MarqoTestCase):
 
     @mock.patch('os.environ', {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': None}})
     def test_bulk_search_with_no_max_searchable_attributes_no_searchable_attributes_field(self):
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1, docs=[
                 {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "id1-first"},
                 {"abc": "random text", "other field": "Close match hehehe", "_id": "id1-second"},
@@ -134,7 +135,7 @@ class TestBulkSearch(MarqoTestCase):
 
 
     def test_bulk_search_no_queries_return_early(self):
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1, docs=[
                 {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "id1-first"},
                 {"abc": "random text", "other field": "Close match hehehe", "_id": "id1-second"},
@@ -144,19 +145,19 @@ class TestBulkSearch(MarqoTestCase):
         assert resp['result'] == []
 
     def test_bulk_search_multiple_indexes_and_queries(self):
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1, docs=[
                 {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "id1-first"},
                 {"abc": "random text", "other field": "Close match hehehe", "_id": "id1-second"},
             ], auto_refresh=True
         )
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_2, docs=[
                 {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "id2-first"},
                 {"abc": "random text", "other field": "Close match hehehe", "_id": "id2-second"},
             ], auto_refresh=True
         )
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_3, docs=[
                 {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "id3-first"},
                 {"abc": "random text", "other field": "Close match hehehe", "_id": "id3-second"},
@@ -205,7 +206,7 @@ class TestBulkSearch(MarqoTestCase):
                 }
             })
 
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1, docs=documents, auto_refresh=True,
             mappings = {"combo_text_image" : {"type":"multimodal_combination", "weights":{"image_field": 0,"text_field": 1}}}
         )
@@ -219,7 +220,7 @@ class TestBulkSearch(MarqoTestCase):
         assert res['result'][0]["hits"][0]["_score"] == res['result'][0]["hits"][1]["_score"]
 
     def test_bulk_search_works_on_uncached_field(self):
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1, docs=[
                 {"abc": "Exact match hehehe efgh ", "other field": "baaadd efgh ",
                  "_id": "5678", "finally": "some field efgh "},
@@ -245,7 +246,7 @@ class TestBulkSearch(MarqoTestCase):
         assert self.index_name_3 in index_meta_cache.get_cache()
 
     def test_bulk_search_query_boosted(self):
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1, docs=[
                 {
                     "Title": "The Travels of Marco Polo",
@@ -283,7 +284,7 @@ class TestBulkSearch(MarqoTestCase):
         self.assertGreater(score_boosted, score_neg_boosted)
 
     def test_bulk_search_query_invalid_boosted(self):
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1, docs=[
                 {
                     "Title": "The Travels of Marco Polo",
@@ -310,12 +311,12 @@ class TestBulkSearch(MarqoTestCase):
             pass
 
     def test_bulk_search_multiple_indexes(self):
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1, docs=[
                 {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "id1-first"},
                 {"abc": "random text", "other field": "Close match hehehe", "_id": "id1-second"},
             ], auto_refresh=True)
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_2, docs=[
                 {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "id2-first"},
                 {"abc": "random text", "other field": "Close match hehehe", "_id": "id2-second"},
@@ -343,7 +344,7 @@ class TestBulkSearch(MarqoTestCase):
     @mock.patch("marqo.tensor_search.tensor_search.bulk_msearch")
     def test_bulk_search_multiple_queries_single_msearch_request(self, mock_bulk_msearch):
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1, docs=[
                 {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "id1-first"},
                 {"abc": "random text", "other field": "Close match hehehe", "_id": "id1-second"},
@@ -432,7 +433,7 @@ class TestBulkSearch(MarqoTestCase):
 
 
     def test_bulk_search_multiple_search_methods(self):
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1, docs=[
                 {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "id1-first"},
                 {"abc": "random text", "other field": "Close match hehehe", "_id": "id1-second"},
@@ -456,7 +457,7 @@ class TestBulkSearch(MarqoTestCase):
         assert len(tensor_result["hits"]) > 0
     
     def test_bulk_search_highlight_per_search_query(self):
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1, docs=[
                 {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "id1-first"},
                 {"abc": "random text", "other field": "Close match hehehe", "_id": "id1-second"},
@@ -481,7 +482,7 @@ class TestBulkSearch(MarqoTestCase):
 
     @mock.patch("marqo.s2_inference.reranking.rerank.rerank_search_results")
     def test_bulk_search_rerank_per_search_query(self, mock_rerank_search_results):
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1, docs=[
                 {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "id1-first"},
                 {"abc": "random text", "other field": "Close match hehehe", "_id": "id1-second"},
@@ -507,7 +508,7 @@ class TestBulkSearch(MarqoTestCase):
         assert call_arg['num_highlights'] == 1
         
     def test_bulk_search_rerank_invalid(self):
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1, docs=[
                 {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "id1-first"},
                 {"abc": "random text", "other field": "Close match hehehe", "_id": "id1-second"},
@@ -529,7 +530,7 @@ class TestBulkSearch(MarqoTestCase):
         """TODO: make sure each return only has one doc for each ID,
                 - esp if matches are found in multiple fields
         """
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1, docs=[
                 {"abc": "Exact match hehehe efgh ", "other field": "baaadd efgh ",
                  "_id": "5678", "finally": "some field efgh "},
@@ -564,7 +565,7 @@ class TestBulkSearch(MarqoTestCase):
         query_text = """The Guardian is a British daily newspaper. It was founded in 1821 as The Manchester Guardian, and changed its name in 1959.[5] Along with its sister papers The Observer and The Guardian Weekly, The Guardian is part of the Guardian Media Group, owned by the Scott Trust.[6] The trust was created in 1936 to "secure the financial and editorial independence of The Guardian in perpetuity and to safeguard the journalistic freedom and liberal values of The Guardian free from commercial or political interference".[7] The trust was converted into a limited company in 2008, with a constitution written so as to maintain for The Guardian the same protections as were built into the structure of the Scott Trust by its creators. Profits are reinvested in journalism rather than distributed to owners or shareholders.[7] It is considered a newspaper of record in the UK.[8][9]
                     The editor-in-chief Katharine Viner succeeded Alan Rusbridger in 2015.[10][11] Since 2018, the paper's main newsprint sections have been published in tabloid format. As of July 2021, its print edition had a daily circulation of 105,134.[4] The newspaper has an online edition, TheGuardian.com, as well as two international websites, Guardian Australia (founded in 2013) and Guardian US (founded in 2011). The paper's readership is generally on the mainstream left of British political opinion,[12][13][14][15] and the term "Guardian reader" is used to imply a stereotype of liberal, left-wing or "politically correct" views.[3] Frequent typographical errors during the age of manual typesetting led Private Eye magazine to dub the paper the "Grauniad" in the 1960s, a nickname still used occasionally by the editors for self-mockery.[16]
                     """
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1, docs=[
                 {"_id": "12345", "Desc": "The Guardian is newspaper, read in the UK and other places around the world"},
                 {"_id": "abc12334", "Title": "Grandma Jo's family recipe. ",
@@ -578,7 +579,7 @@ class TestBulkSearch(MarqoTestCase):
         assert len(search_res[0]['hits']) == 2
 
     def test_bulk_vector_text_search_searchable_attributes(self):
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1, docs=[
                 {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "5678"},
                 {"abc": "random text", "other field": "Close match hehehe", "_id": "1234"},
@@ -593,7 +594,7 @@ class TestBulkSearch(MarqoTestCase):
             assert list(res["_highlights"].keys()) == ["other field"]
 
     def test_bulk_vector_text_search_searchable_attributes_multiple(self):
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1, docs=[
                 {"abc": "Exact match hehehe", "other field": "baaadd",
                  "Cool Field 1": "res res res", "_id": "5678"},
@@ -617,7 +618,7 @@ class TestBulkSearch(MarqoTestCase):
     def test_search_format(self):
         """Is the result formatted correctly?"""
         q = "Exact match hehehe"
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1, docs=[
                 {"abc": "Exact match hehehe", "other field": "baaadd",
                  "Cool Field 1": "res res res", "_id": "5678"},
@@ -643,7 +644,7 @@ class TestBulkSearch(MarqoTestCase):
         assert search_res['result'][0]["limit"] == 50
 
     def test_result_count_validation(self):
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1, docs=[
                 {"abc": "Exact match hehehe", "other field": "baaadd",
                  "Cool Field 1": "res res res", "_id": "5678"},
@@ -678,7 +679,7 @@ class TestBulkSearch(MarqoTestCase):
         assert len(search_results["result"][0]['hits']) >= 1
 
     def test_highlights_tensor(self):
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1, docs=[
                 {"abc": "some text", "other field": "baaadd", "_id": "5678"},
                 {"abc": "some text", "other field": "Close match hehehe", "_id": "1234"},
@@ -704,7 +705,7 @@ class TestBulkSearch(MarqoTestCase):
 
     def test_search_vector_int_field(self):
         """doesn't error out if there is a random int field"""
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1, docs=[
                 {"abc": "some text", "other field": "baaadd", "_id": "5678", "my_int": 144},
                 {"abc": "some text", "other field": "Close match hehehe", "_id": "1234", "my_int": 88},
@@ -718,7 +719,7 @@ class TestBulkSearch(MarqoTestCase):
         assert len(s_res["hits"]) > 0
 
     def test_filtering_list_case_tensor(self):
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1, docs=[
                 {"abc": "some text", "other field": "baaadd", "_id": "5678", "my_string": "b"},
                 {"abc": "some text", "other field": "Close match hehehe", "_id": "1234", "an_int": 2},
@@ -760,7 +761,7 @@ class TestBulkSearch(MarqoTestCase):
         settings = {"index_defaults": {"treat_urls_and_pointers_as_images": True, "model": "ViT-B/32"}}
         tensor_search.create_vector_index(index_name=self.index_name_1, index_settings=settings, config=self.config)
         hippo_img = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1, docs=[
                 {"img": hippo_img, "abc": "some text", "other field": "baaadd", "_id": "5678", "my_string": "b"},
                 {"img": hippo_img, "abc": "some text", "other field": "Close match hehehe", "_id": "1234", "an_int": 2},
@@ -793,7 +794,7 @@ class TestBulkSearch(MarqoTestCase):
 
 
     def test_filtering(self):
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1, docs=[
                 {"abc": "some text", "other field": "baaadd", "_id": "5678", "my_string": "b"},
                 {"abc": "some text", "other field": "Close match hehehe", "_id": "1234", "an_int": 2},
@@ -814,7 +815,7 @@ class TestBulkSearch(MarqoTestCase):
                     assert result[0]["hits"][j]["_id"] in expected_ids[i]
 
     def test_filter_spaced_fields(self):
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1, docs=[
                 {"abc": "some text", "other field": "baaadd", "_id": "5678", "my_string": "b"},
                 {"abc": "some text", "other field": "Close match hehehe", "_id": "1234", "an_int": 2},
@@ -864,7 +865,7 @@ class TestBulkSearch(MarqoTestCase):
         assert mock_config.search_device == "cpu"
 
     def test_search_other_types_subsearch(self):
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1, auto_refresh=True,
             docs=[{
                 "an_int": 1,
@@ -887,7 +888,7 @@ class TestBulkSearch(MarqoTestCase):
             "a_bool": True,
             "some_str": "blah"
         }]
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1, auto_refresh=True,
             docs=docs)
         for field, to_search in docs[0].items():
@@ -912,7 +913,7 @@ class TestBulkSearch(MarqoTestCase):
                           "abc": "random text", "other field": "Close match hehehe"},
             "9000": {"Cool Field 1": "somewhat match", "_id": "9000", "other field": "weewowow"}
         }
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1, docs=list(docs.values()), auto_refresh=True)
         results = tensor_search.bulk_search(
             marqo_config=self.config, query=BulkSearchQuery(
@@ -939,7 +940,7 @@ class TestBulkSearch(MarqoTestCase):
                           "abc": "random text", "other field": "Close match hehehe"},
             "9000": {"Cool Field 1": "somewhat match", "_id": "9000", "other field": "weewowow"}
         }
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1, docs=list(docs.values()), auto_refresh=True)
         for method in ("LEXICAL", "TENSOR"):
             search_res = tensor_search.bulk_search(
@@ -985,7 +986,7 @@ class TestBulkSearch(MarqoTestCase):
                           "abc": "random a text", "other field": "Close match hehehe"},
             "9000": {"Cool Field 1": "somewhat a match", "_id": "9000", "other field": "weewowow"}
         }
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1, docs=list(docs.values()), auto_refresh=True)
         for to_retrieve in [[], ["non existing field name"], ["other field", "non existing field name"]]:
             for method in ("TENSOR", "LEXICAL"):
@@ -1016,7 +1017,7 @@ class TestBulkSearch(MarqoTestCase):
             "i_3": {"field_1": " a ", "_id": "i_3", "field_2": "a",
                     "field_3": "a "}
         }
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1, docs=list(docs.values()), auto_refresh=True)
         for to_retrieve, to_search, expected_ids, expected_fields in [
             (["field_1"], ["field_3"], ["i_3"], ["field_1"]),
@@ -1051,7 +1052,7 @@ class TestBulkSearch(MarqoTestCase):
     
         vocab = requests.get(vocab_source).text.splitlines()
     
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1,
             docs=[{"Title": "a " + (" ".join(random.choices(population=vocab, k=25)))}
                   for _ in range(2000)], auto_refresh=False
@@ -1127,11 +1128,10 @@ class TestBulkSearch(MarqoTestCase):
         vocab_source = "https://www.mit.edu/~ecprice/wordlist.10000"
     
         vocab = requests.get(vocab_source).text.splitlines()
-    
         tensor_search.add_documents_orchestrator(
-            config=self.config, index_name=self.index_name_1,
+            config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1,
             docs=[{"Title": "a " + (" ".join(random.choices(population=vocab, k=25)))}
-                  for _ in range(700)], auto_refresh=False, processes=4, batch_size=50
+                  for _ in range(700)], auto_refresh=False), processes=4, batch_size=50
         )
         tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
     
@@ -1165,7 +1165,7 @@ class TestBulkSearch(MarqoTestCase):
         vocab = requests.get(vocab_source).text.splitlines()
         num_docs = 2000
     
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1,
             docs=[{"Title": "a " + (" ".join(random.choices(population=vocab, k=25))),
                     "_id": str(i)
@@ -1291,7 +1291,7 @@ class TestBulkSearch(MarqoTestCase):
             }
         ]
     
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1,
             docs=docs, auto_refresh=False
         )
@@ -1363,7 +1363,7 @@ class TestBulkSearch(MarqoTestCase):
             {"_id": "789",
              "image_field": url_2},
         ]
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, auto_refresh=True, index_name=self.index_name_1, docs=docs
         )
         res = tensor_search.bulk_search(
@@ -1390,7 +1390,7 @@ class TestBulkSearch(MarqoTestCase):
             {"field_a": "Construction and scaffolding equipment",
              "_id": 'irrelevant_doc'}
         ]
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1,
             docs=docs, auto_refresh=True
         )
@@ -1430,7 +1430,7 @@ class TestBulkSearch(MarqoTestCase):
         }
         tensor_search.create_vector_index(
             config=self.config, index_name=self.index_name_1, index_settings=image_index_config)
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1,
             docs=docs, auto_refresh=True
         )
@@ -1479,7 +1479,7 @@ class TestBulkSearch(MarqoTestCase):
         }
         tensor_search.create_vector_index(
             config=self.config, index_name=self.index_name_1, index_settings=image_index_config)
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1,
             docs=docs, auto_refresh=True
         )
@@ -1514,7 +1514,7 @@ class TestBulkSearch(MarqoTestCase):
         }
         tensor_search.create_vector_index(
             config=self.config, index_name=self.index_name_1, index_settings=image_index_config)
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1,
             docs=docs, auto_refresh=True
         )
@@ -1552,7 +1552,7 @@ class TestBulkSearch(MarqoTestCase):
         }
         tensor_search.create_vector_index(
             config=self.config, index_name=self.index_name_1, index_settings=image_index_config)
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1,
             docs=docs, auto_refresh=True
         )
@@ -1631,7 +1631,7 @@ class TestBulkSearch(MarqoTestCase):
         }
         tensor_search.create_vector_index(
             config=self.config, index_name=self.index_name_1, index_settings=image_index_config)
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1,
             docs=docs, auto_refresh=True
         )
@@ -1717,7 +1717,7 @@ class TestBulkSearch(MarqoTestCase):
         }
         tensor_search.create_vector_index(
             config=self.config, index_name=self.index_name_1, index_settings=image_index_config)
-        tensor_search.add_documents(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1,
             docs=docs, auto_refresh=True
         )

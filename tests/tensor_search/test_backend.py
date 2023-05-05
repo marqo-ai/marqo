@@ -1,7 +1,6 @@
 import copy
 import json
-import pprint
-
+from tests.utils.transition import add_docs_caller
 import requests
 from marqo.tensor_search import enums, backend, utils
 from marqo.tensor_search import tensor_search
@@ -62,8 +61,8 @@ class TestBackend(MarqoTestCase):
             config=mock_config, index_name=self.index_name_1)
         @mock.patch("marqo._httprequests.HttpRequests.put", mock__put)
         def run():
-            tensor_search.add_documents(config=mock_config, docs=[{"f1": "doc"}, {"f2":"C"}],
-                                        index_name=self.index_name_1, auto_refresh=True)
+            add_docs_caller(config=mock_config, docs=[{"f1": "doc"}, {"f2":"C"}],
+                            index_name=self.index_name_1, auto_refresh=True)
             return True
         assert run()
         args, kwargs0 = mock__put.call_args_list[0]
@@ -79,7 +78,7 @@ class TestBackend(MarqoTestCase):
             config=mock_config, index_name=self.index_name_1)
         @mock.patch("marqo._httprequests.HttpRequests.put", mock__put)
         def run():
-            tensor_search.add_documents(config=mock_config, docs=[{"f1": "doc"}, {"f2":"C"}],
+            add_docs_caller(config=mock_config, docs=[{"f1": "doc"}, {"f2":"C"}],
                                         index_name=self.index_name_1, auto_refresh=True)
             return True
         assert run()
@@ -108,7 +107,7 @@ class TestBackend(MarqoTestCase):
         )
         @mock.patch("marqo._httprequests.HttpRequests.put", mock__put)
         def run():
-            tensor_search.add_documents(config=mock_config, docs=[{"f1": "doc"}, {"f2":"C"}],
+            add_docs_caller(config=mock_config, docs=[{"f1": "doc"}, {"f2":"C"}],
                                         index_name=self.index_name_1, auto_refresh=True)
             return True
         assert run()
