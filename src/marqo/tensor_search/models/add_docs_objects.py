@@ -1,11 +1,16 @@
 from pydantic.dataclasses import dataclass
 from pydantic import Field
-from typing import Optional
+from typing import Optional, Union, Any, Sequence
+import numpy as np
 from marqo.tensor_search.models.external_apis.abstract_classes import ExternalAuth
 from typing import List
 
 
-@dataclass(frozen=True)
+class AddDocsParamsConfig:
+    arbitrary_types_allowed = True
+
+
+@dataclass(frozen=True, config=AddDocsParamsConfig)
 class AddDocsParams:
     """Represents the parameters of the tensor_search.add_documents() function
 
@@ -23,8 +28,11 @@ class AddDocsParams:
         mappings: a dictionary used to handle all the object field content in the doc, e.g., multimodal_combination field
 
     """
+
+    # this should only accept Sequences of dicts, but currently validation lies elsewhere
+    docs: Union[Sequence[Union[dict, Any]], np.ndarray]
+
     index_name: str
-    docs: List[dict]
     auto_refresh: bool
     non_tensor_fields: List = Field(default_factory=list)
     device: Optional[str] = None

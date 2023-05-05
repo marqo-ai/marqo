@@ -1,5 +1,5 @@
 import copy
-import fileinput
+from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 import functools
 import json
 import math
@@ -51,13 +51,18 @@ class TestAddDocuments(MarqoTestCase):
     def test_add_plain_id_field(self):
         """does a plain 'id' field work (in the doc body)? """
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
-        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
-            {
-                "_id": "123",
-                "id": "abcdefgh",
-                "title 1": "content 1",
-                "desc 2": "content 2. blah blah blah"
-            }], auto_refresh=True)
+        tensor_search.add_documents(
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1,
+                docs=[{
+                    "_id": "123",
+                    "id": "abcdefgh",
+                    "title 1": "content 1",
+                    "desc 2": "content 2. blah blah blah"
+                }],
+                auto_refresh=True
+            )
+        )
         assert tensor_search.get_document_by_id(
             config=self.config, index_name=self.index_name_1,
             document_id="123") == {
@@ -72,38 +77,44 @@ class TestAddDocuments(MarqoTestCase):
         Should only use the latest inserted ID. Make sure it doesn't get the first/middle one
         """
 
-        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
-            {
-                "_id": "3",
-                "title": "doc 3b"
-            },
-        
-        ], auto_refresh=True)
-        
+        tensor_search.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.index_name_1, docs=[{
+                    "_id": "3",
+                    "title": "doc 3b"
+                }],
+                auto_refresh=True
+            )
+        )
         doc_3_solo = tensor_search.get_document_by_id(
             config=self.config, index_name=self.index_name_1,
             document_id="3", show_vectors=True)
 
         tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
-        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
-            {
-                "_id": "1",
-                "title": "doc 1"
-            },
-            {
-                "_id": "2",
-                "title": "doc 2",
-            },
-            {
-                "_id": "3",
-                "title": "doc 3a",
-            },
-            {
-                "_id": "3",
-                "title": "doc 3b"
-            },
-        
-        ], auto_refresh=True)
+        tensor_search.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.index_name_1, docs=[
+                    {
+                        "_id": "1",
+                        "title": "doc 1"
+                    },
+                    {
+                        "_id": "2",
+                        "title": "doc 2",
+                    },
+                    {
+                        "_id": "3",
+                        "title": "doc 3a",
+                    },
+                    {
+                        "_id": "3",
+                        "title": "doc 3b"
+                    }],
+                auto_refresh=True
+            )
+        )
         
         doc_3_duped = tensor_search.get_document_by_id(
             config=self.config, index_name=self.index_name_1,
@@ -116,12 +127,16 @@ class TestAddDocuments(MarqoTestCase):
         """Updating a doc needs to update the corresponding chunks"
         """
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
-        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
-            {
-                "_id": "123",
-                "title 1": "content 1",
-                "desc 2": "content 2. blah blah blah"
-            }], auto_refresh=True)
+        tensor_search.add_documents(
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1, docs=[
+                    {
+                        "_id": "123",
+                        "title 1": "content 1",
+                        "desc 2": "content 2. blah blah blah"
+                    }],
+                auto_refresh=True)
+        )
         count0_res = requests.post(
             F"{self.endpoint}/{self.index_name_1}/_count",
             timeout=self.config.timeout,
@@ -129,12 +144,18 @@ class TestAddDocuments(MarqoTestCase):
         )
         count0 = count0_res.json()["count"]
         assert count0 == 1
-        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
-            {
-                "_id": "123",
-                "title 1": "content 1",
-                "desc 2": "content 2. blah blah blah"
-            }], auto_refresh=True)
+        tensor_search.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.index_name_1,
+                docs=[{
+                        "_id": "123",
+                        "title 1": "content 1",
+                        "desc 2": "content 2. blah blah blah"
+                }],
+                auto_refresh=True
+            )
+        )
         count1_res = requests.post(
             F"{self.endpoint}/{self.index_name_1}/_count",
             timeout=self.config.timeout,
@@ -150,7 +171,9 @@ class TestAddDocuments(MarqoTestCase):
         )
         assert r1.status_code == 404
         add_doc_res = tensor_search.add_documents(
-            config=self.config, index_name=self.index_name_1, docs=[{"abc": "def"}], auto_refresh=True
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1, docs=[{"abc": "def"}], auto_refresh=True
+            )
         )
         r2 = requests.get(
             url=f"{self.endpoint}/{self.index_name_1}",
@@ -171,7 +194,10 @@ class TestAddDocuments(MarqoTestCase):
 
     def test_default_index_settings_implicitly_created(self):
         add_doc_res = tensor_search.add_documents(
-            config=self.config, index_name=self.index_name_1, docs=[{"abc": "def"}], auto_refresh=True
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.index_name_1, docs=[{"abc": "def"}], auto_refresh=True
+            )
         )
         index_info = requests.get(
             url=f"{self.endpoint}/{self.index_name_1}",
@@ -184,7 +210,9 @@ class TestAddDocuments(MarqoTestCase):
 
     def test_add_new_fields_on_the_fly(self):
         add_doc_res = tensor_search.add_documents(
-            config=self.config, index_name=self.index_name_1, docs=[{"abc": "def"}], auto_refresh=True
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1, docs=[{"abc": "def"}], auto_refresh=True
+            )
         )
         cluster_ix_info = requests.get(
             url=f"{self.endpoint}/{self.index_name_1}",
@@ -194,7 +222,9 @@ class TestAddDocuments(MarqoTestCase):
         assert "__vector_abc" in cluster_ix_info.json()[self.index_name_1]["mappings"]["properties"][TensorField.chunks]["properties"]
         assert "dimension" in cluster_ix_info.json()[self.index_name_1]["mappings"]["properties"][TensorField.chunks]["properties"]["__vector_abc"]
         add_doc_res = tensor_search.add_documents(
-            config=self.config, index_name=self.index_name_1, docs=[{"abc": "1234", "The title book 1": "hahehehe"}], auto_refresh=True
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1, docs=[{"abc": "1234", "The title book 1": "hahehehe"}], auto_refresh=True
+            )
         )
         cluster_ix_info_2 = requests.get(
             url=f"{self.endpoint}/{self.index_name_1}",
@@ -213,7 +243,9 @@ class TestAddDocuments(MarqoTestCase):
             verify=False
         )
         add_doc_res_1 = tensor_search.add_documents(
-            config=self.config, index_name=self.index_name_1, docs=[{"abc": "def"}], auto_refresh=True
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1, docs=[{"abc": "def"}], auto_refresh=True
+            )
         )
         index_info_2 = requests.get(
             url=f"{self.endpoint}/{self.index_name_1}",
@@ -222,7 +254,9 @@ class TestAddDocuments(MarqoTestCase):
         assert index_meta_cache.get_cache()[self.index_name_1].properties[TensorField.chunks]["properties"]["__vector_abc"] \
                == index_info_2.json()[self.index_name_1]["mappings"]["properties"][TensorField.chunks]["properties"]["__vector_abc"]
         add_doc_res_2 = tensor_search.add_documents(
-            config=self.config, index_name=self.index_name_1, docs=[{"cool field": "yep yep", "haha": "heheh"}], auto_refresh=True
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1, docs=[{"cool field": "yep yep", "haha": "heheh"}], auto_refresh=True
+            )
         )
         index_info_3 = requests.get(
             url=f"{self.endpoint}/{self.index_name_1}",
@@ -234,7 +268,10 @@ class TestAddDocuments(MarqoTestCase):
 
     def test_add_multiple_fields(self):
         add_doc_res = tensor_search.add_documents(
-            config=self.config, index_name=self.index_name_1, docs=[{"cool v field": "yep yep", "haha ee": "heheh"}], auto_refresh=True
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1, docs=[{"cool v field": "yep yep", "haha ee": "heheh"}],
+                auto_refresh=True
+            )
         )
         cluster_ix_info = requests.get(
             url=f"{self.endpoint}/{self.index_name_1}",
@@ -249,25 +286,28 @@ class TestAddDocuments(MarqoTestCase):
 
     def test_add_docs_response_format(self):
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
-        add_res = tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
-            {
-                "_id": "123",
-                "id": "abcdefgh",
-                "title 1": "content 1",
-                "desc 2": "content 2. blah blah blah"
-            },
-            {
-                "_id": "456",
-                "id": "abcdefgh",
-                "title 1": "content 1",
-                "desc 2": "content 2. blah blah blah"
-            },
-            {
-                "_id": "789",
-                "subtitle": [1, 2, 3]
-            }
-        ], auto_refresh=True)
 
+
+        add_res = tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1, docs=[
+                {
+                    "_id": "123",
+                    "id": "abcdefgh",
+                    "title 1": "content 1",
+                    "desc 2": "content 2. blah blah blah"
+                },
+                {
+                    "_id": "456",
+                    "id": "abcdefgh",
+                    "title 1": "content 1",
+                    "desc 2": "content 2. blah blah blah"
+                },
+                {
+                    "_id": "789",
+                    "subtitle": [1, 2, 3]
+                }
+            ], auto_refresh=True)
+        )
         assert "errors" in add_res
         assert "processingTimeMs" in add_res
         assert "index_name" in add_res
@@ -308,8 +348,11 @@ class TestAddDocuments(MarqoTestCase):
         # For update
         for bad_doc_arg in bad_doc_args:
             add_res = tensor_search.add_documents(
-                config=self.config, index_name=self.index_name_1,
-                docs=bad_doc_arg, auto_refresh=True, update_mode='update')
+                config=self.config, add_docs_params=AddDocsParams(
+                    index_name=self.index_name_1,
+                   docs=bad_doc_arg, auto_refresh=True, update_mode='update'
+                )
+            )
             assert add_res['errors'] is True
             assert all(['error' in item for item in add_res['items'] if item['_id'].startswith('to_fail')])
             assert all(['result' in item
@@ -319,8 +362,11 @@ class TestAddDocuments(MarqoTestCase):
         for use_existing_tensors_flag in (True, False):
             for bad_doc_arg in bad_doc_args:
                 add_res = tensor_search.add_documents(
-                    config=self.config, index_name=self.index_name_1,
-                    docs=bad_doc_arg, auto_refresh=True, update_mode='replace', use_existing_tensors=use_existing_tensors_flag)
+                    config=self.config, add_docs_params=AddDocsParams(
+                            index_name=self.index_name_1, docs=bad_doc_arg, auto_refresh=True,
+                            update_mode='replace', use_existing_tensors=use_existing_tensors_flag
+                        )
+                    )
                 assert add_res['errors'] is True
                 assert all(['error' in item for item in add_res['items'] if item['_id'].startswith('to_fail')])
                 assert all(['result' in item
@@ -346,9 +392,11 @@ class TestAddDocuments(MarqoTestCase):
         # For update
         for bad_doc_arg in bad_doc_args:
             add_res = tensor_search.add_documents(
-                config=self.config, index_name=self.index_name_1,
-                docs=bad_doc_arg[0], auto_refresh=True, update_mode='update')
-
+                config=self.config, add_docs_params=AddDocsParams(
+                    index_name=self.index_name_1, docs=bad_doc_arg[0],
+                    auto_refresh=True, update_mode='update'
+                )
+            )
             assert add_res['errors'] is True
 
             succeeded_count = 0
@@ -362,8 +410,11 @@ class TestAddDocuments(MarqoTestCase):
         for use_existing_tensors_flag in (True, False):
             for bad_doc_arg in bad_doc_args:
                 add_res = tensor_search.add_documents(
-                    config=self.config, index_name=self.index_name_1,
-                    docs=bad_doc_arg[0], auto_refresh=True, update_mode='replace', use_existing_tensors=use_existing_tensors_flag)
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=self.index_name_1, docs=bad_doc_arg[0], auto_refresh=True,
+                        update_mode='replace', use_existing_tensors=use_existing_tensors_flag
+                    )
+                )
                 assert add_res['errors'] is True
                 succeeded_count = 0
                 for item in add_res['items']:
@@ -380,8 +431,11 @@ class TestAddDocuments(MarqoTestCase):
         for update_mode in ('replace', 'update'):
             for bad_doc_arg in bad_doc_args:
                 add_res = tensor_search.add_documents(
-                    config=self.config, index_name=self.index_name_1,
-                    docs=bad_doc_arg, auto_refresh=True, update_mode=update_mode)
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=self.index_name_1, docs=bad_doc_arg,
+                        auto_refresh=True, update_mode=update_mode
+                    )
+                )
                 assert add_res['errors'] is True
                 assert all(['error' in item for item in add_res['items'] if item['_id'].startswith('to_fail')])
 
@@ -392,9 +446,12 @@ class TestAddDocuments(MarqoTestCase):
         for update_mode in ('replace', 'update'):
             for bad_doc_arg in good_docs:
                 add_res = tensor_search.add_documents(
-                    config=self.config, index_name=self.index_name_1,
-                    docs=bad_doc_arg, auto_refresh=True, update_mode=update_mode,
-                    non_tensor_fields=["my_field"])
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=self.index_name_1,
+                        docs=bad_doc_arg, auto_refresh=True, update_mode=update_mode,
+                        non_tensor_fields=["my_field"]
+                    )
+                )
                 assert add_res['errors'] is False
 
     def test_add_documents_list_data_type_validation(self):
@@ -407,9 +464,12 @@ class TestAddDocuments(MarqoTestCase):
         for update_mode in ('replace', 'update'):
             for bad_doc_arg in bad_doc_args:
                 add_res = tensor_search.add_documents(
-                    config=self.config, index_name=self.index_name_1,
-                    docs=bad_doc_arg, auto_refresh=True, update_mode=update_mode,
-                    non_tensor_fields=["my_field"])
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=self.index_name_1,
+                        docs=bad_doc_arg, auto_refresh=True, update_mode=update_mode,
+                        non_tensor_fields=["my_field"]
+                    )
+                )
         assert add_res['errors'] is True
         assert all(['error' in item for item in add_res['items'] if item['_id'].startswith('to_fail')])
 
@@ -425,8 +485,11 @@ class TestAddDocuments(MarqoTestCase):
         @mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
         def run():
             tensor_search.add_documents(
-                config=self.config, index_name=self.index_name_1, device="cuda:411", docs=[{"some": "doc"}],
-                auto_refresh=True)
+                config=self.config, add_docs_params=AddDocsParams(
+                        index_name=self.index_name_1, device="cuda:411", docs=[{"some": "doc"}],
+                        auto_refresh=True
+                    )
+                )
             return True
 
         assert run()
@@ -445,8 +508,12 @@ class TestAddDocuments(MarqoTestCase):
         @mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
         def run():
             tensor_search.add_documents_orchestrator(
-                config=self.config, index_name=self.index_name_1, device="cuda:22", docs=[{"some": "doc"}, {"som other": "doc"}],
-                auto_refresh=True, batch_size=1, processes=1)
+                config=self.config, add_docs_params=AddDocsParams(
+                    index_name=self.index_name_1, device="cuda:22", docs=[{"some": "doc"}, {"som other": "doc"}],
+                    auto_refresh=True,
+                ),
+                batch_size=1, processes=1
+            )
             return True
 
         assert run()
@@ -465,8 +532,12 @@ class TestAddDocuments(MarqoTestCase):
         @mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
         def run():
             tensor_search.add_documents_orchestrator(
-                config=self.config, index_name=self.index_name_1, device="cuda:22", docs=[{"some": "doc"}, {"som other": "doc"}],
-                auto_refresh=True, batch_size=0)
+                config=self.config, add_docs_params=AddDocsParams(
+                    index_name=self.index_name_1, device="cuda:22", docs=[{"some": "doc"}, {"som other": "doc"}],
+                    auto_refresh=True
+                ),
+                batch_size=0
+            )
             return True
 
         assert run()
@@ -477,8 +548,10 @@ class TestAddDocuments(MarqoTestCase):
     def test_add_documents_empty(self):
         try:
             tensor_search.add_documents(
-                config=self.config, index_name=self.index_name_1, docs=[],
-                auto_refresh=True)
+                config=self.config, add_docs_params=AddDocsParams(
+                    index_name=self.index_name_1, docs=[],
+                   auto_refresh=True)
+            )
             raise AssertionError
         except BadRequestError:
             pass
@@ -529,7 +602,8 @@ class TestAddDocuments(MarqoTestCase):
                  ),
             ]
             for docs, expected_results in docs_results:
-                add_res = tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs, auto_refresh=True)
+                add_res = tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+                    index_name=self.index_name_1, docs=docs, auto_refresh=True))
                 assert len(add_res['items']) == len(expected_results)
                 for i, res_dict in enumerate(add_res['items']):
                     assert res_dict["_id"] == expected_results[i][0]
@@ -579,8 +653,10 @@ class TestAddDocuments(MarqoTestCase):
         for update_mode in ('update', 'replace'):
             for docs, expected_results in docs_results:
                 add_res = tensor_search.add_documents(
-                    config=self.config, index_name=self.index_name_1, docs=docs, auto_refresh=True,
-                    update_mode=update_mode
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=self.index_name_1, docs=docs, auto_refresh=True,
+                        update_mode=update_mode
+                    )
                 )
                 assert len(add_res['items']) == len(expected_results)
                 for i, res_dict in enumerate(add_res['items']):
@@ -633,8 +709,10 @@ class TestAddDocuments(MarqoTestCase):
             for docs, (good_fields, bad_fields) in docs_results:
                 # good_fields should appear in the mapping.
                 # bad_fields should not
-                tensor_search.add_documents(config=self.config, index_name=self.index_name_1,
-                                            docs=docs, auto_refresh=True, update_mode=update_mode)
+                tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+                        index_name=self.index_name_1, docs=docs, auto_refresh=True, update_mode=update_mode
+                    )
+                )
                 ii = backend.get_index_info(config=self.config, index_name=self.index_name_1)
                 customer_props = {field_name for field_name in ii.get_text_properties()}
                 reduced_vector_props = {field_name.replace(TensorField.vector_prefix, '')
@@ -690,7 +768,9 @@ class TestAddDocuments(MarqoTestCase):
             for docs, (good_fields, bad_fields) in docs_results:
                 # good_fields should appear in the mapping.
                 # bad_fields should not
-                tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs, auto_refresh=True)
+                tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+                    index_name=self.index_name_1, docs=docs, auto_refresh=True)
+                )
                 ii = backend.get_index_info(config=self.config, index_name=self.index_name_1)
                 customer_props = {field_name for field_name in ii.get_text_properties()}
                 reduced_vector_props = {field_name.replace(TensorField.vector_prefix, '')
@@ -705,11 +785,14 @@ class TestAddDocuments(MarqoTestCase):
             tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
 
     def patch_documents_tests(self, docs_, update_docs, get_docs):
-        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs_, auto_refresh=True)
+        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+            index_name=self.index_name_1, docs=docs_, auto_refresh=True
+        ))
         update_res = tensor_search.add_documents(
-            config=self.config, index_name=self.index_name_1, docs=update_docs,
-            auto_refresh=True, update_mode='update')
-
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1, docs=update_docs,
+                auto_refresh=True, update_mode='update'
+        ))
         for doc_id, check_dict in get_docs.items():
             updated_doc = tensor_search.get_document_by_id(
                 config=self.config, index_name=self.index_name_1, document_id=doc_id
@@ -844,7 +927,8 @@ class TestAddDocuments(MarqoTestCase):
             3) there are no dangling chunks
         """
         docs_ = [{"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}]
-        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs_, auto_refresh=True)
+        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1, docs=docs_, auto_refresh=True))
         original_doc = requests.get(
             url=F"{self.endpoint}/{self.index_name_1}/_doc/789",
             verify=False
@@ -853,10 +937,13 @@ class TestAddDocuments(MarqoTestCase):
         description_chunk = [chunk for chunk in original_doc.json()['_source']['__chunks']
                              if chunk['__field_name'] == 'Description'][0]
         update_res = tensor_search.add_documents(
-            config=self.config, index_name=self.index_name_1, docs=[
-                {"_id": "789", "Title": "Story of Alice Appleseed",
-                 "Description": "Alice grew up in Rooster, Texas."}],
-            auto_refresh=True, update_mode='update')
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1, docs=[{
+                    "_id": "789", "Title": "Story of Alice Appleseed",
+                    "Description": "Alice grew up in Rooster, Texas."}],
+                auto_refresh=True, update_mode='update'
+            )
+        )
         updated_doc = requests.get(
             url=F"{self.endpoint}/{self.index_name_1}/_doc/789",
             verify=False
@@ -878,13 +965,22 @@ class TestAddDocuments(MarqoTestCase):
         """Can we search with the new vectors
         """
         docs_ = [{"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}]
-        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs_, auto_refresh=True)
+        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1, docs=docs_, auto_refresh=True))
         search_str = "Who is an alien?"
         first_search = tensor_search.search(config=self.config, index_name=self.index_name_1, text=search_str)
-        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
-            {"_id": "789", "Title": "Story of Alice Appleseed",
-             "Description": "Unbeknownst to most, Alice is actually an alien in disguise. She uses a UFO to commute to work."}
-        ], auto_refresh=True, update_mode='update')
+        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1,
+                docs=[
+                    {
+                        "_id": "789", "Title": "Story of Alice Appleseed",
+                        "Description": "Unbeknownst to most, Alice is actually an alien in disguise. "
+                                       "She uses a UFO to commute to work."
+                    }
+                ],
+                auto_refresh=True, update_mode='update'
+            )
+        )
         second_search = tensor_search.search(config=self.config, index_name=self.index_name_1, text=search_str)
         assert not np.isclose(first_search["hits"][0]["_score"], second_search["hits"][0]["_score"])
         assert second_search["hits"][0]["_score"] > first_search["hits"][0]["_score"]
@@ -893,10 +989,15 @@ class TestAddDocuments(MarqoTestCase):
         """Can we search with the new field?
         """
         docs_ = [{"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}]
-        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs_, auto_refresh=True)
-        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
-            {"_id": "789", "Title": "Story of Alice Appleseed", "Favourite Wavelength": "2 microns"}
-        ], auto_refresh=True, update_mode='update')
+        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1, docs=docs_, auto_refresh=True))
+        tensor_search.add_documents(config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.index_name_1, docs=[
+                    {"_id": "789", "Title": "Story of Alice Appleseed", "Favourite Wavelength": "2 microns"}],
+                auto_refresh=True, update_mode='update'
+            )
+        )
         searched = tensor_search.search(
             config=self.config, index_name=self.index_name_1, text="A very small length",
             searchable_attributes=['Favourite Wavelength']
@@ -906,8 +1007,11 @@ class TestAddDocuments(MarqoTestCase):
 
     def patch_documents_filtering_test(self, original_add_docs, update_add_docs, filter_string, expected_ids: set):
         """Helper for filtering tests"""
-        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=original_add_docs, auto_refresh=True)
-        res = tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=update_add_docs, auto_refresh=True, update_mode='update')
+        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+            index_name=self.index_name_1, docs=original_add_docs, auto_refresh=True))
+        res = tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+            index_name=self.index_name_1, docs=update_add_docs, auto_refresh=True, update_mode='update'
+        ))
 
         abc = requests.get(
             url=F"{self.endpoint}/{self.index_name_1}/_doc/789",
@@ -970,8 +1074,10 @@ class TestAddDocuments(MarqoTestCase):
 
     def test_put_document_override_non_tensor_field(self):
         docs_ = [{"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}]
-        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs_, auto_refresh=True, non_tensor_fields=["Title"])
-        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs_, auto_refresh=True)
+        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+            index_name=self.index_name_1, docs=docs_, auto_refresh=True, non_tensor_fields=["Title"]))
+        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+            index_name=self.index_name_1, docs=docs_, auto_refresh=True))
         resp = tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="789", show_vectors=True)
 
         assert len(resp[enums.TensorField.tensor_facets]) == 2
@@ -983,7 +1089,9 @@ class TestAddDocuments(MarqoTestCase):
 
     def test_add_document_with_non_tensor_field(self):
         docs_ = [{"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}]
-        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs_, auto_refresh=True, non_tensor_fields=["Title"])
+        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+            index_name=self.index_name_1, docs=docs_, auto_refresh=True, non_tensor_fields=["Title"]
+        ))
         resp = tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="789", show_vectors=True)
 
         assert len(resp[enums.TensorField.tensor_facets]) == 1
@@ -992,10 +1100,10 @@ class TestAddDocuments(MarqoTestCase):
         assert "Description" in resp[enums.TensorField.tensor_facets][0]
 
     def test_put_no_update(self):
-        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[{'_id':'123'}],
-                                    auto_refresh=True, update_mode='replace')
-        res = tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[{'_id':'123'}],
-                                          auto_refresh=True, update_mode='replace')
+        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+            index_name=self.index_name_1, docs=[{'_id':'123'}], auto_refresh=True, update_mode='replace'))
+        res = tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+            index_name=self.index_name_1, docs=[{'_id':'123'}], auto_refresh=True, update_mode='replace'))
         assert {'_id':'123'} == tensor_search.get_document_by_id(
             config=self.config, index_name=self.index_name_1, document_id='123')
 
@@ -1025,14 +1133,18 @@ class TestAddDocuments(MarqoTestCase):
             {"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}
         ]
 
-        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs_, auto_refresh=True)
+        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+            index_name=self.index_name_1, docs=docs_, auto_refresh=True
+        ))
         update_res = tensor_search.add_documents_orchestrator(
-            config=self.config, index_name=self.index_name_1, docs=[
-                  {"_id": "789", "Title": "Woohoo", "Mega": "Coool"},
-                  {"_id": "789", "Luminosity": "Extreme"},
-                  {"_id": "789", "Temp": 12.5},
+            config=self.config, processes=4, batch_size=1, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1, docs=[
+                      {"_id": "789", "Title": "Woohoo", "Mega": "Coool"},
+                      {"_id": "789", "Luminosity": "Extreme"},
+                      {"_id": "789", "Temp": 12.5},
                   ],
-            auto_refresh=True, update_mode='update', processes=4, batch_size=1)
+            auto_refresh=True, update_mode='update' )
+        )
         time.sleep(5)
         updated_doc = tensor_search.get_document_by_id(
             config=self.config, index_name=self.index_name_1, document_id='789'
@@ -1063,12 +1175,14 @@ class TestAddDocuments(MarqoTestCase):
         @mock.patch("os.environ", mock_environ)
         def run():
             update_res = tensor_search.add_documents(
-                config=self.config, index_name=self.index_name_1, docs=[
+                config=self.config, add_docs_params=AddDocsParams(
+                    index_name=self.index_name_1, docs=[
                         {"_id": "123", 'Bad field': "edf " * (max_size // 4)},
                         {"_id": "789", "Breaker": "abc " * ((max_size // 4) - 500)},
                         {"_id": "456", "Luminosity": "exc " * (max_size // 4)},
                       ],
-                auto_refresh=True, update_mode='update')
+                auto_refresh=True, update_mode='update'
+            ))
             items = update_res['items']
             assert update_res['errors']
             assert 'error' in items[0] and 'error' in items[2]
@@ -1085,10 +1199,12 @@ class TestAddDocuments(MarqoTestCase):
         @mock.patch("os.environ", mock_environ)
         def run():
             update_res = tensor_search.add_documents(
-                config=self.config, index_name=self.index_name_1, docs=[
+                config=self.config, add_docs_params=AddDocsParams(
+                    index_name=self.index_name_1, docs=[
                         {"_id": "123", 'Bad field': "edf " * (max_size // 4)},
                       ],
-                auto_refresh=True, update_mode='update')
+                    auto_refresh=True, update_mode='update')
+            )
             items = update_res['items']
             assert update_res['errors']
             assert 'error' in items[0]
@@ -1101,10 +1217,12 @@ class TestAddDocuments(MarqoTestCase):
             @mock.patch("os.environ", env_dict)
             def run():
                 update_res = tensor_search.add_documents(
-                    config=self.config, index_name=self.index_name_1, docs=[
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=self.index_name_1, docs=[
                             {"_id": "123", 'Some field': "Some content"},
-                          ],
-                    auto_refresh=True, update_mode='update')
+                        ],
+                        auto_refresh=True, update_mode='update'
+                ))
                 items = update_res['items']
                 assert not update_res['errors']
                 assert 'error' not in items[0]
@@ -1116,9 +1234,10 @@ class TestAddDocuments(MarqoTestCase):
         test_doc = {"_id": "123", "my_list": ["data1", "mydata"], "myfield2": "mydata2"}
         tensor_search.add_documents(
             self.config,
-            docs=[test_doc],
-            auto_refresh=True, index_name=self.index_name_1, non_tensor_fields=['my_list']
-        )
+            add_docs_params=AddDocsParams(
+                docs=[test_doc], auto_refresh=True,
+                index_name=self.index_name_1, non_tensor_fields=['my_list']
+        ))
         doc_w_facets = tensor_search.get_document_by_id(
             self.config, index_name=self.index_name_1, document_id='123', show_vectors=True)
 
@@ -1158,15 +1277,18 @@ class TestAddDocuments(MarqoTestCase):
     def test_no_tensor_field_replace(self):
         # test replace and update workflows
         tensor_search.add_documents(
-            self.config,
-            docs=[{"_id": "123", "myfield": "mydata", "myfield2": "mydata2"}],
-            auto_refresh=True, index_name=self.index_name_1
+            self.config, add_docs_params=AddDocsParams(
+                docs=[{"_id": "123", "myfield": "mydata", "myfield2": "mydata2"}],
+                auto_refresh=True, index_name=self.index_name_1
+            )
         )
         tensor_search.add_documents(
             self.config,
-            docs=[{"_id": "123", "myfield": "mydata"}],
-            auto_refresh=True, index_name=self.index_name_1,
-            non_tensor_fields=["myfield"]
+            add_docs_params=AddDocsParams(
+                docs=[{"_id": "123", "myfield": "mydata"}],
+                auto_refresh=True, index_name=self.index_name_1,
+                non_tensor_fields=["myfield"]
+            )
         )
         doc_w_facets = tensor_search.get_document_by_id(
             self.config, index_name=self.index_name_1, document_id='123', show_vectors=True)
@@ -1176,15 +1298,17 @@ class TestAddDocuments(MarqoTestCase):
     def test_no_tensor_field_update(self):
         # test replace and update workflows
         tensor_search.add_documents(
-            self.config,
-            docs=[{"_id": "123", "myfield": "mydata", "myfield2": "mydata2"}],
-            auto_refresh=True, index_name=self.index_name_1
+            self.config, add_docs_params=AddDocsParams(
+                docs=[{"_id": "123", "myfield": "mydata", "myfield2": "mydata2"}],
+                auto_refresh=True, index_name=self.index_name_1
+            )
         )
         tensor_search.add_documents(
-            self.config,
-            docs=[{"_id": "123", "myfield": "mydata"}],
-            auto_refresh=True, index_name=self.index_name_1,
-            non_tensor_fields=["myfield"], update_mode='update'
+            self.config, add_docs_params=AddDocsParams(
+                docs=[{"_id": "123", "myfield": "mydata"}],
+                auto_refresh=True, index_name=self.index_name_1,
+                non_tensor_fields=["myfield"], update_mode='update'
+            )
         )
         doc_w_facets = tensor_search.get_document_by_id(
             self.config, index_name=self.index_name_1, document_id='123', show_vectors=True)
@@ -1195,10 +1319,11 @@ class TestAddDocuments(MarqoTestCase):
 
     def test_no_tensor_field_on_empty_ix(self):
         tensor_search.add_documents(
-            self.config,
-            docs=[{"_id": "123", "myfield": "mydata"}],
-            auto_refresh=True, index_name=self.index_name_1,
-            non_tensor_fields=["myfield"]
+            self.config, add_docs_params=AddDocsParams(
+                docs=[{"_id": "123", "myfield": "mydata"}],
+                auto_refresh=True, index_name=self.index_name_1,
+                non_tensor_fields=["myfield"]
+            )
         )
         doc_w_facets = tensor_search.get_document_by_id(
             self.config, index_name=self.index_name_1, document_id='123', show_vectors=True)
@@ -1207,10 +1332,11 @@ class TestAddDocuments(MarqoTestCase):
 
     def test_no_tensor_field_on_empty_ix_other_field(self):
         tensor_search.add_documents(
-            self.config,
-            docs=[{"_id": "123", "myfield": "mydata", "myfield2": "mydata"}],
-            auto_refresh=True, index_name=self.index_name_1,
-            non_tensor_fields=["myfield"]
+            self.config, add_docs_params=AddDocsParams(
+                docs=[{"_id": "123", "myfield": "mydata", "myfield2": "mydata"}],
+                auto_refresh=True, index_name=self.index_name_1,
+                non_tensor_fields=["myfield"]
+            )
         )
         doc_w_facets = tensor_search.get_document_by_id(
             self.config, index_name=self.index_name_1, document_id='123', show_vectors=True)
@@ -1263,11 +1389,13 @@ class TestAddDocuments(MarqoTestCase):
                 )
                 res1 = tensor_search.add_documents(
                     self.config,
-                    docs=[{"_id": str(doc_num),
-                           "location": hippo_url,
-                           "some_field": "blah"} for doc_num in range(c)],
-                    auto_refresh=True, index_name=self.index_name_1,
-                    update_mode=update_mode
+                    add_docs_params=AddDocsParams(
+                        docs=[{"_id": str(doc_num),
+                               "location": hippo_url,
+                               "some_field": "blah"} for doc_num in range(c)],
+                        auto_refresh=True, index_name=self.index_name_1,
+                        update_mode=update_mode
+                    )
                 )
                 assert c == tensor_search.get_stats(self.config,
                                                     index_name=self.index_name_1)['numberOfDocuments']
@@ -1275,11 +1403,13 @@ class TestAddDocuments(MarqoTestCase):
                 assert _check_get_docs(doc_count=c, some_field_value='blah')
                 res2 = tensor_search.add_documents(
                     self.config,
-                    docs=[{"_id": str(doc_num),
-                           "location": hippo_url,
-                           "some_field": "blah2"} for doc_num in range(c)],
-                    auto_refresh=True, index_name=self.index_name_1,
-                    non_tensor_fields=["myfield"], update_mode=update_mode
+                    add_docs_params=AddDocsParams(
+                        docs=[{"_id": str(doc_num),
+                               "location": hippo_url,
+                               "some_field": "blah2"} for doc_num in range(c)],
+                        auto_refresh=True, index_name=self.index_name_1,
+                        non_tensor_fields=["myfield"], update_mode=update_mode
+                    )
                 )
                 assert not res2['errors']
                 assert c == tensor_search.get_stats(self.config,
@@ -1323,23 +1453,26 @@ class TestAddDocuments(MarqoTestCase):
                 )
                 res1 = tensor_search.add_documents(
                     self.config,
-                    docs=[{"_id": str(doc_num),
-                           "location": hippo_url,
-                           "some_field": "blah"} for doc_num in range(c)],
-                    auto_refresh=True, index_name=self.index_name_1,
-                    non_tensor_fields=["location"], update_mode=update_mode
-                )
+                    add_docs_params=AddDocsParams(
+                        docs=[{"_id": str(doc_num),
+                               "location": hippo_url,
+                               "some_field": "blah"} for doc_num in range(c)],
+                        auto_refresh=True, index_name=self.index_name_1,
+                        non_tensor_fields=["location"], update_mode=update_mode
+                ))
                 assert c == tensor_search.get_stats(self.config,
                                                     index_name=self.index_name_1)['numberOfDocuments']
                 assert not res1['errors']
                 assert _check_get_docs(doc_count=c, some_field_value='blah')
                 res2 = tensor_search.add_documents(
                     self.config,
-                    docs=[{"_id": str(doc_num),
-                           "location": hippo_url,
-                           "some_field": "blah2"} for doc_num in range(c)],
-                    auto_refresh=True, index_name=self.index_name_1,
-                    non_tensor_fields=["location"], update_mode=update_mode
+                    add_docs_params=AddDocsParams(
+                        docs=[{"_id": str(doc_num),
+                               "location": hippo_url,
+                               "some_field": "blah2"} for doc_num in range(c)],
+                        auto_refresh=True, index_name=self.index_name_1,
+                        non_tensor_fields=["location"], update_mode=update_mode
+                    )
                 )
                 assert not res2['errors']
                 assert c == tensor_search.get_stats(self.config,

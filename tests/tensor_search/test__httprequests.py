@@ -1,6 +1,6 @@
 import requests
 from tests.marqo_test import MarqoTestCase
-from marqo import _httprequests
+from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from unittest import mock
 from marqo.tensor_search import tensor_search
 from marqo.errors import (
@@ -31,8 +31,10 @@ class Test_HttpRequests(MarqoTestCase):
         def run():
             try:
                 res = tensor_search.add_documents(
-                    config=self.config, index_name=self.index_name_1,
-                    docs=[{"some ": "doc"}], auto_refresh=True
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=self.index_name_1,
+                        docs=[{"some ": "doc"}], auto_refresh=True
+                    )
                 )
                 raise AssertionError
             except TooManyRequestsError:
