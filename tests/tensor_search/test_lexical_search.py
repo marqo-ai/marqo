@@ -512,4 +512,3 @@ class TestLexicalSearch(MarqoTestCase):
 
         assert len(res["hits"]) == 3, "this is a bug at the moment. the filter is not applied. " \
                                       "fix it will introduce the error."
-
