@@ -1,5 +1,5 @@
 from marqo.tensor_search import enums as ns_enums
-from marqo.tensor_search.enums import IndexSettingsField as NsFields, EnvVars
+from marqo.tensor_search.enums import IndexSettingsField as NsFields, EnvVars, ObjectStores
 from marqo.tensor_search.utils import read_env_vars_and_defaults
 
 settings_schema = {

@@ -91,6 +91,11 @@ class TestModelAuth(MarqoTestCase):
     def test_model_loads_from_multimodal_combination(self):
         pass
 
+    def test_no_creds_error(self):
+        """in s3, if there aren't creds"""
+
+    def test_bad_creds_error(self):
+        """in s3, if creds aren't valid"""
 
     ################## TESTS FOR VECTORISE PARAMS
 

@@ -15,7 +15,7 @@ from marqo.s2_inference.types import *
 from marqo.s2_inference.logger import get_logger
 from marqo.s2_inference.errors import IncompatibleModelDeviceError, InvalidModelPropertiesError
 from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize
-from marqo.s2_inference.processing.custom_clip_utils import HFTokenizer, download_pretrained_from_url
+from marqo.s2_inference.processing.custom_clip_utils import HFTokenizer, download_model
 from torchvision.transforms import InterpolationMode
 from marqo.s2_inference.configs import ModelCache
 

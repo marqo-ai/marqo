@@ -5,10 +5,9 @@ from marqo.tensor_search.models.external_apis.abstract_classes import (
 )
 
 
-@dataclass(frozen=True)
 class S3Auth(ExternalAuth):
     aws_secret_access_key: str
-    aws_access_key: str
+    aws_access_key_id: str
     aws_session_token: Optional[str] = None
 
 

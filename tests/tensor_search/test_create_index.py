@@ -367,19 +367,21 @@ class TestCreateIndex(MarqoTestCase):
                 )
                 assert not res_1['errors']
                 res_1_2 = tensor_search.add_documents(
-                    index_name=self.index_name_1, docs=[
-                        {'f0': 'this is fine, but there is no resiliency.'},
-                        {f"f{i}": "some content" for i in range(lim // 2 + 1)},
-                        {'f0': 'this is fine. Still no resilieny.'}
-                    ],
-                    auto_refresh=True, config=self.config
+                    add_docs_params=AddDocsParams(index_name=self.index_name_1, docs=[
+                            {'f0': 'this is fine, but there is no resiliency.'},
+                            {f"f{i}": "some content" for i in range(lim // 2 + 1)},
+                            {'f0': 'this is fine. Still no resilieny.'}],
+                        auto_refresh=True),
+                    config=self.config
                 )
                 assert not res_1_2['errors']
                 try:
                     res_2 = tensor_search.add_documents(
-                        index_name=self.index_name_1, docs=[
-                            {'fx': "blah"}
-                        ], auto_refresh=True, config=self.config
+                        add_docs_params=AddDocsParams(
+                            index_name=self.index_name_1,
+                            docs=[{'fx': "blah"}],
+                            auto_refresh=True),
+                        config=self.config
                     )
                     raise AssertionError
                 except errors.IndexMaxFieldsError:
