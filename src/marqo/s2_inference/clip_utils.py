@@ -1,7 +1,8 @@
 # from torch import FloatTensor
 # from typing import Any, Dict, List, Optional, Union
 import os
-import PIL.Image
+from marqo.tensor_search.enums import ModelProperties, InferenceParams
+from marqo.tensor_search.models.private_models import ModelLocation, ModelAuth
 import validators
 import requests
 import numpy as np
@@ -205,11 +206,30 @@ class CLIP:
         self.truncate = truncate
         self.model_properties = kwargs.get("model_properties", dict())
 
+        # model_auth gets passed through add_docs and search requests:
+        model_auth = kwargs.get(InferenceParams.model_auth, None)
+        if model_auth is not None:
+            self.model_auth = model_auth
+        else:
+            self.model_auth = None
+
+    def _download_from_repo(self):
+        """Downloads model from an external repo like s3 and returns the filepath"""
+        model_location = ModelLocation(**self.model_properties[ModelProperties.model_location])
+        download_model_params = {"repo_location": model_location}
+
+        if model_location.auth_required:
+            download_model_params['auth'] = self.model_auth
+
+        return download_model(**download_model_params)
+
     def load(self) -> None:
+
+        model_location_presence = ModelProperties.model_location in self.model_properties
 
         path = self.model_properties.get("localpath", None) or self.model_properties.get("url",None)
 
-        if path is None:
+        if path is None and not model_location_presence:
             # The original method to load the openai clip model
             # https://github.com/openai/CLIP/issues/30
             self.model, self.preprocess = clip.load(self.model_type, device='cpu', jit=False, download_root=ModelCache.clip_cache_path)
@@ -217,10 +237,17 @@ class CLIP:
             self.tokenizer = clip.tokenize
         else:
             logger.info("Detecting custom clip model path. We use generic clip model loading.")
-            if os.path.isfile(path):
+            if path and model_location_presence:
+                raise InvalidModelPropertiesError(
+                    "Only one of `url`, `localpath` or `model_location can be specified in "
+                    "model_properties`. Please ensure that only one of these is specified in "
+                    "model_properties and retry.")
+            if model_location_presence:
+                self.model_path = self._download_from_repo()
+            elif os.path.isfile(path):
                 self.model_path = path
             elif validators.url(path):
-                self.model_path = download_pretrained_from_url(path)
+                self.model_path = download_model(url=path)
             else:
                 raise InvalidModelPropertiesError(f"Marqo can not load the custom clip model."
                                                   f"The provided model path `{path}` is neither a local file nor a valid url."
@@ -356,23 +383,33 @@ class OPEN_CLIP(CLIP):
         # https://github.com/mlfoundations/open_clip
         path = self.model_properties.get("localpath", None) or self.model_properties.get("url", None)
 
-        if path is None:
+        model_location_presence = ModelProperties.model_location in self.model_properties
+
+        if path is None and not model_location_presence:
             self.model, _, self.preprocess = open_clip.create_model_and_transforms(self.model_name,
                                                                                    pretrained=self.pretrained,
                                                                                    device=self.device, jit=False, cache_dir=ModelCache.clip_cache_path)
             self.tokenizer = open_clip.get_tokenizer(self.model_name)
             self.model.eval()
         else:
+            if path and model_location_presence:
+                raise InvalidModelPropertiesError(
+                    "Only one of `url`, `localpath` or `model_location can be specified in "
+                    "model_properties`. Please ensure that only one of these is specified in "
+                    "model_properties and retry.")
             logger.info("Detecting custom clip model path. We use generic clip model loading.")
-            if os.path.isfile(path):
+            if model_location_presence:
+                self.model_path = self._download_from_repo()
+            elif os.path.isfile(path):
                 self.model_path = path
             elif validators.url(path):
-                self.model_path = download_pretrained_from_url(path)
+                self.model_path = download_model(url=path)
             else:
-                raise InvalidModelPropertiesError(f"Marqo can not load the custom clip model."
-                                                  f"The provided model path `{path}` is neither a local file nor a valid url."
-                                                  f"Please check your provided model url and retry."
-                                                  f"Check `https://docs.marqo.ai/0.0.13/Models-Reference/dense_retrieval/#generic-clip-models` for more info.")
+                raise InvalidModelPropertiesError(
+                    f"Marqo cannot load the custom clip model. "
+                    f"The provided model path `{path}` is neither a local file nor a valid url. "
+                    f"Please check your provided model url and retry. "
+                    f"Check `https://docs.marqo.ai/0.0.13/Models-Reference/dense_retrieval/#generic-clip-models` for more info.")
 
             self.precision = self.model_properties.get("precision", "fp32")
             self.jit = self.model_properties.get("jit", False)

@@ -137,8 +137,11 @@ class ObjectStores:
 
 class ModelProperties:
     auth_required = 'auth_required'
+    model_location = 'model_location'
 
 
+class InferenceParams:
+    model_auth = "model_auth"
 # Perhaps create a ThrottleType to differentiate thread_count and data_size throttling mechanisms
     
 

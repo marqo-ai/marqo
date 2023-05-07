@@ -11,7 +11,6 @@ class S3Auth(ExternalAuth):
     aws_session_token: Optional[str] = None
 
 
-@dataclass(frozen=True)
 class S3Location(ObjectLocation):
     Bucket: str
     Key: str

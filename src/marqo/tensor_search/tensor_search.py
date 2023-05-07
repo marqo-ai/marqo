@@ -573,7 +573,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                         model_name=index_info.model_name,
                         model_properties=_get_model_properties(index_info), content=content_chunks,
                         device=selected_device, normalize_embeddings=normalize_embeddings,
-                        infer=infer_if_image)
+                        infer=infer_if_image, model_auth=add_docs_params.model_auth)
 
                     end_time = timer()
                     total_vectorise_time += (end_time - start_time)

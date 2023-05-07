@@ -2,7 +2,7 @@ from pydantic.dataclasses import dataclass
 from pydantic import Field
 from typing import Optional, Union, Any, Sequence
 import numpy as np
-from marqo.tensor_search.models.external_apis.abstract_classes import ExternalAuth
+from marqo.tensor_search.models.private_models import ModelAuth
 from typing import List
 
 
@@ -43,4 +43,4 @@ class AddDocsParams:
     image_download_headers: dict = Field(default_factory=dict)
     use_existing_tensors: bool = False
     mappings: Optional[dict] = None
-    model_auth: Optional[ExternalAuth] = None
+    model_auth: Optional[ModelAuth] = None

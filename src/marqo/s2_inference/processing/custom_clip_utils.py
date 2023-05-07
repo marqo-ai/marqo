@@ -74,7 +74,10 @@ def download_model(
         return download_pretrained_from_url(url=url, cache_dir=download_dir)
 
     if repo_location.s3:
-        return download_pretrained_from_s3(location=repo_location.s3, auth=auth.s3, download_dir=download_dir)
+        download_kwargs = {'location': repo_location.s3, 'download_dir': download_dir}
+        if auth is not None:
+            download_kwargs['auth'] = auth.s3
+        return download_pretrained_from_s3(**download_kwargs)
 
 
 def download_pretrained_from_s3(

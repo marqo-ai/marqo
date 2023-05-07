@@ -4,14 +4,16 @@ For example models stored on custom Huggingface repos or on private s3 buckets
 """
 
 from typing import Optional
-from pydantic.dataclasses import dataclass
+from pydantic import BaseModel
 from marqo.tensor_search.models.external_apis.hf import HfAuth, HfModelLocation
 from marqo.tensor_search.models.external_apis.s3 import S3Auth, S3Location
 from marqo.errors import InvalidArgError
 
 
-@dataclass(frozen=True)
-class ModelAuth:
+class ModelAuth(BaseModel):
+    class Config:
+        allow_mutation = False
+
     s3: Optional[S3Auth] = None
     hf: Optional[HfAuth] = None
 
@@ -34,10 +36,14 @@ class ModelAuth:
                 "Only one model authentication object is allowed")
 
 
-@dataclass(frozen=True)
-class ModelLocation:
+class ModelLocation(BaseModel):
+
+    class Config:
+        allow_mutation = False
+
     s3: Optional[S3Location] = None
     hf: Optional[HfModelLocation] = None
+    auth_required: bool = False
 
     def __post_init__(self):
         self._ensure_exactly_one_location()

@@ -29,7 +29,7 @@ def get_presigned_s3_url(location: S3Location, auth: Optional[S3Auth] = None):
         )
     s3_client = boto3.client('s3', **auth.dict())
     try:
-        url = s3_client.generate_presigned_url('get_object', Params=location.dict())
+        return s3_client.generate_presigned_url('get_object', Params=location.dict())
     except NoCredentialsError:  # TODO: invalid creds error
         raise ModelDownloadError(
             "Error retrieving private model. AWS credentials were not accepted."
