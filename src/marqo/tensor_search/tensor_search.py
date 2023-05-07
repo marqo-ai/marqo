@@ -37,6 +37,7 @@ from timeit import default_timer as timer
 import functools
 import pprint
 import typing
+from marqo.tensor_search.models.private_models import ModelAuth
 import uuid
 from typing import List, Optional, Union, Iterable, Sequence, Dict, Any, Tuple
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
@@ -1017,7 +1018,8 @@ def search(config: Config, index_name: str, text: Union[str, dict],
            device=None, boost: Optional[Dict] = None,
            image_download_headers: Optional[Dict] = None,
            context: Optional[Dict] = None,
-           score_modifiers: Optional[Dict] = None) -> Dict:
+           score_modifiers: Optional[Dict] = None,
+           model_auth: Optional[ModelAuth] = None) -> Dict:
     """The root search method. Calls the specific search method
 
     Validation should go here. Validations include:
@@ -1042,6 +1044,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
         image_download_headers: headers for downloading images
         context: a dictionary to allow custom vectors in search, for tensor search only
         score_modifiers: a dictionary to modify the score based on field values, for tensor search only
+        model_auth: Authorisation details for downloading a model (if required)
     Returns:
 
     """
@@ -1094,7 +1097,8 @@ def search(config: Config, index_name: str, text: Union[str, dict],
             return_doc_ids=return_doc_ids, searchable_attributes=searchable_attributes, verbose=verbose,
             number_of_highlights=num_highlights, simplified_format=simplified_format,
             filter_string=filter, device=device, attributes_to_retrieve=attributes_to_retrieve, boost=boost,
-            image_download_headers=image_download_headers, context=context, score_modifiers=score_modifiers
+            image_download_headers=image_download_headers, context=context, score_modifiers=score_modifiers,
+            model_auth=model_auth
         )
     elif search_method.upper() == SearchMethod.LEXICAL:
         search_result = _lexical_search(
@@ -1442,7 +1446,8 @@ def assign_query_to_vector_job(
             device=device,
             normalize_embeddings=index_info.index_settings['index_defaults']['normalize_embeddings'],
             image_download_headers=q.image_download_headers,
-            content_type=content_type
+            content_type=content_type,
+            model_auth=q.model_auth
         )
         # If exists, add content to vector job. Otherwise create new
         if jobs.get(vector_job.groupby_key()) is not None:
@@ -1493,7 +1498,8 @@ def vectorise_jobs(jobs: List[VectorisedJobs]) -> Dict[JHash, Dict[str, List[flo
                     model_name=v.model_name, model_properties=v.model_properties,
                     content=v.content, device=v.device,
                     normalize_embeddings=v.normalize_embeddings,
-                    image_download_headers=v.image_download_headers
+                    image_download_headers=v.image_download_headers,
+                    model_auth=v.model_auth
                 )
                 result[v.groupby_key()] = dict(zip(v.content, vectors))
         except s2_inference_errors.S2InferenceError:
@@ -1697,7 +1703,9 @@ def _vector_text_search(
         attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None,
         image_download_headers: Optional[Dict] = None,
         context: Optional[Dict] = None,
-        score_modifiers: Optional[Dict] = None):
+        score_modifiers: Optional[Dict] = None,
+        model_auth: Optional[ModelAuth] = None
+    ):
     """
     Args:
         config:
@@ -1717,6 +1725,7 @@ def _vector_text_search(
         image_download_headers: headers for downloading images
         context: a dictionary to allow custom vectors in search
         score_modifiers: a dictionary to modify the score based on field values, for tensor search only
+        model_auth: Authorisation details for downloading a model (if required)
     Returns:
 
     Note:
@@ -1777,7 +1786,8 @@ def _vector_text_search(
                 model_name=index_info.model_name, model_properties=_get_model_properties(index_info),
                 content=batch, device=selected_device,
                 normalize_embeddings=index_info.index_settings['index_defaults']['normalize_embeddings'],
-                image_download_headers=image_download_headers
+                image_download_headers=image_download_headers,
+                model_auth=model_auth
             )))
             for batch in to_be_vectorised
         ]
@@ -2290,8 +2300,11 @@ def get_cuda_info() -> dict:
         ))
 
 
-def vectorise_multimodal_combination_field(field: str, multimodal_object: Dict[str, dict], doc: dict, doc_index: int,
-                                            doc_id:str, selected_device:str, index_info, image_repo, field_map:dict):
+def vectorise_multimodal_combination_field(
+        field: str, multimodal_object: Dict[str, dict], doc: dict, doc_index: int,
+        doc_id:str, selected_device:str, index_info, image_repo, field_map:dict,
+        model_auth: Optional[ModelAuth] = None
+):
     '''
     This function is used to vectorise multimodal combination field. The field content should
     have the following structure:
@@ -2308,13 +2321,15 @@ def vectorise_multimodal_combination_field(field: str, multimodal_object: Dict[s
         doc_index: the index of the document. This is an interator variable `i` in the main body to iterator throught the docs
         doc_id: the document id
         selected_device: device from main body
-        index_info: index_info from main body
+        index_info: index_info from main body,
+        model_auth: Model download authorisation information (if required)
     Returns:
-    combo_chunk: the combo_chunk to be appended to the main body
-    combo_document_is_valid:  if the document is a valid
-    unsuccessful_docs: appended unsucessful_docs
-    combo_total_vectorise_time: the vectorise time spent in combo field
-    new_fields_from_multimodal_combination: the new fields from multimodal combination field that will be added to index properties
+        combo_chunk: the combo_chunk to be appended to the main body
+        combo_document_is_valid:  if the document is a valid
+        unsuccessful_docs: appended unsucessful_docs
+        combo_total_vectorise_time: the vectorise time spent in combo field
+        new_fields_from_multimodal_combination: the new fields from multimodal combination field that will be added to
+            index properties
 
     '''
     # field_conent = {"tensor_field_one" : {"weight":0.5, "parameter": "test-paramater-1"},
@@ -2385,14 +2400,14 @@ def vectorise_multimodal_combination_field(field: str, multimodal_object: Dict[s
                 model_name=index_info.model_name,
                 model_properties=_get_model_properties(index_info), content=text_content_to_vectorise,
                 device=selected_device, normalize_embeddings=normalize_embeddings,
-                infer=infer_if_image)
+                infer=infer_if_image, model_auth=model_auth)
         image_vectors = []
         if len(image_content_to_vectorise) > 0:
             image_vectors = s2_inference.vectorise(
                 model_name=index_info.model_name,
                 model_properties=_get_model_properties(index_info), content=image_content_to_vectorise,
                 device=selected_device, normalize_embeddings=normalize_embeddings,
-                infer=infer_if_image)
+                infer=infer_if_image, model_auth=model_auth)
         end_time = timer()
         combo_vectorise_time_to_add += (end_time - start_time)
     except (s2_inference_errors.UnknownModelError,

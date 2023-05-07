@@ -7,6 +7,7 @@ import pydantic
 from pydantic import BaseModel
 from typing import Union, List, Dict, Optional, Any
 from marqo.tensor_search.enums import SearchMethod, Device
+from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search import validation
 
 class BaseMarqoModel(BaseModel):
@@ -28,6 +29,7 @@ class SearchQuery(BaseMarqoModel):
     image_download_headers: Optional[Dict] = None
     context: Optional[Dict] = None
     scoreModifiers: Optional[Dict] = None
+    model_auth: Optional[ModelAuth] = None
 
     @pydantic.validator('searchMethod')
     def validate_search_method(cls, value):

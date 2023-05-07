@@ -101,6 +101,9 @@ class TestModelAuth(MarqoTestCase):
         """We also need to ensure that it doesn't redownload from add docs to search
         and vice vers """
 
+    def test_downloaded_to_correct_dir(self):
+        """"""
+
     ################## TESTS FOR VECTORISE PARAMS
 
     def test_as_dict_discards_nones_expected_dict(self):
