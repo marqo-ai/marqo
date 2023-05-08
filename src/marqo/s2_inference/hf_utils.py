@@ -6,6 +6,7 @@ import numpy as np
 from marqo.s2_inference.sbert_utils import Model
 from marqo.s2_inference.types import Union, FloatTensor, List
 from marqo.s2_inference.logger import get_logger
+from marqo.s2_inference.configs import ModelCache
 logger = get_logger(__name__)
 
 
@@ -19,7 +20,7 @@ class HF_MODEL(Model):
 
     def load(self) -> None:
 
-        self.model = AutoModelForSentenceEmbedding(self.model_name).to(self.device)
+        self.model = AutoModelForSentenceEmbedding(self.model_name, cache_dir=ModelCache.hf_cache_path).to(self.device)
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
 
 
@@ -46,13 +47,13 @@ class HF_MODEL(Model):
 
 class AutoModelForSentenceEmbedding(nn.Module):
 
-    def __init__(self, model_name, normalize = True, pooling='mean'):
+    def __init__(self, model_name, normalize = True, cache_dir: str = None, pooling='mean'):
         super().__init__()
         self.model_name = model_name
         self.normalize = normalize
         self.pooling = pooling
 
-        self.model = AutoModel.from_pretrained(model_name)
+        self.model = AutoModel.from_pretrained(model_name, cache_dir = self.cache_dir)
         self.model.eval()
         if self.pooling == 'mean':
             self._pool_func = self.mean_pooling

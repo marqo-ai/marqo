@@ -5,6 +5,7 @@ class ModelCache:
     onnx_cache_path = os.environ.get('ONNX_SAVE_PATH', f'{utils.get_marqo_root_from_env()}/cache/models_onnx/')
     torch_cache_path = os.getenv('SENTENCE_TRANSFORMERS_HOME', f'{utils.get_marqo_root_from_env()}/cache/models/')
     clip_cache_path = os.getenv('CLIP_SAVE_PATH', f'{utils.get_marqo_root_from_env()}/cache/clip/')
+    hf_cache_path = os.getenv('HF_SAVE_PATH', f'{utils.get_marqo_root_from_env()}/cache/hf/')
 
 class BaseTransformerModels:
 
