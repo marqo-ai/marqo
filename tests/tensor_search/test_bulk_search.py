@@ -385,7 +385,8 @@ class TestBulkSearch(MarqoTestCase):
                 content=['one thing'],
                 device='cpu',
                 normalize_embeddings=False,
-                image_download_headers=None
+                image_download_headers=None,
+                model_auth=None
             )
 
             print("ock_vectorise.call_args_listock_vectorise.call_args_list",  mock_vectorise.call_args_list)
