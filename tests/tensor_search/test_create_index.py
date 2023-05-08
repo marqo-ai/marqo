@@ -367,6 +367,11 @@ class TestCreateIndex(MarqoTestCase):
             except InvalidArgError as e:
                 pass
 
+            try:
+                tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+            except IndexNotFoundError:
+                pass
+
             # a small value should work
             res_1 = tensor_search.create_vector_index(
                 index_name=self.index_name_1, config=self.config,
@@ -385,6 +390,11 @@ class TestCreateIndex(MarqoTestCase):
             )
             assert small_intended_replicas_count == int(
                 resp.json()[self.index_name_1]['settings']['index']['number_of_replicas'])
+
+            try:
+                tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+            except IndexNotFoundError:
+                pass
 
             # the same number should also work
             res_1 = tensor_search.create_vector_index(
