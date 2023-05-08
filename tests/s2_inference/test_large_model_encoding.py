@@ -13,23 +13,49 @@ from marqo.s2_inference.s2_inference import (
 import functools
 from marqo.s2_inference.s2_inference import _load_model as og_load_model
 _load_model = functools.partial(og_load_model, calling_func = "unit_test")
+from marqo.s2_inference.configs import ModelCache
+import shutil
 
+
+def remove_cached_clip_files():
+    '''
+    This function removes all the cached models from the clip cache path to save disk space
+    '''
+    clip_cache_path = ModelCache.clip_cache_path
+    if os.path.exists(clip_cache_path):
+        for item in os.listdir(clip_cache_path):
+            item_path = os.path.join(clip_cache_path, item)
+            # Check if the item is a file or directory
+            if os.path.isfile(item_path):
+                os.remove(item_path)
+            elif os.path.isdir(item_path):
+                shutil.rmtree(item_path)
 
 @pytest.mark.largemodel
 @pytest.mark.skipif(torch.cuda.is_available() is False, reason="We skip the large model test if we don't have cuda support")
 class TestLargeModelEncoding(unittest.TestCase):
 
     def setUp(self) -> None:
-        self.large_clip_models = ["open_clip/ViT-L-14/openai", "open_clip/ViT-L-14/laion400m_e32"]
+        self.large_clip_models = [ "open_clip/ViT-L-14/laion400m_e32",
+                                   'open_clip/coca_ViT-L-14/mscoco_finetuned_laion2b_s13b_b90k',
+                                   #'open_clip/convnext_xxlarge/laion2b_s34b_b82k_augreg_soup',  this model is not currently available in open_clip
+                                   'open_clip/convnext_large_d_320/laion2b_s29b_b131k_ft_soup',
+                                   'open_clip/convnext_large_d/laion2b_s26b_b102k_augreg']
 
         self.multilingual_models = ["multilingual-clip/XLM-Roberta-Large-Vit-L-14"]
 
         self.e5_models = ["hf/e5-large", "hf/e5-large-unsupervised"]
 
-
     def tearDown(self) -> None:
         clear_loaded_models()
 
+    @classmethod
+    def setUpClass(cls) -> None:
+        remove_cached_clip_files()
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        remove_cached_clip_files()
 
     def test_vectorize(self):
         names = self.large_clip_models + self.e5_models

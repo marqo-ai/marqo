@@ -4,6 +4,9 @@ from marqo.tensor_search import tensor_search
 import copy
 from marqo.errors import InvalidArgError, IndexNotFoundError
 from tests.marqo_test import MarqoTestCase
+import random
+import requests
+import json
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 
 
@@ -492,3 +495,34 @@ class TestLexicalSearch(MarqoTestCase):
         res_wrong_attr = tensor_search.search(
             **{**base_search_args, "searchable_attributes": ["abc"]})
         assert len(res_wrong_attr['hits']) == 0
+
+    def test_lexical_search_filter_with_dot(self):
+        tensor_search.add_documents(
+            config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1, docs=[
+                {"content": "a man on a horse", "filename" : "Important_File_1.pdf", "_id":"123"},
+                {"content": "the horse is eating grass", "filename": "Important_File_2.pdf", "_id": "456"},
+                {"content": "what is the document", "filename": "Important_File_3.pdf", "_id": "789"},
+
+            ], auto_refresh=True)
+        )
+
+        res = tensor_search._lexical_search(config=self.config, index_name=self.index_name_1,
+                                            text="horse", return_doc_ids=True, searchable_attributes=["content"],
+                                            filter_string="filename: \"Important_File_1.pdf\"", result_count=8)
+
+        assert len(res["hits"]) == 1
+        assert res["hits"][0]["_id"] == "123"
+
+        res = tensor_search._vector_text_search(config=self.config, index_name=self.index_name_1,
+                                            query="horse", return_doc_ids=True, searchable_attributes=["content"],
+                                            filter_string="filename: Important_File_1.pdf", result_count=8)
+
+        assert len(res["hits"]) == 1
+        assert res["hits"][0]["_id"] == "123"
+
+        res = tensor_search._lexical_search(config=self.config, index_name=self.index_name_1,
+                                            text="horse", return_doc_ids=True, searchable_attributes=["content"],
+                                            filter_string="filename: Important_File_1.pdf", result_count=8)
+
+        assert len(res["hits"]) == 3, "this is a bug at the moment. the filter is not applied. " \
+                                      "fix it will introduce the error."
