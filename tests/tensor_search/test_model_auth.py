@@ -104,6 +104,12 @@ class TestModelAuth(MarqoTestCase):
     def test_downloaded_to_correct_dir(self):
         """"""
 
+    def test_public_s3_no_auth(self):
+        """"""
+
+    def test_public_hf_no_auth(self):
+        """"""
+
     ################## TESTS FOR VECTORISE PARAMS
 
     def test_as_dict_discards_nones_expected_dict(self):

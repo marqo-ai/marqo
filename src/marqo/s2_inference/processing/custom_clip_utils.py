@@ -9,11 +9,12 @@ from tqdm import tqdm
 from marqo.s2_inference.configs import ModelCache
 from typing import Optional
 from marqo.tensor_search.models.private_models import ModelAuth, ModelLocation
-from marqo.s2_inference.download_models import (
+from marqo.s2_inference.model_downloading.from_s3 import (
     get_presigned_s3_url, get_s3_model_cache_filename, check_s3_model_already_exists,
     get_s3_model_absolute_cache_path
 )
 from marqo.tensor_search.models.external_apis.s3 import S3Auth, S3Location
+from marqo.tensor_search.models.external_apis.hf import HfAuth, HfModelLocation
 
 
 def whitespace_clean(text):
@@ -78,6 +79,10 @@ def download_model(
         if auth is not None:
             download_kwargs['auth'] = auth.s3
         return download_pretrained_from_s3(**download_kwargs)
+    elif repo_location.hf:
+        print('getssss here!!!!!')
+        download_kwargs = {'location': repo_location.hf, 'download_dir': download_dir}
+
 
 
 def download_pretrained_from_s3(

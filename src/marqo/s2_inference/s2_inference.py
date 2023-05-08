@@ -1,7 +1,6 @@
 """This is the interface for interacting with S2 Inference
 The functions defined here would have endpoints, later on.
 """
-import functools
 import numpy as np
 from marqo.errors import ModelCacheManagementError
 from marqo.s2_inference.errors import (VectoriseError, InvalidModelPropertiesError, ModelLoadError,
