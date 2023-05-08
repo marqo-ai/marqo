@@ -1,6 +1,6 @@
 from marqo.tensor_search.models.external_apis.hf import HfAuth, HfModelLocation
 from typing import Optional
-from huggingface_hub import cached_download, hf_hub_url, hf_hub_download
+from huggingface_hub import hf_hub_download
 from marqo.s2_inference.logger import get_logger
 
 
@@ -13,6 +13,8 @@ def download_model_from_hf(
         download_dir: Optional[str] = None):
     """Downloads a pretrained model from HF, if it doesn't exist locally. The basename of the
     location's filename is used as the local filename.
+
+    hf_hub_download downloads the model if it does not yet exist in the cache.
 
     Args:
         location: repo_id and filename to be downloaded.

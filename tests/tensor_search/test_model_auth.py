@@ -8,7 +8,7 @@ from marqo.tensor_search.models.external_apis.s3 import S3Location
 from unittest import mock
 import unittest
 import os
-
+from marqo.errors import BadRequestError
 
 class TestModelAuth(MarqoTestCase):
 
@@ -92,10 +92,11 @@ class TestModelAuth(MarqoTestCase):
 
         with unittest.mock.patch('boto3.client', return_value=mock_s3_client)  as mock_boto3_client:
             # Call the function that uses the generate_presigned_url method
-            tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+            res = tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
                 index_name=self.index_name_1, auto_refresh=True, docs=[{'a': 'b'}],
                 model_auth=ModelAuth(s3=S3Auth(aws_access_key_id=fake_access_key_id, aws_secret_access_key=fake_secret_key))
             ))
+            assert not res['errors']
 
         assert os.path.isfile(model_abs_path)
 
@@ -112,27 +113,65 @@ class TestModelAuth(MarqoTestCase):
         self._delete_file(model_abs_path)
 
     def test_model_auth_hf(self):
+        """
+        Does not yet assert that a file is downloaded
+        """
+        hf_object = "some_model.pt"
+        hf_repo_name = "MyRepo/test-private"
+        hf_token = "hf_some_secret_key"
+
         model_properties = {
             "name": "ViT-B/32",
             "dimensions": 512,
             "model_location": {
-                "s3": {
-                    "repo_id": "Marqo/test-private",
-                    "filename": "dummy_model.pt",
+                "hf": {
+                    "repo_id": hf_repo_name,
+                    "filename": hf_object,
                 },
                 "auth_required": True
             },
-            "type": "clip",
+            "type": "open_clip",
         }
-        s3_settings = self._get_base_index_settings()
-        s3_settings['model_properties'] = model_properties
-        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings=s3_settings)
-        # TODO: mock call to HF
-        raise NotImplementedError
+        hf_settings = self._get_base_index_settings()
+        hf_settings['index_defaults']['model_properties'] = model_properties
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings=hf_settings)
+
+        mock_hf_hub_download = mock.MagicMock()
+        mock_hf_hub_download.return_value = 'cache/path/to/model.pt'
+
+        mock_open_clip_creat_model = mock.MagicMock()
+
+        with unittest.mock.patch('open_clip.create_model_and_transforms', mock_open_clip_creat_model):
+            with unittest.mock.patch('marqo.s2_inference.model_downloading.from_hf.hf_hub_download', mock_hf_hub_download):
+                try:
+                    tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+                        index_name=self.index_name_1, auto_refresh=True, docs=[{'a': 'b'}],
+                        model_auth=ModelAuth(hf=HfAuth(token=hf_token))))
+                except BadRequestError:
+                    # bad request due to no models actually being loaded
+                    pass
+
+        mock_hf_hub_download.assert_called_once_with(
+            token=hf_token,
+            repo_id=hf_repo_name,
+            filename=hf_object
+        )
+
+        # is the open clip model being loaded with the expected args?
+        called_with_expected_args = any(
+            call.kwargs.get("pretrained") == "cache/path/to/model.pt"
+            and call.kwargs.get("model_name") == "ViT-B/32"
+            for call in mock_open_clip_creat_model.call_args_list
+        )
+        assert len(mock_open_clip_creat_model.call_args_list) == 1
+        assert called_with_expected_args, "Expected call not found"
 
     def test_model_loads_from_search(self):
         """The other ones load from add_docs, we have to make sure it works for
          search"""
+
+    def test_mismatch_params(self):
+        """hf auth with s3 loc, and vice versa"""
 
     def test_model_loads_from_all_add_docs_derivatives(self):
         """Does it work from add_docs, add_docs orchestrator and add_documents_mp?
