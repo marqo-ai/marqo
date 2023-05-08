@@ -166,9 +166,123 @@ class TestModelAuth(MarqoTestCase):
         assert len(mock_open_clip_creat_model.call_args_list) == 1
         assert called_with_expected_args, "Expected call not found"
 
-    def test_model_loads_from_search(self):
-        """The other ones load from add_docs, we have to make sure it works for
+    def test_model_auth_s3_search(self):
+        """The other test load from add_docs, we have to make sure it works for
          search"""
+
+        s3_object_key = 'path/to/your/secret_model.pt'
+        s3_bucket = 'your-bucket-name'
+
+        model_abs_path = get_s3_model_absolute_cache_path(
+            S3Location(
+                Key=s3_object_key,
+                Bucket=s3_bucket
+        ))
+        self._delete_file(model_abs_path)
+
+        model_properties = {
+            "name": "ViT-B/32",
+            "dimensions": 512,
+            "model_location": {
+                "s3": {
+                    "Bucket": s3_bucket,
+                    "Key": s3_object_key,
+                },
+                "auth_required": True
+            },
+            "type": "open_clip",
+        }
+        s3_settings = self._get_base_index_settings()
+        s3_settings['index_defaults']['model_properties'] = model_properties
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings=s3_settings)
+
+        fake_access_key_id = '12345'
+        fake_secret_key = 'this-is-a-secret'
+        public_model_url = "https://github.com/mlfoundations/open_clip/releases/download/v0.2-weights/vit_b_32-quickgelu-laion400m_avg-8a00ab3c.pt"
+
+        # Create a mock Boto3 client
+        mock_s3_client = mock.MagicMock()
+
+        # Mock the generate_presigned_url method of the mock Boto3 client with a real OpenCLIP model, so that
+        # the rest of the logic works.
+        mock_s3_client.generate_presigned_url.return_value = public_model_url
+
+        # file should not yet exist:
+        assert not os.path.isfile(model_abs_path)
+
+        with unittest.mock.patch('boto3.client', return_value=mock_s3_client)  as mock_boto3_client:
+            res = tensor_search.search(
+                config=self.config, text='hello', index_name=self.index_name_1,
+                model_auth=ModelAuth(s3=S3Auth(aws_access_key_id=fake_access_key_id, aws_secret_access_key=fake_secret_key))
+            )
+
+        assert os.path.isfile(model_abs_path)
+
+        mock_s3_client.generate_presigned_url.assert_called_with(
+            'get_object',
+            Params={'Bucket': 'your-bucket-name', 'Key': s3_object_key}
+        )
+        mock_boto3_client.assert_called_once_with(
+            's3',
+            aws_access_key_id=fake_access_key_id,
+            aws_secret_access_key=fake_secret_key,
+            aws_session_token=None
+        )
+        self._delete_file(model_abs_path)
+
+    def test_model_auth_hf_search(self):
+        """The other test focused on add_docs. This focuses on search
+        Does not yet assert that a file is downloaded
+        """
+        hf_object = "some_model.pt"
+        hf_repo_name = "MyRepo/test-private"
+        hf_token = "hf_some_secret_key"
+
+        model_properties = {
+            "name": "ViT-B/32",
+            "dimensions": 512,
+            "model_location": {
+                "hf": {
+                    "repo_id": hf_repo_name,
+                    "filename": hf_object,
+                },
+                "auth_required": True
+            },
+            "type": "open_clip",
+        }
+        hf_settings = self._get_base_index_settings()
+        hf_settings['index_defaults']['model_properties'] = model_properties
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings=hf_settings)
+
+        mock_hf_hub_download = mock.MagicMock()
+        mock_hf_hub_download.return_value = 'cache/path/to/model.pt'
+
+        mock_open_clip_creat_model = mock.MagicMock()
+
+        with unittest.mock.patch('open_clip.create_model_and_transforms', mock_open_clip_creat_model):
+            with unittest.mock.patch('marqo.s2_inference.model_downloading.from_hf.hf_hub_download', mock_hf_hub_download):
+                try:
+                    res = tensor_search.search(
+                        config=self.config, text='hello', index_name=self.index_name_1,
+                        model_auth=ModelAuth(hf=HfAuth(token=hf_token)))
+                except BadRequestError:
+                    # bad request due to no models actually being loaded
+                    pass
+
+        mock_hf_hub_download.assert_called_once_with(
+            token=hf_token,
+            repo_id=hf_repo_name,
+            filename=hf_object
+        )
+
+        # is the open clip model being loaded with the expected args?
+        called_with_expected_args = any(
+            call.kwargs.get("pretrained") == "cache/path/to/model.pt"
+            and call.kwargs.get("model_name") == "ViT-B/32"
+            for call in mock_open_clip_creat_model.call_args_list
+        )
+        assert len(mock_open_clip_creat_model.call_args_list) == 1
+        assert called_with_expected_args, "Expected call not found"
 
     def test_mismatch_params(self):
         """hf auth with s3 loc, and vice versa"""
