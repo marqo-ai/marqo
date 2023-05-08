@@ -386,6 +386,25 @@ class TestCreateIndex(MarqoTestCase):
             assert small_intended_replicas_count == int(
                 resp.json()[self.index_name_1]['settings']['index']['number_of_replicas'])
 
+            # the same number should also work
+            res_1 = tensor_search.create_vector_index(
+                index_name=self.index_name_1, config=self.config,
+                index_settings={
+                    "index_defaults": {
+                        "treat_urls_and_pointers_as_images": True,
+                        "model": "ViT-B/32",
+                    },
+                    NsField.number_of_replicas: maximum_number_of_replicas
+                }
+            )
+            resp = requests.get(
+                url=self.authorized_url + f"/{self.index_name_1}",
+                headers=self.generic_header,
+                verify=False
+            )
+            assert maximum_number_of_replicas == int(
+                resp.json()[self.index_name_1]['settings']['index']['number_of_replicas'])
+
     def test_default_max_number_of_replicas(self):
         large_intended_replicas_count = 2
         small_intended_replicas_count = 0
