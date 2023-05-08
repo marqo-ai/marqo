@@ -95,7 +95,7 @@ class TestModelAuth(MarqoTestCase):
         """in s3, if there aren't creds"""
 
     def test_bad_creds_error(self):
-        """in s3, if creds aren't valid. Ensure a helpful error"""
+        """in s3, hf if creds aren't valid. Ensure a helpful error"""
 
     def test_doesnt_redownload_s3(self):
         """We also need to ensure that it doesn't redownload from add docs to search
@@ -109,6 +109,9 @@ class TestModelAuth(MarqoTestCase):
 
     def test_public_hf_no_auth(self):
         """"""
+
+    def test_open_clip_reg_clip(self):
+        """both normal and open clip"""
 
     ################## TESTS FOR VECTORISE PARAMS
 

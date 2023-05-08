@@ -33,5 +33,5 @@ def download_model_from_hf(
     download_kwargs = location.dict()
     if auth is not None:
         download_kwargs = {**download_kwargs, **auth.dict()}
-    hf_hub_download(download_kwargs)
+    return hf_hub_download(**download_kwargs)
 

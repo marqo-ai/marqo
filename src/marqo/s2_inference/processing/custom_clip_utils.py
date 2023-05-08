@@ -13,8 +13,8 @@ from marqo.s2_inference.model_downloading.from_s3 import (
     get_presigned_s3_url, get_s3_model_cache_filename, check_s3_model_already_exists,
     get_s3_model_absolute_cache_path
 )
+from marqo.s2_inference.model_downloading.from_hf import download_model_from_hf
 from marqo.tensor_search.models.external_apis.s3 import S3Auth, S3Location
-from marqo.tensor_search.models.external_apis.hf import HfAuth, HfModelLocation
 
 
 def whitespace_clean(text):
@@ -80,8 +80,10 @@ def download_model(
             download_kwargs['auth'] = auth.s3
         return download_pretrained_from_s3(**download_kwargs)
     elif repo_location.hf:
-        print('getssss here!!!!!')
         download_kwargs = {'location': repo_location.hf, 'download_dir': download_dir}
+        if auth is not None:
+            download_kwargs['auth'] = auth.hf
+        return download_model_from_hf(**download_kwargs)
 
 
 

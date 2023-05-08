@@ -214,14 +214,29 @@ class CLIP:
             self.model_auth = None
 
     def _download_from_repo(self):
-        """Downloads model from an external repo like s3 and returns the filepath"""
+        """Downloads model from an external repo like s3 and returns the filepath
+
+        Returns:
+            The model's filepath
+
+        Raises:
+            RunTimeError if an empty filepath is detected. This is important
+                because OpenCLIP will instantiate a model with random weights, if
+                a filepath isn't specified, and the model isn't a publicly
+                available HF or OpenAI one.
+        """
         model_location = ModelLocation(**self.model_properties[ModelProperties.model_location])
         download_model_params = {"repo_location": model_location}
 
         if model_location.auth_required:
             download_model_params['auth'] = self.model_auth
 
-        return download_model(**download_model_params)
+        model_file_path = download_model(**download_model_params)
+        if model_file_path is None or model_file_path == '':
+            raise RuntimeError(
+                'download_model() needs to return a valid filepath to the model! Instead, received '
+                f' filepath `{model_file_path}`')
+        return model_file_path
 
     def load(self) -> None:
 
@@ -421,14 +436,13 @@ class OPEN_CLIP(CLIP):
 
             self.model.eval()
 
-
     def custom_clip_load(self):
         self.model_name = self.model_properties.get("name", None)
 
-
         logger.info(f"The name of the custom clip model is {self.model_name}. We use open_clip load")
-        model, _, preprocess = open_clip.create_model_and_transforms(model_name=self.model_name, jit = self.jit, pretrained=self.model_path, precision = self.precision,
-                                                                     image_mean=self.mean, image_std=self.std, device = self.device, cache_dir=ModelCache.clip_cache_path)
+        model, _, preprocess = open_clip.create_model_and_transforms(
+            model_name=self.model_name, jit = self.jit, pretrained=self.model_path, precision = self.precision,
+            image_mean=self.mean, image_std=self.std, device = self.device, cache_dir=ModelCache.clip_cache_path)
 
         return model, preprocess
 
