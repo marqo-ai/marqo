@@ -1,12 +1,13 @@
-import pprint
-import time
-from marqo.tensor_search import enums, backend
 from marqo.tensor_search import tensor_search
-import unittest
-import copy
+from marqo.tensor_search.models.add_docs_objects import AddDocsParams
+from marqo.tensor_search.models.private_models import S3Auth, ModelAuth, HfAuth
 from marqo.errors import InvalidArgError, IndexNotFoundError
 from tests.marqo_test import MarqoTestCase
-import random
+from marqo.s2_inference.model_downloading.from_s3 import get_s3_model_absolute_cache_path
+from marqo.tensor_search.models.external_apis.s3 import S3Location
+from unittest import mock
+import unittest
+import os
 
 
 class TestModelAuth(MarqoTestCase):
@@ -18,6 +19,13 @@ class TestModelAuth(MarqoTestCase):
         try:
             tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         except IndexNotFoundError as s:
+            pass
+
+    @staticmethod
+    def _delete_file(file_path):
+        try:
+            os.remove(file_path)
+        except FileNotFoundError:
             pass
 
     @staticmethod
@@ -39,24 +47,57 @@ class TestModelAuth(MarqoTestCase):
 
     def test_model_auth_s3(self):
         """check against hardcoded signed URL. """
+
+        s3_object_key = 'path/to/your/secret_model.pt'
+        s3_bucket = 'your-bucket-name'
+
+        model_abs_path = get_s3_model_absolute_cache_path(
+            S3Location(
+                Key=s3_object_key,
+                Bucket=s3_bucket
+        ))
+        self._delete_file(model_abs_path)
+
         model_properties = {
             "name": "ViT-B/32",
             "dimensions": 512,
             "model_location": {
                 "s3": {
-                    "Bucket": 'your-bucket-name',
-                    "Key": 'path/to/your/object.ext',
-
+                    "Bucket": s3_bucket,
+                    "Key": s3_object_key,
                 },
                 "auth_required": True
             },
-            "type": "clip",
+            "type": "open_clip",
         }
         s3_settings = self._get_base_index_settings()
-        s3_settings['model_properties'] = model_properties
+        s3_settings['index_defaults']['model_properties'] = model_properties
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings=s3_settings)
-        # TODO: mock presigned URL
-        raise NotImplementedError
+
+        fake_access_key_id = '12345'
+        fake_secret_key = 'this-is-a-secret'
+        public_model_url = "https://github.com/mlfoundations/open_clip/releases/download/v0.2-weights/vit_b_32-quickgelu-laion400m_avg-8a00ab3c.pt"
+
+        # Create a mock Boto3 client
+        mock_s3_client = mock.MagicMock()
+
+        # Mock the generate_presigned_url method of the mock Boto3 client with a real OpenCLIP model, so that
+        # the rest of the logic works.
+        mock_s3_client.generate_presigned_url.return_value = public_model_url
+
+        # Use the mock.patch context manager to replace the Boto3 client during the test
+        with unittest.mock.patch('boto3.client', return_value=mock_s3_client):
+            # Call the function that uses the generate_presigned_url method
+            tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1, auto_refresh=True, docs=[{'a': 'b'}],
+                model_auth=ModelAuth(s3=S3Auth(aws_access_key_id=fake_access_key_id, aws_secret_access_key=fake_secret_key))
+            ))
+
+        mock_s3_client.generate_presigned_url.assert_called_with(
+            'get_object',
+            Params={'Bucket': 'your-bucket-name', 'Key': s3_object_key}
+        )
+
 
     def test_model_auth_hf(self):
         model_properties = {
