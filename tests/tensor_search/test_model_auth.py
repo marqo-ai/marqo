@@ -46,7 +46,9 @@ class TestModelAuth(MarqoTestCase):
             pass
 
     def test_model_auth_s3(self):
-        """check against hardcoded signed URL. """
+        """Simulates downloading a model from a private and using it in an
+        add docs call
+        """
 
         s3_object_key = 'path/to/your/secret_model.pt'
         s3_bucket = 'your-bucket-name'
@@ -86,7 +88,7 @@ class TestModelAuth(MarqoTestCase):
         mock_s3_client.generate_presigned_url.return_value = public_model_url
 
         # Use the mock.patch context manager to replace the Boto3 client during the test
-        with unittest.mock.patch('boto3.client', return_value=mock_s3_client):
+        with unittest.mock.patch('boto3.client', return_value=mock_s3_client)  as mock_boto3_client:
             # Call the function that uses the generate_presigned_url method
             tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
                 index_name=self.index_name_1, auto_refresh=True, docs=[{'a': 'b'}],
@@ -97,7 +99,12 @@ class TestModelAuth(MarqoTestCase):
             'get_object',
             Params={'Bucket': 'your-bucket-name', 'Key': s3_object_key}
         )
-
+        mock_boto3_client.assert_called_once_with(
+            's3',
+            aws_access_key_id=fake_access_key_id,
+            aws_secret_access_key=fake_secret_key,
+            aws_session_token=None
+        )
 
     def test_model_auth_hf(self):
         model_properties = {
