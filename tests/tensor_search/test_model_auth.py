@@ -87,13 +87,17 @@ class TestModelAuth(MarqoTestCase):
         # the rest of the logic works.
         mock_s3_client.generate_presigned_url.return_value = public_model_url
 
-        # Use the mock.patch context manager to replace the Boto3 client during the test
+        # file should not yet exist:
+        assert not os.path.isfile(model_abs_path)
+
         with unittest.mock.patch('boto3.client', return_value=mock_s3_client)  as mock_boto3_client:
             # Call the function that uses the generate_presigned_url method
             tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
                 index_name=self.index_name_1, auto_refresh=True, docs=[{'a': 'b'}],
                 model_auth=ModelAuth(s3=S3Auth(aws_access_key_id=fake_access_key_id, aws_secret_access_key=fake_secret_key))
             ))
+
+        assert os.path.isfile(model_abs_path)
 
         mock_s3_client.generate_presigned_url.assert_called_with(
             'get_object',
@@ -105,6 +109,7 @@ class TestModelAuth(MarqoTestCase):
             aws_secret_access_key=fake_secret_key,
             aws_session_token=None
         )
+        self._delete_file(model_abs_path)
 
     def test_model_auth_hf(self):
         model_properties = {
