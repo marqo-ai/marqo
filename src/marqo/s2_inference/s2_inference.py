@@ -3,8 +3,9 @@ The functions defined here would have endpoints, later on.
 """
 import numpy as np
 from marqo.errors import ModelCacheManagementError
-from marqo.s2_inference.errors import (VectoriseError, InvalidModelPropertiesError, ModelLoadError,
-                                       UnknownModelError, ModelNotInCacheError)
+from marqo.s2_inference.errors import (
+    VectoriseError, InvalidModelPropertiesError, ModelLoadError,
+    UnknownModelError, ModelNotInCacheError, ModelDownloadError)
 from PIL import UnidentifiedImageError
 from marqo.s2_inference.model_registry import load_model_properties
 from marqo.s2_inference.configs import get_default_device, get_default_normalization, get_default_seq_length
@@ -160,6 +161,10 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
             except Exception as e:
                 logger.error(f"Error loading model {model_name} on device {device} with normalization={normalize_embeddings}. \n"
                              f"Error message is {str(e)}")
+
+                if isinstance(e, ModelDownloadError):
+                    raise e
+
                 raise ModelLoadError(
                     f"Unable to load model={model_name} on device={device} with normalization={normalize_embeddings}. "
                     f"If you are trying to load a custom model, "

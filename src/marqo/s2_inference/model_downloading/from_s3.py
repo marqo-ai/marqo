@@ -21,7 +21,7 @@ def get_presigned_s3_url(location: S3Location, auth: Optional[S3Auth] = None):
 
     TODO: add link to proper usage in error messages
     """
-    if S3Auth is None:
+    if auth is None:
         raise ModelDownloadError(
             "Error retrieving private model. s3 authorisation information is required to "
             "download a model from an s3 bucket. "
