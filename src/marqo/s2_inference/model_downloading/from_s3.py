@@ -59,7 +59,6 @@ def check_s3_model_already_exists(location: S3Location) -> bool:
             The model cache filename of an s3 object
     """
     abs_path = get_s3_model_absolute_cache_path(location)
-    # TODO: is isfile() the best function to check this??
     return os.path.isfile(abs_path)
 
 
