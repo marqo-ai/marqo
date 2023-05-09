@@ -601,6 +601,53 @@ class TestModelAuth(MarqoTestCase):
 
     def test_no_creds_error(self):
         """in s3, if there aren't creds"""
+        s3_object_key = 'path/to/your/secret_model.pt'
+        s3_bucket = 'your-bucket-name'
+
+        model_properties = {
+            "name": "ViT-B/32",
+            "dimensions": 512,
+            "model_location": {
+                "s3": {
+                    "Bucket": s3_bucket,
+                    "Key": s3_object_key,
+                },
+                "auth_required": True
+            },
+            "type": "open_clip",
+        }
+        s3_settings = _get_base_index_settings()
+        s3_settings['index_defaults']['model_properties'] = model_properties
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings=s3_settings)
+
+        public_model_url = "https://github.com/mlfoundations/open_clip/releases/download/v0.2-weights/vit_b_32-quickgelu-laion400m_avg-8a00ab3c.pt"
+        hf_token = 'hf_secret_token'
+
+        # Create a mock Boto3 client
+        mock_s3_client = mock.MagicMock()
+
+        # Mock the generate_presigned_url method of the mock Boto3 client with a real OpenCLIP model, so that
+        # the rest of the logic works.
+        mock_s3_client.generate_presigned_url.return_value = public_model_url
+
+        with unittest.mock.patch('boto3.client', return_value=mock_s3_client):
+            with self.assertRaises(BadRequestError) as cm:
+                tensor_search.search(
+                    config=self.config, text='hello', index_name=self.index_name_1,
+                )
+                self.assertIn("s3 authorisation information is required", str(cm.exception))
+
+
+        with unittest.mock.patch('boto3.client', return_value=mock_s3_client):
+            with self.assertRaises(BadRequestError) as cm2:
+                res = tensor_search.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=self.index_name_1, auto_refresh=True,
+                        docs=[{'title': 'blah blah'}]
+                    )
+                )
+            self.assertIn("s3 authorisation information is required", str(cm2.exception))
+
 
     def test_bad_creds_error(self):
         """in s3, hf if creds aren't valid. Ensure a helpful error"""

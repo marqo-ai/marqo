@@ -578,7 +578,8 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                     total_vectorise_time += (end_time - start_time)
                 except (s2_inference_errors.UnknownModelError,
                         s2_inference_errors.InvalidModelPropertiesError,
-                        s2_inference_errors.ModelLoadError) as model_error:
+                        s2_inference_errors.ModelLoadError,
+                        s2_inference.ModelDownloadError) as model_error:
                     raise errors.BadRequestError(
                         message=f'Problem vectorising query. Reason: {str(model_error)}',
                         link="https://marqo.pages.dev/latest/Models-Reference/dense_retrieval/"
