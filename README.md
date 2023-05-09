@@ -22,11 +22,7 @@ Marqo is an end-to-end, multimodal vector search engine. With Marqo, users can s
     <a href="https://demo.marqo.ai/?q=smiling+with+glasses&index=boredapes"><img src="assets/stripes.gif"></a>
 </p>
  
-<p align="center">
-    <b>    
-    <a href="https://demo.marqo.ai">Try the demo</a> | <a href="https://github.com/marqo-ai/marqo-demo">View the code</a>
-    </b>
-</p>
+
 
 
 
