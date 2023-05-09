@@ -1,5 +1,5 @@
 <p align="center">
-<img src="https://uploads-ssl.webflow.com/62dfa8e3960a6e2b47dc7fae/62fdf9cef684e6f16158b094_MARQO%20LOGO-UPDATED-GREEN.svg" width="90%" height="80%">
+<img src="https://uploads-ssl.webflow.com/62dfa8e3960a6e2b47dc7fae/62fdf9cef684e6f16158b094_MARQO%20LOGO-UPDATED-GREEN.svg" width="50%" height="40%">
 </p>
 
 <p align="center">
@@ -15,18 +15,14 @@
 </p>
 
 <p align="center">
-An end-to-end vector search engine that seamlessly integrates with applications and websites. Marqo allows developers to turbocharge search functionality with the latest machine learning models, in 3 lines of code.
-</p>
+Marqo is an end-to-end, multimodal vector search engine. With Marqo, users can store and query unstructured data such as text, images, and code through a single easy-to-use API. Input preprocessing, machine learning inference, and storage are all included out of the box and can be easily scaled.
+</p> <br>
     
 <p align="center">
-    <a href="https://demo.marqo.ai/?q=smiling+with+glasses&index=boredapes"><img src="assets/demo-short.gif"></a>
+    <a href="https://demo.marqo.ai/?q=smiling+with+glasses&index=boredapes"><img src="assets/stripes.gif"></a>
 </p>
  
-<p align="center">
-    <b>    
-    <a href="https://demo.marqo.ai">Try the demo</a> | <a href="https://github.com/marqo-ai/marqo-demo">View the code</a>
-    </b>
-</p>
+
 
 
 
@@ -64,15 +60,16 @@ An end-to-end vector search engine that seamlessly integrates with applications 
 
 ## Learn more about Marqo
                                                                                                                                                        
-|                                                                                               |                                                                                                                                                                                                                                                   |
+| | |
 | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 📗 [Quick start](#Getting-started)                                             | Build your first application with Marqo in under 5 minutes.                                                                                                                                                                                                 |
-| 🔍 [ What is tensor search?](https://medium.com/@jesse_894/introducing-marqo-build-cloud-native-tensor-search-applications-in-minutes-9cb9a05a1736) | A beginner's guide to the fundamentals of Marqo and tensor search.                                                                                                                                                                                                                          |
-| 🖼 [Marqo for image data](https://medium.com/@wanli19940222/how-to-implement-text-to-image-search-on-marqo-in-5-lines-of-code-448f75bed1da)      | Building text-to-image search in Marqo in 5 lines of code.                                                                                                                                                                                              |
-| 📚 [Marqo for text](https://medium.com/@pandu_95301/how-i-used-marqo-to-create-a-multilingual-legal-database-in-5-key-lines-of-code-42ba49fd0caa)           | Building a multilingual database in Marqo.                                                                                                                                                                                  |
-| 🔮 [Integrating Marqo with GPT](https://medium.com/creator-fund/building-search-engines-that-think-like-humans-e019e6fb6389)             | Making GPT a subject matter expert by using Marqo as a knowledge base.                                                                                                                                                                                                                    |
-| 🎨 [ Marqo for Creative AI](https://medium.com/@jesse_894/combining-stable-diffusion-with-semantic-search-generating-and-categorising-100k-hot-dogs-afeeddea9d81)                             | Combining stable diffusion with semantic search to generate and categorise 100k images of hotdogs.                                                                                                                                                                                         |
-| 🦾 [Features](#-Core-Features)                           | Marqo's core features.                                                                                                                                                                                                                     |
+| 📗 [Quick start](#Getting-started)| Build your first application with Marqo in under 5 minutes. |
+| 🔍 [ What is tensor search?](https://medium.com/@jesse_894/introducing-marqo-build-cloud-native-tensor-search-applications-in-minutes-9cb9a05a1736) | A beginner's guide to the fundamentals of Marqo and tensor search. |
+| 🖼 [Marqo for image data](https://medium.com/@wanli19940222/how-to-implement-text-to-image-search-on-marqo-in-5-lines-of-code-448f75bed1da) | Building text-to-image search in Marqo in 5 lines of code. |
+| 📚 [Marqo for text](https://medium.com/@pandu_95301/how-i-used-marqo-to-create-a-multilingual-legal-database-in-5-key-lines-of-code-42ba49fd0caa) | Building a multilingual database in Marqo. |
+| 🔮 [Integrating Marqo with GPT](https://medium.com/creator-fund/building-search-engines-that-think-like-humans-e019e6fb6389) | Making GPT a subject matter expert by using Marqo as a knowledge base. |
+| 🎨 [ Marqo for Creative AI](https://medium.com/@jesse_894/combining-stable-diffusion-with-semantic-search-generating-and-categorising-100k-hot-dogs-afeeddea9d81) | Combining stable diffusion with semantic search to generate and categorise 100k images of hotdogs. |
+| 🔊 [Marqo and Speech Data](https://www.marqo.ai/blog/speech-processing) | Add diarisation and transcription to preprocess audio for Q&A with Marqo and ChatGPT. |
+| 🦾 [Features](#-Core-Features) | Marqo's core features. |
 
 
 
