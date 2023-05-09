@@ -12,7 +12,7 @@ from marqo.tensor_search.models.external_apis.s3 import S3Location
 from unittest import mock
 import unittest
 import os
-from marqo.errors import BadRequestError
+from marqo.errors import BadRequestError, ModelNotInCacheError
 
 
 def _delete_file(file_path):
@@ -33,7 +33,8 @@ def _get_base_index_settings():
     }
 
 class TestModelAuthLoadedS3(MarqoTestCase):
-    """loads an s3 model loaded index, for tests """
+    """loads an s3 model loaded index, for tests that don't need to redownload
+    the model each time """
 
     model_abs_path = None
     fake_access_key_id = '12345'
@@ -120,6 +121,7 @@ class TestModelAuthLoadedS3(MarqoTestCase):
     def tearDownClass(cls) -> None:
         super().tearDownClass()
         _delete_file(cls.model_abs_path)
+        tensor_search.eject_model(model_name=cls.custom_model_name, device=cls.device)
 
     def test_after_downloading_auth_doesnt_matter(self):
         """on this instance, at least"""
@@ -140,6 +142,8 @@ class TestModelAuthLoadedS3(MarqoTestCase):
             mock_req.assert_not_called()
 
 class TestModelAuth(MarqoTestCase):
+
+    device = 'cpu'
 
     def setUp(self) -> None:
         self.endpoint = self.authorized_url
@@ -191,8 +195,9 @@ class TestModelAuth(MarqoTestCase):
                     tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
                         index_name=self.index_name_1, auto_refresh=True, docs=[{'a': 'b'}],
                         model_auth=ModelAuth(hf=HfAuth(token=hf_token))))
-                except BadRequestError:
+                except BadRequestError as e:
                     # bad request due to no models actually being loaded
+                    print(e)
                     pass
 
         mock_hf_hub_download.assert_called_once_with(
@@ -395,7 +400,10 @@ class TestModelAuth(MarqoTestCase):
         for add_docs_method, kwargs in [
                 (tensor_search.add_documents_orchestrator, {'batch_size': 10}),
             ]:
-            print('add_docs_method, kwarg', add_docs_method, kwargs)
+            try:
+                tensor_search.eject_model(model_name='my_model' ,device=self.device)
+            except ModelNotInCacheError:
+                pass
             # Create a mock Boto3 client
             mock_s3_client = mock.MagicMock()
 
