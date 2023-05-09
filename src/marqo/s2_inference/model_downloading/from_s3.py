@@ -1,9 +1,7 @@
 import os
 from marqo.s2_inference.configs import ModelCache
-from marqo.tensor_search.models.private_models import ModelAuth, ModelLocation
 from marqo.tensor_search.models.external_apis.s3 import S3Auth, S3Location
 from typing import Optional
-from marqo.tensor_search.enums import ObjectStores
 import boto3
 from marqo.s2_inference.errors import ModelDownloadError
 from botocore.exceptions import NoCredentialsError

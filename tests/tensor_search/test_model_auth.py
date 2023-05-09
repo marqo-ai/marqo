@@ -1,4 +1,4 @@
-"""todos: get a public HF-based ViT model so that we can use it for mocks and tests
+"""todos: host a public HF-based CLIP (non-OpenCLIP) model so that we can use it for mocks and tests
 
 multiprocessing should be tested manually -problem with mocking (deadlock esque)
 """
