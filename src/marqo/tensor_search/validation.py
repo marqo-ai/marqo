@@ -4,7 +4,7 @@ import typing
 from marqo.config import Config
 from marqo.tensor_search import constants
 from marqo.tensor_search import enums, utils
-from typing import Container, Iterable, List, Optional, Union
+from typing import Container, Dict, Iterable, List, Optional, Union
 from marqo.errors import (
     MarqoError, InvalidFieldNameError, InvalidArgError, InternalError,
     InvalidDocumentIdError, DocTooLargeError, InvalidIndexNameError,
@@ -70,6 +70,7 @@ def validate_bulk_query_input(q: 'BulkSearchQueryEntity') -> Optional[MarqoError
     except Exception as e:
         return e
 
+    validate_context(context=q.context, query=q.q, search_method=q.searchMethod)
     # Validate result_count + offset <= int(max_docs_limit)
     max_docs_limit = utils.read_env_vars_and_defaults(enums.EnvVars.MARQO_MAX_RETRIEVABLE_DOCS)
     check_upper = True if max_docs_limit is None else q.limit + q.offset <= int(max_docs_limit)
@@ -176,6 +177,22 @@ def validate_field_content(field_content: typing.Any, is_non_tensor_field: bool)
             f"Field content `{field_content}` \n"
             f"of type `{type(field_content).__name__}` is not of valid content type!"
             f"Allowed content types: {[ty.__name__ for ty in constants.ALLOWED_CUSTOMER_FIELD_TYPES]}"
+        )
+
+def validate_context(context: Dict[str, Any], search_method: SearchMethod, query: Union[str, Dict[str, Any]]): 
+    if context is None or search_method is not SearchMethod.TENSOR:
+        return
+
+    if isinstance(query, dict):
+        validate_context_object(context_object=context)
+
+    elif isinstance(query, str):
+        raise InvalidArgError(
+            f"Marqo received a query = `{query}` with type =`{type(query).__name__}` "
+            f"and a parameter `context`.\n" # do not return true {context} here as it might be huge.
+            f"This is not supported as the context only works when the query is a dictionary."
+            f"If you aim to search with your custom vectors, reformat the query as a dictionary.\n"
+            f"Please check `https://docs.marqo.ai/0.0.16/API-Reference/search/#context` for more information."
         )
 
 

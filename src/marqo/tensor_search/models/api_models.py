@@ -37,12 +37,15 @@ class SearchQuery(BaseMarqoModel):
             value=value, enum_class=SearchMethod,
             case_sensitive=False
         )
+    
+    def get_context_tensor(self) -> Optional[List[Dict[str, Any]]]:
+        return self.context.get("tensor", None) if self.context is not None else None
 
 class BulkSearchQueryEntity(SearchQuery):
     index: str
-    # Attributes that are not supported in bulk search
-    context: None = None
-    scoreModifiers: None = None
+
+    context: Optional[Dict] = None
+    scoreModifiers: Optional[Dict] = None
     def to_search_query(self):
         return SearchQuery(**self.dict())
 

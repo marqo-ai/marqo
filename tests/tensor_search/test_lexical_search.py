@@ -79,8 +79,7 @@ class TestLexicalSearch(MarqoTestCase):
                       {"some doc 1": "some 2", "field abc": "robodog is not a cat", "_id": "unusual id"},
                       d0])
         )
-        res = tensor_search._lexical_search(config=self.config, index_name=self.index_name_1, text="marqo field",
-                                            return_doc_ids=True)
+        res = tensor_search._lexical_search(config=self.config, index_name=self.index_name_1, text="marqo field")
         assert len(res["hits"]) == 2
         assert res["hits"][0]["_id"] == "alpha alpha"
         assert res["hits"][1]["_id"] == "abcdef"
@@ -106,7 +105,7 @@ class TestLexicalSearch(MarqoTestCase):
                 docs=[d3, d2]))
         res = tensor_search._lexical_search(
             config=self.config, index_name=self.index_name_1, text="marqo field",
-            return_doc_ids=True, searchable_attributes=["field lambda"], result_count=3)
+             searchable_attributes=["field lambda"], result_count=3)
         assert len(res["hits"]) == 2
         assert res["hits"][0]["_id"] == "122"
         assert res["hits"][1]["_id"] == "123"
@@ -134,38 +133,7 @@ class TestLexicalSearch(MarqoTestCase):
         )
         res = tensor_search._lexical_search(
             config=self.config, index_name=self.index_name_1, text="Marqo field",
-            return_doc_ids=True, searchable_attributes=["field lambda", "FIELD omega"])
-        assert len(res["hits"]) == 3
-        assert self.strip_marqo_fields(res["hits"][0]) == d1
-        assert self.strip_marqo_fields(res["hits"][1]) == d3
-        assert self.strip_marqo_fields(res["hits"][2]) == d4
-
-    def test_lexical_search_multiple_searchable_attribs_no_returned_ids(self):
-        d0 = {"some doc 1": "some FIELD 2",
-            "the big field": "very unlikely theory. marqo marqo field is pretty awesom, in the marqo field"
-        }
-        d1 = {
-            # SHOULD APPEAR FIRST!
-            "FIELD omega": "sentence with the word marqo field awks ",
-            "field lambda":  "sentence with the word marqo field awks ",}
-        d2 = {"some doc 1": "some 2 jnkerkbj", "field abc": "robodog is not a cat field field field field field"}
-        d3 = {"TITITLE": "Tony from the way", # SHOULD APPEAR SECOND
-              "field lambda": "sentence with the word marqo field " }
-        d4 = { # SHOULD APPEAR 3rd (LAST)
-            "Lucy": "Travis", "field lambda": "sentence with the word field" }
-        tensor_search.add_documents(
-            config=self.config, add_docs_params=AddDocsParams(
-                index_name=self.index_name_1, auto_refresh=True, docs=[d0, d4, d1])
-        )
-        tensor_search.add_documents(
-            config=self.config, add_docs_params=AddDocsParams(
-                index_name=self.index_name_1, auto_refresh=True, docs=[d3, d2])
-        )
-        time.sleep(1)
-        res = tensor_search._lexical_search(
-            config=self.config, index_name=self.index_name_1, text="Marqo field awks",
-            return_doc_ids=False, searchable_attributes=["field lambda", "FIELD omega"],
-            result_count=3)
+             searchable_attributes=["field lambda", "FIELD omega"])
         assert len(res["hits"]) == 3
         assert self.strip_marqo_fields(res["hits"][0]) == d1
         assert self.strip_marqo_fields(res["hits"][1]) == d3
@@ -190,17 +158,17 @@ class TestLexicalSearch(MarqoTestCase):
                 docs=[d0, d4, d1, d3, d2]))
         r1 = tensor_search._lexical_search(
             config=self.config, index_name=self.index_name_1, text="Marqo field",
-            return_doc_ids=False, result_count=2
+            result_count=2
         )
         assert len(r1["hits"]) == 2
         r2 = tensor_search._lexical_search(
             config=self.config, index_name=self.index_name_1, text="Marqo field",
-            return_doc_ids=False, result_count=1000
+            result_count=1000
         )
         assert len(r2["hits"]) == 4
         r3 = tensor_search._lexical_search(
             config=self.config, index_name=self.index_name_1, text="Marqo field",
-            return_doc_ids=False, result_count=0
+            result_count=0
         )
         assert len(r3["hits"]) == 0
 
@@ -224,10 +192,10 @@ class TestLexicalSearch(MarqoTestCase):
                 docs=[d0, d4, d1, d3, d2]))
         res_lexical_search = tensor_search._lexical_search(
             config=self.config, index_name=self.index_name_1, text="Marqo field",
-            return_doc_ids=False, searchable_attributes=["field lambda", "FIELD omega"])
+            searchable_attributes=["field lambda", "FIELD omega"])
         res_search_entry_point = tensor_search.search(
             config=self.config, index_name=self.index_name_1, text="Marqo field",
-            return_doc_ids=False, searchable_attributes=["field lambda", "FIELD omega"],
+            searchable_attributes=["field lambda", "FIELD omega"],
             search_method=enums.SearchMethod.LEXICAL)
         res_search_entry_point_no_processing_time = res_search_entry_point.copy()
         del res_search_entry_point_no_processing_time ['processingTimeMs']
@@ -257,11 +225,9 @@ class TestLexicalSearch(MarqoTestCase):
             config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1, auto_refresh=True,
                 docs=[d0]))
         assert [] == tensor_search._lexical_search(
-            config=self.config, index_name=self.index_name_1, text="Marqo field",
-            return_doc_ids=False)["hits"]
+            config=self.config, index_name=self.index_name_1, text="Marqo field")["hits"]
         grey_query = tensor_search._lexical_search(
-            config=self.config, index_name=self.index_name_1, text="4 grey boring walls",
-            return_doc_ids=True)
+            config=self.config, index_name=self.index_name_1, text="4 grey boring walls")
         assert len (grey_query["hits"]) == 1
         assert grey_query["hits"][0]["_id"] == a_consistent_id
         # update doc so it does indeed get returned
@@ -269,13 +235,11 @@ class TestLexicalSearch(MarqoTestCase):
             config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1, auto_refresh=True,
                 docs=[d1]))
         cool_query = tensor_search._lexical_search(
-            config=self.config, index_name=self.index_name_1, text="Marqo field",
-            return_doc_ids=True)
+            config=self.config, index_name=self.index_name_1, text="Marqo field")
         assert a_consistent_id == cool_query["hits"][0]["_id"]
         assert len(cool_query["hits"]) == 1
         assert [] == tensor_search._lexical_search(
-            config=self.config, index_name=self.index_name_1, text="4 grey boring walls",
-            return_doc_ids=False)["hits"]
+            config=self.config, index_name=self.index_name_1, text="4 grey boring walls")["hits"]
 
     def test_lexical_search_filter(self):
         d0 = {
@@ -297,7 +261,7 @@ class TestLexicalSearch(MarqoTestCase):
                 docs=[d3, d2]))
         res = tensor_search._lexical_search(
             config=self.config, index_name=self.index_name_1, text="marqo field",
-            return_doc_ids=True, filter_string="title:Marqo OR (Lucy:Travis AND day:>50)"
+             filter_string="title:Marqo OR (Lucy:Travis AND day:>50)"
             , result_count=3)
         assert len(res["hits"]) == 2
         assert res["hits"][0]["_id"] == "123" or res["hits"][1]["_id"] == "123"
@@ -319,7 +283,7 @@ class TestLexicalSearch(MarqoTestCase):
         )
         res = tensor_search._lexical_search(
             config=self.config, index_name=self.index_name_1, text="extravagant",
-            return_doc_ids=True, searchable_attributes=[], result_count=3)
+             searchable_attributes=[], result_count=3)
         assert len(res["hits"]) == 2
         assert (res["hits"][0]["_id"] == "alpha alpha") or (res["hits"][0]["_id"] == "Jupyter_12")
         assert (res["hits"][0]["_id"] != "abcdef") and (res["hits"][0]["_id"] != "abcdef")
@@ -411,7 +375,7 @@ class TestLexicalSearch(MarqoTestCase):
         for case in cases:
             res = tensor_search._lexical_search(
                 config=self.config, index_name=self.index_name_1, text=case['input'],
-                return_doc_ids=True, searchable_attributes=fields, result_count=8)
+                 searchable_attributes=fields, result_count=8)
 
             id_only_hits = [hit["_id"] for hit in res["hits"]]
 
@@ -507,21 +471,21 @@ class TestLexicalSearch(MarqoTestCase):
         )
 
         res = tensor_search._lexical_search(config=self.config, index_name=self.index_name_1,
-                                            text="horse", return_doc_ids=True, searchable_attributes=["content"],
+                                            text="horse",  searchable_attributes=["content"],
                                             filter_string="filename: \"Important_File_1.pdf\"", result_count=8)
 
         assert len(res["hits"]) == 1
         assert res["hits"][0]["_id"] == "123"
 
         res = tensor_search._vector_text_search(config=self.config, index_name=self.index_name_1,
-                                            query="horse", return_doc_ids=True, searchable_attributes=["content"],
+                                            query="horse",  searchable_attributes=["content"],
                                             filter_string="filename: Important_File_1.pdf", result_count=8)
 
         assert len(res["hits"]) == 1
         assert res["hits"][0]["_id"] == "123"
 
         res = tensor_search._lexical_search(config=self.config, index_name=self.index_name_1,
-                                            text="horse", return_doc_ids=True, searchable_attributes=["content"],
+                                            text="horse",  searchable_attributes=["content"],
                                             filter_string="filename: Important_File_1.pdf", result_count=8)
 
         assert len(res["hits"]) == 3, "this is a bug at the moment. the filter is not applied. " \

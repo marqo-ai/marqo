@@ -46,7 +46,7 @@ from PIL import Image
 import marqo.config as config
 from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest
 from marqo.tensor_search.enums import (
-    MediaType, MlModel, TensorField, SearchMethod, OpenSearchDataType,
+    Device, MediaType, MlModel, TensorField, SearchMethod, OpenSearchDataType,
     EnvVars
 )
 from marqo.tensor_search.enums import IndexSettingsField as NsField
@@ -962,7 +962,7 @@ def bulk_search(query: BulkSearchQuery, marqo_config: config.Config, verbose: bo
     # TODO: combine lexical + tensor queries into /_msearch
     lexical_search_results = dict(zip(lexical_queries.keys(), [_lexical_search(
         config=marqo_config, index_name=q.index, text=q.q, result_count=q.limit, offset=q.offset,
-        return_doc_ids=True, searchable_attributes=q.searchableAttributes, verbose=verbose,
+        searchable_attributes=q.searchableAttributes, verbose=verbose,
         filter_string=q.filter, attributes_to_retrieve=q.attributesToRetrieve
     ) for q in lexical_queries.values()]))
 
@@ -1020,10 +1020,10 @@ def refresh_indexes_in_background(config: Config, index_names: List[str]) -> Non
 
 
 def search(config: Config, index_name: str, text: Union[str, dict],
-           result_count: int = 3, offset: int = 0, highlights=True, return_doc_ids=True,
+           result_count: int = 3, offset: int = 0, highlights=True,
            search_method: Union[str, SearchMethod, None] = SearchMethod.TENSOR,
-           searchable_attributes: Iterable[str] = None, verbose: int = 0, num_highlights: int = 3,
-           reranker: Union[str, Dict] = None, simplified_format: bool = True, filter: str = None,
+           searchable_attributes: Iterable[str] = None, verbose: int = 0,
+           reranker: Union[str, Dict] = None, filter: str = None,
            attributes_to_retrieve: Optional[List[str]] = None,
            device=None, boost: Optional[Dict] = None,
            image_download_headers: Optional[Dict] = None,
@@ -1045,7 +1045,6 @@ def search(config: Config, index_name: str, text: Union[str, dict],
         text:
         result_count:
         offset:
-        return_doc_ids:
         search_method:
         searchable_attributes:
         verbose:
@@ -1080,6 +1079,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
             f"and offset of `{offset}`.")
 
     t0 = timer()
+    validation.validate_context(context=context, query=text, search_method=search_method)
     validation.validate_boost(boost=boost, search_method=search_method)
     validation.validate_searchable_attributes(searchable_attributes=searchable_attributes, search_method=search_method)
     if searchable_attributes is not None:
@@ -1104,8 +1104,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
     if search_method.upper() == SearchMethod.TENSOR:
         search_result = _vector_text_search(
             config=config, index_name=index_name, query=text, result_count=result_count, offset=offset,
-            return_doc_ids=return_doc_ids, searchable_attributes=searchable_attributes, verbose=verbose,
-            number_of_highlights=num_highlights, simplified_format=simplified_format,
+            searchable_attributes=searchable_attributes, verbose=verbose,
             filter_string=filter, device=device, attributes_to_retrieve=attributes_to_retrieve, boost=boost,
             image_download_headers=image_download_headers, context=context, score_modifiers=score_modifiers,
             model_auth=model_auth
@@ -1113,7 +1112,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
     elif search_method.upper() == SearchMethod.LEXICAL:
         search_result = _lexical_search(
             config=config, index_name=index_name, text=text, result_count=result_count, offset=offset,
-            return_doc_ids=return_doc_ids, searchable_attributes=searchable_attributes, verbose=verbose,
+            searchable_attributes=searchable_attributes, verbose=verbose,
             filter_string=filter, attributes_to_retrieve=attributes_to_retrieve
         )
     else:
@@ -1131,7 +1130,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
                                          model_name=reranker,
                                          device=config.indexing_device if device is None else device,
                                          searchable_attributes=searchable_attributes,
-                                         num_highlights=1 if simplified_format else num_highlights)
+                                         num_highlights=1)
             end_rerank_time = timer()
             total_rerank_time = end_rerank_time - start_rerank_time
             logger.debug(
@@ -1155,7 +1154,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
 
 
 def _lexical_search(
-        config: Config, index_name: str, text: str, result_count: int = 3, offset: int = 0, return_doc_ids=True,
+        config: Config, index_name: str, text: str, result_count: int = 3, offset: int = 0,
         searchable_attributes: Sequence[str] = None, verbose: int = 0, filter_string: str = None,
         attributes_to_retrieve: Optional[List[str]] = None, expose_facets: bool = False):
     """
@@ -1166,9 +1165,7 @@ def _lexical_search(
         text:
         result_count:
         offset:
-        return_doc_ids:
         searchable_attributes:
-        number_of_highlights:
         verbose:
 
     Returns:
@@ -1264,9 +1261,8 @@ def _lexical_search(
     res_list = []
     for doc in search_res['hits']['hits']:
         just_doc = _clean_doc(doc["_source"].copy()) if "_source" in doc else dict()
-        if return_doc_ids:
-            just_doc["_id"] = doc["_id"]
-            just_doc["_score"] = doc["_score"]
+        just_doc["_id"] = doc["_id"]
+        just_doc["_score"] = doc["_score"]
         res_list.append({**just_doc, "_highlights": []})
 
     end_postprocess_time = timer()
@@ -1303,65 +1299,56 @@ def construct_vector_input_batches(query: Union[str, Dict], index_info) -> Tuple
             return [k for k, _ in ordered_queries], []
 
 
-def get_vector_properties_to_search(searchable_attributes: Union[None, List[str]], index_info: IndexInfo) -> List[str]:
+def get_vector_properties_to_search(searchable_attributes: Union[None, List[str]], index_info: IndexInfo, offset: int = 0) -> List[str]:
     if searchable_attributes is None:
-        return index_info.get_vector_properties().keys()
+        properties_to_search = index_info.get_vector_properties().keys()
     else:
         searchable_attributes_as_vectors = {
             utils.generate_vector_name(field_name=attribute) for attribute in searchable_attributes
         }
         # discard searchable attributes that aren't found in the cache:
-        return list(searchable_attributes_as_vectors.intersection(
+        properties_to_search = list(searchable_attributes_as_vectors.intersection(
             index_info.get_vector_properties().keys()
         ))
+    
+    # Validation for offset (pagination is single field) if offset not provided, validation is not run.
+    if len(properties_to_search) != 1 and offset > 0:
+        human_readable_vector_properties = [v.replace(TensorField.vector_prefix, '') for v in
+                                            list(properties_to_search)]
+        raise errors.InvalidArgError(
+            f"Pagination (offset > 0) is only supported for single field searches!"
+            f" Your search currently has {len(properties_to_search)} vectorisable fields: {human_readable_vector_properties}"
+        )
+    return properties_to_search
 
 
-def construct_msearch_body_elements(vector_properties_to_search: List[str], offset: int, filter_string: str, index_info: IndexInfo, result_count: int, query_vector: List[float], attributes_to_retrieve: List[str], index_name: str, contextualised_filter: str) -> List[Dict[str, Any]]:
+def construct_msearch_body_elements(searchableAttributes: List[str], offset: int, filter_string: str, index_info: IndexInfo, result_count: int, query_vector: List[float], attributes_to_retrieve: List[str], index_name: str, score_modifiers: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
     """Constructs the body payload of a `/_msearch` request for a single bulk search query"""
+    contextualised_filter = utils.contextualise_filter(filter_string=filter_string, simple_properties=index_info.get_text_properties())
+    vector_properties_to_search = get_vector_properties_to_search(searchableAttributes, index_info, offset=offset)
     body = []
 
-    # Validation for offset (pagination is single field)
-    if len(vector_properties_to_search) != 1 and offset > 0:
-        human_readable_vector_properties = [v.replace(TensorField.vector_prefix, "") for v in list(vector_properties_to_search)]
-        raise errors.InvalidArgError(f"Pagination (offset > 0) is only supported for single field searches! Your search currently has {len(vector_properties_to_search)} vectorisable fields: {human_readable_vector_properties}")
-
     for vector_field in vector_properties_to_search:
-        search_query = {
-            "size": result_count,
-            "from": offset,
-            "query": {
-                "nested": {
-                    "path": TensorField.chunks,
-                    "inner_hits": {
-                        "_source": {
-                            "include": ["__chunks.__field_content", "__chunks.__field_name"]
-                        }
-                    },
-                    "query": {
-                        "knn": {
-                            f"{TensorField.chunks}.{vector_field}": {
-                                "vector": query_vector,
-                                "k": result_count + offset
-                            }
-                        }
-                    },
-                    "score_mode": "max"
+        if score_modifiers is not None:
+            search_query = _create_score_modifiers_tensor_search_query(score_modifiers, result_count, offset, vector_field, query_vector)
+            if filter_string is not None:
+                search_query["query"]["function_score"]["query"]["nested"]["query"]["function_score"]["query"]\
+                    ["knn"][f"{TensorField.chunks}.{vector_field}"][
+                    "filter"] = {
+                    "query_string": {"query": f"{contextualised_filter}"}
+                } 
+        else: 
+            search_query = _create_normal_tensor_search_query(result_count, offset, vector_field, query_vector)
+            if filter_string is not None:
+                search_query["query"]["nested"]["query"]["knn"][f"{TensorField.chunks}.{vector_field}"][
+                    "filter"] = {
+                    "query_string": {"query": f"{contextualised_filter}"}
                 }
-            },
-            "_source": {
-                "exclude": ["__chunks.__vector_*"]
-            }
-        }
 
         if attributes_to_retrieve is not None:
             search_query["_source"] = {"include": attributes_to_retrieve} if len(attributes_to_retrieve) > 0 else False
-
-        if filter_string is not None:
-            search_query["query"]["nested"]["query"]["knn"][f"{TensorField.chunks}.{vector_field}"][
-                "filter"] = {
-                "query_string": {"query": f"{contextualised_filter}"}
-            }
         body += [{"index": index_name}, search_query]
+
     return body
 
 
@@ -1381,14 +1368,17 @@ def bulk_msearch(config: Config, body: List[Dict]) -> List[Dict]:
     except KeyError as e:
         # KeyError indicates we have received a non-successful result
         try:
-            if "index.max_result_window" in response["responses"][0]["error"]["root_cause"][0]["reason"]:
-                raise errors.IllegalRequestedDocCount(
-            "Marqo-OS rejected the response due to too many requested results. "
-            "Try reducing the query's limit parameter") from e
-            elif 'parse_exception' in response["responses"][0]["error"]["root_cause"][0]["reason"]:
+            root_cause_reason = response["responses"][0]["error"]["root_cause"][0]["reason"]
+            root_cause_type: Optional[str] = response["responses"][0]["error"]["root_cause"][0].get("type")
+
+            if "index.max_result_window" in root_cause_reason:
+                raise errors.IllegalRequestedDocCount("Marqo-OS rejected the response due to too many requested results. Try reducing the query's limit parameter") from e
+            elif 'parse_exception' in root_cause_reason:
+                raise errors.InvalidArgError("Syntax error, could not parse filter string") from e
+            elif  root_cause_type == 'query_shard_exception' and root_cause_reason.startswith("Failed to parse query"):
                 raise errors.InvalidArgError("Syntax error, could not parse filter string") from e
             raise errors.BackendCommunicationError(f"Error communicating with Marqo-OS backend:\n{response}")
-        except (KeyError, IndexError) as e2:
+        except (KeyError, IndexError):
             raise e
 
     logger.debug(f"  search (tensor) Marqo-os processing time: took {total_os_process_time:.3f}s for Marqo-os to execute the search.")
@@ -1559,7 +1549,19 @@ def get_query_vectors_from_jobs(
             ]
             # TODO how doe we ensure order?
             weighted_vectors = [np.asarray(vec) * weight for vec, weight, content in vectorised_ordered_queries]
-            merged_vector = np.mean(weighted_vectors, axis=0)
+            
+            custom_tensors = q.get_context_tensor() 
+            if custom_tensors is not None:
+                weighted_vectors += [np.asarray(v["vector"]) * v["weight"] for v in custom_tensors]
+            
+            try:
+                merged_vector = np.mean(weighted_vectors, axis=0)
+            except ValueError as e:
+                raise errors.InvalidArgError(f"The provided vectors are not in the same dimension of the index."
+                                             f"This causes the error when we do `numpy.mean()` over all the vectors.\n"
+                                             f"The original error is `{e}`.\n"
+                                             f"Please check `https://docs.marqo.ai/0.0.16/API-Reference/search/#context`.")
+
             if index_info.index_settings['index_defaults']['normalize_embeddings']:
                 norm = np.linalg.norm(merged_vector, axis=-1, keepdims=True)
                 if norm > 0:
@@ -1611,6 +1613,25 @@ def create_empty_query_response(queries: List[BulkSearchQueryEntity]) -> List[Di
         )
     )
 
+def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity], selected_device: Union[Device, str]) -> Dict[Qidx, List[float]]:
+    """Run the query vectorisation process"""
+    # 1. Pre-process inputs ready for s2_inference.vectorise
+    # we can still use qidx_to_job. But the jobs structure may need to be different
+    vector_jobs_tuple: Tuple[Dict[Qidx, List[VectorisedJobPointer]], Dict[JHash, VectorisedJobs]] = (
+        create_vector_jobs(queries, config, selected_device)
+    )
+    qidx_to_jobs, jobs = vector_jobs_tuple
+
+    # 2. Vectorise in batches against all queries
+    ## TODO: To ensure that we are vectorising in batches, we can mock vectorise (), and see if the number of calls is as expected (if batch_size = 16, and number of docs = 32, and all args are the same, then number of calls = 2)
+    # TODO: we need to enable str/PIL image structure:
+    job_ptr_to_vectors: Dict[JHash, Dict[str, List[float]]] = vectorise_jobs(list(jobs.values()))
+
+    # 3. For each query, get associated vectors
+    qidx_to_vectors: Dict[Qidx, List[float]] = get_query_vectors_from_jobs(
+        queries, qidx_to_jobs, job_ptr_to_vectors, config, jobs
+    )
+    return qidx_to_vectors
 
 def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity], device=None) -> List[Dict]:
     """Resolve a batch of search queries in parallel.
@@ -1628,32 +1649,14 @@ def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity
 
     start_preprocessing_time = timer()
     selected_device = config.indexing_device if device is None else device
-
-    # 1. Pre-process inputs ready for s2_inference.vectorise
-    # we can still use qidx_to_job. But the jobs structure may need to be different
-    vector_jobs_tuple: Tuple[Dict[Qidx, List[VectorisedJobPointer]], Dict[JHash, VectorisedJobs]] = (
-        create_vector_jobs(queries, config, selected_device)
-    )
-    qidx_to_jobs, jobs = vector_jobs_tuple
-
-    # 2. Vectorise in batches against all queries
-    ## TODO: To ensure that we are vectorising in batches, we can mock vectorise (), and see if the number of calls is as expected (if batch_size = 16, and number of docs = 32, and all args are the same, then number of calls = 2)
-    # TODO: we need to enable str/PIL image structure:
-    job_ptr_to_vectors: Dict[JHash, Dict[str, List[float]]] = vectorise_jobs(list(jobs.values()))
-
-    # 3. For each query, get associated vectors
-    qidx_to_vectors: Dict[Qidx, List[float]] = get_query_vectors_from_jobs(
-        queries, qidx_to_jobs, job_ptr_to_vectors, config, jobs
-    )
+    qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, selected_device)
 
     ## 4. Create msearch request bodies and combine to aggregate.
     query_to_body_parts: Dict[Qidx, List[Dict]] = dict()
     query_to_body_count: Dict[Qidx, int] = dict() # Keep track of count, so we can separate after msearch call.
     for qidx, q in enumerate(queries):
         index_info = get_index_info(config=config, index_name=q.index)
-        contextualised_filter = utils.contextualise_filter(filter_string=q.filter, simple_properties=index_info.get_text_properties())
-        vector_properties_to_search = get_vector_properties_to_search(q.searchableAttributes, index_info)
-        body = construct_msearch_body_elements(vector_properties_to_search, q.offset, q.filter, index_info, q.limit, qidx_to_vectors[qidx], q.attributesToRetrieve, q.index, contextualised_filter)
+        body = construct_msearch_body_elements(q.searchableAttributes, q.offset, q.filter, index_info, q.limit, qidx_to_vectors[qidx], q.attributesToRetrieve, q.index, q.scoreModifiers)
 
         query_to_body_parts[qidx] = body
         query_to_body_count[qidx] = len(body)
@@ -1707,15 +1710,10 @@ def create_bulk_search_response(queries: List[BulkSearchQueryEntity], query_to_b
 
 def _vector_text_search(
         config: Config, index_name: str, query: Union[str, dict], result_count: int = 5, offset: int = 0,
-        return_doc_ids=False, searchable_attributes: Iterable[str] = None, number_of_highlights=3,
-        verbose=0, raise_on_searchable_attribs=False, hide_vectors=True, k=500,
-        simplified_format=True, filter_string: str = None, device=None,
-        attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None,
-        image_download_headers: Optional[Dict] = None,
-        context: Optional[Dict] = None,
-        score_modifiers: Optional[Dict] = None,
-        model_auth: Optional[ModelAuth] = None
-    ):
+        searchable_attributes: Iterable[str] = None, verbose=0, filter_string: str = None, device=None,
+        attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None, 
+        image_download_headers: Optional[Dict] = None, context: Optional[Dict] = None,
+        score_modifiers: Optional[Dict] = None, model_auth: Optional[ModelAuth] = None):
     """
     Args:
         config:
@@ -1724,11 +1722,8 @@ def _vector_text_search(
             <query string>:<weight float> pairs.
         result_count:
         offset:
-        return_doc_ids: if True adds doc _id to the docs. Otherwise just returns the docs as-is
         searchable_attributes: Iterable of field names to search. If left as None, then all will
             be searched
-        number_of_highlights: if None, will return all highlights in
-            descending order of relevancy. Otherwise will return this number of highlights
         verbose: if 0 - nothing is printed. if 1 - data is printed without vectors, if 2 - full
             objects are printed out
         attributes_to_retrieve: if set, only returns these fields
@@ -1756,146 +1751,25 @@ def _vector_text_search(
         - max result count should be in a config somewhere
         - searching a non existent index should return a HTTP-type error
     """
-    # SEARCH TIMER-LOGGER (pre-processing)
+    # # SEARCH TIMER-LOGGER (pre-processing)
     start_preprocess_time = timer()
-    custom_tensors = None
-    if context is not None:
-        if isinstance(query, dict):
-            validation.validate_context_object(context_object=context)
-            custom_tensors = context.get("tensor", None)
-        elif isinstance(query, str):
-            raise errors.InvalidArgError(f"Marqo received a query = `{query}` with type =`{type(query).__name__}` "
-                                         f"and a parameter `context`.\n" # do not return true {context} here as it might be huge.
-                                         f"This is not supported as the context only works when the query is a dictionary."
-                                         f"If you aim to search with your custom vectors, reformat the query as a dictionary.\n"
-                                         f"Please check `https://docs.marqo.ai/0.0.16/API-Reference/search/#context` for more information.")
-
     try:
         index_info = get_index_info(config=config, index_name=index_name)
     except KeyError as e:
         raise errors.IndexNotFoundError(message="Tried to search a non-existent index: {}".format(index_name))
+
     selected_device = config.indexing_device if device is None else device
+    queries = [BulkSearchQueryEntity(
+        q=query, searchableAttributes=searchable_attributes,searchMethod=SearchMethod.TENSOR, limit=result_count, offset=offset, showHighlights=False, filter=filter_string, attributesToRetrieve=attributes_to_retrieve, boost=boost, image_download_headers=image_download_headers, context=context, scoreModifiers=score_modifiers, index=index_name
+    )]
+    qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, selected_device)
+    vectorised_text = list(qidx_to_vectors.values())[0]
 
-    # query, weight pairs, if query is a dict:
-    ordered_queries = None
+    contextualised_filter = utils.contextualise_filter(filter_string=filter_string, simple_properties=index_info.get_text_properties())
+    body = construct_msearch_body_elements(
+        searchable_attributes, offset, filter_string, index_info, result_count, vectorised_text, attributes_to_retrieve, index_name, score_modifiers
+    )
 
-    if isinstance(query, str):
-        # one batch with one element in the batch:
-        to_be_vectorised = [[query]]
-    else:  # is dict:
-        ordered_queries = list(query.items())
-        if index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]:
-            text_queries = [k for k, _ in ordered_queries if not _is_image(k)]
-            image_queries = [k for k, _ in ordered_queries if _is_image(k)]
-            to_be_vectorised = [batch for batch in [text_queries, image_queries] if batch]
-        else:
-            to_be_vectorised = [[k for k, _ in ordered_queries], ]
-    try:
-        vectorised_dicts = [
-            dict(zip(batch, s2_inference.vectorise(
-                model_name=index_info.model_name, model_properties=_get_model_properties(index_info),
-                content=batch, device=selected_device,
-                normalize_embeddings=index_info.index_settings['index_defaults']['normalize_embeddings'],
-                image_download_headers=image_download_headers,
-                model_auth=model_auth
-            )))
-            for batch in to_be_vectorised
-        ]
-
-        if ordered_queries:
-            # multiple queries. We have to weight and combine them:
-            weighted_vectors = []
-            for q, weight in ordered_queries:
-                vec = None
-                for batch_dict in vectorised_dicts:
-                    if q in batch_dict:
-                        vec = batch_dict[q]
-                weighted_vectors.append(np.asarray(vec) * weight)
-            if custom_tensors:
-                weighted_vectors += [np.asarray(v["vector"]) * v["weight"]for v in custom_tensors]
-            try:
-                vectorised_text = np.mean(weighted_vectors, axis=0)
-            except ValueError as e:
-                raise errors.InvalidArgError(f"The provided vectors are not in the same dimension of the index."
-                                             f"This causes the error when we do `numpy.mean()` over all the vectors.\n"
-                                             f"The original error is `{e}`.\n"
-                                             f"Please check `https://docs.marqo.ai/0.0.16/API-Reference/search/#context`.")
-            if index_info.index_settings['index_defaults']['normalize_embeddings']:
-                norm = np.linalg.norm(vectorised_text, axis=-1, keepdims=True)
-                if norm > 0:
-                    vectorised_text /= np.linalg.norm(vectorised_text, axis=-1, keepdims=True)
-            vectorised_text = list(vectorised_text)
-        else:
-            vectorised_text = vectorised_dicts[0][query]
-    except (s2_inference_errors.UnknownModelError,
-            s2_inference_errors.InvalidModelPropertiesError,
-            s2_inference_errors.ModelLoadError) as model_error:
-        raise errors.BadRequestError(
-            message=f'Problem vectorising query. Reason: {str(model_error)}',
-            # link="https://marqo.pages.dev/latest/Models-Reference/dense_retrieval/"
-        )
-    except s2_inference_errors.S2InferenceError as s2_error:
-        raise errors.BadRequestError(
-            message=f"Problem vectorising query. Reason: {str(s2_error)}"
-        )
-    body = []
-
-    if searchable_attributes is None:
-        vector_properties_to_search = index_info.get_vector_properties().keys()
-    else:
-        if raise_on_searchable_attribs:
-            vector_properties_to_search = validation.validate_searchable_vector_props(
-                existing_vector_properties=index_info.get_vector_properties().keys(),
-                subset_vector_properties=searchable_attributes
-            )
-        else:
-            searchable_attributes_as_vectors = {utils.generate_vector_name(field_name=attribute)
-                                                for attribute in searchable_attributes}
-            # discard searchable attributes that aren't found in the cache:
-            vector_properties_to_search = searchable_attributes_as_vectors.intersection(
-                index_info.get_vector_properties().keys())
-
-    # Validation for offset (pagination is single field)
-    if len(vector_properties_to_search) != 1 and offset > 0:
-        human_readable_vector_properties = [v.replace(TensorField.vector_prefix, "") for v in
-                                            list(vector_properties_to_search)]
-        raise errors.InvalidArgError(
-            f"Pagination (offset > 0) is only supported for single field searches! Your search currently has {len(vector_properties_to_search)} vectorisable fields: {human_readable_vector_properties}")
-
-    if filter_string is not None:
-        contextualised_filter = utils.contextualise_filter(
-            filter_string=filter_string,
-            simple_properties=index_info.get_text_properties())
-    else:
-        contextualised_filter = ''
-
-    if score_modifiers is not None:
-        validated_score_modifiers = validation.validate_score_modifiers_object(score_modifiers)
-        script_score = convert_validated_score_modifiers_to_script_score(validated_score_modifiers)
-        for vector_field in vector_properties_to_search:
-            search_query = _create_score_modifiers_tensor_search_query(result_count, offset, vector_field, vectorised_text, script_score)
-            if attributes_to_retrieve is not None:
-                search_query["_source"] = {"include": attributes_to_retrieve} if len(attributes_to_retrieve) > 0 else False
-
-            if filter_string is not None:
-                search_query["query"]["function_score"]["query"]["nested"]["query"]["function_score"]["query"]\
-                    ["knn"][f"{TensorField.chunks}.{vector_field}"][
-                    "filter"] = {
-                    "query_string": {"query": f"{contextualised_filter}"}
-                }
-            body += [{"index": index_name}, search_query]
-    else:
-        for vector_field in vector_properties_to_search:
-            search_query = _create_normal_tensor_search_query(result_count, offset, vector_field, vectorised_text)
-            if attributes_to_retrieve is not None:
-                search_query["_source"] = {"include": attributes_to_retrieve} if len(attributes_to_retrieve) > 0 else False
-
-            if filter_string is not None:
-                search_query["query"]["nested"]["query"]["knn"][f"{TensorField.chunks}.{vector_field}"][
-                    "filter"] = {
-                    "query_string": {"query": f"{contextualised_filter}"}
-                }
-            body += [{"index": index_name}, search_query]
     if verbose:
         print("vector search body:")
         if verbose == 1:
@@ -1920,120 +1794,17 @@ def _vector_text_search(
     logger.debug(f"search (tensor) pre-processing: took {(total_preprocess_time):.3f}s to vectorize and process query.")
 
     # SEARCH TIMER-LOGGER (roundtrip)
-    start_search_http_time = timer()
-    response = HttpRequests(config).get(path=F"{index_name}/_msearch",
-                                        body=utils.dicts_to_jsonl(body))
-
-    end_search_http_time = timer()
-    total_search_http_time = end_search_http_time - start_search_http_time
-    total_os_process_time = response["took"] * 0.001
-    num_responses = len(response["responses"])
-    logger.debug(
-        f"search (tensor) roundtrip: took {(total_search_http_time):.3f}s to send {num_responses} search queries (roundtrip) to Marqo-os.")
-
-    try:
-        responses = [r['hits']['hits'] for r in response["responses"]]
-
-        # SEARCH TIMER-LOGGER (Log number of results and time for each search in multisearch)
-        for i in range(len(vector_properties_to_search)):
-            indiv_responses = response["responses"][i]['hits']['hits']
-            indiv_query_time = response["responses"][i]["took"] * 0.001
-            logger.debug(
-                f"  search (tensor) Marqo-os processing time (search field = {list(vector_properties_to_search)[i]}): took {(indiv_query_time):.3f}s and received {len(indiv_responses)} hits.")
-
-    except KeyError as e:
-        # KeyError indicates we have received a non-successful result
-        try:
-            if "index.max_result_window" in response["responses"][0]["error"]["root_cause"][0]["reason"]:
-                raise errors.IllegalRequestedDocCount(
-                    "Marqo-OS rejected the response due to too many requested results. "
-                    "Try reducing the query's limit parameter") from e
-            elif 'parse_exception' in response["responses"][0]["error"]["root_cause"][0]["reason"]:
-                raise errors.InvalidArgError("Syntax error, could not parse filter string") from e
-            elif (contextualised_filter
-                  and contextualised_filter in response["responses"][0]["error"]["root_cause"][0]["reason"]):
-                raise errors.InvalidArgError("Syntax error, could not parse filter string") from e
-            raise errors.BackendCommunicationError(f"Error communicating with Marqo-OS backend:\n{response}")
-        except (KeyError, IndexError) as e2:
-            raise e
-
-    logger.debug(
-        f"  search (tensor) Marqo-os processing time: took {(total_os_process_time):.3f}s for Marqo-os to execute the search.")
+    responses = bulk_msearch(config, body)
 
     # SEARCH TIMER-LOGGER (post-processing)
     start_postprocess_time = timer()
-    gathered_docs = dict()
-
-    if verbose:
-        print("search responses:")
-        pprint.pprint(responses)
-    for i, query_res in enumerate(responses):
-        for doc in query_res:
-            doc_chunks = doc["inner_hits"][TensorField.chunks]["hits"]["hits"]
-            if doc["_id"] in gathered_docs:
-                gathered_docs[doc["_id"]]["doc"] = doc
-                gathered_docs[doc["_id"]]["chunks"].extend(doc_chunks)
-            else:
-                gathered_docs[doc["_id"]] = {
-                    "_id": doc["_id"],
-                    "doc": doc,
-                    "chunks": doc_chunks
-                }
-
-    # Filter out docs with no inner hits:
-
-    for doc_id in list(gathered_docs.keys()):
-        if not gathered_docs[doc_id]["chunks"]:
-            del gathered_docs[doc_id]
-
-    def boost_score(docs: dict, boosters: dict) -> dict:
-        """ re-weighs the scores of individual fields
-        Args:
-            docs:
-            boosters: {'field_to_be_boosted': (int, int)}
-        """
-        to_be_boosted = docs.copy()
-        boosted_fields = set()
-        if searchable_attributes and boosters:
-            if not set(boosters).issubset(set(searchable_attributes)):
-                raise errors.InvalidArgError(
-                    "Boost fieldnames must be a subset of searchable attributes. "
-                    f"\nSearchable attributes: {searchable_attributes}"
-                    f"\nBoost: {boosters}"
-                )
-
-        for doc_id in list(to_be_boosted.keys()):
-            for chunk in to_be_boosted[doc_id]["chunks"]:
-                field_name = chunk['_source']['__field_name']
-                if field_name in boosters.keys():
-                    booster = boosters[field_name]
-                    if len(booster) == 2:
-                        chunk['_score'] = chunk['_score'] * booster[0] + booster[1]
-                    else:
-                        chunk['_score'] = chunk['_score'] * booster[0]
-                    boosted_fields.add(field_name)
-        return to_be_boosted
-
-    # SORT THE DOCS HERE
-    def sort_chunks(docs: dict) -> dict:
-        to_be_sorted = docs.copy()
-        for doc_id in list(to_be_sorted.keys()):
-            to_be_sorted[doc_id]["chunks"] = sorted(
-                to_be_sorted[doc_id]["chunks"], key=lambda x: x["_score"], reverse=True)
-        return to_be_sorted
+    gathered_docs = gather_documents_from_response(responses)
 
     if boost is not None:
-        docs_chunk_boosted = boost_score(gathered_docs, boost)
-        docs_chunks_sorted = sort_chunks(docs_chunk_boosted)
-    else:
-        docs_chunks_sorted = sort_chunks(gathered_docs)
+        gathered_docs = boost_score(gathered_docs, boost, searchable_attributes)
 
-    def sort_docs(docs: dict) -> List[dict]:
-        as_list = list(docs.values())
-        return sorted(as_list, key=lambda x: x["chunks"][0]["_score"], reverse=True)
-
-    completely_sorted = sort_docs(docs_chunks_sorted)
-
+    completely_sorted = sort_chunks(gathered_docs)
+    
     if verbose:
         print("Chunk vector search, sorted result:")
         if verbose == 1:
@@ -2041,49 +1812,7 @@ def _vector_text_search(
         elif verbose == 2:
             pprint.pprint(completely_sorted)
 
-    # format output:
-    def format_ordered_docs_preserving(ordered_docs_w_chunks: List[dict], num_highlights: Optional[int]) -> dict:
-        """Formats docs so that it preserves the original document, unless doc_ids are returned
-        Args:
-            ordered_docs_w_chunks:
-            num_highlights: number of highlights to return.
-        Returns:
-        """
-        return {'hits': [dict([
-            ('doc', _clean_doc(doc['doc']["_source"], doc_id=doc['_id'] if return_doc_ids else None)),
-            ('highlights', [{
-                the_chunk["_source"][TensorField.field_name]: the_chunk["_source"][TensorField.field_content]
-            } for the_chunk in doc['chunks']][:num_highlights])
-        ]) for doc in ordered_docs_w_chunks][:result_count]}
-
-    # format output:
-    def format_ordered_docs_simple(ordered_docs_w_chunks: List[dict]) -> dict:
-        """Only one highlight is returned
-        Args:
-            ordered_docs_w_chunks:
-        Returns:
-        """
-        simple_results = []
-
-        for d in ordered_docs_w_chunks:
-            if "_source" in d['doc']:
-                cleaned = _clean_doc(d['doc']["_source"], doc_id=d['_id'])
-            else:
-                cleaned = _clean_doc(dict(), doc_id=d['_id'])
-
-            cleaned["_highlights"] = {
-                d["chunks"][0]["_source"][TensorField.field_name]: d["chunks"][0]["_source"][
-                    TensorField.field_content]
-            }
-            cleaned["_score"] = d["chunks"][0]["_score"]
-            simple_results.append(cleaned)
-        return {"hits": simple_results[:result_count]}
-
-    if simplified_format:
-        res = format_ordered_docs_simple(ordered_docs_w_chunks=completely_sorted)
-    else:
-        res = format_ordered_docs_preserving(ordered_docs_w_chunks=completely_sorted,
-                                             num_highlights=number_of_highlights)
+    res = _format_ordered_docs_simple(ordered_docs_w_chunks=completely_sorted, result_count=result_count)
 
     end_postprocess_time = timer()
     total_postprocess_time = end_postprocess_time - start_postprocess_time
@@ -2486,7 +2215,9 @@ def _create_normal_tensor_search_query(result_count, offset, vector_field, vecto
     return search_query
 
 
-def _create_score_modifiers_tensor_search_query(result_count, offset, vector_field, vectorised_text, script_score) -> dict:
+def _create_score_modifiers_tensor_search_query(score_modifiers, result_count, offset, vector_field, vectorised_text) -> dict:
+    validated_score_modifiers = validation.validate_score_modifiers_object(score_modifiers)
+    script_score = convert_validated_score_modifiers_to_script_score(validated_score_modifiers)
     search_query = {
         "size": result_count,
         "from": offset,

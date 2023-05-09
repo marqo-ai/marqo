@@ -129,7 +129,7 @@ class TestIndexMetaCache(MarqoTestCase):
         index_meta_cache.empty_cache()
         search_res =tensor_search._lexical_search(
             config=self.config, index_name=self.index_name_1, text="Marqo",
-            searchable_attributes=["some doc 1", "d-one"], return_doc_ids=True)
+            searchable_attributes=["some doc 1", "d-one"])
         assert len(search_res['hits']) == 2
         assert d1 in [self.strip_marqo_fields(res) for res in search_res['hits']]
         assert d0 in [self.strip_marqo_fields(res) for res in search_res['hits']]
@@ -212,13 +212,13 @@ class TestIndexMetaCache(MarqoTestCase):
             self.index_name_1, [{"brand new field": "a line of text", "_id": "1234"}], "brand new field")
         result = tensor_search.search(
             index_name=self.index_name_1, config=self.config, text="a line of text",
-            return_doc_ids=True, search_method=SearchMethod.LEXICAL)
+             search_method=SearchMethod.LEXICAL)
         assert len(result["hits"]) == 0
         # REFRESH INTERVAL IS 2 seconds
         time.sleep(4)
         result_2 = tensor_search.search(
             index_name=self.index_name_1, config=self.config, text="a line of text",
-            return_doc_ids=True, search_method=SearchMethod.LEXICAL)
+             search_method=SearchMethod.LEXICAL)
         assert result_2["hits"][0]["_id"] == "1234"
 
     def test_search_vectors_externally_created_field(self):
@@ -233,12 +233,12 @@ class TestIndexMetaCache(MarqoTestCase):
             self.index_name_1, [{"brand new field": "a line of text", "_id": "1234"}], "brand new field")
         result = tensor_search.search(
             index_name=self.index_name_1, config=self.config, text="a line of text",
-            return_doc_ids=True, search_method=SearchMethod.TENSOR)
+             search_method=SearchMethod.TENSOR)
         assert "1234" not in [h["_id"] for h in result["hits"]]
         assert len([h["_id"] for h in result["hits"]]) > 0
         result_2 = tensor_search.search(
             index_name=self.index_name_1, config=self.config, text="a line of text",
-            return_doc_ids=True, search_method=SearchMethod.TENSOR)
+             search_method=SearchMethod.TENSOR)
         assert result_2["hits"][0]["_id"] == "1234"
 
     def test_search_vectors_externally_created_field_attributes(self):
@@ -253,7 +253,7 @@ class TestIndexMetaCache(MarqoTestCase):
         result = tensor_search.search(
             index_name=self.index_name_1, config=self.config, text="a line of text",
             searchable_attributes=["brand new field"],
-            return_doc_ids=True, search_method=SearchMethod.TENSOR)
+             search_method=SearchMethod.TENSOR)
         assert result['hits'] == []
 
     def test_search_lexical_externally_created_field_attributes(self):
@@ -270,12 +270,12 @@ class TestIndexMetaCache(MarqoTestCase):
         result = tensor_search.search(
             index_name=self.index_name_1, config=self.config, text="a line of text",
             searchable_attributes=["brand new field"],
-            return_doc_ids=True, search_method=SearchMethod.LEXICAL)
+             search_method=SearchMethod.LEXICAL)
         assert result["hits"][0]["_id"] == "1234"
         result_2 = tensor_search.search(
             index_name=self.index_name_1, config=self.config, text="a line of text",
             searchable_attributes=["brand new field"],
-            return_doc_ids=True, search_method=SearchMethod.LEXICAL)
+             search_method=SearchMethod.LEXICAL)
         assert result_2["hits"][0]["_id"] == "1234"
 
     def test_vector_search_non_existent_field(self):
@@ -288,7 +288,7 @@ class TestIndexMetaCache(MarqoTestCase):
         result = tensor_search.search(
             index_name=self.index_name_1, config=self.config, text="a line of text",
             searchable_attributes=["brand new field"],
-            return_doc_ids=True, search_method=SearchMethod.TENSOR)
+             search_method=SearchMethod.TENSOR)
         assert result['hits'] == []
 
     def test_lexical_search_non_existent_field(self):
@@ -303,7 +303,7 @@ class TestIndexMetaCache(MarqoTestCase):
         result = tensor_search.search(
             index_name=self.index_name_1, config=self.config, text="sftstsbtdts",
             searchable_attributes=["brand new field"],
-            return_doc_ids=True, search_method=SearchMethod.LEXICAL)
+             search_method=SearchMethod.LEXICAL)
 
     def test_search_vectors_externally_created_field_attributes_cache_update(self):
         """The cache should update after getting no hits at first"""
@@ -319,7 +319,7 @@ class TestIndexMetaCache(MarqoTestCase):
         result = tensor_search.search(
             index_name=self.index_name_1, config=self.config, text="a line of text",
             searchable_attributes=["brand new field"],
-            return_doc_ids=True, search_method=SearchMethod.TENSOR)
+             search_method=SearchMethod.TENSOR)
         assert result['hits'] == []
         time.sleep(0.5)
         if self.config.cluster_is_remote:
@@ -328,7 +328,7 @@ class TestIndexMetaCache(MarqoTestCase):
         result_2 = tensor_search.search(
             index_name=self.index_name_1, config=self.config, text="a line of text",
             searchable_attributes=["brand new field"],
-            return_doc_ids=True, search_method=SearchMethod.TENSOR)
+             search_method=SearchMethod.TENSOR)
         assert result_2["hits"][0]["_id"] == "1234"
 
     def test_populate_cache(self):
