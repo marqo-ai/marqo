@@ -1,6 +1,7 @@
-import requests
-from marqo.tensor_search import enums, backend
-from marqo.tensor_search import tensor_search
+import pydantic
+from marqo.tensor_search.models.add_docs_objects import ModelAuth
+from marqo.tensor_search.models.private_models import S3Auth
+import urllib.parse
 from marqo.tensor_search.web import api_utils
 from marqo.errors import InvalidArgError, InternalError
 from tests.marqo_test import MarqoTestCase
@@ -44,3 +45,30 @@ class TestApiUtils(MarqoTestCase):
                 raise AssertionError
             except InternalError:
                 pass
+            
+class TestDecodeQueryStringModelAuth(MarqoTestCase):
+
+    def test_decode_query_string_model_auth_none(self):
+        result = api_utils.decode_query_string_model_auth()
+        self.assertIsNone(result)
+
+    def test_decode_query_string_model_auth_empty_string(self):
+        result = api_utils.decode_query_string_model_auth("")
+        self.assertIsNone(result)
+
+    def test_decode_query_string_model_auth_valid(self):
+        model_auth_obj = ModelAuth(s3=S3Auth(
+            aws_access_key_id='some_acc_id', aws_secret_access_key='some_sece_key'))
+        model_auth_str = model_auth_obj.json()
+        model_auth_url_encoded = urllib.parse.quote_plus(model_auth_str)
+
+        result = api_utils.decode_query_string_model_auth(model_auth_url_encoded)
+
+        self.assertIsInstance(result, ModelAuth)
+        self.assertEqual(result.s3.aws_access_key_id, 'some_acc_id')
+        self.assertEqual(result.s3.aws_secret_access_key, 'some_sece_key')
+        self.assertEqual(result.hf, None)
+
+    def test_decode_query_string_model_auth_invalid(self):
+        with self.assertRaises(pydantic.ValidationError):
+            api_utils.decode_query_string_model_auth("invalid_url_encoded_string")
