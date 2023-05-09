@@ -39,8 +39,10 @@ def download_model_from_hf(
     try:
         return hf_hub_download(**download_kwargs)
     except RepositoryNotFoundError:
+        # TODO: add link to HF model auth/loc
         raise ModelDownloadError(
-            "Could not find the specified Hugging Face model repository. Please try again, or create a "
-            "new index, ensuring that the index's Hugging Face location is set correctly."
+            "Could not find the specified Hugging Face model repository. Please ensure that the request's model_auth's "
+            "`hf` credentials and the index's model_location are correct. "
+            "If the index's model_location is not correct, please create a new index with the corrected model_location"
         )
 

@@ -106,6 +106,7 @@ class TestModelAuthLoadedS3(MarqoTestCase):
             ))
             assert not res['errors']
 
+        # now the file exists
         assert os.path.isfile(cls.model_abs_path)
 
         mock_s3_client.generate_presigned_url.assert_called_with(
@@ -135,6 +136,8 @@ class TestModelAuthLoadedS3(MarqoTestCase):
     def test_after_downloading_doesnt_redownload(self):
         """on this instance, at least"""
         tensor_search.eject_model(model_name=self.custom_model_name, device=self.device)
+        mods = tensor_search.get_loaded_models()['models']
+        assert not any([m == 'my_model' for m in mods])
         mock_req = mock.MagicMock()
         with mock.patch('urllib.request.urlopen', mock_req):
             res = tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
@@ -142,6 +145,24 @@ class TestModelAuthLoadedS3(MarqoTestCase):
             ))
             assert not res['errors']
             mock_req.assert_not_called()
+        mods = tensor_search.get_loaded_models()['models']
+        assert any([m == 'my_model' for m in mods])
+
+    def test_after_downloading_search_doesnt_redownload(self):
+        """on this instance, at least"""
+        tensor_search.eject_model(model_name=self.custom_model_name, device=self.device)
+        mods = tensor_search.get_loaded_models()['models']
+        assert not any([m == 'my_model' for m in mods])
+        mock_req = mock.MagicMock()
+        with mock.patch('urllib.request.urlopen', mock_req):
+            res = tensor_search.search(config=self.config,
+                index_name=self.index_name_1, text='hi'
+            )
+            assert 'hits' in res
+            mock_req.assert_not_called()
+
+        mods = tensor_search.get_loaded_models()['models']
+        assert any([m == 'my_model' for m in mods])
 
 class TestModelAuth(MarqoTestCase):
 
@@ -737,13 +758,51 @@ class TestModelAuth(MarqoTestCase):
         self.assertIn("Could not find the specified Hugging Face model repository.", str(cm.exception))
 
     def test_bad_creds_error_hf(self):
-        """todo"""
+        """the model and repo do exist, but creds are bad. raises the same type of error
+        as the previous one. """
+        hf_object = "dummy_model.pt"
+        hf_repo_name = "Marqo/test-private"
+        hf_token = "hf_some_secret_key"
+
+        model_auth = ModelAuth(
+            hf=HfAuth(token=hf_token)
+        )
+
+        model_properties = {
+            "name": "ViT-B/32",
+            "dimensions": 512,
+            "model_location": {
+                "hf": {
+                    "repo_id": hf_repo_name,
+                    "filename": hf_object,
+                },
+                "auth_required": True
+            },
+            "type": "open_clip",
+        }
+        s3_settings = _get_base_index_settings()
+        s3_settings['index_defaults']['model_properties'] = model_properties
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings=s3_settings)
+
+        with self.assertRaises(BadRequestError) as cm:
+            tensor_search.search(
+                config=self.config, text='hello', index_name=self.index_name_1,
+                model_auth=model_auth
+            )
+        self.assertIn("Could not find the specified Hugging Face model repository.", str(cm.exception))
+
+        with self.assertRaises(BadRequestError) as cm2:
+            res = tensor_search.add_documents(
+                config=self.config, add_docs_params=AddDocsParams(
+                    index_name=self.index_name_1, auto_refresh=True,
+                    docs=[{'title': 'blah blah'}], model_auth=model_auth
+                )
+            )
+        self.assertIn("Could not find the specified Hugging Face model repository.", str(cm.exception))
+
     def test_doesnt_redownload_s3(self):
         """We also need to ensure that it doesn't redownload from add docs to search
         and vice vers """
-
-    def test_downloaded_to_correct_dir(self):
-        """"""
 
     def test_public_s3_no_auth(self):
         """"""
