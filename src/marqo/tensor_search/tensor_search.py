@@ -247,12 +247,19 @@ def add_documents_orchestrator(
 
         # create beforehand or pull from the cache so it is up to date for the multi-processing
         _check_and_create_index_if_not_exist(config=config, index_name=add_docs_params.index_name)
+        # this loads the model if it's not already, which prevents race conditions
+        # TODO:
+        #   - we may need to wrap in a try-except around this
+        #   - we need to ensure that it works, even with no documents, or only docs with ALL non tensor fields
+        _vector_text_search(
+            config=config, index_name=add_docs_params.index_name, query='',
+            model_auth=add_docs_params.model_auth,
+            image_download_headers=add_docs_params.image_download_headers)
 
         logger.debug(f"batch_size={batch_size} and processes={processes} - using multi-processing")
         results = parallel.add_documents_mp(
             config=config, batch_size=batch_size, processes=processes, add_docs_params=add_docs_params
         )
-
         # we need to force the cache to update as it does not propagate using mp
         # we just clear this index's entry and it will re-populate when needed next
         if add_docs_params.index_name in get_cache():
