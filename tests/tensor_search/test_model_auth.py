@@ -469,15 +469,6 @@ class TestModelAuth(MarqoTestCase):
     def test_open_clip_reg_clip(self):
         """both normal and open clip"""
 
-    ################## TESTS FOR VECTORISE PARAMS
-
-    def test_as_dict_discards_nones_expected_dict(self):
-        """assert the dict is structured as expected"""
-
-        """Assert __pydantic_initialised__ is not in the dict
-        
-        test both k and value staring with __ 
-        """
 
 
 
