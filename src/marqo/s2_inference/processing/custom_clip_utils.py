@@ -8,6 +8,8 @@ import urllib
 from tqdm import tqdm
 from marqo.s2_inference.configs import ModelCache
 from typing import Optional
+from urllib.error import HTTPError
+from marqo.s2_inference.errors import ModelDownloadError
 from marqo.tensor_search.models.private_models import ModelAuth, ModelLocation
 from marqo.s2_inference.model_downloading.from_s3 import (
     get_presigned_s3_url, get_s3_model_cache_filename, check_s3_model_already_exists,
@@ -109,10 +111,18 @@ def download_pretrained_from_s3(
 
     url = get_presigned_s3_url(location=location, auth=auth)
 
-    return download_pretrained_from_url(
-        url=url, cache_dir=download_dir,
-        cache_file_name=get_s3_model_cache_filename(location)
-    )
+    try:
+        return download_pretrained_from_url(
+            url=url, cache_dir=download_dir,
+            cache_file_name=get_s3_model_cache_filename(location)
+        )
+    except HTTPError as e:
+        if e.code == 403:
+            # TODO: add link to auth docs
+            raise ModelDownloadError(
+                "Received 403 error when trying to retrieve model from s3 storage. "
+                "Please check the request's s3 credentials and try again. "
+            )
 
 
 def download_pretrained_from_url(

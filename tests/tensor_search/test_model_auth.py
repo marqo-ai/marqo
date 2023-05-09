@@ -648,10 +648,54 @@ class TestModelAuth(MarqoTestCase):
                 )
             self.assertIn("s3 authorisation information is required", str(cm2.exception))
 
+    def test_bad_creds_error_s3(self):
+        """in s3 if creds aren't valid. Ensure a helpful error"""
+        s3_object_key = 'path/to/your/secret_model.pt'
+        s3_bucket = 'your-bucket-name'
 
-    def test_bad_creds_error(self):
-        """in s3, hf if creds aren't valid. Ensure a helpful error"""
+        fake_access_key_id = '12345'
+        fake_secret_key = 'this-is-a-secret'
 
+        model_auth = ModelAuth(
+            s3=S3Auth(
+                aws_access_key_id=fake_access_key_id,
+                aws_secret_access_key=fake_secret_key)
+        )
+
+        model_properties = {
+            "name": "ViT-B/32",
+            "dimensions": 512,
+            "model_location": {
+                "s3": {
+                    "Bucket": s3_bucket,
+                    "Key": s3_object_key,
+                },
+                "auth_required": True
+            },
+            "type": "open_clip",
+        }
+        s3_settings = _get_base_index_settings()
+        s3_settings['index_defaults']['model_properties'] = model_properties
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings=s3_settings)
+
+        with self.assertRaises(BadRequestError) as cm:
+            tensor_search.search(
+                config=self.config, text='hello', index_name=self.index_name_1,
+                model_auth=model_auth
+            )
+            self.assertIn("403 error when trying to retrieve model from s3", str(cm.exception))
+
+        with self.assertRaises(BadRequestError) as cm2:
+            res = tensor_search.add_documents(
+                config=self.config, add_docs_params=AddDocsParams(
+                    index_name=self.index_name_1, auto_refresh=True,
+                    docs=[{'title': 'blah blah'}], model_auth=model_auth
+                )
+            )
+            self.assertIn("s3 authorisation information is required", str(cm2.exception))
+
+    def test_bad_creds_error_hf(self):
+        """todo"""
     def test_doesnt_redownload_s3(self):
         """We also need to ensure that it doesn't redownload from add docs to search
         and vice vers """
