@@ -16,9 +16,9 @@
 
 <p align="center">
 Marqo is an end-to-end, multimodal vector search engine.
-<br>
+<br><br>
 With Marqo, users can store and query unstructured data such as text, images, and code through a single easy-to-use API.
-<br>
+<br><br>
 Input preprocessing, machine learning inference, and storage are all included out of the box and can be easily scaled.
 </p>
     
