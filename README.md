@@ -19,7 +19,7 @@ Marqo is an end-to-end, multimodal vector search engine. With Marqo, users can s
 </p>
     
 <p align="center">
-    <a href="https://demo.marqo.ai/?q=smiling+with+glasses&index=boredapes"><img src="assets/demo-short.gif"></a>
+    <a href="https://demo.marqo.ai/?q=smiling+with+glasses&index=boredapes"><img src="assets/backpack.gif"></a>
 </p>
  
 <p align="center">
