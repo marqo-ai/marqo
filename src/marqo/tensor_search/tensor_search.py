@@ -612,7 +612,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                      unsuccessful_doc_to_append, combo_vectorise_time_to_add,
                      new_fields_from_multimodal_combination) = vectorise_multimodal_combination_field(
                             field, field_content, copied, i, doc_id, selected_device, index_info,
-                            image_repo, add_docs_params.mappings[field])
+                            image_repo, add_docs_params.mappings[field], model_auth=add_docs_params.model_auth)
                     total_vectorise_time = total_vectorise_time + combo_vectorise_time_to_add
                     if combo_document_is_valid is False:
                         unsuccessful_docs.append(unsuccessful_doc_to_append)
@@ -2330,7 +2330,7 @@ def vectorise_multimodal_combination_field(
             index properties
 
     '''
-    # field_conent = {"tensor_field_one" : {"weight":0.5, "parameter": "test-paramater-1"},
+    # field_content = {"tensor_field_one" : {"weight":0.5, "parameter": "test-paramater-1"},
     #                 "tensor_field_two" : {"weight": 0.5, parameter": "test-parameter-2"}},
     combo_document_is_valid = True
     combo_vectorise_time_to_add = 0
