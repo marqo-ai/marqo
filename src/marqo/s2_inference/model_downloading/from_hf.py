@@ -2,7 +2,8 @@ from marqo.tensor_search.models.external_apis.hf import HfAuth, HfModelLocation
 from typing import Optional
 from huggingface_hub import hf_hub_download
 from marqo.s2_inference.logger import get_logger
-
+from huggingface_hub.utils._errors import RepositoryNotFoundError
+from marqo.s2_inference.errors import ModelDownloadError
 
 logger = get_logger(__name__)
 
@@ -35,5 +36,11 @@ def download_model_from_hf(
     download_kwargs = location.dict()
     if auth is not None:
         download_kwargs = {**download_kwargs, **auth.dict()}
-    return hf_hub_download(**download_kwargs)
+    try:
+        return hf_hub_download(**download_kwargs)
+    except RepositoryNotFoundError:
+        raise ModelDownloadError(
+            "Could not find the specified Hugging Face model repository. Please try again, or create a "
+            "new index, ensuring that the index's Hugging Face location is set correctly."
+        )
 

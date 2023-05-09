@@ -683,7 +683,7 @@ class TestModelAuth(MarqoTestCase):
                 config=self.config, text='hello', index_name=self.index_name_1,
                 model_auth=model_auth
             )
-            self.assertIn("403 error when trying to retrieve model from s3", str(cm.exception))
+        self.assertIn("403 error when trying to retrieve model from s3", str(cm.exception))
 
         with self.assertRaises(BadRequestError) as cm2:
             res = tensor_search.add_documents(
@@ -692,7 +692,49 @@ class TestModelAuth(MarqoTestCase):
                     docs=[{'title': 'blah blah'}], model_auth=model_auth
                 )
             )
-            self.assertIn("s3 authorisation information is required", str(cm2.exception))
+        self.assertIn("403 error when trying to retrieve model from s3", str(cm2.exception))
+
+    def test_non_existent_hf_location(self):
+        hf_object = "some_model.pt"
+        hf_repo_name = "MyRepo/test-private"
+        hf_token = "hf_some_secret_key"
+
+        model_auth = ModelAuth(
+            hf=HfAuth(token=hf_token)
+        )
+
+        model_properties = {
+            "name": "ViT-B/32",
+            "dimensions": 512,
+            "model_location": {
+                "hf": {
+                    "repo_id": hf_repo_name,
+                    "filename": hf_object,
+                },
+                "auth_required": True
+            },
+            "type": "open_clip",
+        }
+        s3_settings = _get_base_index_settings()
+        s3_settings['index_defaults']['model_properties'] = model_properties
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings=s3_settings)
+
+        with self.assertRaises(BadRequestError) as cm:
+            tensor_search.search(
+                config=self.config, text='hello', index_name=self.index_name_1,
+                model_auth=model_auth
+            )
+
+        self.assertIn("Could not find the specified Hugging Face model repository.", str(cm.exception))
+
+        with self.assertRaises(BadRequestError) as cm2:
+            res = tensor_search.add_documents(
+                config=self.config, add_docs_params=AddDocsParams(
+                    index_name=self.index_name_1, auto_refresh=True,
+                    docs=[{'title': 'blah blah'}], model_auth=model_auth
+                )
+            )
+        self.assertIn("Could not find the specified Hugging Face model repository.", str(cm.exception))
 
     def test_bad_creds_error_hf(self):
         """todo"""
