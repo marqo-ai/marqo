@@ -137,7 +137,7 @@ class TestModelAuthLoadedS3(MarqoTestCase):
         """on this instance, at least"""
         tensor_search.eject_model(model_name=self.custom_model_name, device=self.device)
         mods = tensor_search.get_loaded_models()['models']
-        assert not any([m == 'my_model' for m in mods])
+        assert not any([m['model_name'] == 'my_model' for m in mods])
         mock_req = mock.MagicMock()
         with mock.patch('urllib.request.urlopen', mock_req):
             res = tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
@@ -146,13 +146,13 @@ class TestModelAuthLoadedS3(MarqoTestCase):
             assert not res['errors']
             mock_req.assert_not_called()
         mods = tensor_search.get_loaded_models()['models']
-        assert any([m == 'my_model' for m in mods])
+        assert any([m['model_name'] == 'my_model' for m in mods])
 
     def test_after_downloading_search_doesnt_redownload(self):
         """on this instance, at least"""
         tensor_search.eject_model(model_name=self.custom_model_name, device=self.device)
         mods = tensor_search.get_loaded_models()['models']
-        assert not any([m == 'my_model' for m in mods])
+        assert not any([m['model_name'] == 'my_model' for m in mods])
         mock_req = mock.MagicMock()
         with mock.patch('urllib.request.urlopen', mock_req):
             res = tensor_search.search(config=self.config,
@@ -162,7 +162,7 @@ class TestModelAuthLoadedS3(MarqoTestCase):
             mock_req.assert_not_called()
 
         mods = tensor_search.get_loaded_models()['models']
-        assert any([m == 'my_model' for m in mods])
+        assert any([m['model_name'] == 'my_model' for m in mods])
 
 class TestModelAuth(MarqoTestCase):
 
@@ -800,18 +800,20 @@ class TestModelAuth(MarqoTestCase):
             )
         self.assertIn("Could not find the specified Hugging Face model repository.", str(cm.exception))
 
-    def test_doesnt_redownload_s3(self):
-        """We also need to ensure that it doesn't redownload from add docs to search
-        and vice vers """
-
     def test_public_s3_no_auth(self):
-        """"""
+        """
+        TODO
+        """
 
     def test_public_hf_no_auth(self):
-        """"""
+        """
+        TODO
+        """
 
     def test_open_clip_reg_clip(self):
-        """both normal and open clip"""
+        """both normal and open clip
+        TODO: normal CLIP
+        """
 
 
 
