@@ -1512,9 +1512,9 @@ def vectorise_jobs(jobs: List[VectorisedJobs]) -> Dict[JHash, Dict[str, List[flo
                     model_auth=v.model_auth
                 )
                 result[v.groupby_key()] = dict(zip(v.content, vectors))
-        except s2_inference_errors.S2InferenceError:
+        except s2_inference_errors.S2InferenceError as e:
             # TODO: differentiate image processing errors from other types of vectorise errors
-            raise errors.InvalidArgError(message=f'Could not process given image in: {v.content}')
+            raise errors.InvalidArgError(message=f'Error vectorising content: {v.content}. Message: {e}')
     return result
 
 

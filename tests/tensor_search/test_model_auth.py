@@ -15,7 +15,12 @@ from unittest import mock
 import unittest
 import os
 from marqo.errors import BadRequestError, ModelNotInCacheError
+from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQueryEntity
 
+
+def fake_vectorise(*args, **_kwargs):
+    random_model = Random(model_name='blah', embedding_dim=512)
+    return _convert_vectorized_output(random_model.encode(_kwargs['content']))
 
 def _delete_file(file_path):
     try:
@@ -463,6 +468,9 @@ class TestModelAuth(MarqoTestCase):
                 aws_secret_access_key=fake_secret_key,
                 aws_session_token=None
             )
+            mock_download_pretrained_from_url.reset_mock()
+            mock_s3_client.reset_mock()
+            mock_boto3_client.reset_mock()
 
     def test_model_loads_from_multi_search(self):
         s3_object_key = 'path/to/your/secret_model.pt'
@@ -499,9 +507,6 @@ class TestModelAuth(MarqoTestCase):
         # Mock the generate_presigned_url method of the mock Boto3 client with a real OpenCLIP model, so that
         # the rest of the logic works.
         mock_s3_client.generate_presigned_url.return_value = "https://some_non_existent_model.pt"
-
-        def fake_vectorise(*args, **_kwargs):
-            return _convert_vectorized_output(random_model.encode(_kwargs['content']))
 
         with unittest.mock.patch('marqo.s2_inference.s2_inference.vectorise',
                                  side_effect=fake_vectorise) as mock_vectorise:
@@ -573,9 +578,6 @@ class TestModelAuth(MarqoTestCase):
             # Mock the generate_presigned_url method of the mock Boto3 client with a real OpenCLIP model, so that
             # the rest of the logic works.
             mock_s3_client.generate_presigned_url.return_value = "https://some_non_existent_model.pt"
-
-            def fake_vectorise(*args, **_kwargs):
-                return _convert_vectorized_output(random_model.encode(_kwargs['content']))
 
             with unittest.mock.patch('marqo.s2_inference.s2_inference.vectorise', side_effect=fake_vectorise) as mock_vectorise:
                 model_auth = ModelAuth(
@@ -801,11 +803,176 @@ class TestModelAuth(MarqoTestCase):
         self.assertIn("Could not find the specified Hugging Face model repository.", str(cm.exception))
 
     def test_bulk_search(self):
+        """Does it work with bulk search, including multi search
         """
-        TODO
-        Returns:
+        s3_object_key = 'path/to/your/secret_model.pt'
+        s3_bucket = 'your-bucket-name'
 
+        fake_access_key_id = '12345'
+        fake_secret_key = 'this-is-a-secret'
+
+        model_auth = ModelAuth(
+            s3=S3Auth(
+                aws_access_key_id=fake_access_key_id,
+                aws_secret_access_key=fake_secret_key)
+        )
+
+        model_properties = {
+            "name": "ViT-B/32",
+            "dimensions": 512,
+            "model_location": {
+                "s3": {
+                    "Bucket": s3_bucket,
+                    "Key": s3_object_key,
+                },
+                "auth_required": True
+            },
+            "type": "open_clip",
+        }
+        s3_settings = _get_base_index_settings()
+        s3_settings['index_defaults']['model_properties'] = model_properties
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings=s3_settings)
+
+        for bulk_search_query in [
+                BulkSearchQuery(queries=[
+                    BulkSearchQueryEntity(
+                        index=self.index_name_1, q="match", searchMethod="TENSOR",
+                        modelAuth=model_auth
+                    ),
+                    BulkSearchQueryEntity(
+                        index=self.index_name_1, q={"random text": 0.5, "other_text": -0.3},
+                        searchableAttributes=["abc"], searchMethod="TENSOR",
+                        modelAuth=model_auth
+                    ),
+                ]),
+                BulkSearchQuery(queries=[
+                    BulkSearchQueryEntity(
+                        index=self.index_name_1, q={"random text": 0.5, "other_text": -0.3},
+                        searchableAttributes=["abc"], searchMethod="TENSOR",
+                        modelAuth=model_auth
+                    ),
+                ])
+            ]:
+            try:
+                tensor_search.eject_model(model_name='my_model' ,device=self.device)
+            except ModelNotInCacheError:
+                pass
+            # Create a mock Boto3 client
+            mock_s3_client = mock.MagicMock()
+
+            # Mock the generate_presigned_url method of the mock Boto3 client with a real OpenCLIP model, so that
+            # the rest of the logic works.
+            mock_s3_client.generate_presigned_url.return_value = "https://some_non_existent_model.pt"
+
+            with unittest.mock.patch('boto3.client', return_value=mock_s3_client) as mock_boto3_client:
+                with self.assertRaises(InvalidArgError) as cm:
+                    with unittest.mock.patch(
+                        'marqo.s2_inference.processing.custom_clip_utils.download_pretrained_from_url'
+                    ) as mock_download_pretrained_from_url:
+                        tensor_search.bulk_search(
+                            query=bulk_search_query,
+                            marqo_config=self.config,
+                        )
+            mock_download_pretrained_from_url.assert_called_once_with(
+                url='https://some_non_existent_model.pt', cache_dir=None, cache_file_name='secret_model.pt')
+            mock_s3_client.generate_presigned_url.assert_called_with(
+                'get_object',
+                Params={'Bucket': 'your-bucket-name', 'Key': s3_object_key}
+            )
+            mock_boto3_client.assert_called_once_with(
+                's3',
+                aws_access_key_id=fake_access_key_id,
+                aws_secret_access_key=fake_secret_key,
+                aws_session_token=None
+            )
+
+            mock_download_pretrained_from_url.reset_mock()
+            mock_s3_client.reset_mock()
+            mock_boto3_client.reset_mock()
+
+    def test_bulk_search_vectorise(self):
+        """are the calls to vectorise expected? work with bulk search, including multi search
         """
+        s3_object_key = 'path/to/your/secret_model.pt'
+        s3_bucket = 'your-bucket-name'
+
+        fake_access_key_id = '12345'
+        fake_secret_key = 'this-is-a-secret'
+
+        model_auth = ModelAuth(
+            s3=S3Auth(
+                aws_access_key_id=fake_access_key_id,
+                aws_secret_access_key=fake_secret_key)
+        )
+
+        model_properties = {
+            "name": "ViT-B/32",
+            "dimensions": 512,
+            "model_location": {
+                "s3": {
+                    "Bucket": s3_bucket,
+                    "Key": s3_object_key,
+                },
+                "auth_required": True
+            },
+            "type": "open_clip",
+        }
+        s3_settings = _get_base_index_settings()
+        s3_settings['index_defaults']['model_properties'] = model_properties
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings=s3_settings)
+
+        for bulk_search_query in [
+                BulkSearchQuery(queries=[
+                    BulkSearchQueryEntity(
+                        index=self.index_name_1, q="match", searchMethod="TENSOR",
+                        modelAuth=model_auth
+                    ),
+                    BulkSearchQueryEntity(
+                        index=self.index_name_1, q={"random text": 0.5, "other_text": -0.3},
+                        searchableAttributes=["abc"], searchMethod="TENSOR",
+                        modelAuth=model_auth
+                    ),
+                ]),
+                BulkSearchQuery(queries=[
+                    BulkSearchQueryEntity(
+                        index=self.index_name_1, q={"random text": 0.5, "other_text": -0.3},
+                        searchableAttributes=["abc"], searchMethod="TENSOR",
+                        modelAuth=model_auth
+                    ),
+                ])
+            ]:
+            try:
+                tensor_search.eject_model(model_name='my_model' ,device=self.device)
+            except ModelNotInCacheError:
+                pass
+            # Create a mock Boto3 client
+            mock_s3_client = mock.MagicMock()
+
+            # Mock the generate_presigned_url method of the mock Boto3 client with a real OpenCLIP model, so that
+            # the rest of the logic works.
+            mock_s3_client.generate_presigned_url.return_value = "https://some_non_existent_model.pt"
+
+            with unittest.mock.patch('marqo.s2_inference.s2_inference.vectorise',
+                                     side_effect=fake_vectorise) as mock_vectorise:
+                        tensor_search.bulk_search(
+                            query=bulk_search_query,
+                            marqo_config=self.config,
+                        )
+            mock_vectorise.assert_called()
+            for _args, _kwargs in mock_vectorise.call_args_list:
+                assert _kwargs['model_properties']['model_location'] == {
+                    "s3": {
+                        "Bucket": s3_bucket,
+                        "Key": s3_object_key,
+                    },
+                    "auth_required": True
+                }
+                assert _kwargs['model_auth'] == model_auth
+
+            mock_vectorise.reset_mock()
+
+    def test_lexical_with_auth(self):
+        """should just skip"""
 
     def test_public_s3_no_auth(self):
         """
