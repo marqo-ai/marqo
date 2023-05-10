@@ -800,6 +800,13 @@ class TestModelAuth(MarqoTestCase):
             )
         self.assertIn("Could not find the specified Hugging Face model repository.", str(cm.exception))
 
+    def test_bulk_search(self):
+        """
+        TODO
+        Returns:
+
+        """
+
     def test_public_s3_no_auth(self):
         """
         TODO

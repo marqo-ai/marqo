@@ -397,7 +397,8 @@ class TestBulkSearch(MarqoTestCase):
                 content=['two things'],
                 device='cpu',
                 normalize_embeddings=True,
-                image_download_headers=None
+                image_download_headers=None,
+                model_auth=None
             )
 
             self.assertEqual(mock_vectorise.call_count, 2)

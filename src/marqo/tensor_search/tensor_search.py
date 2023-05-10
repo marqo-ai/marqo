@@ -1457,7 +1457,7 @@ def assign_query_to_vector_job(
             normalize_embeddings=index_info.index_settings['index_defaults']['normalize_embeddings'],
             image_download_headers=q.image_download_headers,
             content_type=content_type,
-            model_auth=q.model_auth
+            model_auth=q.modelAuth
         )
         # If exists, add content to vector job. Otherwise create new
         if jobs.get(vector_job.groupby_key()) is not None:
