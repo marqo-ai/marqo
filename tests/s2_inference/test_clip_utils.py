@@ -12,7 +12,7 @@ from marqo.tensor_search.models.private_models import ModelLocation, ModelAuth
 from unittest.mock import patch
 import pytest
 from marqo.tensor_search.models.private_models import ModelLocation, ModelAuth
-from marqo.tensor_search.models.private_models import S3Auth, S3Location
+from marqo.tensor_search.models.private_models import S3Auth, S3Location, HfModelLocation
 from marqo.s2_inference.configs import ModelCache
 
 
@@ -207,7 +207,9 @@ class TestOpenClipLoad(unittest.TestCase):
     @patch('marqo.s2_inference.clip_utils.CLIP._download_from_repo', 
            return_value='model.pth')
     def test_load_with_model_location(self, mock_download_from_repo, mock_open_clip_create_model_and_transforms):
-        open_clip = OPEN_CLIP(model_properties={ModelProperties.model_location: ModelLocation(auth_required=True).dict()})
+        open_clip = OPEN_CLIP(model_properties={
+            ModelProperties.model_location: ModelLocation(
+                auth_required=True, hf=HfModelLocation(repo_id='someId', filename='some_file.pt')).dict()})
         open_clip.load()
         mock_download_from_repo.assert_called_once()
         mock_open_clip_create_model_and_transforms.assert_called_once_with(

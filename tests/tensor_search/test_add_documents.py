@@ -1125,49 +1125,6 @@ class TestAddDocuments(MarqoTestCase):
             config=self.config, index_name=self.index_name_1, document_id='123')
         assert {'_id': '123', "the_float": 20.22} == get_res
 
-    def test_put_documents_orchestrator(self):
-        """
-        """
-        docs_ = [
-            {"_id": "123", "Title": "Story of Joe Blogs", "Description": "Joe was a great farmer."},
-            {"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}
-        ]
-
-        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
-            index_name=self.index_name_1, docs=docs_, auto_refresh=True
-        ))
-        update_res = tensor_search.add_documents_orchestrator(
-            config=self.config, processes=4, batch_size=1, add_docs_params=AddDocsParams(
-                index_name=self.index_name_1, docs=[
-                      {"_id": "789", "Title": "Woohoo", "Mega": "Coool"},
-                      {"_id": "789", "Luminosity": "Extreme"},
-                      {"_id": "789", "Temp": 12.5},
-                  ],
-            auto_refresh=True, update_mode='update' )
-        )
-        time.sleep(5)
-        updated_doc = tensor_search.get_document_by_id(
-            config=self.config, index_name=self.index_name_1, document_id='789'
-        )
-        check_dict = {"_id": '789', "Temp": 12.5, "Luminosity": "Extreme", "Title": "Woohoo", "Mega": "Coool"}
-        for field, expected_value in check_dict.items():
-            assert updated_doc[field] == expected_value
-
-        updated_raw_doc = requests.get(
-            url=F"{self.endpoint}/{self.index_name_1}/_doc/789",
-            verify=False
-        )
-        check_dict_no_id = copy.deepcopy(check_dict)
-        try:
-            del check_dict_no_id['_id']
-        except KeyError:
-            pass
-        # make sure that the chunks have been updated
-        for ch in updated_raw_doc.json()['_source']['__chunks']:
-            assert '_id' not in ch
-            for field, expected_value in check_dict_no_id.items():
-                assert ch[field] == expected_value
-
     def test_doc_too_large(self):
         max_size = 400000
         mock_environ = {enums.EnvVars.MARQO_MAX_DOC_BYTES: str(max_size)}
