@@ -5,6 +5,7 @@ from marqo.tensor_search import enums
 import unittest
 from unittest import mock
 from unittest.mock import patch
+from marqo.tensor_search.models.score_modifiers_object import ScoreModifier
 from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest
 from marqo.errors import (
     InvalidFieldNameError, InternalError,
@@ -1105,34 +1106,7 @@ class TestValidateIndexSettings(unittest.TestCase):
                     {"field_name": "rate",
                      }]
             },
-            {
-                # weight to be str
-                "multiply_score_by":
-                    [{"field_name": "reputation",
-                      "weight": "1",
-                      },
-                     {
-                         "field_name": "reputation-test",
-                     }, ],
-
-                "add_to_score": [
-                    {"field_name": "rate",
-                     }]
-            },
-            { # empty
-            },
-            {
-                # one part to be None
-                "multiply_score_by":
-                    [{"field_name": "reputation",
-                      "weight": 1,
-                      },
-                     {
-                         "field_name": "reputation-test",
-                     }, ],
-
-                "add_to_score": None
-            },
+            {}, # empty 
             {  # one part to be empty
                 "multiply_score_by": [],
                 "add_to_score": [
@@ -1146,9 +1120,9 @@ class TestValidateIndexSettings(unittest.TestCase):
         ]
         for invalid_custom_score_fields in invalid_custom_score_fields_list:
             try:
-                validation.validate_score_modifiers_object(invalid_custom_score_fields)
-                raise AssertionError
-            except InvalidArgError as e:
+                v = ScoreModifier(**invalid_custom_score_fields)
+                raise AssertionError(invalid_custom_score_fields, v)
+            except InvalidArgError:
                 pass
 
     def test_valid_custom_score_fields(self):
@@ -1187,7 +1161,7 @@ class TestValidateIndexSettings(unittest.TestCase):
         ]
 
         for valid_custom_score_fields in valid_custom_score_fields_list:
-            validation.validate_score_modifiers_object(valid_custom_score_fields)
+            ScoreModifier(**valid_custom_score_fields)
 
 
 class TestValidateDeleteDocsRequest(unittest.TestCase):

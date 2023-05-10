@@ -19,7 +19,6 @@ from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest
 from marqo.tensor_search.models.settings_object import settings_schema
 from marqo.tensor_search.models.mappings_object import mappings_schema, multimodal_combination_schema
 from marqo.tensor_search.models.context_object import context_schema
-from marqo.tensor_search.models.score_modifiers_object import score_modifiers_object_schema
 
 
 def validate_query(q: Union[dict, str], search_method: Union[str, SearchMethod]):
@@ -604,19 +603,6 @@ def validate_multimodal_combination_mapping(field_mapping: dict):
                 f"In multimodal_combination fields, weight must be an int or float."
                 f"Please check `https://docs.marqo.ai/0.0.15/Advanced-Usage/document_fields/#multimodal-combination-object` for more info."
             )
-
-
-def validate_score_modifiers_object(score_modifiers: List[dict]):
-    try:
-        jsonschema.validate(instance=score_modifiers, schema=score_modifiers_object_schema)
-        return score_modifiers
-    except jsonschema.ValidationError as e:
-        raise InvalidArgError(
-            f"Error validating score_modifiers = `{score_modifiers}`. Reason: \n{str(e)} "
-            f"Please revise your score_modifiers based on the provided error."
-            f"\n Check `https://docs.marqo.ai/0.0.17/API-Reference/search/#score-modifiers` for more info."
-        )
-
 
 def validate_delete_docs_request(delete_request: MqDeleteDocsRequest, max_delete_docs_count: int):
     """Validates a delete docs request from the user.

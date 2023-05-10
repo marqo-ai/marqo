@@ -6,14 +6,19 @@ https://pydantic-docs.helpmanual.io/usage/types/#enums-and-choices
 import pydantic
 from pydantic import BaseModel
 from typing import Union, List, Dict, Optional, Any
-from marqo.tensor_search.enums import SearchMethod, Device
-from marqo.tensor_search.models.private_models import ModelAuth
+
 from marqo.tensor_search import validation
+from marqo.tensor_search.enums import SearchMethod
+from marqo.tensor_search.models.private_models import ModelAuth
+from marqo.tensor_search.models.score_modifiers_object import ScoreModifier
+from marqo.tensor_search.models.search import SearchContext
+
 
 class BaseMarqoModel(BaseModel):
      class Config:
          extra: str = "forbid"
      pass
+
 
 class SearchQuery(BaseMarqoModel):
     q: Union[str, Dict[str, float]]
@@ -27,8 +32,8 @@ class SearchQuery(BaseMarqoModel):
     attributesToRetrieve: Union[None, List[str]] = None
     boost: Optional[Dict] = None
     image_download_headers: Optional[Dict] = None
-    context: Optional[Dict] = None
-    scoreModifiers: Optional[Dict] = None
+    context: Optional[SearchContext] = None
+    scoreModifiers: Optional[ScoreModifier] = None,
     modelAuth: Optional[ModelAuth] = None
 
     @pydantic.validator('searchMethod')
@@ -39,13 +44,14 @@ class SearchQuery(BaseMarqoModel):
         )
     
     def get_context_tensor(self) -> Optional[List[Dict[str, Any]]]:
+        """Extract the tensor from the context, if provided"""
         return self.context.get("tensor", None) if self.context is not None else None
 
 class BulkSearchQueryEntity(SearchQuery):
     index: str
 
-    context: Optional[Dict] = None
-    scoreModifiers: Optional[Dict] = None
+    context: Optional[SearchContext] = None
+    scoreModifiers: Optional[ScoreModifier] = None
     def to_search_query(self):
         return SearchQuery(**self.dict())
 

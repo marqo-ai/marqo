@@ -54,7 +54,7 @@ from marqo.tensor_search import utils, backend, validation, configs, parallel, a
 from marqo.tensor_search.formatting import _clean_doc
 from marqo.tensor_search.index_meta_cache import get_cache, get_index_info
 from marqo.tensor_search import index_meta_cache
-from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQueryEntity
+from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQueryEntity, ScoreModifier
 from marqo.tensor_search.models.search import VectorisedJobs, VectorisedJobPointer, Qidx, JHash
 from marqo.tensor_search.models.index_info import IndexInfo
 from marqo.tensor_search.models.external_apis.abstract_classes import ExternalAuth
@@ -1028,7 +1028,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
            device=None, boost: Optional[Dict] = None,
            image_download_headers: Optional[Dict] = None,
            context: Optional[Dict] = None,
-           score_modifiers: Optional[Dict] = None,
+           score_modifiers: Optional[ScoreModifier] = None,
            model_auth: Optional[ModelAuth] = None) -> Dict:
     """The root search method. Calls the specific search method
 
@@ -1322,7 +1322,7 @@ def get_vector_properties_to_search(searchable_attributes: Union[None, List[str]
     return properties_to_search
 
 
-def construct_msearch_body_elements(searchableAttributes: List[str], offset: int, filter_string: str, index_info: IndexInfo, result_count: int, query_vector: List[float], attributes_to_retrieve: List[str], index_name: str, score_modifiers: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+def construct_msearch_body_elements(searchableAttributes: List[str], offset: int, filter_string: str, index_info: IndexInfo, result_count: int, query_vector: List[float], attributes_to_retrieve: List[str], index_name: str, score_modifiers: Optional[ScoreModifier] = None) -> List[Dict[str, Any]]:
     """Constructs the body payload of a `/_msearch` request for a single bulk search query"""
     contextualised_filter = utils.contextualise_filter(filter_string=filter_string, simple_properties=index_info.get_text_properties())
     vector_properties_to_search = get_vector_properties_to_search(searchableAttributes, index_info, offset=offset)
@@ -1713,7 +1713,7 @@ def _vector_text_search(
         searchable_attributes: Iterable[str] = None, verbose=0, filter_string: str = None, device=None,
         attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None, 
         image_download_headers: Optional[Dict] = None, context: Optional[Dict] = None,
-        score_modifiers: Optional[Dict] = None, model_auth: Optional[ModelAuth] = None):
+        score_modifiers: Optional[ScoreModifier] = None, model_auth: Optional[ModelAuth] = None):
     """
     Args:
         config:
@@ -2216,8 +2216,7 @@ def _create_normal_tensor_search_query(result_count, offset, vector_field, vecto
 
 
 def _create_score_modifiers_tensor_search_query(score_modifiers, result_count, offset, vector_field, vectorised_text) -> dict:
-    validated_score_modifiers = validation.validate_score_modifiers_object(score_modifiers)
-    script_score = convert_validated_score_modifiers_to_script_score(validated_score_modifiers)
+    script_score = score_modifiers.to_painless_script()
     search_query = {
         "size": result_count,
         "from": offset,

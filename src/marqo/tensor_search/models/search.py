@@ -53,3 +53,10 @@ class VectorisedJobs(BaseModel):
             start_idx=start_idx,
             end_idx=len(self.content)
         )
+
+class SearchContextTensor(BaseModel):
+    vector: List[float]
+    weight: float
+
+class SearchContext(BaseModel):
+    tensor: Optional[List[SearchContextTensor]]
