@@ -6,7 +6,7 @@ from marqo.s2_inference import clip_utils, types
 import unittest
 from unittest import mock
 import requests
-from marqo.s2_inference.clip_utils import CLIP, download_model
+from marqo.s2_inference.clip_utils import CLIP, download_model, OPEN_CLIP
 from marqo.tensor_search.enums import ModelProperties
 from marqo.tensor_search.models.private_models import ModelLocation, ModelAuth
 from unittest.mock import patch
@@ -165,3 +165,51 @@ class TestLoad(unittest.TestCase):
         mock_download_from_repo.assert_called_once()
         mock_clip_load.assert_called_once_with(name='downloaded_model.pth', device='cpu', jit=False, download_root=ModelCache.clip_cache_path)
 
+class TestOpenClipLoad(unittest.TestCase):
+
+    @patch('marqo.s2_inference.clip_utils.open_clip.create_model_and_transforms', 
+           return_value=(mock.Mock(), mock.Mock(), mock.Mock()))
+    def test_load_without_model_properties(self, mock_open_clip_create_model_and_transforms):
+        """By default laion400m_e32 is loaded..."""
+        open_clip = OPEN_CLIP()
+        open_clip.load()
+        mock_open_clip_create_model_and_transforms.assert_called_once_with(
+            'ViT-B-32-quickgelu', pretrained='laion400m_e32', 
+            device='cpu', jit=False, cache_dir=ModelCache.clip_cache_path)
+
+    @patch('marqo.s2_inference.clip_utils.open_clip.create_model_and_transforms', 
+           return_value=(mock.Mock(), mock.Mock(), mock.Mock()))
+    @patch('os.path.isfile', return_value=True)
+    def test_load_with_local_file(self, mock_isfile, mock_open_clip_create_model_and_transforms):
+        model_path = 'localfile.pth'
+        open_clip = OPEN_CLIP(model_properties={'localpath': model_path})
+        open_clip.load()
+        mock_open_clip_create_model_and_transforms.assert_called_once_with(
+            model_name=open_clip.model_name, jit=False, pretrained=model_path,
+            precision='fp32', image_mean=None, image_std=None, 
+            device='cpu', cache_dir=ModelCache.clip_cache_path)
+
+    @patch('marqo.s2_inference.clip_utils.open_clip.create_model_and_transforms', 
+           return_value=(mock.Mock(), mock.Mock(), mock.Mock()))
+    @patch('validators.url', return_value=True)
+    @patch('marqo.s2_inference.clip_utils.download_model', return_value='model.pth')
+    def test_load_with_url(self, mock_download_model, mock_validators_url, mock_open_clip_create_model_and_transforms):
+        model_url = 'http://model.com/model.pth'
+        open_clip = OPEN_CLIP(model_properties={'url': model_url})
+        open_clip.load()
+        mock_download_model.assert_called_once_with(url=model_url)
+        mock_open_clip_create_model_and_transforms.assert_called_once_with(
+            model_name=open_clip.model_name, jit=False, pretrained='model.pth', precision='fp32',
+            image_mean=None, image_std=None, device='cpu', cache_dir=ModelCache.clip_cache_path)
+
+    @patch('marqo.s2_inference.clip_utils.open_clip.create_model_and_transforms', 
+           return_value=(mock.Mock(), mock.Mock(), mock.Mock()))
+    @patch('marqo.s2_inference.clip_utils.CLIP._download_from_repo', 
+           return_value='model.pth')
+    def test_load_with_model_location(self, mock_download_from_repo, mock_open_clip_create_model_and_transforms):
+        open_clip = OPEN_CLIP(model_properties={ModelProperties.model_location: ModelLocation(auth_required=True).dict()})
+        open_clip.load()
+        mock_download_from_repo.assert_called_once()
+        mock_open_clip_create_model_and_transforms.assert_called_once_with(
+            model_name=open_clip.model_name, jit=False, pretrained='model.pth', precision='fp32',
+            image_mean=None, image_std=None, device='cpu', cache_dir=ModelCache.clip_cache_path)
