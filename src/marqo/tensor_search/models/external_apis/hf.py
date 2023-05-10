@@ -4,11 +4,11 @@ from marqo.tensor_search.models.external_apis.abstract_classes import (
 )
 
 
-class HfAuth(ObjectLocation):
+class HfAuth(ExternalAuth):
     token: str
 
 
-class HfModelLocation(ExternalAuth):
+class HfModelLocation(ObjectLocation):
     repo_id: str
     filename: str
 
