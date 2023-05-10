@@ -1,5 +1,3 @@
-# from torch import FloatTensor
-# from typing import Any, Dict, List, Optional, Union
 import os
 from marqo.tensor_search.enums import ModelProperties, InferenceParams
 from marqo.tensor_search.models.private_models import ModelLocation, ModelAuth
