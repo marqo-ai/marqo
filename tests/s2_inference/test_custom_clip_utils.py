@@ -5,7 +5,8 @@ from marqo.s2_inference.processing.custom_clip_utils import (
     download_pretrained_from_s3, download_model, download_pretrained_from_url,
     ModelDownloadError, S3Auth, S3Location, ModelAuth, ModelLocation
 )
-
+import tempfile
+import os
 
 class TestDownloadModel(unittest.TestCase):
     def test_both_location_and_url_provided(self):
@@ -87,15 +88,19 @@ class TestDownloadPretrainedFromURL(unittest.TestCase):
     def setUp(self):
         self.url = "http://example.com/model.pt"
 
+    @patch("urllib.request.urlopen")
     @patch("os.path.isfile")
-    def test_file_exists_locally(self, mock_isfile):
+    def test_file_exists_locally(self, mock_isfile, mock_urlopen):
         mock_isfile.return_value = True
+        with patch("builtins.open", unittest.mock.mock_open()) as mock_open:
+            with patch("marqo.s2_inference.processing.custom_clip_utils.tqdm") as mock_tqdm:
+                with patch("marqo.s2_inference.processing.custom_clip_utils.ModelCache") as mock_cache:
+                    with tempfile.TemporaryDirectory() as temp_cache_dir:
+                        mock_cache.clip_cache_path = temp_cache_dir
+                        result = download_pretrained_from_url(self.url)
 
-        with patch("marqo.s2_inference.processing.custom_clip_utils.ModelCache") as mock_cache:
-            mock_cache.clip_cache_path = "/cache"
-            result = download_pretrained_from_url(self.url)
-
-        self.assertEqual(result, "/cache/model.pt")
+        self.assertEqual(result, os.path.join(temp_cache_dir, 'model.pt'))
+        mock_urlopen.assert_not_called()
         mock_isfile.assert_called_once()
 
     @patch("os.path.isfile")
@@ -110,33 +115,11 @@ class TestDownloadPretrainedFromURL(unittest.TestCase):
         with patch("builtins.open", unittest.mock.mock_open()) as mock_open:
             with patch("marqo.s2_inference.processing.custom_clip_utils.tqdm") as mock_tqdm:
                 with patch("marqo.s2_inference.processing.custom_clip_utils.ModelCache") as mock_cache:
-                    mock_cache.clip_cache_path = "/cache"
-                    result = download_pretrained_from_url(self.url)
-
-        self.assertEqual(result, "/cache/model.pt")
-        mock_isfile.assert_called_once()
-        mock_urlopen.assert_called_once_with(self.url)
-        mock_open.assert_called_once_with("/cache/model.pt", "wb")
-
-
-    @patch("os.path.isfile")
-    @patch("urllib.request.urlopen")
-    def test_file_does_not_exist_locally_2(self, mock_urlopen, mock_isfile):
-        import tempfile
-        mock_isfile.return_value = False
-        mock_source = MagicMock()
-        mock_source.headers.get.return_value = 0
-        mock_source.read.return_value = b''
-        mock_urlopen.return_value.__enter__.return_value = mock_source
-
-        with tempfile.TemporaryDirectory() as temp_cache_dir:
-            with patch("builtins.open", unittest.mock.mock_open()) as mock_open:
-                with patch("marqo.s2_inference.processing.custom_clip_utils.tqdm") as mock_tqdm:
-                    with patch("marqo.s2_inference.processing.custom_clip_utils.ModelCache") as mock_cache:
+                    with tempfile.TemporaryDirectory() as temp_cache_dir:
                         mock_cache.clip_cache_path = temp_cache_dir
                         result = download_pretrained_from_url(self.url)
 
-        self.assertEqual(result, "/cache/model.pt")
+        self.assertEqual(result, os.path.join(temp_cache_dir, 'model.pt'))
         mock_isfile.assert_called_once()
         mock_urlopen.assert_called_once_with(self.url)
-        mock_open.assert_called_once_with("/cache/model.pt", "wb")
+        mock_open.assert_called_once_with(os.path.join(temp_cache_dir, 'model.pt'), "wb")
