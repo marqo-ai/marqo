@@ -86,6 +86,7 @@ class TestModelAuthLoadedS3(MarqoTestCase):
             # Call the function that uses the generate_presigned_url method
             res = tensor_search.add_documents(config=cls.config, add_docs_params=AddDocsParams(
                 index_name=cls.index_name_1, auto_refresh=True, docs=[{'a': 'b'}],
+                device=cls.device,
                 model_auth=ModelAuth(
                     s3=S3Auth(aws_access_key_id=cls.fake_access_key_id, aws_secret_access_key=cls.fake_secret_key))
             ))
