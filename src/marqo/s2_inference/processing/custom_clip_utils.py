@@ -9,7 +9,7 @@ from tqdm import tqdm
 from marqo.s2_inference.configs import ModelCache
 from typing import Optional
 from urllib.error import HTTPError
-from marqo.s2_inference.errors import ModelDownloadError
+from marqo.s2_inference.errors import ModelDownloadError, InvalidModelPropertiesError
 from marqo.tensor_search.models.private_models import ModelAuth, ModelLocation
 from marqo.s2_inference.model_downloading.from_s3 import (
     get_presigned_s3_url, get_s3_model_cache_filename, check_s3_model_already_exists,
@@ -69,9 +69,9 @@ def download_model(
     single_weight_location_validation_msg = (
         "only exactly one of parameters (repo_location, url) is allowed to be specified.")
     if repo_location is None and url is None:
-        raise RuntimeError(single_weight_location_validation_msg)
+        raise InvalidModelPropertiesError(single_weight_location_validation_msg)
     if repo_location is not None and url is not None:
-        raise RuntimeError(single_weight_location_validation_msg)
+        raise InvalidModelPropertiesError(single_weight_location_validation_msg)
 
     if url:
         return download_pretrained_from_url(url=url, cache_dir=download_dir)

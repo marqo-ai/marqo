@@ -5,16 +5,17 @@ from marqo.s2_inference.processing.custom_clip_utils import (
     download_pretrained_from_s3, download_model, download_pretrained_from_url,
     ModelDownloadError, S3Auth, S3Location, ModelAuth, ModelLocation
 )
+from marqo.s2_inference.errors import InvalidModelPropertiesError
 import tempfile
 import os
 
 class TestDownloadModel(unittest.TestCase):
     def test_both_location_and_url_provided(self):
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(InvalidModelPropertiesError):
             download_model(repo_location=ModelLocation(s3=S3Location(Bucket="test_bucket", Key="test_key")), url="http://example.com/model.pt")
 
     def test_neither_location_nor_url_provided(self):
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(InvalidModelPropertiesError):
             download_model()
 
     @patch("marqo.s2_inference.processing.custom_clip_utils.download_pretrained_from_s3")
@@ -46,11 +47,15 @@ class TestDownloadPretrainedFromS3(unittest.TestCase):
     def test_model_exists_locally(self, mock_check_s3_model):
         mock_check_s3_model.return_value = True
 
-        with patch("marqo.s2_inference.processing.custom_clip_utils.get_s3_model_absolute_cache_path") as mock_get_abs_path:
-            mock_get_abs_path.return_value = "/path/to/model.pt"
-            result = download_pretrained_from_s3(location=self.s3_location, auth=self.s3_auth)
+        with patch("marqo.s2_inference.processing.custom_clip_utils.get_s3_model_absolute_cache_path"
+                   ) as mock_get_abs_path:
+            with patch("marqo.s2_inference.processing.custom_clip_utils.download_pretrained_from_url"
+                       ) as mock_download_pretrained_from_url:
+                mock_get_abs_path.return_value = "/path/to/model.pt"
+                result = download_pretrained_from_s3(location=self.s3_location, auth=self.s3_auth)
 
         self.assertEqual(result, "/path/to/model.pt")
+        mock_download_pretrained_from_url.assert_not_called()
         mock_check_s3_model.assert_called_once_with(location=self.s3_location)
 
     @patch("marqo.s2_inference.processing.custom_clip_utils.check_s3_model_already_exists")
@@ -59,14 +64,16 @@ class TestDownloadPretrainedFromS3(unittest.TestCase):
         mock_check_s3_model.return_value = False
         mock_get_presigned_url.return_value = "http://example.com/model.pt"
 
-        with patch("marqo.s2_inference.processing.custom_clip_utils.download_pretrained_from_url") as mock_download_url:
-            mock_download_url.return_value = "/path/to/model.pt"
+        with patch("marqo.s2_inference.processing.custom_clip_utils.download_pretrained_from_url"
+                   ) as mock_download_pretrained_from_url:
+            mock_download_pretrained_from_url.return_value = "/path/to/model.pt"
             result = download_pretrained_from_s3(location=self.s3_location, auth=self.s3_auth)
 
         self.assertEqual(result, "/path/to/model.pt")
+        mock_download_pretrained_from_url.assert_called()
         mock_get_presigned_url.assert_called_once_with(location=self.s3_location, auth=self.s3_auth)
 
-        mock_download_url.assert_called_once_with(
+        mock_download_pretrained_from_url.assert_called_once_with(
             url="http://example.com/model.pt",
             cache_dir=None,
             cache_file_name=self.s3_location.Key
