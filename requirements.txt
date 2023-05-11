@@ -9,6 +9,8 @@ pytest
 tox
 # s2_inference:
 more_itertools
+boto3==1.25.4
+botocore==1.28.4
 nltk==3.7
 torch==1.12.1
 torchvision==0.13.1

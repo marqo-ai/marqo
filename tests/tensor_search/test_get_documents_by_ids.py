@@ -9,6 +9,8 @@ from marqo.errors import (
 from marqo.tensor_search import tensor_search
 from tests.marqo_test import MarqoTestCase
 from unittest import mock
+from marqo.tensor_search.models.add_docs_objects import AddDocsParams
+
 
 class TestGetDocuments(MarqoTestCase):
 
@@ -25,10 +27,13 @@ class TestGetDocuments(MarqoTestCase):
                 pass
 
     def test_get_documents_by_ids(self):
-        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
-            {"_id": "1", "title 1": "content 1"}, {"_id": "2", "title 1": "content 1"},
-            {"_id": "3", "title 1": "content 1"}
-        ], auto_refresh=True)
+        tensor_search.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(index_name=self.index_name_1, docs=[
+                {"_id": "1", "title 1": "content 1"}, {"_id": "2", "title 1": "content 1"},
+                {"_id": "3", "title 1": "content 1"}
+            ], auto_refresh=True)
+        )
         res = tensor_search.get_documents_by_ids(
             config=self.config, index_name=self.index_name_1, document_ids=['1', '2', '3'],
             show_vectors=True)
@@ -39,8 +44,9 @@ class TestGetDocuments(MarqoTestCase):
         keys = [("title 1", "desc 2", "_id"), ("title 1", "desc 2", "_id")]
         vals = [("content 1", "content 2. blah blah blah", "123"),
                 ("some more content", "some cool desk", "5678")]
-        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
-            dict(zip(k, v)) for k, v in zip(keys, vals)], auto_refresh=True)
+        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+            index_name=self.index_name_1, docs=[dict(zip(k, v)) for k, v in zip(keys, vals)],
+            auto_refresh=True))
         get_res = tensor_search.get_documents_by_ids(
             config=self.config, index_name=self.index_name_1,
             document_ids=["123", "5678"], show_vectors=True)['results']
@@ -77,8 +83,12 @@ class TestGetDocuments(MarqoTestCase):
 
     def test_get_document_vectors_resilient(self):
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
-        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
-            {"_id": '456', "title": "alexandra"}, {'_id': '221', 'message': 'hello'}], auto_refresh=True)
+        tensor_search.add_documents(config=self.config,  add_docs_params=AddDocsParams(
+            index_name=self.index_name_1, docs=[
+                {"_id": '456', "title": "alexandra"},
+                {'_id': '221', 'message': 'hello'}],
+            auto_refresh=True)
+        )
         id_reqs = [
             (['123', '456'], [False, True]), ([['456', '789'], [True, False]]),
             ([['456', '789', '221'], [True, False, True]]), ([['vkj', '456', '4891'], [False, True, False]])
@@ -119,8 +129,10 @@ class TestGetDocuments(MarqoTestCase):
             }})
         docs = [{"Title": "a", "_id": uuid.uuid4().__str__()} for _ in range(2000)]
         tensor_search.add_documents_orchestrator(
-            config=self.config, index_name=self.index_name_1,
-            docs=docs, auto_refresh=False, batch_size=50, processes=4
+            config=self.config, batch_size=50, processes=4, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1,
+                docs=docs, auto_refresh=False
+            )
         )
         tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
         for max_doc in [0, 1, 2, 5, 10, 100, 1000]:
@@ -158,8 +170,11 @@ class TestGetDocuments(MarqoTestCase):
         docs = [{"Title": "a", "_id": uuid.uuid4().__str__()} for _ in range(2000)]
 
         tensor_search.add_documents_orchestrator(
-            config=self.config, index_name=self.index_name_1,
-            docs=docs, auto_refresh=False, batch_size=50, processes=4
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1,
+                docs=docs, auto_refresh=False
+            ),
+            batch_size=50, processes=4
         )
         tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
 

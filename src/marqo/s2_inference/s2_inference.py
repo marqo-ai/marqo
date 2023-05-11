@@ -1,11 +1,11 @@
 """This is the interface for interacting with S2 Inference
 The functions defined here would have endpoints, later on.
 """
-import functools
 import numpy as np
 from marqo.errors import ModelCacheManagementError
-from marqo.s2_inference.errors import (VectoriseError, InvalidModelPropertiesError, ModelLoadError,
-                                       UnknownModelError, ModelNotInCacheError)
+from marqo.s2_inference.errors import (
+    VectoriseError, InvalidModelPropertiesError, ModelLoadError,
+    UnknownModelError, ModelNotInCacheError, ModelDownloadError)
 from PIL import UnidentifiedImageError
 from marqo.s2_inference.model_registry import load_model_properties
 from marqo.s2_inference.configs import get_default_device, get_default_normalization, get_default_seq_length
@@ -17,6 +17,7 @@ from marqo.s2_inference import constants
 from marqo.tensor_search.utils import read_env_vars_and_defaults
 from marqo.tensor_search.enums import AvailableModelsKey
 from marqo.tensor_search.configs import EnvVars
+from marqo.tensor_search.models.private_models import ModelAuth
 import threading
 from marqo.tensor_search.utils import read_env_vars_and_defaults, generate_batches
 from marqo.tensor_search.configs import EnvVars
@@ -34,7 +35,7 @@ MODEL_PROPERTIES = load_model_properties()
 
 def vectorise(model_name: str, content: Union[str, List[str]], model_properties: dict = None,
               device: str = get_default_device(), normalize_embeddings: bool = get_default_normalization(),
-              **kwargs) -> List[List[float]]:
+              model_auth: ModelAuth = None, **kwargs) -> List[List[float]]:
     """vectorizes the content by model name
 
     Args:
@@ -45,6 +46,7 @@ def vectorise(model_name: str, content: Union[str, List[str]], model_properties:
                                 if model_properties['name'] is not in model_registry, these properties are used to fetch the model
                                 if model_properties['name'] is in model_registry, default properties are overridden
                                 model_properties can be None only if model_name is a model present in the registry
+        model_auth: Authorisation details for downloading a model (if required)
 
     Returns:
         List[List[float]]: _description_
@@ -56,7 +58,10 @@ def vectorise(model_name: str, content: Union[str, List[str]], model_properties:
     validated_model_properties = _validate_model_properties(model_name, model_properties)
     model_cache_key = _create_model_cache_key(model_name, device, validated_model_properties)
 
-    _update_available_models(model_cache_key, model_name, validated_model_properties, device, normalize_embeddings)
+    _update_available_models(
+        model_cache_key, model_name, validated_model_properties, device, normalize_embeddings,
+        model_auth=model_auth
+    )
 
     try:
         if isinstance(content, str):
@@ -125,8 +130,7 @@ def _create_model_cache_key(model_name: str, device: str, model_properties: dict
 
 
 def _update_available_models(model_cache_key: str, model_name: str, validated_model_properties: dict,
-                             device: str,
-                             normalize_embeddings: bool) -> None:
+                             device: str, normalize_embeddings: bool, model_auth: ModelAuth = None) -> None:
     """loads the model if it is not already loaded.
     Note this method assume the model_properties are validated.
     """
@@ -142,17 +146,25 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
                                        calling_func=_update_available_models.__name__)
             try:
                 most_recently_used_time = datetime.datetime.now()
-                available_models[model_cache_key] = {AvailableModelsKey.model: _load_model(model_name,
-                                                                                           validated_model_properties,
-                                                                                           device=device,
-                                                                                           calling_func = _update_available_models.__name__),
-                                                     AvailableModelsKey.most_recently_used_time: most_recently_used_time,
-                                                     AvailableModelsKey.model_size: model_size}
+                available_models[model_cache_key] = {
+                    AvailableModelsKey.model: _load_model(
+                        model_name, validated_model_properties,
+                        device=device,
+                        calling_func=_update_available_models.__name__,
+                        model_auth=model_auth
+                    ),
+                    AvailableModelsKey.most_recently_used_time: most_recently_used_time,
+                    AvailableModelsKey.model_size: model_size
+                }
                 logger.info(
                     f'loaded {model_name} on device {device} with normalization={normalize_embeddings} at time={most_recently_used_time}.')
             except Exception as e:
                 logger.error(f"Error loading model {model_name} on device {device} with normalization={normalize_embeddings}. \n"
                              f"Error message is {str(e)}")
+
+                if isinstance(e, ModelDownloadError):
+                    raise e
+
                 raise ModelLoadError(
                     f"Unable to load model={model_name} on device={device} with normalization={normalize_embeddings}. "
                     f"If you are trying to load a custom model, "
@@ -300,13 +312,17 @@ def get_model_size(model_name: str, model_properties: dict) -> (int, float):
     return constants.MODEL_TYPE_SIZE_MAPPING.get(type, constants.DEFAULT_MODEL_SIZE)
 
 
-def _load_model(model_name: str, model_properties: dict, device: Optional[str] = None, calling_func: str = None) -> Any:
+def _load_model(
+        model_name: str, model_properties: dict, device: Optional[str] = None,
+        calling_func: str = None, model_auth: ModelAuth = None
+) -> Any:
     """_summary_
 
     Args:
         model_name (str): Actual model_name to be fetched from external library
                         prefer passing it in the form of model_properties['name']
         device (str, optional): _description_. Defaults to 'cpu'.
+        model_auth: Authorisation details for downloading a model (if required)
 
     Returns:
         Any: _description_
@@ -321,8 +337,10 @@ def _load_model(model_name: str, model_properties: dict, device: Optional[str] =
 
     max_sequence_length = model_properties.get('tokens', get_default_seq_length())
 
-    model = loader(model_properties['name'], device=device, embedding_dim=model_properties['dimensions'],
-                   max_seq_length=max_sequence_length, model_properties=model_properties)
+    model = loader(
+        model_properties['name'], device=device, embedding_dim=model_properties['dimensions'],
+        max_seq_length=max_sequence_length, model_properties=model_properties, model_auth=model_auth
+    )
 
     model.load()
 

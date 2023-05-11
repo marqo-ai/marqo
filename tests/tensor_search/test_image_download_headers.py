@@ -2,6 +2,7 @@
 Module for testing image download headers.
 """
 import unittest.mock
+from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 # we are renaming get to prevent inf. recursion while mocking get():
 from requests import get as requests_get
 from marqo.tensor_search.models.api_models import BulkSearchQuery
@@ -52,9 +53,10 @@ class TestImageDownloadHeaders(MarqoTestCase):
             config=self.config, index_name=self.index_name_1, index_settings=self.image_index_settings()
         )
         image_download_headers = {"Authorization": "some secret key blah"}
-        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
-            {"_id": "1", "image": self.real_img_url}
-        ], auto_refresh=True, image_download_headers=image_download_headers)
+        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+            index_name=self.index_name_1, docs=[
+                {"_id": "1", "image": self.real_img_url}],
+            auto_refresh=True, image_download_headers=image_download_headers))
 
         def pass_through_requests_get(url, *args, **kwargs):
             return requests_get(url, *args, **kwargs)
@@ -94,10 +96,11 @@ class TestImageDownloadHeaders(MarqoTestCase):
             image_download_headers = {"Authorization": "some secret key blah"}
 
             # Add a document with an image URL
-            tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
-                { "_id": "1", "image": self.real_img_url}
-            ], auto_refresh=True, image_download_headers=image_download_headers)
-
+            tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1, docs=[
+                    { "_id": "1", "image": self.real_img_url}
+                ], auto_refresh=True, image_download_headers=image_download_headers
+            ))
             # Check if load_image_from_path was called with the correct headers
             assert len(mock_load_image_from_path.call_args_list) == 1
             call_args, call_kwargs = mock_load_image_from_path.call_args_list[0]
@@ -126,12 +129,13 @@ class TestImageDownloadHeaders(MarqoTestCase):
         mock_load_image_from_path.side_effect = pass_through_load_image_from_path
 
         with unittest.mock.patch("marqo.s2_inference.clip_utils.load_image_from_path", mock_load_image_from_path):
-            tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
+            tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1, docs=[
                 {
                     "_id": "1",
                     "image": test_image_url,
-                }
-            ], auto_refresh=True, image_download_headers=image_download_headers)
+                }],
+                auto_refresh=True, image_download_headers=image_download_headers))
 
         # Set up the mock GET
         mock_get = unittest.mock.MagicMock()

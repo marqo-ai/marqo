@@ -2,8 +2,8 @@
 import typing
 from fastapi.responses import JSONResponse
 from fastapi import Request, Depends
-import marqo.tensor_search.delete_docs
-import marqo.tensor_search.tensor_search
+from marqo.tensor_search.models.add_docs_objects import AddDocsParams
+from marqo.tensor_search.models.add_docs_objects import ModelAuth
 from marqo.errors import InvalidArgError, MarqoWebError, MarqoError
 from fastapi import FastAPI, Query
 import json
@@ -154,49 +154,60 @@ def search(search_query: SearchQuery, index_name: str, device: str = Depends(api
         image_download_headers=search_query.image_download_headers,
         context=search_query.context,
         score_modifiers=search_query.scoreModifiers,
+        model_auth=search_query.modelAuth
     )
 
 
 @app.post("/indexes/{index_name}/documents")
 @throttle(RequestType.INDEX)
-def add_or_replace_documents(docs: List[Dict], index_name: str, refresh: bool = True,
-                        marqo_config: config.Config = Depends(generate_config),
-                        batch_size: int = 0, processes: int = 1,
-                        non_tensor_fields: List[str] = Query(default=[]),
-                        device: str = Depends(api_validation.validate_device),
-                        use_existing_tensors: bool = False,
-                        image_download_headers: typing.Optional[dict] = Depends(
-                            api_utils.decode_image_download_headers),
-                        mappings: typing.Optional[dict] = Depends(
-                            api_utils.decode_mappings)
-                             ):
+def add_or_replace_documents(
+        docs: List[Dict],
+        index_name: str,
+        refresh: bool = True,
+        marqo_config: config.Config = Depends(generate_config),
+        batch_size: int = 0,
+        processes: int = 1,
+        non_tensor_fields: List[str] = Query(default=[]),
+        device: str = Depends(api_validation.validate_device),
+        use_existing_tensors: bool = False,
+        image_download_headers: typing.Optional[dict] = Depends(
+            api_utils.decode_image_download_headers
+        ),
+        model_auth: typing.Optional[ModelAuth] = Depends(
+            api_utils.decode_query_string_model_auth
+        ),
+        mappings: typing.Optional[dict] = Depends(api_utils.decode_mappings)):
     """add_documents endpoint (replace existing docs with the same id)"""
+    add_docs_params = AddDocsParams(
+        index_name=index_name, docs=docs, auto_refresh=refresh,
+        device=device, update_mode='replace', non_tensor_fields=non_tensor_fields,
+        use_existing_tensors=use_existing_tensors, image_download_headers=image_download_headers,
+        mappings=mappings, model_auth=model_auth
+    )
     return tensor_search.add_documents_orchestrator(
-        config=marqo_config,
-        docs=docs,
-        index_name=index_name, auto_refresh=refresh,
-        batch_size=batch_size, processes=processes, device=device,
-        non_tensor_fields=non_tensor_fields, update_mode='replace',
-        image_download_headers=image_download_headers,
-        use_existing_tensors=use_existing_tensors,
-        mappings=mappings
+        config=marqo_config, add_docs_params=add_docs_params,
+        batch_size=batch_size, processes=processes
     )
 
 
 @app.put("/indexes/{index_name}/documents")
 @throttle(RequestType.INDEX)
-def add_or_update_documents(docs: List[Dict], index_name: str, refresh: bool = True,
-                        marqo_config: config.Config = Depends(generate_config),
-                        batch_size: int = 0, processes: int = 1,
-                        non_tensor_fields: List[str] = Query(default=[]),
-                        device: str = Depends(api_validation.validate_device)):
+def add_or_update_documents(
+        docs: List[Dict],
+        index_name: str,
+        refresh: bool = True,
+        marqo_config: config.Config = Depends(generate_config),
+        batch_size: int = 0, processes: int = 1,
+        non_tensor_fields: List[str] = Query(default=[]),
+        device: str = Depends(api_validation.validate_device)):
     """WILL BE DEPRECATED SOON. update add_documents endpoint"""
+    add_docs_params = AddDocsParams(
+        index_name=index_name, docs=docs, auto_refresh=refresh,
+        device=device, update_mode='update', non_tensor_fields=non_tensor_fields
+    )
     return tensor_search.add_documents_orchestrator(
-        config=marqo_config,
-        docs=docs,
-        index_name=index_name, auto_refresh=refresh,
-        batch_size=batch_size, processes=processes, device=device,
-        non_tensor_fields=non_tensor_fields, update_mode='update'
+        config=marqo_config, add_docs_params=add_docs_params,
+        batch_size=batch_size, processes=processes,
     )
 
 @app.get("/indexes/{index_name}/documents/{document_id}")

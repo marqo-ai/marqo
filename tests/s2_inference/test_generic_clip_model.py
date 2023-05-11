@@ -1,5 +1,5 @@
 import numpy as np
-
+from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.errors import IndexNotFoundError
 from marqo.s2_inference.errors import UnknownModelError, ModelLoadError
 from marqo.tensor_search import tensor_search
@@ -65,7 +65,9 @@ class TestGenericModelSupport(MarqoTestCase):
             }]
 
         auto_refresh = True
-        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs, auto_refresh=auto_refresh)
+        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+            index_name=self.index_name_1, docs=docs, auto_refresh=auto_refresh)
+        )
 
         # test if we can get the document by _id
         assert tensor_search.get_document_by_id(
@@ -84,8 +86,8 @@ class TestGenericModelSupport(MarqoTestCase):
                 "desc 2": "test again test again test again"
             }]
 
-        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs2,
-                                    auto_refresh=auto_refresh)
+        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+            index_name=self.index_name_1, docs=docs2, auto_refresh=auto_refresh))
 
         assert tensor_search.get_document_by_id(
             config=self.config, index_name=self.index_name_1,
@@ -130,7 +132,9 @@ class TestGenericModelSupport(MarqoTestCase):
             }]
 
         auto_refresh = True
-        tensor_search.add_documents(config=self.config, index_name=self.index_name_2, docs=docs, auto_refresh=auto_refresh)
+        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+            index_name=self.index_name_2, docs=docs, auto_refresh=auto_refresh
+        ))
 
         assert tensor_search.get_document_by_id(
             config=self.config, index_name=self.index_name_2,
@@ -147,8 +151,8 @@ class TestGenericModelSupport(MarqoTestCase):
                 "desc 2": "test again test again test again"
             }]
 
-        tensor_search.add_documents(config=self.config, index_name=self.index_name_2, docs=docs2,
-                                    auto_refresh=auto_refresh)
+        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+            index_name=self.index_name_2, docs=docs2, auto_refresh=auto_refresh))
 
         assert tensor_search.get_document_by_id(
             config=self.config, index_name=self.index_name_2,
@@ -196,8 +200,8 @@ class TestGenericModelSupport(MarqoTestCase):
             }]
 
         auto_refresh = True
-        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs,
-                                    auto_refresh=auto_refresh)
+        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+            index_name=self.index_name_1, docs=docs, auto_refresh=auto_refresh))
 
         assert tensor_search.get_document_by_id(
             config=self.config, index_name=self.index_name_1,
@@ -214,8 +218,8 @@ class TestGenericModelSupport(MarqoTestCase):
                 "desc 2": "test again test again test again"
             }]
 
-        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=docs2,
-                                    auto_refresh=auto_refresh)
+        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+            index_name=self.index_name_1, docs=docs2, auto_refresh=auto_refresh))
 
         assert tensor_search.get_document_by_id(
             config=self.config, index_name=self.index_name_1,
@@ -318,7 +322,8 @@ class TestGenericModelSupport(MarqoTestCase):
             }]
         auto_refresh = True
 
-        tensor_search.add_documents(config=config, index_name=index_name, docs=docs, auto_refresh=auto_refresh)
+        tensor_search.add_documents(config=config, add_docs_params=AddDocsParams(
+            index_name=index_name, docs=docs, auto_refresh=auto_refresh))
 
 
     def test_load_generic_clip_without_url_or_localpath(self):

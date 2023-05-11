@@ -1,5 +1,6 @@
 import json
 from pydantic import BaseModel
+from marqo.tensor_search.models.private_models import ModelAuth
 from typing import Any, Union, List, Dict, Optional, NewType, Literal
 
 Qidx = NewType('Qidx', int) # Indicates the position of a search query in a bulk search request
@@ -24,6 +25,7 @@ class VectorisedJobs(BaseModel):
     normalize_embeddings: bool
     image_download_headers: Optional[Dict]
     content_type: Literal['text', 'image']
+    model_auth: Optional[ModelAuth]
 
     def __hash__(self):
         return self.groupby_key() + hash(json.dumps(self.content, sort_keys=True))

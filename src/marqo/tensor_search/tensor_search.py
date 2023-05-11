@@ -1,13 +1,13 @@
-"""tensor search logic. In the future this will be accessible to the client via an API
+"""tensor search logic
 
 API Notes:
-    - Fields beginning with a double underscore "__" are protected and used for our internal purposes.
+    - Some fields beginning with a double underscore "__" are protected and used for our internal purposes.
     - Examples include:
-        __embedding_vector
         __field_name
         __field_content
         __doc_chunk_relation
         __chunk_ids
+        fields beginning with "__vector_"
     - The "_id" field isn't a real field. It's a way to declare an ID. Internally we use it as the ID
         for the doc. The doc is stored without this field in its body
 
@@ -37,8 +37,10 @@ from timeit import default_timer as timer
 import functools
 import pprint
 import typing
+from marqo.tensor_search.models.private_models import ModelAuth
 import uuid
 from typing import List, Optional, Union, Iterable, Sequence, Dict, Any, Tuple
+from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 import numpy as np
 from PIL import Image
 import marqo.config as config
@@ -55,6 +57,7 @@ from marqo.tensor_search import index_meta_cache
 from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQueryEntity
 from marqo.tensor_search.models.search import VectorisedJobs, VectorisedJobPointer, Qidx, JHash
 from marqo.tensor_search.models.index_info import IndexInfo
+from marqo.tensor_search.models.external_apis.abstract_classes import ExternalAuth
 from marqo.tensor_search.utils import add_timing
 from marqo.tensor_search import delete_docs
 from marqo.s2_inference.processing import text as text_processor
@@ -71,7 +74,7 @@ from marqo.config import Config
 from marqo import errors
 from marqo.s2_inference import errors as s2_inference_errors
 import threading
-
+from dataclasses import replace
 from marqo.tensor_search.tensor_search_logging import get_logger
 
 logger = get_logger(__name__)
@@ -195,26 +198,12 @@ def _autofill_index_settings(index_settings: dict):
 
     copied_settings = utils.merge_dicts(default_settings, copied_settings)
 
-    # if NsField.index_defaults not in copied_settings:
-    #     copied_settings[NsField.index_defaults] = default_settings[NsField.index_defaults]
-
     if NsField.treat_urls_and_pointers_as_images in copied_settings[NsField.index_defaults] and \
             copied_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images] is True \
             and copied_settings[NsField.index_defaults][NsField.model] is None:
         copied_settings[NsField.index_defaults][NsField.model] = MlModel.clip
 
-    # make sure the first level of keys are present, if not add all of those defaults
-    # for key in list(default_settings):
-    #     if key not in copied_settings or copied_settings[key] is None:
-    #         copied_settings[key] = default_settings[key]
-
-    # # make sure the first level of keys in index defaults is present, if not add all of those defaults
-    # for key in list(default_settings[NsField.index_defaults]):
-    #     if key not in copied_settings[NsField.index_defaults] or \
-    #             copied_settings[NsField.index_defaults][key] is None:
-    #         copied_settings[NsField.index_defaults][key] = default_settings[NsField.index_defaults][key]
-
-    # text preprocessing sub fields - fills any missing sub-dict fields if some of the first level are present
+    # text preprocessing subfields - fills any missing sub-dict fields if some of the first level are present
     for key in list(default_settings[NsField.index_defaults][NsField.text_preprocessing]):
         if key not in copied_settings[NsField.index_defaults][NsField.text_preprocessing] or \
                 copied_settings[NsField.index_defaults][NsField.text_preprocessing][key] is None:
@@ -247,73 +236,57 @@ def _check_and_create_index_if_not_exist(config: Config, index_name: str):
 
 
 def add_documents_orchestrator(
-        config: Config, index_name: str, docs: List[dict],
-        auto_refresh: bool, batch_size: int = 0, processes: int = 1,
-        non_tensor_fields=None, image_download_headers: dict = None,
-        device=None, update_mode: str = 'replace', use_existing_tensors: bool = False,
-        mappings: dict = None
+        config: Config, add_docs_params: AddDocsParams,
+        batch_size: int = 0, processes: int = 1,
     ):
-    if image_download_headers is None:
-        image_download_headers = dict()
-
-    if non_tensor_fields is None:
-        non_tensor_fields = []
 
     if batch_size is None or batch_size == 0:
         logger.debug(f"batch_size={batch_size} and processes={processes} - not doing any marqo side batching")
-        return add_documents(
-            config=config, index_name=index_name, docs=docs, auto_refresh=auto_refresh,
-            device=device, update_mode=update_mode, non_tensor_fields=non_tensor_fields,
-            use_existing_tensors=use_existing_tensors, image_download_headers=image_download_headers,
-            mappings=mappings
-        )
+        return add_documents(config=config, add_docs_params=add_docs_params)
     elif processes is not None and processes > 1:
 
-        # create beforehand or pull from the cache so it is upto date for the multi-processing
-        _check_and_create_index_if_not_exist(config=config, index_name=index_name)
+        # create beforehand or pull from the cache so it is up to date for the multi-processing
+        _check_and_create_index_if_not_exist(config=config, index_name=add_docs_params.index_name)
+
+        try:
+            _vector_text_search(
+                config=config, index_name=add_docs_params.index_name, query='',
+                model_auth=add_docs_params.model_auth,
+                image_download_headers=add_docs_params.image_download_headers)
+        except Exception as e:
+            logger.warning(
+                f"add_documents orchestrator's call to _vector_text_search, prior to parallel add_docs, raised an error. "
+                f"Continuing to parallel add_docs. "
+                f"Message: {e}"
+            )
 
         logger.debug(f"batch_size={batch_size} and processes={processes} - using multi-processing")
         results = parallel.add_documents_mp(
-            config=config, index_name=index_name, docs=docs,
-            auto_refresh=auto_refresh, batch_size=batch_size, processes=processes,
-            device=device, update_mode=update_mode, non_tensor_fields=non_tensor_fields,
-            use_existing_tensors=use_existing_tensors, image_download_headers=image_download_headers,
-            mappings=mappings
+            config=config, batch_size=batch_size, processes=processes, add_docs_params=add_docs_params
         )
-
         # we need to force the cache to update as it does not propagate using mp
         # we just clear this index's entry and it will re-populate when needed next
-        if index_name in get_cache():
-            logger.info(f'deleting cache entry for {index_name} after parallel add documents')
-            del get_cache()[index_name]
+        if add_docs_params.index_name in get_cache():
+            logger.info(f'deleting cache entry for {add_docs_params.index_name} after parallel add documents')
+            del get_cache()[add_docs_params.index_name]
 
         return results
     else:
         if batch_size < 0:
             raise errors.InvalidArgError("Batch size can't be less than 1!")
         logger.debug(f"batch_size={batch_size} and processes={processes} - batching using a single process")
-        return _batch_request(config=config, index_name=index_name, dataset=docs, device=device,
-                              batch_size=batch_size, verbose=False, non_tensor_fields=non_tensor_fields,
-                              use_existing_tensors=use_existing_tensors,
-                              image_download_headers=image_download_headers, mappings=mappings)
+        return _batch_request(config=config, verbose=False, add_docs_params=add_docs_params, batch_size=batch_size)
 
 
-def _batch_request(config: Config, index_name: str, dataset: List[dict],
-                   batch_size: int = 100, verbose: bool = True, device=None,
-                   update_mode: str = 'replace', non_tensor_fields=None,
-                   image_download_headers: Optional[Dict] = None, use_existing_tensors: bool = False,
-                   mappings: dict = None
-                   ) -> List[Dict[str, Any]]:
+def _batch_request(
+        config: Config, add_docs_params: AddDocsParams,
+        verbose: bool = True, batch_size: int = 100
+        ) -> List[Dict[str, Any]]:
     """Batch by the number of documents"""
-    if image_download_headers is None:
-        image_download_headers = dict()
-
-    if non_tensor_fields is None:
-        non_tensor_fields = []
 
     logger.info(f"starting batch ingestion in sizes of {batch_size}")
 
-    deeper = ((doc, i, batch_size) for i, doc in enumerate(dataset))
+    deeper = ((doc, i, batch_size) for i, doc in enumerate(add_docs_params.docs))
 
     def batch_requests(gathered, doc_tuple):
         doc, i, the_batch_size = doc_tuple
@@ -329,18 +302,14 @@ def _batch_request(config: Config, index_name: str, dataset: List[dict],
         t0 = timer()
 
         logger.debug(f"    batch {i}: beginning ingestion. ")
-        res = add_documents(
-            config=config, index_name=index_name,
-            docs=docs, auto_refresh=False, device=device,
-            update_mode=update_mode, non_tensor_fields=non_tensor_fields,
-            use_existing_tensors=use_existing_tensors, image_download_headers=image_download_headers,
-            mappings=mappings
-        )
+        # we need to just use docs in the batch
+        batch_add_docs_params = replace(add_docs_params, docs=docs)
+        res = add_documents(config=config, add_docs_params=batch_add_docs_params)
         total_batch_time = timer() - t0
         num_docs = len(docs)
 
         logger.debug(f"    batch {i}: ingested {num_docs} docs. Time taken: {(total_batch_time):.3f}. "
-                    f"Average time per doc {(total_batch_time / num_docs):.3f}")
+                     f"Average time per doc {(total_batch_time / num_docs):.3f}")
         if verbose:
             logger.debug(f"        results from indexing batch {i}: {res}")
         return res
@@ -378,61 +347,44 @@ def _get_chunks_for_field(field_name: str, doc_id: str, doc):
     return [chunk for chunk in doc["_source"]["__chunks"] if chunk["__field_name"] == field_name]
 
 
-def add_documents(config: Config, index_name: str, docs: List[dict], auto_refresh: bool,
-                  non_tensor_fields=None, device=None, update_mode: str = "replace",
-                  image_download_thread_count: int = 20, image_download_headers: dict = None,
-                  use_existing_tensors: bool = False, mappings: dict = None):
+def add_documents(config: Config, add_docs_params: AddDocsParams):
     """
 
     Args:
         config: Config object
-        index_name: name of the index
-        docs: List of documents
-        auto_refresh: Set to False if indexing lots of docs
-        non_tensor_fields: List of fields, within documents to not create tensors for. Default to
-          make tensors for all fields.
-        use_existing_tensors: Whether or not to use the vectors already in doc (for update docs)
-        device: Device used to carry out the document update.
-        update_mode: {'replace' | 'update'}. If set to replace (default) just
-        image_download_thread_count: number of threads used to concurrently download images
-        image_download_headers: headers to authenticate image download
-        mappings: a dictionary used to handle all the object field content in the doc, e.g., multimodal_combination field
+        add_docs_params: add_documents()'s parameters
     Returns:
 
     """
     # ADD DOCS TIMER-LOGGER (3)
-    if image_download_headers is None:
-        image_download_headers = dict()
+
     start_time_3 = timer()
 
-    if non_tensor_fields is None:
-        non_tensor_fields = []
-
-    if mappings is not None:
-        validation.validate_mappings_object(mappings_object=mappings)
+    if add_docs_params.mappings is not None:
+        validation.validate_mappings_object(mappings_object=add_docs_params.mappings)
 
     t0 = timer()
     bulk_parent_dicts = []
 
     try:
-        index_info = backend.get_index_info(config=config, index_name=index_name)
+        index_info = backend.get_index_info(config=config, index_name=add_docs_params.index_name)
     except errors.IndexNotFoundError as s:
-        create_vector_index(config=config, index_name=index_name)
-        index_info = backend.get_index_info(config=config, index_name=index_name)
+        create_vector_index(config=config, index_name=add_docs_params.index_name)
+        index_info = backend.get_index_info(config=config, index_name=add_docs_params.index_name)
 
-    if len(docs) == 0:
+    if len(add_docs_params.docs) == 0:
         raise errors.BadRequestError(message="Received empty add documents request")
 
-    if use_existing_tensors and update_mode != "replace":
+    if add_docs_params.use_existing_tensors and add_docs_params.update_mode != "replace":
         raise errors.InvalidArgError("use_existing_tensors=True is only available for add and replace documents,"
                                      "not for add and update!")
 
     valid_update_modes = ('update', 'replace')
-    if update_mode not in valid_update_modes:
-        raise errors.InvalidArgError(message=f"Unknown update_mode `{update_mode}` "
+    if add_docs_params.update_mode not in valid_update_modes:
+        raise errors.InvalidArgError(message=f"Unknown update_mode `{add_docs_params.update_mode}` "
                                              f"received! Valid update modes: {valid_update_modes}")
-    if mappings is not None:
-        validate_mappings = validation.validate_mappings(mappings)
+    if add_docs_params.mappings is not None:
+        validate_mappings = validation.validate_mappings(add_docs_params.mappings)
 
     existing_fields = set(index_info.properties.keys())
     new_fields = set()
@@ -443,32 +395,35 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
     # Check backend to see the differences between multimodal_fields and new_fields
     new_obj_fields = dict()
 
-    selected_device = config.indexing_device if device is None else device
+    selected_device = config.indexing_device if add_docs_params.device is None else add_docs_params.device
 
     unsuccessful_docs = []
     total_vectorise_time = 0
-    batch_size = len(docs)
+    batch_size = len(add_docs_params.docs)
     image_repo = {}
 
     if index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]:
         ti_0 = timer()
-        image_repo = add_docs.download_images(docs=docs, thread_count=20, non_tensor_fields=tuple(non_tensor_fields),
-                                              image_download_headers=image_download_headers)
+        image_repo = add_docs.download_images(docs=add_docs_params.docs, thread_count=20,
+                                              non_tensor_fields=tuple(add_docs_params.non_tensor_fields),
+                                              image_download_headers=add_docs_params.image_download_headers)
         logger.debug(f"          add_documents image download: took {(timer() - ti_0):.3f}s to concurrently download "
-                    f"images for {batch_size} docs using {image_download_thread_count} threads ")
+                    f"images for {batch_size} docs using {add_docs_params.image_download_thread_count} threads ")
 
-    if update_mode == 'replace' and use_existing_tensors:
+    if add_docs_params.update_mode == 'replace' and add_docs_params.use_existing_tensors:
         doc_ids = []
 
         # Iterate through the list in reverse, only latest doc with dupe id gets added.
-        for i in range(len(docs)-1, -1, -1):
-            if ("_id" in docs[i]) and (docs[i]["_id"] not in doc_ids):
-                doc_ids.append(docs[i]["_id"])
-        existing_docs = _get_documents_for_upsert(config=config, index_name=index_name, document_ids=doc_ids)
+        for i in range(len(add_docs_params.docs)-1, -1, -1):
+            if ("_id" in add_docs_params.docs[i]) and (add_docs_params.docs[i]["_id"] not in doc_ids):
+                doc_ids.append(add_docs_params.docs[i]["_id"])
+        existing_docs = _get_documents_for_upsert(
+            config=config, index_name=add_docs_params.index_name, document_ids=doc_ids)
 
-    for i, doc in enumerate(docs):
+    for i, doc in enumerate(add_docs_params.docs):
 
-        indexing_instructions = {'index' if update_mode == 'replace' else 'update': {"_index": index_name}}
+        indexing_instructions = {
+            'index' if add_docs_params.update_mode == 'replace' else 'update': {"_index": add_docs_params.index_name}}
         copied = copy.deepcopy(doc)
 
         document_is_valid = True
@@ -492,9 +447,9 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
             )
             continue
 
-        if update_mode == "replace":
+        if add_docs_params.update_mode == "replace":
             indexing_instructions["index"]["_id"] = doc_id
-            if use_existing_tensors:
+            if add_docs_params.use_existing_tensors:
                 matching_doc = [doc for doc in existing_docs["docs"] if doc["_id"] == doc_id]
                 # Should only have 1 result, as only 1 id matches
                 if len(matching_doc) == 1:
@@ -525,10 +480,12 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
             try:
                 field_content = validation.validate_field_content(
-                    field_content=copied[field], is_non_tensor_field=field in non_tensor_fields)
+                    field_content=copied[field], is_non_tensor_field=field in add_docs_params.non_tensor_fields)
                 if isinstance(field_content, dict):
-                    field_content = validation.validate_dict(field = field, field_content = field_content,
-                                                             is_non_tensor_field=field in non_tensor_fields, mappings=mappings)
+                    field_content = validation.validate_dict(
+                        field=field, field_content=field_content,
+                        is_non_tensor_field=field in add_docs_params.non_tensor_fields,
+                        mappings=add_docs_params.mappings)
             except errors.InvalidArgError as err:
                 document_is_valid = False
                 unsuccessful_docs.append(
@@ -541,13 +498,14 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                 new_fields_from_doc.add((field, _infer_opensearch_data_type(copied[field])))
 
             # Don't process text/image fields when explicitly told not to.
-            if field in non_tensor_fields:
+            if field in add_docs_params.non_tensor_fields:
                 continue
 
             # chunks generated by processing this field for this doc:
             chunks_to_append = []
             # Check if content of this field changed. If no, skip all chunking and vectorisation
-            if ((update_mode == 'replace') and use_existing_tensors and existing_doc["found"]
+            if ((add_docs_params.update_mode == 'replace') and add_docs_params.use_existing_tensors
+                    and existing_doc["found"]
                     and (field in existing_doc["_source"]) and (existing_doc["_source"][field] == field_content)):
                 chunks_to_append = _get_chunks_for_field(field_name=field, doc_id=doc_id, doc=existing_doc)
 
@@ -625,13 +583,14 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                         model_name=index_info.model_name,
                         model_properties=_get_model_properties(index_info), content=content_chunks,
                         device=selected_device, normalize_embeddings=normalize_embeddings,
-                        infer=infer_if_image)
+                        infer=infer_if_image, model_auth=add_docs_params.model_auth)
 
                     end_time = timer()
                     total_vectorise_time += (end_time - start_time)
                 except (s2_inference_errors.UnknownModelError,
                         s2_inference_errors.InvalidModelPropertiesError,
-                        s2_inference_errors.ModelLoadError) as model_error:
+                        s2_inference_errors.ModelLoadError,
+                        s2_inference.ModelDownloadError) as model_error:
                     raise errors.BadRequestError(
                         message=f'Problem vectorising query. Reason: {str(model_error)}',
                         link="https://marqo.pages.dev/latest/Models-Reference/dense_retrieval/"
@@ -660,12 +619,12 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                     })
             
             elif isinstance(field_content, dict):
-                if mappings[field]["type"]=="multimodal_combination":
-                    combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add,\
-                        new_fields_from_multimodal_combination= \
-                        vectorise_multimodal_combination_field(field, field_content, copied,
-                                                               i, doc_id, selected_device, index_info, image_repo, mappings[field])
-
+                if add_docs_params.mappings[field]["type"] == "multimodal_combination":
+                    (combo_chunk, combo_document_is_valid,
+                     unsuccessful_doc_to_append, combo_vectorise_time_to_add,
+                     new_fields_from_multimodal_combination) = vectorise_multimodal_combination_field(
+                            field, field_content, copied, i, doc_id, selected_device, index_info,
+                            image_repo, add_docs_params.mappings[field], model_auth=add_docs_params.model_auth)
                     total_vectorise_time = total_vectorise_time + combo_vectorise_time_to_add
                     if combo_document_is_valid is False:
                         unsuccessful_docs.append(unsuccessful_doc_to_append)
@@ -684,7 +643,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
 
         if document_is_valid:
             new_fields = new_fields.union(new_fields_from_doc)
-            if update_mode == 'replace':
+            if add_docs_params.update_mode == 'replace':
                 copied[TensorField.chunks] = chunks
                 bulk_parent_dicts.append(indexing_instructions)
                 bulk_parent_dicts.append(copied)
@@ -742,7 +701,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
                             "doc_fields": list(copied.keys()),
                             "new_chunks": chunks,
                             "customer_dict": copied,
-                            "non_tensor_fields": non_tensor_fields
+                            "non_tensor_fields": add_docs_params.non_tensor_fields
                         },
                     }
                 })
@@ -758,7 +717,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
     if bulk_parent_dicts:
         # the HttpRequest wrapper handles error logic
         update_mapping_response = backend.add_customer_field_properties(
-            config=config, index_name=index_name, customer_field_names=new_fields,
+            config=config, index_name=add_docs_params.index_name, customer_field_names=new_fields,
             model_properties=_get_model_properties(index_info), multimodal_combination_fields=new_obj_fields)
 
         # ADD DOCS TIMER-LOGGER (5)
@@ -778,8 +737,8 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
     else:
         index_parent_response = None
 
-    if auto_refresh:
-        refresh_response = HttpRequests(config).post(path=F"{index_name}/_refresh")
+    if add_docs_params.auto_refresh:
+        refresh_response = HttpRequests(config).post(path=F"{add_docs_params.index_name}/_refresh")
 
     t1 = timer()
 
@@ -793,7 +752,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
             copied_res = copy.deepcopy(response)
 
             result_dict['errors'] = copied_res['errors']
-            actioned = "index" if update_mode == 'replace' else 'update'
+            actioned = "index" if add_docs_params.update_mode == 'replace' else 'update'
 
             for item in copied_res["items"]:
                 for to_remove in item_fields_to_remove:
@@ -808,7 +767,7 @@ def add_documents(config: Config, index_name: str, docs: List[dict], auto_refres
             new_items.insert(loc, error_info)
 
         result_dict["processingTimeMs"] = time_diff * 1000
-        result_dict["index_name"] = index_name
+        result_dict["index_name"] = add_docs_params.index_name
         result_dict["items"] = new_items
         return result_dict
 
@@ -1069,7 +1028,8 @@ def search(config: Config, index_name: str, text: Union[str, dict],
            device=None, boost: Optional[Dict] = None,
            image_download_headers: Optional[Dict] = None,
            context: Optional[Dict] = None,
-           score_modifiers: Optional[Dict] = None) -> Dict:
+           score_modifiers: Optional[Dict] = None,
+           model_auth: Optional[ModelAuth] = None) -> Dict:
     """The root search method. Calls the specific search method
 
     Validation should go here. Validations include:
@@ -1094,6 +1054,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
         image_download_headers: headers for downloading images
         context: a dictionary to allow custom vectors in search, for tensor search only
         score_modifiers: a dictionary to modify the score based on field values, for tensor search only
+        model_auth: Authorisation details for downloading a model (if required)
     Returns:
 
     """
@@ -1146,7 +1107,8 @@ def search(config: Config, index_name: str, text: Union[str, dict],
             return_doc_ids=return_doc_ids, searchable_attributes=searchable_attributes, verbose=verbose,
             number_of_highlights=num_highlights, simplified_format=simplified_format,
             filter_string=filter, device=device, attributes_to_retrieve=attributes_to_retrieve, boost=boost,
-            image_download_headers=image_download_headers, context=context, score_modifiers=score_modifiers
+            image_download_headers=image_download_headers, context=context, score_modifiers=score_modifiers,
+            model_auth=model_auth
         )
     elif search_method.upper() == SearchMethod.LEXICAL:
         search_result = _lexical_search(
@@ -1494,7 +1456,8 @@ def assign_query_to_vector_job(
             device=device,
             normalize_embeddings=index_info.index_settings['index_defaults']['normalize_embeddings'],
             image_download_headers=q.image_download_headers,
-            content_type=content_type
+            content_type=content_type,
+            model_auth=q.modelAuth
         )
         # If exists, add content to vector job. Otherwise create new
         if jobs.get(vector_job.groupby_key()) is not None:
@@ -1545,12 +1508,13 @@ def vectorise_jobs(jobs: List[VectorisedJobs]) -> Dict[JHash, Dict[str, List[flo
                     model_name=v.model_name, model_properties=v.model_properties,
                     content=v.content, device=v.device,
                     normalize_embeddings=v.normalize_embeddings,
-                    image_download_headers=v.image_download_headers
+                    image_download_headers=v.image_download_headers,
+                    model_auth=v.model_auth
                 )
                 result[v.groupby_key()] = dict(zip(v.content, vectors))
-        except s2_inference_errors.S2InferenceError:
+        except s2_inference_errors.S2InferenceError as e:
             # TODO: differentiate image processing errors from other types of vectorise errors
-            raise errors.InvalidArgError(message=f'Could not process given image in: {v.content}')
+            raise errors.InvalidArgError(message=f'Error vectorising content: {v.content}. Message: {e}')
     return result
 
 
@@ -1749,7 +1713,9 @@ def _vector_text_search(
         attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None,
         image_download_headers: Optional[Dict] = None,
         context: Optional[Dict] = None,
-        score_modifiers: Optional[Dict] = None):
+        score_modifiers: Optional[Dict] = None,
+        model_auth: Optional[ModelAuth] = None
+    ):
     """
     Args:
         config:
@@ -1769,6 +1735,7 @@ def _vector_text_search(
         image_download_headers: headers for downloading images
         context: a dictionary to allow custom vectors in search
         score_modifiers: a dictionary to modify the score based on field values, for tensor search only
+        model_auth: Authorisation details for downloading a model (if required)
     Returns:
 
     Note:
@@ -1829,7 +1796,8 @@ def _vector_text_search(
                 model_name=index_info.model_name, model_properties=_get_model_properties(index_info),
                 content=batch, device=selected_device,
                 normalize_embeddings=index_info.index_settings['index_defaults']['normalize_embeddings'],
-                image_download_headers=image_download_headers
+                image_download_headers=image_download_headers,
+                model_auth=model_auth
             )))
             for batch in to_be_vectorised
         ]
@@ -2342,9 +2310,11 @@ def get_cuda_info() -> dict:
         ))
 
 
-
-def vectorise_multimodal_combination_field(field: str, multimodal_object: Dict[str, dict], doc: dict, doc_index: int,
-                                            doc_id:str, selected_device:str, index_info, image_repo, field_map:dict):
+def vectorise_multimodal_combination_field(
+        field: str, multimodal_object: Dict[str, dict], doc: dict, doc_index: int,
+        doc_id:str, selected_device:str, index_info, image_repo, field_map:dict,
+        model_auth: Optional[ModelAuth] = None
+):
     '''
     This function is used to vectorise multimodal combination field. The field content should
     have the following structure:
@@ -2361,16 +2331,18 @@ def vectorise_multimodal_combination_field(field: str, multimodal_object: Dict[s
         doc_index: the index of the document. This is an interator variable `i` in the main body to iterator throught the docs
         doc_id: the document id
         selected_device: device from main body
-        index_info: index_info from main body
+        index_info: index_info from main body,
+        model_auth: Model download authorisation information (if required)
     Returns:
-    combo_chunk: the combo_chunk to be appended to the main body
-    combo_document_is_valid:  if the document is a valid
-    unsuccessful_docs: appended unsucessful_docs
-    combo_total_vectorise_time: the vectorise time spent in combo field
-    new_fields_from_multimodal_combination: the new fields from multimodal combination field that will be added to index properties
+        combo_chunk: the combo_chunk to be appended to the main body
+        combo_document_is_valid:  if the document is a valid
+        unsuccessful_docs: appended unsucessful_docs
+        combo_total_vectorise_time: the vectorise time spent in combo field
+        new_fields_from_multimodal_combination: the new fields from multimodal combination field that will be added to
+            index properties
 
     '''
-    # field_conent = {"tensor_field_one" : {"weight":0.5, "parameter": "test-paramater-1"},
+    # field_content = {"tensor_field_one" : {"weight":0.5, "parameter": "test-paramater-1"},
     #                 "tensor_field_two" : {"weight": 0.5, parameter": "test-parameter-2"}},
     combo_document_is_valid = True
     combo_vectorise_time_to_add = 0
@@ -2406,7 +2378,7 @@ def vectorise_multimodal_combination_field(field: str, multimodal_object: Dict[s
             else:
                 try:
                     if isinstance(sub_content, str) and index_info.index_settings[NsField.index_defaults][
-                        NsField.treat_urls_and_pointers_as_images]:
+                            NsField.treat_urls_and_pointers_as_images]:
                         if not isinstance(image_repo[sub_content], Exception):
                             image_data = image_repo[sub_content]
                         else:
@@ -2438,14 +2410,14 @@ def vectorise_multimodal_combination_field(field: str, multimodal_object: Dict[s
                 model_name=index_info.model_name,
                 model_properties=_get_model_properties(index_info), content=text_content_to_vectorise,
                 device=selected_device, normalize_embeddings=normalize_embeddings,
-                infer=infer_if_image)
+                infer=infer_if_image, model_auth=model_auth)
         image_vectors = []
         if len(image_content_to_vectorise) > 0:
             image_vectors = s2_inference.vectorise(
                 model_name=index_info.model_name,
                 model_properties=_get_model_properties(index_info), content=image_content_to_vectorise,
                 device=selected_device, normalize_embeddings=normalize_embeddings,
-                infer=infer_if_image)
+                infer=infer_if_image, model_auth=model_auth)
         end_time = timer()
         combo_vectorise_time_to_add += (end_time - start_time)
     except (s2_inference_errors.UnknownModelError,

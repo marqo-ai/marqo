@@ -9,6 +9,10 @@ from torch import multiprocessing as mp
 from marqo import errors
 from marqo.tensor_search import tensor_search
 from marqo.marqo_logging import logger
+from marqo.tensor_search.models.add_docs_objects import AddDocsParams
+from dataclasses import replace
+from marqo.config import Config
+
 
 try:
     mp.set_start_method('spawn', force=True)
@@ -85,30 +89,22 @@ class IndexChunk:
     """wrapper to pass through documents to be indexed to multiprocessing
     """
 
-    def __init__(self, config=None, index_name: str = None, docs: List[Dict] = [], 
-                        auto_refresh: bool = False, batch_size: int = 50, 
-                        device: str = None, process_id: int = 0, 
-                        non_tensor_fields: List[str] = [],
-                        threads_per_process: int = None, update_mode: str = 'replace',
-                        use_existing_tensors: bool = False, image_download_headers: Optional[Dict] = None,
-                        mappings: dict = None):
+    def __init__(
+            self,
+            add_docs_params: AddDocsParams,
+            config: Config,
+            batch_size: int = 50,
+            process_id: int = 0,
+            threads_per_process: int = None):
 
         self.config = copy.deepcopy(config)
-        self.index_name = index_name
-        self.docs = docs
-        self.auto_refresh = auto_refresh
+        self.add_docs_params = add_docs_params
         self.n_batch = batch_size
-        self.n_docs = len(docs)
+        self.n_docs = len(add_docs_params.docs)
         self.n_chunks = max(1, self.n_docs // self.n_batch)
-        self.device = device
         self.process_id = process_id
-        self.update_mode = update_mode
-        self.config.indexing_device = device if device is not None else self.config.indexing_device
+        self.config.indexing_device = add_docs_params.device if add_docs_params.device is not None else self.config.indexing_device
         self.threads_per_process = threads_per_process
-        self.non_tensor_fields = non_tensor_fields
-        self.use_existing_tensors = use_existing_tensors
-        self.image_download_headers = image_download_headers
-        self.mappings = mappings
 
     def process(self):  
 
@@ -117,7 +113,7 @@ class IndexChunk:
 
         logger.info(f'starting add documents using {self.n_chunks} chunks per process...')
         
-        if self.device.startswith('cpu') and self.threads_per_process is not None:
+        if self.add_docs_params.device.startswith('cpu') and self.threads_per_process is not None:
             logger.info(f"restricting threads to {self.threads_per_process} for process={self.process_id}")
             torch.set_num_threads(self.threads_per_process)
         
@@ -127,18 +123,16 @@ class IndexChunk:
         total_progress_displays = 10
         progress_display_frequency = max(1, self.n_chunks // total_progress_displays)
 
-        for n_processed,_doc in enumerate(np.array_split(self.docs, self.n_chunks)):
+        for n_processed,_doc in enumerate(np.array_split(self.add_docs_params.docs, self.n_chunks)):
             t_chunk_start = time.time()
             percent_done = self._calculate_percent_done(n_processed + 1, self.n_chunks)
             
             if n_processed % progress_display_frequency == 0:
-                logger.info(f'process={self.process_id} completed={percent_done}/100% on device={self.device}')
+                logger.info(
+                    f'process={self.process_id} completed={percent_done}/100% on device={self.add_docs_params.device}')
 
             results.append(tensor_search.add_documents(
-                config=self.config, index_name=self.index_name, docs=_doc, auto_refresh=self.auto_refresh,
-                update_mode=self.update_mode, non_tensor_fields=self.non_tensor_fields,
-                use_existing_tensors=self.use_existing_tensors, image_download_headers=self.image_download_headers,
-                mappings=self.mappings
+                config=self.config, add_docs_params=self.add_docs_params
             ))
             t_chunk_end = time.time()
 
@@ -170,22 +164,18 @@ def get_threads_per_process(processes: int):
     total_cpu = max(1, mp.cpu_count() - 2)
     return max(1, total_cpu//processes)
 
-def add_documents_mp(config=None, index_name=None, docs=None, 
-                     auto_refresh=None, batch_size=50, processes=1, device=None,
-                     non_tensor_fields: List[str] = [], update_mode: str = None,
-                     image_download_headers: Optional[Dict] = None, use_existing_tensors=None,
-                     mappings: dict = None
-                     ):
+def add_documents_mp(
+        add_docs_params: AddDocsParams,
+        config: Config,
+        batch_size=50,
+        processes=1
+    ):
     """add documents using parallel processing using ray
     Args:
-        documents (_type_): _description_
-        config (_type_, optional): _description_. Defaults to None.
-        index_name (_type_, optional): _description_. Defaults to None.
-        auto_refresh (_type_, optional): _description_. Defaults to None.
-        non_tensor_fields (_type, List[str]): _description_. Fields within documents not to create 
-          tensors for. Defaults to create tensors for all fields.
-        update_mode (str, optional):
-        use_existing_tensors
+        add_docs_params: parameters used by the add_docs call
+        config: Marqo configuration object
+        batch_size: size of batch to be processed and sent to Marqo-os
+        processes: number of processes to use
     
     Assumes running on the same host right now. Ray or something else should 
     be used if the processing is distributed.
@@ -193,11 +183,10 @@ def add_documents_mp(config=None, index_name=None, docs=None,
     Returns:
         _type_: _description_
     """
-    if image_download_headers is None:
-        image_download_headers = dict()
-    selected_device = device if device is not None else config.indexing_device
 
-    n_documents = len(docs)
+    selected_device = add_docs_params.device if add_docs_params.device is not None else config.indexing_device
+
+    n_documents = len(add_docs_params.docs)
 
     logger.info(f"found {n_documents} documents")
 
@@ -214,12 +203,12 @@ def add_documents_mp(config=None, index_name=None, docs=None,
 
     start = time.time()
 
-    chunkers = [IndexChunk(
-            config=config, index_name=index_name, docs=_docs, non_tensor_fields=non_tensor_fields,
-            auto_refresh=auto_refresh, batch_size=batch_size, update_mode=update_mode, 
-            use_existing_tensors=use_existing_tensors, image_download_headers=image_download_headers,
-            process_id=p_id, device=device_ids[p_id], threads_per_process=threads_per_process, mappings=mappings)
-        for p_id,_docs in enumerate(np.array_split(docs, n_processes))]
+    chunkers = [
+        IndexChunk(
+            config=config,  batch_size=batch_size,
+            process_id=p_id, threads_per_process=threads_per_process,
+            add_docs_params=replace(add_docs_params, docs=_docs, device=device_ids[p_id]))
+        for p_id,_docs in enumerate(np.array_split(add_docs_params.docs, n_processes))]
     logger.info(f'Performing parallel now across devices {device_ids}...')
     with mp.Pool(n_processes) as pool:
         results = pool.map(_run_chunker, chunkers)

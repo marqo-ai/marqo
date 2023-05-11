@@ -1,6 +1,6 @@
 from marqo.errors import IndexNotFoundError, InvalidArgError
 from marqo.tensor_search import tensor_search
-
+from tests.utils.transition import add_docs_caller
 from tests.marqo_test import MarqoTestCase
 
 
@@ -16,7 +16,7 @@ class TestBoostFieldScores(MarqoTestCase):
             tensor_search.create_vector_index(
                 index_name=self.index_name_1, config=self.config)
 
-            tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
+            add_docs_caller(config=self.config, index_name=self.index_name_1, docs=[
                 {
                     "Title": "The Travels of Marco Polo",
                     "Description": "A 13th-century travelogue describing Polo's travels",
@@ -100,7 +100,7 @@ class TestBoostFieldScoresComparison(MarqoTestCase):
             pass
 
     def test_boost_multiple_fields(self):
-        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
+        add_docs_caller(config=self.config, index_name=self.index_name_1, docs=[
             {
                 "Title": "A comparison of the best pets",
                 "Description": "Animals",
@@ -133,7 +133,7 @@ class TestBoostFieldScoresComparison(MarqoTestCase):
 
     def test_boost_equation_single_field(self):
         # add a test to check if the score is boosted as expected
-        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
+        add_docs_caller(config=self.config, index_name=self.index_name_1, docs=[
             {
                 "Title": "A comparison of the best pets",
                 "Description": "Animals",
@@ -177,7 +177,7 @@ class TestBoostFieldScoresComparison(MarqoTestCase):
 
     def test_boost_equation_multiple_fields(self):
         # add a test to check if the score is boosted as expected
-        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
+        add_docs_caller(config=self.config, index_name=self.index_name_1, docs=[
             {
                 "Title": "A comparison of the best pets",
                 "Description": "Animals",
@@ -209,7 +209,7 @@ class TestBoostFieldScoresComparison(MarqoTestCase):
     def test_boost_equation_with_multiple_docs(self):
         # add a test to check if the score is boosted as expected
         for num_of_doc in range(1,20):
-            tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
+            add_docs_caller(config=self.config, index_name=self.index_name_1, docs=[
                 {
                     "Title": "A comparison of the best pets",
                     "Description": "Animals",
@@ -242,10 +242,10 @@ class TestBoostFieldScoresComparison(MarqoTestCase):
                     index_name=self.index_name_1, config=self.config)
 
 
-    def test_boost_equation_with_multiple_docs(self):
+    def test_boost_equation_with_multiple_docs_2(self):
         # add a test to check if the score is boosted as expected
         for num_of_doc in range(1,20):
-            tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
+            add_docs_caller(config=self.config, index_name=self.index_name_1, docs=[
                 {
                     "Title": "A comparison of the best pets",
                     "Description": "Animals",
@@ -280,7 +280,7 @@ class TestBoostFieldScoresComparison(MarqoTestCase):
     def test_boost_equation_with_pagination_docs(self):
         # add a test to check if the score is boosted as expected
         num_of_doc = 50
-        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
+        add_docs_caller(config=self.config, index_name=self.index_name_1, docs=[
             {
                 "Title": "A comparison of the best pets",
                 "Description": "Animals",
@@ -322,7 +322,7 @@ class TestBoostFieldScoresComparison(MarqoTestCase):
                 boost[f"void_field_{i}"] = [1,1]
 
 
-            tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
+            add_docs_caller(config=self.config, index_name=self.index_name_1, docs=[
                 docs
             ] * num_of_doc, auto_refresh=True)
 

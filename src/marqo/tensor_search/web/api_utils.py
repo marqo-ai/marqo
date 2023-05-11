@@ -4,7 +4,7 @@ from marqo.errors import InvalidArgError, InternalError
 from marqo.tensor_search import enums
 from typing import Optional
 from marqo.tensor_search.utils import construct_authorized_url
-from marqo import config
+from marqo.tensor_search.models.add_docs_objects import ModelAuth
 
 
 def upconstruct_authorized_url(opensearch_url: str) -> str:
@@ -66,7 +66,7 @@ def translate_api_device(device: Optional[str]) -> Optional[str]:
 
 
 def decode_image_download_headers(image_download_headers: Optional[str] = None) -> dict:
-    """Decodes and image download header string into a Python dict
+    """Decodes an image download header string into a Python dict
 
     Args:
         image_download_headers: JSON-serialised, URL encoded header dictionary
@@ -75,7 +75,7 @@ def decode_image_download_headers(image_download_headers: Optional[str] = None) 
         image_download_headers as a dict
 
     Raises:
-        InvalidArgError is there is trouble parsing the dictionary
+        InvalidArgError if there is trouble parsing the dictionary
     """
     if not image_download_headers:
         return dict()
@@ -86,6 +86,26 @@ def decode_image_download_headers(image_download_headers: Optional[str] = None) 
             return as_dict
         except json.JSONDecodeError as e:
             raise InvalidArgError(f"Error parsing image_download_headers. Message: {e}")
+
+
+def decode_query_string_model_auth(model_auth: Optional[str] = None) -> Optional[ModelAuth]:
+    """Decodes a url encoded ModelAuth string into a ModelAuth object
+
+    Args:
+        model_auth: JSON-serialised, URL encoded ModelAuth dictionary
+
+    Returns:
+        model_auth as a ModelAuth object, if found. Otherwise None
+
+    Raises:
+        ValidationError if there is trouble parsing the string
+    """
+    if not model_auth:
+        return None
+    else:
+        as_str = urllib.parse.unquote_plus(model_auth)
+        as_objc = ModelAuth.parse_raw(as_str)
+        return as_objc
 
 
 def decode_mappings(mappings: Optional[str] = None) -> dict:

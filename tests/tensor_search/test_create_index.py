@@ -2,6 +2,7 @@ import pprint
 from typing import Any, Dict
 from unittest.mock import patch
 import requests
+from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.tensor_search.enums import IndexSettingsField, EnvVars
 from marqo.errors import MarqoApiError, MarqoError, IndexNotFoundError
 from marqo.tensor_search import tensor_search, configs, backend
@@ -9,6 +10,7 @@ from marqo.tensor_search.utils import read_env_vars_and_defaults
 from tests.marqo_test import MarqoTestCase
 from marqo.tensor_search.enums import IndexSettingsField as NsField
 from unittest import mock
+from marqo.tensor_search.models.settings_object import settings_schema
 from marqo import errors
 from marqo.errors import InvalidArgError
 
@@ -171,7 +173,8 @@ class TestCreateIndex(MarqoTestCase):
             config=self.config, index_name=self.index_name_1, index_settings={
                 NsField.index_defaults: custom_settings})
         tensor_search.add_documents(
-            config=self.config, index_name=self.index_name_1, docs=[{"Title": "wowow"}], auto_refresh=True)
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1, docs=[{"Title": "wowow"}], auto_refresh=True))
         mappings = requests.get(
             url=self.endpoint + "/" + self.index_name_1 + "/_mapping",
             verify=False
@@ -208,7 +211,8 @@ class TestCreateIndex(MarqoTestCase):
             config=self.config, index_name=self.index_name_1, index_settings={
                 NsField.index_defaults: custom_settings})
         tensor_search.add_documents(
-            config=self.config, index_name=self.index_name_1, docs=[{"Title": "wowow"}], auto_refresh=True)
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1, docs=[{"Title": "wowow"}], auto_refresh=True))
         mappings = requests.get(
             url=self.endpoint + "/" + self.index_name_1 + "/_mapping",
             verify=False
@@ -466,27 +470,31 @@ class TestCreateIndex(MarqoTestCase):
             @mock.patch("os.environ", {EnvVars.MARQO_MAX_INDEX_FIELDS: str(lim)})
             def run():
                 res_1 = tensor_search.add_documents(
-                    index_name=self.index_name_1, docs=[
-                        {f"f{i}": "some content" for i in range(lim)},
-                        {"_id": "1234", **{f"f{i}": "new content" for i in range(lim)}},
-                    ],
-                    auto_refresh=True, config=self.config
+                    add_docs_params=AddDocsParams(
+                        index_name=self.index_name_1, docs=[
+                            {f"f{i}": "some content" for i in range(lim)},
+                            {"_id": "1234", **{f"f{i}": "new content" for i in range(lim)}},
+                        ],
+                        auto_refresh=True),
+                    config=self.config
                 )
                 assert not res_1['errors']
                 res_1_2 = tensor_search.add_documents(
-                    index_name=self.index_name_1, docs=[
-                        {'f0': 'this is fine, but there is no resiliency.'},
-                        {f"f{i}": "some content" for i in range(lim // 2 + 1)},
-                        {'f0': 'this is fine. Still no resilieny.'}
-                    ],
-                    auto_refresh=True, config=self.config
+                    add_docs_params=AddDocsParams(index_name=self.index_name_1, docs=[
+                            {'f0': 'this is fine, but there is no resiliency.'},
+                            {f"f{i}": "some content" for i in range(lim // 2 + 1)},
+                            {'f0': 'this is fine. Still no resilieny.'}],
+                        auto_refresh=True),
+                    config=self.config
                 )
                 assert not res_1_2['errors']
                 try:
                     res_2 = tensor_search.add_documents(
-                        index_name=self.index_name_1, docs=[
-                            {'fx': "blah"}
-                        ], auto_refresh=True, config=self.config
+                        add_docs_params=AddDocsParams(
+                            index_name=self.index_name_1,
+                            docs=[{'fx': "blah"}],
+                            auto_refresh=True),
+                        config=self.config
                     )
                     raise AssertionError
                 except errors.IndexMaxFieldsError:
@@ -504,14 +512,17 @@ class TestCreateIndex(MarqoTestCase):
                 {"f2": 49, "f3": 400.4, "f4": "alien message"}
             ]
             res_1 = tensor_search.add_documents(
-                index_name=self.index_name_1, docs=docs, auto_refresh=True, config=self.config
+                add_docs_params=AddDocsParams(index_name=self.index_name_1, docs=docs, auto_refresh=True),
+                config=self.config
             )
             assert not res_1['errors']
             try:
                 res_2 = tensor_search.add_documents(
-                    index_name=self.index_name_1, docs=[
-                        {'fx': "blah"}
-                    ], auto_refresh=True, config=self.config
+                    add_docs_params=AddDocsParams(
+                        index_name=self.index_name_1, docs=[
+                            {'fx': "blah"}
+                        ], auto_refresh=True),
+                    config=self.config
                 )
                 raise AssertionError
             except errors.IndexMaxFieldsError:
@@ -535,7 +546,8 @@ class TestCreateIndex(MarqoTestCase):
                 {"f2": 49, "f3": 400.4, "f4": "alien message", "_id": "rkjn"}
             ]
             res_1 = tensor_search.add_documents(
-                index_name=self.index_name_1, docs=docs, auto_refresh=True, config=self.config
+                add_docs_params=AddDocsParams(index_name=self.index_name_1, docs=docs, auto_refresh=True),
+                config=self.config
             )
             mapping_info = requests.get(
                 self.authorized_url + f"/{self.index_name_1}/_mapping",

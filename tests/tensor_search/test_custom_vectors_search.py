@@ -1,9 +1,4 @@
-import unittest.mock
-import pprint
-
-import torch
-
-import marqo.tensor_search.backend
+from tests.utils.transition import add_docs_caller
 from marqo.errors import IndexNotFoundError, InvalidArgError
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import TensorField, IndexSettingsField, SearchMethod
@@ -31,7 +26,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                     IndexSettingsField.normalize_embeddings: True
                 }
             })
-        tensor_search.add_documents(config=self.config, index_name=self.index_name_1, docs=[
+        add_docs_caller(config=self.config, index_name=self.index_name_1, docs=[
             {
                 "Title": "Horse rider",
                 "text_field": "A rider is riding a horse jumping over the barrier.",

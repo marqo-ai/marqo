@@ -1,14 +1,14 @@
-import pprint
 import time
 from marqo.tensor_search import enums, backend
 from marqo.tensor_search import tensor_search
-import unittest
 import copy
 from marqo.errors import InvalidArgError, IndexNotFoundError
 from tests.marqo_test import MarqoTestCase
 import random
 import requests
 import json
+from marqo.tensor_search.models.add_docs_objects import AddDocsParams
+
 
 class TestLexicalSearch(MarqoTestCase):
 
@@ -41,16 +41,17 @@ class TestLexicalSearch(MarqoTestCase):
     
     def test_lexical_search_empty_text(self):
         tensor_search.add_documents(
-            config=self.config, index_name=self.index_name_1,
-            docs=[{"some doc 1": "some field 2", "some doc 2": "some other thing"}], auto_refresh=True)
+            config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1,
+                docs=[{"some doc 1": "some field 2", "some doc 2": "some other thing"}], auto_refresh=True)
+        )
         res = tensor_search._lexical_search(config=self.config, index_name=self.index_name_1, text="")
         assert len(res["hits"]) == 0
         assert res["hits"] == []
 
     def test_lexical_search_bad_text_type(self):
         tensor_search.add_documents(
-            config=self.config, index_name=self.index_name_1,
-            docs=[{"some doc 1": "some field 2", "some doc 2": "some other thing"}], auto_refresh=True)
+            config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1,
+                docs=[{"some doc 1": "some field 2", "some doc 2": "some other thing"}], auto_refresh=True))
         bad_args = [None, 1234, 1.0]
         for a in bad_args:
             try:
@@ -72,9 +73,12 @@ class TestLexicalSearch(MarqoTestCase):
         }
         d1 = {"title": "Marqo", "some doc 2": "some other thing", "_id": "abcdef"}
         tensor_search.add_documents(
-            config=self.config, index_name=self.index_name_1, auto_refresh=True,
-            docs=[d1, {"some doc 1": "some 2", "field abc": "robodog is not a cat", "_id": "unusual id"},
-                  d0])
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1, auto_refresh=True,
+                docs=[d1,
+                      {"some doc 1": "some 2", "field abc": "robodog is not a cat", "_id": "unusual id"},
+                      d0])
+        )
         res = tensor_search._lexical_search(config=self.config, index_name=self.index_name_1, text="marqo field",
                                             return_doc_ids=True)
         assert len(res["hits"]) == 2
@@ -95,11 +99,11 @@ class TestLexicalSearch(MarqoTestCase):
         d4 = {"Lucy": "Travis", "field lambda": "there is a whole bunch of text here. "
                                                 "Just a slight mention of a field", "_id": "123"}
         tensor_search.add_documents(
-            config=self.config, index_name=self.index_name_1, auto_refresh=True,
-            docs=[d0, d4, d1 ])
+            config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1, auto_refresh=True,
+                docs=[d0, d4, d1 ]))
         tensor_search.add_documents(
-            config=self.config, index_name=self.index_name_1, auto_refresh=True,
-            docs=[d3, d2])
+            config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1, auto_refresh=True,
+                docs=[d3, d2]))
         res = tensor_search._lexical_search(
             config=self.config, index_name=self.index_name_1, text="marqo field",
             return_doc_ids=True, searchable_attributes=["field lambda"], result_count=3)
@@ -121,11 +125,13 @@ class TestLexicalSearch(MarqoTestCase):
         d4 = {"Lucy": "Travis", "field lambda": "there is a whole bunch of text here. "
                                                 "Just a slight mention of a field", "_id": "123"}
         tensor_search.add_documents(
-            config=self.config, index_name=self.index_name_1, auto_refresh=True,
-            docs=[d0, d4, d1])
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1, auto_refresh=True,
+                docs=[d0, d4, d1]))
         tensor_search.add_documents(
-            config=self.config, index_name=self.index_name_1, auto_refresh=True,
-            docs=[d3, d2])
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1, auto_refresh=True, docs=[d3, d2])
+        )
         res = tensor_search._lexical_search(
             config=self.config, index_name=self.index_name_1, text="Marqo field",
             return_doc_ids=True, searchable_attributes=["field lambda", "FIELD omega"])
@@ -148,11 +154,13 @@ class TestLexicalSearch(MarqoTestCase):
         d4 = { # SHOULD APPEAR 3rd (LAST)
             "Lucy": "Travis", "field lambda": "sentence with the word field" }
         tensor_search.add_documents(
-            config=self.config, index_name=self.index_name_1, auto_refresh=True,
-            docs=[d0, d4, d1])
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1, auto_refresh=True, docs=[d0, d4, d1])
+        )
         tensor_search.add_documents(
-            config=self.config, index_name=self.index_name_1, auto_refresh=True,
-            docs=[d3, d2])
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1, auto_refresh=True, docs=[d3, d2])
+        )
         time.sleep(1)
         res = tensor_search._lexical_search(
             config=self.config, index_name=self.index_name_1, text="Marqo field awks",
@@ -178,8 +186,8 @@ class TestLexicalSearch(MarqoTestCase):
                                                 "Just a slight mention of a field"}
         d5 = {"some completely irrelevant": "document hehehe"}
         tensor_search.add_documents(
-            config=self.config, index_name=self.index_name_1, auto_refresh=True,
-            docs=[d0, d4, d1, d3, d2])
+            config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1, auto_refresh=True,
+                docs=[d0, d4, d1, d3, d2]))
         r1 = tensor_search._lexical_search(
             config=self.config, index_name=self.index_name_1, text="Marqo field",
             return_doc_ids=False, result_count=2
@@ -212,8 +220,8 @@ class TestLexicalSearch(MarqoTestCase):
                                                 "Just a slight mention of a field"}
         d5 = {"some completely irrelevant": "document hehehe"}
         tensor_search.add_documents(
-            config=self.config, index_name=self.index_name_1, auto_refresh=True,
-            docs=[d0, d4, d1, d3, d2])
+            config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1, auto_refresh=True,
+                docs=[d0, d4, d1, d3, d2]))
         res_lexical_search = tensor_search._lexical_search(
             config=self.config, index_name=self.index_name_1, text="Marqo field",
             return_doc_ids=False, searchable_attributes=["field lambda", "FIELD omega"])
@@ -246,8 +254,8 @@ class TestLexicalSearch(MarqoTestCase):
             "Cool field": "Marqo is the best!"
         }
         tensor_search.add_documents(
-            config=self.config, index_name=self.index_name_1, auto_refresh=True,
-            docs=[d0])
+            config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1, auto_refresh=True,
+                docs=[d0]))
         assert [] == tensor_search._lexical_search(
             config=self.config, index_name=self.index_name_1, text="Marqo field",
             return_doc_ids=False)["hits"]
@@ -258,8 +266,8 @@ class TestLexicalSearch(MarqoTestCase):
         assert grey_query["hits"][0]["_id"] == a_consistent_id
         # update doc so it does indeed get returned
         tensor_search.add_documents(
-            config=self.config, index_name=self.index_name_1, auto_refresh=True,
-            docs=[d1])
+            config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1, auto_refresh=True,
+                docs=[d1]))
         cool_query = tensor_search._lexical_search(
             config=self.config, index_name=self.index_name_1, text="Marqo field",
             return_doc_ids=True)
@@ -282,11 +290,11 @@ class TestLexicalSearch(MarqoTestCase):
                                                 "Just a slight mention of a field", "day": 190,
               "_id": "123"}
         tensor_search.add_documents(
-            config=self.config, index_name=self.index_name_1, auto_refresh=True,
-            docs=[d0, d4, d1 ])
+            config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1, auto_refresh=True,
+                docs=[d0, d4, d1 ]))
         tensor_search.add_documents(
-            config=self.config, index_name=self.index_name_1, auto_refresh=True,
-            docs=[d3, d2])
+            config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1, auto_refresh=True,
+                docs=[d3, d2]))
         res = tensor_search._lexical_search(
             config=self.config, index_name=self.index_name_1, text="marqo field",
             return_doc_ids=True, filter_string="title:Marqo OR (Lucy:Travis AND day:>50)"
@@ -305,8 +313,10 @@ class TestLexicalSearch(MarqoTestCase):
         d2 = {"some doc 1": "some 2 jnkerkbj", "field abc": "extravagant robodog is not a cat", "_id": "Jupyter_12"}
 
         tensor_search.add_documents(
-            config=self.config, index_name=self.index_name_1, auto_refresh=True,
-            docs=[d0, d1, d2])
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1, auto_refresh=True,
+                docs=[d0, d1, d2])
+        )
         res = tensor_search._lexical_search(
             config=self.config, index_name=self.index_name_1, text="extravagant",
             return_doc_ids=True, searchable_attributes=[], result_count=3)
@@ -369,8 +379,8 @@ class TestLexicalSearch(MarqoTestCase):
         fields = ["Field 1", "Field 2", "Field 3"]
 
         tensor_search.add_documents(
-            config=self.config, index_name=self.index_name_1,
-            docs=docs, auto_refresh=False
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1, docs=docs, auto_refresh=False)
         )
         tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
 
@@ -430,12 +440,13 @@ class TestLexicalSearch(MarqoTestCase):
 
     def test_lexical_search_list(self):
         tensor_search.add_documents(
-            config=self.config, index_name=self.index_name_1, docs=[
-                {"abc": "some text", "other field": "baaadd", "_id": "5678", "my_string": "b"},
-                {"abc": "some text", "other field": "Close match hehehe", "_id": "1234", "an_int": 2},
-                {"abc": "some text", "_id": "1235",  "my_list": ["tag1", "tag2 some"]},
-                {"abc": "some text", "_id": "1001", "my_cool_list": ["b_1", "b2"], "fun list": ['truk', 'car']},
-            ], auto_refresh=True, non_tensor_fields=["my_list", "fun list", "my_cool_list"])
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1, docs=[
+                    {"abc": "some text", "other field": "baaadd", "_id": "5678", "my_string": "b"},
+                    {"abc": "some text", "other field": "Close match hehehe", "_id": "1234", "an_int": 2},
+                    {"abc": "some text", "_id": "1235",  "my_list": ["tag1", "tag2 some"]},
+                    {"abc": "some text", "_id": "1001", "my_cool_list": ["b_1", "b2"], "fun list": ['truk', 'car']},
+                ], auto_refresh=True, non_tensor_fields=["my_list", "fun list", "my_cool_list"]))
         base_search_args = {
             'index_name': self.index_name_1, "config": self.config,
             "search_method": enums.SearchMethod.LEXICAL
@@ -464,12 +475,14 @@ class TestLexicalSearch(MarqoTestCase):
 
     def test_lexical_search_list_searchable_attr(self):
         tensor_search.add_documents(
-            config=self.config, index_name=self.index_name_1, docs=[
-                {"abc": "some text", "other field": "baaadd", "_id": "5678", "my_string": "b"},
-                {"abc": "some text", "other field": "Close match hehehe", "_id": "1234", "an_int": 2},
-                {"abc": "some text", "_id": "1235",  "my_list": ["tag1", "tag2 some"]},
-                {"abc": "some text", "_id": "1001", "my_cool_list": ["b_1", "b2"], "fun list": ['truk', 'car']},
-            ], auto_refresh=True, non_tensor_fields=["my_list", "fun list", "my_cool_list"])
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1, docs=[
+                    {"abc": "some text", "other field": "baaadd", "_id": "5678", "my_string": "b"},
+                    {"abc": "some text", "other field": "Close match hehehe", "_id": "1234", "an_int": 2},
+                    {"abc": "some text", "_id": "1235",  "my_list": ["tag1", "tag2 some"]},
+                    {"abc": "some text", "_id": "1001", "my_cool_list": ["b_1", "b2"], "fun list": ['truk', 'car']},
+                ], auto_refresh=True, non_tensor_fields=["my_list", "fun list", "my_cool_list"])
+        )
         base_search_args = {
             'index_name': self.index_name_1, "config": self.config,
             "search_method": enums.SearchMethod.LEXICAL, 'text': "tag1"
@@ -485,12 +498,13 @@ class TestLexicalSearch(MarqoTestCase):
 
     def test_lexical_search_filter_with_dot(self):
         tensor_search.add_documents(
-            config=self.config, index_name=self.index_name_1, docs=[
+            config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1, docs=[
                 {"content": "a man on a horse", "filename" : "Important_File_1.pdf", "_id":"123"},
                 {"content": "the horse is eating grass", "filename": "Important_File_2.pdf", "_id": "456"},
                 {"content": "what is the document", "filename": "Important_File_3.pdf", "_id": "789"},
 
             ], auto_refresh=True)
+        )
 
         res = tensor_search._lexical_search(config=self.config, index_name=self.index_name_1,
                                             text="horse", return_doc_ids=True, searchable_attributes=["content"],

@@ -131,6 +131,18 @@ class AvailableModelsKey:
     model_size = "model_size"
 
 
+class ObjectStores:
+    s3 = 's3'
+    hf = 'hf'
+
+
+class ModelProperties:
+    auth_required = 'auth_required'
+    model_location = 'model_location'
+
+
+class InferenceParams:
+    model_auth = "model_auth"
 # Perhaps create a ThrottleType to differentiate thread_count and data_size throttling mechanisms
     
 
