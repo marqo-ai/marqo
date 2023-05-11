@@ -1,4 +1,4 @@
-__version__ = "0.0.19-model-auth-beta"
+__version__ = "0.0.19"
 
 
 def get_version() -> str:
