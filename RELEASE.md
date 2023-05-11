@@ -1,3 +1,21 @@
+# Release 0.0.19
+
+## New features
+- Model authorisation(https://github.com/marqo-ai/marqo/pull/460). Non-public OpenCLIP and CLIP models can now be loaded 
+  from Hugging Face and AWS s3 via the `model_location` settings object and `model_auth`. 
+  See [here (model auth during search)](https://docs.marqo.ai/0.0.19/API-Reference/search/#model-auth)
+  and [here (model auth during add_documents)](https://docs.marqo.ai/0.0.19/API-Reference/documents/#model-auth) for usage
+- Max replicas configuration (https://github.com/marqo-ai/marqo/pull/465). Marqo admins now have more control over the max number of replicas that can be set for an index on a Marqo instance 
+
+## Breaking changes
+- Marqo now allows for 1 maximum replica per index by default (https://github.com/marqo-ai/marqo/pull/465).
+
+## Bug fixes and minor changes
+- Prevented unneeded files being included in built Docker image (https://github.com/marqo-ai/marqo/pull/448, https://github.com/marqo-ai/marqo/pull/426)
+- README improvements (https://github.com/marqo-ai/marqo/pull/468)
+- Added tests (https://github.com/marqo-ai/marqo/pull/464/files)
+
+
 # Release 0.0.18
 
 ## New features
