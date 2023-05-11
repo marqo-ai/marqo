@@ -13,6 +13,7 @@
 ## Bug fixes and minor changes
 - Prevented unneeded files being included in built Docker image (https://github.com/marqo-ai/marqo/pull/448, https://github.com/marqo-ai/marqo/pull/426)
 - README improvements (https://github.com/marqo-ai/marqo/pull/468)
+- OpenCLIP version bumped (https://github.com/marqo-ai/marqo/pull/461)
 - Added tests (https://github.com/marqo-ai/marqo/pull/464/files)
 
 
