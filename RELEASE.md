@@ -4,17 +4,25 @@
 - Model authorisation(https://github.com/marqo-ai/marqo/pull/460). Non-public OpenCLIP and CLIP models can now be loaded 
   from Hugging Face and AWS s3 via the `model_location` settings object and `model_auth`. 
   See [here (model auth during search)](https://docs.marqo.ai/0.0.19/API-Reference/search/#model-auth)
-  and [here (model auth during add_documents)](https://docs.marqo.ai/0.0.19/API-Reference/documents/#model-auth) for usage
-- Max replicas configuration (https://github.com/marqo-ai/marqo/pull/465). Marqo admins now have more control over the max number of replicas that can be set for an index on a Marqo instance 
+  and [here (model auth during add_documents)](https://docs.marqo.ai/0.0.19/API-Reference/documents/#model-auth) for usage.
+- Max replicas configuration (https://github.com/marqo-ai/marqo/pull/465). 
+  Marqo admins now have more control over the max number of replicas that can be set for indexes on the Marqo instance.
+  See [here](https://docs.marqo.ai/0.0.19/Advanced-Usage/configuration/#configuring-usage-limits) for how to configure this.
 
 ## Breaking changes
-- Marqo now allows for 1 maximum replica per index by default (https://github.com/marqo-ai/marqo/pull/465).
+- Marqo now allows for a maximum of 1 replica per index by default (https://github.com/marqo-ai/marqo/pull/465).
 
 ## Bug fixes and minor changes
-- Prevented unneeded files being included in built Docker image (https://github.com/marqo-ai/marqo/pull/448, https://github.com/marqo-ai/marqo/pull/426)
 - README improvements (https://github.com/marqo-ai/marqo/pull/468)
 - OpenCLIP version bumped (https://github.com/marqo-ai/marqo/pull/461)
-- Added tests (https://github.com/marqo-ai/marqo/pull/464/files)
+- Added extra tests (https://github.com/marqo-ai/marqo/pull/464/files)
+- Unneeded files are now excluded in Docker builds (https://github.com/marqo-ai/marqo/pull/448, https://github.com/marqo-ai/marqo/pull/426)
+
+## Contributor shout-outs
+- Thank you to our 2.9k stargazers!
+- Thank you to community members for the increasingly exciting discussions on our Slack channel. 
+  Feedback, questions and hearing about use cases helps us build a great open source product.
+- Thank you to [@jalajk24](https://github.com/jalajk24) for the PR to exclude unneeded files from Docker builds!
 
 
 # Release 0.0.18
