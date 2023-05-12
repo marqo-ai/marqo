@@ -112,8 +112,9 @@ class ModelsForCacheing:
                 # TODO: Change error message to match new format
                 raise errors.EnvVarError(
                     f"Could not parse environment variable `{EnvVars.MARQO_MODELS_TO_PRELOAD}`. "
-                    f"Please ensure that this a JSON-encoded array of strings or dictionaries. For example:\n"
+                    f"Please ensure that this a JSON-encoded array of strings or dicts. For example:\n"
                     f"""export {EnvVars.MARQO_MODELS_TO_PRELOAD}='["ViT-L/14", "onnx/all_datasets_v4_MiniLM-L6"]'"""
+                    f"""To add a custom model, it must be a dict with keys `model` and `model_properties` as defined in `https://marqo.pages.dev/0.0.20/Models-Reference/bring_your_own_model/`"""
                 ) from e
         else:
             self.models = warmed_models
@@ -135,7 +136,6 @@ class ModelsForCacheing:
                 Model properties will be passed to vectorise call if object exists
             """
             if isinstance(model, str):
-                self.logger.debug(f"Model {model} has been passed as a str")
                 # For models IN REGISTRY
                 _ = vectorise(
                     model_name=model, 
@@ -148,13 +148,18 @@ class ModelsForCacheing:
                 TODO: include validation from on start script (model name properties etc)
                 _check_model_name(index_settings)
                 """
-                self.logger.debug(f"Model {model['model_name']} has been passed as a dict")
-                _ = vectorise(
-                    model_name=model["model_name"], 
-                    model_properties=model["model_properties"], 
-                    content=test_string, 
-                    device=device
-                )
+                try:
+                    _ = vectorise(
+                        model_name=model["model"], 
+                        model_properties=model["model_properties"], 
+                        content=test_string, 
+                        device=device
+                    )
+                except KeyError as e:
+                    raise errors.EnvVarError(
+                        f"Your custom model {model} is missing either `model_name` or `model_properties`."
+                        f"""To add a custom model, it must be a dict with keys `model` and `model_properties` as defined in `https://marqo.pages.dev/0.0.20/Models-Reference/bring_your_own_model/`"""
+                    ) from e
         
         from marqo.s2_inference.s2_inference import vectorise
        
@@ -170,13 +175,13 @@ class ModelsForCacheing:
 
                 t = 0
                 for n in range(N):
-                    self.logger.debug(f"Vectorise Call #{n}")
                     t0 = time.time()
                     _ = _prewarm_model(model=model, content=test_string, device=device)
                     t1 = time.time()
                     t += (t1 - t0)
                 message = f"{(t)/float((N))} for {model} and {device}"
                 messages.append(message)
+                self.logger.debug(f"{model} {device} vectorise run {N} times.")
                 self.logger.info(f"{model} {device} run succesfully!")
 
         for message in messages:
