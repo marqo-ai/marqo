@@ -109,13 +109,16 @@ class ModelsForCacheing:
             try:
                 self.models = json.loads(warmed_models)
             except json.JSONDecodeError as e:
+                # TODO: Change error message to match new format
                 raise errors.EnvVarError(
                     f"Could not parse environment variable `{EnvVars.MARQO_MODELS_TO_PRELOAD}`. "
-                    f"Please ensure that this a JSON-encoded array of strings. For example:\n"
+                    f"Please ensure that this a JSON-encoded array of strings or dictionaries. For example:\n"
                     f"""export {EnvVars.MARQO_MODELS_TO_PRELOAD}='["ViT-L/14", "onnx/all_datasets_v4_MiniLM-L6"]'"""
                 ) from e
         else:
             self.models = warmed_models
+        
+        self.logger.debug(f"self.models is of data type {type(self.models)}. The value is {self.models}")
         # TBD to include cross-encoder/ms-marco-TinyBERT-L-2-v2
 
         self.default_devices = ['cpu'] if not torch.cuda.is_available() else ['cpu', 'cuda']
@@ -123,6 +126,36 @@ class ModelsForCacheing:
         self.logger.info(f"pre-loading {self.models} onto devices={self.default_devices}")
 
     def run(self):
+
+        def _prewarm_model(model, content, device):
+            """
+                Calls vectorise for a model once. This will load in the model if it isn't already loaded.
+                If `model` is a str, it should be a model name in the registry
+                If `model is a dict, it should be an object containing `model_name` and `model_properties`
+                Model properties will be passed to vectorise call if object exists
+            """
+            if isinstance(model, str):
+                self.logger.debug(f"Model {model} has been passed as a str")
+                # For models IN REGISTRY
+                _ = vectorise(
+                    model_name=model, 
+                    content=test_string, 
+                    device=device
+                )
+            elif isinstance(model, dict):
+                # For models from URL
+                """
+                TODO: include validation from on start script (model name properties etc)
+                _check_model_name(index_settings)
+                """
+                self.logger.debug(f"Model {model['model_name']} has been passed as a dict")
+                _ = vectorise(
+                    model_name=model["model_name"], 
+                    model_properties=model["model_properties"], 
+                    content=test_string, 
+                    device=device
+                )
+        
         from marqo.s2_inference.s2_inference import vectorise
        
         test_string = 'this is a test string'
@@ -130,14 +163,16 @@ class ModelsForCacheing:
         messages = []
         for model in self.models:
             for device in self.default_devices:
+                self.logger.debug(f"Beginning loading for model: {model} on device: {device}")
                 
                 # warm it up
-                _ = vectorise(model, test_string, device=device)
+                _ = _prewarm_model(model=model, content=test_string, device=device)
 
                 t = 0
                 for n in range(N):
+                    self.logger.debug(f"Vectorise Call #{n}")
                     t0 = time.time()
-                    _ = vectorise(model, test_string, device=device)
+                    _ = _prewarm_model(model=model, content=test_string, device=device)
                     t1 = time.time()
                     t += (t1 - t0)
                 message = f"{(t)/float((N))} for {model} and {device}"
