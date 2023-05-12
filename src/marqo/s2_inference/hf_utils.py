@@ -158,7 +158,7 @@ class AutoModelForSentenceEmbedding(nn.Module):
         return model_output[0][:, 0]
 
 
-def validate_huggingface_archive(path: str):
+def validate_huggingface_archive(path: str) -> str:
     '''
         This function extracts the model from a huggingface archive if necessary.
         Unlike open clip models that can loaded from a single .pt or .bin file,
