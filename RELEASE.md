@@ -15,7 +15,7 @@
 ## Bug fixes and minor changes
 - README improvements (https://github.com/marqo-ai/marqo/pull/468)
 - OpenCLIP version bumped (https://github.com/marqo-ai/marqo/pull/461)
-- Added extra tests (https://github.com/marqo-ai/marqo/pull/464/files)
+- Added extra tests (https://github.com/marqo-ai/marqo/pull/464/)
 - Unneeded files are now excluded in Docker builds (https://github.com/marqo-ai/marqo/pull/448, https://github.com/marqo-ai/marqo/pull/426)
 
 ## Contributor shout-outs
