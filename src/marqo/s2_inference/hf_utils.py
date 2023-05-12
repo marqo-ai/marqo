@@ -2,10 +2,18 @@ import torch
 from torch import nn
 from transformers import (AutoModel, AutoTokenizer)
 import numpy as np
-
+from marqo.tensor_search.models.private_models import ModelLocation, ModelAuth
+from marqo.tensor_search.enums import ModelProperties, InferenceParams
 from marqo.s2_inference.sbert_utils import Model
 from marqo.s2_inference.types import Union, FloatTensor, List
 from marqo.s2_inference.logger import get_logger
+from marqo.tensor_search.enums import ModelProperties
+from marqo.s2_inference.errors import InvalidModelPropertiesError
+import os, validators
+from marqo.s2_inference.processing.custom_clip_utils import download_model
+from marqo.s2_inference.configs import ModelCache
+import zipfile, tarfile
+
 logger = get_logger(__name__)
 
 
@@ -17,14 +25,78 @@ class HF_MODEL(Model):
         if self.max_seq_length is None:
             self.max_seq_length = 128
 
+        model_auth = kwargs.get(InferenceParams.model_auth, None)
+        if model_auth is not None:
+            self.model_auth = model_auth
+        else:
+            self.model_auth = None
+
     def load(self) -> None:
 
-        self.model = AutoModelForSentenceEmbedding(self.model_name).to(self.device)
-        self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+        model_location_presence = ModelProperties.model_location in self.model_properties
+        path = self.model_properties.get("localpath", None) or self.model_properties.get("url", None)
+
+        # HF models can be loaded from 3 entries: path (url or localpath), model_name, or model_location
+        if (path is not None) + (self.model_name is not None) + (model_location_presence is not None) != 1:
+            raise InvalidModelPropertiesError("Exactly one of `url`, `localpath` or `model_location`, `name` can be specified"
+                                              " in `model_properties` for `hf` models as they conflict with each other in model loading."
+                                              " Please ensure that exactly one of these is specified in `model_properties` and retry.")
+        elif path is not None:
+            if validators.url(path) is True:
+                self.model_path = download_model(url = path, download_dir=self.model_auth)
+            elif os.path.isdir(path) or os.path.isfile(path):
+                self.model_path = path
+
+        elif self.model_name is not None:
+            self.model_path = self.model_name
+            self.model = AutoModelForSentenceEmbedding.from_pretrained(self.model_path, use_auth_token = self.model_auth ).to(self.device)
+            self.tokenizer = AutoTokenizer.from_pretrained(self.model_path, use_auth_token = self.model_auth)
+            return
+
+        elif model_location_presence is not None:
+            self.model_path = self._download_from_repo()
+
+        else:
+            raise InvalidModelPropertiesError(
+                "Exactly one of `url`, `localpath` or `model_location`, `name` must be specified"
+                " in `model_properties` for `hf` models as they conflict with each other in model loading."
+                " Please ensure that exactly one of these is specified in `model_properties` and retry.")
+
+        # The Automodel.from_pretrained method can load from a dictionary pointer or a model name.
+        # We need to do extraction here if necessary
+        self.model_path = validate_huggingface_archive(self.model_path)
+
+        self.model = AutoModelForSentenceEmbedding.from_pretrained(self.model_path).to(self.device)
+        self.tokenizer = AutoTokenizer.from_pretrained(self.model_path)
+
+    def _download_from_repo(self):
+        """Downloads model from an external repo like s3 and returns the filepath
+
+        Returns:
+            The model's filepath
+
+        Raises:
+            RunTimeError if an empty filepath is detected. This is important
+                because OpenCLIP will instantiate a model with random weights, if
+                a filepath isn't specified, and the model isn't a publicly
+                available HF or OpenAI one.
+        """
+        model_location = ModelLocation(**self.model_properties[ModelProperties.model_location])
+        download_model_params = {"repo_location": model_location}
+
+        if model_location.auth_required:
+            download_model_params['auth'] = self.model_auth
+
+        model_file_path = download_model(**download_model_params)
+        if model_file_path is None or model_file_path == '':
+            raise RuntimeError(
+                'download_model() needs to return a valid filepath to the model! Instead, received '
+                f' filepath `{model_file_path}`')
+        return model_file_path
 
 
-    def encode(self, sentence: Union[str, List[str]], normalize = True, **kwargs) -> Union[FloatTensor, np.ndarray]:
-        
+    def encode(self, sentence: Union[str, List[str]], normalize=True, **kwargs) -> Union[FloatTensor, np.ndarray]:
+
         if isinstance(sentence, str):
             sentence = [sentence]
 
@@ -33,7 +105,8 @@ class HF_MODEL(Model):
 
         self.model.normalize = normalize
 
-        inputs = self.tokenizer(sentence, padding=True, truncation=True, max_length=self.max_seq_length, return_tensors="pt").to(self.device)
+        inputs = self.tokenizer(sentence, padding=True, truncation=True, max_length=self.max_seq_length,
+                                return_tensors="pt").to(self.device)
 
         with torch.no_grad():
             return self._convert_output(self.model.forward(**inputs))
@@ -44,15 +117,16 @@ class HF_MODEL(Model):
         elif self.device.startswith('cuda'):
             return output.cpu().numpy()
 
+
 class AutoModelForSentenceEmbedding(nn.Module):
 
-    def __init__(self, model_name, normalize = True, pooling='mean'):
+    def __init__(self, model_name: str = None, use_auth_token: str = None, normalize=True, pooling='mean'):
         super().__init__()
         self.model_name = model_name
         self.normalize = normalize
         self.pooling = pooling
 
-        self.model = AutoModel.from_pretrained(model_name)
+        self.model = AutoModel.from_pretrained(model_name, use_auth_token = use_auth_token)
         self.model.eval()
         if self.pooling == 'mean':
             self._pool_func = self.mean_pooling
@@ -75,10 +149,46 @@ class AutoModelForSentenceEmbedding(nn.Module):
     def mean_pooling(self, model_output, attention_mask):
 
         token_embeddings = model_output[0]
-        
+
         input_mask_expanded = attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
 
         return torch.sum(token_embeddings * input_mask_expanded, 1) / torch.clamp(input_mask_expanded.sum(1), min=1e-9)
 
     def cls_pooling(self, model_output, attention_mask):
-        return model_output[0][:,0]
+        return model_output[0][:, 0]
+
+
+def validate_huggingface_archive(path: str):
+    '''
+        This function extracts the model from a huggingface archive if necessary.
+        Unlike open clip models that can loaded from a single .pt or .bin file,
+        Huggingface models are loaded from a directory.
+
+    Returns:
+        The directory path to the model
+    '''
+    if os.path.isdir(path):
+        # if it's a directory, return the path directly
+        return path
+    elif os.path.isfile(path):
+        # if it's a file, check if it's a compressed file
+        base, ext = os.path.splitext(path)
+        if ext in ['.tar', '.gz', '.tgz', '.bz2', '.zip']:
+            # create a new directory with the same name as the file
+            new_dir = base
+            os.makedirs(new_dir, exist_ok=True)
+
+            # extract the compressed file
+            if ext == '.zip':
+                with zipfile.ZipFile(path, 'r') as zip_ref:
+                    zip_ref.extractall(new_dir)
+            else:
+                with tarfile.open(path, 'r') as tar_ref:
+                    tar_ref.extractall(new_dir)
+
+            # return the path to the new directory
+            return new_dir
+        else:
+            raise ValueError(f'Unsupported file extension: {ext}. The path must be a directory or a compressed file.')
+    else:
+        raise ValueError(f'Invalid path: {path}. The path must be a directory or a compressed file.')

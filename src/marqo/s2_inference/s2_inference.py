@@ -188,7 +188,7 @@ def _validate_model_properties(model_name: str, model_properties: dict) -> dict:
         """checks model dict to see if all required keys are present
         """
         if model_properties.get("type", None) in (None, "sbert"):
-            required_keys = ["name", "dimensions"]
+            required_keys = ["dimensions", "name"]
             for key in required_keys:
                 if key not in model_properties:
                     raise InvalidModelPropertiesError(f"model_properties has missing key '{key}'."
@@ -209,6 +209,15 @@ def _validate_model_properties(model_name: str, model_properties: dict) -> dict:
                     raise InvalidModelPropertiesError(f"model_properties has missing key '{key}'."
                                                       f"please update your model properties with required key `{key}`"
                                                       f"check `https://docs.marqo.ai/0.0.12/Models-Reference/dense_retrieval/` for more info.")
+
+        elif model_properties.get("type", None) in ("hf"):
+            required_keys = ["dimension"]
+            for key in required_keys:
+                if key not in model_properties:
+                    raise InvalidModelPropertiesError(f"model_properties has missing key '{key}'."
+                                                      f"please update your model properties with required key `{key}`"
+                                                      f"check `https://docs.marqo.ai/0.0.12/Models-Reference/dense_retrieval/` for more info.")
+
     else:
         model_properties = get_model_properties_from_registry(model_name)
 

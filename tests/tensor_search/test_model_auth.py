@@ -989,6 +989,38 @@ class TestModelAuth(MarqoTestCase):
         TODO: normal CLIP
         """
 
+class TestModelAuthLoadedS3ForHuggingFace(MarqoTestCase):
+
+    model_abs_path = None
+    fake_access_key_id = '12345'
+    fake_secret_key = 'this-is-a-secret'
+    index_name_1 = "test-model-auth-index-1"
+    s3_object_key = 'path/to/your/secret_model.pt'
+    s3_bucket = 'your-bucket-name'
+    custom_model_name = 'my_model'
+    device='cpu'
+
+    def setUp(self):
+        self.index_name_1 = "test-model-auth-index-1"
+
+    def load_model_from_url(self):
+        index_settings = {
+            "index_defaults": {
+                "treat_urls_and_pointers_as_images": False,
+                "model" : "my_sentence_transformer_model",
+                "model_properties": {
+                    "name": "my",
+                    "dimensions": 512,
+                    "url" : "https://marqo-cache-sentence-transformers.s3.us-west-2.amazonaws.com/all-MiniLM-L6-v2/all-MiniLM-L6-v2.zip",
+                    "type": "sbert",
+            }
+        }
+        }
+
+
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings= index_settings)
+
+
 
 
 

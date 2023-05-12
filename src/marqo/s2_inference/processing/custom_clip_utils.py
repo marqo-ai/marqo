@@ -168,3 +168,8 @@ def download_pretrained_from_url(
                 loop.update(len(buffer))
 
     return download_target
+
+
+def extract_model_config_file():
+    pass
+
