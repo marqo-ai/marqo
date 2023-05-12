@@ -189,6 +189,6 @@ def validate_huggingface_archive(path: str):
             # return the path to the new directory
             return new_dir
         else:
-            raise ValueError(f'Unsupported file extension: {ext}. The path must be a directory or a compressed file.')
+            raise InvalidModelPropertiesError(f'Unsupported file extension: {ext}. The path must be a directory or a compressed file.')
     else:
-        raise ValueError(f'Invalid path: {path}. The path must be a directory or a compressed file.')
+        raise InvalidModelPropertiesError(f'Invalid path: {path}. The path must be a directory or a compressed file.')
