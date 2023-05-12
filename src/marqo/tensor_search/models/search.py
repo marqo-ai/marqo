@@ -1,7 +1,10 @@
 import json
-from pydantic import BaseModel
-from marqo.tensor_search.models.private_models import ModelAuth
+
+from pydantic import BaseModel, validator
 from typing import Any, Union, List, Dict, Optional, NewType, Literal
+
+from marqo.errors import InvalidArgError
+from marqo.tensor_search.models.private_models import ModelAuth
 
 Qidx = NewType('Qidx', int) # Indicates the position of a search query in a bulk search request
 JHash = NewType('JHash', int) # hash of a VectoriseJob. Used for quick access of VectorisedJobs
@@ -58,5 +61,12 @@ class SearchContextTensor(BaseModel):
     vector: List[float]
     weight: float
 
+
 class SearchContext(BaseModel):
     tensor: Optional[List[SearchContextTensor]]
+
+    @validator('tensor')
+    def check_vector_length(cls, v):
+        if not (1 <= len(v) <= 64):
+            raise InvalidArgError('The number of tensors must be between 1 and 64')
+        return v

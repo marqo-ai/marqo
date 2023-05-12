@@ -1,24 +1,23 @@
+from enum import Enum
+import jsonschema
 import json
-import pprint
 import typing
+from typing import Any, Container, Dict, Iterable, List, Optional, Tuple, Type, Sequence, Union
+
 from marqo.config import Config
 from marqo.tensor_search import constants
 from marqo.tensor_search import enums, utils
-from typing import Container, Dict, Iterable, List, Optional, Union
 from marqo.errors import (
     MarqoError, InvalidFieldNameError, InvalidArgError, InternalError,
     InvalidDocumentIdError, DocTooLargeError, InvalidIndexNameError,
     IllegalRequestedDocCount)
 from marqo.tensor_search.enums import TensorField, SearchMethod
 from marqo.tensor_search import constants
-from typing import Any, Type, Sequence
+from marqo.tensor_search.models.search import SearchContext
 
-from enum import Enum
-import jsonschema
 from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest
 from marqo.tensor_search.models.settings_object import settings_schema
 from marqo.tensor_search.models.mappings_object import mappings_schema, multimodal_combination_schema
-from marqo.tensor_search.models.context_object import context_schema
 
 
 def validate_query(q: Union[dict, str], search_method: Union[str, SearchMethod]):
@@ -70,6 +69,7 @@ def validate_bulk_query_input(q: 'BulkSearchQueryEntity') -> Optional[MarqoError
         return e
 
     validate_context(context=q.context, query=q.q, search_method=q.searchMethod)
+    
     # Validate result_count + offset <= int(max_docs_limit)
     max_docs_limit = utils.read_env_vars_and_defaults(enums.EnvVars.MARQO_MAX_RETRIEVABLE_DOCS)
     check_upper = True if max_docs_limit is None else q.limit + q.offset <= int(max_docs_limit)
@@ -81,11 +81,11 @@ def validate_bulk_query_input(q: 'BulkSearchQueryEntity') -> Optional[MarqoError
 
     validate_boost(boost=q.boost, search_method=q.searchMethod)
     if q.searchableAttributes is not None:
-        if not isinstance(q.searchableAttributes, (List, typing.Tuple)):
+        if not isinstance(q.searchableAttributes, (List, Tuple)):
             raise InvalidArgError("searchableAttributes must be a sequence!")
         [validate_field_name(attribute) for attribute in q.searchableAttributes]
     if q.attributesToRetrieve is not None:
-        if not isinstance(q.attributesToRetrieve, (List, typing.Tuple)):
+        if not isinstance(q.attributesToRetrieve, (List, Tuple)):
             raise InvalidArgError("attributesToRetrieve must be a sequence!")
         [validate_field_name(attribute) for attribute in q.attributesToRetrieve]
 
@@ -134,11 +134,11 @@ def validate_str_against_enum(value: Any, enum_class: Type[Enum], case_sensitive
     return value
 
 
-def list_contains_only_strings(field_content: typing.List) -> bool:
+def list_contains_only_strings(field_content: List) -> bool:
     return all(isinstance(s, str) for s in field_content)
 
 
-def validate_list(field_content: typing.List, is_non_tensor_field: bool):
+def validate_list(field_content: List, is_non_tensor_field: bool):
     if type(field_content) is list and not list_contains_only_strings(field_content):
         # if the field content is a list, it should only contain strings.
         raise InvalidArgError(
@@ -155,7 +155,7 @@ def validate_list(field_content: typing.List, is_non_tensor_field: bool):
     return True
 
 
-def validate_field_content(field_content: typing.Any, is_non_tensor_field: bool) -> typing.Any:
+def validate_field_content(field_content: Any, is_non_tensor_field: bool) -> Any:
     """
     field: the field name of the field content. we need this to passed to validate_dict
     Returns
@@ -178,14 +178,15 @@ def validate_field_content(field_content: typing.Any, is_non_tensor_field: bool)
             f"Allowed content types: {[ty.__name__ for ty in constants.ALLOWED_CUSTOMER_FIELD_TYPES]}"
         )
 
-def validate_context(context: Dict[str, Any], search_method: SearchMethod, query: Union[str, Dict[str, Any]]): 
-    if context is None or search_method is not SearchMethod.TENSOR:
-        return
+def validate_context(context: Optional[SearchContext], search_method: SearchMethod, query: Union[str, Dict[str, Any]]): 
+    """Validate the SearchContext.
 
-    if isinstance(query, dict):
-        validate_context_object(context_object=context)
-
-    elif isinstance(query, str):
+    'validate_context' ensures that if the context is provided for a tensor search
+    operation, the query must be a dictionary (not a str). 'context' 
+    structure is validated internally.
+    
+    """
+    if context is not None and search_method is SearchMethod.TENSOR and isinstance(query, str):
         raise InvalidArgError(
             f"Marqo received a query = `{query}` with type =`{type(query).__name__}` "
             f"and a parameter `context`.\n" # do not return true {context} here as it might be huge.
@@ -195,7 +196,7 @@ def validate_context(context: Dict[str, Any], search_method: SearchMethod, query
         )
 
 
-def validate_boost(boost: dict, search_method: typing.Union[str, SearchMethod]):
+def validate_boost(boost: Dict, search_method: Union[str, SearchMethod]):
     if boost is not None:
         further_info_message = ("\nRead about boost usage here: "
                                 "https://docs.marqo.ai/0.0.13/API-Reference/search/#boost")
@@ -279,7 +280,7 @@ def validate_field_name(field_name) -> str:
         raise InvalidFieldNameError(f"field name can't be a protected field. Please rename this field: {field_name}")
 
 
-def validate_doc(doc: dict) -> dict:
+def validate_doc(doc: Dict) -> dict:
     """
     Args:
         doc: a document indexed by the client
@@ -428,7 +429,7 @@ def validate_settings_object(settings_object):
         )
 
 
-def validate_dict(field: str, field_content: typing.Dict, is_non_tensor_field: bool, mappings: dict):
+def validate_dict(field: str, field_content: Dict, is_non_tensor_field: bool, mappings: Dict):
     '''
 
     Args:
@@ -504,25 +505,7 @@ def validate_multimodal_combination(field_content, is_non_tensor_field, field_ma
         )
     return True
 
-
-def validate_context_object(context_object: dict):
-    """validates the mappings object.
-        Returns
-            the given context_object if passed the validation
-
-        Raises an InvalidArgError if the context object is badly formatted
-        """
-    try:
-        jsonschema.validate(instance=context_object, schema=context_schema)
-        return context_object
-    except jsonschema.ValidationError as e:
-        raise InvalidArgError(
-            f"Error validating mappings object. Reason: \n{str(e)}"
-            f"\nRead about the mappings object here: https://docs.marqo.ai/0.0.16"
-        )
-
-
-def validate_mappings_object(mappings_object: dict):
+def validate_mappings_object(mappings_object: Dict):
     """validates the mappings object.
     Returns
         The given mappings object if validation has passed
@@ -542,7 +525,7 @@ def validate_mappings_object(mappings_object: dict):
         )
 
 
-def validate_multimodal_combination_object(multimodal_mappings: dict):
+def validate_multimodal_combination_object(multimodal_mappings: Dict):
     """Validates the multimodal mappings object
 
     Args:
@@ -562,7 +545,7 @@ def validate_multimodal_combination_object(multimodal_mappings: dict):
         )
 
 
-def validate_mappings(mappings: dict):
+def validate_mappings(mappings: Dict):
     '''
     Args:
         mappings:  a dictionary to help handle object content field
@@ -582,7 +565,7 @@ def validate_mappings(mappings: dict):
     return True
 
 
-def validate_multimodal_combination_mapping(field_mapping: dict):
+def validate_multimodal_combination_mapping(field_mapping: Dict):
     if "weights" not in field_mapping:
         raise InvalidArgError(
             f"The multimodal_combination mapping `{field_mapping}` does not contain `weights`"

@@ -7,6 +7,7 @@ from unittest import mock
 from unittest.mock import patch
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifier
 from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest
+from marqo.tensor_search.models.search import SearchContext
 from marqo.errors import (
     InvalidFieldNameError, InternalError,
     InvalidDocumentIdError, InvalidArgError, DocTooLargeError,
@@ -930,7 +931,7 @@ class TestValidateIndexSettings(unittest.TestCase):
         ]
 
         for valid_context in valid_context_list:
-            assert valid_context == validation.validate_context_object(valid_context)
+            SearchContext(**valid_context)
 
     def test_validate_invalid_context_object(self):
         valid_context_list = [
@@ -1007,8 +1008,8 @@ class TestValidateIndexSettings(unittest.TestCase):
 
         for invalid_context in valid_context_list:
             try:
-                validation.validate_context_object(invalid_context)
-                raise AssertionError
+                s = SearchContext(**invalid_context)
+                raise AssertionError(invalid_context, s)
             except InvalidArgError:
                 pass
 

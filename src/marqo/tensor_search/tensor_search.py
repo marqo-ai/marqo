@@ -55,7 +55,7 @@ from marqo.tensor_search.formatting import _clean_doc
 from marqo.tensor_search.index_meta_cache import get_cache, get_index_info
 from marqo.tensor_search import index_meta_cache
 from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQueryEntity, ScoreModifier
-from marqo.tensor_search.models.search import VectorisedJobs, VectorisedJobPointer, Qidx, JHash
+from marqo.tensor_search.models.search import Qidx, JHash, SearchContext, VectorisedJobs, VectorisedJobPointer
 from marqo.tensor_search.models.index_info import IndexInfo
 from marqo.tensor_search.models.external_apis.abstract_classes import ExternalAuth
 from marqo.tensor_search.utils import add_timing
@@ -1027,7 +1027,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
            attributes_to_retrieve: Optional[List[str]] = None,
            device=None, boost: Optional[Dict] = None,
            image_download_headers: Optional[Dict] = None,
-           context: Optional[Dict] = None,
+           context: Optional[SearchContext] = None,
            score_modifiers: Optional[ScoreModifier] = None,
            model_auth: Optional[ModelAuth] = None) -> Dict:
     """The root search method. Calls the specific search method
