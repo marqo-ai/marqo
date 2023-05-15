@@ -20,18 +20,20 @@ class HfModelLocation(ObjectLocation):
         repo_id = values.get('repo_id')
         filename = values.get('filename')
         name = values.get('name')
+        basic_error_message = "In `type = hf` model properties, {}, \n " \
+                              "please check https://docs.marqo.ai/0.0.21/API-Reference/search/#model-auth for details."
 
         if (repo_id is not None and filename is None) or (repo_id is None and filename is not None):
             raise InvalidArgError(
-                "In `type = hf` model properties, 'repo_id' and 'filename' should be provided together.")
+                basic_error_message.format("repo_id' and 'filename' should be provided together."))
 
         if name is not None and (repo_id is not None or filename is not None):
             raise InvalidArgError(
-                "In `type = hf` model properties, if 'name' is provided, 'repo_id' and 'filename' should not be provided.")
+                basic_error_message.format("if 'name' is provided, 'repo_id' and 'filename' should not be provided."))
 
         if name is None and (repo_id is None or filename is None):
             raise InvalidArgError(
-                "In `type = hf` model properties, either 'name' or both 'repo_id' and 'filename' should be provided.")
+                basic_error_message.format("either 'name' or both 'repo_id' and 'filename' should be provided."))
 
         return values
 

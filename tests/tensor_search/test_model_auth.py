@@ -1383,7 +1383,7 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
         assert len(mock_automodel_from_pretrained.call_args_list) == 1
         assert mock_automodel_from_pretrained.call_args_list[0][0][0] == ModelCache.hf_cache_path + os.path.basename(public_url).replace('.zip', '')
 
-    def test_5_load_model_from_public_hf_repo_with_auth_search(self):
+    def test_5_load_model_from_private_hf_repo_with_auth_search(self):
         private_repo_name = "your-private-repo"
         hf_token = "some-secret-token"
 
@@ -1646,7 +1646,7 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
         assert len(mock_automodel_from_pretrained.call_args_list) == 1
         assert mock_automodel_from_pretrained.call_args_list[0][0][0] == ModelCache.hf_cache_path + os.path.basename(public_url).replace('.zip', '')
 
-    def test_5_load_model_from_public_hf_repo_with_auth_add_documents(self):
+    def test_5_load_model_from_private_hf_repo_with_auth_add_documents(self):
         private_repo_name = "your-private-repo"
         hf_token = "some-secret-token"
 
@@ -1706,6 +1706,86 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
 
         assert len(mock_automodel_from_pretrained.call_args_list) == 1
         assert mock_automodel_from_pretrained.call_args_list[0][0][0] == public_repo_name
+
+    def test_invalid_hf_location(self):
+        private_repo_name = "your-private-repo"
+        invalid_model_properties_list = [
+        {
+            "dimensions": 384,
+            "model_location": {
+                "auth_required": True,
+                "hf": {"name": private_repo_name,
+                       "repo_id": "random",
+                       "filename":"random again"}
+            },
+            "type": "hf",
+        },
+        {
+            "dimensions": 384,
+            "model_location": {
+                "auth_required": True,
+                "hf": {"name": private_repo_name,
+                       "filename":"random again"}
+            },
+            "type": "hf",
+        },
+        {
+            "dimensions": 384,
+            "model_location": {
+                "auth_required": True,
+                "hf": {"filename":"random again"}
+            },
+            "type": "hf",
+        },
+        ]
+        for invalid_model_properties in invalid_model_properties_list:
+            try:
+                model_location = ModelLocation(**invalid_model_properties['model_location'])
+            except InvalidArgError as e:
+                assert "In `type = hf` model properties" in str(e)
+
+    def test_load_model_from_private_hf_repo_with_redirect(self):
+        private_repo_name = "your-private-repo"
+        hf_token = "some-secret-token"
+
+        redirect_hf_repo = "sentence-transformers/all-MiniLM-L6-v1"
+        redirect_hf_token = None
+
+        model_properties = {
+            "dimensions": 384,
+            "model_location": {
+                "auth_required": True,
+                "hf": {"name": private_repo_name}
+            },
+            "type": "hf",
+        }
+
+        s3_settings = _get_base_index_settings()
+        s3_settings['index_defaults']['model_properties'] = model_properties
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1,
+                                          index_settings=s3_settings)
+
+        # Redirect the private model to a public one to finish the test
+        mock_automodel_from_pretrained = mock.MagicMock()
+        mock_automodel_from_pretrained.return_value = AutoModel.from_pretrained(
+            redirect_hf_repo, use_auth_token=redirect_hf_token)
+
+        mock_autotokenizer_from_pretrained = mock.MagicMock()
+        mock_autotokenizer_from_pretrained.return_value = AutoTokenizer.from_pretrained(
+            redirect_hf_repo, use_auth_token=redirect_hf_token)
+
+        with unittest.mock.patch("transformers.AutoModel.from_pretrained", mock_automodel_from_pretrained):
+            with unittest.mock.patch("transformers.AutoTokenizer.from_pretrained", mock_autotokenizer_from_pretrained):
+                res = tensor_search.search(config=self.config, text='hello', index_name=self.index_name_1,
+                                           model_auth=ModelAuth(hf=HfAuth(token=hf_token)))
+
+        assert len(mock_automodel_from_pretrained.call_args_list) == 1
+        assert mock_automodel_from_pretrained.call_args_list[0][0][0] == private_repo_name
+        mock_autotokenizer_from_pretrained.call_args_list[0][1]["use_auth_token"] == hf_token
+
+        assert len(mock_autotokenizer_from_pretrained.call_args_list) == 1
+        assert mock_autotokenizer_from_pretrained.call_args_list[0][0][0] == private_repo_name
+        mock_autotokenizer_from_pretrained.call_args_list[0][1]["use_auth_token"] == hf_token
 
 class TestS3ModelAuthlLoadForHFModelVariants(MarqoTestCase):
     """
@@ -2291,105 +2371,6 @@ class TestS3ModelAuthlLoadForHFModelVariants(MarqoTestCase):
             mock_vectorise.reset_mock()
 
 
-class TestHuggingFaceRepoModelAuthlLoadForHFModelVariants(MarqoTestCase):
-    """
-    While the open_clip focus on the loading clip model from s3, we want to focus on loading
-    custom sbert models from Huggingface repo
-    """
-
-    def setUp(self) -> None:
-        self.endpoint = self.authorized_url
-        self.generic_header = {"Content-type": "application/json"}
-        self.index_name_1 = "test-model-auth-index-1"
-        try:
-            tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
-        except IndexNotFoundError as s:
-            pass
-
-    def tearDown(self) -> None:
-        try:
-            tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
-        except IndexNotFoundError as s:
-            pass
-
-        clear_loaded_models()
-
-    def test_invalid_hf_location(self):
-        private_repo_name = "your-private-repo"
-        invalid_model_properties_list = [
-        {
-            "dimensions": 384,
-            "model_location": {
-                "auth_required": True,
-                "hf": {"name": private_repo_name,
-                       "repo_id": "random",
-                       "filename":"random again"}
-            },
-            "type": "hf",
-        },
-        {
-            "dimensions": 384,
-            "model_location": {
-                "auth_required": True,
-                "hf": {"name": private_repo_name,
-                       "filename":"random again"}
-            },
-            "type": "hf",
-        },
-        {
-            "dimensions": 384,
-            "model_location": {
-                "auth_required": True,
-                "hf": {"filename":"random again"}
-            },
-            "type": "hf",
-        },
-        ]
-        for invalid_model_properties in invalid_model_properties_list:
-            try:
-                model_location = ModelLocation(**invalid_model_properties['model_location'])
-            except InvalidArgError as e:
-                assert "In `type = hf` model properties" in str(e)
-
-    def test_hf_model_auth(self):
-        private_repo_name = "your-private-repo"
-        hf_token = "some-secret-token"
-
-        model_properties = {
-            "dimensions": 384,
-            "model_location": {
-                "auth_required": True,
-                "hf": {"name": private_repo_name}
-            },
-            "type": "hf",
-        }
-
-        s3_settings = _get_base_index_settings()
-        s3_settings['index_defaults']['model_properties'] = model_properties
-        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1,
-                                          index_settings=s3_settings)
-
-        # Redirect the private model to a public one to finish the test
-        mock_automodel_from_pretrained = mock.MagicMock()
-        mock_automodel_from_pretrained.return_value = AutoModel.from_pretrained(
-            "sentence-transformers/all-MiniLM-L6-v1")
-
-        mock_autotokenizer_from_pretrained = mock.MagicMock()
-        mock_autotokenizer_from_pretrained.return_value = AutoTokenizer.from_pretrained(
-            "sentence-transformers/all-MiniLM-L6-v1")
-
-        with unittest.mock.patch("transformers.AutoModel.from_pretrained", mock_automodel_from_pretrained):
-            with unittest.mock.patch("transformers.AutoTokenizer.from_pretrained", mock_autotokenizer_from_pretrained):
-                res = tensor_search.search(config=self.config, text='hello', index_name=self.index_name_1,
-                                           model_auth=ModelAuth(hf=HfAuth(token=hf_token)))
-
-        assert len(mock_automodel_from_pretrained.call_args_list) == 1
-        assert mock_automodel_from_pretrained.call_args_list[0][0][0] == private_repo_name
-        mock_autotokenizer_from_pretrained.call_args_list[0][1]["use_auth_token"] == hf_token
-
-        assert len(mock_autotokenizer_from_pretrained.call_args_list) == 1
-        assert mock_autotokenizer_from_pretrained.call_args_list[0][0][0] == private_repo_name
-        mock_autotokenizer_from_pretrained.call_args_list[0][1]["use_auth_token"] == hf_token
 
 
 
