@@ -47,20 +47,16 @@ class HF_MODEL(Model):
                 self.model_path = download_model(url = path, download_dir=ModelCache.hf_cache_path)
             elif os.path.isdir(path) or os.path.isfile(path):
                 self.model_path = path
-
         elif self.model_name is not None:
             # Loading from structured huggingface repo directly, token is required directly
             self.model_path = self.model_name
             self.model = AutoModelForSentenceEmbedding(self.model_path).to(self.device)
             self.tokenizer = AutoTokenizer.from_pretrained(self.model_path)
             return
-
         elif model_location_presence is not None:
+            # This is a special case for huggingface models, where we can load a model directory from a repo
             if "hf" in self.model_properties["model_location"] and "name" in self.model_properties["model_location"]["hf"]:
-                self.model_path = self.model_properties["model_location"]["hf"]["name"]
-                self.model = AutoModelForSentenceEmbedding(self.model_path, use_auth_token = self.model_auth.hf.token).to(self.device)
-                self.tokenizer = AutoTokenizer.from_pretrained(self.model_path, use_auth_token = self.model_auth.hf.token)
-                return
+                return self._load_from_private_hf_repo()
             else:
                 self.model_path = self._download_from_repo()
 
@@ -70,18 +66,30 @@ class HF_MODEL(Model):
                 " in `model_properties` for `hf` models as they conflict with each other in model loading."
                 " Please ensure that exactly one of these is specified in `model_properties` and retry.")
 
-        # Loading from a directory.
         # We need to do extraction here if necessary
         self.model_path = validate_huggingface_archive(self.model_path)
-        print(self.model_path)
         self.model = AutoModelForSentenceEmbedding(self.model_path).to(self.device)
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_path)
 
-    def _download_from_repo(self):
+    def _load_from_private_hf_repo(self) -> None:
+        model_location = ModelLocation(**self.model_properties[ModelProperties.model_location])
+        self.model_path = model_location.hf.name
+        token = None
+        if self.model_auth is not None:
+            try:
+                token = self.model_auth.hf.token
+            except KeyError:
+                raise InvalidModelPropertiesError("Please ensure that `model_auth` is a valid "
+                                                  "`ModelAuth` object with a `token` attribute for private hf repo models")
+        self.model = AutoModelForSentenceEmbedding(model_name=self.model_path, use_auth_token=token).to(self.device)
+        self.tokenizer = AutoTokenizer.from_pretrained(self.model_path, use_auth_token=token)
+
+
+    def _download_from_repo(self) -> str:
         """Downloads model from an external repo like s3 and returns the filepath
 
         Returns:
-            The model's filepath
+            The model's filepath or a string of hugging face repo name
 
         Raises:
             RunTimeError if an empty filepath is detected.

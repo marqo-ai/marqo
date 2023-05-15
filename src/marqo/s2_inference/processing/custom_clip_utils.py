@@ -110,6 +110,7 @@ def download_pretrained_from_s3(
 
     if check_s3_model_already_exists(location=location, download_dir=download_dir):
         # TODO: check if abs path is even the most appropriate???
+        print(get_s3_model_absolute_cache_path(location, download_dir=download_dir))
         return get_s3_model_absolute_cache_path(location=location, download_dir=download_dir)
 
     url = get_presigned_s3_url(location=location, auth=auth)

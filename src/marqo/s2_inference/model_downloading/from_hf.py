@@ -26,6 +26,7 @@ def download_model_from_hf(
     Returns:
         Path to the downloaded model
     """
+    print("download_model_from_hf_called")
     if download_dir is not None:
         logger.warning(
             "Hugging Face model download was given the `download_dir` argument, "
@@ -33,7 +34,7 @@ def download_model_from_hf(
             "The specified model will be downloaded but the `download_dir` "
             "parameter will be ignored."
         )
-    download_kwargs = location.dict()
+    download_kwargs = location.dict(exclude_unset=True) # Ignore unset values to avoid adding None to params
     if auth is not None:
         download_kwargs = {**download_kwargs, **auth.dict()}
     try:

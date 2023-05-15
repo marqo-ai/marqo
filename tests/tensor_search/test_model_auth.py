@@ -22,9 +22,15 @@ from marqo.errors import BadRequestError, ModelNotInCacheError
 from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQueryEntity
 from marqo.s2_inference.configs import ModelCache
 import shutil
+from marqo.tensor_search.models.external_apis.hf import HfModelLocation
+from marqo.tensor_search.models.private_models import ModelLocation
 
 def fake_vectorise(*args, **_kwargs):
     random_model = Random(model_name='blah', embedding_dim=512)
+    return _convert_vectorized_output(random_model.encode(_kwargs['content']))
+
+def fake_vectorise_384(*args, **_kwargs):
+    random_model = Random(model_name='blah', embedding_dim=384)
     return _convert_vectorized_output(random_model.encode(_kwargs['content']))
 
 def _delete_file(file_path):
@@ -1200,19 +1206,21 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
         mock_validate_huggingface_archive.return_value = 'cache/path/to/model/'
 
         mock_automodel_from_pretrained = mock.MagicMock()
+        mock_autotokenizer_from_pretrained = mock.MagicMock()
 
         with unittest.mock.patch('transformers.AutoModel.from_pretrained', mock_automodel_from_pretrained):
-            with unittest.mock.patch('marqo.s2_inference.model_downloading.from_hf.hf_hub_download', mock_hf_hub_download):
-                with unittest.mock.patch("marqo.s2_inference.hf_utils.validate_huggingface_archive", mock_validate_huggingface_archive):
-                    try:
-                        res = tensor_search.search(
-                            config=self.config, text='hello', index_name=self.index_name_1,
-                            model_auth=ModelAuth(hf=HfAuth(token=hf_token))
-                        )
-                    except BadRequestError as e:
-                        # bad request due to no models actually being loaded
-                        print(e)
-                        pass
+            with unittest.mock.patch('transformers.AutoTokenizer.from_pretrained', mock_autotokenizer_from_pretrained):
+                with unittest.mock.patch('marqo.s2_inference.model_downloading.from_hf.hf_hub_download', mock_hf_hub_download):
+                    with unittest.mock.patch("marqo.s2_inference.hf_utils.validate_huggingface_archive", mock_validate_huggingface_archive):
+                        try:
+                            res = tensor_search.search(
+                                config=self.config, text='hello', index_name=self.index_name_1,
+                                model_auth=ModelAuth(hf=HfAuth(token=hf_token))
+                            )
+                        except KeyError as e:
+                        # KeyError as this is not a real model. It does not have an attention_mask
+                            assert "attention_mask" in str(e)
+                            pass
 
         mock_hf_hub_download.assert_called_once_with(
             token=hf_token,
@@ -1232,7 +1240,7 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
         """
         Does not yet assert that a file is downloaded
         """
-        hf_object = "some_model.pt"
+        hf_object = "some_model.zip"
         hf_repo_name = "MyRepo/test-private"
         hf_token = "hf_some_secret_key"
 
@@ -1258,17 +1266,19 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
         mock_validate_huggingface_archive.return_value = 'cache/path/to/model/'
 
         mock_automodel_from_pretrained = mock.MagicMock()
+        mock_autotokenizer_from_pretrained = mock.MagicMock()
 
         with unittest.mock.patch('transformers.AutoModel.from_pretrained', mock_automodel_from_pretrained):
-            with unittest.mock.patch('marqo.s2_inference.model_downloading.from_hf.hf_hub_download', mock_hf_hub_download):
-                with unittest.mock.patch("marqo.s2_inference.hf_utils.validate_huggingface_archive", mock_validate_huggingface_archive):
-                    try:
-                        res = tensor_search.search(
-                            config=self.config, text='hello', index_name=self.index_name_1,)
-                    except BadRequestError as e:
-                        # bad request due to no models actually being loaded
-                        print(e)
-                        pass
+            with unittest.mock.patch('transformers.AutoTokenizer.from_pretrained', mock_autotokenizer_from_pretrained):
+                with unittest.mock.patch('marqo.s2_inference.model_downloading.from_hf.hf_hub_download', mock_hf_hub_download):
+                    with unittest.mock.patch("marqo.s2_inference.hf_utils.validate_huggingface_archive", mock_validate_huggingface_archive):
+                        try:
+                            res = tensor_search.search(
+                                config=self.config, text='hello', index_name=self.index_name_1,)
+                        except KeyError as e:
+                            # KeyError as this is not a real model. It does not have an attention_mask
+                            assert "attention_mask" in str(e)
+                            pass
 
         mock_hf_hub_download.assert_called_once_with(
             repo_id=hf_repo_name,
@@ -1278,6 +1288,10 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
         # is the hf model being loaded with the expected args?
         assert len(mock_automodel_from_pretrained.call_args_list) == 1
         assert mock_automodel_from_pretrained.call_args_list[0][0][0] == 'cache/path/to/model/', "Expected call not found"
+
+        # is the hf tokenizer being loaded with the expected args?
+        assert len(mock_autotokenizer_from_pretrained.call_args_list) == 1
+        assert mock_autotokenizer_from_pretrained.call_args_list[0][0][0] == 'cache/path/to/model/', "Expected call not found"
 
         # is the zip file being extracted with the expected args?
         assert len(mock_validate_huggingface_archive.call_args_list) == 1
@@ -1460,18 +1474,20 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
         mock_validate_huggingface_archive.return_value = 'cache/path/to/model/'
 
         mock_automodel_from_pretrained = mock.MagicMock()
+        mock_autotokenizer_from_pretrained = mock.MagicMock()
 
         with unittest.mock.patch('transformers.AutoModel.from_pretrained', mock_automodel_from_pretrained):
-            with unittest.mock.patch('marqo.s2_inference.model_downloading.from_hf.hf_hub_download', mock_hf_hub_download):
-                with unittest.mock.patch("marqo.s2_inference.hf_utils.validate_huggingface_archive", mock_validate_huggingface_archive):
-                    try:
-                        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
-                            index_name=self.index_name_1, auto_refresh=True, docs=[{'a': 'b'}],
-                            model_auth=ModelAuth(hf=HfAuth(token=hf_token))))
-                    except BadRequestError as e:
-                        # bad request due to no models actually being loaded
-                        print(e)
-                        pass
+            with unittest.mock.patch('transformers.AutoTokenizer.from_pretrained', mock_autotokenizer_from_pretrained):
+                with unittest.mock.patch('marqo.s2_inference.model_downloading.from_hf.hf_hub_download', mock_hf_hub_download):
+                    with unittest.mock.patch("marqo.s2_inference.hf_utils.validate_huggingface_archive", mock_validate_huggingface_archive):
+                        try:
+                            tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+                                index_name=self.index_name_1, auto_refresh=True, docs=[{'a': 'b'}],
+                                model_auth=ModelAuth(hf=HfAuth(token=hf_token))))
+                        except KeyError as e:
+                            # KeyError as this is not a real model. It does not have an attention_mask
+                            assert "attention_mask" in str(e)
+                            pass
 
         mock_hf_hub_download.assert_called_once_with(
             token=hf_token,
@@ -1517,17 +1533,19 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
         mock_validate_huggingface_archive.return_value = 'cache/path/to/model/'
 
         mock_automodel_from_pretrained = mock.MagicMock()
+        mock_autotokenizer_from_pretrained = mock.MagicMock()
 
         with unittest.mock.patch('transformers.AutoModel.from_pretrained', mock_automodel_from_pretrained):
-            with unittest.mock.patch('marqo.s2_inference.model_downloading.from_hf.hf_hub_download', mock_hf_hub_download):
-                with unittest.mock.patch("marqo.s2_inference.hf_utils.validate_huggingface_archive", mock_validate_huggingface_archive):
-                    try:
-                        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
-                            index_name=self.index_name_1, auto_refresh=True, docs=[{'a': 'b'}]))
-                    except BadRequestError as e:
-                        # bad request due to no models actually being loaded
-                        print(e)
-                        pass
+            with unittest.mock.patch('transformers.AutoTokenizer.from_pretrained', mock_autotokenizer_from_pretrained):
+                with unittest.mock.patch('marqo.s2_inference.model_downloading.from_hf.hf_hub_download', mock_hf_hub_download):
+                    with unittest.mock.patch("marqo.s2_inference.hf_utils.validate_huggingface_archive", mock_validate_huggingface_archive):
+                        try:
+                            tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+                                index_name=self.index_name_1, auto_refresh=True, docs=[{'a': 'b'}]))
+                        except KeyError as e:
+                            # KeyError as this is not a real model. It does not have an attention_mask
+                            assert "attention_mask" in str(e)
+                            pass
 
         mock_hf_hub_download.assert_called_once_with(
             repo_id=hf_repo_name,
@@ -1689,7 +1707,7 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
         assert len(mock_automodel_from_pretrained.call_args_list) == 1
         assert mock_automodel_from_pretrained.call_args_list[0][0][0] == public_repo_name
 
-class TestModelAuthlLoadForHFModelVariants(MarqoTestCase):
+class TestS3ModelAuthlLoadForHFModelVariants(MarqoTestCase):
     """
     This class tests the variants of the hf model loading and the expected error messages
     """
@@ -1710,28 +1728,24 @@ class TestModelAuthlLoadForHFModelVariants(MarqoTestCase):
             tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         except IndexNotFoundError as s:
             pass
-
         clear_loaded_models()
 
 
     def test_model_auth_mismatch_param_s3_ix(self):
-        """There isn't validation for the hf because users may download public models this way
-
-        This test is finished in open_clip"""
+        """This test is finished in open_clip test"""
         pass
 
     def test_model_loads_from_all_add_docs_derivatives(self):
         """Does it work from add_docs, add_docs orchestrator and add_documents_mp?
         """
-        s3_object_key = 'path/to/your/secret_model.pt'
+        s3_object_key = 'path/to/your/secret_model.zip'
         s3_bucket = 'your-bucket-name'
 
         fake_access_key_id = '12345'
         fake_secret_key = 'this-is-a-secret'
 
         model_properties = {
-            "name": "ViT-B/32",
-            "dimensions": 512,
+            "dimensions": 384,
             "model_location": {
                 "s3": {
                     "Bucket": s3_bucket,
@@ -1739,8 +1753,17 @@ class TestModelAuthlLoadForHFModelVariants(MarqoTestCase):
                 },
                 "auth_required": True
             },
-            "type": "open_clip",
+            "type": "hf",
         }
+
+        model_abs_path = get_s3_model_absolute_cache_path(
+            S3Location(
+                Key=s3_object_key,
+                Bucket=s3_bucket
+            ), download_dir=ModelCache.hf_cache_path)
+
+        _delete_file(model_abs_path)
+
         s3_settings = _get_base_index_settings()
         s3_settings['index_defaults']['model_properties'] = model_properties
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings=s3_settings)
@@ -1757,7 +1780,8 @@ class TestModelAuthlLoadForHFModelVariants(MarqoTestCase):
 
             # Mock the generate_presigned_url method of the mock Boto3 client with a real OpenCLIP model, so that
             # the rest of the logic works.
-            mock_s3_client.generate_presigned_url.return_value = "https://some_non_existent_model.pt"
+            public_url = "https://marqo-cache-sentence-transformers.s3.us-west-2.amazonaws.com/all-MiniLM-L6-v1/all-MiniLM-L6-v2.zip"
+            mock_s3_client.generate_presigned_url.return_value = public_url
 
             with unittest.mock.patch('boto3.client', return_value=mock_s3_client) as mock_boto3_client:
                 with self.assertRaises(BadRequestError) as cm:
@@ -1777,7 +1801,7 @@ class TestModelAuthlLoadForHFModelVariants(MarqoTestCase):
                             **kwargs
                         )
             mock_download_pretrained_from_url.assert_called_once_with(
-                url='https://some_non_existent_model.pt', cache_dir=None, cache_file_name='secret_model.pt')
+                url=public_url, cache_dir=ModelCache.hf_cache_path, cache_file_name='secret_model.zip')
             mock_s3_client.generate_presigned_url.assert_called_with(
                 'get_object',
                 Params={'Bucket': 'your-bucket-name', 'Key': s3_object_key}
@@ -1800,8 +1824,7 @@ class TestModelAuthlLoadForHFModelVariants(MarqoTestCase):
         fake_secret_key = 'this-is-a-secret'
 
         model_properties = {
-            "name": "ViT-B/32",
-            "dimensions": 512,
+            "dimensions": 384,
             "model_location": {
                 "s3": {
                     "Bucket": s3_bucket,
@@ -1809,27 +1832,20 @@ class TestModelAuthlLoadForHFModelVariants(MarqoTestCase):
                 },
                 "auth_required": True
             },
-            "type": "open_clip",
+            "type": "hf",
         }
         s3_settings = _get_base_index_settings()
         s3_settings['index_defaults']['model_properties'] = model_properties
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings=s3_settings)
 
-        random_model = Random(model_name='blah', embedding_dim=512)
-
         try:
             tensor_search.eject_model(model_name='my_model', device=self.device)
         except ModelNotInCacheError:
             pass
-        # Create a mock Boto3 client
-        mock_s3_client = mock.MagicMock()
 
-        # Mock the generate_presigned_url method of the mock Boto3 client with a real OpenCLIP model, so that
-        # the rest of the logic works.
-        mock_s3_client.generate_presigned_url.return_value = "https://some_non_existent_model.pt"
 
         with unittest.mock.patch('marqo.s2_inference.s2_inference.vectorise',
-                                 side_effect=fake_vectorise) as mock_vectorise:
+                                 side_effect=fake_vectorise_384) as mock_vectorise:
             model_auth = ModelAuth(
                 s3=S3Auth(
                     aws_access_key_id=fake_access_key_id,
@@ -1866,8 +1882,7 @@ class TestModelAuthlLoadForHFModelVariants(MarqoTestCase):
         fake_secret_key = 'this-is-a-secret'
 
         model_properties = {
-            "name": "ViT-B/32",
-            "dimensions": 512,
+            "dimensions": 384,
             "model_location": {
                 "s3": {
                     "Bucket": s3_bucket,
@@ -1875,14 +1890,11 @@ class TestModelAuthlLoadForHFModelVariants(MarqoTestCase):
                 },
                 "auth_required": True
             },
-            "type": "open_clip",
+            "type": "hf",
         }
         s3_settings = _get_base_index_settings()
         s3_settings['index_defaults']['model_properties'] = model_properties
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings=s3_settings)
-
-        random_model = Random(model_name='blah', embedding_dim=512)
-
 
         for add_docs_method, kwargs in [
             (tensor_search.add_documents_orchestrator, {'batch_size': 10}),
@@ -1895,11 +1907,9 @@ class TestModelAuthlLoadForHFModelVariants(MarqoTestCase):
             # Create a mock Boto3 client
             mock_s3_client = mock.MagicMock()
 
-            # Mock the generate_presigned_url method of the mock Boto3 client with a real OpenCLIP model, so that
-            # the rest of the logic works.
-            mock_s3_client.generate_presigned_url.return_value = "https://some_non_existent_model.pt"
+            mock_s3_client.generate_presigned_url.return_value = "https://random_model.zip"
 
-            with unittest.mock.patch('marqo.s2_inference.s2_inference.vectorise', side_effect=fake_vectorise) as mock_vectorise:
+            with unittest.mock.patch('marqo.s2_inference.s2_inference.vectorise', side_effect=fake_vectorise_384) as mock_vectorise:
                 model_auth = ModelAuth(
                     s3=S3Auth(
                     aws_access_key_id=fake_access_key_id,
@@ -1948,8 +1958,7 @@ class TestModelAuthlLoadForHFModelVariants(MarqoTestCase):
         s3_bucket = 'your-bucket-name'
 
         model_properties = {
-            "name": "ViT-B/32",
-            "dimensions": 512,
+            "dimensions": 384,
             "model_location": {
                 "s3": {
                     "Bucket": s3_bucket,
@@ -1957,21 +1966,18 @@ class TestModelAuthlLoadForHFModelVariants(MarqoTestCase):
                 },
                 "auth_required": True
             },
-            "type": "open_clip",
+            "type": "hf",
         }
         s3_settings = _get_base_index_settings()
         s3_settings['index_defaults']['model_properties'] = model_properties
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings=s3_settings)
 
-        public_model_url = "https://github.com/mlfoundations/open_clip/releases/download/v0.2-weights/vit_b_32-quickgelu-laion400m_avg-8a00ab3c.pt"
-        hf_token = 'hf_secret_token'
+
 
         # Create a mock Boto3 client
         mock_s3_client = mock.MagicMock()
 
-        # Mock the generate_presigned_url method of the mock Boto3 client with a real OpenCLIP model, so that
-        # the rest of the logic works.
-        mock_s3_client.generate_presigned_url.return_value = public_model_url
+        mock_s3_client.generate_presigned_url.return_value = "https://dummy_model.zip"
 
         with unittest.mock.patch('boto3.client', return_value=mock_s3_client):
             with self.assertRaises(BadRequestError) as cm:
@@ -2006,8 +2012,7 @@ class TestModelAuthlLoadForHFModelVariants(MarqoTestCase):
         )
 
         model_properties = {
-            "name": "ViT-B/32",
-            "dimensions": 512,
+            "dimensions": 384,
             "model_location": {
                 "s3": {
                     "Bucket": s3_bucket,
@@ -2015,7 +2020,7 @@ class TestModelAuthlLoadForHFModelVariants(MarqoTestCase):
                 },
                 "auth_required": True
             },
-            "type": "open_clip",
+            "type": "hf",
         }
         s3_settings = _get_base_index_settings()
         s3_settings['index_defaults']['model_properties'] = model_properties
@@ -2047,8 +2052,7 @@ class TestModelAuthlLoadForHFModelVariants(MarqoTestCase):
         )
 
         model_properties = {
-            "name": "ViT-B/32",
-            "dimensions": 512,
+            "dimensions": 384,
             "model_location": {
                 "hf": {
                     "repo_id": hf_repo_name,
@@ -2056,7 +2060,7 @@ class TestModelAuthlLoadForHFModelVariants(MarqoTestCase):
                 },
                 "auth_required": True
             },
-            "type": "open_clip",
+            "type": "hf",
         }
         s3_settings = _get_base_index_settings()
         s3_settings['index_defaults']['model_properties'] = model_properties
@@ -2091,8 +2095,7 @@ class TestModelAuthlLoadForHFModelVariants(MarqoTestCase):
         )
 
         model_properties = {
-            "name": "ViT-B/32",
-            "dimensions": 512,
+            "dimensions": 384,
             "model_location": {
                 "hf": {
                     "repo_id": hf_repo_name,
@@ -2100,7 +2103,7 @@ class TestModelAuthlLoadForHFModelVariants(MarqoTestCase):
                 },
                 "auth_required": True
             },
-            "type": "open_clip",
+            "type": "hf",
         }
         s3_settings = _get_base_index_settings()
         s3_settings['index_defaults']['model_properties'] = model_properties
@@ -2125,7 +2128,7 @@ class TestModelAuthlLoadForHFModelVariants(MarqoTestCase):
     def test_bulk_search(self):
         """Does it work with bulk search, including multi search
         """
-        s3_object_key = 'path/to/your/secret_model.pt'
+        s3_object_key = 'path/to/your/secret_model.zip'
         s3_bucket = 'your-bucket-name'
 
         fake_access_key_id = '12345'
@@ -2138,8 +2141,7 @@ class TestModelAuthlLoadForHFModelVariants(MarqoTestCase):
         )
 
         model_properties = {
-            "name": "ViT-B/32",
-            "dimensions": 512,
+            "dimensions": 384,
             "model_location": {
                 "s3": {
                     "Bucket": s3_bucket,
@@ -2147,7 +2149,7 @@ class TestModelAuthlLoadForHFModelVariants(MarqoTestCase):
                 },
                 "auth_required": True
             },
-            "type": "open_clip",
+            "type": "hf",
         }
         s3_settings = _get_base_index_settings()
         s3_settings['index_defaults']['model_properties'] = model_properties
@@ -2180,8 +2182,6 @@ class TestModelAuthlLoadForHFModelVariants(MarqoTestCase):
             # Create a mock Boto3 client
             mock_s3_client = mock.MagicMock()
 
-            # Mock the generate_presigned_url method of the mock Boto3 client with a real OpenCLIP model, so that
-            # the rest of the logic works.
             mock_s3_client.generate_presigned_url.return_value = "https://some_non_existent_model.pt"
 
             with unittest.mock.patch('boto3.client', return_value=mock_s3_client) as mock_boto3_client:
@@ -2194,7 +2194,7 @@ class TestModelAuthlLoadForHFModelVariants(MarqoTestCase):
                             marqo_config=self.config,
                         )
             mock_download_pretrained_from_url.assert_called_once_with(
-                url='https://some_non_existent_model.pt', cache_dir=None, cache_file_name='secret_model.pt')
+                url='https://some_non_existent_model.pt', cache_dir=ModelCache.hf_cache_path, cache_file_name='secret_model.zip')
             mock_s3_client.generate_presigned_url.assert_called_with(
                 'get_object',
                 Params={'Bucket': 'your-bucket-name', 'Key': s3_object_key}
@@ -2226,8 +2226,7 @@ class TestModelAuthlLoadForHFModelVariants(MarqoTestCase):
         )
 
         model_properties = {
-            "name": "ViT-B/32",
-            "dimensions": 512,
+            "dimensions": 384,
             "model_location": {
                 "s3": {
                     "Bucket": s3_bucket,
@@ -2235,7 +2234,7 @@ class TestModelAuthlLoadForHFModelVariants(MarqoTestCase):
                 },
                 "auth_required": True
             },
-            "type": "open_clip",
+            "type": "hf",
         }
         s3_settings = _get_base_index_settings()
         s3_settings['index_defaults']['model_properties'] = model_properties
@@ -2291,23 +2290,109 @@ class TestModelAuthlLoadForHFModelVariants(MarqoTestCase):
 
             mock_vectorise.reset_mock()
 
-    def test_lexical_with_auth(self):
-        """should just skip"""
 
-    def test_public_s3_no_auth(self):
-        """
-        TODO
-        """
+class TestHuggingFaceRepoModelAuthlLoadForHFModelVariants(MarqoTestCase):
+    """
+    While the open_clip focus on the loading clip model from s3, we want to focus on loading
+    custom sbert models from Huggingface repo
+    """
 
-    def test_public_hf_no_auth(self):
-        """
-        TODO
-        """
+    def setUp(self) -> None:
+        self.endpoint = self.authorized_url
+        self.generic_header = {"Content-type": "application/json"}
+        self.index_name_1 = "test-model-auth-index-1"
+        try:
+            tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+        except IndexNotFoundError as s:
+            pass
 
-    def test_open_clip_reg_clip(self):
-        """both normal and open clip
-        TODO: normal CLIP
-        """
+    def tearDown(self) -> None:
+        try:
+            tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+        except IndexNotFoundError as s:
+            pass
+
+        clear_loaded_models()
+
+    def test_invalid_hf_location(self):
+        private_repo_name = "your-private-repo"
+        invalid_model_properties_list = [
+        {
+            "dimensions": 384,
+            "model_location": {
+                "auth_required": True,
+                "hf": {"name": private_repo_name,
+                       "repo_id": "random",
+                       "filename":"random again"}
+            },
+            "type": "hf",
+        },
+        {
+            "dimensions": 384,
+            "model_location": {
+                "auth_required": True,
+                "hf": {"name": private_repo_name,
+                       "filename":"random again"}
+            },
+            "type": "hf",
+        },
+        {
+            "dimensions": 384,
+            "model_location": {
+                "auth_required": True,
+                "hf": {"filename":"random again"}
+            },
+            "type": "hf",
+        },
+        ]
+        for invalid_model_properties in invalid_model_properties_list:
+            try:
+                model_location = ModelLocation(**invalid_model_properties['model_location'])
+            except InvalidArgError as e:
+                assert "In `type = hf` model properties" in str(e)
+
+    def test_hf_model_auth(self):
+        private_repo_name = "your-private-repo"
+        hf_token = "some-secret-token"
+
+        model_properties = {
+            "dimensions": 384,
+            "model_location": {
+                "auth_required": True,
+                "hf": {"name": private_repo_name}
+            },
+            "type": "hf",
+        }
+
+        s3_settings = _get_base_index_settings()
+        s3_settings['index_defaults']['model_properties'] = model_properties
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1,
+                                          index_settings=s3_settings)
+
+        # Redirect the private model to a public one to finish the test
+        mock_automodel_from_pretrained = mock.MagicMock()
+        mock_automodel_from_pretrained.return_value = AutoModel.from_pretrained(
+            "sentence-transformers/all-MiniLM-L6-v1")
+
+        mock_autotokenizer_from_pretrained = mock.MagicMock()
+        mock_autotokenizer_from_pretrained.return_value = AutoTokenizer.from_pretrained(
+            "sentence-transformers/all-MiniLM-L6-v1")
+
+        with unittest.mock.patch("transformers.AutoModel.from_pretrained", mock_automodel_from_pretrained):
+            with unittest.mock.patch("transformers.AutoTokenizer.from_pretrained", mock_autotokenizer_from_pretrained):
+                res = tensor_search.search(config=self.config, text='hello', index_name=self.index_name_1,
+                                           model_auth=ModelAuth(hf=HfAuth(token=hf_token)))
+
+        assert len(mock_automodel_from_pretrained.call_args_list) == 1
+        assert mock_automodel_from_pretrained.call_args_list[0][0][0] == private_repo_name
+        mock_autotokenizer_from_pretrained.call_args_list[0][1]["use_auth_token"] == hf_token
+
+        assert len(mock_autotokenizer_from_pretrained.call_args_list) == 1
+        assert mock_autotokenizer_from_pretrained.call_args_list[0][0][0] == private_repo_name
+        mock_autotokenizer_from_pretrained.call_args_list[0][1]["use_auth_token"] == hf_token
+
+
+
 
 
 
