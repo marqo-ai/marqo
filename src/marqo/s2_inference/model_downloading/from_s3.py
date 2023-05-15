@@ -34,7 +34,7 @@ def get_presigned_s3_url(location: S3Location, auth: Optional[S3Auth] = None):
         )
 
 
-def get_s3_model_absolute_cache_path(location: S3Location) -> str:
+def get_s3_model_absolute_cache_path(location: S3Location, download_dir:str = None) -> str:
     """Returns the absolute path of an s3 model if it were downloaded.
 
         Args:
@@ -43,11 +43,14 @@ def get_s3_model_absolute_cache_path(location: S3Location) -> str:
         Returns:
             The absolute path of an s3 model if it were downloaded.
     """
-    cache_dir = os.path.expanduser(ModelCache.clip_cache_path)
+    if download_dir is None:
+        cache_dir = os.path.expanduser(ModelCache.clip_cache_path)
+    else:
+        cache_dir = os.path.expanduser(download_dir)
     return os.path.join(cache_dir, get_s3_model_cache_filename(location))
 
 
-def check_s3_model_already_exists(location: S3Location) -> bool:
+def check_s3_model_already_exists(location: S3Location, download_dir:str= None) -> bool:
     """Returns True iff an s3 model is already downloaded
 
         Args:
@@ -56,7 +59,7 @@ def check_s3_model_already_exists(location: S3Location) -> bool:
         Returns:
             The model cache filename of an s3 object
     """
-    abs_path = get_s3_model_absolute_cache_path(location)
+    abs_path = get_s3_model_absolute_cache_path(location, download_dir)
     return os.path.isfile(abs_path)
 
 

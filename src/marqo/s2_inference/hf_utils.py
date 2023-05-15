@@ -51,14 +51,18 @@ class HF_MODEL(Model):
         elif self.model_name is not None:
             # Loading from structured huggingface repo directly, token is required directly
             self.model_path = self.model_name
-            self.model = AutoModelForSentenceEmbedding(self.model_path, use_auth_token = self.model_auth.hf.token if self.model_auth is not None else None).to(self.device)
-            self.tokenizer = AutoTokenizer.from_pretrained(self.model_path, use_auth_token = self.model_auth.hf.token if self.model_auth is not None else None)
+            self.model = AutoModelForSentenceEmbedding(self.model_path).to(self.device)
+            self.tokenizer = AutoTokenizer.from_pretrained(self.model_path)
             return
 
         elif model_location_presence is not None:
-            print("Try to call _download_from_repo")
-            self.model_path = self._download_from_repo()
-            print(self.model_path)
+            if "hf" in self.model_properties["model_location"] and "name" in self.model_properties["model_location"]["hf"]:
+                self.model_path = self.model_properties["model_location"]["hf"]["name"]
+                self.model = AutoModelForSentenceEmbedding(self.model_path, use_auth_token = self.model_auth.hf.token).to(self.device)
+                self.tokenizer = AutoTokenizer.from_pretrained(self.model_path, use_auth_token = self.model_auth.hf.token)
+                return
+            else:
+                self.model_path = self._download_from_repo()
 
         else:
             raise InvalidModelPropertiesError(
@@ -89,7 +93,7 @@ class HF_MODEL(Model):
         if model_location.auth_required:
             download_model_params['auth'] = self.model_auth
 
-        model_file_path = download_model(**download_model_params)
+        model_file_path = download_model(**download_model_params, download_dir=ModelCache.hf_cache_path)
         if model_file_path is None or model_file_path == '':
             raise RuntimeError(
                 'download_model() needs to return a valid filepath to the model! Instead, received '

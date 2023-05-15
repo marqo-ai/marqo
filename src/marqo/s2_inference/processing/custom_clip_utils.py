@@ -108,9 +108,9 @@ def download_pretrained_from_s3(
     """
     print("download_pretrained_from_s3_called")
 
-    if check_s3_model_already_exists(location=location):
+    if check_s3_model_already_exists(location=location, download_dir=download_dir):
         # TODO: check if abs path is even the most appropriate???
-        return get_s3_model_absolute_cache_path(location=location)
+        return get_s3_model_absolute_cache_path(location=location, download_dir=download_dir)
 
     url = get_presigned_s3_url(location=location, auth=auth)
 
