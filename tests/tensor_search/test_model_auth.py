@@ -1003,22 +1003,30 @@ class TestModelAuthLoadedS3ForHuggingFace(MarqoTestCase):
     def setUp(self):
         self.index_name_1 = "test-model-auth-index-1"
 
-    def load_model_from_url(self):
+    def test_load_model_from_url(self):
         index_settings = {
             "index_defaults": {
                 "treat_urls_and_pointers_as_images": False,
                 "model" : "my_sentence_transformer_model",
                 "model_properties": {
-                    "name": "my",
+                    "name": "Marqo/cache-sentence-transformers-Mini-L6-v2",
                     "dimensions": 512,
-                    "url" : "https://marqo-cache-sentence-transformers.s3.us-west-2.amazonaws.com/all-MiniLM-L6-v2/all-MiniLM-L6-v2.zip",
-                    "type": "sbert",
+                    "type": "hf",
             }
         }
         }
-
+        try:
+            tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+        except IndexNotFoundError:
+            pass
 
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings= index_settings)
+
+        tensor_search.add_documents(config=self.config,  add_docs_params =
+        AddDocsParams(index_name=self.index_name_1, docs=[{"title":"what is marqo?"}],
+                                                                                      auto_refresh = True, model_auth = ModelAuth(hf=HfAuth(token="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"))))
+
+
 
 
 

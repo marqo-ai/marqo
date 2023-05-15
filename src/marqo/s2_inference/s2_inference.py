@@ -211,7 +211,7 @@ def _validate_model_properties(model_name: str, model_properties: dict) -> dict:
                                                       f"check `https://docs.marqo.ai/0.0.12/Models-Reference/dense_retrieval/` for more info.")
 
         elif model_properties.get("type", None) in ("hf"):
-            required_keys = ["dimension"]
+            required_keys = ["dimensions"]
             for key in required_keys:
                 if key not in model_properties:
                     raise InvalidModelPropertiesError(f"model_properties has missing key '{key}'."

@@ -24,6 +24,8 @@ class HF_MODEL(Model):
 
         if self.max_seq_length is None:
             self.max_seq_length = 128
+        self.model_properties = kwargs.get("model_properties", dict())
+        self.model_name = self.model_properties.get("name", None)
 
         model_auth = kwargs.get(InferenceParams.model_auth, None)
         if model_auth is not None:
@@ -37,7 +39,8 @@ class HF_MODEL(Model):
         path = self.model_properties.get("localpath", None) or self.model_properties.get("url", None)
 
         # HF models can be loaded from 3 entries: path (url or localpath), model_name, or model_location
-        if (path is not None) + (self.model_name is not None) + (model_location_presence is not None) != 1:
+        if (path is not None) + (self.model_name is not None) + (model_location_presence is True) != 1:
+            print(path is not None, self.model_name is not None, model_location_presence is not None)
             raise InvalidModelPropertiesError("Exactly one of `url`, `localpath` or `model_location`, `name` can be specified"
                                               " in `model_properties` for `hf` models as they conflict with each other in model loading."
                                               " Please ensure that exactly one of these is specified in `model_properties` and retry.")
@@ -48,9 +51,10 @@ class HF_MODEL(Model):
                 self.model_path = path
 
         elif self.model_name is not None:
+            # Loading from structured huggingface repo directly
             self.model_path = self.model_name
-            self.model = AutoModelForSentenceEmbedding.from_pretrained(self.model_path, use_auth_token = self.model_auth ).to(self.device)
-            self.tokenizer = AutoTokenizer.from_pretrained(self.model_path, use_auth_token = self.model_auth)
+            self.model = AutoModelForSentenceEmbedding(self.model_path, use_auth_token = self.model_auth.hf.token).to(self.device)
+            self.tokenizer = AutoTokenizer.from_pretrained(self.model_path, use_auth_token = self.model_auth.hf.token)
             return
 
         elif model_location_presence is not None:
@@ -66,7 +70,7 @@ class HF_MODEL(Model):
         # We need to do extraction here if necessary
         self.model_path = validate_huggingface_archive(self.model_path)
 
-        self.model = AutoModelForSentenceEmbedding.from_pretrained(self.model_path).to(self.device)
+        self.model = AutoModelForSentenceEmbedding(self.model_path).to(self.device)
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_path)
 
     def _download_from_repo(self):
@@ -125,7 +129,7 @@ class AutoModelForSentenceEmbedding(nn.Module):
         self.model_name = model_name
         self.normalize = normalize
         self.pooling = pooling
-
+        print(model_name)
         self.model = AutoModel.from_pretrained(model_name, use_auth_token = use_auth_token)
         self.model.eval()
         if self.pooling == 'mean':
