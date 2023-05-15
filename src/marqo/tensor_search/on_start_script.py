@@ -120,8 +120,6 @@ class ModelsForCacheing:
                 ) from e
         else:
             self.models = warmed_models
-        
-        self.logger.debug(f"self.models is of data type {type(self.models)}. The value is {self.models}")
         # TBD to include cross-encoder/ms-marco-TinyBERT-L-2-v2
 
         self.default_devices = ['cpu'] if not torch.cuda.is_available() else ['cpu', 'cuda']

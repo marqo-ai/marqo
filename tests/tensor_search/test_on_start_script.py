@@ -85,7 +85,8 @@ class TestOnStartScript(MarqoTestCase):
             "open_clip", 
             "https://github.com/mlfoundations/open_clip/releases/download/v0.2-weights/vit_b_32-quickgelu-laion400m_avg-8a00ab3c.pt"
         )
-
+        
+        # So far has clip and open clip tests
         environ_expected_models = [
             ({enums.EnvVars.MARQO_MODELS_TO_PRELOAD: [clip_model_object, open_clip_model_object]}, [clip_model_expected, open_clip_model_expected]),
             ({enums.EnvVars.MARQO_MODELS_TO_PRELOAD: json.dumps([clip_model_object, open_clip_model_object])}, [clip_model_expected, open_clip_model_expected])
