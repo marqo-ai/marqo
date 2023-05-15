@@ -66,6 +66,8 @@ def download_model(
     Returns:
         The path of the downloaded model
     """
+
+    print("download_model_called")
     single_weight_location_validation_msg = (
         "only exactly one of parameters (repo_location, url) is allowed to be specified.")
     if repo_location is None and url is None:
@@ -104,6 +106,7 @@ def download_pretrained_from_s3(
     Returns:
         Path to the downloaded model
     """
+    print("download_pretrained_from_s3_called")
 
     if check_s3_model_already_exists(location=location):
         # TODO: check if abs path is even the most appropriate???
@@ -142,6 +145,7 @@ def download_pretrained_from_url(
     Returns:
         download_target: the local path of the downloaded file.
     '''
+    print("download_pretrained_from_url_called")
     buffer_size = 8192
     if not cache_dir:
         cache_dir = os.path.expanduser(ModelCache.clip_cache_path)

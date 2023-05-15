@@ -37,28 +37,28 @@ class HF_MODEL(Model):
 
         model_location_presence = ModelProperties.model_location in self.model_properties
         path = self.model_properties.get("localpath", None) or self.model_properties.get("url", None)
-
         # HF models can be loaded from 3 entries: path (url or localpath), model_name, or model_location
         if (path is not None) + (self.model_name is not None) + (model_location_presence is True) != 1:
-            print(path is not None, self.model_name is not None, model_location_presence is not None)
             raise InvalidModelPropertiesError("Exactly one of `url`, `localpath` or `model_location`, `name` can be specified"
                                               " in `model_properties` for `hf` models as they conflict with each other in model loading."
                                               " Please ensure that exactly one of these is specified in `model_properties` and retry.")
         elif path is not None:
             if validators.url(path) is True:
-                self.model_path = download_model(url = path, download_dir=self.model_auth)
+                self.model_path = download_model(url = path, download_dir=ModelCache.hf_cache_path)
             elif os.path.isdir(path) or os.path.isfile(path):
                 self.model_path = path
 
         elif self.model_name is not None:
-            # Loading from structured huggingface repo directly
+            # Loading from structured huggingface repo directly, token is required directly
             self.model_path = self.model_name
-            self.model = AutoModelForSentenceEmbedding(self.model_path, use_auth_token = self.model_auth.hf.token).to(self.device)
-            self.tokenizer = AutoTokenizer.from_pretrained(self.model_path, use_auth_token = self.model_auth.hf.token)
+            self.model = AutoModelForSentenceEmbedding(self.model_path, use_auth_token = self.model_auth.hf.token if self.model_auth is not None else None).to(self.device)
+            self.tokenizer = AutoTokenizer.from_pretrained(self.model_path, use_auth_token = self.model_auth.hf.token if self.model_auth is not None else None)
             return
 
         elif model_location_presence is not None:
+            print("Try to call _download_from_repo")
             self.model_path = self._download_from_repo()
+            print(self.model_path)
 
         else:
             raise InvalidModelPropertiesError(
@@ -66,10 +66,10 @@ class HF_MODEL(Model):
                 " in `model_properties` for `hf` models as they conflict with each other in model loading."
                 " Please ensure that exactly one of these is specified in `model_properties` and retry.")
 
-        # The Automodel.from_pretrained method can load from a dictionary pointer or a model name.
+        # Loading from a directory.
         # We need to do extraction here if necessary
         self.model_path = validate_huggingface_archive(self.model_path)
-
+        print(self.model_path)
         self.model = AutoModelForSentenceEmbedding(self.model_path).to(self.device)
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_path)
 
@@ -80,11 +80,9 @@ class HF_MODEL(Model):
             The model's filepath
 
         Raises:
-            RunTimeError if an empty filepath is detected. This is important
-                because OpenCLIP will instantiate a model with random weights, if
-                a filepath isn't specified, and the model isn't a publicly
-                available HF or OpenAI one.
+            RunTimeError if an empty filepath is detected.
         """
+        print("_download_from_repo called")
         model_location = ModelLocation(**self.model_properties[ModelProperties.model_location])
         download_model_params = {"repo_location": model_location}
 
@@ -129,7 +127,6 @@ class AutoModelForSentenceEmbedding(nn.Module):
         self.model_name = model_name
         self.normalize = normalize
         self.pooling = pooling
-        print(model_name)
         self.model = AutoModel.from_pretrained(model_name, use_auth_token = use_auth_token)
         self.model.eval()
         if self.pooling == 'mean':
