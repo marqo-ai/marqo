@@ -12,7 +12,6 @@ from marqo._httprequests import HttpRequests
 from marqo import errors
 from marqo.tensor_search.throttling.redis_throttle import throttle
 from marqo.connections import redis_driver
-from marqo.s2_inference.s2_inference import vectorise
 
 
 def on_start(marqo_os_url: str):
@@ -97,40 +96,6 @@ class CUDAAvailable:
         self.logger.info(f"found devices {device_names}")
 
 
-def _preload_model(model, content, device):
-    """
-        Calls vectorise for a model once. This will load in the model if it isn't already loaded.
-        If `model` is a str, it should be a model name in the registry
-        If `model is a dict, it should be an object containing `model_name` and `model_properties`
-        Model properties will be passed to vectorise call if object exists
-    """
-    if isinstance(model, str):
-        # For models IN REGISTRY
-        _ = vectorise(
-            model_name=model, 
-            content=content, 
-            device=device
-        )
-    elif isinstance(model, dict):
-        # For models from URL
-        """
-        TODO: include validation from on start script (model name properties etc)
-        _check_model_name(index_settings)
-        """
-        try:
-            _ = vectorise(
-                model_name=model["model"], 
-                model_properties=model["model_properties"], 
-                content=content, 
-                device=device
-            )
-        except KeyError as e:
-            raise errors.EnvVarError(
-                f"Your custom model {model} is missing either `model_name` or `model_properties`."
-                f"""To add a custom model, it must be a dict with keys `model` and `model_properties` as defined in `https://marqo.pages.dev/0.0.20/Models-Reference/bring_your_own_model/`"""
-            ) from e
-
-
 class ModelsForCacheing:
     """warms the in-memory model cache by preloading good defaults
     """
@@ -163,10 +128,10 @@ class ModelsForCacheing:
         self.logger.info(f"pre-loading {self.models} onto devices={self.default_devices}")
 
     def run(self):
-       
         test_string = 'this is a test string'
         N = 10
         messages = []
+        self.logger.debug(f"DEBUG Models to load: {self.models}")
         for model in self.models:
             for device in self.default_devices:
                 self.logger.debug(f"Beginning loading for model: {model} on device: {device}")
@@ -188,6 +153,41 @@ class ModelsForCacheing:
         for message in messages:
             self.logger.info(message)
         self.logger.info("completed loading models")
+
+
+def _preload_model(model, content, device):
+    """
+        Calls vectorise for a model once. This will load in the model if it isn't already loaded.
+        If `model` is a str, it should be a model name in the registry
+        If `model is a dict, it should be an object containing `model_name` and `model_properties`
+        Model properties will be passed to vectorise call if object exists
+    """
+    from marqo.s2_inference.s2_inference import vectorise
+    if isinstance(model, str):
+        # For models IN REGISTRY
+        _ = vectorise(
+            model_name=model, 
+            content=content, 
+            device=device
+        )
+    elif isinstance(model, dict):
+        # For models from URL
+        """
+        TODO: include validation from on start script (model name properties etc)
+        _check_model_name(index_settings)
+        """
+        try:
+            _ = vectorise(
+                model_name=model["model"], 
+                model_properties=model["model_properties"], 
+                content=content, 
+                device=device
+            )
+        except KeyError as e:
+            raise errors.EnvVarError(
+                f"Your custom model {model} is missing either `model_name` or `model_properties`."
+                f"""To add a custom model, it must be a dict with keys `model` and `model_properties` as defined in `https://marqo.pages.dev/0.0.20/Models-Reference/bring_your_own_model/`"""
+            ) from e
 
 
 class InitializeRedis:
