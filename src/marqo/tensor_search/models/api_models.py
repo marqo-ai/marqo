@@ -11,7 +11,7 @@ from marqo.tensor_search import validation
 from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifier
-from marqo.tensor_search.models.search import SearchContext
+from marqo.tensor_search.models.search import SearchContext, SearchContextTensor
 
 
 class BaseMarqoModel(BaseModel):
@@ -43,9 +43,9 @@ class SearchQuery(BaseMarqoModel):
             case_sensitive=False
         )
     
-    def get_context_tensor(self) -> Optional[List[Dict[str, Any]]]:
+    def get_context_tensor(self) -> Optional[List[SearchContextTensor]]:
         """Extract the tensor from the context, if provided"""
-        return self.context.get("tensor", None) if self.context is not None else None
+        return self.context.tensor if self.context is not None else None
 
 class BulkSearchQueryEntity(SearchQuery):
     index: str

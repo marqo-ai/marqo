@@ -1552,7 +1552,7 @@ def get_query_vectors_from_jobs(
             
             custom_tensors = q.get_context_tensor() 
             if custom_tensors is not None:
-                weighted_vectors += [np.asarray(v["vector"]) * v["weight"] for v in custom_tensors]
+                weighted_vectors += [np.asarray(v.vector) * v.weight for v in custom_tensors]
             
             try:
                 merged_vector = np.mean(weighted_vectors, axis=0)

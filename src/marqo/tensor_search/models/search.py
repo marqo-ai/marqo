@@ -1,6 +1,6 @@
 import json
 
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, validator, ValidationError
 from typing import Any, Union, List, Dict, Optional, NewType, Literal
 
 from marqo.errors import InvalidArgError
@@ -63,9 +63,15 @@ class SearchContextTensor(BaseModel):
 
 
 class SearchContext(BaseModel):
-    tensor: Optional[List[SearchContextTensor]]
+    tensor: List[SearchContextTensor]
 
-    @validator('tensor')
+    def __init__(self, **data):
+        try:
+            super().__init__(**data)
+        except ValidationError as e:
+            raise InvalidArgError(message=e.json())
+
+    @validator('tensor', pre=True, always=True)
     def check_vector_length(cls, v):
         if not (1 <= len(v) <= 64):
             raise InvalidArgError('The number of tensors must be between 1 and 64')

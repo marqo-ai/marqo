@@ -67,7 +67,6 @@ class ScoreModifier(BaseModel):
         try:
             super().__init__(**data)
         except ValidationError as e:
-            print("HELP", e)
             raise ScoreModifierValidationError(modifier=data, message=json.dumps(e.errors()))
 
     @validator('multiply_score_by', 'add_to_score', pre=True, always=True)

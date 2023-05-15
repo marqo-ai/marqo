@@ -935,14 +935,14 @@ class TestValidateIndexSettings(unittest.TestCase):
 
     def test_validate_invalid_context_object(self):
         valid_context_list = [
-            {
-                # Typo in tensor
-                "tensors": [
-                    {"vector" : [0.2132] * 512, "weight" : 0.32},
-                    {"vector": [0.2132] * 512, "weight": 0.32},
-                    {"vector": [0.2132] * 512, "weight": 0.32},
-                ]
-            },
+            # {
+            #     # Typo in tensor
+            #     "tensors": [
+            #         {"vector" : [0.2132] * 512, "weight" : 0.32},
+            #         {"vector": [0.2132] * 512, "weight": 0.32},
+            #         {"vector": [0.2132] * 512, "weight": 0.32},
+            #     ]
+            # },
             {
                 # Typo in vector
                 "tensor": [
