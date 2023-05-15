@@ -12,6 +12,7 @@ from marqo._httprequests import HttpRequests
 from marqo import errors
 from marqo.tensor_search.throttling.redis_throttle import throttle
 from marqo.connections import redis_driver
+from marqo.s2_inference.s2_inference import vectorise
 
 
 def on_start(marqo_os_url: str):
@@ -131,7 +132,6 @@ class ModelsForCacheing:
         test_string = 'this is a test string'
         N = 10
         messages = []
-        self.logger.debug(f"DEBUG Models to load: {self.models}")
         for model in self.models:
             for device in self.default_devices:
                 self.logger.debug(f"Beginning loading for model: {model} on device: {device}")
@@ -162,7 +162,6 @@ def _preload_model(model, content, device):
         If `model is a dict, it should be an object containing `model_name` and `model_properties`
         Model properties will be passed to vectorise call if object exists
     """
-    from marqo.s2_inference.s2_inference import vectorise
     if isinstance(model, str):
         # For models IN REGISTRY
         _ = vectorise(
