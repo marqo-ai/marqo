@@ -441,14 +441,12 @@ def _get_hf_properties() -> Dict:
     HF_MODEL_PROPERTIES = {
             "hf/all-MiniLM-L6-v1":
                 {"name": "sentence-transformers/all-MiniLM-L6-v1",
-                 # "url" : "https://marqo-cache-sentence-transformers.s3.us-west-2.amazonaws.com/all-MiniLM-L6-v1/all-MiniLM-L6-v1.zip",
                 "dimensions": 384,
                 "tokens":128,
                 "type":"hf",
                 "notes": ""},
             "hf/all-MiniLM-L6-v2":
                 {"name": "sentence-transformers/all-MiniLM-L6-v2",
-                 # "url" : "https://marqo-cache-sentence-transformers.s3.us-west-2.amazonaws.com/all-MiniLM-L6-v2/all-MiniLM-L6-v2.zip",
                 "dimensions": 384,
                 "tokens":256,
                 "type":"hf",

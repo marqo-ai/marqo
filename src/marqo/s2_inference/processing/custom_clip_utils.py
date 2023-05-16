@@ -169,7 +169,3 @@ def download_pretrained_from_url(
 
     return download_target
 
-
-def extract_model_config_file():
-    pass
-

@@ -1,7 +1,9 @@
+import os, validators
+import zipfile, tarfile
+import numpy as np
 import torch
 from torch import nn
 from transformers import (AutoModel, AutoTokenizer)
-import numpy as np
 from marqo.tensor_search.models.private_models import ModelLocation, ModelAuth
 from marqo.tensor_search.enums import ModelProperties, InferenceParams
 from marqo.s2_inference.sbert_utils import Model
@@ -9,10 +11,9 @@ from marqo.s2_inference.types import Union, FloatTensor, List
 from marqo.s2_inference.logger import get_logger
 from marqo.tensor_search.enums import ModelProperties
 from marqo.s2_inference.errors import InvalidModelPropertiesError
-import os, validators
 from marqo.s2_inference.processing.custom_clip_utils import download_model
 from marqo.s2_inference.configs import ModelCache
-import zipfile, tarfile
+
 
 logger = get_logger(__name__)
 
@@ -26,12 +27,7 @@ class HF_MODEL(Model):
             self.max_seq_length = 128
         self.model_properties = kwargs.get("model_properties", dict())
         self.model_name = self.model_properties.get("name", None)
-
-        model_auth = kwargs.get(InferenceParams.model_auth, None)
-        if model_auth is not None:
-            self.model_auth = model_auth
-        else:
-            self.model_auth = None
+        self.model_auth = kwargs.get(InferenceParams.model_auth, None)
 
     def load(self) -> None:
 
@@ -39,7 +35,7 @@ class HF_MODEL(Model):
         path = self.model_properties.get("localpath", None) or self.model_properties.get("url", None)
         # HF models can be loaded from 3 entries: path (url or localpath), model_name, or model_location
         if (path is not None) + (self.model_name is not None) + (model_location_presence is True) != 1:
-            raise InvalidModelPropertiesError("Exactly one of `url`, `localpath` or `model_location`, `name` can be specified"
+            raise InvalidModelPropertiesError("Exactly one of (`localpath`/`url`) or `model_location`, `name` can be specified"
                                               " in `model_properties` for `hf` models as they conflict with each other in model loading."
                                               " Please ensure that exactly one of these is specified in `model_properties` and retry.")
         elif path is not None:
@@ -53,19 +49,13 @@ class HF_MODEL(Model):
             self.model = AutoModelForSentenceEmbedding(self.model_path).to(self.device)
             self.tokenizer = AutoTokenizer.from_pretrained(self.model_path)
             return
-        elif model_location_presence is not None:
+        elif model_location_presence is True:
             # This is a special case for huggingface models, where we can load a model directory from a repo
             if ("hf" in self.model_properties["model_location"]) and ("repo_id" in self.model_properties["model_location"]["hf"]) and \
                 ("filename" not in self.model_properties["model_location"]["hf"]):
                 return self._load_from_private_hf_repo()
             else:
                 self.model_path = self._download_from_repo()
-
-        else:
-            raise InvalidModelPropertiesError(
-                "Exactly one of `url`, `localpath` or `model_location`, `name` must be specified"
-                " in `model_properties` for `hf` models as they conflict with each other in model loading."
-                " Please ensure that exactly one of these is specified in `model_properties` and retry.")
 
         # We need to do extraction here if necessary
         self.model_path = validate_huggingface_archive(self.model_path)
@@ -74,8 +64,9 @@ class HF_MODEL(Model):
 
     def _load_from_private_hf_repo(self) -> None:
         """
-        Load a private model from a huggingface repo directly using the `name` attribute in `model_properties`
+        Load a private model from a huggingface repo directly using the `repo_id` attribute in `model_properties`
         This is a special case for HF models, where we can load a model directory from a repo.
+        Token is also used if provided in `model_auth` object.
         """
         model_location = ModelLocation(**self.model_properties[ModelProperties.model_location])
         self.model_path = model_location.hf.repo_id
