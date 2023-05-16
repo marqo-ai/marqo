@@ -26,19 +26,11 @@ def download_model_from_hf(
     Returns:
         Path to the downloaded model
     """
-    print("download_model_from_hf_called")
-    if download_dir is not None:
-        logger.warning(
-            "Hugging Face model download was given the `download_dir` argument, "
-            "even though it is not yet implemented. "
-            "The specified model will be downloaded but the `download_dir` "
-            "parameter will be ignored."
-        )
     download_kwargs = location.dict(exclude_unset=True) # Ignore unset values to avoid adding None to params
     if auth is not None:
         download_kwargs = {**download_kwargs, **auth.dict()}
     try:
-        return hf_hub_download(**download_kwargs)
+        return hf_hub_download(**download_kwargs, cache_dir=download_dir)
     except RepositoryNotFoundError:
         # TODO: add link to HF model auth/loc
         raise ModelDownloadError(

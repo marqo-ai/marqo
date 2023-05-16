@@ -139,7 +139,7 @@ class AutoModelForSentenceEmbedding(nn.Module):
         self.model_name = model_name
         self.normalize = normalize
         self.pooling = pooling
-        self.model = AutoModel.from_pretrained(model_name, use_auth_token = use_auth_token)
+        self.model = AutoModel.from_pretrained(model_name, use_auth_token = use_auth_token, cache_dir=ModelCache.hf_cache_path)
         self.model.eval()
         if self.pooling == 'mean':
             self._pool_func = self.mean_pooling
