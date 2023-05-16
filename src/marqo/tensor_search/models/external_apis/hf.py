@@ -20,7 +20,3 @@ class HfModelLocation(ObjectLocation):
         if not isinstance(value, str):
             raise InvalidArgError("To load a custom model from huggingface, `repo_id` must be provided as a valid string.")
         return value
-
-
-
-
