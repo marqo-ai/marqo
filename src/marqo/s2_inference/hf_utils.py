@@ -83,8 +83,8 @@ class HF_MODEL(Model):
             try:
                 token = self.model_auth.hf.token
             except KeyError:
-                raise InvalidModelPropertiesError("Please ensure that `model_auth` is a valid "
-                                                  "`ModelAuth` object with a `token` attribute for private hf repo models")
+                raise InvalidModelPropertiesError("Please ensure that `model_auth` is a valid for private huggingface model"
+                                                  "`ModelAuth` object with a `hugging face token` attribute for private hf repo models")
         self.model = AutoModelForSentenceEmbedding(model_name=self.model_path, use_auth_token=token).to(self.device)
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_path, use_auth_token=token)
 
