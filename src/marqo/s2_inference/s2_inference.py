@@ -171,7 +171,7 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
                     f"and Marqo has access to the weights file.")
     else:
         most_recently_used_time = datetime.datetime.now()
-        logger.debug(f'renew {model_name} on device {device} with new time={most_recently_used_time}.')
+        logger.debug(f'renewed {model_name} on device {device} with new most recently time={most_recently_used_time}.')
         try:
             available_models[model_cache_key][AvailableModelsKey.most_recently_used_time] = most_recently_used_time
         except KeyError:
