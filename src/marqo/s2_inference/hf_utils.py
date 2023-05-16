@@ -66,6 +66,7 @@ class HF_MODEL(Model):
         """
         Load a private model from a huggingface repo directly using the `repo_id` attribute in `model_properties`
         This is a special case for HF models, where we can load a model directory from a repo.
+        The self.model_path will be set to the repo_id, which is the remote path in the HuggingFace repo.
         Token is also used if provided in `model_auth` object.
         """
         model_location = ModelLocation(**self.model_properties[ModelProperties.model_location])
@@ -74,9 +75,9 @@ class HF_MODEL(Model):
         if self.model_auth is not None:
             try:
                 token = self.model_auth.hf.token
-            except KeyError:
-                raise InvalidModelPropertiesError("Please ensure that `model_auth` is a valid for private huggingface model"
-                                                  "`ModelAuth` object with a `hugging face token` attribute for private hf repo models")
+            except AttributeError:
+                raise InvalidModelPropertiesError("Please ensure that `model_auth` is valid for a private Hugging Face model"
+                                                  " `ModelAuth` object with a `hugging face token` attribute for private hf repo models")
         self.model = AutoModelForSentenceEmbedding(model_name=self.model_path, use_auth_token=token).to(self.device)
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_path, use_auth_token=token)
 

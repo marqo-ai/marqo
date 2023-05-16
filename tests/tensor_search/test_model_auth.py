@@ -1332,16 +1332,29 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
         # Mock the generate_presigned_url method of the mock Boto3 client to return a dummy URL
         mock_s3_client.generate_presigned_url.return_value = public_model_url
 
-        with unittest.mock.patch('boto3.client', return_value=mock_s3_client) as mock_boto3_client:
+        mock_download_pretrained_from_url = mock.MagicMock()
+        mock_download_pretrained_from_url.return_value = 'cache/path/to/model.zip'
 
-            try:
-                res = tensor_search.search(
-                    config=self.config, text='hello', index_name=self.index_name_1,
-                    model_auth=ModelAuth(s3=S3Auth(aws_access_key_id=fake_access_key_id, aws_secret_access_key=fake_secret_key))
-                )
-            except BadRequestError as e:
-                print()
-                pass
+        mock_validate_huggingface_archive = mock.MagicMock()
+        mock_validate_huggingface_archive.return_value = 'cache/path/to/model/'
+
+        mock_automodel_from_pretrained = mock.MagicMock()
+        mock_autotokenizer_from_pretrained = mock.MagicMock()
+
+        with unittest.mock.patch('transformers.AutoModel.from_pretrained', mock_automodel_from_pretrained):
+            with unittest.mock.patch('transformers.AutoTokenizer.from_pretrained',mock_autotokenizer_from_pretrained):
+                with unittest.mock.patch('boto3.client', return_value=mock_s3_client) as mock_boto3_client:
+                    with unittest.mock.patch("marqo.s2_inference.processing.custom_clip_utils.download_pretrained_from_url", mock_download_pretrained_from_url):
+                        with unittest.mock.patch("marqo.s2_inference.hf_utils.validate_huggingface_archive", mock_validate_huggingface_archive):
+                            try:
+                                res = tensor_search.search(
+                                    config=self.config, text='hello', index_name=self.index_name_1,
+                                    model_auth=ModelAuth(s3=S3Auth(aws_access_key_id=fake_access_key_id, aws_secret_access_key=fake_secret_key))
+                                )
+                            except KeyError as e:
+                                # KeyError as this is not a real model. It does not have an attention_mask
+                                assert "attention_mask" in str(e)
+                                pass
 
         mock_s3_client.generate_presigned_url.assert_called_with(
             'get_object',
@@ -1352,6 +1365,19 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
             aws_access_key_id=fake_access_key_id,
             aws_secret_access_key=fake_secret_key,
             aws_session_token=None
+        )
+        mock_autotokenizer_from_pretrained.assert_called_once_with(
+            "cache/path/to/model/",
+        )
+
+        mock_download_pretrained_from_url.assert_called_once_with(
+            url = public_model_url,
+            cache_dir = ModelCache.hf_cache_path,
+            cache_file_name = os.path.basename(s3_object_key)
+        )
+
+        mock_validate_huggingface_archive.assert_called_once_with(
+            "cache/path/to/model.zip",
         )
 
     def test_4_load_model_from_public_url_zip_file_search(self):
@@ -1567,56 +1593,89 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
         assert mock_validate_huggingface_archive.call_args_list[0][0][0] == 'cache/path/to/model.zip', "Expected call not found"
 
     def test_3_load_model_from_s3_zip_file_with_auth_add_documents(self):
-        s3_object_key = 'path/to/your/secret_model.pt'
-        s3_bucket = 'your-bucket-name'
+        def test_3_load_model_from_s3_zip_file_with_auth_search(self):
+            s3_object_key = 'path/to/your/secret_model.pt'
+            s3_bucket = 'your-bucket-name'
 
-        _delete_file(os.path.join(ModelCache.hf_cache_path, os.path.basename(s3_object_key)))
+            _delete_file(os.path.join(ModelCache.hf_cache_path, os.path.basename(s3_object_key)))
 
-        model_properties = {
-            "dimensions": 384,
-            "model_location": {
-                "s3": {
-                    "Bucket": s3_bucket,
-                    "Key": s3_object_key,
+            model_properties = {
+                "dimensions": 384,
+                "model_location": {
+                    "s3": {
+                        "Bucket": s3_bucket,
+                        "Key": s3_object_key,
+                    },
+                    "auth_required": True
                 },
-                "auth_required": True
-            },
-            "type": "hf",
-        }
-        s3_settings = _get_base_index_settings()
-        s3_settings['index_defaults']['model_properties'] = model_properties
-        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings=s3_settings)
+                "type": "hf",
+            }
+            s3_settings = _get_base_index_settings()
+            s3_settings['index_defaults']['model_properties'] = model_properties
+            tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1,
+                                              index_settings=s3_settings)
 
-        fake_access_key_id = '12345'
-        fake_secret_key = 'this-is-a-secret'
-        public_model_url = "https://dummy/url/for/model.zip"
+            fake_access_key_id = '12345'
+            fake_secret_key = 'this-is-a-secret'
+            public_model_url = "https://dummy/url/for/model.zip"
 
-        # Create a mock Boto3 client
-        mock_s3_client = mock.MagicMock()
+            # Create a mock Boto3 client
+            mock_s3_client = mock.MagicMock()
 
-        # Mock the generate_presigned_url method of the mock Boto3 client to return a dummy URL
-        mock_s3_client.generate_presigned_url.return_value = public_model_url
+            # Mock the generate_presigned_url method of the mock Boto3 client to return a dummy URL
+            mock_s3_client.generate_presigned_url.return_value = public_model_url
 
-        with unittest.mock.patch('boto3.client', return_value=mock_s3_client) as mock_boto3_client:
+            mock_download_pretrained_from_url = mock.MagicMock()
+            mock_download_pretrained_from_url.return_value = 'cache/path/to/model.zip'
 
-            try:
-                tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
-                    index_name=self.index_name_1, auto_refresh=True, docs=[{'a': 'b'}],
-                    model_auth=ModelAuth(s3=S3Auth(aws_access_key_id=fake_access_key_id, aws_secret_access_key=fake_secret_key))))
-            except BadRequestError as e:
-                print()
-                pass
+            mock_validate_huggingface_archive = mock.MagicMock()
+            mock_validate_huggingface_archive.return_value = 'cache/path/to/model/'
 
-        mock_s3_client.generate_presigned_url.assert_called_with(
-            'get_object',
-            Params={'Bucket': 'your-bucket-name', 'Key': s3_object_key}
-        )
-        mock_boto3_client.assert_called_once_with(
-            's3',
-            aws_access_key_id=fake_access_key_id,
-            aws_secret_access_key=fake_secret_key,
-            aws_session_token=None
-        )
+            mock_automodel_from_pretrained = mock.MagicMock()
+            mock_autotokenizer_from_pretrained = mock.MagicMock()
+
+            with unittest.mock.patch('transformers.AutoModel.from_pretrained', mock_automodel_from_pretrained):
+                with unittest.mock.patch('transformers.AutoTokenizer.from_pretrained',
+                                         mock_autotokenizer_from_pretrained):
+                    with unittest.mock.patch('boto3.client', return_value=mock_s3_client) as mock_boto3_client:
+                        with unittest.mock.patch(
+                                "marqo.s2_inference.processing.custom_clip_utils.download_pretrained_from_url",
+                                mock_download_pretrained_from_url):
+                            with unittest.mock.patch("marqo.s2_inference.hf_utils.validate_huggingface_archive",
+                                                     mock_validate_huggingface_archive):
+                                try:
+                                    tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+                                        index_name=self.index_name_1, auto_refresh=True, docs=[{'a': 'b'}],
+                                        model_auth=ModelAuth(s3=S3Auth(aws_access_key_id=fake_access_key_id,
+                                                                       aws_secret_access_key=fake_secret_key))))
+                                except KeyError as e:
+                                    # KeyError as this is not a real model. It does not have an attention_mask
+                                    assert "attention_mask" in str(e)
+                                    pass
+
+            mock_s3_client.generate_presigned_url.assert_called_with(
+                'get_object',
+                Params={'Bucket': 'your-bucket-name', 'Key': s3_object_key}
+            )
+            mock_boto3_client.assert_called_once_with(
+                's3',
+                aws_access_key_id=fake_access_key_id,
+                aws_secret_access_key=fake_secret_key,
+                aws_session_token=None
+            )
+            mock_autotokenizer_from_pretrained.assert_called_once_with(
+                "cache/path/to/model/",
+            )
+
+            mock_download_pretrained_from_url.assert_called_once_with(
+                url=public_model_url,
+                cache_dir=ModelCache.hf_cache_path,
+                cache_file_name=os.path.basename(s3_object_key)
+            )
+
+            mock_validate_huggingface_archive.assert_called_once_with(
+                "cache/path/to/model.zip",
+            )
 
     def test_4_load_model_from_public_url_zip_file_add_documents(self):
         public_url = "https://marqo-cache-sentence-transformers.s3.us-west-2.amazonaws.com/all-MiniLM-L6-v1/all-MiniLM-L6-v1.zip"

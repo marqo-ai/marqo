@@ -199,7 +199,7 @@ def _validate_model_properties(model_name: str, model_properties: dict) -> dict:
         elif model_properties.get("type", None) in ("clip", "open_clip"):
             required_keys = ["name", "dimensions"]
 
-        elif model_properties.get("type", None) in ("hf"):
+        elif model_properties.get("type", None) in ("hf", ):
             required_keys = ["dimensions"]
 
         for key in required_keys:
