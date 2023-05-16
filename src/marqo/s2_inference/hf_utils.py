@@ -84,7 +84,6 @@ class HF_MODEL(Model):
         self.model = AutoModelForSentenceEmbedding(model_name=self.model_path, use_auth_token=token).to(self.device)
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_path, use_auth_token=token)
 
-
     def _download_from_repo(self) -> str:
         """Downloads model from an external repo like s3 and returns the filepath
 
@@ -106,7 +105,6 @@ class HF_MODEL(Model):
                 'download_model() needs to return a valid filepath to the model! Instead, received '
                 f' filepath `{model_file_path}`')
         return model_file_path
-
 
     def encode(self, sentence: Union[str, List[str]], normalize=True, **kwargs) -> Union[FloatTensor, np.ndarray]:
 
