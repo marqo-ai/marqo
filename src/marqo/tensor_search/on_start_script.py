@@ -12,6 +12,7 @@ from marqo._httprequests import HttpRequests
 from marqo import errors
 from marqo.tensor_search.throttling.redis_throttle import throttle
 from marqo.connections import redis_driver
+from marqo.s2_inference.s2_inference import vectorise
 
 
 def on_start(marqo_os_url: str):
@@ -95,6 +96,7 @@ class CUDAAvailable:
             device_names.append( {'id':device_id, 'name':id_to_device(device_id)})
         self.logger.info(f"found devices {device_names}")
 
+
 class ModelsForCacheing:
     """warms the in-memory model cache by preloading good defaults
     """
@@ -109,10 +111,12 @@ class ModelsForCacheing:
             try:
                 self.models = json.loads(warmed_models)
             except json.JSONDecodeError as e:
+                # TODO: Change error message to match new format
                 raise errors.EnvVarError(
                     f"Could not parse environment variable `{EnvVars.MARQO_MODELS_TO_PRELOAD}`. "
-                    f"Please ensure that this a JSON-encoded array of strings. For example:\n"
+                    f"Please ensure that this a JSON-encoded array of strings or dicts. For example:\n"
                     f"""export {EnvVars.MARQO_MODELS_TO_PRELOAD}='["ViT-L/14", "onnx/all_datasets_v4_MiniLM-L6"]'"""
+                    f"""To add a custom model, it must be a dict with keys `model` and `model_properties` as defined in `https://marqo.pages.dev/0.0.20/Models-Reference/bring_your_own_model/`"""
                 ) from e
         else:
             self.models = warmed_models
@@ -123,30 +127,64 @@ class ModelsForCacheing:
         self.logger.info(f"pre-loading {self.models} onto devices={self.default_devices}")
 
     def run(self):
-        from marqo.s2_inference.s2_inference import vectorise
-       
         test_string = 'this is a test string'
         N = 10
         messages = []
         for model in self.models:
             for device in self.default_devices:
+                self.logger.debug(f"Beginning loading for model: {model} on device: {device}")
                 
                 # warm it up
-                _ = vectorise(model, test_string, device=device)
+                _ = _preload_model(model=model, content=test_string, device=device)
 
                 t = 0
                 for n in range(N):
                     t0 = time.time()
-                    _ = vectorise(model, test_string, device=device)
+                    _ = _preload_model(model=model, content=test_string, device=device)
                     t1 = time.time()
                     t += (t1 - t0)
                 message = f"{(t)/float((N))} for {model} and {device}"
                 messages.append(message)
+                self.logger.debug(f"{model} {device} vectorise run {N} times.")
                 self.logger.info(f"{model} {device} run succesfully!")
 
         for message in messages:
             self.logger.info(message)
         self.logger.info("completed loading models")
+
+
+def _preload_model(model, content, device):
+    """
+        Calls vectorise for a model once. This will load in the model if it isn't already loaded.
+        If `model` is a str, it should be a model name in the registry
+        If `model is a dict, it should be an object containing `model_name` and `model_properties`
+        Model properties will be passed to vectorise call if object exists
+    """
+    if isinstance(model, str):
+        # For models IN REGISTRY
+        _ = vectorise(
+            model_name=model, 
+            content=content, 
+            device=device
+        )
+    elif isinstance(model, dict):
+        # For models from URL
+        """
+        TODO: include validation from on start script (model name properties etc)
+        _check_model_name(index_settings)
+        """
+        try:
+            _ = vectorise(
+                model_name=model["model"], 
+                model_properties=model["model_properties"], 
+                content=content, 
+                device=device
+            )
+        except KeyError as e:
+            raise errors.EnvVarError(
+                f"Your custom model {model} is missing either `model` or `model_properties`."
+                f"""To add a custom model, it must be a dict with keys `model` and `model_properties` as defined in `https://marqo.pages.dev/0.0.20/Advanced-Usage/configuration/#configuring-preloaded-models`"""
+            ) from e
 
 
 class InitializeRedis:
