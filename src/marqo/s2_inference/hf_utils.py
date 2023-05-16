@@ -55,7 +55,8 @@ class HF_MODEL(Model):
             return
         elif model_location_presence is not None:
             # This is a special case for huggingface models, where we can load a model directory from a repo
-            if "hf" in self.model_properties["model_location"] and "name" in self.model_properties["model_location"]["hf"]:
+            if ("hf" in self.model_properties["model_location"]) and ("repo_id" in self.model_properties["model_location"]["hf"]) and \
+                ("filename" not in self.model_properties["model_location"]["hf"]):
                 return self._load_from_private_hf_repo()
             else:
                 self.model_path = self._download_from_repo()
@@ -77,7 +78,7 @@ class HF_MODEL(Model):
         This is a special case for HF models, where we can load a model directory from a repo.
         """
         model_location = ModelLocation(**self.model_properties[ModelProperties.model_location])
-        self.model_path = model_location.hf.name
+        self.model_path = model_location.hf.repo_id
         token = None
         if self.model_auth is not None:
             try:

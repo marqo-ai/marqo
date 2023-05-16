@@ -3,7 +3,7 @@ from typing import Optional
 from marqo.tensor_search.models.external_apis.abstract_classes import (
     ObjectLocation, ExternalAuth
 )
-from pydantic import validator, root_validator
+from pydantic import BaseModel, Field, validator
 from marqo.errors import InvalidArgError
 
 
@@ -12,30 +12,15 @@ class HfAuth(ExternalAuth):
 
 
 class HfModelLocation(ObjectLocation):
-    repo_id: Optional[str]
-    filename: Optional[str]
-    name: Optional[str]
-    @root_validator(pre=True)
-    def validate_input(cls, values):
-        repo_id = values.get('repo_id')
-        filename = values.get('filename')
-        name = values.get('name')
-        basic_error_message = "In `type = hf` model properties, {}, \n " \
-                              "please check https://docs.marqo.ai/0.0.21/API-Reference/search/#model-auth for details."
+    repo_id: str = Field(..., description="ID of the repository")
+    filename: Optional[str] = Field(None, description="Name of the file")
 
-        if (repo_id is not None and filename is None) or (repo_id is None and filename is not None):
-            raise InvalidArgError(
-                basic_error_message.format("repo_id' and 'filename' should be provided together."))
+    @validator('repo_id')
+    def validate_repo_id(cls, value):
+        if not isinstance(value, str):
+            raise InvalidArgError("To load a custom model from huggingface, `repo_id` must be provided as a valid string.")
+        return value
 
-        if name is not None and (repo_id is not None or filename is not None):
-            raise InvalidArgError(
-                basic_error_message.format("if 'name' is provided, 'repo_id' and 'filename' should not be provided."))
-
-        if name is None and (repo_id is None or filename is None):
-            raise InvalidArgError(
-                basic_error_message.format("either 'name' or both 'repo_id' and 'filename' should be provided."))
-
-        return values
 
 
 

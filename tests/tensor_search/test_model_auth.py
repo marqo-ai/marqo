@@ -24,6 +24,7 @@ from marqo.s2_inference.configs import ModelCache
 import shutil
 from marqo.tensor_search.models.external_apis.hf import HfModelLocation
 from marqo.tensor_search.models.private_models import ModelLocation
+from pydantic.error_wrappers import ValidationError
 
 def fake_vectorise(*args, **_kwargs):
     random_model = Random(model_name='blah', embedding_dim=512)
@@ -1140,7 +1141,6 @@ class TestModelAuthDownloadAndExtractS3HFModel(MarqoTestCase):
         assert any([m['model_name'] == 'my_model' for m in mods])
 
 
-
 class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
     """
     This class tests the following scenarios:
@@ -1395,7 +1395,7 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
             "dimensions": 384,
             "model_location": {
                 "auth_required": True,
-                "hf": {"name": private_repo_name}
+                "hf": {"repo_id": private_repo_name}
             },
             "type": "hf",
         }
@@ -1660,7 +1660,7 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
             "dimensions": 384,
             "model_location": {
                 "auth_required": True,
-                "hf": {"name": private_repo_name}
+                "hf": {"repo_id": private_repo_name}
             },
             "type": "hf",
         }
@@ -1720,26 +1720,16 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
             "dimensions": 384,
             "model_location": {
                 "auth_required": True,
-                "hf": {"name": private_repo_name,
-                       "repo_id": "random",
-                       "filename":"random again"}
-            },
-            "type": "hf",
-        },
-        {
-            "dimensions": 384,
-            "model_location": {
-                "auth_required": True,
-                "hf": {"name": private_repo_name,
-                       "filename":"random again"}
-            },
-            "type": "hf",
-        },
-        {
-            "dimensions": 384,
-            "model_location": {
-                "auth_required": True,
                 "hf": {"filename":"random again"}
+            },
+            "type": "hf",
+        },
+        {
+            "dimensions": 384,
+            "model_location": {
+                "auth_required": True,
+                "hf": {"name": 3,
+                       "filename":"random again"}
             },
             "type": "hf",
         },
@@ -1747,8 +1737,9 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
         for invalid_model_properties in invalid_model_properties_list:
             try:
                 model_location = ModelLocation(**invalid_model_properties['model_location'])
-            except InvalidArgError as e:
-                assert "In `type = hf` model properties" in str(e)
+                raise AssertionError
+            except (InvalidArgError, ValidationError) as e:
+                pass
 
     def test_load_model_from_private_hf_repo_with_redirect(self):
         private_repo_name = "your-private-repo"
@@ -1761,7 +1752,7 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
             "dimensions": 384,
             "model_location": {
                 "auth_required": True,
-                "hf": {"name": private_repo_name}
+                "hf": {"repo_id": private_repo_name}
             },
             "type": "hf",
         }
