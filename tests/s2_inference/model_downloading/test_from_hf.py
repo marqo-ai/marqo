@@ -65,7 +65,7 @@ class TestDownloadModelFromHF(unittest.TestCase):
         with patch(
                 "marqo.s2_inference.model_downloading.from_hf.hf_hub_download",
                 return_value="model_path") as hf_hub_download_mock:
-            result = download_model_from_hf(self.hf_location, ModelCache.hf_cache_path)
+            result = download_model_from_hf(self.hf_location, download_dir=ModelCache.hf_cache_path)
         self.assertEqual(result, "model_path")
         hf_hub_download_mock.assert_called_once_with(repo_id="test-repo-id", filename="test-filename",
                                                      cache_dir=ModelCache.hf_cache_path)
@@ -74,7 +74,7 @@ class TestDownloadModelFromHF(unittest.TestCase):
         with patch(
                 "marqo.s2_inference.model_downloading.from_hf.hf_hub_download",
                 return_value="model_path") as hf_hub_download_mock:
-            result = download_model_from_hf(self.hf_location, ModelCache.clip_cache_path)
+            result = download_model_from_hf(self.hf_location, download_dir=ModelCache.clip_cache_path)
         self.assertEqual(result, "model_path")
         hf_hub_download_mock.assert_called_once_with(repo_id="test-repo-id", filename="test-filename",
                                                      cache_dir=ModelCache.clip_cache_path)
