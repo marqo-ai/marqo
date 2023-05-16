@@ -20,7 +20,7 @@ def download_model_from_hf(
     Args:
         location: repo_id and filename to be downloaded.
         auth: contains HF API token for model access
-        download_dir: [not yet implemented]. The location where the model
+        download_dir: The location where the model
             should be stored
 
     Returns:

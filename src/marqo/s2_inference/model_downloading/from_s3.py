@@ -15,7 +15,7 @@ def get_presigned_s3_url(location: S3Location, auth: Optional[S3Auth] = None):
         auth: AWS IAM access keys to a user with access to the model to be downloaded
 
     Returns:
-        The the presigned s3 URL
+        The presigned s3 URL
 
     TODO: add link to proper usage in error messages
     """
