@@ -72,6 +72,10 @@ class HF_MODEL(Model):
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_path)
 
     def _load_from_private_hf_repo(self) -> None:
+        """
+        Load a private model from a huggingface repo directly using the `name` attribute in `model_properties`
+        This is a special case for HF models, where we can load a model directory from a repo.
+        """
         model_location = ModelLocation(**self.model_properties[ModelProperties.model_location])
         self.model_path = model_location.hf.name
         token = None
