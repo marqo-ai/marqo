@@ -706,6 +706,7 @@ class TestModelAuth(MarqoTestCase):
                 config=self.config, text='hello', index_name=self.index_name_1,
                 model_auth=model_auth
             )
+
         self.assertIn("403 error when trying to retrieve model from s3", str(cm.exception))
 
         with self.assertRaises(BadRequestError) as cm2:
@@ -865,7 +866,7 @@ class TestModelAuth(MarqoTestCase):
             mock_s3_client.generate_presigned_url.return_value = "https://some_non_existent_model.pt"
 
             with unittest.mock.patch('boto3.client', return_value=mock_s3_client) as mock_boto3_client:
-                with self.assertRaises(InvalidArgError) as cm:
+                with self.assertRaises(BadRequestError) as cm:
                     with unittest.mock.patch(
                         'marqo.s2_inference.processing.custom_clip_utils.download_pretrained_from_url'
                     ) as mock_download_pretrained_from_url:

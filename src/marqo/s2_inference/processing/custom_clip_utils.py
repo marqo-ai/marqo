@@ -104,7 +104,6 @@ def download_pretrained_from_s3(
     Returns:
         Path to the downloaded model
     """
-
     if check_s3_model_already_exists(location=location):
         # TODO: check if abs path is even the most appropriate???
         return get_s3_model_absolute_cache_path(location=location)
@@ -123,7 +122,6 @@ def download_pretrained_from_s3(
                 "Received 403 error when trying to retrieve model from s3 storage. "
                 "Please check the request's s3 credentials and try again. "
             )
-
 
 def download_pretrained_from_url(
         url: str,

@@ -33,7 +33,7 @@ class SearchQuery(BaseMarqoModel):
     boost: Optional[Dict] = None
     image_download_headers: Optional[Dict] = None
     context: Optional[SearchContext] = None
-    scoreModifiers: Optional[ScoreModifier] = None,
+    scoreModifiers: Optional[ScoreModifier] = None
     modelAuth: Optional[ModelAuth] = None
 
     @pydantic.validator('searchMethod')

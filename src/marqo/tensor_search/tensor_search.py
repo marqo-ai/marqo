@@ -1502,6 +1502,17 @@ def vectorise_jobs(jobs: List[VectorisedJobs]) -> Dict[JHash, Dict[str, List[flo
                     model_auth=v.model_auth
                 )
                 result[v.groupby_key()] = dict(zip(v.content, vectors))
+
+        # TODO: This is a temporary addition.
+        except (s2_inference_errors.UnknownModelError,
+                s2_inference_errors.InvalidModelPropertiesError,
+                s2_inference_errors.ModelLoadError,
+                s2_inference.ModelDownloadError) as model_error:
+            raise errors.BadRequestError(
+                message=f'Problem vectorising query. Reason: {str(model_error)}',
+                link="https://marqo.pages.dev/latest/Models-Reference/dense_retrieval/"
+            )
+
         except s2_inference_errors.S2InferenceError as e:
             # TODO: differentiate image processing errors from other types of vectorise errors
             raise errors.InvalidArgError(message=f'Error vectorising content: {v.content}. Message: {e}')
@@ -1760,7 +1771,7 @@ def _vector_text_search(
 
     selected_device = config.indexing_device if device is None else device
     queries = [BulkSearchQueryEntity(
-        q=query, searchableAttributes=searchable_attributes,searchMethod=SearchMethod.TENSOR, limit=result_count, offset=offset, showHighlights=False, filter=filter_string, attributesToRetrieve=attributes_to_retrieve, boost=boost, image_download_headers=image_download_headers, context=context, scoreModifiers=score_modifiers, index=index_name
+        q=query, searchableAttributes=searchable_attributes,searchMethod=SearchMethod.TENSOR, limit=result_count, offset=offset, showHighlights=False, filter=filter_string, attributesToRetrieve=attributes_to_retrieve, boost=boost, image_download_headers=image_download_headers, context=context, scoreModifiers=score_modifiers, index=index_name, modelAuth=model_auth
     )]
     qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, selected_device)
     vectorised_text = list(qidx_to_vectors.values())[0]

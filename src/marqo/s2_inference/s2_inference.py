@@ -164,7 +164,6 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
 
                 if isinstance(e, ModelDownloadError):
                     raise e
-
                 raise ModelLoadError(
                     f"Unable to load model={model_name} on device={device} with normalization={normalize_embeddings}. "
                     f"If you are trying to load a custom model, "
@@ -314,7 +313,7 @@ def get_model_size(model_name: str, model_properties: dict) -> (int, float):
 
 def _load_model(
         model_name: str, model_properties: dict, device: Optional[str] = None,
-        calling_func: str = None, model_auth: ModelAuth = None
+        calling_func: str = None, model_auth: Optional[ModelAuth] = None
 ) -> Any:
     """_summary_
 
@@ -336,14 +335,11 @@ def _load_model(
     loader = _get_model_loader(model_properties['name'], model_properties)
 
     max_sequence_length = model_properties.get('tokens', get_default_seq_length())
-
     model = loader(
         model_properties['name'], device=device, embedding_dim=model_properties['dimensions'],
         max_seq_length=max_sequence_length, model_properties=model_properties, model_auth=model_auth
     )
-
     model.load()
-
     return model
 
 

@@ -21,6 +21,7 @@ class ScoreModifierOperator(BaseModel):
 
     class Config:
         extra: str = "forbid"
+        allow_mutation = False
 
     @validator('field_name')
     def name_not_id(cls, v):
@@ -52,7 +53,7 @@ class ScoreModifierOperator(BaseModel):
 
         else:
             raise ValueError(
-                f"operation must be either 'multiplicative' or 'additive', {operation} provided."
+                f"operation must be either 'multiply_score_by' or 'add_to_score', {operation} provided."
             )
 
 
