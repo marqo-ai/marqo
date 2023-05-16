@@ -94,7 +94,6 @@ class HF_MODEL(Model):
         Raises:
             RunTimeError if an empty filepath is detected.
         """
-        print("_download_from_repo called")
         model_location = ModelLocation(**self.model_properties[ModelProperties.model_location])
         download_model_params = {"repo_location": model_location}
 
