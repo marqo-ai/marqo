@@ -182,8 +182,8 @@ def _preload_model(model, content, device):
             )
         except KeyError as e:
             raise errors.EnvVarError(
-                f"Your custom model {model} is missing either `model_name` or `model_properties`."
-                f"""To add a custom model, it must be a dict with keys `model` and `model_properties` as defined in `https://marqo.pages.dev/0.0.20/Models-Reference/bring_your_own_model/`"""
+                f"Your custom model {model} is missing either `model` or `model_properties`."
+                f"""To add a custom model, it must be a dict with keys `model` and `model_properties` as defined in `https://marqo.pages.dev/0.0.20/Advanced-Usage/configuration/#configuring-preloaded-models`"""
             ) from e
 
 
