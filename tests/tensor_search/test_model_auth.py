@@ -248,7 +248,8 @@ class TestModelAuthOpenCLIP(MarqoTestCase):
         mock_hf_hub_download.assert_called_once_with(
             token=hf_token,
             repo_id=hf_repo_name,
-            filename=hf_object
+            filename=hf_object,
+            cache_dir = None,
         )
 
         # is the open clip model being loaded with the expected args?
@@ -366,7 +367,8 @@ class TestModelAuthOpenCLIP(MarqoTestCase):
         mock_hf_hub_download.assert_called_once_with(
             token=hf_token,
             repo_id=hf_repo_name,
-            filename=hf_object
+            filename=hf_object,
+            cache_dir = None,
         )
 
         # is the open clip model being loaded with the expected args?
@@ -1225,7 +1227,8 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
         mock_hf_hub_download.assert_called_once_with(
             token=hf_token,
             repo_id=hf_repo_name,
-            filename=hf_object
+            filename=hf_object,
+            cache_dir = ModelCache.hf_cache_path,
         )
 
         # is the hf model being loaded with the expected args?
@@ -1282,7 +1285,8 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
 
         mock_hf_hub_download.assert_called_once_with(
             repo_id=hf_repo_name,
-            filename=hf_object
+            filename=hf_object,
+            cache_dir = ModelCache.hf_cache_path,
         )
 
         # is the hf model being loaded with the expected args?
@@ -1492,7 +1496,8 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
         mock_hf_hub_download.assert_called_once_with(
             token=hf_token,
             repo_id=hf_repo_name,
-            filename=hf_object
+            filename=hf_object,
+            cache_dir = ModelCache.hf_cache_path
         )
 
         # is the hf model being loaded with the expected args?
@@ -1549,7 +1554,8 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
 
         mock_hf_hub_download.assert_called_once_with(
             repo_id=hf_repo_name,
-            filename=hf_object
+            filename=hf_object,
+            cache_dir = ModelCache.hf_cache_path
         )
 
         # is the hf model being loaded with the expected args?
