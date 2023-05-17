@@ -1,5 +1,6 @@
 import os, validators
 import zipfile, tarfile
+from urllib.error import HTTPError
 import numpy as np
 from typing import Optional
 import torch
@@ -11,7 +12,7 @@ from marqo.s2_inference.sbert_utils import Model
 from marqo.s2_inference.types import Union, FloatTensor, List
 from marqo.s2_inference.logger import get_logger
 from marqo.tensor_search.enums import ModelProperties
-from marqo.s2_inference.errors import InvalidModelPropertiesError
+from marqo.s2_inference.errors import InvalidModelPropertiesError, ModelDownloadError
 from marqo.s2_inference.processing.custom_clip_utils import download_model
 from marqo.s2_inference.configs import ModelCache
 
@@ -62,9 +63,16 @@ class HF_MODEL(Model):
         try:
             self.model = AutoModelForSentenceEmbedding(self.model_path).to(self.device)
             self.tokenizer = AutoTokenizer.from_pretrained(self.model_path)
-        except Exception as e:
-            raise InvalidModelPropertiesError(f"Marqo encountering error loading the Hugging Face model = `{self.model_path}` using AutoModel or AutoTokenizer "
-                                              f"Please ensure that the model is a valid Hugging Face model and retry. Original error message = {e}")
+        except (OSError, ValueError, RuntimeError) as e:
+            raise InvalidModelPropertiesError(
+                f"Marqo encounters error loading the Hugging Face model = `{self.model_path}` using AutoModel or AutoTokenizer "
+                f"Please ensure that the model is a valid Hugging Face model and retry.\n"
+                f" Original error message = {e}")
+        except (HTTPError, ConnectionError) as e:
+            raise ModelDownloadError(
+                f"Marqo encounters ConnectionError loading the Hugging Face model = `{self.model_path}` using AutoModel or AutoTokenizer. "
+                f"This is likely to be caused by an invalid Hugging Face token. Please ensure that the model is a valid Hugging Face model. \n"
+                f" Original error message = {e}")
 
     def _load_from_private_hf_repo(self) -> None:
         """
@@ -85,9 +93,14 @@ class HF_MODEL(Model):
         try:
             self.model = AutoModelForSentenceEmbedding(model_name=self.model_path, use_auth_token=token).to(self.device)
             self.tokenizer = AutoTokenizer.from_pretrained(self.model_path, use_auth_token=token)
-        except Exception as e:
-            raise InvalidModelPropertiesError(f"Marqo encountering error loading the Hugging Face model = `{self.model_path}` using AutoModel or AutoTokenizer "
-                                              f"Please ensure that the model is a valid Hugging Face model and retry. Original error message = {e}")
+        except (OSError, ValueError, RuntimeError) as e:
+            raise InvalidModelPropertiesError(f"Marqo encounters error loading the Hugging Face model = `{self.model_path}` using AutoModel or AutoTokenizer "
+                                              f"Please ensure that the model is a valid Hugging Face model, the token is correct, and retry\n"
+                                              f" Original error message = {e}")
+        except (HTTPError, ConnectionError) as e:
+            raise ModelDownloadError(f"Marqo encounters ConnectionError loading the Hugging Face model = `{self.model_path}` using AutoModel or AutoTokenizer. "
+                                     f"This is likely to be caused by an invalid Hugging Face token. Please ensure that the model is a valid Hugging Face model. \n"
+                                     f" Original error message = {e}")
 
     def _download_from_repo(self) -> str:
         """Downloads model from an external repo like s3 and returns the filepath
