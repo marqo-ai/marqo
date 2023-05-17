@@ -48,9 +48,6 @@ class HF_MODEL(Model):
         elif self.model_name is not None:
             # Loading from structured huggingface repo directly, token is required directly
             self.model_path = self.model_name
-            self.model = AutoModelForSentenceEmbedding(self.model_path).to(self.device)
-            self.tokenizer = AutoTokenizer.from_pretrained(self.model_path)
-            return
         elif model_location_presence is True:
             # This is a special case for huggingface models, where we can load a model directory from a repo
             if ("hf" in self.model_properties["model_location"]) and ("repo_id" in self.model_properties["model_location"]["hf"]) and \
@@ -61,8 +58,13 @@ class HF_MODEL(Model):
 
         # We need to do extraction here if necessary
         self.model_path = validate_huggingface_archive(self.model_path)
-        self.model = AutoModelForSentenceEmbedding(self.model_path).to(self.device)
-        self.tokenizer = AutoTokenizer.from_pretrained(self.model_path)
+
+        try:
+            self.model = AutoModelForSentenceEmbedding(self.model_path).to(self.device)
+            self.tokenizer = AutoTokenizer.from_pretrained(self.model_path)
+        except Exception as e:
+            raise InvalidModelPropertiesError(f"Marqo encountering error loading the Hugging Face model = `{self.model_path}` using AutoModel or AutoTokenizer "
+                                              f"Please ensure that the model is a valid Hugging Face model and retry. Original error message = {e}")
 
     def _load_from_private_hf_repo(self) -> None:
         """
@@ -80,8 +82,12 @@ class HF_MODEL(Model):
             except AttributeError:
                 raise InvalidModelPropertiesError("Please ensure that `model_auth` is valid for a private Hugging Face model"
                                                   " `ModelAuth` object with a `hugging face token` attribute for private hf repo models")
-        self.model = AutoModelForSentenceEmbedding(model_name=self.model_path, use_auth_token=token).to(self.device)
-        self.tokenizer = AutoTokenizer.from_pretrained(self.model_path, use_auth_token=token)
+        try:
+            self.model = AutoModelForSentenceEmbedding(model_name=self.model_path, use_auth_token=token).to(self.device)
+            self.tokenizer = AutoTokenizer.from_pretrained(self.model_path, use_auth_token=token)
+        except Exception as e:
+            raise InvalidModelPropertiesError(f"Marqo encountering error loading the Hugging Face model = `{self.model_path}` using AutoModel or AutoTokenizer "
+                                              f"Please ensure that the model is a valid Hugging Face model and retry. Original error message = {e}")
 
     def _download_from_repo(self) -> str:
         """Downloads model from an external repo like s3 and returns the filepath
@@ -99,10 +105,6 @@ class HF_MODEL(Model):
             download_model_params['auth'] = self.model_auth
 
         model_file_path = download_model(**download_model_params, download_dir=ModelCache.hf_cache_path)
-        if model_file_path is None or model_file_path == '':
-            raise RuntimeError(
-                'download_model() needs to return a valid filepath to the model! Instead, received '
-                f' filepath `{model_file_path}`')
         return model_file_path
 
     def encode(self, sentence: Union[str, List[str]], normalize=True, **kwargs) -> Union[FloatTensor, np.ndarray]:
@@ -176,10 +178,11 @@ def validate_huggingface_archive(path: str) -> str:
     Returns:
         The directory path to the model
     '''
-    if os.path.isdir(path):
-        # if it's a directory, return the path directly
-        return path
-    elif os.path.isfile(path):
+    if path is None or path == '':
+        raise RuntimeError(
+            'download_model() needs to return a valid filepath to the model! Instead, received '
+            f' filepath `{path}`')
+    if os.path.isfile(path):
         # if it's a file, check if it's a compressed file
         base, ext = os.path.splitext(path)
         if ext in ['.tar', '.gz', '.tgz', '.bz2', '.zip']:
@@ -212,4 +215,5 @@ def validate_huggingface_archive(path: str) -> str:
         else:
             raise InvalidModelPropertiesError(f'Unsupported file extension: {ext}. The path must be a directory or a compressed file.')
     else:
-        raise InvalidModelPropertiesError(f'Invalid path: {path}. The path must be a directory or a compressed file.')
+        # return the directory path or repo_id directory
+        return path
