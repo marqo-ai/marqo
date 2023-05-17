@@ -71,7 +71,7 @@ class HF_MODEL(Model):
         except (HTTPError, ConnectionError) as e:
             raise ModelDownloadError(
                 f"Marqo encounters ConnectionError loading the Hugging Face model = `{self.model_path}` using AutoModel or AutoTokenizer. "
-                f"This is likely to be caused by an invalid Hugging Face token. Please ensure that the model is a valid Hugging Face model. \n"
+                f"This is likely to be caused by an internet issue. Please check Marqo's internet connect with Hugging Face and retry. \n"
                 f" Original error message = {e}")
 
     def _load_from_private_hf_repo(self) -> None:
@@ -99,7 +99,7 @@ class HF_MODEL(Model):
                                               f" Original error message = {e}")
         except (HTTPError, ConnectionError) as e:
             raise ModelDownloadError(f"Marqo encounters ConnectionError loading the Hugging Face model = `{self.model_path}` using AutoModel or AutoTokenizer. "
-                                     f"This is likely to be caused by an invalid Hugging Face token. Please ensure that the model is a valid Hugging Face model. \n"
+                                     f"This is likely to be caused by an internet issue. Please check Marqo's internet connect with Hugging Face and retry. \n"
                                      f" Original error message = {e}")
 
     def _download_from_repo(self) -> str:
