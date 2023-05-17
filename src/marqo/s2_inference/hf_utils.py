@@ -60,17 +60,17 @@ class HF_MODEL(Model):
         # We need to do extraction here if necessary
         self.model_path = validate_huggingface_archive(self.model_path)
 
+        self.model = AutoModelForSentenceEmbedding(self.model_path).to(self.device)
         try:
-            self.model = AutoModelForSentenceEmbedding(self.model_path).to(self.device)
             self.tokenizer = AutoTokenizer.from_pretrained(self.model_path)
         except (OSError, ValueError, RuntimeError) as e:
             raise InvalidModelPropertiesError(
-                f"Marqo encounters error loading the Hugging Face model = `{self.model_path}` using AutoModel or AutoTokenizer "
+                f"Marqo encounters error loading the Hugging Face model = `{self.model_path}` using AutoTokenizer "
                 f"Please ensure that the model is a valid Hugging Face model and retry.\n"
                 f" Original error message = {e}")
         except (HTTPError, ConnectionError) as e:
             raise ModelDownloadError(
-                f"Marqo encounters ConnectionError loading the Hugging Face model = `{self.model_path}` using AutoModel or AutoTokenizer. "
+                f"Marqo encounters ConnectionError loading the Hugging Face model = `{self.model_path}` using AutoTokenizer. "
                 f"This is likely to be caused by an internet issue. Please check Marqo's internet connection with Hugging Face and retry. \n"
                 f" Original error message = {e}")
 
@@ -90,15 +90,16 @@ class HF_MODEL(Model):
             except AttributeError:
                 raise InvalidModelPropertiesError("Please ensure that `model_auth` is valid for a private Hugging Face model"
                                                   " `ModelAuth` object with a `hugging face token` attribute for private hf repo models")
+
+        self.model = AutoModelForSentenceEmbedding(model_name=self.model_path, use_auth_token=token).to(self.device)
         try:
-            self.model = AutoModelForSentenceEmbedding(model_name=self.model_path, use_auth_token=token).to(self.device)
             self.tokenizer = AutoTokenizer.from_pretrained(self.model_path, use_auth_token=token)
         except (OSError, ValueError, RuntimeError) as e:
-            raise InvalidModelPropertiesError(f"Marqo encounters error loading the Hugging Face model = `{self.model_path}` using AutoModel or AutoTokenizer "
+            raise InvalidModelPropertiesError(f"Marqo encounters error loading the Hugging Face model = `{self.model_path}` using AutoTokenizer "
                                               f"Please ensure that the model is a valid Hugging Face model, the token is correct, and retry\n"
                                               f" Original error message = {e}")
         except (HTTPError, ConnectionError) as e:
-            raise ModelDownloadError(f"Marqo encounters ConnectionError loading the Hugging Face model = `{self.model_path}` using AutoModel or AutoTokenizer. "
+            raise ModelDownloadError(f"Marqo encounters ConnectionError loading the Hugging Face model = `{self.model_path}` using AutoTokenizer. "
                                      f"This is likely to be caused by an internet issue. Please check Marqo's internet connection with Hugging Face and retry. \n"
                                      f" Original error message = {e}")
 
@@ -154,7 +155,18 @@ class AutoModelForSentenceEmbedding(nn.Module):
         self.model_name = model_name
         self.normalize = normalize
         self.pooling = pooling
-        self.model = AutoModel.from_pretrained(model_name, use_auth_token = use_auth_token, cache_dir=ModelCache.hf_cache_path)
+        try:
+            self.model = AutoModel.from_pretrained(model_name, use_auth_token = use_auth_token, cache_dir=ModelCache.hf_cache_path)
+        except (OSError, ValueError, RuntimeError) as e:
+            raise InvalidModelPropertiesError(
+                f"Marqo encounters error loading the Hugging Face model = `{self.model_path}` using AutoModel "
+                f"Please ensure that the model is a valid Hugging Face model and retry.\n"
+                f" Original error message = {e}")
+        except (HTTPError, ConnectionError) as e:
+            raise ModelDownloadError(
+                f"Marqo encounters ConnectionError loading the Hugging Face model = `{self.model_path}` using AutoModel. "
+                f"This is likely to be caused by an internet issue. Please check Marqo's internet connection with Hugging Face and retry. \n"
+                f" Original error message = {e}")
         self.model.eval()
         if self.pooling == 'mean':
             self._pool_func = self.mean_pooling
