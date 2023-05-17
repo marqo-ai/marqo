@@ -28,7 +28,7 @@ def download_model_from_hf(
     """
     download_kwargs = location.dict(exclude_unset=True) # Ignore unset values to avoid adding None to params
     if auth is not None:
-        download_kwargs = {**download_kwargs, **auth.dict(exclude_unset=True)}
+        download_kwargs = {**download_kwargs, **auth.dict()}
     try:
         return hf_hub_download(**download_kwargs, cache_dir=download_dir)
     except RepositoryNotFoundError:

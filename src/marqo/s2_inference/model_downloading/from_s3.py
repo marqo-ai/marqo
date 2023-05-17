@@ -25,7 +25,7 @@ def get_presigned_s3_url(location: S3Location, auth: Optional[S3Auth] = None):
             "download a model from an s3 bucket. "
             "If the model is publicly accessible, please use the model's publicly accessible URL."
         )
-    s3_client = boto3.client('s3', **auth.dict(exclude_unset=True))
+    s3_client = boto3.client('s3', **auth.dict())
     try:
         return s3_client.generate_presigned_url('get_object', Params=location.dict(exclude_unset=True))
     except NoCredentialsError:
