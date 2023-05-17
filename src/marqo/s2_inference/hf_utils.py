@@ -1,6 +1,7 @@
 import os, validators
 import zipfile, tarfile
 import numpy as np
+from typing import Optional
 import torch
 from torch import nn
 from transformers import (AutoModel, AutoTokenizer)
@@ -13,6 +14,7 @@ from marqo.tensor_search.enums import ModelProperties
 from marqo.s2_inference.errors import InvalidModelPropertiesError
 from marqo.s2_inference.processing.custom_clip_utils import download_model
 from marqo.s2_inference.configs import ModelCache
+
 
 
 logger = get_logger(__name__)
@@ -128,7 +130,7 @@ class HF_MODEL(Model):
 
 class AutoModelForSentenceEmbedding(nn.Module):
 
-    def __init__(self, model_name: str = None, use_auth_token: str = None, normalize=True, pooling='mean'):
+    def __init__(self, model_name: Optional[str] = None, use_auth_token: Optional[str] = None, normalize=True, pooling='mean'):
         super().__init__()
         self.model_name = model_name
         self.normalize = normalize
@@ -181,20 +183,32 @@ def validate_huggingface_archive(path: str) -> str:
         # if it's a file, check if it's a compressed file
         base, ext = os.path.splitext(path)
         if ext in ['.tar', '.gz', '.tgz', '.bz2', '.zip']:
-            # create a new directory with the same name as the file
-            new_dir = base
-            os.makedirs(new_dir, exist_ok=True)
+            try:
+                # create a new directory with the same name as the file
+                new_dir = base
+                os.makedirs(new_dir, exist_ok=True)
 
-            # extract the compressed file
-            if ext == '.zip':
-                with zipfile.ZipFile(path, 'r') as zip_ref:
-                    zip_ref.extractall(new_dir)
-            else:
-                with tarfile.open(path, 'r') as tar_ref:
-                    tar_ref.extractall(new_dir)
-
-            # return the path to the new directory
-            return new_dir
+                # extract the compressed file
+                if ext == '.zip':
+                    with zipfile.ZipFile(path, 'r') as zip_ref:
+                        zip_ref.extractall(new_dir)
+                else:
+                    with tarfile.open(path, 'r') as tar_ref:
+                        tar_ref.extractall(new_dir)
+                # return the path to the new directory
+                return new_dir
+            except (tarfile.TarError, zipfile.BadZipfile):
+                raise InvalidModelPropertiesError(f'Marqo encountered an error while extracting the compressed model archive from {path}. '
+                                                  f'This is probably because the file is corrupted. '
+                                                  f'Please ensure that the file is a valid compressed file and try again.')
+            # will this error really happen?
+            except (PermissionError):
+                raise InvalidModelPropertiesError(f'Marqo encountered an error while extracting the compressed model archive from {path}. '
+                                                  f'This is probably because the Marqo does not have the permission to write to the directory. '
+                                                  f'Please check the access permission of Marqo and try again.')
+            except Exception as e:
+                raise InvalidModelPropertiesError(f'Marqo encountered an error while extracting the compressed model archive from {path}. '
+                                                  f'The original error message is `{str(e)}`')
         else:
             raise InvalidModelPropertiesError(f'Unsupported file extension: {ext}. The path must be a directory or a compressed file.')
     else:

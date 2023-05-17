@@ -91,7 +91,7 @@ class TestDownloadFromRepo(unittest.TestCase):
             ModelProperties.model_location: location.dict(),
         }
         auth = {
-            's3': s3_auth.dict()
+            's3': s3_auth.dict(exclude_unset=True)
         }
 
         clip = CLIP(model_properties=model_props, model_auth=auth)
