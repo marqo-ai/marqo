@@ -105,6 +105,10 @@ class HF_MODEL(Model):
             download_model_params['auth'] = self.model_auth
 
         model_file_path = download_model(**download_model_params, download_dir=ModelCache.hf_cache_path)
+        if model_file_path is None or model_file_path == '':
+            raise RuntimeError(
+                'download_model() needs to return a valid filepath to the model! Instead, received '
+                f' filepath `{model_file_path}`')
         return model_file_path
 
     def encode(self, sentence: Union[str, List[str]], normalize=True, **kwargs) -> Union[FloatTensor, np.ndarray]:
@@ -178,10 +182,6 @@ def validate_huggingface_archive(path: str) -> str:
     Returns:
         The directory path to the model
     '''
-    if path is None or path == '':
-        raise RuntimeError(
-            'download_model() needs to return a valid filepath to the model! Instead, received '
-            f' filepath `{path}`')
     if os.path.isfile(path):
         # if it's a file, check if it's a compressed file
         base, ext = os.path.splitext(path)
