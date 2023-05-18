@@ -1,3 +1,14 @@
+# Release 0.0.20
+
+## New features
+- Custom model pre-loading (https://github.com/marqo-ai/marqo/pull/475). Public models can now be loaded on Marqo startup via URL
+  through the `MARQO_MODELS_TO_PRELOAD` environment variable. These must be formatted as JSON objects with `model` and `model_properties`.
+  See [here (configuring pre-loaded models)](https://marqo.pages.dev/0.0.20/Advanced-Usage/configuration/#configuring-preloaded-models) for usage.
+
+## Bug fixes and minor changes
+- Fixed ARM64 build issue caused by package version conflicts (https://github.com/marqo-ai/marqo/pull/478)
+
+
 # Release 0.0.19
 
 ## New features
