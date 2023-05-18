@@ -51,8 +51,8 @@ Marqo is an end-to-end, multimodal vector search engine. With Marqo, users can s
 
 **🍱 Managed cloud**
 - Scale Marqo at the click of a button.
-- Multi-az, accelerated inference.
-- Marqo cloud ☁️ is in beta. If you’re interested, [apply here](https://q78175g1wwa.typeform.com/to/d0PEuRPC).
+- High availability, accelerated inference.
+- Marqo cloud ☁️ is in pre-release. If you’re interested, [apply here](https://q78175g1wwa.typeform.com/to/d0PEuRPC).
 
 <p align="center">
     <a href="https://q78175g1wwa.typeform.com/to/d0PEuRPC"><img src="assets/join-the-cloud-beta.png" width="90%" height="20%"/></a>
