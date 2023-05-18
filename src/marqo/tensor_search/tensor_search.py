@@ -1561,9 +1561,9 @@ def get_query_vectors_from_jobs(
             # TODO how doe we ensure order?
             weighted_vectors = [np.asarray(vec) * weight for vec, weight, content in vectorised_ordered_queries]
             
-            custom_tensors = q.get_context_tensor() 
-            if custom_tensors is not None:
-                weighted_vectors += [np.asarray(v.vector) * v.weight for v in custom_tensors]
+            context_tensors = q.get_context_tensor() 
+            if context_tensors is not None:
+                weighted_vectors += [np.asarray(v.vector) * v.weight for v in context_tensors]
             
             try:
                 merged_vector = np.mean(weighted_vectors, axis=0)
@@ -1657,6 +1657,8 @@ def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity
     """
     if len(queries) == 0:
         return []
+
+
 
     start_preprocessing_time = timer()
     selected_device = config.indexing_device if device is None else device
@@ -1882,42 +1884,6 @@ def boost_score(docs: dict, boosters: dict, searchable_attributes) -> dict:
     return to_be_boosted
 
 
-def convert_validated_score_modifiers_to_script_score(validated_score_modifiers: Dict = None) -> str:
-    '''
-    A function that converts the validated score modifiers to a painless script to modify the score.
-    '''
-    script_parts = ["double additive = 0;"]
-    for config in validated_score_modifiers.get("multiply_score_by", []):
-        field_name = config["field_name"]
-        weight = config.get("weight", 1)
-        # doc.containsKey check if the field is in the mappings.
-        # doc[].size() >0 and doc[].value instanceof java.lang.Number check if the field has a valid value
-        script_parts.append(f"""
-        if (doc.containsKey('__chunks.{field_name}')) {{
-            if (doc['__chunks.{field_name}'].size() > 0 &&
-                (doc['__chunks.{field_name}'].value instanceof java.lang.Number)) {{
-                _score = _score * doc['__chunks.{field_name}'].value * {weight};
-            }}
-        }}
-        """)
-
-    for config in validated_score_modifiers.get("add_to_score", []):
-        field_name = config["field_name"]
-        weight = config.get("weight", 1)
-        script_parts.append(f""" 
-        if (doc.containsKey('__chunks.{field_name}')) {{     
-            if (doc['__chunks.{field_name}'].size() > 0 &&
-                (doc['__chunks.{field_name}'].value instanceof java.lang.Number)) {{
-                additive = additive + doc['__chunks.{field_name}'].value * {weight};
-            }}
-        }}
-        """)
-
-    script_parts.append(f"return Math.max(0.0, (_score + additive));")
-    script = "\n".join(script_parts)
-    return f"""{script}"""
-
-
 def sort_chunks(docs: dict) -> List:
     to_be_sorted = docs.copy()
     for doc_id in list(to_be_sorted.keys()):
@@ -1963,7 +1929,6 @@ def check_health(config: Config):
             "status": marqo_os_status
         }
     }
-
 
 def delete_index(config: Config, index_name):
     res = HttpRequests(config).delete(path=index_name)

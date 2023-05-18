@@ -5,21 +5,27 @@ import requests
 import random
 from unittest import mock
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
+from marqo.s2_inference.errors import UnknownModelError
 from marqo.s2_inference.s2_inference import vectorise
 import unittest
 from marqo.tensor_search.enums import TensorField, SearchMethod, EnvVars, IndexSettingsField
 from marqo.errors import (
     BackendCommunicationError, IndexNotFoundError, InvalidArgError, IllegalRequestedDocCount, BadRequestError
 )
-from marqo.tensor_search import api
+
+from marqo.tensor_search import api, tensor_search, index_meta_cache, utils
 from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQueryEntity
-from marqo.tensor_search import tensor_search, constants, index_meta_cache, utils
+from marqo.tensor_search.models.search import VectorisedJobs
 import numpy as np
 from tests.marqo_test import MarqoTestCase
 from typing import List
 import pydantic
 from tests.utils.transition import add_docs_caller
 
+
+# run_vectorise_pipeline
+# create_vector_jobs
+# get_query_vectors_from_jobs
 
 def pass_through_vectorise(*arg, **kwargs):
     """Vectorise will behave as usual, but we will be able to see the call list
@@ -28,8 +34,76 @@ def pass_through_vectorise(*arg, **kwargs):
     return vectorise(*arg, **kwargs)
 
 
-class TestBulkSearch(MarqoTestCase):
+class TestVectoriseJobs(unittest.TestCase):
+    def setUp(self):
+        self.vectorised_jobs = [
+            VectorisedJobs(
+                model_name='test_model',
+                model_properties={'test': 'property'},
+                content=['test_content'],
+                device='cpu',
+                normalize_embeddings=True,
+                image_download_headers=None,
+                content_type='text',
+                model_auth=None
+            )
+        ]
 
+    @mock.patch('marqo.s2_inference.s2_inference.vectorise')
+    def test_vectorise_jobs_success(self, mock_vectorise):
+        # Setup
+        mock_vectorise.return_value = [[0.1, 0.2, 0.3]]
+        
+        # Execution
+        result = tensor_search.vectorise_jobs(self.vectorised_jobs)
+
+        # Assertions
+        self.assertTrue(mock_vectorise.called)
+        self.assertIsInstance(result, dict)
+        self.assertEqual(len(result), 1)
+        self.assertListEqual(result[self.vectorised_jobs[0].groupby_key()]['test_content'], [0.1, 0.2, 0.3])
+
+    @mock.patch('marqo.s2_inference.s2_inference.vectorise')
+    def test_vectorise_jobs_model_error(self, mock_vectorise):
+        # Setup
+        mock_vectorise.side_effect = UnknownModelError('Model Error')
+
+        # Assertions
+        with self.assertRaises(BadRequestError):
+            tensor_search.vectorise_jobs(self.vectorised_jobs)
+
+    @mock.patch('marqo.s2_inference.s2_inference.vectorise')
+    def test_vectorise_jobs_multiple_jobs(self, mock_vectorise):
+        # Setup
+        vectorised_jobs = self.vectorised_jobs + [
+            VectorisedJobs(
+                model_name='test_model2',
+                model_properties={'test': 'property2'},
+                content=['test_content2'],
+                device='cpu',
+                normalize_embeddings=True,
+                image_download_headers=None,
+                content_type='text',
+                model_auth=None
+            )
+        ]
+        mock_vectorise.side_effect = [
+            [[0.1, 0.2, 0.3]],
+            [[0.4, 0.5, 0.6]]
+        ]
+
+        # Execution
+        result = tensor_search.vectorise_jobs(vectorised_jobs)
+
+        # Assertions
+        self.assertEqual(mock_vectorise.call_count, 2)
+        self.assertIsInstance(result, dict)
+        self.assertEqual(len(result), 2)
+        self.assertListEqual(result[vectorised_jobs[0].groupby_key()]['test_content'], [0.1, 0.2, 0.3])
+        self.assertListEqual(result[vectorised_jobs[1].groupby_key()]['test_content2'], [0.4, 0.5, 0.6])
+
+
+class TestBulkSearch(MarqoTestCase):
     def setUp(self) -> None:
         self.index_name_1 = "my-test-index-1"
         self.index_name_2 = "my-test-index-2"
