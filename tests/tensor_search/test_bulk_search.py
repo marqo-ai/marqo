@@ -73,6 +73,19 @@ class TestGetQueryVectorsFromJobs(MarqoTestCase):
 
         self.assertTrue((qidx_to_vectors[0] == np.array([0.5, 0.5])).all())
         self.assertTrue((qidx_to_vectors[1] == np.array([0.5, 0.5])).all())
+    
+    @mock.patch("marqo.tensor_search.tensor_search.get_index_info")
+    @mock.patch("marqo.tensor_search.tensor_search.get_content_vector")
+    def test_get_query_vectors_from_jobs_multimodal(self, mock_get_content_vector, mock_get_index_info):
+        mock_get_index_info.return_value = self.index_info
+        mock_get_content_vector.return_value = np.array([0.5, 0.5])
+        
+        qidx_to_vectors = tensor_search.get_query_vectors_from_jobs([
+            BulkSearchQueryEntity(index="index_name_1", q={"a test ": 0.8, "query": 0.2}, limit=2),
+        ], {0: self.qidx_to_job[0]}, self.job_to_vectors, self.config, self.jobs)
+
+        self.assertEqual(len(qidx_to_vectors), 1)
+        self.assertTrue((qidx_to_vectors[0] == np.array([0.25, 0.25])).all())
         
     @mock.patch("marqo.tensor_search.tensor_search.get_index_info")
     def test_empty_inputs(self, mock_get_index_info):
@@ -80,6 +93,7 @@ class TestGetQueryVectorsFromJobs(MarqoTestCase):
         
         empty_qidx_to_vectors = tensor_search.get_query_vectors_from_jobs([], {}, {}, self.config, {})
         self.assertEqual(len(empty_qidx_to_vectors), 0)
+
 
     @mock.patch("marqo.tensor_search.tensor_search.get_index_info")
     def test_no_matching_jobs(self, mock_get_index_info):

@@ -1631,7 +1631,6 @@ def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity],
     # we can still use qidx_to_job. But the jobs structure may need to be different
     vector_jobs_tuple: Tuple[Dict[Qidx, List[VectorisedJobPointer]], Dict[JHash, VectorisedJobs]] = create_vector_jobs(queries, config, selected_device)
 
-    print(vector_jobs_tuple, create_vector_jobs)
     qidx_to_jobs, jobs = vector_jobs_tuple
 
     # 2. Vectorise in batches against all queries
