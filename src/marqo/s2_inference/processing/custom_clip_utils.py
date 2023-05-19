@@ -66,6 +66,7 @@ def download_model(
     Returns:
         The path of the downloaded model
     """
+
     single_weight_location_validation_msg = (
         "only exactly one of parameters (repo_location, url) is allowed to be specified.")
     if repo_location is None and url is None:
@@ -104,10 +105,9 @@ def download_pretrained_from_s3(
     Returns:
         Path to the downloaded model
     """
-
-    if check_s3_model_already_exists(location=location):
+    if check_s3_model_already_exists(location=location, download_dir=download_dir):
         # TODO: check if abs path is even the most appropriate???
-        return get_s3_model_absolute_cache_path(location=location)
+        return get_s3_model_absolute_cache_path(location=location, download_dir=download_dir)
 
     url = get_presigned_s3_url(location=location, auth=auth)
 
@@ -168,3 +168,4 @@ def download_pretrained_from_url(
                 loop.update(len(buffer))
 
     return download_target
+
