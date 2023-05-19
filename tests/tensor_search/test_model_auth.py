@@ -16,7 +16,7 @@ import unittest
 from marqo.s2_inference.s2_inference import clear_loaded_models
 from transformers import AutoModel, AutoTokenizer
 from marqo.s2_inference.processing.custom_clip_utils import download_pretrained_from_url
-from marqo.s2_inference.hf_utils import validate_huggingface_archive
+from marqo.s2_inference.hf_utils import extract_huggingface_archive
 import os
 from marqo.errors import BadRequestError, ModelNotInCacheError
 from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQueryEntity
@@ -1394,7 +1394,7 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1,
                                           index_settings=s3_settings)
 
-        mock_validate_huggingface_archive = mock.MagicMock(side_effect=validate_huggingface_archive)
+        mock_validate_huggingface_archive = mock.MagicMock(side_effect=extract_huggingface_archive)
         mock_automodel_from_pretrained = mock.MagicMock(side_effect=AutoModel.from_pretrained)
         mock_download = mock.MagicMock(side_effect=download_pretrained_from_url)
 
@@ -1691,7 +1691,7 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1,
                                           index_settings=s3_settings)
 
-        mock_validate_huggingface_archive = mock.MagicMock(side_effect=validate_huggingface_archive)
+        mock_validate_huggingface_archive = mock.MagicMock(side_effect=extract_huggingface_archive)
         mock_automodel_from_pretrained = mock.MagicMock(side_effect=AutoModel.from_pretrained)
         mock_download = mock.MagicMock(side_effect=download_pretrained_from_url)
 

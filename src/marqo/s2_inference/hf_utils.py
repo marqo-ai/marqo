@@ -58,20 +58,20 @@ class HF_MODEL(Model):
                 self.model_path = self._download_from_repo()
 
         # We need to do extraction here if necessary
-        self.model_path = validate_huggingface_archive(self.model_path)
+        self.model_path = extract_huggingface_archive(self.model_path)
 
         self.model = AutoModelForSentenceEmbedding(self.model_path).to(self.device)
         try:
             self.tokenizer = AutoTokenizer.from_pretrained(self.model_path)
         except (OSError, ValueError, RuntimeError) as e:
             raise InvalidModelPropertiesError(
-                f"Marqo encounters error loading the Hugging Face model = `{self.model_path}` using AutoTokenizer "
+                f"Marqo encountered an error loading the Hugging Face model = `{self.model_path}` using AutoTokenizer "
                 f"Please ensure that the model is a valid Hugging Face model and retry.\n"
                 f" Original error message = {e}")
         except (HTTPError, ConnectionError) as e:
             raise ModelDownloadError(
-                f"Marqo encounters ConnectionError loading the Hugging Face model = `{self.model_path}` using AutoTokenizer. "
-                f"This is likely to be caused by an internet issue. Please check Marqo's internet connection with Hugging Face and retry. \n"
+                f"Marqo encountered an ConnectionError loading the Hugging Face model = `{self.model_path}` using AutoTokenizer. "
+                f"This is likely to be caused by an internet issue. Please check Marqo's internet connection to Hugging Face and retry. \n"
                 f" Original error message = {e}")
 
     def _load_from_private_hf_repo(self) -> None:
@@ -95,12 +95,12 @@ class HF_MODEL(Model):
         try:
             self.tokenizer = AutoTokenizer.from_pretrained(self.model_path, use_auth_token=token)
         except (OSError, ValueError, RuntimeError) as e:
-            raise InvalidModelPropertiesError(f"Marqo encounters error loading the Hugging Face model = `{self.model_path}` using AutoTokenizer "
+            raise InvalidModelPropertiesError(f"Marqo encounterend an error loading the Hugging Face model = `{self.model_path}` using AutoTokenizer "
                                               f"Please ensure that the model is a valid Hugging Face model, the token is correct, and retry\n"
                                               f" Original error message = {e}")
         except (HTTPError, ConnectionError) as e:
             raise ModelDownloadError(f"Marqo encounters ConnectionError loading the Hugging Face model = `{self.model_path}` using AutoTokenizer. "
-                                     f"This is likely to be caused by an internet issue. Please check Marqo's internet connection with Hugging Face and retry. \n"
+                                     f"This is likely to be caused by an internet issue. Please check Marqo's internet connection to Hugging Face and retry. \n"
                                      f" Original error message = {e}")
 
     def _download_from_repo(self) -> str:
@@ -198,47 +198,47 @@ class AutoModelForSentenceEmbedding(nn.Module):
         return model_output[0][:, 0]
 
 
-def validate_huggingface_archive(path: str) -> str:
+def extract_huggingface_archive(path: str) -> str:
     '''
         This function extracts the model from a huggingface archive if necessary.
         Unlike open clip models that can loaded from a single .pt or .bin file,
-        Huggingface models are loaded from a directory.
-
+        Huggingface models are loaded from a directory. Please avoid using this function
+        for CLIP or Open CLIP models.
     Returns:
         The directory path to the model
     '''
     if os.path.isfile(path):
         # if it's a file, check if it's a compressed file
         base, ext = os.path.splitext(path)
-        if ext in ['.tar', '.gz', '.tgz', '.bz2', '.zip']:
-            try:
-                # create a new directory with the same name as the file
-                new_dir = base
-                os.makedirs(new_dir, exist_ok=True)
+        if ext in ['.bin', '.pt']:
+            raise InvalidModelPropertiesError(f"Marqo does not support loading Hugging Face SBERT models from the provided single `{ext}` file. "
+                                              "Please try to wrap the model in a Hugging Face archive file and try again. ")
+        try:
+            # create a new directory with the same name as the file
+            new_dir = base
+            os.makedirs(new_dir, exist_ok=True)
 
-                # extract the compressed file
-                if ext == '.zip':
-                    with zipfile.ZipFile(path, 'r') as zip_ref:
-                        zip_ref.extractall(new_dir)
-                else:
-                    with tarfile.open(path, 'r') as tar_ref:
-                        tar_ref.extractall(new_dir)
-                # return the path to the new directory
-                return new_dir
-            except (tarfile.TarError, zipfile.BadZipfile):
-                raise InvalidModelPropertiesError(f'Marqo encountered an error while extracting the compressed model archive from {path}. '
-                                                  f'This is probably because the file is corrupted. '
-                                                  f'Please ensure that the file is a valid compressed file and try again.')
-            # will this error really happen?
-            except (PermissionError):
-                raise InvalidModelPropertiesError(f'Marqo encountered an error while extracting the compressed model archive from {path}. '
-                                                  f'This is probably because the Marqo does not have the permission to write to the directory. '
-                                                  f'Please check the access permission of Marqo and try again.')
-            except Exception as e:
-                raise InvalidModelPropertiesError(f'Marqo encountered an error while extracting the compressed model archive from {path}. '
-                                                  f'The original error message is `{str(e)}`')
-        else:
-            raise InvalidModelPropertiesError(f'Unsupported file extension: {ext}. The path must be a directory or a compressed file.')
+            # extract the compressed file
+            if ext == '.zip':
+                with zipfile.ZipFile(path, 'r') as zip_ref:
+                    zip_ref.extractall(new_dir)
+            else:
+                with tarfile.open(path, 'r') as tar_ref:
+                    tar_ref.extractall(new_dir)
+            # return the path to the new directory
+            return new_dir
+        except (tarfile.ReadError, zipfile.BadZipfile):
+            raise InvalidModelPropertiesError(f'Marqo encountered an error while extracting the compressed model archive from {path}.\n '
+                                              f'This is probably because the file is corrupted or the extionsion {ext} is not supported. '
+                                              f'Please ensure that the file is a valid compressed file and try again.')
+        # will this error really happen?
+        except (PermissionError):
+            raise InvalidModelPropertiesError(f'Marqo encountered an error while extracting the compressed model archive from {path}. '
+                                              f'This is probably because the Marqo does not have the permission to write to the directory. '
+                                              f'Please check the access permission of Marqo and try again.')
+        except Exception as e:
+            raise InvalidModelPropertiesError(f'Marqo encountered an error while extracting the compressed model archive from {path}. '
+                                              f'The original error message is `{str(e)}`')
     else:
         # return the directory path or repo_id directory
         return path
