@@ -1152,7 +1152,8 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
     4. Load from public url, without auth
 
     5. Load from huggingface repo, with auth
-    6. Load from public url, without auth
+    61. Load from huggingface, without auth, using hf.repo_id
+    62. Load from huggingface, without auth, using name
 
     for both search and add_document calls
     """
@@ -1181,12 +1182,12 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
         """
         Does not yet assert that a file is downloaded
         """
-        hf_object = "some_model.pt"
+        hf_object = "some_model_archive.zip"
         hf_repo_name = "MyRepo/test-private"
         hf_token = "hf_some_secret_key"
 
         model_properties = {
-            #"name": "ViT-B/32", Note, name is not a required field for HF models.
+            #"name": "bulabulabula", Note: name is not a required field for HF models.
             "dimensions": 384,
             "model_location": {
                 "hf": {
@@ -1204,8 +1205,8 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
         mock_hf_hub_download = mock.MagicMock()
         mock_hf_hub_download.return_value = 'cache/path/to/model.zip'
 
-        mock_validate_huggingface_archive = mock.MagicMock()
-        mock_validate_huggingface_archive.return_value = 'cache/path/to/model/'
+        mock_extract_huggingface_archive = mock.MagicMock()
+        mock_extract_huggingface_archive.return_value = 'cache/path/to/model/'
 
         mock_automodel_from_pretrained = mock.MagicMock()
         mock_autotokenizer_from_pretrained = mock.MagicMock()
@@ -1213,14 +1214,14 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
         with unittest.mock.patch('transformers.AutoModel.from_pretrained', mock_automodel_from_pretrained):
             with unittest.mock.patch('transformers.AutoTokenizer.from_pretrained', mock_autotokenizer_from_pretrained):
                 with unittest.mock.patch('marqo.s2_inference.model_downloading.from_hf.hf_hub_download', mock_hf_hub_download):
-                    with unittest.mock.patch("marqo.s2_inference.hf_utils.validate_huggingface_archive", mock_validate_huggingface_archive):
+                    with unittest.mock.patch("marqo.s2_inference.hf_utils.extract_huggingface_archive", mock_extract_huggingface_archive):
                         try:
                             res = tensor_search.search(
                                 config=self.config, text='hello', index_name=self.index_name_1,
                                 model_auth=ModelAuth(hf=HfAuth(token=hf_token))
                             )
                         except KeyError as e:
-                        # KeyError as this is not a real model. It does not have an attention_mask
+                            # KeyError as this is not a real model. It does not have an attention_mask
                             assert "attention_mask" in str(e)
                             pass
 
@@ -1236,8 +1237,8 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
         assert mock_automodel_from_pretrained.call_args_list[0][0][0] == 'cache/path/to/model/', "Expected call not found"
 
         # is the zip file being extracted with the expected args?
-        assert len(mock_validate_huggingface_archive.call_args_list) == 1
-        assert mock_validate_huggingface_archive.call_args_list[0][0][0] == 'cache/path/to/model.zip', "Expected call not found"
+        assert len(mock_extract_huggingface_archive.call_args_list) == 1
+        assert mock_extract_huggingface_archive.call_args_list[0][0][0] == 'cache/path/to/model.zip', "Expected call not found"
 
     def test_2_load_model_from_hf_zip_file_without_auth_search(self):
         """
@@ -1245,7 +1246,6 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
         """
         hf_object = "some_model.zip"
         hf_repo_name = "MyRepo/test-private"
-        hf_token = "hf_some_secret_key"
 
         model_properties = {
             "dimensions": 384,
@@ -1265,8 +1265,8 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
         mock_hf_hub_download = mock.MagicMock()
         mock_hf_hub_download.return_value = 'cache/path/to/model.zip'
 
-        mock_validate_huggingface_archive = mock.MagicMock()
-        mock_validate_huggingface_archive.return_value = 'cache/path/to/model/'
+        mock_extract_huggingface_archive = mock.MagicMock()
+        mock_extract_huggingface_archive.return_value = 'cache/path/to/model/'
 
         mock_automodel_from_pretrained = mock.MagicMock()
         mock_autotokenizer_from_pretrained = mock.MagicMock()
@@ -1274,7 +1274,7 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
         with unittest.mock.patch('transformers.AutoModel.from_pretrained', mock_automodel_from_pretrained):
             with unittest.mock.patch('transformers.AutoTokenizer.from_pretrained', mock_autotokenizer_from_pretrained):
                 with unittest.mock.patch('marqo.s2_inference.model_downloading.from_hf.hf_hub_download', mock_hf_hub_download):
-                    with unittest.mock.patch("marqo.s2_inference.hf_utils.validate_huggingface_archive", mock_validate_huggingface_archive):
+                    with unittest.mock.patch("marqo.s2_inference.hf_utils.extract_huggingface_archive", mock_extract_huggingface_archive):
                         try:
                             res = tensor_search.search(
                                 config=self.config, text='hello', index_name=self.index_name_1,)
@@ -1298,8 +1298,8 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
         assert mock_autotokenizer_from_pretrained.call_args_list[0][0][0] == 'cache/path/to/model/', "Expected call not found"
 
         # is the zip file being extracted with the expected args?
-        assert len(mock_validate_huggingface_archive.call_args_list) == 1
-        assert mock_validate_huggingface_archive.call_args_list[0][0][0] == 'cache/path/to/model.zip', "Expected call not found"
+        assert len(mock_extract_huggingface_archive.call_args_list) == 1
+        assert mock_extract_huggingface_archive.call_args_list[0][0][0] == 'cache/path/to/model.zip', "Expected call not found"
 
     def test_3_load_model_from_s3_zip_file_with_auth_search(self):
         s3_object_key = 'path/to/your/secret_model.pt'
@@ -1335,8 +1335,8 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
         mock_download_pretrained_from_url = mock.MagicMock()
         mock_download_pretrained_from_url.return_value = 'cache/path/to/model.zip'
 
-        mock_validate_huggingface_archive = mock.MagicMock()
-        mock_validate_huggingface_archive.return_value = 'cache/path/to/model/'
+        mock_extract_huggingface_archive = mock.MagicMock()
+        mock_extract_huggingface_archive.return_value = 'cache/path/to/model/'
 
         mock_automodel_from_pretrained = mock.MagicMock()
         mock_autotokenizer_from_pretrained = mock.MagicMock()
@@ -1345,7 +1345,7 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
             with unittest.mock.patch('transformers.AutoTokenizer.from_pretrained',mock_autotokenizer_from_pretrained):
                 with unittest.mock.patch('boto3.client', return_value=mock_s3_client) as mock_boto3_client:
                     with unittest.mock.patch("marqo.s2_inference.processing.custom_clip_utils.download_pretrained_from_url", mock_download_pretrained_from_url):
-                        with unittest.mock.patch("marqo.s2_inference.hf_utils.validate_huggingface_archive", mock_validate_huggingface_archive):
+                        with unittest.mock.patch("marqo.s2_inference.hf_utils.extract_huggingface_archive", mock_extract_huggingface_archive):
                             try:
                                 res = tensor_search.search(
                                     config=self.config, text='hello', index_name=self.index_name_1,
@@ -1376,7 +1376,7 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
             cache_file_name = os.path.basename(s3_object_key)
         )
 
-        mock_validate_huggingface_archive.assert_called_once_with(
+        mock_extract_huggingface_archive.assert_called_once_with(
             "cache/path/to/model.zip",
         )
 
@@ -1384,7 +1384,6 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
         public_url = "https://marqo-cache-sentence-transformers.s3.us-west-2.amazonaws.com/all-MiniLM-L6-v1/all-MiniLM-L6-v1.zip"
 
         model_properties = {
-            # "name": "ViT-B/32", Note, name is not a required field for HF models.
             "dimensions": 384,
             "url" : public_url,
             "type": "hf",
@@ -1394,17 +1393,17 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1,
                                           index_settings=s3_settings)
 
-        mock_validate_huggingface_archive = mock.MagicMock(side_effect=extract_huggingface_archive)
+        mock_extract_huggingface_archive = mock.MagicMock(side_effect=extract_huggingface_archive)
         mock_automodel_from_pretrained = mock.MagicMock(side_effect=AutoModel.from_pretrained)
         mock_download = mock.MagicMock(side_effect=download_pretrained_from_url)
 
         with mock.patch('transformers.AutoModel.from_pretrained', new=mock_automodel_from_pretrained):
             with mock.patch('marqo.s2_inference.processing.custom_clip_utils.download_pretrained_from_url', new=mock_download):
-                with mock.patch("marqo.s2_inference.hf_utils.validate_huggingface_archive", new=mock_validate_huggingface_archive):
+                with mock.patch("marqo.s2_inference.hf_utils.extract_huggingface_archive", new=mock_extract_huggingface_archive):
                     res = tensor_search.search(config=self.config, text='hello', index_name=self.index_name_1)
 
-        assert len(mock_validate_huggingface_archive.call_args_list) == 1
-        assert mock_validate_huggingface_archive.call_args_list[0][0][0] == (ModelCache.hf_cache_path + os.path.basename(public_url))
+        assert len(mock_extract_huggingface_archive.call_args_list) == 1
+        assert mock_extract_huggingface_archive.call_args_list[0][0][0] == (ModelCache.hf_cache_path + os.path.basename(public_url))
 
         assert len(mock_download.call_args_list) == 1
         _, call_kwargs = mock_download.call_args_list[0]
@@ -1443,15 +1442,52 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
                 res = tensor_search.search(config=self.config, text='hello', index_name=self.index_name_1,
                                            model_auth=ModelAuth(hf=HfAuth(token=hf_token)))
 
-        assert len(mock_automodel_from_pretrained.call_args_list) == 1
-        assert mock_automodel_from_pretrained.call_args_list[0][0][0] == private_repo_name
-        mock_autotokenizer_from_pretrained.call_args_list[0][1]["use_auth_token"] == hf_token
+        mock_automodel_from_pretrained.assert_called_once_with(
+            private_repo_name, use_auth_token=hf_token, cache_dir=ModelCache.hf_cache_path
+        )
 
-        assert len(mock_autotokenizer_from_pretrained.call_args_list) == 1
-        assert mock_autotokenizer_from_pretrained.call_args_list[0][0][0] == private_repo_name
-        mock_autotokenizer_from_pretrained.call_args_list[0][1]["use_auth_token"] == hf_token
+        mock_autotokenizer_from_pretrained.assert_called_once_with(
+            private_repo_name, use_auth_token=hf_token
+        )
 
-    def test_6_load_model_from_public_hf_repo_without_auth_search(self):
+    def test_61_load_model_from_public_hf_repo_without_auth_using_repo_id_search(self):
+        public_repo_name = "sentence-transformers/all-MiniLM-L6-v1"
+        hf_token = "some-secret-token"
+
+        model_properties = {
+            "dimensions": 384,
+            "model_location": {
+                "auth_required": False,
+                "hf": {"repo_id": public_repo_name}
+            },
+            "type": "hf",
+        }
+
+        s3_settings = _get_base_index_settings()
+        s3_settings['index_defaults']['model_properties'] = model_properties
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1,
+                                          index_settings=s3_settings)
+
+        # Redirect the private model to a public one to finish the test
+        mock_automodel_from_pretrained = mock.MagicMock()
+        mock_automodel_from_pretrained.return_value = AutoModel.from_pretrained("sentence-transformers/all-MiniLM-L6-v1")
+
+        mock_autotokenizer_from_pretrained = mock.MagicMock()
+        mock_autotokenizer_from_pretrained.return_value = AutoTokenizer.from_pretrained("sentence-transformers/all-MiniLM-L6-v1")
+
+        with unittest.mock.patch("transformers.AutoModel.from_pretrained",  mock_automodel_from_pretrained):
+            with unittest.mock.patch("transformers.AutoTokenizer.from_pretrained", mock_autotokenizer_from_pretrained):
+                res = tensor_search.search(config=self.config, text='hello', index_name=self.index_name_1)
+
+        mock_automodel_from_pretrained.assert_called_once_with(
+            public_repo_name, use_auth_token=None, cache_dir=ModelCache.hf_cache_path
+        )
+
+        mock_autotokenizer_from_pretrained.assert_called_once_with(
+            public_repo_name, use_auth_token=None
+        )
+
+    def test_62_load_model_from_public_hf_repo_without_auth_using_name_search(self):
         public_repo_name = "sentence-transformers/all-MiniLM-L6-v1"
 
         model_properties = {
@@ -1464,14 +1500,14 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1,
                                           index_settings=s3_settings)
 
-
         mock_automodel_from_pretrained = mock.MagicMock(side_effect=AutoModel.from_pretrained)
 
         with mock.patch('transformers.AutoModel.from_pretrained', new=mock_automodel_from_pretrained):
                     res = tensor_search.search(config=self.config, text='hello', index_name=self.index_name_1)
 
-        assert len(mock_automodel_from_pretrained.call_args_list) == 1
-        assert mock_automodel_from_pretrained.call_args_list[0][0][0] == public_repo_name
+        assert mock_automodel_from_pretrained.assert_called_once_with(
+            public_repo_name, use_auth_token=None, cache_dir=ModelCache.hf_cache_path
+        )
 
     def test_1_load_model_from_hf_zip_file_with_auth_add_documents(self):
         """
@@ -1500,8 +1536,8 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
         mock_hf_hub_download = mock.MagicMock()
         mock_hf_hub_download.return_value = 'cache/path/to/model.zip'
 
-        mock_validate_huggingface_archive = mock.MagicMock()
-        mock_validate_huggingface_archive.return_value = 'cache/path/to/model/'
+        mock_extract_huggingface_archive = mock.MagicMock()
+        mock_extract_huggingface_archive.return_value = 'cache/path/to/model/'
 
         mock_automodel_from_pretrained = mock.MagicMock()
         mock_autotokenizer_from_pretrained = mock.MagicMock()
@@ -1509,7 +1545,7 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
         with unittest.mock.patch('transformers.AutoModel.from_pretrained', mock_automodel_from_pretrained):
             with unittest.mock.patch('transformers.AutoTokenizer.from_pretrained', mock_autotokenizer_from_pretrained):
                 with unittest.mock.patch('marqo.s2_inference.model_downloading.from_hf.hf_hub_download', mock_hf_hub_download):
-                    with unittest.mock.patch("marqo.s2_inference.hf_utils.validate_huggingface_archive", mock_validate_huggingface_archive):
+                    with unittest.mock.patch("marqo.s2_inference.hf_utils.extract_huggingface_archive", mock_extract_huggingface_archive):
                         try:
                             tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
                                 index_name=self.index_name_1, auto_refresh=True, docs=[{'a': 'b'}],
@@ -1531,8 +1567,8 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
         assert mock_automodel_from_pretrained.call_args_list[0][0][0] == 'cache/path/to/model/', "Expected call not found"
 
         # is the zip file being extracted with the expected args?
-        assert len(mock_validate_huggingface_archive.call_args_list) == 1
-        assert mock_validate_huggingface_archive.call_args_list[0][0][0] == 'cache/path/to/model.zip', "Expected call not found"
+        assert len(mock_extract_huggingface_archive.call_args_list) == 1
+        assert mock_extract_huggingface_archive.call_args_list[0][0][0] == 'cache/path/to/model.zip', "Expected call not found"
 
     def test_2_load_model_from_hf_zip_file_without_auth_add_documents(self):
         """
@@ -1560,8 +1596,8 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
         mock_hf_hub_download = mock.MagicMock()
         mock_hf_hub_download.return_value = 'cache/path/to/model.zip'
 
-        mock_validate_huggingface_archive = mock.MagicMock()
-        mock_validate_huggingface_archive.return_value = 'cache/path/to/model/'
+        mock_extract_huggingface_archive = mock.MagicMock()
+        mock_extract_huggingface_archive.return_value = 'cache/path/to/model/'
 
         mock_automodel_from_pretrained = mock.MagicMock()
         mock_autotokenizer_from_pretrained = mock.MagicMock()
@@ -1569,7 +1605,7 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
         with unittest.mock.patch('transformers.AutoModel.from_pretrained', mock_automodel_from_pretrained):
             with unittest.mock.patch('transformers.AutoTokenizer.from_pretrained', mock_autotokenizer_from_pretrained):
                 with unittest.mock.patch('marqo.s2_inference.model_downloading.from_hf.hf_hub_download', mock_hf_hub_download):
-                    with unittest.mock.patch("marqo.s2_inference.hf_utils.validate_huggingface_archive", mock_validate_huggingface_archive):
+                    with unittest.mock.patch("marqo.s2_inference.hf_utils.extract_huggingface_archive", mock_extract_huggingface_archive):
                         try:
                             tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
                                 index_name=self.index_name_1, auto_refresh=True, docs=[{'a': 'b'}]))
@@ -1589,8 +1625,8 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
         assert mock_automodel_from_pretrained.call_args_list[0][0][0] == 'cache/path/to/model/', "Expected call not found"
 
         # is the zip file being extracted with the expected args?
-        assert len(mock_validate_huggingface_archive.call_args_list) == 1
-        assert mock_validate_huggingface_archive.call_args_list[0][0][0] == 'cache/path/to/model.zip', "Expected call not found"
+        assert len(mock_extract_huggingface_archive.call_args_list) == 1
+        assert mock_extract_huggingface_archive.call_args_list[0][0][0] == 'cache/path/to/model.zip', "Expected call not found"
 
     def test_3_load_model_from_s3_zip_file_with_auth_add_documents(self):
         def test_3_load_model_from_s3_zip_file_with_auth_search(self):
@@ -1628,8 +1664,8 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
             mock_download_pretrained_from_url = mock.MagicMock()
             mock_download_pretrained_from_url.return_value = 'cache/path/to/model.zip'
 
-            mock_validate_huggingface_archive = mock.MagicMock()
-            mock_validate_huggingface_archive.return_value = 'cache/path/to/model/'
+            mock_extract_huggingface_archive = mock.MagicMock()
+            mock_extract_huggingface_archive.return_value = 'cache/path/to/model/'
 
             mock_automodel_from_pretrained = mock.MagicMock()
             mock_autotokenizer_from_pretrained = mock.MagicMock()
@@ -1641,8 +1677,8 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
                         with unittest.mock.patch(
                                 "marqo.s2_inference.processing.custom_clip_utils.download_pretrained_from_url",
                                 mock_download_pretrained_from_url):
-                            with unittest.mock.patch("marqo.s2_inference.hf_utils.validate_huggingface_archive",
-                                                     mock_validate_huggingface_archive):
+                            with unittest.mock.patch("marqo.s2_inference.hf_utils.extract_huggingface_archive",
+                                                     mock_extract_huggingface_archive):
                                 try:
                                     tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
                                         index_name=self.index_name_1, auto_refresh=True, docs=[{'a': 'b'}],
@@ -1673,7 +1709,7 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
                 cache_file_name=os.path.basename(s3_object_key)
             )
 
-            mock_validate_huggingface_archive.assert_called_once_with(
+            mock_extract_huggingface_archive.assert_called_once_with(
                 "cache/path/to/model.zip",
             )
 
@@ -1691,18 +1727,18 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1,
                                           index_settings=s3_settings)
 
-        mock_validate_huggingface_archive = mock.MagicMock(side_effect=extract_huggingface_archive)
+        mock_extract_huggingface_archive = mock.MagicMock(side_effect=extract_huggingface_archive)
         mock_automodel_from_pretrained = mock.MagicMock(side_effect=AutoModel.from_pretrained)
         mock_download = mock.MagicMock(side_effect=download_pretrained_from_url)
 
         with mock.patch('transformers.AutoModel.from_pretrained', new=mock_automodel_from_pretrained):
             with mock.patch('marqo.s2_inference.processing.custom_clip_utils.download_pretrained_from_url', new=mock_download):
-                with mock.patch("marqo.s2_inference.hf_utils.validate_huggingface_archive", new=mock_validate_huggingface_archive):
+                with mock.patch("marqo.s2_inference.hf_utils.extract_huggingface_archive", new=mock_extract_huggingface_archive):
                     tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
                         index_name=self.index_name_1, auto_refresh=True, docs=[{'a': 'b'}]))
 
-        assert len(mock_validate_huggingface_archive.call_args_list) == 1
-        assert mock_validate_huggingface_archive.call_args_list[0][0][0] == (ModelCache.hf_cache_path + os.path.basename(public_url))
+        assert len(mock_extract_huggingface_archive.call_args_list) == 1
+        assert mock_extract_huggingface_archive.call_args_list[0][0][0] == (ModelCache.hf_cache_path + os.path.basename(public_url))
 
         assert len(mock_download.call_args_list) == 1
         _, call_kwargs = mock_download.call_args_list[0]
@@ -1741,15 +1777,57 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
                 tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
                     index_name=self.index_name_1, auto_refresh=True, docs=[{'a': 'b'}], model_auth=ModelAuth(hf=HfAuth(token=hf_token))))
 
-        assert len(mock_automodel_from_pretrained.call_args_list) == 1
-        assert mock_automodel_from_pretrained.call_args_list[0][0][0] == private_repo_name
-        mock_autotokenizer_from_pretrained.call_args_list[0][1]["use_auth_token"] == hf_token
 
-        assert len(mock_autotokenizer_from_pretrained.call_args_list) == 1
-        assert mock_autotokenizer_from_pretrained.call_args_list[0][0][0] == private_repo_name
-        mock_autotokenizer_from_pretrained.call_args_list[0][1]["use_auth_token"] == hf_token
+        mock_automodel_from_pretrained.assert_called_once_with(
+            private_repo_name, use_auth_token=hf_token, cache_dir=ModelCache.hf_cache_path
+        )
 
-    def test_6_load_model_from_public_hf_repo_without_auth_add_documents(self):
+        mock_autotokenizer_from_pretrained.assert_called_once_with(
+            private_repo_name, use_auth_token=hf_token
+        )
+
+
+    def test_61_load_model_from_public_hf_repo_without_auth_using_repo_id_add_documents(self):
+        public_repo_name = "sentence-transformers/all-MiniLM-L6-v1"
+        hf_token = "some-secret-token"
+
+        model_properties = {
+            "dimensions": 384,
+            "model_location": {
+                "auth_required": False,
+                "hf": {"repo_id": public_repo_name}
+            },
+            "type": "hf",
+        }
+
+        s3_settings = _get_base_index_settings()
+        s3_settings['index_defaults']['model_properties'] = model_properties
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1,
+                                          index_settings=s3_settings)
+
+        # Redirect the private model to a public one to finish the test
+        mock_automodel_from_pretrained = mock.MagicMock()
+        mock_automodel_from_pretrained.return_value = AutoModel.from_pretrained(
+            "sentence-transformers/all-MiniLM-L6-v1")
+
+        mock_autotokenizer_from_pretrained = mock.MagicMock()
+        mock_autotokenizer_from_pretrained.return_value = AutoTokenizer.from_pretrained(
+            "sentence-transformers/all-MiniLM-L6-v1")
+
+        with unittest.mock.patch("transformers.AutoModel.from_pretrained", mock_automodel_from_pretrained):
+            with unittest.mock.patch("transformers.AutoTokenizer.from_pretrained",
+                                     mock_autotokenizer_from_pretrained):
+                res = tensor_search.search(config=self.config, text='hello', index_name=self.index_name_1)
+
+        mock_automodel_from_pretrained.assert_called_once_with(
+            public_repo_name, use_auth_token=None, cache_dir=ModelCache.hf_cache_path
+        )
+
+        mock_autotokenizer_from_pretrained.assert_called_once_with(
+            public_repo_name, use_auth_token=None
+        )
+
+    def test_62_load_model_from_public_hf_repo_without_auth_using_name_add_documents(self):
         public_repo_name = "sentence-transformers/all-MiniLM-L6-v1"
 
         model_properties = {
@@ -1769,8 +1847,53 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
             tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
                 index_name=self.index_name_1, auto_refresh=True, docs=[{'a': 'b'}]))
 
-        assert len(mock_automodel_from_pretrained.call_args_list) == 1
-        assert mock_automodel_from_pretrained.call_args_list[0][0][0] == public_repo_name
+        mock_automodel_from_pretrained.assert_called_once_with(
+            public_repo_name, use_auth_token=None, cache_dir=ModelCache.hf_cache_path
+        )
+
+    def test_hf_token_is_skipped_when_auth_required_is_False(self):
+        public_repo_name = "sentence-transformers/all-MiniLM-L6-v1"
+        hf_token = "some-secret-token"
+
+        model_properties = {
+            "dimensions": 384,
+            "model_location": {
+                "auth_required": False,
+                "hf": {"repo_id": public_repo_name}
+            },
+            "type": "hf",
+        }
+
+        s3_settings = _get_base_index_settings()
+        s3_settings['index_defaults']['model_properties'] = model_properties
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1,
+                                          index_settings=s3_settings)
+
+        # Redirect the private model to a public one to finish the test
+        mock_automodel_from_pretrained = mock.MagicMock()
+        mock_automodel_from_pretrained.return_value = AutoModel.from_pretrained(
+            "sentence-transformers/all-MiniLM-L6-v1")
+
+        mock_autotokenizer_from_pretrained = mock.MagicMock()
+        mock_autotokenizer_from_pretrained.return_value = AutoTokenizer.from_pretrained(
+            "sentence-transformers/all-MiniLM-L6-v1")
+
+        with unittest.mock.patch("transformers.AutoModel.from_pretrained", mock_automodel_from_pretrained):
+            with unittest.mock.patch("transformers.AutoTokenizer.from_pretrained",
+                                     mock_autotokenizer_from_pretrained):
+                res = tensor_search.search(config=self.config, text='hello', index_name=self.index_name_1,
+                                           model_auth=ModelAuth(hf=HfAuth(token=hf_token)))
+
+        mock_automodel_from_pretrained.assert_called_once_with(
+            public_repo_name,
+            use_auth_token=None,
+            cache_dir = ModelCache.hf_cache_path
+        )
+
+        mock_autotokenizer_from_pretrained.assert_called_once_with(
+            public_repo_name,
+            use_auth_token=None,
+        )
 
     def test_invalid_hf_location(self):
         private_repo_name = "your-private-repo"

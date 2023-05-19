@@ -83,13 +83,14 @@ class HF_MODEL(Model):
         """
         model_location = ModelLocation(**self.model_properties[ModelProperties.model_location])
         self.model_path = model_location.hf.repo_id
+
         token = None
-        if self.model_auth is not None:
+        if model_location.auth_required:
             try:
                 token = self.model_auth.hf.token
             except AttributeError:
-                raise InvalidModelPropertiesError("Please ensure that `model_auth` is valid for a private Hugging Face model"
-                                                  " `ModelAuth` object with a `hugging face token` attribute for private hf repo models")
+                raise InvalidModelPropertiesError("Please ensure that `model_auth` is valid for a private Hugging Face model and retry. "
+                                                  "A valid `ModelAuth` object should consist a `hugging face token` attribute for private hf repo models")
 
         self.model = AutoModelForSentenceEmbedding(model_name=self.model_path, use_auth_token=token).to(self.device)
         try:
