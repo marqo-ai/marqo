@@ -1505,7 +1505,7 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
         with mock.patch('transformers.AutoModel.from_pretrained', new=mock_automodel_from_pretrained):
                     res = tensor_search.search(config=self.config, text='hello', index_name=self.index_name_1)
 
-        assert mock_automodel_from_pretrained.assert_called_once_with(
+        mock_automodel_from_pretrained.assert_called_once_with(
             public_repo_name, use_auth_token=None, cache_dir=ModelCache.hf_cache_path
         )
 
