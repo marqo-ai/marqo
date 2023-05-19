@@ -2,8 +2,7 @@
 import typing
 from fastapi.responses import JSONResponse
 from fastapi import Request, Depends
-from marqo.tensor_search.models.add_docs_objects import AddDocsParams
-from marqo.tensor_search.models.add_docs_objects import ModelAuth
+from marqo.tensor_search.models.add_docs_objects import AddDocsParams, Document, ModelAuth
 from marqo.errors import InvalidArgError, MarqoWebError, MarqoError
 from fastapi import FastAPI, Query
 import json
@@ -161,7 +160,7 @@ def search(search_query: SearchQuery, index_name: str, device: str = Depends(api
 @app.post("/indexes/{index_name}/documents")
 @throttle(RequestType.INDEX)
 def add_or_replace_documents(
-        docs: List[Dict],
+        docs: List[Document],
         index_name: str,
         refresh: bool = True,
         marqo_config: config.Config = Depends(generate_config),
@@ -178,12 +177,14 @@ def add_or_replace_documents(
         ),
         mappings: typing.Optional[dict] = Depends(api_utils.decode_mappings)):
     """add_documents endpoint (replace existing docs with the same id)"""
+
     add_docs_params = AddDocsParams(
-        index_name=index_name, docs=docs, auto_refresh=refresh,
-        device=device, update_mode='replace', non_tensor_fields=non_tensor_fields,
+        index_name=index_name, auto_refresh=refresh,
+        device=device, non_tensor_fields=non_tensor_fields,
         use_existing_tensors=use_existing_tensors, image_download_headers=image_download_headers,
-        mappings=mappings, model_auth=model_auth
+        mappings=mappings, model_auth=model_auth, docs=docs,
     )
+    add_docs_params.docs = docs
     return tensor_search.add_documents_orchestrator(
         config=marqo_config, add_docs_params=add_docs_params,
         batch_size=batch_size, processes=processes
@@ -193,7 +194,7 @@ def add_or_replace_documents(
 @app.put("/indexes/{index_name}/documents")
 @throttle(RequestType.INDEX)
 def add_or_update_documents(
-        docs: List[Dict],
+        docs: List[Document],
         index_name: str,
         refresh: bool = True,
         marqo_config: config.Config = Depends(generate_config),

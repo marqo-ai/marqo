@@ -239,7 +239,7 @@ def add_documents_orchestrator(
         config: Config, add_docs_params: AddDocsParams,
         batch_size: int = 0, processes: int = 1,
     ):
-
+    print("add_documents_orchestrator", add_docs_params)
     if batch_size is None or batch_size == 0:
         logger.debug(f"batch_size={batch_size} and processes={processes} - not doing any marqo side batching")
         return add_documents(config=config, add_docs_params=add_docs_params)
@@ -303,7 +303,8 @@ def _batch_request(
 
         logger.debug(f"    batch {i}: beginning ingestion. ")
         # we need to just use docs in the batch
-        batch_add_docs_params = replace(add_docs_params, docs=docs)
+        batch_add_docs_params = add_docs_params.copy()
+        batch_add_docs_params.docs=docs
         res = add_documents(config=config, add_docs_params=batch_add_docs_params)
         total_batch_time = timer() - t0
         num_docs = len(docs)
@@ -359,10 +360,6 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
     # ADD DOCS TIMER-LOGGER (3)
 
     start_time_3 = timer()
-
-    if add_docs_params.mappings is not None:
-        validation.validate_mappings_object(mappings_object=add_docs_params.mappings)
-
     t0 = timer()
     bulk_parent_dicts = []
 
@@ -371,20 +368,6 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
     except errors.IndexNotFoundError as s:
         create_vector_index(config=config, index_name=add_docs_params.index_name)
         index_info = backend.get_index_info(config=config, index_name=add_docs_params.index_name)
-
-    if len(add_docs_params.docs) == 0:
-        raise errors.BadRequestError(message="Received empty add documents request")
-
-    if add_docs_params.use_existing_tensors and add_docs_params.update_mode != "replace":
-        raise errors.InvalidArgError("use_existing_tensors=True is only available for add and replace documents,"
-                                     "not for add and update!")
-
-    valid_update_modes = ('update', 'replace')
-    if add_docs_params.update_mode not in valid_update_modes:
-        raise errors.InvalidArgError(message=f"Unknown update_mode `{add_docs_params.update_mode}` "
-                                             f"received! Valid update modes: {valid_update_modes}")
-    if add_docs_params.mappings is not None:
-        validate_mappings = validation.validate_mappings(add_docs_params.mappings)
 
     existing_fields = set(index_info.properties.keys())
     new_fields = set()
@@ -399,7 +382,6 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
 
     unsuccessful_docs = []
     total_vectorise_time = 0
-    batch_size = len(add_docs_params.docs)
     image_repo = {}
 
     if index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]:
@@ -408,22 +390,15 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                                               non_tensor_fields=tuple(add_docs_params.non_tensor_fields),
                                               image_download_headers=add_docs_params.image_download_headers)
         logger.debug(f"          add_documents image download: took {(timer() - ti_0):.3f}s to concurrently download "
-                    f"images for {batch_size} docs using {add_docs_params.image_download_thread_count} threads ")
+                    f"images for {add_docs_params.batch_size()} docs using {add_docs_params.image_download_thread_count} threads ")
 
-    if add_docs_params.update_mode == 'replace' and add_docs_params.use_existing_tensors:
-        doc_ids = []
-
-        # Iterate through the list in reverse, only latest doc with dupe id gets added.
-        for i in range(len(add_docs_params.docs)-1, -1, -1):
-            if ("_id" in add_docs_params.docs[i]) and (add_docs_params.docs[i]["_id"] not in doc_ids):
-                doc_ids.append(add_docs_params.docs[i]["_id"])
+    if add_docs_params.use_existing_tensors:
+        doc_ids = add_docs_params.get_doc_ids_uniquely()
         existing_docs = _get_documents_for_upsert(
-            config=config, index_name=add_docs_params.index_name, document_ids=doc_ids)
-
+            config=config, index_name=add_docs_params.index_name, document_ids=doc_ids
+        )
     for i, doc in enumerate(add_docs_params.docs):
-
-        indexing_instructions = {
-            'index' if add_docs_params.update_mode == 'replace' else 'update': {"_index": add_docs_params.index_name}}
+        indexing_instructions = add_docs_params.indexing_instructions()
         copied = copy.deepcopy(doc)
 
         document_is_valid = True
@@ -431,15 +406,10 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
 
         doc_id = None
         try:
-            validation.validate_doc(doc)
+            doc_id = copied.get_or_generate_id()
+            copied = copied.__dict__
+            del copied['_id']
 
-            if "_id" in doc:
-                doc_id = validation.validate_id(doc["_id"])
-                del copied["_id"]
-            else:
-                doc_id = str(uuid.uuid4())
-
-            [validation.validate_field_name(field) for field in copied]
         except errors.__InvalidRequestError as err:
             unsuccessful_docs.append(
                 (i, {'_id': doc_id if doc_id is not None else '',
@@ -463,16 +433,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
         else:
             indexing_instructions["update"]["_id"] = doc_id
 
-        # Metadata can be calculated here at the doc level.
-        # Only add chunk values which are string, boolean, numeric or dictionary.
-        # Dictionary keys will be store in a list.
-        chunk_values_for_filtering = {}
-        for key, value in copied.items():
-            if not (isinstance(value, str) or isinstance(value, float)
-                    or isinstance(value, bool) or isinstance(value, int)
-                    or isinstance(value, list) or isinstance(value, dict)):
-                continue
-            chunk_values_for_filtering[key] = value
+        chunk_values_for_filtering = doc.get_chunk_values_for_filtering()
 
         chunks = []
 
@@ -706,17 +667,17 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                     }
                 })
 
-    end_time_3 = timer()
-    total_preproc_time = end_time_3 - start_time_3
-    logger.debug(f"      add_documents pre-processing: took {(total_preproc_time):.3f}s total for {batch_size} docs, "
-                f"for an average of {(total_preproc_time / batch_size):.3f}s per doc.")
+    
+    total_preproc_time = timer() - start_time_3
+    logger.debug(f"      add_documents pre-processing: took {(total_preproc_time):.3f}s total for {add_docs_params.batch_size()} docs, "
+                f"for an average of {(total_preproc_time / add_docs_params.batch_size()):.3f}s per doc.")
 
-    logger.debug(f"          add_documents vectorise: took {(total_vectorise_time):.3f}s for {batch_size} docs, "
-                f"for an average of {(total_vectorise_time / batch_size):.3f}s per doc.")
+    logger.debug(f"          add_documents vectorise: took {(total_vectorise_time):.3f}s for {add_docs_params.batch_size()} docs, "
+                f"for an average of {(total_vectorise_time / add_docs_params.batch_size()):.3f}s per doc.")
 
     if bulk_parent_dicts:
         # the HttpRequest wrapper handles error logic
-        update_mapping_response = backend.add_customer_field_properties(
+        backend.add_customer_field_properties(
             config=config, index_name=add_docs_params.index_name, customer_field_names=new_fields,
             model_properties=_get_model_properties(index_info), multimodal_combination_fields=new_obj_fields)
 
@@ -728,51 +689,48 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
         total_http_time = end_time_5 - start_time_5
         total_index_time = index_parent_response["took"] * 0.001
         logger.debug(
-            f"      add_documents roundtrip: took {(total_http_time):.3f}s to send {batch_size} docs (roundtrip) to Marqo-os, "
-            f"for an average of {(total_http_time / batch_size):.3f}s per doc.")
+            f"      add_documents roundtrip: took {(total_http_time):.3f}s to send {add_docs_params.batch_size()} docs (roundtrip) to Marqo-os, "
+            f"for an average of {(total_http_time / add_docs_params.batch_size()):.3f}s per doc.")
 
         logger.debug(
-            f"          add_documents Marqo-os index: took {(total_index_time):.3f}s for Marqo-os to index {batch_size} docs, "
-            f"for an average of {(total_index_time / batch_size):.3f}s per doc.")
+            f"          add_documents Marqo-os index: took {(total_index_time):.3f}s for Marqo-os to index {add_docs_params.batch_size()} docs, "
+            f"for an average of {(total_index_time / add_docs_params.batch_size()):.3f}s per doc.")
     else:
         index_parent_response = None
 
     if add_docs_params.auto_refresh:
-        refresh_response = HttpRequests(config).post(path=F"{add_docs_params.index_name}/_refresh")
+        HttpRequests(config).post(path=F"{add_docs_params.index_name}/_refresh") 
 
-    t1 = timer()
+    return translate_add_doc_response(add_docs_params, response=index_parent_response, time_diff=timer() - t0, unsuccessful_docs=unsuccessful_docs)
 
-    def translate_add_doc_response(response: Optional[dict], time_diff: float) -> dict:
-        """translates OpenSearch response dict into Marqo dict"""
-        item_fields_to_remove = ['_index', '_primary_term', '_seq_no', '_shards', '_version']
-        result_dict = {}
-        new_items = []
+def translate_add_doc_response(add_docs_params: AddDocsParams, response: Optional[dict], time_diff: float, unsuccessful_docs: List[Tuple[int, Dict[str, Any]]]=[] ) -> dict:
+    """translates OpenSearch response dict into Marqo dict"""
+    item_fields_to_remove = ['_index', '_primary_term', '_seq_no', '_shards', '_version']
+    result_dict = {}
+    new_items = []
 
-        if response is not None:
-            copied_res = copy.deepcopy(response)
+    if response is not None:
+        copied_res = copy.deepcopy(response)
 
-            result_dict['errors'] = copied_res['errors']
-            actioned = "index" if add_docs_params.update_mode == 'replace' else 'update'
+        result_dict['errors'] = copied_res['errors']
+        actioned = "index" if add_docs_params.update_mode == 'replace' else 'update'
 
-            for item in copied_res["items"]:
-                for to_remove in item_fields_to_remove:
-                    if to_remove in item[actioned]:
-                        del item[actioned][to_remove]
-                new_items.append(item[actioned])
+        for item in copied_res["items"]:
+            for to_remove in item_fields_to_remove:
+                if to_remove in item[actioned]:
+                    del item[actioned][to_remove]
+            new_items.append(item[actioned])
 
-        if unsuccessful_docs:
-            result_dict['errors'] = True
+    if unsuccessful_docs:
+        result_dict['errors'] = True
 
-        for loc, error_info in unsuccessful_docs:
-            new_items.insert(loc, error_info)
+    for loc, error_info in unsuccessful_docs:
+        new_items.insert(loc, error_info)
 
-        result_dict["processingTimeMs"] = time_diff * 1000
-        result_dict["index_name"] = add_docs_params.index_name
-        result_dict["items"] = new_items
-        return result_dict
-
-    return translate_add_doc_response(response=index_parent_response, time_diff=t1 - t0)
-
+    result_dict["processingTimeMs"] = time_diff * 1000
+    result_dict["index_name"] = add_docs_params.index_name
+    result_dict["items"] = new_items
+    return result_dict
 
 def get_document_by_id(
         config: Config, index_name: str, document_id: str, show_vectors: bool = False):
