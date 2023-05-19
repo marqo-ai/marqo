@@ -1273,7 +1273,7 @@ def _lexical_search(
     return {'hits': res_list}
 
 
-def construct_vector_input_batches(query: Union[str, Dict], index_info) -> Tuple[List[str], List[str]]:
+def construct_vector_input_batches(query: Union[str, Dict], index_info: IndexInfo) -> Tuple[List[str], List[str]]:
     """Splits images from text in a single query (either a query string, or dict of weighted strings).
 
     Args:
@@ -1482,6 +1482,7 @@ def create_vector_jobs(queries: List[BulkSearchQueryEntity], config: Config, sel
         # split images from text:
         to_be_vectorised: Tuple[List[str], List[str]] = construct_vector_input_batches(q.q, index_info)
         qidx_to_job[i] = assign_query_to_vector_job(q, jobs, to_be_vectorised, index_info, selected_device)
+    
     return qidx_to_job, jobs
 
 
@@ -1581,7 +1582,7 @@ def get_query_vectors_from_jobs(
         else:
             # result[qidx] = vectors[0]
             result[qidx] = get_content_vector(
-                possible_jobs=qidx_to_job[qidx],
+                possible_jobs=qidx_to_job.get(qidx, []),
                 jobs=jobs,
                 job_to_vectors= job_to_vectors,
                 treat_urls_as_images=index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images],
@@ -1628,9 +1629,9 @@ def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity],
     """Run the query vectorisation process"""
     # 1. Pre-process inputs ready for s2_inference.vectorise
     # we can still use qidx_to_job. But the jobs structure may need to be different
-    vector_jobs_tuple: Tuple[Dict[Qidx, List[VectorisedJobPointer]], Dict[JHash, VectorisedJobs]] = (
-        create_vector_jobs(queries, config, selected_device)
-    )
+    vector_jobs_tuple: Tuple[Dict[Qidx, List[VectorisedJobPointer]], Dict[JHash, VectorisedJobs]] = create_vector_jobs(queries, config, selected_device)
+
+    print(vector_jobs_tuple, create_vector_jobs)
     qidx_to_jobs, jobs = vector_jobs_tuple
 
     # 2. Vectorise in batches against all queries

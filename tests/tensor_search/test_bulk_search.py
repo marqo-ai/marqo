@@ -15,23 +15,213 @@ from marqo.errors import (
 
 from marqo.tensor_search import api, tensor_search, index_meta_cache, utils
 from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQueryEntity
-from marqo.tensor_search.models.search import VectorisedJobs
+from marqo.tensor_search.models.index_info import IndexInfo
+from marqo.tensor_search.models.search import Qidx, JHash, VectorisedJobPointer, VectorisedJobs
 import numpy as np
 from tests.marqo_test import MarqoTestCase
-from typing import List
+from typing import Dict, List
 import pydantic
 from tests.utils.transition import add_docs_caller
 
-
-# run_vectorise_pipeline
-# create_vector_jobs
-# get_query_vectors_from_jobs
 
 def pass_through_vectorise(*arg, **kwargs):
     """Vectorise will behave as usual, but we will be able to see the call list
      via mock
     """
     return vectorise(*arg, **kwargs)
+
+
+class TestGetQueryVectorsFromJobs(MarqoTestCase):
+    def setUp(self):
+        self.queries = [
+            BulkSearchQueryEntity(index="index_name_1", q="a test query", limit=2),
+            BulkSearchQueryEntity(index="index_name_2", q="another", limit=2),
+        ]
+        self.index_info = IndexInfo("model_name", {},  {
+            "index_defaults": {"treat_urls_and_pointers_as_images": False, "normalize_embeddings": False},
+            'model_name': 'test_model',
+            'model_properties': {'test': 'property'},
+            'normalize_embeddings': True,
+            'content_type': 'text',
+            'image_download_headers': None
+        })
+
+        self.jobs: Dict[JHash, VectorisedJobs] = {
+            123: VectorisedJobs(model_name="model_name", model_auth=None, model_properties={}, content_type="text", content=["a test query"], device="cpu",normalize_embeddings=False),
+            456: VectorisedJobs(model_name="model_name", model_auth=None, model_properties={}, content_type="text", content=["another"], device="cpu",normalize_embeddings=False),
+            789: VectorisedJobs(model_name="model_name", model_auth=None, model_properties={}, content_type="text", content=["red herring"], device="cpu",normalize_embeddings=False),
+        }
+        self.qidx_to_job: Dict[Qidx, List[VectorisedJobPointer]] = {
+            0: [VectorisedJobPointer(job_hash=123, start_idx=0, end_idx=1)],
+            1: [VectorisedJobPointer(job_hash=456, start_idx=0, end_idx=1)]
+        }
+        self.job_to_vectors: Dict[JHash, Dict[str, List[float]]] = {
+            123: {"a test query":  [0.5, 0.5]},
+            456: {"another": [0.5, 0.6]},
+            789: {"red herring": [0.6, 0.5]}
+        }
+
+    @mock.patch("marqo.tensor_search.tensor_search.get_index_info")
+    @mock.patch("marqo.tensor_search.tensor_search.get_content_vector")
+    def test_get_query_vectors_from_jobs(self, mock_get_content_vector, mock_get_index_info):
+        mock_get_index_info.return_value = self.index_info
+        mock_get_content_vector.return_value = np.array([0.5, 0.5])
+        
+        qidx_to_vectors = tensor_search.get_query_vectors_from_jobs(self.queries, self.qidx_to_job, self.job_to_vectors, self.config, self.jobs)
+
+        self.assertEqual(len(qidx_to_vectors), len(self.queries))
+
+        self.assertTrue((qidx_to_vectors[0] == np.array([0.5, 0.5])).all())
+        self.assertTrue((qidx_to_vectors[1] == np.array([0.5, 0.5])).all())
+        
+    @mock.patch("marqo.tensor_search.tensor_search.get_index_info")
+    def test_empty_inputs(self, mock_get_index_info):
+        mock_get_index_info.return_value = self.index_info
+        
+        empty_qidx_to_vectors = tensor_search.get_query_vectors_from_jobs([], {}, {}, self.config, {})
+        self.assertEqual(len(empty_qidx_to_vectors), 0)
+
+    @mock.patch("marqo.tensor_search.tensor_search.get_index_info")
+    def test_no_matching_jobs(self, mock_get_index_info):
+        mock_get_index_info.return_value = self.index_info
+        qidx_to_job_with_no_matching_jobs = {}
+        
+        qidx_to_vectors = tensor_search.get_query_vectors_from_jobs(self.queries, qidx_to_job_with_no_matching_jobs, self.job_to_vectors, self.config, self.jobs)
+        self.assertEqual(len(qidx_to_vectors), 0) 
+
+
+
+
+class TestRunVectorisePipeline(MarqoTestCase):
+    def setUp(self):
+        self.queries = [
+            BulkSearchQueryEntity(index="index_name_1", q="a test query", limit=2),
+            BulkSearchQueryEntity(index="index_name_2", q="a test query", limit=2),
+            BulkSearchQueryEntity(index="index_name_1", q="another test query", limit=4)
+        ]
+        self.selected_device = 'cpu'
+
+    @mock.patch("marqo.tensor_search.tensor_search.get_query_vectors_from_jobs")
+    @mock.patch("marqo.tensor_search.tensor_search.vectorise_jobs")
+    @mock.patch("marqo.tensor_search.tensor_search.create_vector_jobs")
+    def test_run_vectorise_pipeline(self, mock_create_vector_jobs, mock_vectorise_jobs, mock_get_query_vectors_from_jobs):
+        mock_create_vector_jobs.return_value = {}, {}
+        mock_vectorise_jobs.return_value = {}
+        mock_get_query_vectors_from_jobs.return_value = {}
+
+        qidx_to_vectors = tensor_search.run_vectorise_pipeline(self.config, self.queries, self.selected_device)
+
+        mock_create_vector_jobs.assert_called_once_with(self.queries, self.config, self.selected_device)
+        mock_vectorise_jobs.assert_called_once_with(list(mock_create_vector_jobs.return_value[1].values()))
+        mock_get_query_vectors_from_jobs.assert_called_once_with(self.queries, mock_create_vector_jobs.return_value[0], mock_vectorise_jobs.return_value, self.config, mock_create_vector_jobs.return_value[1])
+        self.assertEqual(qidx_to_vectors, mock_get_query_vectors_from_jobs.return_value)
+
+    def test_run_vectorise_pipeline_empty_queries(self):
+        qidx_to_vectors = tensor_search.run_vectorise_pipeline(self.config, [], self.selected_device)
+        self.assertEqual(0, len(qidx_to_vectors))
+        
+
+class TestCreateVectorJobs(MarqoTestCase):
+    def setUp(self):
+        self.selected_device = 'cpu'
+        self.queries = [
+            BulkSearchQueryEntity(index="index_name_1", q="a test query", limit=2),
+            BulkSearchQueryEntity(index="index_name_2", q="a test query", limit=2),
+            BulkSearchQueryEntity(index="index_name_1", q="another test query", limit=4)
+        ]
+
+        self.index_info = IndexInfo("model_name", {},  {
+            "index_defaults": {"treat_urls_and_pointers_as_images": False, "normalize_embeddings": False},
+            'model_name': 'test_model',
+            'model_properties': {'test': 'property'},
+            'normalize_embeddings': True,
+            'content_type': 'text',
+            'image_download_headers': None
+        })
+
+        self.index_info2 = IndexInfo("model_name2", {},  {
+            "index_defaults": {"treat_urls_and_pointers_as_images": False, "normalize_embeddings": True},
+            'model_name': 'test_model',
+            'model_properties': {'test': 'property'},
+            'normalize_embeddings': True,
+            'content_type': 'text',
+            'image_download_headers': None
+        })
+
+    @mock.patch('marqo.tensor_search.tensor_search.get_index_info')
+    @mock.patch('marqo.s2_inference.s2_inference.get_model_properties_from_registry')
+    def test_create_vector_jobs_single(self, mock_get_model_properties_from_registry, mock_get_index_info):
+        mock_get_index_info.side_effect = [self.index_info, self.index_info2, self.index_info]
+        mock_get_model_properties_from_registry.return_value = {}
+        
+        query = self.queries[0]
+        qidx_to_job, jobs = tensor_search.create_vector_jobs([query], self.config, self.selected_device)
+
+        self.assertEqual(len(qidx_to_job), 1)
+        self.assertEqual(len(jobs), 2) # Currently empty [] image content is processed as a job
+        
+
+        vector_job_pointers: List[VectorisedJobPointer] = qidx_to_job[0]
+        self.assertTrue(mock_get_index_info.called_with(self.config, query.index))
+        
+        assert(2, len(vector_job_pointers))
+        jobs[vector_job_pointers[0].job_hash].content = query.q
+        jobs[vector_job_pointers[0].job_hash].model_name = "model_name"
+        jobs[vector_job_pointers[1].job_hash].content = []
+
+
+    @mock.patch('marqo.tensor_search.tensor_search.get_index_info')
+    @mock.patch('marqo.s2_inference.s2_inference.get_model_properties_from_registry')
+    def test_create_vector_jobs_matching_jobs_from_different_indices(self, mock_get_model_properties_from_registry, mock_get_index_info):
+        mock_get_index_info.side_effect = [self.index_info, self.index_info2, self.index_info]
+        mock_get_model_properties_from_registry.return_value = {}
+        
+        qidx_to_job, jobs = tensor_search.create_vector_jobs(self.queries, self.config, self.selected_device)
+
+        self.assertEqual(len(qidx_to_job), 3)
+        self.assertEqual(len(jobs), 4) # One for each query text, one empty image job (across all three)
+
+        for idx, query in enumerate(self.queries):
+
+            vector_job_pointers: List[VectorisedJobPointer] = qidx_to_job[idx]
+            
+            assert(2, len(vector_job_pointers))
+            jobs[vector_job_pointers[0].job_hash].content = query.q
+            jobs[vector_job_pointers[0].job_hash].model_name = "model_name"
+            jobs[vector_job_pointers[1].job_hash].content = []
+
+    @mock.patch('marqo.tensor_search.tensor_search.get_index_info')
+    @mock.patch('marqo.s2_inference.s2_inference.get_model_properties_from_registry')
+    def test_create_vector_jobs(self, mock_get_model_properties_from_registry, mock_get_index_info):
+        mock_get_index_info.return_value = self.index_info
+        mock_get_model_properties_from_registry.return_value = {}
+        
+        qidx_to_job, jobs = tensor_search.create_vector_jobs(self.queries, self.config, self.selected_device)
+
+        self.assertEqual(len(qidx_to_job), 3)
+        self.assertEqual(len(jobs), 2)  # not 4, BulkSearchQueryEntity 1 and 3 have same vectorisation params (e.g. models and index settings)
+
+        for idx, query in enumerate(self.queries):
+
+            vector_job_pointers: List[VectorisedJobPointer] = qidx_to_job[idx]
+            
+            assert(2, len(vector_job_pointers))
+            jobs[vector_job_pointers[0].job_hash].content = query.q
+            jobs[vector_job_pointers[0].job_hash].model_name = "model_name"
+            jobs[vector_job_pointers[1].job_hash].content = []
+
+
+    @mock.patch('marqo.tensor_search.tensor_search.get_index_info')
+    def test_create_vector_jobs_empty_queries(self, mock_get_index_info):
+        self.queries = []
+
+        mock_get_index_info.return_value = self.index_info
+    
+        qidx_to_job, jobs = tensor_search.create_vector_jobs(self.queries, self.config, self.selected_device)
+
+        self.assertEqual(len(qidx_to_job), 0)
+        self.assertEqual(len(jobs), 0)
+        mock_get_index_info.assert_not_called()
 
 
 class TestVectoriseJobs(unittest.TestCase):
