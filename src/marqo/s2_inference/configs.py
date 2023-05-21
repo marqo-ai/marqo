@@ -2,9 +2,17 @@ import os
 from marqo.tensor_search import utils
 
 class ModelCache:
+    """
+    Class to store the cache paths for different models
+    We categorize the cache path based on the model type
+    E.g., if a open_clip model is downloaded from HuggingFace repo, it will be stored under clip_cache_path
+          if a HuggingFace sbert model is downloaded from S3, it will be stored under hf_cache_path
+    """
     onnx_cache_path = os.environ.get('ONNX_SAVE_PATH', f'{utils.get_marqo_root_from_env()}/cache/models_onnx/')
     torch_cache_path = os.getenv('SENTENCE_TRANSFORMERS_HOME', f'{utils.get_marqo_root_from_env()}/cache/models/')
     clip_cache_path = os.getenv('CLIP_SAVE_PATH', f'{utils.get_marqo_root_from_env()}/cache/clip/')
+    # The hf_cache_path is managed by the hf_hub_download function
+    hf_cache_path = os.getenv('HF_SAVE_PATH', f'{utils.get_marqo_root_from_env()}/cache/hf/')
 
 class BaseTransformerModels:
 

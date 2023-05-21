@@ -15,7 +15,7 @@ def get_presigned_s3_url(location: S3Location, auth: Optional[S3Auth] = None):
         auth: AWS IAM access keys to a user with access to the model to be downloaded
 
     Returns:
-        The the presigned s3 URL
+        The presigned s3 URL
 
     TODO: add link to proper usage in error messages
     """
@@ -27,14 +27,14 @@ def get_presigned_s3_url(location: S3Location, auth: Optional[S3Auth] = None):
         )
     s3_client = boto3.client('s3', **auth.dict())
     try:
-        return s3_client.generate_presigned_url('get_object', Params=location.dict())
+        return s3_client.generate_presigned_url('get_object', Params=location.dict(exclude_unset=True))
     except NoCredentialsError:
         raise ModelDownloadError(
             "Error retrieving private model. AWS credentials were not accepted."
         )
 
 
-def get_s3_model_absolute_cache_path(location: S3Location) -> str:
+def get_s3_model_absolute_cache_path(location: S3Location, download_dir: Optional[str] = None) -> str:
     """Returns the absolute path of an s3 model if it were downloaded.
 
         Args:
@@ -43,11 +43,12 @@ def get_s3_model_absolute_cache_path(location: S3Location) -> str:
         Returns:
             The absolute path of an s3 model if it were downloaded.
     """
-    cache_dir = os.path.expanduser(ModelCache.clip_cache_path)
+
+    cache_dir = os.path.expanduser(download_dir if download_dir is not None else ModelCache.clip_cache_path)
     return os.path.join(cache_dir, get_s3_model_cache_filename(location))
 
 
-def check_s3_model_already_exists(location: S3Location) -> bool:
+def check_s3_model_already_exists(location: S3Location, download_dir: Optional[str] = None) -> bool:
     """Returns True iff an s3 model is already downloaded
 
         Args:
@@ -56,7 +57,7 @@ def check_s3_model_already_exists(location: S3Location) -> bool:
         Returns:
             The model cache filename of an s3 object
     """
-    abs_path = get_s3_model_absolute_cache_path(location)
+    abs_path = get_s3_model_absolute_cache_path(location, download_dir)
     return os.path.isfile(abs_path)
 
 

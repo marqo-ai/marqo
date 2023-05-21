@@ -205,11 +205,8 @@ class CLIP:
         self.model_properties = kwargs.get("model_properties", dict())
 
         # model_auth gets passed through add_docs and search requests:
-        model_auth = kwargs.get(InferenceParams.model_auth, None)
-        if model_auth is not None:
-            self.model_auth = model_auth
-        else:
-            self.model_auth = None
+        self.model_auth = kwargs.get(InferenceParams.model_auth, None)
+
 
     def _download_from_repo(self):
         """Downloads model from an external repo like s3 and returns the filepath
