@@ -2470,6 +2470,7 @@ class TestS3ModelAuthlLoadForHFModelVariants(MarqoTestCase):
                                     pass
             mock_download_pretrained_from_url.assert_called_once_with(
                 url=public_model_url, cache_dir=ModelCache.hf_cache_path, cache_file_name='secret_model.zip')
+
             mock_s3_client.generate_presigned_url.assert_called_with(
                 'get_object',
                 Params={'Bucket': 'your-bucket-name', 'Key': s3_object_key}
@@ -2479,6 +2480,18 @@ class TestS3ModelAuthlLoadForHFModelVariants(MarqoTestCase):
                 aws_access_key_id=fake_access_key_id,
                 aws_secret_access_key=fake_secret_key,
                 aws_session_token=None
+            )
+
+            mock_autotokenizer_from_pretrained.assert_called_once_with(
+                "cache/path/to/model/",
+            )
+
+            mock_automodel_from_pretrained.assert_called_once_with(
+                "cache/path/to/model/", use_auth_token=None, cache_dir = ModelCache.hf_cache_path
+            )
+
+            mock_extract_huggingface_archive.assert_called_once_with(
+                "cache/path/to/model.zip",
             )
 
             mock_download_pretrained_from_url.reset_mock()
