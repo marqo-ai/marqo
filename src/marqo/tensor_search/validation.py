@@ -195,7 +195,6 @@ def validate_context(context: Optional[SearchContext], search_method: SearchMeth
             f"Please check `https://docs.marqo.ai/0.0.16/API-Reference/search/#context` for more information."
         )
 
-
 def validate_boost(boost: Dict, search_method: Union[str, SearchMethod]):
     if boost is not None:
         further_info_message = ("\nRead about boost usage here: "
@@ -278,7 +277,6 @@ def validate_field_name(field_name) -> str:
         return field_name
     else:
         raise InvalidFieldNameError(f"field name can't be a protected field. Please rename this field: {field_name}")
-
 
 def validate_vector_name(name: str):
     """Checks that the vector name is valid.
@@ -472,6 +470,7 @@ def validate_multimodal_combination(field_content, is_non_tensor_field, field_ma
             f"add them as normal fields to fix this problem."
         )
     return True
+
 
 def validate_delete_docs_request(delete_request: MqDeleteDocsRequest, max_delete_docs_count: int):
     """Validates a delete docs request from the user.
