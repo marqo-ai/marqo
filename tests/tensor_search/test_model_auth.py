@@ -2414,6 +2414,7 @@ class TestS3ModelAuthlLoadForHFModelVariants(MarqoTestCase):
         s3_settings = _get_base_index_settings()
         s3_settings['index_defaults']['model_properties'] = model_properties
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings=s3_settings)
+        public_model_url = "https://dummy/url/for/model.zip"
 
         for bulk_search_query in [
                 BulkSearchQuery(queries=[
@@ -2439,22 +2440,36 @@ class TestS3ModelAuthlLoadForHFModelVariants(MarqoTestCase):
                 tensor_search.eject_model(model_name='my_model' ,device=self.device)
             except ModelNotInCacheError:
                 pass
-            # Create a mock Boto3 client
             mock_s3_client = mock.MagicMock()
 
-            mock_s3_client.generate_presigned_url.return_value = "https://some_non_existent_model.pt"
+            # Mock the generate_presigned_url method of the mock Boto3 client to return a dummy URL
+            mock_s3_client.generate_presigned_url.return_value = public_model_url
 
-            with unittest.mock.patch('boto3.client', return_value=mock_s3_client) as mock_boto3_client:
-                with self.assertRaises(InvalidArgError) as cm:
-                    with unittest.mock.patch(
-                        'marqo.s2_inference.processing.custom_clip_utils.download_pretrained_from_url'
-                    ) as mock_download_pretrained_from_url:
-                        tensor_search.bulk_search(
-                            query=bulk_search_query,
-                            marqo_config=self.config,
-                        )
+            mock_download_pretrained_from_url = mock.MagicMock()
+            mock_download_pretrained_from_url.return_value = 'cache/path/to/model.zip'
+
+            mock_extract_huggingface_archive = mock.MagicMock()
+            mock_extract_huggingface_archive.return_value = 'cache/path/to/model/'
+
+            mock_automodel_from_pretrained = mock.MagicMock()
+            mock_autotokenizer_from_pretrained = mock.MagicMock()
+
+            with unittest.mock.patch('transformers.AutoModel.from_pretrained', mock_automodel_from_pretrained):
+                with unittest.mock.patch('transformers.AutoTokenizer.from_pretrained', mock_autotokenizer_from_pretrained):
+                    with unittest.mock.patch('boto3.client', return_value=mock_s3_client) as mock_boto3_client:
+                        with unittest.mock.patch("marqo.s2_inference.processing.custom_clip_utils.download_pretrained_from_url",mock_download_pretrained_from_url):
+                            with unittest.mock.patch("marqo.s2_inference.hf_utils.extract_huggingface_archive", mock_extract_huggingface_archive):
+                                try:
+                                    tensor_search.bulk_search(
+                                        query=bulk_search_query,
+                                        marqo_config=self.config,
+                                    )
+                                except KeyError as e:
+                                    # KeyError as this is not a real model. It does not have an attention_mask
+                                    assert "attention_mask" in str(e)
+                                    pass
             mock_download_pretrained_from_url.assert_called_once_with(
-                url='https://some_non_existent_model.pt', cache_dir=ModelCache.hf_cache_path, cache_file_name='secret_model.zip')
+                url=public_model_url, cache_dir=ModelCache.hf_cache_path, cache_file_name='secret_model.zip')
             mock_s3_client.generate_presigned_url.assert_called_with(
                 'get_object',
                 Params={'Bucket': 'your-bucket-name', 'Key': s3_object_key}
