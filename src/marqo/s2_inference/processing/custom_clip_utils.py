@@ -124,7 +124,6 @@ def download_pretrained_from_s3(
                 "Please check the request's s3 credentials and try again. "
             )
 
-
 def download_pretrained_from_url(
         url: str,
         cache_dir: Union[str, None] = None,
