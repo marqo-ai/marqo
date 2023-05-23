@@ -207,8 +207,8 @@ def add_documents_mp(
         IndexChunk(
             config=config,  batch_size=batch_size,
             process_id=p_id, threads_per_process=threads_per_process,
-            add_docs_params=replace(add_docs_params, docs=_docs, device=device_ids[p_id]))
-        for p_id,_docs in enumerate(np.array_split(add_docs_params.docs, n_processes))]
+            add_docs_params=add_docs_params.create_anew(docs=_docs, device=device_ids[p_id])
+        ) for p_id,_docs in enumerate(np.array_split(add_docs_params.docs, n_processes))]
     logger.info(f'Performing parallel now across devices {device_ids}...')
     with mp.Pool(n_processes) as pool:
         results = pool.map(_run_chunker, chunkers)

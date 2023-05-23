@@ -5,6 +5,7 @@ from marqo.tensor_search import enums
 import unittest
 from unittest import mock
 from unittest.mock import patch
+from marqo.tensor_search.models.add_docs_objects import MappingObject
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifier
 from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest
 from marqo.tensor_search.models.search import SearchContext
@@ -705,8 +706,7 @@ class TestValidateIndexSettings(unittest.TestCase):
             },
         ]
         for d in mappings:
-            assert d == validation.validate_mappings_object(d)
-
+            assert d == MappingObject(**d).dict()
 
     def test_validate_mappings_invalid(self):
         mappings = [
@@ -789,8 +789,8 @@ class TestValidateIndexSettings(unittest.TestCase):
         ]
         for mapping in mappings:
             try:
-                validation.validate_mappings_object(mapping)
-                raise AssertionError
+                d = MappingObject(**mapping)
+                raise AssertionError(d, mapping)
             except InvalidArgError as e:
                 pass
 

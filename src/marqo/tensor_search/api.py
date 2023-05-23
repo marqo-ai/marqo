@@ -2,7 +2,7 @@
 import typing
 from fastapi.responses import JSONResponse
 from fastapi import Request, Depends
-from marqo.tensor_search.models.add_docs_objects import AddDocsParams
+from marqo.tensor_search.models.add_docs_objects import AddDocsParams, Document
 from marqo.tensor_search.models.add_docs_objects import ModelAuth
 from marqo.errors import InvalidArgError, MarqoWebError, MarqoError
 from fastapi import FastAPI, Query
@@ -161,7 +161,7 @@ def search(search_query: SearchQuery, index_name: str, device: str = Depends(api
 @app.post("/indexes/{index_name}/documents")
 @throttle(RequestType.INDEX)
 def add_or_replace_documents(
-        docs: List[Dict],
+        docs: List[Document],
         index_name: str,
         refresh: bool = True,
         marqo_config: config.Config = Depends(generate_config),
@@ -193,7 +193,7 @@ def add_or_replace_documents(
 @app.put("/indexes/{index_name}/documents")
 @throttle(RequestType.INDEX)
 def add_or_update_documents(
-        docs: List[Dict],
+        docs: List[Document],
         index_name: str,
         refresh: bool = True,
         marqo_config: config.Config = Depends(generate_config),

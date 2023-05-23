@@ -264,6 +264,7 @@ def add_documents_orchestrator(
         results = parallel.add_documents_mp(
             config=config, batch_size=batch_size, processes=processes, add_docs_params=add_docs_params
         )
+
         # we need to force the cache to update as it does not propagate using mp
         # we just clear this index's entry and it will re-populate when needed next
         if add_docs_params.index_name in get_cache():
@@ -303,7 +304,9 @@ def _batch_request(
 
         logger.debug(f"    batch {i}: beginning ingestion. ")
         # we need to just use docs in the batch
-        batch_add_docs_params = replace(add_docs_params, docs=docs)
+        batch_add_docs_params = add_docs_params.create_anew(docs=docs)
+
+        
         res = add_documents(config=config, add_docs_params=batch_add_docs_params)
         total_batch_time = timer() - t0
         num_docs = len(docs)
@@ -360,9 +363,6 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
 
     start_time_3 = timer()
 
-    if add_docs_params.mappings is not None:
-        validation.validate_mappings_object(mappings_object=add_docs_params.mappings)
-
     t0 = timer()
     bulk_parent_dicts = []
 
@@ -371,20 +371,6 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
     except errors.IndexNotFoundError as s:
         create_vector_index(config=config, index_name=add_docs_params.index_name)
         index_info = backend.get_index_info(config=config, index_name=add_docs_params.index_name)
-
-    if len(add_docs_params.docs) == 0:
-        raise errors.BadRequestError(message="Received empty add documents request")
-
-    if add_docs_params.use_existing_tensors and add_docs_params.update_mode != "replace":
-        raise errors.InvalidArgError("use_existing_tensors=True is only available for add and replace documents,"
-                                     "not for add and update!")
-
-    valid_update_modes = ('update', 'replace')
-    if add_docs_params.update_mode not in valid_update_modes:
-        raise errors.InvalidArgError(message=f"Unknown update_mode `{add_docs_params.update_mode}` "
-                                             f"received! Valid update modes: {valid_update_modes}")
-    if add_docs_params.mappings is not None:
-        validate_mappings = validation.validate_mappings(add_docs_params.mappings)
 
     existing_fields = set(index_info.properties.keys())
     new_fields = set()
@@ -404,42 +390,25 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
 
     if index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]:
         ti_0 = timer()
-        image_repo = add_docs.download_images(docs=add_docs_params.docs, thread_count=20,
+        image_repo = add_docs.download_images(docs=[d.dict() for d in add_docs_params.docs], thread_count=20,
                                               non_tensor_fields=tuple(add_docs_params.non_tensor_fields),
                                               image_download_headers=add_docs_params.image_download_headers)
+        print("INSIDE", image_repo)
         logger.debug(f"          add_documents image download: took {(timer() - ti_0):.3f}s to concurrently download "
                     f"images for {batch_size} docs using {add_docs_params.image_download_thread_count} threads ")
 
     if add_docs_params.update_mode == 'replace' and add_docs_params.use_existing_tensors:
-        doc_ids = []
-
-        # Iterate through the list in reverse, only latest doc with dupe id gets added.
-        for i in range(len(add_docs_params.docs)-1, -1, -1):
-            if ("_id" in add_docs_params.docs[i]) and (add_docs_params.docs[i]["_id"] not in doc_ids):
-                doc_ids.append(add_docs_params.docs[i]["_id"])
+        doc_ids = add_docs_params.get_doc_ids_uniquely()
         existing_docs = _get_documents_for_upsert(
             config=config, index_name=add_docs_params.index_name, document_ids=doc_ids)
+    else:
+        existing_docs = {}
 
     for i, doc in enumerate(add_docs_params.docs):
-
-        indexing_instructions = {
-            'index' if add_docs_params.update_mode == 'replace' else 'update': {"_index": add_docs_params.index_name}}
-        copied = copy.deepcopy(doc)
-
-        document_is_valid = True
-        new_fields_from_doc = set()
-
+        
         doc_id = None
         try:
-            validation.validate_doc(doc)
-
-            if "_id" in doc:
-                doc_id = validation.validate_id(doc["_id"])
-                del copied["_id"]
-            else:
-                doc_id = str(uuid.uuid4())
-
-            [validation.validate_field_name(field) for field in copied]
+            doc.validate_document()
         except errors.__InvalidRequestError as err:
             unsuccessful_docs.append(
                 (i, {'_id': doc_id if doc_id is not None else '',
@@ -447,37 +416,24 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
             )
             continue
 
-        if add_docs_params.update_mode == "replace":
-            indexing_instructions["index"]["_id"] = doc_id
-            if add_docs_params.use_existing_tensors:
-                matching_doc = [doc for doc in existing_docs["docs"] if doc["_id"] == doc_id]
-                # Should only have 1 result, as only 1 id matches
-                if len(matching_doc) == 1:
-                    existing_doc = matching_doc[0]
-                # When a request isn't sent to get matching docs, because the added docs don't
-                # have IDs:
-                elif len(matching_doc) == 0:
-                    existing_doc = {"found": False}
-                else:
-                    raise errors.InternalError(message= f"Upsert: found {len(matching_doc)} matching docs for {doc_id} when only 1 or 0 should have been found.")
-        else:
-            indexing_instructions["update"]["_id"] = doc_id
+        document_is_valid = True
+        new_fields_from_doc = set()
+        doc_id = doc.get_or_generate_id()
+        copied = doc.dict() 
+        del copied["_id"]
+        indexing_instructions = add_docs_params.indexing_instructions(doc_id=doc_id)
 
-        # Metadata can be calculated here at the doc level.
-        # Only add chunk values which are string, boolean, numeric or dictionary.
-        # Dictionary keys will be store in a list.
-        chunk_values_for_filtering = {}
-        for key, value in copied.items():
-            if not (isinstance(value, str) or isinstance(value, float)
-                    or isinstance(value, bool) or isinstance(value, int)
-                    or isinstance(value, list) or isinstance(value, dict)):
-                continue
-            chunk_values_for_filtering[key] = value
+        existing_doc_dict: Optional[Dict[str, Any]] = get_existing_document(
+            add_docs_params=add_docs_params,
+            existing_docs=existing_docs["docs"] if existing_docs else [],
+            doc_id=doc_id
+        )
+
+        chunk_values_for_filtering = doc.get_chunk_values_for_filtering()
 
         chunks = []
 
         for field in copied:
-
             try:
                 field_content = validation.validate_field_content(
                     field_content=copied[field], is_non_tensor_field=field in add_docs_params.non_tensor_fields)
@@ -503,140 +459,41 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
 
             # chunks generated by processing this field for this doc:
             chunks_to_append = []
-            # Check if content of this field changed. If no, skip all chunking and vectorisation
-            if ((add_docs_params.update_mode == 'replace') and add_docs_params.use_existing_tensors
-                    and existing_doc["found"]
-                    and (field in existing_doc["_source"]) and (existing_doc["_source"][field] == field_content)):
-                chunks_to_append = _get_chunks_for_field(field_name=field, doc_id=doc_id, doc=existing_doc)
+            try:
+                # Check if content of this field changed. If no, skip all chunking and vectorisation
+                if existing_doc_dict and field in existing_doc_dict["_source"] and existing_doc_dict["_source"][field] == field_content:
+                    chunks_to_append = _get_chunks_for_field(field_name=field, doc_id=doc_id, doc=existing_doc_dict)
 
-            # Chunk and vectorise, since content changed.
-            elif isinstance(field_content, (str, Image.Image)):
-
-                # TODO: better/consistent handling of a no-op for processing (but still vectorize)
-
-                # 1. check if urls should be downloaded -> "treat_pointers_and_urls_as_images":True
-                # 2. check if it is a url or pointer
-                # 3. If yes in 1 and 2, download blindly (without type)
-                # 4. Determine media type of downloaded
-                # 5. load correct media type into memory -> PIL (images), videos (), audio (torchaudio)
-                # 6. if chunking -> then add the extra chunker
-
-                if isinstance(field_content, str) and not _is_image(field_content):
-                    # text processing pipeline:
-                    split_by = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][
-                        NsField.split_method]
-                    split_length = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][
-                        NsField.split_length]
-                    split_overlap = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][
-                        NsField.split_overlap]
-                    content_chunks = text_processor.split_text(field_content, split_by=split_by,
-                                                               split_length=split_length, split_overlap=split_overlap)
-                    text_chunks = content_chunks
-                else:
-                    # TODO put the logic for getting field parameters into a function and add per field options
-                    image_method = index_info.index_settings[NsField.index_defaults][NsField.image_preprocessing][
-                        NsField.patch_method]
-                    # the chunk_image contains the no-op logic as of now - method = None will be a no-op
-                    try:
-                        # in the future, if we have different chunking methods, make sure we catch possible
-                        # errors of different types generated here, too.
-                        if isinstance(field_content, str) and index_info.index_settings[NsField.index_defaults][
-                            NsField.treat_urls_and_pointers_as_images]:
-                            if not isinstance(image_repo[field_content], Exception):
-                                image_data = image_repo[field_content]
-                            else:
-                                raise s2_inference_errors.S2InferenceError(
-                                    f"Could not find image found at `{field_content}`. \n"
-                                    f"Reason: {str(image_repo[field_content])}"
-                                )
-                        else:
-                            image_data = field_content
-                        if image_method not in [None, 'none', '', "None", ' ']:
-                            content_chunks, text_chunks = image_processor.chunk_image(
-                                image_data, device=selected_device, method=image_method)
-                        else:
-                            # if we are not chunking, then we set the chunks as 1-len lists
-                            # content_chunk is the PIL image
-                            # text_chunk refers to URL
-                            content_chunks, text_chunks = [image_data], [field_content]
-                    except s2_inference_errors.S2InferenceError as e:
-                        document_is_valid = False
-                        unsuccessful_docs.append(
-                            (i, {'_id': doc_id, 'error': e.message,
-                                 'status': int(errors.InvalidArgError.status_code),
-                                 'code': errors.InvalidArgError.code})
+                # Chunk and vectorise, since content changed.
+                elif isinstance(field_content, (str, Image.Image)):
+                    chunks_to_append = standard_chunk_and_vectorise(
+                        index_info=index_info,
+                        field=field,
+                        field_content=field_content,
+                        image_repo=image_repo,
+                        selected_device=selected_device,
+                        model_auth=add_docs_params.model_auth
+                    )
+                elif isinstance(field_content, dict):
+                    if add_docs_params.mappings[field]["type"] == "multimodal_combination":
+                        (combo_chunk, combo_vectorise_time_to_add, new_fields_from_multimodal_combination) = vectorise_multimodal_combination_field(
+                                field, field_content, copied, i, doc_id, selected_device, index_info,
+                                image_repo, add_docs_params.mappings[field], model_auth=add_docs_params.model_auth
                         )
-                        break
-
-                normalize_embeddings = index_info.index_settings[NsField.index_defaults][
-                    NsField.normalize_embeddings]
-                infer_if_image = index_info.index_settings[NsField.index_defaults][
-                    NsField.treat_urls_and_pointers_as_images]
-
-                try:
-                    # in the future, if we have different underlying vectorising methods, make sure we catch possible
-                    # errors of different types generated here, too.
-
-                    # ADD DOCS TIMER-LOGGER (4)
-                    start_time = timer()
-                    vector_chunks = s2_inference.vectorise(
-                        model_name=index_info.model_name,
-                        model_properties=_get_model_properties(index_info), content=content_chunks,
-                        device=selected_device, normalize_embeddings=normalize_embeddings,
-                        infer=infer_if_image, model_auth=add_docs_params.model_auth)
-
-                    end_time = timer()
-                    total_vectorise_time += (end_time - start_time)
-                except (s2_inference_errors.UnknownModelError,
-                        s2_inference_errors.InvalidModelPropertiesError,
-                        s2_inference_errors.ModelLoadError,
-                        s2_inference.ModelDownloadError) as model_error:
-                    raise errors.BadRequestError(
-                        message=f'Problem vectorising query. Reason: {str(model_error)}',
-                        link="https://marqo.pages.dev/latest/Models-Reference/dense_retrieval/"
-                    )
-                except s2_inference_errors.S2InferenceError:
-                    document_is_valid = False
-                    image_err = errors.InvalidArgError(message=f'Could not process given image: {field_content}')
-                    unsuccessful_docs.append(
-                        (i, {'_id': doc_id, 'error': image_err.message, 'status': int(image_err.status_code),
-                             'code': image_err.code})
-                    )
-                    break
-
-                if (len(vector_chunks) != len(text_chunks)):
-                    raise RuntimeError(
-                        f"the input content after preprocessing and its vectorized counterparts must be the same length."
-                        f"recevied text_chunks={len(text_chunks)} and vector_chunks={len(vector_chunks)}. "
-                        f"check the preprocessing functions and try again. ")
-
-                for text_chunk, vector_chunk in zip(text_chunks, vector_chunks):
-                    # We do not put in metadata yet at this stage.
-                    chunks_to_append.append({
-                        utils.generate_vector_name(field): vector_chunk,
-                        TensorField.field_content: text_chunk,
-                        TensorField.field_name: field
-                    })
-            
-            elif isinstance(field_content, dict):
-                if add_docs_params.mappings[field]["type"] == "multimodal_combination":
-                    (combo_chunk, combo_document_is_valid,
-                     unsuccessful_doc_to_append, combo_vectorise_time_to_add,
-                     new_fields_from_multimodal_combination) = vectorise_multimodal_combination_field(
-                            field, field_content, copied, i, doc_id, selected_device, index_info,
-                            image_repo, add_docs_params.mappings[field], model_auth=add_docs_params.model_auth)
-                    total_vectorise_time = total_vectorise_time + combo_vectorise_time_to_add
-                    if combo_document_is_valid is False:
-                        unsuccessful_docs.append(unsuccessful_doc_to_append)
-                        break
-                    else:
+                        total_vectorise_time = total_vectorise_time + combo_vectorise_time_to_add
                         if field not in new_obj_fields:
                             new_obj_fields[field] = set()
                         new_obj_fields[field] = new_obj_fields[field].union(new_fields_from_multimodal_combination)
-                        # TODO: we may want to use chunks_to_append here to make it uniform with use_existing_tensors and normal vectorisation
-                        chunks.append({**combo_chunk, **chunk_values_for_filtering})
-                        continue
-            
+                        chunks_to_append = [combo_chunk]
+
+            except errors.InvalidArgError as e:
+                document_is_valid = False
+                unsuccessful_docs.append((i, {
+                    '_id': doc_id, 'error': e.message,
+                    'status': int(e.status_code), 'code': e.code
+                }))
+                break
+
             # Add chunks_to_append along with doc metadata to total chunks
             for chunk in chunks_to_append:
                 chunks.append({**chunk, **chunk_values_for_filtering})
@@ -716,7 +573,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
 
     if bulk_parent_dicts:
         # the HttpRequest wrapper handles error logic
-        update_mapping_response = backend.add_customer_field_properties(
+        backend.add_customer_field_properties(
             config=config, index_name=add_docs_params.index_name, customer_field_names=new_fields,
             model_properties=_get_model_properties(index_info), multimodal_combination_fields=new_obj_fields)
 
@@ -724,8 +581,8 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
         start_time_5 = timer()
         index_parent_response = HttpRequests(config).post(
             path="_bulk", body=utils.dicts_to_jsonl(bulk_parent_dicts))
-        end_time_5 = timer()
-        total_http_time = end_time_5 - start_time_5
+
+        total_http_time = timer() - start_time_5
         total_index_time = index_parent_response["took"] * 0.001
         logger.debug(
             f"      add_documents roundtrip: took {(total_http_time):.3f}s to send {batch_size} docs (roundtrip) to Marqo-os, "
@@ -738,41 +595,146 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
         index_parent_response = None
 
     if add_docs_params.auto_refresh:
-        refresh_response = HttpRequests(config).post(path=F"{add_docs_params.index_name}/_refresh")
+        HttpRequests(config).post(path=F"{add_docs_params.index_name}/_refresh")
 
-    t1 = timer()
+    return translate_add_doc_response(add_docs_params=add_docs_params, response=index_parent_response, time_diff=timer() - t0, unsuccessful_docs=unsuccessful_docs)
 
-    def translate_add_doc_response(response: Optional[dict], time_diff: float) -> dict:
-        """translates OpenSearch response dict into Marqo dict"""
-        item_fields_to_remove = ['_index', '_primary_term', '_seq_no', '_shards', '_version']
-        result_dict = {}
-        new_items = []
+def get_standard_chunks(index_info: IndexInfo, field_content: Union[str, Image.Image], image_repo: Dict[Any, Any], selected_device: str,):
+    if isinstance(field_content, str) and not _is_image(field_content):
+        content_chunks = text_processor.split_text(
+            field_content,
+            split_by=index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][NsField.split_method],
+            split_length=index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][NsField.split_length],
+            split_overlap=index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][NsField.split_overlap]
+        )
+        return content_chunks, content_chunks
 
-        if response is not None:
-            copied_res = copy.deepcopy(response)
+    else:
+        # TODO put the logic for getting field parameters into a function and add per field options
+        image_method = index_info.index_settings[NsField.index_defaults][NsField.image_preprocessing][NsField.patch_method]
+        # the chunk_image contains the no-op logic as of now - method = None will be a no-op
+        try:
+            # in the future, if we have different chunking methods, make sure we catch possible
+            # errors of different types generated here, too.
+            if isinstance(field_content, str) and index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]:
+                if not isinstance(image_repo[field_content], Exception):
+                    image_data = image_repo[field_content]
+                else:
+                    raise s2_inference_errors.S2InferenceError(
+                        f"Could not find image found at `{field_content}`. \n"
+                        f"Reason: {str(image_repo[field_content])}"
+                    )
+            else:
+                image_data = field_content
 
-            result_dict['errors'] = copied_res['errors']
-            actioned = "index" if add_docs_params.update_mode == 'replace' else 'update'
+            if image_method not in [None, 'none', '', "None", ' ']:
+                content_chunks, text_chunks = image_processor.chunk_image(
+                    image_data, device=selected_device, method=image_method)
+            else:
+                # if we are not chunking, then we set the chunks as 1-len lists
+                # content_chunk is the PIL image
+                # text_chunk refers to URL
+                content_chunks, text_chunks = [image_data], [field_content]
+            return content_chunks, text_chunks
+        except s2_inference_errors.S2InferenceError as e:
+            raise errors.InvalidArgError(e.message)
 
-            for item in copied_res["items"]:
-                for to_remove in item_fields_to_remove:
-                    if to_remove in item[actioned]:
-                        del item[actioned][to_remove]
-                new_items.append(item[actioned])
+def standard_chunk_and_vectorise(index_info: IndexInfo, field: str, field_content: Union[str, Image.Image], image_repo: Dict[Any, Any], selected_device: str, model_auth: Optional[ModelAuth] = None) -> List[Dict[str, Any]]:
+    # TODO: better/consistent handling of a no-op for processing (but still vectorize)
 
-        if unsuccessful_docs:
-            result_dict['errors'] = True
+    # 1. check if urls should be downloaded -> "treat_pointers_and_urls_as_images":True
+    # 2. check if it is a url or pointer
+    # 3. If yes in 1 and 2, download blindly (without type)
+    # 4. Determine media type of downloaded
+    # 5. load correct media type into memory -> PIL (images), videos (), audio (torchaudio)
+    # 6. if chunking -> then add the extra chunker
+    content_chunks, text_chunks = get_standard_chunks(index_info, field_content, image_repo, selected_device)
 
-        for loc, error_info in unsuccessful_docs:
-            new_items.insert(loc, error_info)
+    try:
+        # in the future, if we have different underlying vectorising methods, make sure we catch possible
+        # errors of different types generated here, too.
 
-        result_dict["processingTimeMs"] = time_diff * 1000
-        result_dict["index_name"] = add_docs_params.index_name
-        result_dict["items"] = new_items
-        return result_dict
+        # ADD DOCS TIMER-LOGGER (4)
+        start_time = timer()
+        vector_chunks = s2_inference.vectorise(
+            model_name=index_info.model_name,
+            model_properties=_get_model_properties(index_info), content=content_chunks,
+            device=selected_device,
+            model_auth=model_auth,
+            normalize_embeddings=index_info.index_settings[NsField.index_defaults][NsField.normalize_embeddings],
+            infer=index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]
+        )
 
-    return translate_add_doc_response(response=index_parent_response, time_diff=t1 - t0)
+        end_time = timer()
+        # total_vectorise_time += (end_time - start_time)
+    except (s2_inference_errors.UnknownModelError,
+            s2_inference_errors.InvalidModelPropertiesError,
+            s2_inference_errors.ModelLoadError,
+            s2_inference.ModelDownloadError) as model_error:
+        raise errors.BadRequestError(
+            message=f'Problem vectorising query. Reason: {str(model_error)}',
+            link="https://marqo.pages.dev/latest/Models-Reference/dense_retrieval/"
+        )
+    except s2_inference_errors.S2InferenceError:
+        raise errors.InvalidArgError(message=f'Could not process given image: {field_content}')
 
+    if (len(vector_chunks) != len(text_chunks)):
+        raise RuntimeError(
+            f"the input content after preprocessing and its vectorized counterparts must be the same length."
+            f"recevied text_chunks={len(text_chunks)} and vector_chunks={len(vector_chunks)}. "
+            f"check the preprocessing functions and try again. ")
+
+    chunks_to_append = []
+    for text_chunk, vector_chunk in zip(text_chunks, vector_chunks):
+        # We do not put in metadata yet at this stage.
+        chunks_to_append.append({
+            utils.generate_vector_name(field): vector_chunk,
+            TensorField.field_content: text_chunk,
+            TensorField.field_name: field
+        })
+    return chunks_to_append
+
+
+def get_existing_document(add_docs_params: AddDocsParams, existing_docs: List[Dict[str, Any]], doc_id: str) -> Optional[Dict[str, Any]]:
+    if add_docs_params.update_mode != "replace" or not add_docs_params.use_existing_tensors:
+        return None
+
+    matching_doc = [doc for doc in existing_docs if doc["_id"] == doc_id]
+    if len(matching_doc) == 1:
+        return matching_doc[0]
+    elif len(matching_doc) == 0:
+        return None
+    else:
+        raise errors.InternalError(message= f"Upsert: found {len(matching_doc)} matching docs for {doc_id} when only 1 or 0 should have been found.")
+
+
+def translate_add_doc_response(add_docs_params: AddDocsParams, response: Optional[dict], time_diff: float, unsuccessful_docs: List[Tuple[int, Dict[str, Any]]]=[]) -> Dict[str, Any]:
+    """translates OpenSearch response dict into Marqo dict"""
+    item_fields_to_remove = ['_index', '_primary_term', '_seq_no', '_shards', '_version']
+    result_dict = {}
+    new_items = []
+    if response is not None:
+        copied_res = copy.deepcopy(response)
+
+        result_dict['errors'] = copied_res['errors']
+        actioned = "index" if add_docs_params.update_mode == 'replace' else 'update'
+
+        for item in copied_res["items"]:
+            for to_remove in item_fields_to_remove:
+                if to_remove in item[actioned]:
+                    del item[actioned][to_remove]
+            new_items.append(item[actioned])
+
+    if unsuccessful_docs:
+        result_dict['errors'] = True
+
+    for loc, error_info in unsuccessful_docs:
+        new_items.insert(loc, error_info)
+
+    result_dict["processingTimeMs"] = time_diff * 1000
+    result_dict["index_name"] = add_docs_params.index_name
+    result_dict["items"] = new_items
+    return result_dict
 
 def get_document_by_id(
         config: Config, index_name: str, document_id: str, show_vectors: bool = False):
@@ -2040,8 +2002,6 @@ def vectorise_multimodal_combination_field(
         model_auth: Model download authorisation information (if required)
     Returns:
         combo_chunk: the combo_chunk to be appended to the main body
-        combo_document_is_valid:  if the document is a valid
-        unsuccessful_docs: appended unsucessful_docs
         combo_total_vectorise_time: the vectorise time spent in combo field
         new_fields_from_multimodal_combination: the new fields from multimodal combination field that will be added to
             index properties
@@ -2049,10 +2009,8 @@ def vectorise_multimodal_combination_field(
     '''
     # field_content = {"tensor_field_one" : {"weight":0.5, "parameter": "test-paramater-1"},
     #                 "tensor_field_two" : {"weight": 0.5, parameter": "test-parameter-2"}},
-    combo_document_is_valid = True
     combo_vectorise_time_to_add = 0
     combo_chunk = {}
-    unsuccessful_doc_to_append = tuple()
     new_fields_from_multimodal_combination = set()
 
     # Copy the important mutable objects from main body for safety purpose
@@ -2098,14 +2056,7 @@ def vectorise_multimodal_combination_field(
                     image_field_names.append(sub_field_name)
 
                 except s2_inference_errors.S2InferenceError as e:
-                    combo_document_is_valid = False
-                    unsuccessful_doc_to_append = \
-                        (doc_index, {'_id': doc_id, 'error': e.message,
-                                     'status': int(errors.InvalidArgError.status_code),
-                                     'code': errors.InvalidArgError.code})
-
-                    return combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add, new_fields_from_multimodal_combination
-            new_fields_from_multimodal_combination.add((sub_field_name, _infer_opensearch_data_type(sub_content)))
+                    raise errors.InvalidArgError(e.message)
 
     try:
         start_time = timer()
@@ -2133,13 +2084,7 @@ def vectorise_multimodal_combination_field(
             link="https://marqo.pages.dev/latest/Models-Reference/dense_retrieval/"
         )
     except s2_inference_errors.S2InferenceError:
-        combo_document_is_valid = False
-        image_err = errors.InvalidArgError(message=f'Could not process given image: {multimodal_object_copy}')
-        unsuccessful_doc_to_append = \
-            (doc_index, {'_id': doc_id, 'error': image_err.message, 'status': int(image_err.status_code),
-                 'code': image_err.code})
-
-        return combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add, new_fields_from_multimodal_combination
+        raise errors.InvalidArgError(message=f'Could not process given image: {multimodal_object_copy}')
 
     sub_field_name_list = text_field_names + image_field_names
     vectors_list = text_vectors + image_vectors
@@ -2159,7 +2104,7 @@ def vectorise_multimodal_combination_field(
         TensorField.field_content: json.dumps(multimodal_object),
         TensorField.field_name: field,
     })
-    return combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add, new_fields_from_multimodal_combination
+    return combo_chunk, combo_vectorise_time_to_add, new_fields_from_multimodal_combination
 
 def _create_normal_tensor_search_query(result_count, offset, vector_field, vectorised_text) -> dict:
     search_query = {

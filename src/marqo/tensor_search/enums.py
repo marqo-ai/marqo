@@ -117,7 +117,7 @@ class RequestType:
     CREATE = "CREATE"
 
 
-class MappingsObjectType:
+class MappingsObjectType(str, Enum):
     multimodal_combination = "multimodal_combination"
 
 
