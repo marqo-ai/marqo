@@ -55,7 +55,7 @@ from marqo.tensor_search.formatting import _clean_doc
 from marqo.tensor_search.index_meta_cache import get_cache, get_index_info
 from marqo.tensor_search import index_meta_cache
 from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQueryEntity, ScoreModifier
-from marqo.tensor_search.models.search import Qidx, JHash, SearchContext, VectorisedJobs, VectorisedJobPointer
+from marqo.tensor_search.models.search import Qidx, JHash, SearchContext, VectorisedJobs, VectorisedJobPointer, ContentType
 from marqo.tensor_search.models.index_info import IndexInfo
 from marqo.tensor_search.models.external_apis.abstract_classes import ExternalAuth
 from marqo.tensor_search.utils import add_timing
@@ -1438,7 +1438,7 @@ def assign_query_to_vector_job(
             f" `grouped_content` with {len(grouped_content)} elems")
     ptrs = []
     for i, grouped_content in enumerate(grouped_content):
-        content_type = 'text' if i == 0 else 'image'
+        content_type = ContentType.text if i == 0 else ContentType.image
         vector_job = VectorisedJobs(
             model_name=index_info.model_name,
             model_properties=_get_model_properties(index_info),
@@ -1607,7 +1607,7 @@ def get_content_vector(possible_jobs: List[VectorisedJobPointer], job_to_vectors
 
     Raises runtime error if is not found
     """
-    content_type = 'image' if treat_urls_as_images and _is_image(content) else 'text'
+    content_type = ContentType.image if treat_urls_as_images and _is_image(content) else ContentType.text
     not_found_error = RuntimeError(f"get_content_vector(): could not find corresponding vector for content `{content}`")
     for vec_job_pointer in possible_jobs:
         if jobs[vec_job_pointer.job_hash].content_type == content_type:

@@ -1,4 +1,5 @@
 import json
+from enum import Enum
 
 from pydantic import BaseModel, validator, ValidationError
 from typing import Any, Union, List, Dict, Optional, NewType, Literal
@@ -16,6 +17,11 @@ class VectorisedJobPointer(BaseModel):
     start_idx: int
     end_idx: int
 
+class ContentType(str, Enum):
+    text = 'text'
+    image = 'image'
+
+
 class VectorisedJobs(BaseModel):
     """A vectorised job describes content (e.q. search queries, images) that can be vectorised (i.e can be sent to 
     `s2_inference.vectorise`) in a single batch given they share common inference parameters.
@@ -27,7 +33,7 @@ class VectorisedJobs(BaseModel):
     device: str
     normalize_embeddings: bool
     image_download_headers: Optional[Dict]
-    content_type: Literal['text', 'image']
+    content_type: ContentType
     model_auth: Optional[ModelAuth]
 
     def __hash__(self):
