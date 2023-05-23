@@ -35,5 +35,3 @@ redis==4.4.2
 platformdirs==3.5.0
 timm==0.6.13
 transformers==4.29.0
-
-pydantic==1.10.6 # pin for release 0.0.21
