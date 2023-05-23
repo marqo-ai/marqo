@@ -35,3 +35,5 @@ redis==4.4.2
 platformdirs==3.5.0
 timm==0.6.13
 transformers==4.29.0
+
+flatbuffers==23.5.8
