@@ -36,4 +36,9 @@ platformdirs==3.5.0
 timm==0.6.13
 transformers==4.29.0
 
-flatbuffers==23.5.8
+flatbuffers==23.5.9
+certifi==2019.11.28
+idna==2.8
+six==1.14.0
+typing-extensions==4.5.0
+urllib3==1.25.8
