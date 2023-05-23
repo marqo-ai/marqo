@@ -42,7 +42,7 @@ Marqo is an end-to-end, multimodal vector search engine. With Marqo, users can s
 
 **☁️ Cloud-native**
 - Fast deployment using Docker.
-- Run Marqo multi-az and high availability.
+- Run Marqo high availability.
 
 **🌌 End-to-end**
 - Build search and analytics on multiple unstructured data types such as text, image, code, video.
