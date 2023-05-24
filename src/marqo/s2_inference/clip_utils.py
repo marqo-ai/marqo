@@ -466,8 +466,13 @@ class OPEN_CLIP(CLIP):
 
         self.image_input_processed = torch.stack([self.preprocess(_img).to(self.device) for _img in image_input])
 
-        with torch.no_grad(), torch.autocast(device_type="cuda" if self.device.startswith("cuda") else "cpu"):
-            outputs = self.model.encode_image(self.image_input_processed).to(torch.float32)
+        with torch.no_grad():
+            if self.device.startswith("cuda"):
+                with torch.cuda.amp.autocast():
+                    outputs = self.model.encode_image(self.image_input_processed).to(torch.float32)
+            else:
+                outputs = self.model.encode_image(self.image_input_processed).to(torch.float32)
+
 
         if normalize:
             _shape_before = outputs.shape
@@ -483,8 +488,12 @@ class OPEN_CLIP(CLIP):
 
         text = self.tokenizer(sentence).to(self.device)
 
-        with torch.no_grad(), torch.autocast(device_type="cuda" if self.device.startswith("cuda") else "cpu"):
-            outputs = self.model.encode_text(text).to(torch.float32)
+        with torch.no_grad():
+            if self.device.startswith("cuda"):
+                with torch.cuda.amp.autocast():
+                    outputs = self.model.encode_text(text).to(torch.float32)
+            else:
+                outputs = self.model.encode_text(text).to(torch.float32)
 
         if normalize:
             _shape_before = outputs.shape
