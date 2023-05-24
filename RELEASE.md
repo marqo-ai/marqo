@@ -1,3 +1,29 @@
+# Release 0.0.21
+
+## New features
+- Custom SBERT Models Loading with Authentication(https://github.com/marqo-ai/marqo/pull/474). 
+Marqo now supports the integration of your fine-tuned public and private BERT models. 
+For information on loading your own SBERT models through different entries, 
+please refer to our [documentation](https://docs.marqo.ai/0.0.21/Models-Reference/bring_your_own_model/). 
+For instructions on loading a private model using authentication, check
+[model auth during search](https://docs.marqo.ai/0.0.19/API-Reference/search/#model-auth) and 
+[model auth during add_documents](https://docs.marqo.ai/0.0.19/API-Reference/documents/#model-auth).
+
+- Score Modifiers and Context Vectors in Bulk Search(https://github.com/marqo-ai/marqo/pull/469). 
+We have added support for [score modifiers](https://docs.marqo.ai/0.0.21/API-Reference/search/#score-modifiers) 
+and [context vectors](https://docs.marqo.ai/0.0.21/API-Reference/search/#context) in our bulk API, 
+thus enhancing throughput and performance. 
+You can check our [documents](https://docs.marqo.ai/0.0.21/API-Reference/bulk/) for more details.
+
+## Bug fixes and minor changes
+- Enhanced our README documentation for better user 
+understanding(https://github.com/marqo-ai/marqo/pull/482, https://github.com/marqo-ai/marqo/pull/481).
+
+## Contributor shout-outs
+- Thank you to our 3.0k stargazers for their unwavering support.
+- Thank you to our community members for the vibrant and insightful discussions on our Slack channel.
+
+
 # Release 0.0.20
 
 ## New features
