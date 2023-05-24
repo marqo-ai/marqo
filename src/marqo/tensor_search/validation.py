@@ -14,7 +14,6 @@ from marqo.errors import (
 from marqo.tensor_search.enums import TensorField, SearchMethod
 from marqo.tensor_search import constants
 from marqo.tensor_search.models.search import SearchContext
-
 from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest
 from marqo.tensor_search.models.settings_object import settings_schema
 from marqo.tensor_search.models.mappings_object import mappings_schema, multimodal_combination_schema
@@ -397,7 +396,7 @@ def validate_settings_object(settings_object):
         )
 
 
-def validate_dict(field: str, field_content: Dict, is_non_tensor_field: bool, mappings: Dict):
+def validate_dict(field: str, field_content: Dict, is_non_tensor_field: bool, mappings: Optional[Dict[str, "MappingObject"]]):
     '''
 
     Args:
@@ -425,13 +424,13 @@ def validate_dict(field: str, field_content: Dict, is_non_tensor_field: bool, ma
             f"If you aim to use dictionary filed content as a special field,"
             f"please check `https://docs.marqo.ai/0.0.15/Advanced-Usage/document_fields/#multimodal-combination-object` for more info.")
 
-    if mappings[field]["type"] == "multimodal_combination":
+    if mappings[field].type == "multimodal_combination":
         validate_multimodal_combination(field_content, is_non_tensor_field, mappings[field])
 
     return field_content
 
 
-def validate_multimodal_combination(field_content, is_non_tensor_field, field_mapping):
+def validate_multimodal_combination(field_content: Dict[str, Any], is_non_tensor_field: bool, field_mapping: "MappingObject"):
     '''
 
     Args:
@@ -456,11 +455,10 @@ def validate_multimodal_combination(field_content, is_non_tensor_field, field_ma
                 f"Multimodal-combination field content `{key}:{value}` \n  "
                 f"of type `{type(key).__name__} : {type(value).__name__}` is not of valid content type (one of {constants.ALLOWED_MULTIMODAL_FIELD_TYPES})."
             )
-
-        if not key in field_mapping["weights"]:
+        if not key in field_mapping.weights.dict():
             raise InvalidArgError(
                 f"Multimodal-combination field content `{key}:{value}` \n  "
-                f"is not in the multimodal_field mappings weights `{field_mapping['weights']}`. Each sub_field requires a weights."
+                f"is not in the multimodal_field mappings weights `{field_mapping.weights}`. Each sub_field requires a weights."
                 f"Please add the `{key}` to the mappings."
                 f"please check `https://docs.marqo.ai/0.0.15/Advanced-Usage/document_fields/#multimodal-combination-object` for more info.")
 

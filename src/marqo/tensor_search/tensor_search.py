@@ -475,7 +475,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                         model_auth=add_docs_params.model_auth
                     )
                 elif isinstance(field_content, dict):
-                    if add_docs_params.mappings[field]["type"] == "multimodal_combination":
+                    if add_docs_params.mappings[field].type == "multimodal_combination":
                         (combo_chunk, combo_vectorise_time_to_add, new_fields_from_multimodal_combination) = vectorise_multimodal_combination_field(
                                 field, field_content, copied, i, doc_id, selected_device, index_info,
                                 image_repo, add_docs_params.mappings[field], model_auth=add_docs_params.model_auth
@@ -628,14 +628,14 @@ def get_standard_chunks(index_info: IndexInfo, field_content: Union[str, Image.I
                 image_data = field_content
 
             if image_method not in [None, 'none', '', "None", ' ']:
-                content_chunks, text_chunks = image_processor.chunk_image(
-                    image_data, device=selected_device, method=image_method)
+                return image_processor.chunk_image(
+                    image_data, device=selected_device, method=image_method
+                )
             else:
                 # if we are not chunking, then we set the chunks as 1-len lists
                 # content_chunk is the PIL image
                 # text_chunk refers to URL
-                content_chunks, text_chunks = [image_data], [field_content]
-            return content_chunks, text_chunks
+                return [image_data], [field_content]
         except s2_inference_errors.S2InferenceError as e:
             raise errors.InvalidArgError(e.message)
 
@@ -651,11 +651,6 @@ def standard_chunk_and_vectorise(index_info: IndexInfo, field: str, field_conten
     content_chunks, text_chunks = get_standard_chunks(index_info, field_content, image_repo, selected_device)
 
     try:
-        # in the future, if we have different underlying vectorising methods, make sure we catch possible
-        # errors of different types generated here, too.
-
-        # ADD DOCS TIMER-LOGGER (4)
-        start_time = timer()
         vector_chunks = s2_inference.vectorise(
             model_name=index_info.model_name,
             model_properties=_get_model_properties(index_info), content=content_chunks,
@@ -664,9 +659,6 @@ def standard_chunk_and_vectorise(index_info: IndexInfo, field: str, field_conten
             normalize_embeddings=index_info.index_settings[NsField.index_defaults][NsField.normalize_embeddings],
             infer=index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]
         )
-
-        end_time = timer()
-        # total_vectorise_time += (end_time - start_time)
     except (s2_inference_errors.UnknownModelError,
             s2_inference_errors.InvalidModelPropertiesError,
             s2_inference_errors.ModelLoadError,
@@ -699,7 +691,7 @@ def get_existing_document(add_docs_params: AddDocsParams, existing_docs: List[Di
     if add_docs_params.update_mode != "replace" or not add_docs_params.use_existing_tensors:
         return None
 
-    matching_doc = [doc for doc in existing_docs if doc["_id"] == doc_id]
+    matching_doc = [doc for doc in existing_docs if doc["_id"] == doc_id and doc.get("found", False)]
     if len(matching_doc) == 1:
         return matching_doc[0]
     elif len(matching_doc) == 0:
@@ -2092,7 +2084,7 @@ def vectorise_multimodal_combination_field(
     if not len(sub_field_name_list) == len(vectors_list):
         raise errors.BatchInferenceSizeError(message=f"Batch inference size does not match content for multimodal field {field}")
 
-    vector_chunk = np.squeeze(np.mean([np.array(vector) * field_map["weights"][sub_field_name] for sub_field_name, vector in zip(sub_field_name_list, vectors_list)], axis=0))
+    vector_chunk = np.squeeze(np.mean([np.array(vector) * field_map.weights.dict()[sub_field_name] for sub_field_name, vector in zip(sub_field_name_list, vectors_list)], axis=0))
 
     if normalize_embeddings is True:
         vector_chunk = vector_chunk / np.linalg.norm(vector_chunk)

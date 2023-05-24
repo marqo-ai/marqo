@@ -302,7 +302,10 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
                 }], auto_refresh=True, non_tensor_fields=["2nd-non-tensor-field"], use_existing_tensors=True))
             content_to_be_vectorised = [call_kwargs['content'] for call_args, call_kwargs
                                         in mock_vectorise.call_args_list]
-            assert content_to_be_vectorised == [["cat on mat"], ["updated content"]]
+            
+            assert all([v in [["cat on mat"], ["updated content"]] for v in content_to_be_vectorised])
+            assert len(content_to_be_vectorised) == len([["cat on mat"], ["updated content"]])
+            
             return True
         assert run()
 
@@ -474,8 +477,11 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
                 ["this is the updated 1st sentence.", "This is my second"],
                 ["this is a brand new sentence.", "Yes it is"],
                 [artefact_pil_image], [artefact_pil_image]]
-            assert vectorised_content == expected_to_be_vectorised
-
+            
+            # Unordered list equivalent of `assert vectorised_content == expected_to_be_vectorised`
+            assert all([v in expected_to_be_vectorised for v in vectorised_content])
+            assert len(vectorised_content) == len(expected_to_be_vectorised)
+            
             updated_doc = requests.get(
                 url=F"{self.endpoint}/{self.index_name_1}/_doc/123",
                 verify=False

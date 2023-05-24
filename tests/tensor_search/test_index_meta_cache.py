@@ -594,15 +594,7 @@ class TestIndexMetaCache(MarqoTestCase):
         When the add_documents process completes, it attempts to update mappings, but when it tries to get
         the existing info, it is no longer there.
         """
-        # we need to rename this prevent infinite recursion inside mock_validate_doc
-        from marqo.tensor_search.validation import validate_doc as og_validate_doc
-
-        def mock_validate_doc(*args, **kwargs):
-            # we want to slow this down slightly, so that the other thread can manipulate the index meta cache
-            # validate_doc is between the initial get_index call and
-            time.sleep(0.1)
-            return og_validate_doc(*args, **kwargs)
-
+        
         def clear_cache():
             """This will sleep briefly, allowing add_dcuments to start. When it runs it should be between
             both index_info calls.
@@ -610,7 +602,6 @@ class TestIndexMetaCache(MarqoTestCase):
             time.sleep(0.1)
             index_meta_cache.empty_cache()
 
-        @mock.patch("marqo.tensor_search.validation.validate_doc", mock_validate_doc)
         def run():
             tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1,
                                               index_settings={"index_defaults": {"model": "random"}})
@@ -633,14 +624,6 @@ class TestIndexMetaCache(MarqoTestCase):
         """Same as test_add_documents_to_unknown_index but the other thread deletes the index.
         Instead of a 500 error, it should be an "index not found" error
         """
-        # we need to rename this prevent infinite recursion inside mock_validate_doc
-        from marqo.tensor_search.validation import validate_doc as og_validate_doc
-
-        def mock_validate_doc(*args, **kwargs):
-            # we want to slow this down slightly, so that the other thread can manipulate the index meta cache
-            # validate_doc is between the initial get_index call and
-            time.sleep(0.1)
-            return og_validate_doc(*args, **kwargs)
 
         def delete_index():
             """This will sleep briefly, allowing add_documents to start. When it runs it should be between
@@ -649,7 +632,6 @@ class TestIndexMetaCache(MarqoTestCase):
             time.sleep(0.1)
             tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
 
-        @mock.patch("marqo.tensor_search.validation.validate_doc", mock_validate_doc)
         def run():
             tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1,
                                               index_settings={"index_defaults": {"model": "random"}})

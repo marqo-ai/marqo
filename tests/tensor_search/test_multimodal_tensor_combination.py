@@ -2,9 +2,10 @@ import unittest.mock
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.errors import IndexNotFoundError, InvalidArgError
 from marqo.tensor_search import tensor_search
-from marqo.tensor_search.enums import TensorField, IndexSettingsField, SearchMethod
+from marqo.tensor_search.models.add_docs_objects import MappingObject
+from marqo.tensor_search.enums import TensorField, IndexSettingsField
 from tests.marqo_test import MarqoTestCase
-from marqo.tensor_search.tensor_search import add_documents, vectorise_multimodal_combination_field
+from marqo.tensor_search.tensor_search import vectorise_multimodal_combination_field
 from marqo.errors import DocumentNotFoundError
 import numpy as np
 from marqo.tensor_search.validation import validate_dict
@@ -433,9 +434,9 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             pass
 
     def test_validate_dict(self):
-        test_mappings = {"my_combo_field":{"type":"multimodal_combination", "weights":{
+        test_mappings = {"my_combo_field": MappingObject(type="multimodal_combination", weights = {
             "test_1":0.5, "test_2":0.5
-        }}}
+        })}
         field = "my_combo_field"
         valid_dict = {"test_1": "test", "test_2": "test_test"}
 
@@ -834,7 +835,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                         "weights": {
                             "my_image": 0.5,
                             "some_text": 0.5,
-                            "filter_field": 0,
+                            "filter_field": 0.0,
                     }
                 }},
                 auto_refresh=True
@@ -891,7 +892,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                         "weights": {
                             "my_image": 0.5,
                             "some_text": 0.5,
-                            "filter_field": 0,
+                            "filter_field": 0.0,
                         }
                 }},
                 auto_refresh=True))

@@ -1,24 +1,25 @@
 import json
-from typing import Any, Callable, Dict, List, Literal, Optional, Sequence, Union
+from typing import Any, Callable, Dict, List, Optional
 import uuid
 
-import numpy as np
-from pydantic.dataclasses import dataclass
-from pydantic import Field, validator, BaseModel, root_validator
+from pydantic import Field, validator, BaseModel, root_validator, ValidationError
 
-from marqo.tensor_search import constants, enums, validation, utils
+from marqo.tensor_search import enums, validation, utils
 import marqo.errors as errors
 from marqo.tensor_search.models.private_models import ModelAuth
 
 
 class Weights(BaseModel):
-    __root__: Dict[str, float]  # Allowing only string keys and number values
+    class Config:
+        extra = 'allow'
 
     @root_validator(pre=True, allow_reuse=True)
     def check_keys(cls, values):
+        """Ensure all keys map to floats"""
         if not all(isinstance(i, str) for i in values.keys()):
             raise ValueError('All keys must be strings')
-        if not all(isinstance(i, (int, float)) for i in values.values()):
+        if not all(isinstance(i, (int, float)) and not isinstance(i, bool) for i in values.values()):
+            # Note: `isinstance(True, (int, float)) == True`
             raise ValueError('All values must be numbers')
         return values
 
@@ -27,19 +28,25 @@ class MappingObject(BaseModel):
     type: enums.MappingsObjectType
     weights: Weights = None  # Default value
 
+    def __init__(self, **data):
+        try:
+            super().__init__(**data)
+        except ValidationError as e:
+            raise errors.InvalidArgError(message=e.json())
+
     class Config:
-        extra = 'allow'
+        extra = 'forbid'
 
     @validator('weights', always=True, allow_reuse=True)
     def check_weights(cls, weights, values, **kwargs):
         """Ensure that weights is provided if and only if the type is 'MappingsObjectType.multimodal_combination'."""
-        is_multimodal = values['type'] == enums.MappingsObjectType.multimodal_combination
-        if is_multimodal and weights is not None:
+        is_multimodal = values.get('type', None) == enums.MappingsObjectType.multimodal_combination
+        if is_multimodal and weights is None:
             raise errors.InvalidArgError(
                 f"Error validating multimodal combination object. Reason: 'weights' is not provided"
                 f"\nRead about the mappings object here: https://docs.marqo.ai/0.0.15/API-Reference/mappings/"
             )
-        elif not is_multimodal and weights is None:
+        elif not is_multimodal and weights is not None:
             raise errors.InvalidArgError(
                 f"Error validating mappings. Mapping is not multimodal combination object. Reason: field is not multimodal, but weights provided."
                 f"\nRead about the mappings object here: https://docs.marqo.ai/0.0.15/API-Reference/mappings/"
