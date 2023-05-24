@@ -405,7 +405,6 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
         existing_docs = {}
 
     for i, doc in enumerate(add_docs_params.docs):
-        
         doc_id = None
         try:
             doc.validate_document()
@@ -476,13 +475,14 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                     )
                 elif isinstance(field_content, dict):
                     if add_docs_params.mappings[field].type == "multimodal_combination":
-                        (combo_chunk, combo_vectorise_time_to_add, new_fields_from_multimodal_combination) = vectorise_multimodal_combination_field(
+                        (combo_chunk, combo_vectorise_time_to_add, new_fields_from_multimodal_combination) =  vectorise_multimodal_combination_field(
                                 field, field_content, copied, i, doc_id, selected_device, index_info,
                                 image_repo, add_docs_params.mappings[field], model_auth=add_docs_params.model_auth
                         )
                         total_vectorise_time = total_vectorise_time + combo_vectorise_time_to_add
                         if field not in new_obj_fields:
                             new_obj_fields[field] = set()
+
                         new_obj_fields[field] = new_obj_fields[field].union(new_fields_from_multimodal_combination)
                         chunks_to_append = [combo_chunk]
 
@@ -2050,6 +2050,8 @@ def vectorise_multimodal_combination_field(
                 except s2_inference_errors.S2InferenceError as e:
                     raise errors.InvalidArgError(e.message)
 
+            new_fields_from_multimodal_combination.add((sub_field_name, _infer_opensearch_data_type(sub_content)))
+
     try:
         start_time = timer()
         text_vectors = []
@@ -2085,7 +2087,7 @@ def vectorise_multimodal_combination_field(
         raise errors.BatchInferenceSizeError(message=f"Batch inference size does not match content for multimodal field {field}")
 
     vector_chunk = np.squeeze(np.mean([np.array(vector) * field_map.weights.dict()[sub_field_name] for sub_field_name, vector in zip(sub_field_name_list, vectors_list)], axis=0))
-
+    
     if normalize_embeddings is True:
         vector_chunk = vector_chunk / np.linalg.norm(vector_chunk)
 
@@ -2097,6 +2099,8 @@ def vectorise_multimodal_combination_field(
         TensorField.field_name: field,
     })
     return combo_chunk, combo_vectorise_time_to_add, new_fields_from_multimodal_combination
+
+
 
 def _create_normal_tensor_search_query(result_count, offset, vector_field, vectorised_text) -> dict:
     search_query = {
