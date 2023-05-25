@@ -393,7 +393,6 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
         image_repo = add_docs.download_images(docs=[d.dict() for d in add_docs_params.docs], thread_count=20,
                                               non_tensor_fields=tuple(add_docs_params.non_tensor_fields),
                                               image_download_headers=add_docs_params.image_download_headers)
-        print("INSIDE", image_repo)
         logger.debug(f"          add_documents image download: took {(timer() - ti_0):.3f}s to concurrently download "
                     f"images for {batch_size} docs using {add_docs_params.image_download_thread_count} threads ")
 
