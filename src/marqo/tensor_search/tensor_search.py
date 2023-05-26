@@ -269,8 +269,11 @@ def _autofill_index_settings(index_settings: dict):
 
 def get_stats(config: Config, index_name: str):
     doc_count = HttpRequests(config).post(path=F"{index_name}/_count")["count"]
+    index_info = HttpRequests(config).get(path=F"_cat/indices/{index_name}?format=json")
+    size = index_info[0]["store.size"]
     return {
-        "numberOfDocuments": doc_count
+        "numberOfDocuments": doc_count,
+        "size": size
     }
 
 
