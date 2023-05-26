@@ -35,6 +35,8 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         except:
             pass
+
+
     def test_add_documents(self):
         tensor_search.create_vector_index(
             index_name=self.index_name_1, config=self.config, index_settings={
@@ -75,15 +77,13 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         for key, value in expected_doc.items():
             assert expected_doc[key] == added_doc[key]
 
-        tensor_field = added_doc["_tensor_facets"]
-
-        # for "Title" : "Horse Rider"
-        assert "_embedding" in tensor_field[0]
-        assert tensor_field[0]["Title"] == expected_doc["Title"]
-        #
-        # for combo filed
-        assert "_embedding" in tensor_field[1]
-        assert tensor_field[1]["combo_text_image"] == json.dumps(expected_doc["combo_text_image"])
+        # Order of '_tensor_facets' maps is not deterministic
+        assert ("Title", "_embedding") in [tuple(t.keys()) for t in added_doc["_tensor_facets"]]
+        assert ("combo_text_image", "_embedding") in [tuple(t.keys()) for t in added_doc["_tensor_facets"]]
+        
+        combined = {k: v for d in added_doc["_tensor_facets"] for k, v in d.items()}
+        assert combined["Title"] == expected_doc["Title"]
+        assert combined["combo_text_image"] == json.dumps(expected_doc["combo_text_image"])
 
     def test_multimodal_tensor_combination_score(self):
         def get_score(document):
@@ -747,7 +747,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         assert res["hits"][0]["_id"] == "article_591"
 
         res = tensor_search._lexical_search(config=self.config, index_name=self.index_name_1, text="test_search here")
-        assert res["hits"][0]["_id"] == "article_592"
+        assert res["hits"][0][ "_id"] == "article_592"
 
     def test_overwrite_multimodal_tensor_field(self):
         tensor_search.create_vector_index(
