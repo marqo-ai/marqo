@@ -1084,11 +1084,8 @@ class TestAddDocuments(MarqoTestCase):
         resp = tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="789", show_vectors=True)
 
         assert len(resp[enums.TensorField.tensor_facets]) == 2
-        assert enums.TensorField.embedding in resp[enums.TensorField.tensor_facets][0]
-        assert enums.TensorField.embedding in resp[enums.TensorField.tensor_facets][1]
-        # the order doesn't really matter. We can test for both orderings if this breaks in the future
-        assert "Title" in resp[enums.TensorField.tensor_facets][0]
-        assert "Description" in resp[enums.TensorField.tensor_facets][1]
+        assert ("Title", "_embedding") in [tuple(t.keys()) for t in resp[enums.TensorField.tensor_facets]]
+        assert ("Description", "_embedding") in [tuple(t.keys()) for t in resp[enums.TensorField.tensor_facets]]
 
     def test_add_document_with_non_tensor_field(self):
         docs_ = [{"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}]
