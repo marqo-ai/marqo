@@ -137,9 +137,9 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
     if model_cache_key not in available_models:
         model_size = get_model_size(model_name, validated_model_properties)
         if lock.locked():
-            raise ModelCacheManagementError("Request rejected, as this request attempted to update the model cache, while"
-                                            "another request was updating the model cache at the same time.\n"
-                                            "Please wait for 10 seconds and send the request again.\n"
+            raise ModelCacheManagementError("Request rejected, as this request attempted to update the model cache, while "
+                                            "another request was updating the model cache at the same time.\n "
+                                            "Please wait for 10 seconds and send the request again.\n "
                                             "Marqo's documentation can be found here: `https://docs.marqo.ai/latest/`")
         with lock:
             _validate_model_into_device(model_name, validated_model_properties, device,

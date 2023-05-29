@@ -1,3 +1,23 @@
+# Release 0.0.21
+
+## New features
+- Load custom SBERT models from cloud storage with authentication (https://github.com/marqo-ai/marqo/pull/474). 
+Marqo now supports fetching your fine-tuned public and private SBERT models from Hugging Face and AWS s3. Learn more about using your own SBERT model [here](https://docs.marqo.ai/0.0.21/Models-Reference/bring_your_own_model/#bring-your-own-hugging-face-sbert-models). For instructions on loading a private model using authentication, check
+[model auth during search](https://docs.marqo.ai/0.0.19/API-Reference/search/#model-auth) and 
+[model auth during add_documents](https://docs.marqo.ai/0.0.19/API-Reference/documents/#model-auth).
+
+- Bulk search score modifier and context vector support (https://github.com/marqo-ai/marqo/pull/469). 
+Support has been added for [score modifiers](https://docs.marqo.ai/0.0.21/API-Reference/search/#score-modifiers) 
+and [context vectors](https://docs.marqo.ai/0.0.21/API-Reference/search/#context) to our bulk search API. 
+This can help enhance throughput and performance for certain workloads. Please see [documentation](https://docs.marqo.ai/0.0.21/API-Reference/bulk/) for usage. 
+
+## Bug fixes and minor changes
+- README enhancements (https://github.com/marqo-ai/marqo/pull/482, https://github.com/marqo-ai/marqo/pull/481).
+
+## Contributor shout-outs
+- A special thank you to our 3.0k stargazers!
+
+
 # Release 0.0.20
 
 ## New features
