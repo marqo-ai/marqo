@@ -20,7 +20,7 @@ class Config:
         self.cluster_is_remote = False
         self.url = self.set_url(url)
         self.timeout = timeout
-        default_device = enums.Device.cpu
+        default_device = enums.Device.cuda
 
         self.indexing_device = indexing_device if indexing_device is not None else default_device
         self.search_device = search_device if search_device is not None else default_device

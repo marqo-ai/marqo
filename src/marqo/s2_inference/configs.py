@@ -30,7 +30,7 @@ class Ignore:
 
 
 def get_default_device():
-    return 'cpu'
+    return 'cuda'
 
 def get_default_normalization():
     return True
