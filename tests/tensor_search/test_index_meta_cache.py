@@ -620,10 +620,19 @@ class TestIndexMetaCache(MarqoTestCase):
             return True
         assert run()
 
+
+    
     def test_add_documents_to_non_existent_index(self):
         """Same as test_add_documents_to_unknown_index but the other thread deletes the index.
         Instead of a 500 error, it should be an "index not found" error
         """
+        from marqo.tensor_search.validation import validate_field_content as og_validate_field_content
+
+        def mock_validate_field_content(*args, **kwargs):
+            # we want to slow this down slightly, so that the other thread can manipulate the index meta cache
+            # validate_doc is between the initial get_index call and
+            time.sleep(0.1)
+            return og_validate_field_content(*args, **kwargs)
 
         def delete_index():
             """This will sleep briefly, allowing add_documents to start. When it runs it should be between
@@ -632,6 +641,7 @@ class TestIndexMetaCache(MarqoTestCase):
             time.sleep(0.1)
             tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
 
+        @mock.patch("marqo.tensor_search.validation.validate_field_content", mock_validate_field_content)
         def run():
             tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1,
                                               index_settings={"index_defaults": {"model": "random"}})
