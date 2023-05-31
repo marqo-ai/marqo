@@ -1703,6 +1703,9 @@ def _get_model_load_mappings() -> Dict:
             'hf':HF_MODEL}
 
 def load_model_properties() -> Dict:
+    """This is used as a source of truth for documenting available models. So be careful about renaming this, 
+    to prevent regressions in downstream automations
+    """
     # also truncate the name if not already
     sbert_model_properties = _get_sbert_properties()
     sbert_model_properties.update({k.split('/')[-1]:v for k,v in sbert_model_properties.items()})
