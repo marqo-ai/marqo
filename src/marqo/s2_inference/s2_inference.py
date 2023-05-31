@@ -34,7 +34,7 @@ MODEL_PROPERTIES = load_model_properties()
 
 
 def vectorise(model_name: str, content: Union[str, List[str]], model_properties: dict = None,
-              device: str = get_default_device(), normalize_embeddings: bool = get_default_normalization(),
+              device: str = None, normalize_embeddings: bool = get_default_normalization(),
               model_auth: ModelAuth = None, **kwargs) -> List[List[float]]:
     """vectorizes the content by model name
 

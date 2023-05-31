@@ -240,6 +240,11 @@ def add_documents_orchestrator(
         batch_size: int = 0, processes: int = 1,
     ):
 
+    # Default device calculated here and not in add_documents call
+    selected_device = utils.read_env_vars_and_defaults["_MARQO_BEST_AVAILABLE_DEVICE"] \
+        if add_docs_params.device is None else add_docs_params.device
+    add_docs_params.device = selected_device
+    
     if batch_size is None or batch_size == 0:
         logger.debug(f"batch_size={batch_size} and processes={processes} - not doing any marqo side batching")
         return add_documents(config=config, add_docs_params=add_docs_params)
@@ -251,7 +256,7 @@ def add_documents_orchestrator(
         try:
             _vector_text_search(
                 config=config, index_name=add_docs_params.index_name, query='',
-                model_auth=add_docs_params.model_auth,
+                model_auth=add_docs_params.model_auth, device=selected_device,
                 image_download_headers=add_docs_params.image_download_headers)
         except Exception as e:
             logger.warning(
@@ -355,6 +360,9 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
         add_docs_params: add_documents()'s parameters
     Returns:
 
+    Note:
+    - add_docs_params.device should ALWAYS be set, since it was filled in by add_documents_orchestrator
+
     """
     # ADD DOCS TIMER-LOGGER (3)
 
@@ -394,8 +402,6 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
     #      =  parent_field_2 : set((child_field_1, type), )}
     # Check backend to see the differences between multimodal_fields and new_fields
     new_obj_fields = dict()
-
-    selected_device = config.indexing_device if add_docs_params.device is None else add_docs_params.device
 
     unsuccessful_docs = []
     total_vectorise_time = 0
@@ -553,7 +559,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                             image_data = field_content
                         if image_method not in [None, 'none', '', "None", ' ']:
                             content_chunks, text_chunks = image_processor.chunk_image(
-                                image_data, device=selected_device, method=image_method)
+                                image_data, device=add_docs_params.device, method=image_method)
                         else:
                             # if we are not chunking, then we set the chunks as 1-len lists
                             # content_chunk is the PIL image
@@ -582,7 +588,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                     vector_chunks = s2_inference.vectorise(
                         model_name=index_info.model_name,
                         model_properties=_get_model_properties(index_info), content=content_chunks,
-                        device=selected_device, normalize_embeddings=normalize_embeddings,
+                        device=add_docs_params.device, normalize_embeddings=normalize_embeddings,
                         infer=infer_if_image, model_auth=add_docs_params.model_auth)
 
                     end_time = timer()
@@ -623,7 +629,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                     (combo_chunk, combo_document_is_valid,
                      unsuccessful_doc_to_append, combo_vectorise_time_to_add,
                      new_fields_from_multimodal_combination) = vectorise_multimodal_combination_field(
-                            field, field_content, copied, i, doc_id, selected_device, index_info,
+                            field, field_content, copied, i, doc_id, add_docs_params.device, index_info,
                             image_repo, add_docs_params.mappings[field], model_auth=add_docs_params.model_auth)
                     total_vectorise_time = total_vectorise_time + combo_vectorise_time_to_add
                     if combo_document_is_valid is False:
@@ -950,7 +956,8 @@ def bulk_search(query: BulkSearchQuery, marqo_config: config.Config, verbose: bo
     if len(query.queries) == 0:
         return {"result": []}
 
-    selected_device = marqo_config.indexing_device if device is None else device
+    selected_device = utils.read_env_vars_and_defaults["_MARQO_BEST_AVAILABLE_DEVICE"] \
+        if device is None else device
 
     tensor_queries: Dict[int, BulkSearchQueryEntity] = dict(filter(lambda e: e[1].searchMethod == SearchMethod.TENSOR, enumerate(query.queries)))
     lexical_queries: Dict[int, BulkSearchQueryEntity] = dict(filter(lambda e: e[1].searchMethod == SearchMethod.LEXICAL, enumerate(query.queries)))
@@ -1048,6 +1055,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
         search_method:
         searchable_attributes:
         verbose:
+        device: May be none, we calculate default device here
         num_highlights: number of highlights to return for each doc
         boost: boosters to re-weight the scores of individual fields
         image_download_headers: headers for downloading images
@@ -1101,11 +1109,14 @@ def search(config: Config, index_name: str, text: Union[str, dict],
         args=(config, index_name, REFRESH_INTERVAL_SECONDS))
     cache_update_thread.start()
 
+    selected_device = utils.read_env_vars_and_defaults["_MARQO_BEST_AVAILABLE_DEVICE"] \
+        if device is None else device
+    
     if search_method.upper() == SearchMethod.TENSOR:
         search_result = _vector_text_search(
             config=config, index_name=index_name, query=text, result_count=result_count, offset=offset,
             searchable_attributes=searchable_attributes, verbose=verbose,
-            filter_string=filter, device=device, attributes_to_retrieve=attributes_to_retrieve, boost=boost,
+            filter_string=filter, device=selected_device, attributes_to_retrieve=attributes_to_retrieve, boost=boost,
             image_download_headers=image_download_headers, context=context, score_modifiers=score_modifiers,
             model_auth=model_auth
         )
@@ -1128,7 +1139,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
             start_rerank_time = timer()
             rerank.rerank_search_results(search_result=search_result, query=text,
                                          model_name=reranker,
-                                         device=config.indexing_device if device is None else device,
+                                         device=selected_device,
                                          searchable_attributes=searchable_attributes,
                                          num_highlights=1)
             end_rerank_time = timer()
@@ -1654,15 +1665,14 @@ def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity
         A list of search query responses (see `_format_ordered_docs_simple` for structure of individual entities).
     Note:
         - Search results are in the same order as `queries`.
+        - device should ALWAYS be set, because it is only called by _bulk_search with the parameter specified
     """
     if len(queries) == 0:
         return []
 
 
-
     start_preprocessing_time = timer()
-    selected_device = config.indexing_device if device is None else device
-    qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, selected_device)
+    qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, device)
 
     ## 4. Create msearch request bodies and combine to aggregate.
     query_to_body_parts: Dict[Qidx, List[Dict]] = dict()
@@ -1751,6 +1761,7 @@ def _vector_text_search(
         ridiculous number of attributes
         - Should not be directly called by client - the search() method should
         be called. The search() method adds syncing
+        - device should ALWAYS be set
 
     Output format:
         [
@@ -1771,11 +1782,10 @@ def _vector_text_search(
     except KeyError as e:
         raise errors.IndexNotFoundError(message="Tried to search a non-existent index: {}".format(index_name))
 
-    selected_device = config.indexing_device if device is None else device
     queries = [BulkSearchQueryEntity(
         q=query, searchableAttributes=searchable_attributes,searchMethod=SearchMethod.TENSOR, limit=result_count, offset=offset, showHighlights=False, filter=filter_string, attributesToRetrieve=attributes_to_retrieve, boost=boost, image_download_headers=image_download_headers, context=context, scoreModifiers=score_modifiers, index=index_name, modelAuth=model_auth
     )]
-    qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, selected_device)
+    qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, device)
     vectorised_text = list(qidx_to_vectors.values())[0]
 
     contextualised_filter = utils.contextualise_filter(filter_string=filter_string, simple_properties=index_info.get_text_properties())

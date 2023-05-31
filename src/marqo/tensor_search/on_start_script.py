@@ -84,8 +84,16 @@ class CUDAAvailable:
             if id < 0:
                 return ['cpu']
             return [torch.cuda.get_device_name(id)]
-        
-        device_count = 0 if not torch.cuda.is_available() else torch.cuda.device_count()
+
+        """
+            This is set once at startup time. We assume it will NOT change,
+            if it does, health check should throw a warning.
+        """
+        device_count = 0
+        os.environ["_MARQO_BEST_AVAILABLE_DEVICE"] = "cpu"
+        if torch.cuda.is_available():
+            device_count = torch.cuda.device_count()
+            os.environ["_MARQO_BEST_AVAILABLE_DEVICE"] = "cuda"
 
         # use -1 for cpu
         device_ids = [-1]
@@ -94,6 +102,7 @@ class CUDAAvailable:
         device_names = []
         for device_id in device_ids:
             device_names.append( {'id':device_id, 'name':id_to_device(device_id)})
+
         self.logger.info(f"found devices {device_names}")
 
 
