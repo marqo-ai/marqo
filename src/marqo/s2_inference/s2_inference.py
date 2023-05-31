@@ -287,9 +287,9 @@ def _check_memory_threshold_for_model(device: str, model_size: Union[float, int]
             f"without device cache check. This might break down Marqo if too many models are loaded.")
     if model_size > threshold:
         raise ModelCacheManagementError(
-            f"You are trying to load a model with size = `{model_size}` into device = `{device}`, which is larger than the device threshlod = `{threshold}`."
+            f"You are trying to load a model with size = `{model_size}` into device = `{device}`, which is larger than the device threshold = `{threshold}`. "
             f"Marqo CANNOT find enough space for the model. Please change the threshold by adjusting the environment variables.\n"
-            f"You can find more detailed information at `https://docs.marqo.ai/0.0.17/Advanced-Usage/configuration/`.")
+            f"You can find more detailed information at `https://docs.marqo.ai/0.0.21/Advanced-Usage/configuration/`.")
     return (used_memory + model_size) < threshold
 
 
