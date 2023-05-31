@@ -154,8 +154,7 @@ class AddDocsParams(BaseModel):
     index_name: str
     auto_refresh: bool
 
-    # this should only accept Sequences of dicts, but currently validation lies elsewhere
-    docs: List[Document]= Field(default_factory=list)
+    docs: List[Document] = Field(default_factory=list)
     
     non_tensor_fields: List = Field(default_factory=list)
     device: Optional[str] = None
