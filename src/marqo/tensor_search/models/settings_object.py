@@ -1,3 +1,7 @@
+"""
+The settings object should be validated by JSON schema, rather than PyDantic, so that it can be used as a template for
+documentation and potentially front-end validation (for usability). 
+"""
 from marqo.tensor_search import enums as ns_enums
 from marqo.tensor_search.enums import IndexSettingsField as NsFields, EnvVars, ObjectStores
 from marqo.tensor_search.utils import read_env_vars_and_defaults, read_env_vars_and_defaults_ints
