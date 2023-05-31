@@ -98,7 +98,7 @@ def _verify_model_inputs(list_of_lists: List[List]) -> bool:
     """
     return all(isinstance(x, (list, tuple)) for x in list_of_lists)
 
-def convert_device_id_to_int(device: str = 'cpu'):
+def convert_device_id_to_int(device: str = 'cuda'):
     """maps the string device, 'cpu', 'cuda', 'cuda:#'
     to an int for HF pipelines device representation
 
