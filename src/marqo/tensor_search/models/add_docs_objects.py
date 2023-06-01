@@ -10,8 +10,11 @@ from marqo.tensor_search.models.private_models import ModelAuth
 
 
 class Weights(BaseModel):
+    """Represents a map between field names and an associated weight (e.g.multi-modal fields )."""
     class Config:
         extra = 'allow'
+        allow_mutation = False
+
 
     @root_validator(pre=True, allow_reuse=True)
     def check_keys(cls, values):
@@ -25,6 +28,10 @@ class Weights(BaseModel):
 
 
 class MappingObject(BaseModel):
+    """Field level control over a field. Currently only supports multi-modal combinations
+    
+    See: https://docs.marqo.ai/*/API-Reference/mappings/
+    """
     type: enums.MappingsObjectType
     weights: Weights = None  # Default value
 
@@ -36,6 +43,8 @@ class MappingObject(BaseModel):
 
     class Config:
         extra = 'forbid'
+        allow_mutation = False
+
 
     @validator('weights', always=True, allow_reuse=True)
     def check_weights(cls, weights, values, **kwargs):
@@ -44,12 +53,12 @@ class MappingObject(BaseModel):
         if is_multimodal and weights is None:
             raise errors.InvalidArgError(
                 f"Error validating multimodal combination object. Reason: 'weights' is not provided"
-                f"\nRead about the mappings object here: https://docs.marqo.ai/0.0.15/API-Reference/mappings/"
+                f" \nRead about the mappings object here: https://docs.marqo.ai/0.0.15/API-Reference/mappings/"
             )
         elif not is_multimodal and weights is not None:
             raise errors.InvalidArgError(
                 f"Error validating mappings. Mapping is not multimodal combination object. Reason: field is not multimodal, but weights provided."
-                f"\nRead about the mappings object here: https://docs.marqo.ai/0.0.15/API-Reference/mappings/"
+                f" \nRead about the mappings object here: https://docs.marqo.ai/0.0.15/API-Reference/mappings/"
             )
         return weights
 
@@ -59,25 +68,22 @@ class Document(BaseModel):
     class Config:
         extra = 'allow'
 
-    # @validator('*', pre=True, allow_reuse=True)
     def validate_field_names(self, v, values, field):
         if field.name == "_id":
             return
 
         validation.validate_field_name(field)
 
-    # @root_validator(allow_reuse=True)
     def validate_id(cls, values):
         if "_id" in values.keys():
             validation.validate_id(values.get("_id"))
 
         return values
 
-    # @root_validator(allow_reuse=True)
     def validate_document_size(cls, values):
         """Ensure document is less than MARQO_MAX_DOC_BYTES bytes (when set)."""
 
-        max_doc_size = utils.read_env_vars_and_defaults(var=enums.EnvVars.MARQO_MAX_DOC_BYTES)
+        max_doc_size = utils.read_env_vars_and_defaults_ints(var=enums.EnvVars.MARQO_MAX_DOC_BYTES)
         if max_doc_size is None:    
             return
 
@@ -115,19 +121,18 @@ class Document(BaseModel):
         """Gets the '_id' or generates AND sets to self, a UUID."""
         if self._id is not None:
             return self._id
-        
         self._id = id_gen()
+
         validation.validate_id(self._id)
         return self._id
     
     def get_chunk_values_for_filtering(self) -> Dict[str, Any]:
         """
         Metadata can be calculated here at the doc level. Only add chunk 
-        values which are string, boolean, numeric or dictionary. Dictionary
-        keys will be store in a list.
+        values which are string, boolean, numeric or dictionary.
         """
         return dict([
-            (k, v)for k, v in self.__dict__.items() if k != "_id" and isinstance(v, (str, float, bool, int, list, dict))
+            (k, v) for k, v in self.__dict__.items() if k != "_id" and isinstance(v, (str, float, bool, int, list, dict))
         ])
 
 
@@ -167,6 +172,13 @@ class AddDocsParams(BaseModel):
 
     class Config:
         arbitrary_types_allowed = True
+        allow_mutation = False
+
+    def __init__(self, **data):
+        try:
+            super().__init__(**data)
+        except ValidationError as e:
+            raise errors.InvalidArgError(message=e.json())
 
     @validator('docs', always=True)
     def docs_isnt_empty(cls, v, values, field):
@@ -216,5 +228,18 @@ class AddDocsParams(BaseModel):
         return doc_ids[::-1]
     
     def create_anew(self, **new_kwargs: Dict[str, Any]) -> "AddDocsParams":
+        """
+        Creates a new instance of AddDocsParams with kwargs overriding those in this
+        AddDocsParams object. Validation is performed on the new object with its kwarg overrides.
+
+        Args:
+            **new_kwargs: Any parameters to replace in the new instance.
+
+        Returns:
+            A new instance of AddDocsParams with the merged parameters.
+        Raises:
+            InvalidArgError: If AddDocsParams validation fails.
+            BadRequestError: If the new AddDocsParams has no documents.
+        """
         new_dict = {**self.dict(), **new_kwargs}
         return AddDocsParams(**new_dict)

@@ -839,7 +839,7 @@ class TestValidateIndexSettings(unittest.TestCase):
             try:
                 should_be_invalid = MappingObject(**mapping).dict()
                 raise AssertionError(mapping, should_be_invalid)
-            except InvalidArgError as e:
+            except InvalidArgError:
                 pass
 
     def test_validate_valid_context_object(self):

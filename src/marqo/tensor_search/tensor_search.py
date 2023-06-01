@@ -696,7 +696,7 @@ def get_existing_document(add_docs_params: AddDocsParams, existing_docs: List[Di
     elif len(matching_doc) == 0:
         return None
     else:
-        raise errors.InternalError(message= f"Upsert: found {len(matching_doc)} matching docs for {doc_id} when only 1 or 0 should have been found.")
+        raise errors.InternalError(message= f"Use existing tensors: found {len(matching_doc)} matching docs for {doc_id} when only 1 or 0 should have been found.")
 
 
 def translate_add_doc_response(add_docs_params: AddDocsParams, response: Optional[dict], time_diff: float, unsuccessful_docs: List[Tuple[int, Dict[str, Any]]]=[]) -> Dict[str, Any]:
