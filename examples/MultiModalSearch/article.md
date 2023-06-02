@@ -10,6 +10,11 @@
 
 Often the items we want to search over contain more than just text. For example, they may also contain images or videos. These modalities other than text will often contain a wealth of information that is not captured by the text. By incorporating these other modalities into search, the relevancy of results can be improved. Examples include items like fashion which will have title, description as well as multiple images displaying the item. Other examples include recipes which will have titles, instructions, ingredients and images of the food. The information contained in these is complementary and often very rich. This data can also help disambiguate the subject of the image - for example if there are multiple items present like pants and a top, the text can provide the necessary context to identify the correct subject. 
 
+<p align="center">
+  <img src="assets/example.png"/>
+</p>
+
+
 ### 1.1 Multi-modal Search
 
 Multi-modal search is search that operates over multiple modalities. We can think of two ways of doing multi-modal search, using multi-modal queries and multi-modal documents. For the former, the query itself may contain a combination of text and images  and the latter the document is made up of a combination of text and images.  For clarity we will stick to two modalities for now, text and images but the concepts are not restricted to just those and can be extended to video or audio.
