@@ -428,7 +428,7 @@ class OPEN_CLIP(CLIP):
             self.jit = self.model_properties.get("jit", False)
             self.mean = self.model_properties.get("mean", None)
             self.std = self.model_properties.get("std", None)
-
+            print("call custom clip load")
             self.model, self.preprocess = self.custom_clip_load()
             self.tokenizer = self.load_tokenizer()
 
@@ -436,13 +436,36 @@ class OPEN_CLIP(CLIP):
 
     def custom_clip_load(self):
         self.model_name = self.model_properties.get("name", None)
-
         logger.info(f"The name of the custom clip model is {self.model_name}. We use open_clip load")
-        model, _, preprocess = open_clip.create_model_and_transforms(
-            model_name=self.model_name, jit = self.jit, pretrained=self.model_path, precision = self.precision,
-            image_mean=self.mean, image_std=self.std, device = self.device, cache_dir=ModelCache.clip_cache_path)
-
-        return model, preprocess
+        try:
+            model, _, preprocess = open_clip.create_model_and_transforms(
+                model_name=self.model_name, jit=self.jit, pretrained=self.model_path, precision=self.precision,
+                image_mean=self.mean, image_std=self.std, device=self.device, cache_dir=ModelCache.clip_cache_path)
+        except Exception as e:
+            if isinstance(e, RuntimeError) and "The file might be corrupted" in str(e):
+                try:
+                    os.remove(self.model_path)
+                except Exception as remove_e:
+                    raise InvalidModelPropertiesError(
+                        f"Marqo encountered an error while attempting to delete corrupted file `{self.model_path}`. "
+                        f"Please manually check and remove the file. Error message: `{str(remove_e)}`"
+                    )
+                raise InvalidModelPropertiesError(
+                    f"Marqo encountered a corrupted file when loading open_clip file `{self.model_path}`. "
+                    f"Marqo has removed this file from the disk. \n"
+                    f"This is likely to be caused by 3 reasons: 1. the file is not a valid open_clip checkpoint, "
+                    f"2. the file is corrupted during download or incomplete download, "
+                    f"3. you may load a `clip` model with `open_clip` model properties. \n"
+                    f"Please check and update your model properties and retry. "
+                    f"You can find more details at `https://docs.marqo.ai/0.0.21/Models-Reference/bring_your_own_model/#bring-your-own-clip-model`")
+            else:
+                raise InvalidModelPropertiesError(
+                    f"Marqo encountered an error when loading custom open_clip model `{self.model_name}` with "
+                    f"model properties = `{self.model_properties}`. \n"
+                    f"The error message is `{str(e)}`. \n"
+                    f"Please check and update your model properties and retry. "
+                    f"You can find more details at `https://docs.marqo.ai/0.0.21/Models-Reference/bring_your_own_model/#bring-your-own-clip-model`"
+                )
 
     def load_tokenizer(self):
         tokenizer_name = self.model_properties.get("tokenizer", "clip")
