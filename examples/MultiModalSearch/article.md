@@ -1,4 +1,4 @@
-# “Context is all you need” - multi-modal vector search with personalization for e-commerce
+# “Context is all you need” - multi-modal vector search with personalization 
 
 *TL:DR We show how both text and images can be used to represent items allowing multi-modal search. We show how other signals can be used to also rank and avoid duplicates. Finally we show how search results can be easily curated on a per query basis. These features allow the creation and curation of high-quality search experiences, particularly for e-commerce*
 
