@@ -2,6 +2,10 @@
 
 *TL:DR We show how both text and images can be used to represent items allowing multi-modal search. We show how other signals can be used to also rank and avoid duplicates. Finally we show how search results can be easily curated on a per query basis. These features allow the creation and curation of high-quality search experiences, particularly for e-commerce*
 
+<p align="center">
+  <img src="assets/backpack.gif"/>
+</p>
+
 ## 1. Introduction
 
 Often the items we want to search over contain more than just text. For example, they may also contain images or videos. These modalities other than text will often contain a wealth of information that is not captured by the text. By incorporating these other modalities into search, the relevancy of results can be improved. Examples include items like fashion which will have title, description as well as multiple images displaying the item. Other examples include recipes which will have titles, instructions, ingredients and images of the food. The information contained in these is complementary and often very rich. This data can also help disambiguate the subject of the image - for example if there are multiple items present like pants and a top, the text can provide the necessary context to identify the correct subject. 
@@ -9,6 +13,11 @@ Often the items we want to search over contain more than just text. For example,
 ### 1.1 Multi-modal Search
 
 Multi-modal search is search that operates over multiple modalities. We can think of two ways of doing multi-modal search, using multi-modal queries and multi-modal documents. For the former, the query itself may contain a combination of text and images  and the latter the document is made up of a combination of text and images.  For clarity we will stick to two modalities for now, text and images but the concepts are not restricted to just those and can be extended to video or audio.
+
+<p align="center">
+  <img src="assets/stripes.gif"/>
+</p>
+
 
 ### 1.2 Benefits
 
@@ -35,6 +44,11 @@ Shown below is an example of this where the query has multiple components. The f
 query = {"green shirt":1.0, "short sleeves":1.0}
 ```
 
+<p align="center">
+  <img src="assets/shirt1.gif"/>
+</p>
+
+
 ### 2.2 Negation
 
 Negation within the queries is really a version of multi-modal queries. The difference is that the weighting of the concepts is now negative. This can further curate results by indicating themes or concepts to avoid.
@@ -43,13 +57,24 @@ Negation within the queries is really a version of multi-modal queries. The diff
 query = {"green shirt":1.0, "short sleeves":1.0, "buttons":-1.0}
 ```
 
-Additionally,  it can help avoid particular things when returning results, like low-quality images or ones with artifacts. These can be easily described using natural language. This can be extended to [NSFW content](https://www.marqo.ai/blog/refining-image-quality-and-eliminating-nsfw-content-with-marqo) for example.
+<p align="center">
+  <img src="assets/shirt2.gif"/>
+</p>
+
+
+### 2.2 Excluding low quality images
+
+Negation can help avoid particular things when returning results, like low-quality images or ones with artifacts. These can be easily described using natural language. This can be extended to [NSFW content](https://www.marqo.ai/blog/refining-image-quality-and-eliminating-nsfw-content-with-marqo) for example.
 
 ```python
 query = {"yellow handbag":1.0, "lowres, blurry, low quality":-1.1}
 ```
 
 In the example below the initial results contain three low-quality images. These are denoted by a red mark for clarity and the poor image quality can be seen by the strong banding in the background of these images. 
+
+<p align="center">
+  <img src="assets/handbag1.gif"/>
+</p>
 
 
 ### 2.3 Searching with images
@@ -66,6 +91,11 @@ It can also be easily extended in the same way as with text to include multiple 
 query = {image_url:1.0, "RED":1.0}
 ```
 
+<p align="center">
+  <img src="assets/backpack1.gif"/>
+</p>
+
+
 ### 2.4 Conditional search with popular or liked items
 
 Another way to utilize the multi-modal queries is for things like query expansion. In this example, each query will be expanded by adding additional variations of the query. However, in this case we will be not using variations on the query itself, but instead pre-compute expansions for particular queries (i.e. head queries).
@@ -75,6 +105,16 @@ query = {"backpack":1.0}                        query = {"backpack":1.0}
 context_vector1 = [.1, ...,.-.8]                context_vector2 = [-.01, ...,.3]
 ```
 
+<p align="center">
+  <img src="assets/context.png"/>
+</p>
+
+<p align="center">
+  <img src="assets/backpack2.gif"/>
+</p>
+
+
+
 ### 2.5 Searching as prompting
 
 An alternative method to constructing multi-part queries is to append specific characteristics or styles to the end of a query. For example, additional descriptors can be appended to a query to curate the results.
@@ -83,10 +123,19 @@ An alternative method to constructing multi-part queries is to append specific c
 query = {"handbag, bold colors, vibrant":1.0}
 ```
 
+<p align="center">
+  <img src="assets/handbag2.gif"/>
+</p>
+
 
 ```python
 query = {"cozy sweater, xmas, festive, holidays":1.0}
 ```
+
+<p align="center">
+  <img src="assets/sweater1.gif"/>
+</p>
+
 
 ### 2.7 Ranking with other signals
 
@@ -95,6 +144,10 @@ We can also rank with other signals, not just the similarity. For example docume
 ```python
 query = {"yellow handbag":1.0}
 ```
+
+<p align="center">
+  <img src="assets/handbag1.png"/>
+</p>
 
 
 ```python
@@ -105,6 +158,11 @@ score_modifiers = {
               {"field_name": "aesthetic_score", "weight": 0.02}]
        }
 ```
+
+<p align="center">
+  <img src="assets/handbag2.png"/>
+</p>
+
 
 ### 2.8 **Multi-modal Entities**
 
@@ -121,6 +179,11 @@ document = {"combined_text_image":
 							}
 						}
 ```
+
+<p align="center">
+  <img src="assets/multim.png"/>
+</p>
+
 
 ## 3. Detailed Example
 
