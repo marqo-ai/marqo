@@ -103,7 +103,6 @@ class IndexChunk:
         self.n_docs = len(add_docs_params.docs)
         self.n_chunks = max(1, self.n_docs // self.n_batch)
         self.process_id = process_id
-        self.config.indexing_device = add_docs_params.device if add_docs_params.device is not None else self.config.indexing_device
         self.threads_per_process = threads_per_process
 
     def process(self):  
@@ -184,7 +183,9 @@ def add_documents_mp(
         _type_: _description_
     """
 
-    selected_device = add_docs_params.device if add_docs_params.device is not None else config.indexing_device
+    # Default device calculated here to ensure processes and device IDs  can be fetched
+    selected_device = utils.read_env_vars_and_defaults["_MARQO_BEST_AVAILABLE_DEVICE"] \
+        if device is None else device
 
     n_documents = len(add_docs_params.docs)
 

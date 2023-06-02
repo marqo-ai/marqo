@@ -239,11 +239,6 @@ def add_documents_orchestrator(
         config: Config, add_docs_params: AddDocsParams,
         batch_size: int = 0, processes: int = 1,
     ):
-
-    # Default device calculated here and not in add_documents call
-    selected_device = utils.read_env_vars_and_defaults["_MARQO_BEST_AVAILABLE_DEVICE"] \
-        if add_docs_params.device is None else add_docs_params.device
-    add_docs_params.device = selected_device
     
     if batch_size is None or batch_size == 0:
         logger.debug(f"batch_size={batch_size} and processes={processes} - not doing any marqo side batching")
@@ -254,13 +249,14 @@ def add_documents_orchestrator(
         _check_and_create_index_if_not_exist(config=config, index_name=add_docs_params.index_name)
 
         try:
-            _vector_text_search(
-                config=config, index_name=add_docs_params.index_name, query='',
-                model_auth=add_docs_params.model_auth, device=selected_device,
+            # using search instead of _vector_text_search since search calculates default device
+            search(
+                search_method="TENSOR", config=config, index_name=add_docs_params.index_name, text='',
+                model_auth=add_docs_params.model_auth, device=add_docs_params.device,
                 image_download_headers=add_docs_params.image_download_headers)
         except Exception as e:
             logger.warning(
-                f"add_documents orchestrator's call to _vector_text_search, prior to parallel add_docs, raised an error. "
+                f"add_documents orchestrator's call to search (with search_method='TENSOR'), prior to parallel add_docs, raised an error. "
                 f"Continuing to parallel add_docs. "
                 f"Message: {e}"
             )
@@ -361,12 +357,16 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
     Returns:
 
     Note:
-    - add_docs_params.device should ALWAYS be set, since it was filled in by add_documents_orchestrator
+    - add_docs_params.device default device should be calculated here
 
     """
     # ADD DOCS TIMER-LOGGER (3)
 
     start_time_3 = timer()
+
+    # Default device calculated here and not in orchestrator call
+    selected_device = utils.read_env_vars_and_defaults["_MARQO_BEST_AVAILABLE_DEVICE"] \
+        if add_docs_params.device is None else add_docs_params.device
 
     if add_docs_params.mappings is not None:
         validation.validate_mappings_object(mappings_object=add_docs_params.mappings)
@@ -559,7 +559,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                             image_data = field_content
                         if image_method not in [None, 'none', '', "None", ' ']:
                             content_chunks, text_chunks = image_processor.chunk_image(
-                                image_data, device=add_docs_params.device, method=image_method)
+                                image_data, device=selected_device, method=image_method)
                         else:
                             # if we are not chunking, then we set the chunks as 1-len lists
                             # content_chunk is the PIL image
@@ -588,7 +588,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                     vector_chunks = s2_inference.vectorise(
                         model_name=index_info.model_name,
                         model_properties=_get_model_properties(index_info), content=content_chunks,
-                        device=add_docs_params.device, normalize_embeddings=normalize_embeddings,
+                        device=selected_device, normalize_embeddings=normalize_embeddings,
                         infer=infer_if_image, model_auth=add_docs_params.model_auth)
 
                     end_time = timer()
@@ -629,7 +629,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                     (combo_chunk, combo_document_is_valid,
                      unsuccessful_doc_to_append, combo_vectorise_time_to_add,
                      new_fields_from_multimodal_combination) = vectorise_multimodal_combination_field(
-                            field, field_content, copied, i, doc_id, add_docs_params.device, index_info,
+                            field, field_content, copied, i, doc_id, selected_device, index_info,
                             image_repo, add_docs_params.mappings[field], model_auth=add_docs_params.model_auth)
                     total_vectorise_time = total_vectorise_time + combo_vectorise_time_to_add
                     if combo_document_is_valid is False:

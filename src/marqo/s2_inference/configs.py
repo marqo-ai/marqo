@@ -27,11 +27,6 @@ class Ignore:
 
     files = ('flax_model.msgpack', 'rust_model.ot', 'tf_model.h5')
 
-
-
-def get_default_device():
-    return 'cuda'
-
 def get_default_normalization():
     return True
 
