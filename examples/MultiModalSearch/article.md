@@ -1,34 +1,41 @@
 # “Context is all you need” - multi-modal vector search with personalization 
 
-*TL:DR We show how both text and images can be used to represent items allowing multi-modal search. We show how other signals can be used to also rank and avoid duplicates. Finally we show how search results can be easily curated on a per query basis. These features allow the creation and curation of high-quality search experiences, particularly for e-commerce*
+*TL:DR We show how both text and images can be used for multi-modal search. This allows for multi-part queries, multi-modal queries, searching via prompting, promoting/suppressing content by themes, per query curation and personalization. Additionally, we show how other query independneet signals can be used to rank documents in addition to similairty. These features allow the creation and curation of high-quality search experiences, particularly for e-commerce and image heavy applications.*
 
 <p align="center">
   <img src="assets/backpack.gif"/>
 </p>
+<p align="center">
+    <em>An example of multi-modal search that uses multi-modal queries to curate search results based on text and images.</em>
+</p>
 
 ## 1. Introduction
 
-Often the items we want to search over contain more than just text. For example, they may also contain images or videos. These modalities other than text will often contain a wealth of information that is not captured by the text. By incorporating these other modalities into search, the relevancy of results can be improved. Examples include items like fashion which will have title, description as well as multiple images displaying the item. Other examples include recipes which will have titles, instructions, ingredients and images of the food. The information contained in these is complementary and often very rich. This data can also help disambiguate the subject of the image - for example if there are multiple items present like pants and a top, the text can provide the necessary context to identify the correct subject. 
+Often the items we want to search over contain more than just text. For example, they may also contain images or videos. These modalities other than text will often contain a wealth of information that is not captured by the text. By incorporating these other modalities into search, the relevancy of results can be improved as well as unlocking new ways to search. Examples of multi-modal search include domains like fashion and e-commerce which will have title, description as well as multiple images displaying the item. This data can also help disambiguate the subject of the image - for example if there are multiple items present like pants and a top, the text can provide the necessary context to identify the correct subject. The information contained in these data across modalities is complementary and rich. 
 
 <p align="center">
   <img src="assets/example.png"/>
 </p>
-
+<p align="center">
+    <em>An example of multi-modal "document" that contain both images and text.</em>
+</p>
 
 ### 1.1 Multi-modal Search
 
-Multi-modal search is search that operates over multiple modalities. We can think of two ways of doing multi-modal search, using multi-modal queries and multi-modal documents. For the former, the query itself may contain a combination of text and images  and the latter the document is made up of a combination of text and images.  For clarity we will stick to two modalities for now, text and images but the concepts are not restricted to just those and can be extended to video or audio.
+Multi-modal search is search that operates over multiple modalities. We can think of two ways of doing multi-modal search, using multi-modal queries and multi-modal documents. For the former, the query itself may contain a combination of text and images  and the latter the document is made up of a combination of text and images.  For clarity we will stick to two modalities for now, text and images but the concepts are not restricted to just those and can be extended to video or audio (for example).
 
 <p align="center">
   <img src="assets/stripes.gif"/>
 </p>
-
+<p align="center">
+    <em>An example of multi-modal search using images and text to refine a search.</em>
+</p>
 
 ### 1.2 Benefits
 
 There are numerous benefits to this multi-modal approach. For example:
 
-- The mulit-modal representations of documents allows for utilizing not just text or images or a combination of these. This allows complementary information to be captured.
+- The mulit-modal representations of documents allows for utilizing not just text or images or a combination of these. This allows complementary information to be captured that is not present in either modality.
 - Using multi-modal representations allows for updatable and editable meta data for documents without re-training a model or re-indexing large amounts of data.
 - Relevance feedback can be easily incorporated (in natural language) at a document level to improve or modify results.
 - Curating queries with additional context allows for personalization and curation of results on a per query basis without additional models or fine-tuning.
@@ -39,9 +46,9 @@ There are numerous benefits to this multi-modal approach. For example:
 
 In this section we will walk through a number of ways multi-modal search can be used to improve and curate results.
 
-### 2.1 **Multi-modal Queries**
+### 2.1 Multi-modal Queries
 
-Multi-modal queries are just that, queries that are made up of multiple components and/or multiple modalities. The benefit is that it effectively allows us to modify the scoring function for the approximate-knn to take into account additional similarities - for example, across multiple images or text and images.  We have seen previous examples of this already where variations can be generated on an existing item, for example by color or patterns.
+Multi-modal queries are queries that are made up of multiple components and/or multiple modalities. The benefit is that it effectively allows us to modify the scoring function for the approximate-knn to take into account additional similarities - for example, across multiple images or text and images.  The similairty scoring will now be against a weighted collection of items rather than a single piece of text. This allows finer grained curation of search results than by using a single part query alone.  We have seen previous examples of this earlier in the article already where both images and text are used to curate the search.
 
 Shown below is an example of this where the query has multiple components. The first query is for an item while the second query is used to further condition the results. This acts as a “soft” or “semantic” filter. This multi-part query can be understood to be a form of manual [query expansion](https://en.wikipedia.org/wiki/Query_expansion).
 
