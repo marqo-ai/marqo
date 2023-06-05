@@ -161,6 +161,7 @@ class ModelsForCacheing:
         messages = []
         for model in self.models:
             for device in self.default_devices:
+                logger.info(f"Start warning up model {model} on device {device}")
 
                 # warm it up
                 _ = vectorise(model, test_string, device=device)
@@ -173,7 +174,7 @@ class ModelsForCacheing:
                     t += (t1 - t0)
                 message = f"{(t) / float((N))} for {model} and {device}"
                 messages.append(message)
-                self.logger.info(f"{model} {device} run succesfully!")
+                logger.info(f"{model} {device} run succesfully!")
 
         for message in messages:
             logger.info(message)

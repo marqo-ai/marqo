@@ -317,7 +317,7 @@ def _load_model(model_name: str, model_properties: dict, device: Optional[str] =
         raise RuntimeError(f"The function `{_load_model.__name__}` should only be called by "
                            f"`unit_test` or `_update_available_models` for threading safeness.")
 
-    print(f"{time.time()} - loading for: model_name={model_name} and properties={model_properties}")
+    print(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - loading for: model_name={model_name} and properties={model_properties}")
     if device is None: device = get_default_device()
     loader = _get_model_loader(model_properties['name'], model_properties)
 
