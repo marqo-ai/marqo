@@ -428,7 +428,6 @@ class OPEN_CLIP(CLIP):
             self.jit = self.model_properties.get("jit", False)
             self.mean = self.model_properties.get("mean", None)
             self.std = self.model_properties.get("std", None)
-            print("call custom clip load")
             self.model, self.preprocess = self.custom_clip_load()
             self.tokenizer = self.load_tokenizer()
 
@@ -458,6 +457,17 @@ class OPEN_CLIP(CLIP):
                     f"3. you may load a `clip` model with `open_clip` model properties. \n"
                     f"Please check and update your model properties and retry. "
                     f"You can find more details at `https://docs.marqo.ai/0.0.21/Models-Reference/bring_your_own_model/#bring-your-own-clip-model`")
+
+            elif "This could be because the operator doesn't exist for this backend" in str(e):
+                raise InvalidModelPropertiesError(
+                    f"Marqo encountered an error when loading custom open_clip model `{self.model_name}` with "
+                    f"model properties = `{self.model_properties}`. \n"
+                    f"The error message is `{str(e)}`. \n"
+                    f"It is likely that you are tyring to load a `CLIP (OpenAI)` model with type `open_clip` in model_properties. \n"
+                    f"Please check and update your model properties and retry. "
+                    f"You can find more details at `https://docs.marqo.ai/0.0.21/Models-Reference/bring_your_own_model/#bring-your-own-clip-model`"
+                )
+
             else:
                 raise InvalidModelPropertiesError(
                     f"Marqo encountered an error when loading custom open_clip model `{self.model_name}` with "

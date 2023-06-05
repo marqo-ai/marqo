@@ -66,6 +66,7 @@ def download_model(
     Returns:
         The path of the downloaded model
     """
+    print("Downloading model is called", url)
     single_weight_location_validation_msg = (
         "only exactly one of parameters (repo_location, url) is allowed to be specified.")
     if repo_location is None and url is None:
@@ -129,7 +130,6 @@ def download_pretrained_from_url(
         url: str,
         cache_dir: Union[str, None] = None,
         cache_file_name: Optional[str] = None,
-        sha256_checksum: Optional[str] = None,
 ):
     '''
     This function takes a clip model checkpoint url as input, downloads the model if it doesn't exist locally,
@@ -155,12 +155,8 @@ def download_pretrained_from_url(
 
     download_target = os.path.join(cache_dir, filename)
 
-    if os.path.isfile(download_target) and sha256_checksum is not None:
-        existing_checksum = calculate_sha256_checksum(download_target)
-        if existing_checksum == sha256_checksum:
-            return download_target
-        else:
-            os.remove(download_target)
+    if os.path.isfile(download_target):
+        return download_target
 
     with urllib.request.urlopen(url) as source, open(download_target, "wb") as output:
         with tqdm(total=int(source.headers.get("Content-Length")), ncols=80, unit='iB', unit_scale=True) as loop:
@@ -173,19 +169,3 @@ def download_pretrained_from_url(
                 loop.update(len(buffer))
 
     return download_target
-
-
-def calculate_sha256_checksum(file_path: str) -> str:
-    '''
-    Calculates the SHA256 checksum of a file.
-
-    Args:
-        file_path: Path to the file.
-    Returns:
-        sha256_checksum: SHA256 checksum of the file.
-    '''
-    sha256_hash = hashlib.sha256()
-    with open(file_path, "rb") as file:
-        for chunk in iter(lambda: file.read(4096), b""):
-            sha256_hash.update(chunk)
-    return sha256_hash.hexdigest()
