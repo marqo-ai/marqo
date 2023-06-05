@@ -14,7 +14,7 @@ from marqo.s2_inference.configs import get_default_device, get_default_normaliza
 from marqo.s2_inference.types import *
 from marqo.s2_inference.logger import get_logger
 import torch
-import datetime
+from datetime import datetime
 from marqo.s2_inference import constants
 from marqo.tensor_search.utils import read_env_vars_and_defaults
 from marqo.tensor_search.enums import AvailableModelsKey
