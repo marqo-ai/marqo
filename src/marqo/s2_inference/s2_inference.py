@@ -14,7 +14,7 @@ from marqo.s2_inference.configs import get_default_device, get_default_normaliza
 from marqo.s2_inference.types import *
 from marqo.s2_inference.logger import get_logger
 import torch
-from datetime import datetime
+import datetime
 from marqo.s2_inference import constants
 from marqo.tensor_search.utils import read_env_vars_and_defaults
 from marqo.tensor_search.enums import AvailableModelsKey
@@ -317,7 +317,7 @@ def _load_model(model_name: str, model_properties: dict, device: Optional[str] =
         raise RuntimeError(f"The function `{_load_model.__name__}` should only be called by "
                            f"`unit_test` or `_update_available_models` for threading safeness.")
 
-    print(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - loading for: model_name={model_name} and properties={model_properties}")
+    print(f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - loading for: model_name={model_name} and properties={model_properties}")
     if device is None: device = get_default_device()
     loader = _get_model_loader(model_properties['name'], model_properties)
 
