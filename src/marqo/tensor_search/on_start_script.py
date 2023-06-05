@@ -15,9 +15,7 @@ from marqo.tensor_search.throttling.redis_throttle import throttle
 from marqo.connections import redis_driver
 from functools import wraps
 
-logging.basicConfig()
 logger = logging.getLogger(__name__)
-# Configure the logger
 logger.setLevel(logging.INFO)
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 handler = logging.StreamHandler()
