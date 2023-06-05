@@ -6,6 +6,7 @@ def get_logger(name):
     logger = logging.getLogger(name)
 
     log_level = read_env_vars_and_defaults("MARQO_LOG_LEVEL").lower()
+    log_level = "warning"
     if log_level == "warning":
         logger.setLevel(level=logging.WARNING)
     elif log_level == "info":
