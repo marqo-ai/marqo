@@ -205,11 +205,8 @@ class CLIP:
         self.model_properties = kwargs.get("model_properties", dict())
 
         # model_auth gets passed through add_docs and search requests:
-        model_auth = kwargs.get(InferenceParams.model_auth, None)
-        if model_auth is not None:
-            self.model_auth = model_auth
-        else:
-            self.model_auth = None
+        self.model_auth = kwargs.get(InferenceParams.model_auth, None)
+
 
     def _download_from_repo(self):
         """Downloads model from an external repo like s3 and returns the filepath
@@ -397,7 +394,6 @@ class OPEN_CLIP(CLIP):
         path = self.model_properties.get("localpath", None) or self.model_properties.get("url", None)
 
         model_location_presence = ModelProperties.model_location in self.model_properties
-
         if path is None and not model_location_presence:
             self.model, _, self.preprocess = open_clip.create_model_and_transforms(self.model_name,
                                                                                    pretrained=self.pretrained,

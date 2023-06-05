@@ -2,6 +2,7 @@ from tests.utils.transition import add_docs_caller
 from marqo.errors import IndexNotFoundError, InvalidArgError
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import TensorField, IndexSettingsField, SearchMethod
+from marqo.tensor_search.models.search import SearchContext
 from tests.marqo_test import MarqoTestCase
 from unittest.mock import patch
 import numpy as np
@@ -44,15 +45,15 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             "A rider is riding a horse jumping over the barrier": 1,
         }
         res = tensor_search.search(config=self.config, index_name=self.index_name_1, text=query, context=
-        {"tensor": [{"vector": [1, ] * 512, "weight": 2}, {"vector": [2, ] * 512, "weight": -1}], })
+        SearchContext(**{"tensor": [{"vector": [1, ] * 512, "weight": 2}, {"vector": [2, ] * 512, "weight": -1}], }))
 
     def test_search_with_incorrect_tensor_dimension(self):
         query = {
             "A rider is riding a horse jumping over the barrier": 1,
         }
         try:
-            res = tensor_search.search(config=self.config, index_name=self.index_name_1, text=query, context=
-            {"tensor": [{"vector": [1, ] * 3, "weight": 0}, {"vector": [2, ] * 512, "weight": 0}], })
+            tensor_search.search(config=self.config, index_name=self.index_name_1, text=query, context=SearchContext(
+                **{"tensor": [{"vector": [1, ] * 3, "weight": 0}, {"vector": [2, ] * 512, "weight": 0}], }))
             raise AssertionError
         except InvalidArgError as e:
             assert "This causes the error when we do `numpy.mean()` over" in e.message
@@ -61,7 +62,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         query = "A rider is riding a horse jumping over the barrier"
         try:
             res = tensor_search.search(config=self.config, index_name=self.index_name_1, text=query, context=
-            {"tensor": [{"vector": [1, ] * 512, "weight": 0}, {"vector": [2, ] * 512, "weight": 0}], })
+            SearchContext(**{"tensor": [{"vector": [1, ] * 512, "weight": 0}, {"vector": [2, ] * 512, "weight": 0}], }))
             raise AssertionError
         except InvalidArgError as e:
             assert "This is not supported as the context only works when the query is a dictionary." in e.message
@@ -73,9 +74,9 @@ class TestMultimodalTensorCombination(MarqoTestCase):
 
         res_1 = tensor_search.search(config=self.config, index_name=self.index_name_1, text=query)
         res_2 = tensor_search.search(config=self.config, index_name=self.index_name_1, text=query, context=
-        {"tensor": [{"vector": [1, ] * 512, "weight": 0}, {"vector": [2, ] * 512, "weight": 0}], })
+        SearchContext(**{"tensor": [{"vector": [1, ] * 512, "weight": 0}, {"vector": [2, ] * 512, "weight": 0}], }))
         res_3 = tensor_search.search(config=self.config, index_name=self.index_name_1, text=query, context=
-        {"tensor": [{"vector": [1, ] * 512, "weight": -1}, {"vector": [1, ] * 512, "weight": 1}], })
+        SearchContext(**{"tensor": [{"vector": [1, ] * 512, "weight": -1}, {"vector": [1, ] * 512, "weight": 1}], }))
 
         assert res_1["hits"][0]["_score"] == res_2["hits"][0]["_score"]
         assert res_1["hits"][0]["_score"] == res_3["hits"][0]["_score"]
@@ -95,7 +96,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             }
 
             res_2 = tensor_search.search(config=self.config, index_name=self.index_name_1, text=query, context=
-            {"tensor": [{"vector": vector_2, "weight": weight_2}, {"vector": vector_3, "weight": weight_3}], })
+            SearchContext(**{"tensor": [{"vector": vector_2, "weight": weight_2}, {"vector": vector_3, "weight": weight_3}], }))
 
             args_list = [args[0] for args in mock_mean.call_args_list]
             vectorised_string = args_list[0][0][0]

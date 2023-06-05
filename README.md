@@ -42,17 +42,17 @@ Marqo is an end-to-end, multimodal vector search engine. With Marqo, users can s
 
 **☁️ Cloud-native**
 - Fast deployment using Docker.
-- Run Marqo multi-az and high availability.
+- Run Marqo high availability.
 
 **🌌 End-to-end**
 - Build search and analytics on multiple unstructured data types such as text, image, code, video.
 - Filter search results using Marqo’s query DSL.
-- Store unstructred data and semi-structured metadata together in documents, using a range of supported datatypes like bools, ints and keywords.
+- Store unstructured data and semi-structured metadata together in documents, using a range of supported datatypes like bools, ints and keywords.
 
 **🍱 Managed cloud**
 - Scale Marqo at the click of a button.
-- Multi-az, accelerated inference.
-- Marqo cloud ☁️ is in beta. If you’re interested, [apply here](https://q78175g1wwa.typeform.com/to/d0PEuRPC).
+- High availability, accelerated inference.
+- Marqo cloud ☁️ is in pre-release. If you’re interested, [apply here](https://q78175g1wwa.typeform.com/to/d0PEuRPC).
 
 <p align="center">
     <a href="https://q78175g1wwa.typeform.com/to/d0PEuRPC"><img src="assets/join-the-cloud-beta.png" width="90%" height="20%"/></a>
@@ -329,7 +329,7 @@ pprint.pprint(results)
 ### Creating and searching indexes with multimodal combination fields
 Marqo lets you have indexes with multimodal combination fields. Multimodal combination fields can combine text and images into one field. This allows scoring of documents across the combined text and image fields together. It also allows for a single vector representation instead of needing many which saves on storage. The relative weighting of each component can be set per document.
 
-The example below demonstrates this with retrival of caption and image pairs using multiple types of queries.
+The example below demonstrates this with retrieval of caption and image pairs using multiple types of queries.
 
 ```python
 
@@ -439,7 +439,7 @@ Note that you should not run other applications on Marqo's Opensearch cluster as
 
 ## M series Mac users
 
-Marqo does not yet support the docker-in-docker backend configuration for the arm64 architecture. This means that if you have an M series Mac, you will also need to run marqo's backend, marqo-os, locally.
+Marqo does not yet support the docker-in-docker backend configuration for the arm64 architecture. This means that if you have an M series Mac, you will also need to run Marqo's backend, marqo-os, locally.
 
 To run Marqo on an M series Mac, follow the next steps.
 

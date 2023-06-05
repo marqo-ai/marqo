@@ -56,7 +56,7 @@ class TestDownloadPretrainedFromS3(unittest.TestCase):
 
         self.assertEqual(result, "/path/to/model.pt")
         mock_download_pretrained_from_url.assert_not_called()
-        mock_check_s3_model.assert_called_once_with(location=self.s3_location)
+        mock_check_s3_model.assert_called_once_with(location=self.s3_location, download_dir=None)
 
     @patch("marqo.s2_inference.processing.custom_clip_utils.check_s3_model_already_exists")
     @patch("marqo.s2_inference.processing.custom_clip_utils.get_presigned_s3_url")

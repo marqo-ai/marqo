@@ -58,3 +58,4 @@ class ModelLocation(BaseModel):
             raise InvalidArgError(
                 "Missing model location object. A location object, for example `s3` or  "
                 "`hf`, must be provided. ")
+
