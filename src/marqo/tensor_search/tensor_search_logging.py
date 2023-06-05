@@ -21,8 +21,5 @@ def get_logger(name):
 
     formatter = logging.Formatter(
         "{asctime} {threadName:>11} {levelname} {message}", style='{')
-    handler = logging.StreamHandler()
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
 
     return logger

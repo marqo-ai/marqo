@@ -16,6 +16,12 @@ from marqo.connections import redis_driver
 from functools import wraps
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+handler = logging.StreamHandler()
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+
 
 def on_start(marqo_os_url: str):
     logger.info("Starting the on start script")
