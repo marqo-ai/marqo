@@ -174,7 +174,7 @@ class ModelsForCacheing:
                     t += (t1 - t0)
                 message = f"{(t) / float((N))} for {model} and {device}"
                 messages.append(message)
-                logger.info(f"{model} {device} run succesfully!")
+                logger.info(f"{model} {device} run successfully!")
 
         for message in messages:
             logger.info(message)
