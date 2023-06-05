@@ -96,7 +96,7 @@ class PopulateCache:
 class CUDAAvailable:
     """checks the status of cuda
     """
-    logger = get_logger('CUDA device summary')
+    #logger = get_logger('CUDA device summary')
 
     @log_time
     def __init__(self):
@@ -121,13 +121,13 @@ class CUDAAvailable:
         device_names = []
         for device_id in device_ids:
             device_names.append({'id': device_id, 'name': id_to_device(device_id)})
-        self.logger.info(f"found devices {device_names}")
+        logger.info(f"found devices {device_names}")
 
 
 class ModelsForCacheing:
     """warms the in-memory model cache by preloading good defaults
     """
-    logger = get_logger('ModelsForStartup')
+    #logger = get_logger('ModelsForStartup')
 
     @log_time
     def __init__(self):
@@ -150,7 +150,7 @@ class ModelsForCacheing:
 
         self.default_devices = ['cpu'] if not torch.cuda.is_available() else ['cpu', 'cuda']
 
-        self.logger.info(f"pre-loading {self.models} onto devices={self.default_devices}")
+        logger.info(f"pre-loading {self.models} onto devices={self.default_devices}")
 
     @log_time
     def run(self):
@@ -176,8 +176,8 @@ class ModelsForCacheing:
                 self.logger.info(f"{model} {device} run succesfully!")
 
         for message in messages:
-            self.logger.info(message)
-        self.logger.info("completed loading models")
+            logger.info(message)
+        logger.info("completed loading models")
 
 
 class InitializeRedis:
