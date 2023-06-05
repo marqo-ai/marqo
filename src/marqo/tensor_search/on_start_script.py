@@ -46,12 +46,12 @@ def log_time(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
         start_time = time.time()
-        logger.info(f"{func.__name__} started")
+        logger.info(f"{func.__qualname__} started")
         result = func(*args, **kwargs)
         end_time = time.time()
-        logger.info(f"{func.__name__} finished")
+        logger.info(f"{func.__qualname__} finished")
         elapsed_time = end_time - start_time
-        logger.info(f"{func.__name__} finished in {elapsed_time} seconds")
+        logger.info(f"{func.__qualname__} finished in {elapsed_time} seconds")
         return result
 
     return wrapper
