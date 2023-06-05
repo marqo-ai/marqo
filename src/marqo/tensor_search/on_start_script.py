@@ -21,6 +21,7 @@ formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 handler = logging.StreamHandler()
 handler.setFormatter(formatter)
 logger.addHandler(handler)
+logger.propagate = False
 
 
 def on_start(marqo_os_url: str):
