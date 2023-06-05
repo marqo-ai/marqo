@@ -1,7 +1,6 @@
 import json
 import os
 import logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 from marqo.tensor_search import enums
 from marqo.tensor_search.tensor_search_logging import get_logger
 import time
@@ -17,6 +16,11 @@ from marqo.connections import redis_driver
 from functools import wraps
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+handler = logging.StreamHandler()
+handler.setFormatter(formatter)
+logger.addHandler(handler)
 
 
 def on_start(marqo_os_url: str):
