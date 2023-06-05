@@ -220,6 +220,7 @@ def extract_huggingface_archive(path: str) -> str:
             os.makedirs(new_dir, exist_ok=True)
 
             # extract the compressed file
+            # If the target directory already exists, it will be overwritten by default without warning.
             if ext == '.zip':
                 with zipfile.ZipFile(path, 'r') as zip_ref:
                     zip_ref.extractall(new_dir)
