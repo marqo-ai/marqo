@@ -142,8 +142,6 @@ Below is an example of two sets of 4 items that are going to be used to conditio
     <em>Two sets of items based on different relevence feedback mechansisms that can be used to curate the search.</em>
 </p>
 
-Below are the two results sets for the same query, coinditioned on the two previous sets of items. 
-
 <p align="center">
   <img src="assets/backpack2.gif"/>
 </p>
@@ -154,16 +152,22 @@ Below are the two results sets for the same query, coinditioned on the two previ
 
 ### 2.5 Searching as prompting
 
-An alternative method to constructing multi-part queries is to append specific characteristics or styles to the end of a query. For example, additional descriptors can be appended to a query to curate the results.
+An alternative method to constructing multi-part queries is to append specific characteristics or styles to the end of a query. This is effectively the same as "prompting" in text to image generation models like [DALLE](https://openai.com/research/dall-e) and [Stable Diffusion](https://github.com/CompVis/stable-diffusion). For example, additional descriptors can be appended to a query to curate the results. An example query with additional prompting is below:
 
 ```python 
 query = {"handbag, bold colors, vibrant":1.0}
 ```
 
+The impact of this proimpting on the results can be seen in the animation.
+
 <p align="center">
   <img src="assets/handbag2.gif"/>
 </p>
+<p align="center">
+    <em>Results that are curated with prompting.</em>
+</p>
 
+Another example query of searching as prompting:
 
 ```python
 query = {"cozy sweater, xmas, festive, holidays":1.0}
@@ -171,6 +175,9 @@ query = {"cozy sweater, xmas, festive, holidays":1.0}
 
 <p align="center">
   <img src="assets/sweater1.gif"/>
+</p>
+<p align="center">
+    <em>Results that are curated with prompting.</em>
 </p>
 
 
