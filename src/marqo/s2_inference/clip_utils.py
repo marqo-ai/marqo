@@ -18,6 +18,7 @@ from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normal
 from marqo.s2_inference.processing.custom_clip_utils import HFTokenizer, download_pretrained_from_url
 from torchvision.transforms import InterpolationMode
 from marqo.s2_inference.configs import ModelCache
+import time
 
 logger = get_logger(__name__)
 logger.propagate=False
@@ -213,11 +214,13 @@ class CLIP:
         if path is None:
             # The original method to load the openai clip model
             # https://github.com/openai/CLIP/issues/30
-            logger.info(f"===>Always loading clip model from openai into cpu")
+            logger.info(f"**Always loading clip model from openai into cpu**")
             self.model, self.preprocess = clip.load(self.model_type, device='cpu', jit=False, download_root=ModelCache.clip_cache_path)
-            logger.info(f"Moving clip model to {self.device}")
+            logger.info(f"===========>Moving clip model to {self.device}")
+            start = time.time()
             self.model = self.model.to(self.device)
-            logger.info("Loading clip tokenizer<====")
+            elapsed_time = time.time() - start
+            logger.info(f"Moving clip model to {self.device} finished, taking {elapsed_time}s<====")
             self.tokenizer = clip.tokenize
         else:
             logger.info("Detecting custom clip model path. We use generic clip model loading.")
