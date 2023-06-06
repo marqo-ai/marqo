@@ -68,11 +68,13 @@ This multi-part query can be understood to be a form of manual [query expansion]
 
 ### 2.2 Negation
 
-Negation within the queries is really a version of multi-modal queries. The difference is that the weighting of the concepts is now negative. This can further curate results by indicating themes or concepts to avoid.
+In the previous examples we saw how multiple queries can be used to condition the search. In those examples, the terms were being added with a positive weighting. Another way to utilise these queries is to use negative weighting terms to move away from particualr terms or concepts. Below is an example of a query with an additional negative term:
 
 ```python
 query = {"green shirt":1.0, "short sleeves":1.0, "buttons":-1.0}
 ```
+
+Now the search results are also moving away from the `buttons` while being drawn to the `green shirt` and `short sleeves`.
 
 <p align="center">
   <img src="assets/shirt2.gif"/>
