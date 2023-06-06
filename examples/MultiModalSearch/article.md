@@ -50,11 +50,13 @@ In this section we will walk through a number of ways multi-modal search can be 
 
 Multi-modal queries are queries that are made up of multiple components and/or multiple modalities. The benefit is that it effectively allows us to modify the scoring function for the approximate-knn to take into account additional similarities - for example, across multiple images or text and images.  The similairty scoring will now be against a weighted collection of items rather than a single piece of text. This allows finer grained curation of search results than by using a single part query alone.  We have seen previous examples of this earlier in the article already where both images and text are used to curate the search.
 
-Shown below is an example of this where the query has multiple components. The first query is for an item while the second query is used to further condition the results. This acts as a “soft” or “semantic” filter. This multi-part query can be understood to be a form of manual [query expansion](https://en.wikipedia.org/wiki/Query_expansion).
+Shown below is an example of this where the query has multiple components. The first query is for an item while the second query is used to further condition the results. This acts as a “soft” or “semantic” filter. 
 
 ```python
 query = {"green shirt":1.0, "short sleeves":1.0}
 ```
+
+This multi-part query can be understood to be a form of manual [query expansion](https://en.wikipedia.org/wiki/Query_expansion). The animation below illustrates how the query can be used to modify search results. 
 
 <p align="center">
   <img src="assets/shirt1.gif"/>
