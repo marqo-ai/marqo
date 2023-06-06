@@ -98,7 +98,7 @@ In the example below the initial results contain three low-quality images. These
   <img src="assets/handbag1.gif"/>
 </p>
 <p align="center">
-    <em>An example of multi-modal search using negation to avoid lowe quality images.</em>
+    <em>An example of multi-modal search using negation to avoid lowe quality images. The low-quality images are denoted by a red dot next to them. </em>
 </p>
 
 An alternative use is to use the same query to clean up existing data by using a positive weight. 
