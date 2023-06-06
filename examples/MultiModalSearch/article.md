@@ -150,7 +150,7 @@ Below is an example of two sets of 4 items that are going to be used to conditio
 </p>
 
 
-### 2.5 Searching as prompting
+### 2.6 Searching as prompting
 
 An alternative method to constructing multi-part queries is to append specific characteristics or styles to the end of a query. This is effectively the same as "prompting" in text to image generation models like [DALLE](https://openai.com/research/dall-e) and [Stable Diffusion](https://github.com/CompVis/stable-diffusion). For example, additional descriptors can be appended to a query to curate the results. An example query with additional prompting is below:
 
@@ -214,7 +214,7 @@ score_modifiers = {
     <em>Results that are based on similarity and aesthetic score.</em>
 </p>
 
-In the image above, the results have now been biased by the aesthetic score to remove the low-quality images (which have a low aesthetic score). This example uses aesthetic score but any other scalar can be used - for example ones based around sales or popularity. 
+In the image above, the results have now been biased by the aesthetic score to remove the low-quality images (which have a low aesthetic score). This example uses aesthetic score but any other number of scalars can be used - for example ones based around sales and/or popularity. 
 
 
 ### 2.8 Multi-modal Entities
