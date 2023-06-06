@@ -126,12 +126,14 @@ query = {image_url:1.0, "RED":1.0}
 
 ### 2.4 Conditional search with popular or liked items
 
-Another way to utilize the multi-modal queries is to condition the query using a set of items. For example, this set could come from previously liked or purchased items. This will steer the search in the direction of these items and can be used to promote particular items or themes. This method can be seen as a form of [relevence feedback](https://en.wikipedia.org/wiki/Rocchio_algorithm) that uses items instead of variations on the query words themselves. To avoid any penalty at search time we can pre-compute the set of items vectors and fuse them so that there is no additional model inference required. 
+Another way to utilize the multi-modal queries is to condition the query using a set of items. For example, this set could come from previously liked or purchased items. This will steer the search in the direction of these items and can be used to promote particular items or themes. This method can be seen as a form of [relevence feedback](https://en.wikipedia.org/wiki/Rocchio_algorithm) that uses items instead of variations on the query words themselves. To avoid any penalty at search time we can pre-compute the set of items vectors and fuse them into a context vector so that there is no additional model inference required. 
 
 ```python
 query = {"backpack":1.0}                      		  query = {"backpack":1.0}
 context_vector1 = [.1, ...,.-.8]               		  context_vector2 = [-.01, ...,.3]
 ```
+
+Below is an example of two sets of 4 items that are going to be used to condition the search. The contribution for each item can also be adjusted to reflect the magnitude of its popularity. 
 
 <p align="center">
   <img src="assets/context.png"/>
@@ -139,6 +141,8 @@ context_vector1 = [.1, ...,.-.8]               		  context_vector2 = [-.01, ...,
 <p align="center">
     <em>Two sets of items based on different relevence feedback mechansisms that can be used to curate the search.</em>
 </p>
+
+Below are the two results sets for the same query, coinditioned on the two previous sets of items. 
 
 <p align="center">
   <img src="assets/backpack2.gif"/>
