@@ -172,12 +172,8 @@ class ModelsForCacheing:
                     _ = vectorise(model, test_string, device=device)
                     t1 = time.time()
                     t += (t1 - t0)
-                message = f"Each inference takes {(t) / float((N))}s for {model} and {device}"
-                messages.append(message)
+                logger.info(f"Each inference takes {(t) / float((N))}s for {model} and {device}")
                 logger.info(f"{model} {device} run successfully!")
-
-        for message in messages:
-            logger.info(message)
         logger.info("completed loading models")
 
 
