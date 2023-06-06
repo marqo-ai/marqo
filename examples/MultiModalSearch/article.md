@@ -468,7 +468,6 @@ mappings2 = {"multimodal":
                                "top_4": 0.25,
                             }}}
 
-Then we can index the collections
 # index the document             
 res = client.index(index_name).add_documents([document1], device=device, mappings=mappings1)
     
