@@ -86,7 +86,7 @@ Now the search results are also moving away from the `buttons` while being drawn
 
 ### 2.2 Excluding low quality images
 
-Negation can help avoid particular things when returning results, like low-quality images or ones with artifacts. These can be easily described using natural language. This can be extended to [NSFW content](https://www.marqo.ai/blog/refining-image-quality-and-eliminating-nsfw-content-with-marqo) for example.
+Negation can help avoid particular things when returning results, like low-quality images or ones with artifacts. Avoiding things like low-quality images or [NSFW content](https://www.marqo.ai/blog/refining-image-quality-and-eliminating-nsfw-content-with-marqo) can be easily described using natural language as seen in the exanmple query below:
 
 ```python
 query = {"yellow handbag":1.0, "lowres, blurry, low quality":-1.1}
@@ -97,7 +97,11 @@ In the example below the initial results contain three low-quality images. These
 <p align="center">
   <img src="assets/handbag1.gif"/>
 </p>
+<p align="center">
+    <em>An example of multi-modal search using negation to avoid lowe quality images.</em>
+</p>
 
+An alternative use is to use the same query to clean up existing data by using a positive weight. 
 
 ### 2.3 Searching with images
 
