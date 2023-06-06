@@ -126,7 +126,7 @@ query = {image_url:1.0, "RED":1.0}
 
 ### 2.4 Conditional search with popular or liked items
 
-Another way to utilize the multi-modal queries is to condition the query using a set of items. For example, this set could come from previously liked or purchased items. This will steer the search in the direction of these items and can be used to promote particular items or themes. This method can be seen as a form of [relevence feedback](https://en.wikipedia.org/wiki/Rocchio_algorithm) that uses items instead of variations on the query words themselves. 
+Another way to utilize the multi-modal queries is to condition the query using a set of items. For example, this set could come from previously liked or purchased items. This will steer the search in the direction of these items and can be used to promote particular items or themes. This method can be seen as a form of [relevence feedback](https://en.wikipedia.org/wiki/Rocchio_algorithm) that uses items instead of variations on the query words themselves. To avoid any penalty at search time we can pre-compute the set of items vectors and fuse them so that there is no additional model inference required. 
 
 ```python
 query = {"backpack":1.0}                      		  query = {"backpack":1.0}
