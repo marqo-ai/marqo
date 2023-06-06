@@ -129,8 +129,8 @@ query = {image_url:1.0, "RED":1.0}
 Another way to utilize the multi-modal queries is to condition the query using a set of items. For example, this set could come from previously liked or purchased items. This will steer the search in the direction of these items and can be used to promote particular items or themes. This method can be seen as a form of [relevance feedback](https://en.wikipedia.org/wiki/Rocchio_algorithm) that uses items instead of variations on the query words themselves. To avoid any extra inference at search time, we can pre-compute the set of items vectors and fuse them into a context vector. 
 
 ```python
-query = {"backpack":1.0}                      		  query = {"backpack":1.0}
-context_vector1 = [.1, ...,.-.8]               		  context_vector2 = [-.01, ...,.3]
+query = {"backpack":1.0}                      			  query = {"backpack":1.0}
+context_vector1 = [.1, ...,.-.8]               		 	  context_vector2 = [-.01, ...,.3]
 ```
 
 Below is an example of two sets of 4 items that are going to be used to condition the search. The contribution for each item can also be adjusted to reflect the magnitude of its popularity. 
@@ -275,7 +275,7 @@ pip install marqo
 The first step is to load the data. The images are hosted on s3 for easy access. We use a file that contains all the image pointers as well as the meta data for them (found [here](https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce_meta_data.csv)). 
 
 ```python
-filename = "ecommerce_meta_data.csv"
+filename = "https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce_meta_data.csv"
 data = pd.read_csv(filename)
 data['_id'] = data['s3_http']
 documents = data[['s3_http', '_id', 'price', 'blip_large_caption', 'aesthetic_score']].to_dict(orient='records')
