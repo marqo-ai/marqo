@@ -56,10 +56,13 @@ Shown below is an example of this where the query has multiple components. The f
 query = {"green shirt":1.0, "short sleeves":1.0}
 ```
 
-This multi-part query can be understood to be a form of manual [query expansion](https://en.wikipedia.org/wiki/Query_expansion). The animation below illustrates how the query can be used to modify search results. 
+This multi-part query can be understood to be a form of manual [query expansion](https://en.wikipedia.org/wiki/Query_expansion). The animation below illustrates how the query can be used to modify search results.
 
 <p align="center">
   <img src="assets/shirt1.gif"/>
+</p>
+<p align="center">
+    <em>An example of multi-modal search two text queries to further refine the search.</em>
 </p>
 
 
