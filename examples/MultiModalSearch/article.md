@@ -126,21 +126,26 @@ query = {image_url:1.0, "RED":1.0}
 
 ### 2.4 Conditional search with popular or liked items
 
-Another way to utilize the multi-modal queries is for things like query expansion. In this example, each query will be expanded by adding additional variations of the query. However, in this case we will be not using variations on the query itself, but instead pre-compute expansions for particular queries (i.e. head queries).
+Another way to utilize the multi-modal queries is to condition the query using a set of items. For example, this set could come from previously liked or purchased items. This will steer the search in the direction of these items and can be used to promote particular items or themes. This method can be seen as a form of [relevence feedback](https://en.wikipedia.org/wiki/Rocchio_algorithm) that uses items instead of variations on the query words themselves. 
 
 ```python
-query = {"backpack":1.0}                        query = {"backpack":1.0}
-context_vector1 = [.1, ...,.-.8]                context_vector2 = [-.01, ...,.3]
+query = {"backpack":1.0}                      		  query = {"backpack":1.0}
+context_vector1 = [.1, ...,.-.8]               		  context_vector2 = [-.01, ...,.3]
 ```
 
 <p align="center">
   <img src="assets/context.png"/>
 </p>
+<p align="center">
+    <em>Two sets of items based on different relevence feedback mechansisms that can be used to curate the search.</em>
+</p>
 
 <p align="center">
   <img src="assets/backpack2.gif"/>
 </p>
-
+<p align="center">
+    <em>Two results sets for identical queries that were conditioned on two different sets of items. The search results are aligned with their conditioning.</em>
+</p>
 
 
 ### 2.5 Searching as prompting
@@ -192,7 +197,7 @@ score_modifiers = {
 </p>
 
 
-### 2.8 **Multi-modal Entities**
+### 2.8 Multi-modal Entities
 
 Multi modal entities or items are just that - representations that take into account multiple pieces of information. These can be images or text or some combination of both. Examples include using multiple display images for ecommerce. Using multiple images can aid retrieval and help disambiguating between the item for sale and other items in the images. If a multi-modal model like CLIP is used, then the different modalities can be used together as they live in the same latent space.
 
@@ -200,12 +205,12 @@ Multi modal entities or items are just that - representations that take into acc
 document = {"combined_text_image": 
 		         {
                 "image1":"https://some_image1.png",
-								"image2":"https://some_image2.png",
-								"image3":"https://some_image3.png", 
-								"title": "Fresh and Versatile: The Green Cotton T-Shirt for Effortless Style"
-								"description": "Crafted from high-quality cotton fabric, this t-shirt offers a soft and breathable feel, ensuring all-day comfort."
-							}
-						}
+		"image2":"https://some_image2.png",
+		"image3":"https://some_image3.png", 
+		"title": "Fresh and Versatile: The Green Cotton T-Shirt for Effortless Style"
+		"description": "Crafted from high-quality cotton fabric, this t-shirt offers a soft and breathable feel, ensuring all-day comfort."
+			  }
+	    }
 ```
 
 <p align="center">
