@@ -58,6 +58,7 @@ from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQue
 from marqo.tensor_search.models.search import Qidx, JHash, SearchContext, VectorisedJobs, VectorisedJobPointer
 from marqo.tensor_search.models.index_info import IndexInfo
 from marqo.tensor_search.models.external_apis.abstract_classes import ExternalAuth
+from marqo.tensor_search.telemetry import RequestMetrics
 from marqo.tensor_search.utils import add_timing
 from marqo.tensor_search import delete_docs
 from marqo.s2_inference.processing import text as text_processor

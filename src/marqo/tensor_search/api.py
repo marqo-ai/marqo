@@ -1,11 +1,12 @@
 """The API entrypoint for Tensor Search"""
 import typing
+from typing import Callable, Any
 from fastapi.responses import JSONResponse
 from fastapi import Request, Depends
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.tensor_search.models.add_docs_objects import ModelAuth
 from marqo.errors import InvalidArgError, MarqoWebError, MarqoError
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, Request, Response
 import json
 from marqo.tensor_search import tensor_search
 from marqo import config
@@ -20,6 +21,8 @@ from marqo.tensor_search.enums import RequestType
 from marqo.tensor_search.throttling.redis_throttle import throttle
 from marqo.tensor_search.utils import add_timing
 import pydantic
+
+from marqo.tensor_search.telemetry import TelemetryMiddleware
 
 
 def replace_host_localhosts(OPENSEARCH_IS_INTERNAL: str, OS_URL: str):
@@ -56,6 +59,7 @@ app = FastAPI(
     title="Marqo",
     version=version.get_version()
 )
+app.add_middleware(TelemetryMiddleware)
 
 
 def generate_config() -> config.Config:
