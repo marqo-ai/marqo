@@ -101,7 +101,7 @@ In the example below the initial results contain three low-quality images. These
     <em>An example of multi-modal search using negation to avoid low quality images. The low-quality images are denoted by a red dot next to them. </em>
 </p>
 
-An alternative is to use the same query to clean up existing data by using a positive weight to actively identify low-quality images for removal. 
+An alternative is to use the same query to clean up existing data by using a positive weight to [actively identify low-quality images](https://www.marqo.ai/blog/refining-image-quality-and-eliminating-nsfw-content-with-marqo) for removal. 
 
 ### 2.3 Searching with images
 
