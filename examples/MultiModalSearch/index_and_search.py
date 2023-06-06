@@ -5,15 +5,19 @@ from marqo import Client
 
 
 if __name__ == "__main__":
-
+    
     #######################################################################
     ############        Read in the data                       ############
     #######################################################################
     
-    filename = "ecommerce_meta_data.csv"
+    N = 100 # the number of samples to use (full size is ~220k)
+    
+    filename = "https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce_meta_data.csv"
     data = pd.read_csv(filename)
     data['_id'] = data['s3_http']
-    documents = data[['s3_http', '_id', 'price', 'blip_large_caption', 'aesthetic_score']].to_dict(orient='records')
+    documents = data[['s3_http', '_id', 'price', 'blip_large_caption', 'aesthetic_score']].to_dict(orient='records')[:N]
+    
+    print("Finished reading data...")
     
     #######################################################################
     ############        Create the index                       ############
@@ -30,25 +34,29 @@ if __name__ == "__main__":
             },
         }
     
+    # if the index already exists it will cause an error
     res = client.create_index(index_name, settings_dict=settings)
+    print("Finished creating index...")
 
     #######################################################################
     ############        Index the data (image only)            ############
     #######################################################################
     
-    device = 'cuda'
+    device = 'cpu' # change to 'cuda' if GPU is available 
     non_tensor_fields = ['_id', 'price', 'blip_large_caption', 'aesthetic_score']
 
     res = client.index(index_name).add_documents(documents, client_batch_size=64, non_tensor_fields=non_tensor_fields, device=device)
 
-    
+    print("Finished indexing data...")
+
     #######################################################################
     ############        Search                                 ############
     #######################################################################
 
     query = "green shirt"
     res = client.index(index_name).search(query, searchable_attributes=['s3_http'], device=device, limit=10)
-
+    
+    
     #######################################################################
     ############        Searching as prompting                 ############
     #######################################################################
@@ -118,6 +126,8 @@ if __name__ == "__main__":
     res = client.index(index_name).search(query, searchable_attributes=['s3_http'], device=device, limit=10)
 
     print(sum(r['aesthetic_score'] for r in res['hits']))
+
+    print("Finished searching data...")
 
     #######################################################################
     ############        Guided search with popular products    ############
@@ -208,3 +218,48 @@ if __name__ == "__main__":
     
     query = {"backpack":1.0}
     res = client.index(index_name).search(query, searchable_attributes=['s3_http'], device=device, limit=10, context=context2)
+    
+    
+    #######################################################################
+    ############        Indexing as multi-modal objects        ############
+    #######################################################################
+    
+    # we will create a new index for the multimodal objects
+    index_name = 'multimodal-objects'
+    settings = {
+            "index_defaults": {
+                "treat_urls_and_pointers_as_images": True,
+                "model": "open_clip/ViT-L-14/laion2b_s32b_b82k",
+                "normalize_embeddings": True,
+            },
+        }
+    
+    res = client.create_index(index_name, settings_dict=settings)
+    print(res)
+    
+    # now create the multi-modal field in the documents
+    for doc in documents:
+        doc['multimodal'] = {
+                            'blip_large_caption':doc['blip_large_caption'],
+                            's3_http':doc['s3_http'],
+                            }
+        
+    # the fields we do not want to embed
+    non_tensor_fields = ['_id', 'price', 'blip_large_caption', 'aesthetic_score', 's3_http']
+
+    # define how we want to comnbine the fields
+    mappings = {"multimodal": 
+                         {"type": "multimodal_combination",
+                          "weights": 
+                             {"blip_large_caption": 0.20,
+                               "s3_http": 0.80,
+                             }
+                         }
+                }
+    
+    # now index
+    res = client.index(index_name).add_documents(documents, client_batch_size=64, non_tensor_fields=non_tensor_fields, device=device, mappings=mappings)
+    
+    # now search
+    query = "red shawl"
+    res = client.index(index_name).search(query, searchable_attributes=['multimodal'], device=device, limit=10)
