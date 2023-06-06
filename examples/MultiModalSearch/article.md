@@ -158,7 +158,7 @@ An alternative method to constructing multi-part queries is to append specific c
 query = {"handbag, bold colors, vibrant":1.0}
 ```
 
-The impact of this proimpting on the results can be seen in the animation.
+The impact of this prompting on the results can be seen in the animation.
 
 <p align="center">
   <img src="assets/handbag2.gif"/>
@@ -183,7 +183,7 @@ query = {"cozy sweater, xmas, festive, holidays":1.0}
 
 ### 2.7 Ranking with other signals
 
-We can also rank with other signals, not just the similarity. For example document specific values can be used to multiply or bias the vector similarity score. This allows for things like previous sales or popularity to impact the ranking.  In the example below, we have calculated an [aesthetic score](https://github.com/LAION-AI/aesthetic-predictor) and we can bias the score using this document (but query independent) field.
+In addition to curating the search with the methods outlined above, we can modify the similairty score to allow ranking with other signals. For example document specific values can be used to multiply or bias the vector similarity score. This allows for document specific concepts like overall popularity to impact the ranking.  Below is the regular query and search results based on vector similiarty alone:
 
 ```python
 query = {"yellow handbag":1.0}
@@ -192,7 +192,11 @@ query = {"yellow handbag":1.0}
 <p align="center">
   <img src="assets/handbag1.png"/>
 </p>
+<p align="center">
+    <em>Results that are based on similarity alone.</em>
+</p>
 
+To illustrate the ability to modify the score and use other signals for ranking we have calculated an [aesthetic score](https://github.com/LAION-AI/aesthetic-predictor) for each item. The aesthetic score is meant to identify "aesthetic" images and rate them between 1 and 10. We can now bias the score using this document (but query independent) field. An example is below:
 
 ```python
 query = {"yellow handbag":1.0}
@@ -206,6 +210,11 @@ score_modifiers = {
 <p align="center">
   <img src="assets/handbag2.png"/>
 </p>
+<p align="center">
+    <em>Results that are based on similarity and aesthetic score.</em>
+</p>
+
+In the image above, the results have now been biased by the aesthetic score to remove the low-quality images (which have a low aesthetic score). This example uses aesthetic score but any other scalar can be used - for example ones based around sales or popularity. 
 
 
 ### 2.8 Multi-modal Entities
