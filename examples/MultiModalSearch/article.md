@@ -79,6 +79,9 @@ Now the search results are also moving away from the `buttons` while being drawn
 <p align="center">
   <img src="assets/shirt2.gif"/>
 </p>
+<p align="center">
+    <em>An example of multi-modal search using negation to avoid particualr concepts - `buttons` in this case.</em>
+</p>
 
 
 ### 2.2 Excluding low quality images
