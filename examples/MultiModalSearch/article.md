@@ -494,6 +494,64 @@ res1 = client.index(index_name).search(query, searchable_attributes=['s3_http'],
 res2 = client.index(index_name).search(query, searchable_attributes=['s3_http'], device=device, limit=10, context=context2)
 ```
 
+###  3.14 Indexing as multi-modal objects
+
+For the final part of this example, we demonstrate how both text and images can be combined together for a single representation and allow multi-modal representations.
+We will create a new inex in the same way as before but with a new name.
+
+```python
+# we will create a new index for the multimodal objects
+index_name = 'multimodal-objects'
+settings = {
+            "index_defaults": {
+                "treat_urls_and_pointers_as_images": True,
+                "model": "open_clip/ViT-L-14/laion2b_s32b_b82k",
+                "normalize_embeddings": True,
+            },
+        }
+    
+ res = client.create_index(index_name, settings_dict=settings) 
+ ```
+ 
+ To index the documents as multi-modal objects, we need to create a new field and add in what we want to use. 
+    
+ ```python
+ # now create the multi-modal field in the documents
+ for doc in documents:
+     doc['multimodal'] = {
+                            'blip_large_caption':doc['blip_large_caption'],
+                            's3_http':doc['s3_http'],
+                            }
+```
+
+The next step is to index. The only change is an additional mappings object which details how we want to combine the different fields for each document.
+
+```python
+# the fields we do not want to embed
+non_tensor_fields = ['_id', 'price', 'blip_large_caption', 'aesthetic_score', 's3_http']
+
+# define how we want to comnbine the fields
+mappings = {"multimodal": 
+                         {"type": "multimodal_combination",
+                          "weights": 
+                             {"blip_large_caption": 0.20,
+                               "s3_http": 0.80,
+                             }
+                         }
+                }
+    
+# now index
+res = client.index(index_name).add_documents(documents, client_batch_size=64, non_tensor_fields=non_tensor_fields, device=device, mappings=mappings)
+```
+
+Finally we can search in the same way as before. 
+
+```pythoh
+# now search
+query = "red shawl"
+res = client.index(index_name).search(query, searchable_attributes=['multimodal'], device=device, limit=10)
+```
+
 ### 4. Conclusion
 
 To summarise, we have shown how vector search can be easily modified to enable a number of useful functions. These include the use of multi-modal queries that comprise text and images, queries with negative terms, excluding low quality images, searching with images, per query search curation using popular items, verbose searching via prompting, ranking with external scalars and multi-modal representations. If you are interested in learning more, then head to [Marqo](https://github.com/marqo-ai/marqo), see other [examples](https://github.com/marqo-ai/marqo/tree/mainline/examples) or read more in our [blog](https://www.marqo.ai/blog). 
