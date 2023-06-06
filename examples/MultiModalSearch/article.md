@@ -101,11 +101,11 @@ In the example below the initial results contain three low-quality images. These
     <em>An example of multi-modal search using negation to avoid lowe quality images. The low-quality images are denoted by a red dot next to them. </em>
 </p>
 
-An alternative use is to use the same query to clean up existing data by using a positive weight. 
+An alternative is to use the same query to clean up existing data by using a positive weight to actively identify low-quality images for removal. 
 
 ### 2.3 Searching with images
 
-In the earlier examples we have seen how searching can be performed using weighted combinations of images and text. Searching with images alone can also be performed to utilize image similarity to find similar looking items.
+In the earlier examples we have seen how searching can be performed using weighted combinations of images and text. Searching with images alone can also be performed to utilize image similarity to find similar looking items. An example query is below:
 
 ```python
 query = {image_url:1.0}
@@ -120,7 +120,9 @@ query = {image_url:1.0, "RED":1.0}
 <p align="center">
   <img src="assets/backpack1.gif"/>
 </p>
-
+<p align="center">
+    <em>An example of multi-modal search using an image as the query before refining the search further with natural language. </em>
+</p>
 
 ### 2.4 Conditional search with popular or liked items
 
