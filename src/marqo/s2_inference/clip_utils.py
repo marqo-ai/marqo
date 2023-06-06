@@ -212,8 +212,11 @@ class CLIP:
         if path is None:
             # The original method to load the openai clip model
             # https://github.com/openai/CLIP/issues/30
+            logger.info(f"===>Always loading clip model from openai into cpu")
             self.model, self.preprocess = clip.load(self.model_type, device='cpu', jit=False, download_root=ModelCache.clip_cache_path)
+            logger.info(f"Moving clip model to {self.device}")
             self.model = self.model.to(self.device)
+            logger.info("Loading clip tokenizer<====")
             self.tokenizer = clip.tokenize
         else:
             logger.info("Detecting custom clip model path. We use generic clip model loading.")
