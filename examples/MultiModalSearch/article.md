@@ -84,7 +84,7 @@ Now the search results are also moving away from the `buttons` while being drawn
 </p>
 
 
-### 2.2 Excluding low quality images
+### 2.3 Excluding low quality images
 
 Negation can help avoid particular things when returning results, like low-quality images or ones with artifacts. Avoiding things like low-quality images or [NSFW content](https://www.marqo.ai/blog/refining-image-quality-and-eliminating-nsfw-content-with-marqo) can be easily described using natural language as seen in the example query below:
 
@@ -103,7 +103,7 @@ In the example below the initial results contain three low-quality images. These
 
 An alternative is to use the same query to clean up existing data by using a positive weight to [actively identify low-quality images](https://www.marqo.ai/blog/refining-image-quality-and-eliminating-nsfw-content-with-marqo) for removal. 
 
-### 2.3 Searching with images
+### 2.4 Searching with images
 
 In the earlier examples we have seen how searching can be performed using weighted combinations of images and text. Searching with images alone can also be performed to utilize image similarity to find similar looking items. An example query is below:
 
@@ -124,9 +124,9 @@ query = {image_url:1.0, "RED":1.0}
     <em>An example of multi-modal search using an image as the query before refining the search further with natural language. </em>
 </p>
 
-### 2.4 Conditional search with popular or liked items
+### 2.5 Conditional search with popular or liked items
 
-Another way to utilize the multi-modal queries is to condition the query using a set of items. For example, this set could come from previously liked or purchased items. This will steer the search in the direction of these items and can be used to promote particular items or themes. This method can be seen as a form of [relevance feedback](https://en.wikipedia.org/wiki/Rocchio_algorithm) that uses items instead of variations on the query words themselves. To avoid any penalty at search time we can pre-compute the set of items vectors and fuse them into a context vector so that there is no additional model inference required. 
+Another way to utilize the multi-modal queries is to condition the query using a set of items. For example, this set could come from previously liked or purchased items. This will steer the search in the direction of these items and can be used to promote particular items or themes. This method can be seen as a form of [relevance feedback](https://en.wikipedia.org/wiki/Rocchio_algorithm) that uses items instead of variations on the query words themselves. To avoid any extra inference at search time, we can pre-compute the set of items vectors and fuse them into a context vector. 
 
 ```python
 query = {"backpack":1.0}                      		  query = {"backpack":1.0}
