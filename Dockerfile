@@ -16,7 +16,6 @@ RUN add-apt-repository ppa:deadsnakes/ppa
 RUN apt-get update
 RUN apt-get install python3.8-distutils -y # python3-distutils
 RUN apt-get  install python3.8 python3-pip -y # pip is 276 MB!
-RUN chmod +x /app/entrypoint.sh
 # opencv requirements
 RUN apt-get install ffmpeg libsm6 libxext6 -y
 
@@ -43,5 +42,6 @@ RUN bash dind_setup/setup_dind.sh
 COPY . /app
 ENV PYTHONPATH "${PYTHONPATH}:/app"
 RUN chmod +x ./run_marqo.sh
+RUN chmod +x /app/entrypoint.sh
 # CMD ["./run_marqo.sh"]
 ENTRYPOINT ["/app/entrypoint.sh", "./run_marqo.sh"]
