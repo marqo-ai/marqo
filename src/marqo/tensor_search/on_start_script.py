@@ -164,7 +164,10 @@ class ModelsForCacheing:
                 logger.info(f"Start warning up model {model} on device {device}")
 
                 # warm it up
+                start_time = time.time()
                 _ = vectorise(model, test_string, device=device)
+                elapsed_time = time.time() - start_time
+                logger.info(f"*******The warm up in Marqo for `{model}` in `{device} takes {elapsed_time}s.********** ")
 
                 t = 0
                 for n in range(N):
