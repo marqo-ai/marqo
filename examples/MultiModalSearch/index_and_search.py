@@ -23,8 +23,10 @@ if __name__ == "__main__":
     ############        Create the index                       ############
     #######################################################################
     
+    # https://marqo.pages.dev/0.0.21/
     client = Client()
     
+    # https://marqo.pages.dev/0.0.21/API-Reference/indexes/
     index_name = 'multimodal'
     settings = {
             "index_defaults": {
@@ -42,6 +44,7 @@ if __name__ == "__main__":
     ############        Index the data (image only)            ############
     #######################################################################
     
+    # https://marqo.pages.dev/0.0.21/API-Reference/documents/
     device = 'cpu' # change to 'cuda' if GPU is available 
     non_tensor_fields = ['_id', 'price', 'blip_large_caption', 'aesthetic_score']
 
@@ -52,7 +55,8 @@ if __name__ == "__main__":
     #######################################################################
     ############        Search                                 ############
     #######################################################################
-
+    
+    # https://marqo.pages.dev/0.0.21/API-Reference/search/
     query = "green shirt"
     res = client.index(index_name).search(query, searchable_attributes=['s3_http'], device=device, limit=10)
     
@@ -67,7 +71,8 @@ if __name__ == "__main__":
     #######################################################################
     ############        Searching with semantic filters        ############
     #######################################################################
-
+    
+    # https://marqo.pages.dev/0.0.21/API-Reference/search/#query-q
     query = {"green shirt":1.0, "short sleeves":1.0}
     res = client.index(index_name).search(query, searchable_attributes=['s3_http'], device=device, limit=10)
 
@@ -109,6 +114,7 @@ if __name__ == "__main__":
 
     query = {"yellow handbag":1.0}
     
+    # https://marqo.pages.dev/0.0.21/API-Reference/search/#score-modifiers
     # we define the extra document specific data to use for ranking
     # multiple fields can be used to multiply or add to the vector similairty score
     score_modifiers = { 
@@ -145,6 +151,7 @@ if __name__ == "__main__":
     
     response = client.create_index(index_name, settings_dict=settings)
     
+    # https://marqo.pages.dev/0.0.21/Advanced-Usage/document_fields/#multimodal-combination-object
     # create the document that will be created from multiple images
     document1 = {"_id":"1",
                 "multimodal": 
@@ -167,7 +174,7 @@ if __name__ == "__main__":
                     }
                }
 
-    
+    # https://marqo.pages.dev/0.0.21/API-Reference/mappings/
     # define how we want to comnbined
     mappings1 = {"multimodal": {"type": "multimodal_combination",
                                "weights": {"top_1": 0.40,
@@ -194,10 +201,12 @@ if __name__ == "__main__":
     # retrieve the embedding to use as a context for search
     indexed_documents = client.index(index_name).get_documents([document1['_id'], document2['_id']] , expose_facets=True)
     
+    # https://marqo.pages.dev/0.0.21/API-Reference/documents/
     # get the embedding
     context_vector1 = indexed_documents['results'][0]['_tensor_facets'][0]['_embedding']
     context_vector2 = indexed_documents['results'][1]['_tensor_facets'][0]['_embedding']
     
+    # https://marqo.pages.dev/0.0.21/API-Reference/search/#context
     # create the context for the search
     context1 = {"tensor":
                 [
