@@ -242,11 +242,19 @@ document = {"combined_text_image":
 
 In the next section we will demonstrate how all of the above concepts can be implemented using Marqo.
 
-### **3.1 Dataset**
+### 3.1 Dataset
 
 The dataset consists of ~220,000 e-commerce products with images, text and some meta-data. The items span many categories of items, from clothing and watches to bags, backpacks and wallets. Along with the images they also have an [aesthetic score](https://github.com/LAION-AI/aesthetic-predictor), caption, and price. We will use all these features in the following example. Some images from the dataset are below.
 
-### **3.2 Installing Marqo**
+<p align="center">
+  <img src="assets/example_data.png"/>
+</p>
+<p align="center">
+    <em>Some example images from the dataset.</em>
+</p>
+
+
+### 3.2 Installing Marqo
 
 The first thing to do is start [Marqo](https://github.com/marqo-ai/marqo). To start, we can run the following [docker command](https://marqo.pages.dev/0.0.21/) from a terminal (for M-series Mac users see [here](https://marqo.pages.dev/0.0.21/m1_mac_users/)).
 
@@ -262,7 +270,7 @@ The next step is to install the python client (a REST API is also [available](ht
 pip install marqo
 ```
 
-### **3.3 Loading the data**
+### 3.3 Loading the data
 
 The first step is to load the data. The images are hosted on s3 for easy access. We use a file that contains all the image pointers as well as the meta data for them (found [here](https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce_meta_data.csv)). 
 
@@ -273,7 +281,7 @@ data['_id'] = data['s3_http']
 documents = data[['s3_http', '_id', 'price', 'blip_large_caption', 'aesthetic_score']].to_dict(orient='records')
 ```
 
-###  **3.4 Create the index**
+###  3.4 Create the index
 
 Now we have the data prepared, we can setup the index. We will use a ViT-L-14 from open clip as the model. This model is very good to start with. It is recommended to use a GPU (at least 4GB VRAM) otherwise a [smaller model](https://marqo.pages.dev/0.0.21/Models-Reference/dense_retrieval/#open-clip) can be used (although results may be worse).  
 
