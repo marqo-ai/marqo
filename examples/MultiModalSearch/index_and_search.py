@@ -11,7 +11,7 @@ if __name__ == "__main__":
     #######################################################################
     
     # run the following from the terminal
-    # https://marqo.pages.dev/0.0.21/
+    # see https://marqo.pages.dev/0.0.21/
     
     """
     docker pull marqoai/marqo:latest
@@ -28,9 +28,9 @@ if __name__ == "__main__":
     N = 100 # the number of samples to use (full size is ~220k)
     
     filename = "https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce_meta_data.csv"
-    data = pd.read_csv(filename)
+    data = pd.read_csv(filename, nrows=N)
     data['_id'] = data['s3_http']
-    documents = data[['s3_http', '_id', 'price', 'blip_large_caption', 'aesthetic_score']].to_dict(orient='records')[:N]
+    documents = data[['s3_http', '_id', 'price', 'blip_large_caption', 'aesthetic_score']].to_dict(orient='records')
     
     print("Finished reading data...")
     
@@ -155,17 +155,18 @@ if __name__ == "__main__":
     #######################################################################
     
     # we create another index to create a context vector
-    index_name = 'multimodal-context'
+    # we create another index to create a context vector
+    index_name_context = 'multimodal-context'
     settings = {
-            "index_defaults": {
-                "treat_urls_and_pointers_as_images": True,
-                "model": "open_clip/ViT-L-14/laion2b_s32b_b82k",
-                "normalize_embeddings": True,
-            },
-        }
-    
-    response = client.create_index(index_name, settings_dict=settings)
-    
+                "index_defaults": {
+                    "treat_urls_and_pointers_as_images": True,
+                    "model": "open_clip/ViT-L-14/laion2b_s32b_b82k",
+                    "normalize_embeddings": True,
+                },
+            }
+
+    res = client.create_index(index_name_context, settings_dict=settings)
+
     # https://marqo.pages.dev/0.0.21/Advanced-Usage/document_fields/#multimodal-combination-object
     # create the document that will be created from multiple images
     document1 = {"_id":"1",
@@ -208,40 +209,37 @@ if __name__ == "__main__":
 
     
     # index the document             
-    res = client.index(index_name).add_documents([document1], device=device, mappings=mappings1)
-    
+    res = client.index(index_name_context).add_documents([document1], device=device, mappings=mappings1)
+
     # index the other using a different mappings
-    res = client.index(index_name).add_documents([document2], device=device, mappings=mappings2)
-    
+    res = client.index(index_name_context).add_documents([document2], device=device, mappings=mappings2)
+
     # retrieve the embedding to use as a context for search
-    indexed_documents = client.index(index_name).get_documents([document1['_id'], document2['_id']] , expose_facets=True)
-    
-    # https://marqo.pages.dev/0.0.21/API-Reference/documents/
+    indexed_documents = client.index(index_name_context).get_documents([document1['_id'], document2['_id']] , expose_facets=True)
+
     # get the embedding
     context_vector1 = indexed_documents['results'][0]['_tensor_facets'][0]['_embedding']
     context_vector2 = indexed_documents['results'][1]['_tensor_facets'][0]['_embedding']
-    
-    # https://marqo.pages.dev/0.0.21/API-Reference/search/#context
+
     # create the context for the search
     context1 = {"tensor":
-                [
-                  {'vector':context_vector1, 'weight':0.50}                  
-                ]
-            }
+                    [
+                      {'vector':context_vector1, 'weight':0.50}                  
+                    ]
+                }
 
     # create the context for the search
     context2 = {"tensor":
-                [
-                  {'vector':context_vector2, 'weight':0.50}                  
-                ]
-            }
+                    [
+                      {'vector':context_vector2, 'weight':0.50}                  
+                    ]
+                }
 
     # now search
     query = {"backpack":1.0}
-    res = client.index(index_name).search(query, searchable_attributes=['s3_http'], device=device, limit=10, context=context1)
-    
-    query = {"backpack":1.0}
-    res = client.index(index_name).search(query, searchable_attributes=['s3_http'], device=device, limit=10, context=context2)
+    res1 = client.index(index_name).search(query, searchable_attributes=['s3_http'], device=device, limit=10, context=context1)
+
+    res2 = client.index(index_name).search(query, searchable_attributes=['s3_http'], device=device, limit=10, context=context2)
     
     
     #######################################################################
@@ -249,16 +247,16 @@ if __name__ == "__main__":
     #######################################################################
     
     # we will create a new index for the multimodal objects
-    index_name = 'multimodal-objects'
+    index_name_mm_objects = 'multimodal-objects'
     settings = {
-            "index_defaults": {
-                "treat_urls_and_pointers_as_images": True,
-                "model": "open_clip/ViT-L-14/laion2b_s32b_b82k",
-                "normalize_embeddings": True,
-            },
-        }
-    
-    res = client.create_index(index_name, settings_dict=settings)
+                "index_defaults": {
+                    "treat_urls_and_pointers_as_images": True,
+                    "model": "open_clip/ViT-L-14/laion2b_s32b_b82k",
+                    "normalize_embeddings": True,
+                },
+            }
+
+    res = client.create_index(index_name_mm_objects, settings_dict=settings) 
     print(res)
     
     # now create the multi-modal field in the documents
@@ -271,19 +269,19 @@ if __name__ == "__main__":
     # the fields we do not want to embed
     non_tensor_fields = ['_id', 'price', 'blip_large_caption', 'aesthetic_score', 's3_http']
 
-    # define how we want to comnbine the fields
+    # define how we want to combine the fields
     mappings = {"multimodal": 
-                         {"type": "multimodal_combination",
-                          "weights": 
-                             {"blip_large_caption": 0.20,
-                               "s3_http": 0.80,
+                             {"type": "multimodal_combination",
+                              "weights": 
+                                 {"blip_large_caption": 0.20,
+                                   "s3_http": 0.80,
+                                 }
                              }
-                         }
-                }
-    
+                    }
+
     # now index
-    res = client.index(index_name).add_documents(documents, client_batch_size=64, non_tensor_fields=non_tensor_fields, device=device, mappings=mappings)
-    
+    res = client.index(index_name_mm_objects).add_documents(documents, client_batch_size=64, non_tensor_fields=non_tensor_fields, device=device, mappings=mappings)    
+
     # now search
     query = "red shawl"
-    res = client.index(index_name).search(query, searchable_attributes=['multimodal'], device=device, limit=10)
+    res = client.index(index_name_mm_objects).search(query, searchable_attributes=['multimodal'], device=device, limit=10)
