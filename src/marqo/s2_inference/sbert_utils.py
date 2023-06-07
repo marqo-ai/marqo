@@ -11,7 +11,7 @@ logger = get_logger(__name__)
 class Model:
     """ generic model wrapper class
     """
-    def __init__(self, model_name: Optional[str] = None, device: str = 'cuda', batch_size: int = 2048, embedding_dim=None, max_seq_length=None , **kwargs) -> None:
+    def __init__(self, model_name: Optional[str] = None, device: str = None, batch_size: int = 2048, embedding_dim=None, max_seq_length=None , **kwargs) -> None:
 
         self.model_name = model_name
         self.device = device

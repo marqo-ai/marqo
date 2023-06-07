@@ -225,7 +225,7 @@ class ReRankerText(ReRanker):
     """
     class for reranking with hf based text models
     """
-    def __init__(self, model_name: str, device: str = 'cpu', max_length: int = 512, num_highlights: int = 1, 
+    def __init__(self, model_name: str, device: str, max_length: int = 512, num_highlights: int = 1, 
                         split_params: Dict = get_default_text_processing_parameters()):
         super().__init__()
 

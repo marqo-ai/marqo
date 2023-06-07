@@ -82,7 +82,7 @@ def _get_DINO_transform(image_size: Tuple = (224, 224)) -> Any:
     ])
 
 def DINO_inference(model: Any, transform: Any, img: ImageType = None, 
-                        patch_size: int = None, device: str = "cuda") -> FloatTensor:
+                        patch_size: int = None, device: str = None) -> FloatTensor:
     """runs inference for a model, transform and image
 
     Args:
@@ -90,7 +90,7 @@ def DINO_inference(model: Any, transform: Any, img: ImageType = None,
         transform (Any): _get_DINO_transform
         img (ImageType, optional): the image to infer on. Defaults to None.
         patch_size (int, optional): the patch size the model architecture uses. Defaults to None.
-        device (str, optional): device for the model to run on. Defaults to "cuda".
+        device (str, optional): device for the model to run on. Required to be set
 
     Returns:
         FloatTensor: returns N x w x h tensor

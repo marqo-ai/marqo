@@ -930,7 +930,7 @@ def refresh_index(config: Config, index_name: str):
 
 
 @add_timing
-def bulk_search(query: BulkSearchQuery, marqo_config: config.Config, verbose: bool = True, device=None):
+def bulk_search(query: BulkSearchQuery, marqo_config: config.Config, verbose: bool = True, device: str = None):
     """Performs a set of search operations in parallel.
 
     Args:
@@ -1474,7 +1474,7 @@ def assign_query_to_vector_job(
     return ptrs
 
 
-def create_vector_jobs(queries: List[BulkSearchQueryEntity], config: Config, selected_device: str) -> Tuple[Dict[Qidx, List[VectorisedJobPointer]], Dict[JHash, VectorisedJobs]]:
+def create_vector_jobs(queries: List[BulkSearchQueryEntity], config: Config, device: str) -> Tuple[Dict[Qidx, List[VectorisedJobPointer]], Dict[JHash, VectorisedJobs]]:
     """
         For each query:
             - Find what needs to be vectorised
@@ -1492,7 +1492,7 @@ def create_vector_jobs(queries: List[BulkSearchQueryEntity], config: Config, sel
         index_info = get_index_info(config=config, index_name=q.index)
         # split images from text:
         to_be_vectorised: Tuple[List[str], List[str]] = construct_vector_input_batches(q.q, index_info)
-        qidx_to_job[i] = assign_query_to_vector_job(q, jobs, to_be_vectorised, index_info, selected_device)
+        qidx_to_job[i] = assign_query_to_vector_job(q, jobs, to_be_vectorised, index_info, device)
     
     return qidx_to_job, jobs
 
@@ -1636,11 +1636,11 @@ def create_empty_query_response(queries: List[BulkSearchQueryEntity]) -> List[Di
         )
     )
 
-def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity], selected_device: Union[Device, str]) -> Dict[Qidx, List[float]]:
+def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity], device: Union[Device, str]) -> Dict[Qidx, List[float]]:
     """Run the query vectorisation process"""
     # 1. Pre-process inputs ready for s2_inference.vectorise
     # we can still use qidx_to_job. But the jobs structure may need to be different
-    vector_jobs_tuple: Tuple[Dict[Qidx, List[VectorisedJobPointer]], Dict[JHash, VectorisedJobs]] = create_vector_jobs(queries, config, selected_device)
+    vector_jobs_tuple: Tuple[Dict[Qidx, List[VectorisedJobPointer]], Dict[JHash, VectorisedJobs]] = create_vector_jobs(queries, config, device)
 
     qidx_to_jobs, jobs = vector_jobs_tuple
 
@@ -2027,7 +2027,7 @@ def get_cuda_info() -> dict:
 
 def vectorise_multimodal_combination_field(
         field: str, multimodal_object: Dict[str, dict], doc: dict, doc_index: int,
-        doc_id:str, selected_device:str, index_info, image_repo, field_map:dict,
+        doc_id:str, device:str, index_info, image_repo, field_map:dict,
         model_auth: Optional[ModelAuth] = None
 ):
     '''
@@ -2045,7 +2045,7 @@ def vectorise_multimodal_combination_field(
         total_vectorise_time: total vectorise time in the main body
         doc_index: the index of the document. This is an interator variable `i` in the main body to iterator throught the docs
         doc_id: the document id
-        selected_device: device from main body
+        device: device from main body
         index_info: index_info from main body,
         model_auth: Model download authorisation information (if required)
     Returns:
@@ -2124,14 +2124,14 @@ def vectorise_multimodal_combination_field(
             text_vectors = s2_inference.vectorise(
                 model_name=index_info.model_name,
                 model_properties=_get_model_properties(index_info), content=text_content_to_vectorise,
-                device=selected_device, normalize_embeddings=normalize_embeddings,
+                device=device, normalize_embeddings=normalize_embeddings,
                 infer=infer_if_image, model_auth=model_auth)
         image_vectors = []
         if len(image_content_to_vectorise) > 0:
             image_vectors = s2_inference.vectorise(
                 model_name=index_info.model_name,
                 model_properties=_get_model_properties(index_info), content=image_content_to_vectorise,
-                device=selected_device, normalize_embeddings=normalize_embeddings,
+                device=device, normalize_embeddings=normalize_embeddings,
                 infer=infer_if_image, model_auth=model_auth)
         end_time = timer()
         combo_vectorise_time_to_add += (end_time - start_time)
