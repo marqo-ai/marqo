@@ -277,6 +277,7 @@ The first step is to load the data. The images are hosted on s3 for easy access.
 ```python
 import pandas as pd
 
+N = 100 # samples to use, the full dataset is ~220k
 filename = "https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce_meta_data.csv"
 data = pd.read_csv(filename)
 data['_id'] = data['s3_http']
@@ -309,7 +310,7 @@ response = client.create_index(index_name, settings_dict=settings)
 Now we can [add images](https://marqo.pages.dev/0.0.21/API-Reference/documents/) to the index which can then be searched over. We can also select the device we want to use and also which fields in the data to embed.
 
 ```python
-device = 'cuda'
+device = 'cpu' # use 'cuda' if a GPU is available
 non_tensor_fields = ['_id', 'price', 'blip_large_caption', 'aesthetic_score']
 
 res = client.index(index_name).add_documents(documents, client_batch_size=64, non_tensor_fields=non_tensor_fields, device=device)
