@@ -412,7 +412,7 @@ Results at a per-query level can be personalized using sets of items. These item
 The first step is to create a new index to calculate the context vectors.
 ```python
 # we create another index to create a context vector
-index_name = 'multimodal-context'
+index_name_context = 'multimodal-context'
 settings = {
             "index_defaults": {
                 "treat_urls_and_pointers_as_images": True,
@@ -421,7 +421,7 @@ settings = {
             },
         }
     
-response = client.create_index(index_name, settings_dict=settings)
+response = client.create_index(index_name_context, settings_dict=settings)
 
 ```
 
@@ -474,10 +474,10 @@ mappings2 = {"multimodal":
                             }}}
 
 # index the document             
-res = client.index(index_name).add_documents([document1], device=device, mappings=mappings1)
+res = client.index(index_name_context).add_documents([document1], device=device, mappings=mappings1)
     
 # index the other using a different mappings
-res = client.index(index_name).add_documents([document2], device=device, mappings=mappings2)
+res = client.index(index_name_context).add_documents([document2], device=device, mappings=mappings2)
 ```
 
 To get the vectors to use as context vectors at search time - we need to [retrieve the calculated vectors](https://marqo.pages.dev/0.0.21/API-Reference/documents/). We can then [create a context object](https://marqo.pages.dev/0.0.21/API-Reference/search/#context) that is used at search time.
@@ -485,7 +485,7 @@ To get the vectors to use as context vectors at search time - we need to [retrie
 ```python
 
 # retrieve the embedding to use as a context for search
-indexed_documents = client.index(index_name).get_documents([document1['_id'], document2['_id']] , expose_facets=True)
+indexed_documents = client.index(index_name_context).get_documents([document1['_id'], document2['_id']] , expose_facets=True)
     
 # get the embedding
 context_vector1 = indexed_documents['results'][0]['_tensor_facets'][0]['_embedding']
