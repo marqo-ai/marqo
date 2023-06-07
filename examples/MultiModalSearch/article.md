@@ -275,6 +275,8 @@ pip install marqo
 The first step is to load the data. The images are hosted on s3 for easy access. We use a file that contains all the image pointers as well as the meta data for them (found [here](https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce_meta_data.csv)). 
 
 ```python
+import pandas as pd
+
 filename = "https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce_meta_data.csv"
 data = pd.read_csv(filename)
 data['_id'] = data['s3_http']
@@ -286,6 +288,8 @@ documents = data[['s3_http', '_id', 'price', 'blip_large_caption', 'aesthetic_sc
 Now we have the data prepared, we can [set up the index](https://marqo.pages.dev/0.0.21/API-Reference/indexes/). We will use a ViT-L-14 from open clip as the model. This model is very good to start with. It is recommended to use a GPU (at least 4GB VRAM) otherwise a [smaller model](https://marqo.pages.dev/0.0.21/Models-Reference/dense_retrieval/#open-clip) can be used (although results may be worse).  
 
 ```python
+from marqo import Client
+
 client = Client()
     
 index_name = 'multimodal'
