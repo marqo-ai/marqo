@@ -1,4 +1,4 @@
-# “Context is all you need” - multi-modal vector search with personalization 
+# “Context Is All You Need” - Multi-Modal Vector Search with Personalization 
 
 *TL:DR We show how both text and images can be used for multi-modal search. This allows for multi-part queries, multi-modal queries, searching via prompting, promoting/suppressing content by themes, per query curation and personalization. Additionally, we show how other query independent signals can be used to rank documents in addition to similarity. These features allow the creation and curation of high-quality search experiences, particularly for e-commerce and image heavy applications.*
 
@@ -20,7 +20,7 @@ Often the items we want to search over contain more than just text. For example,
     <em>An example of multi-modal "document" that contain both images and text.</em>
 </p>
 
-### 1.1 Multi-modal Search
+### 1.1 Multi-Modal Search
 
 Multi-modal search is search that operates over multiple modalities. We can think of two ways of doing multi-modal search, using multi-modal queries and multi-modal documents. In both cases, they may contain any combination of text and images. For clarity we will stick to two modalities for now, text and images but the concepts are not restricted to just those and can be extended to video or audio (for example).
 
@@ -42,11 +42,11 @@ There are numerous benefits to this multi-modal approach. For example:
 - Curation can be performed in natural language.
 - Business logic can be incorporated into the search using natural language.
 
-## 2. Multi-modal Search in practice
+## 2. Multi-modal Search in Practice
 
 In this section we will walk through a number of ways multi-modal search can be used to improve and curate results.
 
-### 2.1 Multi-modal Queries
+### 2.1 Multi-Modal Queries
 
 Multi-modal queries are queries that are made up of multiple components and/or multiple modalities. The benefit is that it effectively allows us to modify the scoring function for the approximate-knn to take into account additional similarities - for example, across multiple images or text and images.  The similarity scoring will now be against a weighted collection of items rather than a single piece of text. This allows finer grained curation of search results than by using a single part query alone.  We have seen previous examples of this earlier in the article already where both images and text are used to curate the search.
 
@@ -84,7 +84,7 @@ Now the search results are also moving away from the `buttons` while being drawn
 </p>
 
 
-### 2.3 Excluding low quality images
+### 2.3 Excluding Low Quality Images
 
 Negation can help avoid particular things when returning results, like low-quality images or ones with artifacts. Avoiding things like low-quality images or [NSFW content](https://www.marqo.ai/blog/refining-image-quality-and-eliminating-nsfw-content-with-marqo) can be easily described using natural language as seen in the example query below:
 
@@ -103,7 +103,7 @@ In the example below the initial results contain three low-quality images. These
 
 An alternative is to use the same query to clean up existing data by using a positive weight to [actively identify low-quality images](https://www.marqo.ai/blog/refining-image-quality-and-eliminating-nsfw-content-with-marqo) for removal. 
 
-### 2.4 Searching with images
+### 2.4 Searching with Images
 
 In the earlier examples we have seen how searching can be performed using weighted combinations of images and text. Searching with images alone can also be performed to utilize image similarity to find similar looking items. An example query is below:
 
@@ -124,7 +124,7 @@ query = {image_url:1.0, "RED":1.0}
     <em>An example of multi-modal search using an image as the query before refining the search further with natural language. </em>
 </p>
 
-### 2.5 Conditional search with popular or liked items
+### 2.5 Conditional Search with Popular or Liked Items
 
 Another way to utilize the multi-modal queries is to condition the query using a set of items. For example, this set could come from previously liked or purchased items. This will steer the search in the direction of these items and can be used to promote particular items or themes. This method can be seen as a form of [relevance feedback](https://en.wikipedia.org/wiki/Rocchio_algorithm) that uses items instead of variations on the query words themselves. To avoid any extra inference at search time, we can pre-compute the set of items vectors and fuse them into a context vector. 
 
@@ -150,7 +150,7 @@ Below is an example of two sets of 4 items that are going to be used to conditio
 </p>
 
 
-### 2.6 Searching as prompting
+### 2.6 Searching as Prompting
 
 An alternative method to constructing multi-part queries is to append specific characteristics or styles to the end of a query. This is effectively the same as "prompting" in text to image generation models like [DALLE](https://openai.com/research/dall-e) and [Stable Diffusion](https://github.com/CompVis/stable-diffusion). For example, additional descriptors can be appended to a query to curate the results. An example query with additional prompting is below:
 
@@ -181,7 +181,7 @@ query = {"cozy sweater, xmas, festive, holidays":1.0}
 </p>
 
 
-### 2.7 Ranking with other signals
+### 2.7 Ranking with Other Signals
 
 In addition to curating the search with the methods outlined above, we can modify the similarity score to allow ranking with other signals. For example document specific values can be used to multiply or bias the vector similarity score. This allows for document specific concepts like overall popularity to impact the ranking.  Below is the regular query and search results based on vector similarity alone:
 
@@ -217,7 +217,7 @@ score_modifiers = {
 In the image above, the results have now been biased by the aesthetic score to remove the low-quality images (which have a low aesthetic score). This example uses aesthetic score but any other number of scalars can be used - for example ones based around sales and/or popularity. 
 
 
-### 2.8 Multi-modal Entities
+### 2.8 Multi-Modal Entities
 
 Multi modal entities or items are just that - representations that take into account multiple pieces of information. These can be images or text or some combination of both. Examples include using multiple display images for ecommerce. Using multiple images can aid retrieval and help disambiguate between the item for sale and other items in the images. If a multi-modal model like CLIP is used, then the different modalities can be used together as they live in the same latent space.
 
@@ -270,7 +270,7 @@ The next step is to install the python client (a REST API is also [available](ht
 pip install marqo
 ```
 
-### 3.3 Loading the data
+### 3.3 Loading the Data
 
 The first step is to load the data. The images are hosted on s3 for easy access. We use a file that contains all the image pointers as well as the meta data for them (found [here](https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce_meta_data.csv)). 
 
@@ -284,7 +284,7 @@ data['_id'] = data['s3_http']
 documents = data[['s3_http', '_id', 'price', 'blip_large_caption', 'aesthetic_score']].to_dict(orient='records')
 ```
 
-###  3.4 Create the index
+###  3.4 Create the Index
 
 Now we have the data prepared, we can [set up the index](https://marqo.pages.dev/0.0.21/API-Reference/indexes/). We will use a ViT-L-14 from open clip as the model. This model is very good to start with. It is recommended to [use a GPU](https://marqo.pages.dev/0.0.21/using_marqo_with_a_gpu/) (at least 4GB VRAM) otherwise a [smaller model](https://marqo.pages.dev/0.0.21/Models-Reference/dense_retrieval/#open-clip) can be used (although results may be worse).  
 
@@ -305,7 +305,7 @@ settings = {
 response = client.create_index(index_name, settings_dict=settings)
 ```
 
-###  3.5 Add images to the index
+###  3.5 Add Images to the Index
 
 Now we can [add images](https://marqo.pages.dev/0.0.21/API-Reference/documents/) to the index which can then be searched over. We can also select the device we want to use and also which fields in the data to embed. To use a GPU, change the device to `cuda` (see [here](https://marqo.pages.dev/0.0.21/using_marqo_with_a_gpu/) for how to use Marqo with a GPU).
 
@@ -325,7 +325,7 @@ query = "green shirt"
 res = client.index(index_name).search(query, searchable_attributes=['s3_http'], device=device, limit=10)
 ```
 
-###  3.7 Searching as prompting
+###  3.7 Searching as Prompting
 
 Like in the examples above, it is easy to do more specific searches by adopting a similar style to prompting. 
 
@@ -334,7 +334,7 @@ query = "cozy sweater, xmas, festive, holidays"
 res = client.index(index_name).search(query, searchable_attributes=['s3_http'], device=device, limit=10)
 ```
 
-###  3.8 Searching with semantic filters
+###  3.8 Searching with Semantic Filters
 
 Now we can extend the searching to use multi-part queries. These can act as "semantic filters" that can be based on any words to further refine the results.
 
@@ -343,7 +343,7 @@ query = {"green shirt":1.0, "short sleeves":1.0}
 res = client.index(index_name).search(query, searchable_attributes=['s3_http'], device=device, limit=10)
 ```
 
-###  3.9 Searching with negation
+###  3.9 Searching with Negation
 
 In addition to additive terms, negation can be used. Here we remove buttons from long sleeve shirt examples.
 
@@ -352,7 +352,7 @@ query = {"green shirt":1.0, "short sleeves":1.0, "buttons":-1.0}
 res = client.index(index_name).search(query, searchable_attributes=['s3_http'], device=device, limit=10)
 ```
 
-###  3.10 Searching with images
+###  3.10 Searching with Images
 
 In addition to text, searching can be done with images alone. 
 
@@ -362,7 +362,7 @@ query = {image_context_url:1.0}
 res = client.index(index_name).search(query, searchable_attributes=['s3_http'], device=device, limit=10)
 ```
 
-###  3.11 Searching with multi-modal queries
+###  3.11 Searching with Multi-Modal Queries
 
 The multi-part queries can span both text and images. 
 
@@ -380,7 +380,7 @@ query = {"backpack":1.0, image_context_url:1.0}
 res = client.index(index_name).search(query, searchable_attributes=['s3_http'], device=device, limit=10)
 ```
 
-###  3.12 Searching with ranking
+###  3.12 Searching with Ranking
 
 We can now extend the search to also include document specific values to boost the [ranking of documents](https://marqo.pages.dev/0.0.21/API-Reference/search/#score-modifiers) in addition to the vector similarity. In this example, each document has a field called `aesthetic_score` which can also be used to bias the score of each document.
 
@@ -406,7 +406,7 @@ res = client.index(index_name).search(query, searchable_attributes=['s3_http'], 
 print(sum(r['aesthetic_score'] for r in res['hits']))
 ```
 
-###  3.13 Searching with popular or liked products
+###  3.13 Searching with Popular or Liked Products
 
 Results at a per-query level can be personalized using sets of items. These items could be previously liked or popular items. To perform this we do it in two stages. The first is to calculate the "context vector" which is a condensed representation of the items. This is pre-computed and then stored to remove any additional overhead at query time. The context is generated by [creating documents](https://marqo.pages.dev/0.0.21/Advanced-Usage/document_fields/#multimodal-combination-object) of the item sets and retrieving the corresponding vectors. 
 The first step is to create a new index to calculate the context vectors.
@@ -511,7 +511,7 @@ res1 = client.index(index_name).search(query, searchable_attributes=['s3_http'],
 res2 = client.index(index_name).search(query, searchable_attributes=['s3_http'], device=device, limit=10, context=context2)
 ```
 
-###  3.14 Indexing as multi-modal objects
+###  3.14 Indexing as Multi-Modal Objects
 
 For the final part of this example, we demonstrate how both text and images can be combined together as a single entity and allow multi-modal representations.
 We will create a new inex in the same way as before but with a new name.
