@@ -5,6 +5,21 @@ from marqo import Client
 
 
 if __name__ == "__main__":
+
+    #######################################################################
+    ############        Install Marqo and the python client    ############
+    #######################################################################
+    
+    # run the following from the terminal
+    # https://marqo.pages.dev/0.0.21/
+    
+    """
+    docker pull marqoai/marqo:latest
+    docker rm -f marqo
+    docker run --name marqo -it --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:latest
+    
+    pip install marqo
+    """
     
     #######################################################################
     ############        Read in the data                       ############
