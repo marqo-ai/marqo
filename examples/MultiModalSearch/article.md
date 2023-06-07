@@ -205,14 +205,14 @@ query = {"cozy sweater, xmas, festive, holidays":1.0}
 
 ### 2.7 Ranking with Other Signals
 
-In addition to curating the search with the methods outlined above, we can modify the similarity score to allow ranking with other signals. For example document specific values can be used to multiply or bias the vector similarity score. This allows for document specific concepts like overall popularity to impact the ranking.  Below is the regular query and search results based on vector similarity alone. There are three low-quality images in the result set and can be identified by the strong banding in the background of the images.
+In addition to curating the search with the methods outlined above, we can modify the similarity score to allow ranking with other signals. For example document specific values can be used to multiply or bias the vector similarity score. This allows for document specific concepts like overall popularity to impact the ranking.  Below is the regular query and search results based on vector similarity alone. There are three low-quality images in the result set and can be identified by the strong banding in the background of the images (and are denoted by a red square).
 
 ```python
 query = {"yellow handbag":1.0}
 ```
 
 <p align="center">
-  <img src="assets/handbag1.png"/>
+  <img src="assets/handbag1-1.png"/>
 </p>
 <p align="center">
     <em>Results that are based on similarity alone.</em>
