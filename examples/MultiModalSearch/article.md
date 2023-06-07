@@ -421,8 +421,7 @@ settings = {
             },
         }
     
-response = client.create_index(index_name_context, settings_dict=settings)
-
+res = client.create_index(index_name_context, settings_dict=settings)
 ```
 
 Then we [construct the objects](https://marqo.pages.dev/0.0.21/Advanced-Usage/document_fields/#multimodal-combination-object) from the sets of items we want to use for the context.
@@ -528,8 +527,8 @@ settings = {
             },
         }
     
- res = client.create_index(index_name_mm_objects, settings_dict=settings) 
- ```
+res = client.create_index(index_name_mm_objects, settings_dict=settings) 
+```
  
  To index the documents as multi-modal objects, we need to create a new field and add in what we want to use. 
     
