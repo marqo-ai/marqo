@@ -56,7 +56,7 @@ class CLIP_ONNX(object):
     Load a clip model and convert it to onnx version for faster inference
     """
 
-    def __init__(self, model_name="onnx32/openai/ViT-L/14", device="cpu", embedding_dim: int = None,
+    def __init__(self, model_name: str ="onnx32/openai/ViT-L/14", device: str = None, embedding_dim: int = None,
                  truncate: bool = True,
                  load=True, **kwargs):
         self.model_name = model_name

@@ -8,7 +8,7 @@ from marqo.s2_inference.errors import (
     UnknownModelError, ModelNotInCacheError, ModelDownloadError)
 from PIL import UnidentifiedImageError
 from marqo.s2_inference.model_registry import load_model_properties
-from marqo.s2_inference.configs import get_default_device, get_default_normalization, get_default_seq_length
+from marqo.s2_inference.configs import get_default_normalization, get_default_seq_length
 from marqo.s2_inference.types import *
 from marqo.s2_inference.logger import get_logger
 import torch
@@ -311,7 +311,7 @@ def get_model_size(model_name: str, model_properties: dict) -> (int, float):
 
 
 def _load_model(
-        model_name: str, model_properties: dict, device: Optional[str] = None,
+        model_name: str, model_properties: dict, device: str = None,
         calling_func: str = None, model_auth: Optional[ModelAuth] = None
 ) -> Any:
     """_summary_
@@ -319,7 +319,7 @@ def _load_model(
     Args:
         model_name (str): Actual model_name to be fetched from external library
                         prefer passing it in the form of model_properties['name']
-        device (str, optional): _description_. Defaults to 'cpu'.
+        device (str): Required. Should always be passed when loading model
         model_auth: Authorisation details for downloading a model (if required)
 
     Returns:
@@ -330,7 +330,6 @@ def _load_model(
                            f"`unit_test` or `_update_available_models` for threading safeness.")
 
     print(f"loading for: model_name={model_name} and properties={model_properties}")
-    if device is None: device = get_default_device()
     loader = _get_model_loader(model_properties.get('name', None), model_properties)
 
     max_sequence_length = model_properties.get('tokens', get_default_seq_length())
@@ -402,7 +401,7 @@ def _check_output_type(output: List[List[float]]) -> bool:
     return True
 
 
-def _float_tensor_to_list(output: FloatTensor, device: str = get_default_device()) -> Union[
+def _float_tensor_to_list(output: FloatTensor, device: str) -> Union[
     List[List[float]], List[float]]:
     """
 
