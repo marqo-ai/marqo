@@ -9,13 +9,13 @@
     <em>An example of multi-modal search that uses multi-modal queries to curate search results based on text and images.</em>
 </p>
 
-## 1. Introduction
+## 1. Introduction to Multi-modal Search
 
 Often the items we want to search over contain more than just text. For example, they may also contain images or videos. These modalities other than text will often contain a wealth of information that is not captured by the text. By incorporating these other modalities into search, the relevancy of results can be improved as well as unlocking new ways to search. Examples of multi-modal search include domains like fashion and e-commerce which may have title, description as well as multiple images displaying the item. This data can also help disambiguate the subject of the image - for example if there are multiple items present like pants and a top, the text can provide the necessary context to identify the correct subject. The information contained in these data across modalities is complementary and rich. 
 
 This articles has three main parts:
-1. [Introduction to multi-modal search.](https://github.com/marqo-ai/marqo/blob/mainline/examples/MultiModalSearch/article.md#1-introduction)
-2. [Examples of Multi-modal search.](https://github.com/marqo-ai/marqo/blob/mainline/examples/MultiModalSearch/article.md#2-multi-modal-search-in-practice)
+1. [Introduction to Multi-Modal Search.](https://github.com/marqo-ai/marqo/blob/mainline/examples/MultiModalSearch/article.md#1-introduction)
+2. [Multi-modal Search in Practice.](https://github.com/marqo-ai/marqo/blob/mainline/examples/MultiModalSearch/article.md#2-multi-modal-search-in-practice)
 
 	2.1. [Multi-Modal Queries](https://github.com/marqo-ai/marqo/blob/mainline/examples/MultiModalSearch/article.md#21-multi-modal-queries)
 
@@ -33,7 +33,7 @@ This articles has three main parts:
 	
 	2.8. [Multi-Modal Entities](https://github.com/marqo-ai/marqo/blob/mainline/examples/MultiModalSearch/article.md#28-multi-modal-entities)
 
-3. [Complete code to reproduce the examples.](https://github.com/marqo-ai/marqo/blob/mainline/examples/MultiModalSearch/article.md#3-detailed-example)
+3. [Detailed Example (with code)](https://github.com/marqo-ai/marqo/blob/mainline/examples/MultiModalSearch/article.md#3-detailed-example)
 
 <p align="center">
   <img src="assets/example.png"/>
