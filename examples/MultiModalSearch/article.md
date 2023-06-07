@@ -301,7 +301,7 @@ settings = {
             },
         }
     
- response = mq.create_index(index_name, settings_dict=settings)
+response = client.create_index(index_name, settings_dict=settings)
 ```
 
 ###  3.5 Add images to the index
