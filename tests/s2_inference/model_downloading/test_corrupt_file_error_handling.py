@@ -249,9 +249,3 @@ class TestCorruptFileInHuggingFace(unittest.TestCase):
             with self.assertRaises(InvalidModelPropertiesError):
                 extract_huggingface_archive('/path/to/file.zip')
             mock_remove.assert_called_once_with('/path/to/file.zip')
-
-
-
-
-
-
