@@ -519,7 +519,7 @@ We will create a new inex in the same way as before but with a new name.
 
 ```python
 # we will create a new index for the multimodal objects
-index_name = 'multimodal-objects'
+index_name_mm_objects = 'multimodal-objects'
 settings = {
             "index_defaults": {
                 "treat_urls_and_pointers_as_images": True,
@@ -528,7 +528,7 @@ settings = {
             },
         }
     
- res = client.create_index(index_name, settings_dict=settings) 
+ res = client.create_index(index_name_mm_objects, settings_dict=settings) 
  ```
  
  To index the documents as multi-modal objects, we need to create a new field and add in what we want to use. 
@@ -559,7 +559,7 @@ mappings = {"multimodal":
                 }
     
 # now index
-res = client.index(index_name).add_documents(documents, client_batch_size=64, non_tensor_fields=non_tensor_fields, device=device, mappings=mappings)
+res = client.index(index_name_mm_objects).add_documents(documents, client_batch_size=64, non_tensor_fields=non_tensor_fields, device=device, mappings=mappings)
 ```
 
 Finally we can search in the same way as before. 
@@ -567,7 +567,7 @@ Finally we can search in the same way as before.
 ```pythoh
 # now search
 query = "red shawl"
-res = client.index(index_name).search(query, searchable_attributes=['multimodal'], device=device, limit=10)
+res = client.index(index_name_mm_objects).search(query, searchable_attributes=['multimodal'], device=device, limit=10)
 ```
 
 ### 4. Conclusion
