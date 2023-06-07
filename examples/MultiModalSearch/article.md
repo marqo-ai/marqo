@@ -563,8 +563,7 @@ res = client.index(index_name_mm_objects).add_documents(documents, client_batch_
 
 Finally we can search in the same way as before. 
 
-```pythoh
-# now search
+```python
 query = "red shawl"
 res = client.index(index_name_mm_objects).search(query, searchable_attributes=['multimodal'], device=device, limit=10)
 ```
