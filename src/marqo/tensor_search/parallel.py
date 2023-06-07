@@ -182,16 +182,11 @@ def add_documents_mp(
     Returns:
         _type_: _description_
     """
-
-    # Default device calculated here to ensure processes and device IDs  can be fetched
-    selected_device = utils.read_env_vars_and_defaults["_MARQO_BEST_AVAILABLE_DEVICE"] \
-        if device is None else device
-
     n_documents = len(add_docs_params.docs)
 
     logger.info(f"found {n_documents} documents")
 
-    n_processes = get_processes(selected_device, processes)
+    n_processes = get_processes(add_docs_params.device, processes)
     if n_documents < n_processes:
         n_processes = max(1, n_documents)
     
@@ -200,7 +195,7 @@ def add_documents_mp(
     logger.info(f"using {n_processes} processes")
 
     # get the device ids for each process based on the process count and available devices
-    device_ids = get_device_ids(n_processes, selected_device)
+    device_ids = get_device_ids(n_processes, add_docs_params.device)
 
     start = time.time()
 
