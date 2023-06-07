@@ -543,7 +543,7 @@ The next step is to index. The only change is an additional mappings object whic
 # the fields we do not want to embed
 non_tensor_fields = ['_id', 'price', 'blip_large_caption', 'aesthetic_score', 's3_http']
 
-# define how we want to comnbine the fields
+# define how we want to combine the fields
 mappings = {"multimodal": 
                          {"type": "multimodal_combination",
                           "weights": 
