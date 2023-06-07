@@ -1,6 +1,6 @@
 # “Context Is All You Need” - Multi-Modal Vector Search with Personalization 
 
-*TL:DR We show how both text and images can be used for multi-modal search. This allows for multi-part queries, multi-modal queries, searching via prompting, promoting/suppressing content by themes, per query curation and personalization. Additionally, we show how other query independent signals can be used to rank documents in addition to similarity. These features allow the creation and curation of high-quality search experiences, particularly for e-commerce and image heavy applications.*
+*TL:DR We show how both text and images can be used for multi-modal search. This allows for multi-part queries, multi-modal queries, searching via prompting, promoting/suppressing content by themes, per query curation and personalization. Additionally, we show how other query independent signals can be used to rank documents in addition to similarity. These features allow the creation and curation of high-quality search experiences, particularly for e-commerce and image heavy applications. The article contains multiple examples and code to reproduce these.*
 
 <p align="center">
   <img src="assets/backpack.gif"/>
