@@ -13,6 +13,11 @@
 
 Often the items we want to search over contain more than just text. For example, they may also contain images or videos. These modalities other than text will often contain a wealth of information that is not captured by the text. By incorporating these other modalities into search, the relevancy of results can be improved as well as unlocking new ways to search. Examples of multi-modal search include domains like fashion and e-commerce which may have title, description as well as multiple images displaying the item. This data can also help disambiguate the subject of the image - for example if there are multiple items present like pants and a top, the text can provide the necessary context to identify the correct subject. The information contained in these data across modalities is complementary and rich. 
 
+This articles has three main parts:
+1. Introduction
+2. Examples of Multi-modal search
+3. Complete code to reproduce the examples
+
 <p align="center">
   <img src="assets/example.png"/>
 </p>
