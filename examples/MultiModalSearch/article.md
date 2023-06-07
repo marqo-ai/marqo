@@ -286,7 +286,7 @@ documents = data[['s3_http', '_id', 'price', 'blip_large_caption', 'aesthetic_sc
 
 ###  3.4 Create the index
 
-Now we have the data prepared, we can [set up the index](https://marqo.pages.dev/0.0.21/API-Reference/indexes/). We will use a ViT-L-14 from open clip as the model. This model is very good to start with. It is recommended to use a GPU (at least 4GB VRAM) otherwise a [smaller model](https://marqo.pages.dev/0.0.21/Models-Reference/dense_retrieval/#open-clip) can be used (although results may be worse).  
+Now we have the data prepared, we can [set up the index](https://marqo.pages.dev/0.0.21/API-Reference/indexes/). We will use a ViT-L-14 from open clip as the model. This model is very good to start with. It is recommended to [use a GPU](https://marqo.pages.dev/0.0.21/using_marqo_with_a_gpu/) (at least 4GB VRAM) otherwise a [smaller model](https://marqo.pages.dev/0.0.21/Models-Reference/dense_retrieval/#open-clip) can be used (although results may be worse).  
 
 ```python
 from marqo import Client
@@ -307,7 +307,7 @@ response = client.create_index(index_name, settings_dict=settings)
 
 ###  3.5 Add images to the index
 
-Now we can [add images](https://marqo.pages.dev/0.0.21/API-Reference/documents/) to the index which can then be searched over. We can also select the device we want to use and also which fields in the data to embed.
+Now we can [add images](https://marqo.pages.dev/0.0.21/API-Reference/documents/) to the index which can then be searched over. We can also select the device we want to use and also which fields in the data to embed. To use a GPU, change the device to `cuda` (see [here](https://marqo.pages.dev/0.0.21/using_marqo_with_a_gpu/) for how to use Marqo with a GPU).
 
 ```python
 device = 'cpu' # use 'cuda' if a GPU is available
