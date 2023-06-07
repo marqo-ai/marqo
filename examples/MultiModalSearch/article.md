@@ -383,7 +383,7 @@ We can now extend the search to also include document specific values to boost t
 query = {"yellow handbag":1.0}
     
 # we define the extra document specific data to use for ranking
-# multiple fields can be used to multiply or add to the vector similairty score
+# multiple fields can be used to multiply or add to the vector similarity score
 score_modifiers = { 
         "add_to_score": 
             [
@@ -447,7 +447,7 @@ document2 = {"_id":"2",
 
 ```
 
-We can now [define mappings](https://marqo.pages.dev/0.0.21/API-Reference/mappings/) objects to determine how we want to combnine the different fields. We can then index the documents.
+We can now [define mappings](https://marqo.pages.dev/0.0.21/API-Reference/mappings/) objects to determine how we want to combine the different fields. We can then index the documents.
 
 ```python
 # define how we want to combined
