@@ -16,14 +16,23 @@ Often the items we want to search over contain more than just text. For example,
 This articles has three main parts:
 1. [Introduction to multi-modal search.](https://github.com/marqo-ai/marqo/blob/mainline/examples/MultiModalSearch/article.md#1-introduction)
 2. [Examples of Multi-modal search.](https://github.com/marqo-ai/marqo/blob/mainline/examples/MultiModalSearch/article.md#2-multi-modal-search-in-practice)
+
 	2.1. [Multi-Modal Queries](https://github.com/marqo-ai/marqo/blob/mainline/examples/MultiModalSearch/article.md#21-multi-modal-queries)
+
 	2.2. [Negation](https://github.com/marqo-ai/marqo/blob/mainline/examples/MultiModalSearch/article.md#22-negation)
+	
 	2.3. [Excluding Low Quality Images](https://github.com/marqo-ai/marqo/blob/mainline/examples/MultiModalSearch/article.md#23-excluding-low-quality-images)
+	
 	2.4. [Searching with Images](https://github.com/marqo-ai/marqo/blob/mainline/examples/MultiModalSearch/article.md#24-searching-with-images)
+	
 	2.5. [Conditional Search with Popular or Liked Items](https://github.com/marqo-ai/marqo/blob/mainline/examples/MultiModalSearch/article.md#25-conditional-search-with-popular-or-liked-items)
+	
 	2.6. [Searching as Prompting](https://github.com/marqo-ai/marqo/blob/mainline/examples/MultiModalSearch/article.md#26-searching-as-prompting)
+	
 	2.7. [Ranking with Other Signals](https://github.com/marqo-ai/marqo/blob/mainline/examples/MultiModalSearch/article.md#27-ranking-with-other-signals)
+	
 	2.8. [Multi-Modal Entities](https://github.com/marqo-ai/marqo/blob/mainline/examples/MultiModalSearch/article.md#28-multi-modal-entities)
+
 3. [Complete code to reproduce the examples.](https://github.com/marqo-ai/marqo/blob/mainline/examples/MultiModalSearch/article.md#3-detailed-example)
 
 <p align="center">
