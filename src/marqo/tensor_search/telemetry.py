@@ -13,6 +13,7 @@ logger = get_logger(__name__)
 current_request: ContextVar[Request] = ContextVar('current_request')
 
 class TimerError(Exception):
+    """An error occured whn operating on a metric timer (e.g. stopping a stopped timer)"""
     pass
 
 
@@ -74,7 +75,7 @@ class RequestMetrics():
             yield
         finally:
             elapsed_time = self.stop(k)
-            self.times[k] += elapsed_time
+            self.times[k] = elapsed_time
 
     def start(self, k: str):
         """Start a new timer for the given key"""
@@ -94,17 +95,15 @@ class RequestMetrics():
 
     def json(self):
         return {
-            "counter": self.counter,
-            "times": self.times
+            "counter": dict(self.counter),
+            "times": dict(self.times)
         }
 
 class TelemetryMiddleware(BaseHTTPMiddleware):
     """
-    Responsible for starting a request-level opentelemetry span, capturing telemetry and injecting 
-    it into the Response payload. Opentelemetry is dependent on `cls.TELEMETRY_METRIC_FLAG_KEY` 
-    query parameter. Opentelemetry is only returned if the query parameter is provided and it is 
-    "true". Otherwise the request is not altered.
-    
+    Responsible for starting a request-level metric object, capturing telemetry and injecting 
+    it into the Response payload. Metrics are only returned if the `DEFAULT_TELEMETRY_QUERY_PARAM`
+    query parameter is provided and it is  "true". Otherwise the request is not altered.    
     """
 
     DEFAULT_TELEMETRY_QUERY_PARAM = "telemetry"
@@ -140,7 +139,6 @@ class TelemetryMiddleware(BaseHTTPMiddleware):
         # Early exit if opentelemetry is not to be injected into response.
         if not self.telemetry_enabled_for_request(request):
             return response
-
 
         data = await self.get_response_json(response)
         

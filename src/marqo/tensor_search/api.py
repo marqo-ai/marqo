@@ -1,12 +1,11 @@
 """The API entrypoint for Tensor Search"""
 import typing
-from typing import Callable, Any
 from fastapi.responses import JSONResponse
 from fastapi import Request, Depends
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.tensor_search.models.add_docs_objects import ModelAuth
 from marqo.errors import InvalidArgError, MarqoWebError, MarqoError
-from fastapi import FastAPI, Query, Request, Response
+from fastapi import FastAPI, Query
 import json
 from marqo.tensor_search import tensor_search
 from marqo import config
