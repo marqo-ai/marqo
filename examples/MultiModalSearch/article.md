@@ -241,7 +241,7 @@ In the image above, the results have now been biased by the aesthetic score to r
 
 ### 2.8 Multimodal Entities
 
-Multi modal entities or items are just that - representations that take into account multiple pieces of information. These can be images or text or some combination of both. Examples include using multiple display images for ecommerce. Using multiple images can aid retrieval and help disambiguate between the item for sale and other items in the images. If a multimodal model like [CLIP](https://openai.com/research/clip) is used, then the different modalities can be used together as they live in the same latent space.
+Multimodal entities or items are just that - representations that take into account multiple pieces of information. These can be images or text or some combination of both. Examples include using multiple display images for ecommerce. Using multiple images can aid retrieval and help disambiguate between the item for sale and other items in the images. If a multimodal model like [CLIP](https://openai.com/research/clip) is used, then the different modalities can be used together as they live in the same latent space.
 
 ```python
 document = {"combined_text_image": 
@@ -536,7 +536,7 @@ res2 = client.index(index_name).search(query, searchable_attributes=['s3_http'],
 ###  3.14 Indexing as Multimodal Objects
 
 For the final part of this example, we demonstrate how both text and images can be combined together as a single entity and allow multimodal representations.
-We will create a new inex in the same way as before but with a new name.
+We will create a new index in the same way as before but with a new name.
 
 ```python
 # we will create a new index for the multimodal objects
