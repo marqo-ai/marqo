@@ -1,23 +1,23 @@
-# “Context Is All You Need” - Multi-Modal Vector Search with Personalization 
+# “Context Is All You Need” - Multimodal Vector Search with Personalization 
 
-*TL:DR We show how both text and images can be used for multi-modal search. This allows for multi-part queries, multi-modal queries, searching via prompting, promoting/suppressing content by themes, per query curation and personalization. Additionally, we show how other query independent signals can be used to rank documents in addition to similarity. These features allow the creation and curation of high-quality search experiences, particularly for e-commerce and image heavy applications. The article [contains many examples](https://github.com/marqo-ai/marqo/blob/mainline/examples/MultiModalSearch/article.md#2-multi-modal-search-in-practice) of multi-modal search and a [walkthrough](https://github.com/marqo-ai/marqo/blob/mainline/examples/MultiModalSearch/article.md#3-detailed-example) of the [code](https://github.com/marqo-ai/marqo/blob/mainline/examples/MultiModalSearch/index_and_search.py) to reproduce these.*
+*TL:DR We show how both text and images can be used for multimodal search. This allows for multi-part queries, multimodal queries, searching via prompting, promoting/suppressing content by themes, per query curation and personalization. Additionally, we show how other query independent signals can be used to rank documents in addition to similarity. These features allow the creation and curation of high-quality search experiences, particularly for e-commerce and image heavy applications. The article [contains many examples](https://github.com/marqo-ai/marqo/blob/mainline/examples/MultiModalSearch/article.md#2-multimodal-search-in-practice) of multimodal search and a [walkthrough](https://github.com/marqo-ai/marqo/blob/mainline/examples/MultiModalSearch/article.md#3-detailed-example) of the [code](https://github.com/marqo-ai/marqo/blob/mainline/examples/MultiModalSearch/index_and_search.py) to reproduce these.*
 
 <p align="center">
   <img src="assets/backpack.gif"/>
 </p>
 <p align="center">
-    <em>An example of multi-modal search that uses multi-modal queries to curate search results based on text and images.</em>
+    <em>An example of multimodal search that uses multimodal queries to curate search results based on text and images.</em>
 </p>
 
-## 1. Introduction to Multi-modal Search
+## 1. Introduction to Multimodal Search
 
-Often the items we want to search over contain more than just text. For example, they may also contain images or videos. These modalities other than text will often contain a wealth of information that is not captured by the text. By incorporating these other modalities into search, the relevancy of results can be improved as well as unlocking new ways to search. Examples of multi-modal search include domains like fashion and e-commerce which may have title, description as well as multiple images displaying the item. This data can also help disambiguate the subject of the image - for example if there are multiple items present like pants and a top, the text can provide the necessary context to identify the correct subject. The information contained in these data across modalities is complementary and rich. 
+Often the items we want to search over contain more than just text. For example, they may also contain images or videos. These modalities other than text will often contain a wealth of information that is not captured by the text. By incorporating these other modalities into search, the relevancy of results can be improved as well as unlocking new ways to search. Examples of multimodal search include domains like fashion and e-commerce which may have title, description as well as multiple images displaying the item. This data can also help disambiguate the subject of the image - for example if there are multiple items present like pants and a top, the text can provide the necessary context to identify the correct subject. The information contained in these data across modalities is complementary and rich. 
 
 This articles has three main parts:
-1. [Introduction to Multi-Modal Search.](https://github.com/marqo-ai/marqo/blob/mainline/examples/MultiModalSearch/article.md#1-introduction)
-2. [Multi-modal Search in Practice.](https://github.com/marqo-ai/marqo/blob/mainline/examples/MultiModalSearch/article.md#2-multi-modal-search-in-practice)
+1. [Introduction to Multimodal Search.](https://github.com/marqo-ai/marqo/blob/mainline/examples/MultiModalSearch/article.md#1-introduction)
+2. [Multimodal Search in Practice.](https://github.com/marqo-ai/marqo/blob/mainline/examples/MultiModalSearch/article.md#2-multimodal-search-in-practice)
 
-	2.1. [Multi-Modal Queries](https://github.com/marqo-ai/marqo/blob/mainline/examples/MultiModalSearch/article.md#21-multi-modal-queries)
+	2.1. [Multimodal Queries](https://github.com/marqo-ai/marqo/blob/mainline/examples/MultiModalSearch/article.md#21-multimodal-queries)
 
 	2.2. [Negation](https://github.com/marqo-ai/marqo/blob/mainline/examples/MultiModalSearch/article.md#22-negation)
 	
@@ -31,7 +31,7 @@ This articles has three main parts:
 	
 	2.7. [Ranking with Other Signals](https://github.com/marqo-ai/marqo/blob/mainline/examples/MultiModalSearch/article.md#27-ranking-with-other-signals)
 	
-	2.8. [Multi-Modal Entities](https://github.com/marqo-ai/marqo/blob/mainline/examples/MultiModalSearch/article.md#28-multi-modal-entities)
+	2.8. [Multimodal Entities](https://github.com/marqo-ai/marqo/blob/mainline/examples/MultiModalSearch/article.md#28-multimodal-entities)
 
 3. [Detailed Example (with code)](https://github.com/marqo-ai/marqo/blob/mainline/examples/MultiModalSearch/article.md#3-detailed-example)
 
@@ -39,38 +39,38 @@ This articles has three main parts:
   <img src="assets/example.png"/>
 </p>
 <p align="center">
-    <em>An example of multi-modal "document" that contain both images and text.</em>
+    <em>An example of multimodal "document" that contain both images and text.</em>
 </p>
 
-### 1.1 Multi-Modal Search
+### 1.1 Multimodal Search
 
-Multi-modal search is search that operates over multiple modalities. We can think of two ways of doing multi-modal search, using multi-modal queries and multi-modal documents. In both cases, they may contain any combination of text and images. For clarity we will stick to two modalities for now, text and images but the concepts are not restricted to just those and can be extended to video or audio (for example).
+Multimodal search is search that operates over multiple modalities. We can think of two ways of doing multimodal search, using multimodal queries and multimodal documents. In both cases, they may contain any combination of text and images. For clarity we will stick to two modalities for now, text and images but the concepts are not restricted to just those and can be extended to video or audio (for example).
 
 <p align="center">
   <img src="assets/stripes.gif"/>
 </p>
 <p align="center">
-    <em>An example of multi-modal search using images and text to refine a search.</em>
+    <em>An example of multimodal search using images and text to refine a search.</em>
 </p>
 
 ### 1.2 Benefits
 
-There are numerous benefits to this multi-modal approach. For example:
+There are numerous benefits to this multimodal approach. For example:
 
 - The mulit-modal representations of documents allows for utilizing not just text or images or a combination of these. This allows complementary information to be captured that is not present in either modality.
-- Using multi-modal representations allows for updatable and editable meta data for documents without re-training a model or re-indexing large amounts of data.
+- Using multimodal representations allows for updatable and editable meta data for documents without re-training a model or re-indexing large amounts of data.
 - Relevance feedback can be easily incorporated at a document level to improve or modify results.
 - Curating queries with additional context allows for personalization and curation of results on a per query basis without additional models or fine-tuning.
 - Curation can be performed in natural language.
 - Business logic can be incorporated into the search using natural language.
 
-## 2. Multi-modal Search in Practice
+## 2. Multimodal Search in Practice
 
-In this section we will walk through a number of ways multi-modal search can be used to improve and curate results.
+In this section we will walk through a number of ways multimodal search can be used to improve and curate results.
 
-### 2.1 Multi-Modal Queries
+### 2.1 Multimodal Queries
 
-Multi-modal queries are queries that are made up of multiple components and/or multiple modalities. The benefit is that it effectively allows us to modify the scoring function for the approximate-knn to take into account additional similarities - for example, across multiple images or text and images.  The similarity scoring will now be against a weighted collection of items rather than a single piece of text. This allows finer grained curation of search results than by using a single part query alone.  We have seen previous examples of this earlier in the article already where both images and text are used to curate the search.
+Multimodal queries are queries that are made up of multiple components and/or multiple modalities. The benefit is that it effectively allows us to modify the scoring function for the approximate-knn to take into account additional similarities - for example, across multiple images or text and images.  The similarity scoring will now be against a weighted collection of items rather than a single piece of text. This allows finer grained curation of search results than by using a single part query alone.  We have seen previous examples of this earlier in the article already where both images and text are used to curate the search.
 
 Shown below is an example of this where the query has multiple components. The first query is for an item while the second query is used to further condition the results. This acts as a “soft” or “semantic” filter. 
 
@@ -84,7 +84,7 @@ This multi-part query can be understood to be a form of manual [query expansion]
   <img src="assets/shirt1.gif"/>
 </p>
 <p align="center">
-    <em>An example of multi-modal search two text queries to further refine the search.</em>
+    <em>An example of multimodal search two text queries to further refine the search.</em>
 </p>
 
 
@@ -102,7 +102,7 @@ Now the search results are also moving away from the `buttons` while being drawn
   <img src="assets/shirt2.gif"/>
 </p>
 <p align="center">
-    <em>An example of multi-modal search using negation to avoid certain concepts - `buttons` in this case.</em>
+    <em>An example of multimodal search using negation to avoid certain concepts - `buttons` in this case.</em>
 </p>
 
 
@@ -120,7 +120,7 @@ In the example below the initial results contain three low-quality images. These
   <img src="assets/handbag1.gif"/>
 </p>
 <p align="center">
-    <em>An example of multi-modal search using negation to avoid low quality images. The low-quality images are denoted by a red dot next to them. </em>
+    <em>An example of multimodal search using negation to avoid low quality images. The low-quality images are denoted by a red dot next to them. </em>
 </p>
 
 An alternative is to use the same query to clean up existing data by using a positive weight to [actively identify low-quality images](https://www.marqo.ai/blog/refining-image-quality-and-eliminating-nsfw-content-with-marqo) for removal. 
@@ -133,7 +133,7 @@ In the earlier examples we have seen how searching can be performed using weight
 query = {image_url:1.0}
 ```
 
-It can also be easily extended in the same way as with text to include multiple multi-modal terms.
+It can also be easily extended in the same way as with text to include multiple multimodal terms.
 
 ```python
 query = {image_url:1.0, "RED":1.0}
@@ -143,12 +143,12 @@ query = {image_url:1.0, "RED":1.0}
   <img src="assets/backpack1.gif"/>
 </p>
 <p align="center">
-    <em>An example of multi-modal search using an image as the query before refining the search further with natural language. </em>
+    <em>An example of multimodal search using an image as the query before refining the search further with natural language. </em>
 </p>
 
 ### 2.5 Conditional Search with Popular or Liked Items
 
-Another way to utilize the multi-modal queries is to condition the query using a set of items. For example, this set could come from previously liked or purchased items. This will steer the search in the direction of these items and can be used to promote particular items or themes. This method can be seen as a form of [relevance feedback](https://en.wikipedia.org/wiki/Rocchio_algorithm) that uses items instead of variations on the query words themselves. To avoid any extra inference at search time, we can pre-compute the set of items vectors and fuse them into a context vector. 
+Another way to utilize the multimodal queries is to condition the query using a set of items. For example, this set could come from previously liked or purchased items. This will steer the search in the direction of these items and can be used to promote particular items or themes. This method can be seen as a form of [relevance feedback](https://en.wikipedia.org/wiki/Rocchio_algorithm) that uses items instead of variations on the query words themselves. To avoid any extra inference at search time, we can pre-compute the set of items vectors and fuse them into a context vector. 
 
 ```python
 query = {"backpack":1.0}                      			  query = {"backpack":1.0}
@@ -239,9 +239,9 @@ score_modifiers = {
 In the image above, the results have now been biased by the aesthetic score to remove the low-quality images (which have a low aesthetic score). This example uses aesthetic score but any other number of scalars can be used - for example ones based around sales and/or popularity. 
 
 
-### 2.8 Multi-Modal Entities
+### 2.8 Multimodal Entities
 
-Multi modal entities or items are just that - representations that take into account multiple pieces of information. These can be images or text or some combination of both. Examples include using multiple display images for ecommerce. Using multiple images can aid retrieval and help disambiguate between the item for sale and other items in the images. If a multi-modal model like [CLIP](https://openai.com/research/clip) is used, then the different modalities can be used together as they live in the same latent space.
+Multi modal entities or items are just that - representations that take into account multiple pieces of information. These can be images or text or some combination of both. Examples include using multiple display images for ecommerce. Using multiple images can aid retrieval and help disambiguate between the item for sale and other items in the images. If a multimodal model like [CLIP](https://openai.com/research/clip) is used, then the different modalities can be used together as they live in the same latent space.
 
 ```python
 document = {"combined_text_image": 
@@ -384,7 +384,7 @@ query = {image_context_url:1.0}
 res = client.index(index_name).search(query, searchable_attributes=['s3_http'], device=device, limit=10)
 ```
 
-###  3.11 Searching with Multi-Modal Queries
+###  3.11 Searching with Multimodal Queries
 
 The multi-part queries can span both text and images. 
 
@@ -533,9 +533,9 @@ res1 = client.index(index_name).search(query, searchable_attributes=['s3_http'],
 res2 = client.index(index_name).search(query, searchable_attributes=['s3_http'], device=device, limit=10, context=context2)
 ```
 
-###  3.14 Indexing as Multi-Modal Objects
+###  3.14 Indexing as Multimodal Objects
 
-For the final part of this example, we demonstrate how both text and images can be combined together as a single entity and allow multi-modal representations.
+For the final part of this example, we demonstrate how both text and images can be combined together as a single entity and allow multimodal representations.
 We will create a new inex in the same way as before but with a new name.
 
 ```python
@@ -552,10 +552,10 @@ settings = {
 res = client.create_index(index_name_mm_objects, settings_dict=settings) 
 ```
  
- To index the documents as multi-modal objects, we need to create a new field and add in what we want to use. 
+ To index the documents as multimodal objects, we need to create a new field and add in what we want to use. 
     
  ```python
- # now create the multi-modal field in the documents
+ # now create the multimodal field in the documents
  for doc in documents:
      doc['multimodal'] = {
                             'blip_large_caption':doc['blip_large_caption'],
@@ -592,6 +592,6 @@ res = client.index(index_name_mm_objects).search(query, searchable_attributes=['
 
 ### 4. Conclusion
 
-To summarise, we have shown how vector search can be easily modified to enable a number of useful functions. These include the use of multi-modal queries that comprise text and images, queries with negative terms, excluding low quality images, searching with images, per query search curation using popular items, verbose searching via prompting, ranking with external scalars and multi-modal representations. If you are interested in learning more, then head to [Marqo](https://github.com/marqo-ai/marqo), see other [examples](https://github.com/marqo-ai/marqo/tree/mainline/examples) or read more in our [blog](https://www.marqo.ai/blog). 
+To summarise, we have shown how vector search can be easily modified to enable a number of useful functions. These include the use of multimodal queries that comprise text and images, queries with negative terms, excluding low quality images, searching with images, per query search curation using popular items, verbose searching via prompting, ranking with external scalars and multimodal representations. If you are interested in learning more, then head to [Marqo](https://github.com/marqo-ai/marqo), see other [examples](https://github.com/marqo-ai/marqo/tree/mainline/examples) or read more in our [blog](https://www.marqo.ai/blog). 
 
 
