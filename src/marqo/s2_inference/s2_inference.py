@@ -2,7 +2,7 @@
 The functions defined here would have endpoints, later on.
 """
 import numpy as np
-from marqo.errors import ModelCacheManagementError
+from marqo.errors import ModelCacheManagementError, InvalidArgError
 from marqo.s2_inference.errors import (
     VectoriseError, InvalidModelPropertiesError, ModelLoadError,
     UnknownModelError, ModelNotInCacheError, ModelDownloadError)
@@ -14,7 +14,6 @@ from marqo.s2_inference.logger import get_logger
 import torch
 import datetime
 from marqo.s2_inference import constants
-from marqo.tensor_search.utils import read_env_vars_and_defaults
 from marqo.tensor_search.enums import AvailableModelsKey
 from marqo.tensor_search.configs import EnvVars
 from marqo.tensor_search.models.private_models import ModelAuth
@@ -55,6 +54,9 @@ def vectorise(model_name: str, content: Union[str, List[str]], model_properties:
         VectoriseError: if the content can't be vectorised, for some reason.
     """
 
+    if not device:
+        raise InvalidArgError(message=f"vectorise (internal function) cannot be called without setting device!")
+    
     validated_model_properties = _validate_model_properties(model_name, model_properties)
     model_cache_key = _create_model_cache_key(model_name, device, validated_model_properties)
 
@@ -401,7 +403,7 @@ def _check_output_type(output: List[List[float]]) -> bool:
     return True
 
 
-def _float_tensor_to_list(output: FloatTensor, device: str) -> Union[
+def _float_tensor_to_list(output: FloatTensor) -> Union[
     List[List[float]], List[float]]:
     """
 
@@ -411,7 +413,8 @@ def _float_tensor_to_list(output: FloatTensor, device: str) -> Union[
     Returns:
         List[List[float]]: _description_
     """
-
+    
+    device = read_env_vars_and_defaults("_MARQO_BEST_AVAILABLE_DEVICE")
     return output.detach().to(device).tolist()
 
 

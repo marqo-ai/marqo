@@ -66,7 +66,7 @@ class TestGenericModelSupport(MarqoTestCase):
 
         auto_refresh = True
         tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
-            index_name=self.index_name_1, docs=docs, auto_refresh=auto_refresh)
+            index_name=self.index_name_1, docs=docs, auto_refresh=auto_refresh, device="cpu")
         )
 
         # test if we can get the document by _id
@@ -87,7 +87,7 @@ class TestGenericModelSupport(MarqoTestCase):
             }]
 
         tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
-            index_name=self.index_name_1, docs=docs2, auto_refresh=auto_refresh))
+            index_name=self.index_name_1, docs=docs2, auto_refresh=auto_refresh, device="cpu"))
 
         assert tensor_search.get_document_by_id(
             config=self.config, index_name=self.index_name_1,
@@ -133,7 +133,7 @@ class TestGenericModelSupport(MarqoTestCase):
 
         auto_refresh = True
         tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
-            index_name=self.index_name_2, docs=docs, auto_refresh=auto_refresh
+            index_name=self.index_name_2, docs=docs, auto_refresh=auto_refresh, device="cpu"
         ))
 
         assert tensor_search.get_document_by_id(
@@ -152,7 +152,7 @@ class TestGenericModelSupport(MarqoTestCase):
             }]
 
         tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
-            index_name=self.index_name_2, docs=docs2, auto_refresh=auto_refresh))
+            index_name=self.index_name_2, docs=docs2, auto_refresh=auto_refresh, device="cpu"))
 
         assert tensor_search.get_document_by_id(
             config=self.config, index_name=self.index_name_2,
@@ -201,7 +201,7 @@ class TestGenericModelSupport(MarqoTestCase):
 
         auto_refresh = True
         tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
-            index_name=self.index_name_1, docs=docs, auto_refresh=auto_refresh))
+            index_name=self.index_name_1, docs=docs, auto_refresh=auto_refresh, device="cpu"))
 
         assert tensor_search.get_document_by_id(
             config=self.config, index_name=self.index_name_1,
@@ -219,7 +219,7 @@ class TestGenericModelSupport(MarqoTestCase):
             }]
 
         tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
-            index_name=self.index_name_1, docs=docs2, auto_refresh=auto_refresh))
+            index_name=self.index_name_1, docs=docs2, auto_refresh=auto_refresh, device="cpu"))
 
         assert tensor_search.get_document_by_id(
             config=self.config, index_name=self.index_name_1,
@@ -249,7 +249,7 @@ class TestGenericModelSupport(MarqoTestCase):
                             "type": "clip",
                             }
 
-        self.assertRaises(ModelLoadError, vectorise, model_name, content, model_properties)
+        self.assertRaises(ModelLoadError, vectorise, model_name, content, model_properties, device="cpu")
 
 
     def test_vectorise_with_generic_open_clip_model_properties_invalid_url(self):
@@ -265,7 +265,7 @@ class TestGenericModelSupport(MarqoTestCase):
                             "type": "clip",
                             }
 
-        self.assertRaises(ModelLoadError, vectorise, model_name, content, model_properties)
+        self.assertRaises(ModelLoadError, vectorise, model_name, content, model_properties, device="cpu")
 
 
     def test_create_index_with_model_properties_without_model_name(self):
@@ -323,7 +323,7 @@ class TestGenericModelSupport(MarqoTestCase):
         auto_refresh = True
 
         tensor_search.add_documents(config=config, add_docs_params=AddDocsParams(
-            index_name=index_name, docs=docs, auto_refresh=auto_refresh))
+            index_name=index_name, docs=docs, auto_refresh=auto_refresh, device="cpu"))
 
 
     def test_load_generic_clip_without_url_or_localpath(self):
@@ -338,11 +338,11 @@ class TestGenericModelSupport(MarqoTestCase):
                             "type": "clip",
                             }
 
-        self.assertRaises(ModelLoadError, vectorise, model_name,content, model_properties)
+        self.assertRaises(ModelLoadError, vectorise, model_name,content, model_properties, device="cpu")
 
         model_properties["url"] = "https://openaipublic.azureedge.net/clip/models/40d365715913c9da98579312b702a82c18be219cc2a73407c4526f58eba950af/ViT-B-32.pt"
 
-        vectorise(model_name, content, model_properties)
+        vectorise(model_name, content, model_properties, device="cpu")
 
 
     def test_vectorise_without_clip_type(self):
@@ -357,10 +357,10 @@ class TestGenericModelSupport(MarqoTestCase):
                             #"type": "clip",
                             }
 
-        self.assertRaises(ModelLoadError, vectorise, model_name,content, model_properties)
+        self.assertRaises(ModelLoadError, vectorise, model_name,content, model_properties, device="cpu")
 
         model_properties["type"] = "clip"
-        vectorise(model_name, content, model_properties)
+        vectorise(model_name, content, model_properties, device="cpu")
 
 
     def test_validate_model_properties_unknown_model_error(self):
@@ -396,8 +396,8 @@ class TestGenericModelSupport(MarqoTestCase):
                             "type": "clip",
                             }
 
-        a = vectorise(model_name, content = image, model_properties = model_properties)
-        b = vectorise("ViT-B/32", content = image)
+        a = vectorise(model_name, content = image, model_properties = model_properties, device="cpu")
+        b = vectorise("ViT-B/32", content = image, device="cpu")
 
         assert np.abs(np.array(a) - np.array(b)).sum() < epsilon
 
@@ -415,8 +415,8 @@ class TestGenericModelSupport(MarqoTestCase):
                             "type": "clip",
                             }
 
-        a = vectorise(model_name, content=text, model_properties=model_properties)
-        b = vectorise("ViT-B/32", content=text)
+        a = vectorise(model_name, content=text, model_properties=model_properties, device="cpu")
+        b = vectorise("ViT-B/32", content=text, device="cpu")
 
         assert np.abs(np.array(a) - np.array(b)).sum() < epsilon
 
@@ -436,8 +436,8 @@ class TestGenericModelSupport(MarqoTestCase):
                             "jit" : False
                             }
 
-        a = vectorise(model_name, content = image, model_properties = model_properties)
-        b = vectorise("open_clip/ViT-B-32-quickgelu/laion400m_e31", content = image)
+        a = vectorise(model_name, content = image, model_properties = model_properties, device="cpu")
+        b = vectorise("open_clip/ViT-B-32-quickgelu/laion400m_e31", content = image, device="cpu")
 
         assert np.abs(np.array(a) - np.array(b)).sum() < epsilon
 
@@ -456,8 +456,8 @@ class TestGenericModelSupport(MarqoTestCase):
         }
 
 
-        a = vectorise(model_name, content=text, model_properties=model_properties)
-        b = vectorise("open_clip/ViT-B-32-quickgelu/laion400m_e31", content=text)
+        a = vectorise(model_name, content=text, model_properties=model_properties, device="cpu")
+        b = vectorise("open_clip/ViT-B-32-quickgelu/laion400m_e31", content=text, device="cpu")
 
         assert np.abs(np.array(a) - np.array(b)).sum() < epsilon
 
@@ -476,8 +476,8 @@ class TestGenericModelSupport(MarqoTestCase):
         }
 
 
-        a = vectorise(model_name, content=text, model_properties=model_properties)
-        b = vectorise("open_clip/ViT-B-32-quickgelu/laion400m_e32", content=text)
+        a = vectorise(model_name, content=text, model_properties=model_properties, device="cpu")
+        b = vectorise("open_clip/ViT-B-32-quickgelu/laion400m_e32", content=text, device="cpu")
 
         assert np.abs(np.array(a) - np.array(b)).sum() > epsilon
 

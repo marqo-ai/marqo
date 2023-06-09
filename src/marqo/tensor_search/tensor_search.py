@@ -242,7 +242,7 @@ def add_documents_orchestrator(
     
     # Default device calculated here and not in add_documents call
     if add_docs_params.device is None:
-        add_docs_params.device = utils.read_env_vars_and_defaults["_MARQO_BEST_AVAILABLE_DEVICE"]
+        add_docs_params.device = utils.read_env_vars_and_defaults("_MARQO_BEST_AVAILABLE_DEVICE")
 
     if batch_size is None or batch_size == 0:
         logger.debug(f"batch_size={batch_size} and processes={processes} - not doing any marqo side batching")
@@ -374,6 +374,9 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
     t0 = timer()
     bulk_parent_dicts = []
 
+    if not add_docs_params.device:
+        raise errors.InvalidArgError(message=f"add_documents (internal function) cannot be called without setting device!")
+    
     try:
         index_info = backend.get_index_info(config=config, index_name=add_docs_params.index_name)
     except errors.IndexNotFoundError as s:
@@ -956,7 +959,7 @@ def bulk_search(query: BulkSearchQuery, marqo_config: config.Config, verbose: bo
     if len(query.queries) == 0:
         return {"result": []}
 
-    selected_device = utils.read_env_vars_and_defaults["_MARQO_BEST_AVAILABLE_DEVICE"] \
+    selected_device = utils.read_env_vars_and_defaults("_MARQO_BEST_AVAILABLE_DEVICE") \
         if device is None else device
 
     tensor_queries: Dict[int, BulkSearchQueryEntity] = dict(filter(lambda e: e[1].searchMethod == SearchMethod.TENSOR, enumerate(query.queries)))
@@ -1109,7 +1112,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
         args=(config, index_name, REFRESH_INTERVAL_SECONDS))
     cache_update_thread.start()
 
-    selected_device = utils.read_env_vars_and_defaults["_MARQO_BEST_AVAILABLE_DEVICE"] \
+    selected_device = utils.read_env_vars_and_defaults("_MARQO_BEST_AVAILABLE_DEVICE") \
         if device is None else device
     
     if search_method.upper() == SearchMethod.TENSOR:

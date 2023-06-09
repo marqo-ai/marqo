@@ -1967,7 +1967,8 @@ class TestBulkSearch(MarqoTestCase):
             weighted_vectors = []
             for q, weight in multi_query.items():
                 vec = vectorise(model_name="ViT-B/16", content=[q, ],
-                                image_download_headers=None, normalize_embeddings=True)[0]
+                                image_download_headers=None, normalize_embeddings=True, 
+                                device="cpu")[0]
                 weighted_vectors.append(np.asarray(vec) * weight)
 
             manually_combined = np.mean(weighted_vectors, axis=0)
@@ -2059,7 +2060,8 @@ class TestBulkSearch(MarqoTestCase):
             weighted_vectors = []
             for q, weight in multi_query.items():
                 vec = vectorise(model_name="ViT-B/16", content=[q, ],
-                                image_download_headers=None, normalize_embeddings=True)[0]
+                                image_download_headers=None, normalize_embeddings=True, 
+                                device="cpu")[0]
                 weighted_vectors.append(np.asarray(vec) * weight)
 
             manually_combined = np.mean(weighted_vectors, axis=0)

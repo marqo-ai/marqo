@@ -157,7 +157,7 @@ class PatchifyModel:
         """_summary_
 
         Args:
-            device (str, optional): the device to run the model on. Required to be set.
+            device (str): the device to run the model on. Required to be set.
             size (Tuple, optional): the final image size to go to the model. Defaults to (224, 224).
             min_area (float, optional): the min area (pixels) that a box must meet to be kept. 
                 areas lower than this are removed. Defaults to 60*60.

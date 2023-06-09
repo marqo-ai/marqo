@@ -10,6 +10,7 @@ from marqo.s2_inference.s2_inference import (
 from torch import FloatTensor
 import numpy as np
 import functools
+from unittest import mock
 from marqo.s2_inference.s2_inference import _load_model as og_load_model
 _load_model = functools.partial(og_load_model, calling_func = "unit_test")
 
@@ -18,7 +19,7 @@ class TestTestModelOutputs(unittest.TestCase):
     def setUp(self) -> None:
 
         pass
-
+    
     def test_load_test_text_model(self):
         names = ["test"]
         device = 'cpu'
