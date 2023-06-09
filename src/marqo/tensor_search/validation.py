@@ -186,7 +186,7 @@ def validate_context(context: Optional[SearchContext], search_method: SearchMeth
     structure is validated internally.
     
     """
-    if context is not None and search_method is SearchMethod.TENSOR and isinstance(query, str):
+    if context is not None and search_method == SearchMethod.TENSOR and isinstance(query, str):
         raise InvalidArgError(
             f"Marqo received a query = `{query}` with type =`{type(query).__name__}` "
             f"and a parameter `context`.\n" # do not return true {context} here as it might be huge.
