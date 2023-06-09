@@ -96,7 +96,7 @@ class TestCorruptFileInOpenCLIP(unittest.TestCase):
         with patch("marqo.s2_inference.clip_utils.download_model", return_value = self.dummpy_corrupted_file):
             for model_properties in self.dummpy_model_properties:
                 # Execute and Verify
-                with self.assertRaises(InvalidModelPropertiesError) as context:
+                with self.assertRaises(RuntimeError) as context:
                     _ = _load_model(**self.load_parameters, model_properties=model_properties)
                 self.assertIn("Marqo encountered an error when loading custom open_clip model", str(context.exception))
                 mock_os_remove.assert_not_called()
@@ -113,7 +113,7 @@ class TestCorruptFileInOpenCLIP(unittest.TestCase):
                 with self.assertRaises(InvalidModelPropertiesError) as context:
                     _ = _load_model(**self.load_parameters, model_properties=model_properties)
                 self.assertIn(
-                    "It is likely that you are tyring to load a `CLIP (OpenAI)` model with type `open_clip` in model_properties.",
+                    "You may have tried to load a `clip` model even though `model_properties['type']` is set to 'open_clip'",
                     str(context.exception))
                 mock_os_remove.assert_not_called()
 
@@ -128,7 +128,28 @@ class TestCorruptFileInOpenCLIP(unittest.TestCase):
             _ = _load_model(**self.load_parameters, model_properties=model_properties)
 
         self.assertIn(
-            "It is likely that you are tyring to load a `CLIP (OpenAI)` model with type `open_clip` in model_properties.",
+            "You may have tried to load a `clip` model even though `model_properties['type']` is set to 'open_clip'",
+            str(context.exception))
+
+    def test_incomplete_download_open_clip_no_mock(self):
+        '''An end-to-end test of corrupted file handling in open_clip model loading
+        '''
+        model_properties = {
+            "name": "ViT-B-32",
+            "dimensions": 512,
+            "url": "https://marqo-unittest-storage.s3.us-west-2.amazonaws.com/corrupted_vit_b_32-quickgelu-laion400m_e32-46683a32.pt",
+            "type": "open_clip",
+        }
+        mock_remove = MagicMock()
+
+        with patch("os.remove", mock_remove):
+            with self.assertRaises(InvalidModelPropertiesError) as context:
+                _ = _load_model(**self.load_parameters, model_properties=model_properties)
+
+        mock_remove.assert_called_once()
+
+        self.assertIn(
+            "Marqo encountered a corrupted file when loading open_clip file",
             str(context.exception))
 
 
@@ -181,7 +202,7 @@ class TestCorruptFileInHuggingFace(unittest.TestCase):
              patch('os.makedirs'), \
              patch("marqo.s2_inference.hf_utils.download_model", return_value = "/path/to/file.txt"):
             for model_properties in self.dummy_model_properties:
-                with self.assertRaises(InvalidModelPropertiesError) as context:
+                with self.assertRaises(RuntimeError) as context:
                     _ = _load_model(**self.load_parameters, model_properties=model_properties)
                 self.assertIn("No such file or directory: '/path/to/file.txt", str(context.exception))
 

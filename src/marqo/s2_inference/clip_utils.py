@@ -441,16 +441,17 @@ class OPEN_CLIP(CLIP):
                 try:
                     os.remove(self.model_path)
                 except Exception as remove_e:
-                    raise InvalidModelPropertiesError(
-                        f"Marqo encountered an error while attempting to delete corrupted file `{self.model_path}`. "
+                    raise RuntimeError(
+                        f"Marqo encountered an error while attempting to delete a corrupted file `{self.model_path}`. "
                         f"Please manually check and remove the file. Error message: `{str(remove_e)}`"
                     )
                 raise InvalidModelPropertiesError(
                     f"Marqo encountered a corrupted file when loading open_clip file `{self.model_path}`. "
-                    f"Marqo has removed this file from the disk. \n"
-                    f"This is likely to be caused by 3 reasons: 1. the file is not a valid open_clip checkpoint, "
-                    f"2. the file is corrupted during download or incomplete download, "
-                    f"3. you may load a `clip` model with `open_clip` model properties. \n"
+                    f"Marqo has removed this file from the disk. "
+                    f"Some possible causes are: \n"
+                    f"1. the file was not a valid open_clip checkpoint, \n"
+                    f"2. the file was corrupted during download or incompletely downloaded, \n"
+                    f"3. you may have tried to load a `clip` model even though `model_properties['type']` is set to 'open_clip'. \n"
                     f"Please check and update your model properties and retry. "
                     f"You can find more details at `https://docs.marqo.ai/0.0.21/Models-Reference/bring_your_own_model/#bring-your-own-clip-model`")
 
@@ -459,13 +460,13 @@ class OPEN_CLIP(CLIP):
                     f"Marqo encountered an error when loading custom open_clip model `{self.model_name}` with "
                     f"model properties = `{self.model_properties}`. \n"
                     f"The error message is `{str(e)}`. \n"
-                    f"It is likely that you are tyring to load a `CLIP (OpenAI)` model with type `open_clip` in model_properties. \n"
+                    f"You may have tried to load a `clip` model even though `model_properties['type']` is set to 'open_clip' \n"
                     f"Please check and update your model properties and retry. "
                     f"You can find more details at `https://docs.marqo.ai/0.0.21/Models-Reference/bring_your_own_model/#bring-your-own-clip-model`"
                 )
 
             else:
-                raise InvalidModelPropertiesError(
+                raise RuntimeError(
                     f"Marqo encountered an error when loading custom open_clip model `{self.model_name}` with "
                     f"model properties = `{self.model_properties}`. \n"
                     f"The error message is `{str(e)}`. \n"

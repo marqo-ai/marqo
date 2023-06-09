@@ -236,7 +236,7 @@ def extract_huggingface_archive(path: str) -> str:
             try:
                 os.remove(path)
             except Exception as remove_e:
-                raise InvalidModelPropertiesError(
+                raise RuntimeError(
                     f"Marqo encountered an error while attempting to delete corrupted file `{path}`. "
                     f"Please manually check and remove the file. Error message: `{str(remove_e)}`"
                 )
@@ -251,7 +251,7 @@ def extract_huggingface_archive(path: str) -> str:
                                               f'This is probably because the Marqo does not have the permission to write to the directory. '
                                               f'Please check the access permission of Marqo and try again.')
         except Exception as e:
-            raise InvalidModelPropertiesError(f'Marqo encountered an error while extracting the compressed model archive from `{path}`. '
+            raise RuntimeError(f'Marqo encountered an error while extracting the compressed model archive from `{path}`. '
                                               f'The original error message is `{str(e)}`')
     else:
         # return the directory path or repo_id directory
