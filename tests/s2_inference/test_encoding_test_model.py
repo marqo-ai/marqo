@@ -38,7 +38,7 @@ class TestTestModelOutputs(unittest.TestCase):
     def test_check_output(self):
         texts = ['a', ['a'], ['a', 'b', 'longer text. with more stuff']]
         model_properties = get_model_properties_from_registry('test')
-        model = _load_model(model_properties['name'], model_properties=model_properties)
+        model = _load_model(model_properties['name'], model_properties=model_properties, device="cpu")
 
         for text in texts:
             output = model.encode(text)
