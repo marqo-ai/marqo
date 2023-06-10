@@ -313,7 +313,7 @@ def get_model_size(model_name: str, model_properties: dict) -> (int, float):
 
 
 def _load_model(
-        model_name: str, model_properties: dict, device: str = None,
+        model_name: str, model_properties: dict, device: str,
         calling_func: str = None, model_auth: Optional[ModelAuth] = None
 ) -> Any:
     """_summary_
@@ -414,7 +414,8 @@ def _float_tensor_to_list(output: FloatTensor) -> Union[
         List[List[float]]: _description_
     """
     
-    device = read_env_vars_and_defaults("_MARQO_BEST_AVAILABLE_DEVICE")
+    # Hardcoded since get_default_device() used to return "cpu" anyway
+    device = "cpu"
     return output.detach().to(device).tolist()
 
 

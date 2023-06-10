@@ -70,7 +70,7 @@ class TestImageDownloadHeaders(MarqoTestCase):
                 # Perform a vector search
                 search_res = tensor_search._vector_text_search(
                     config=self.config, index_name=self.index_name_1,
-                    result_count=1, query=self.real_img_url, image_download_headers=image_download_headers
+                    result_count=1, query=self.real_img_url, image_download_headers=image_download_headers, device="cpu"
                 )
                 # Check if the image URL was called at least once with the correct headers
                 image_url_called = any(

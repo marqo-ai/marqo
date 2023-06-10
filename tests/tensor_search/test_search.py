@@ -53,7 +53,7 @@ class TestVectorSearch(MarqoTestCase):
                  "_id": "1234", "finally": "Random text here efgh "},
             ], auto_refresh=True)
         search_res = tensor_search._vector_text_search(
-            config=self.config, index_name=self.index_name_1, query=" efgh ", result_count=10
+            config=self.config, index_name=self.index_name_1, query=" efgh ", result_count=10, device="cpu"
         )
         assert len(search_res['hits']) == 2
 
@@ -111,14 +111,14 @@ class TestVectorSearch(MarqoTestCase):
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
         search_res = tensor_search._vector_text_search(
                 config=self.config, index_name=self.index_name_1,
-                result_count=5, query="some text...")
+                result_count=5, query="some text...", device="cpu")
         assert {'hits': []} == search_res
 
     def test_vector_search_against_non_existent_index(self):
         try:
             tensor_search._vector_text_search(
                 config=self.config, index_name="some-non-existent-index",
-                result_count=5, query="some text...")
+                result_count=5, query="some text...", device="cpu")
         except IndexNotFoundError as s:
             pass
 
@@ -133,7 +133,7 @@ class TestVectorSearch(MarqoTestCase):
                  "Steps": "1. Cook meat. 2: Dice Onions. 3: Serve."},
             ], auto_refresh=True)
         tensor_search._vector_text_search(
-            config=self.config, index_name=self.index_name_1, query=query_text
+            config=self.config, index_name=self.index_name_1, query=query_text, device="cpu"
         )
 
     def test_vector_search_searchable_attributes(self):
@@ -574,27 +574,6 @@ class TestVectorSearch(MarqoTestCase):
         except InvalidArgError:
             pass
 
-    def test_set_device(self):
-        """calling search with a specified device overrides device defined in config"""
-        mock_config = copy.deepcopy(self.config)
-        mock_config.search_device = "cpu"
-        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
-
-        mock_vectorise = mock.MagicMock()
-        mock_vectorise.return_value = [[0, 0, 0, 0]]
-
-        @mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
-        def run():
-            tensor_search.search(
-                config=self.config, index_name=self.index_name_1, text="some text",
-                search_method=SearchMethod.TENSOR, highlights=True, device="cuda:123")
-            return True
-
-        assert run()
-        assert mock_config.search_device == "cpu"
-        args, kwargs = mock_vectorise.call_args
-        assert kwargs["device"] == "cuda:123"
-
     def test_search_other_types_subsearch(self):
         add_docs_caller(
             config=self.config, index_name=self.index_name_1, auto_refresh=True,
@@ -610,7 +589,7 @@ class TestVectorSearch(MarqoTestCase):
 
             )
             assert "hits" in tensor_search._vector_text_search(
-                query=str(to_search), config=self.config, index_name=self.index_name_1
+                query=str(to_search), config=self.config, index_name=self.index_name_1, device="cpu"
             )
 
     def test_search_other_types_top_search(self):

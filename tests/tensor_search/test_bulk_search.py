@@ -819,7 +819,8 @@ class TestBulkSearch(MarqoTestCase):
                  "_id": "1234", "finally": "Random text here efgh "},
             ], auto_refresh=True)
         search_res = tensor_search._bulk_vector_text_search(
-            config=self.config, queries=[BulkSearchQueryEntity(index=self.index_name_1, q=" efgh ", limit=10)]
+            config=self.config, queries=[BulkSearchQueryEntity(index=self.index_name_1, q=" efgh ", limit=10)],
+            device="cpu"
         )
         assert len(search_res) == 1
         assert len(search_res[0]['hits']) == 2
@@ -827,7 +828,8 @@ class TestBulkSearch(MarqoTestCase):
     def test_bulk_vector_text_search_against_empty_index(self):
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
         search_res = tensor_search._bulk_vector_text_search(
-            config=self.config, queries=[BulkSearchQueryEntity(index=self.index_name_1, q=" efgh ", limit=10)]
+            config=self.config, queries=[BulkSearchQueryEntity(index=self.index_name_1, q=" efgh ", limit=10)],
+            device="cpu"
         )
         assert len(search_res) > 0
         assert len(search_res[0]['hits']) == 0
@@ -836,7 +838,8 @@ class TestBulkSearch(MarqoTestCase):
     def test_bulk_vector_text_search_against_non_existent_index(self):
         try:
             tensor_search._bulk_vector_text_search(
-                config=self.config, queries=[BulkSearchQueryEntity(index=self.index_name_1, q=" efgh ", limit=10)]
+                config=self.config, queries=[BulkSearchQueryEntity(index=self.index_name_1, q=" efgh ", limit=10)],
+                device="cpu"
             )
             raise AssertionError
         except IndexNotFoundError:
@@ -854,7 +857,7 @@ class TestBulkSearch(MarqoTestCase):
             ], auto_refresh=True)
         search_res = tensor_search._bulk_vector_text_search(
             config=self.config, queries=[BulkSearchQueryEntity(index=self.index_name_1, q=query_text)],
-
+            device="cpu"
         )
         assert len(search_res) == 1
         assert len(search_res[0]['hits']) == 2
@@ -994,7 +997,7 @@ class TestBulkSearch(MarqoTestCase):
 
         results = tensor_search._bulk_vector_text_search(
             queries=[BulkSearchQueryEntity(index=self.index_name_1, q="88")],
-            config=self.config)
+            config=self.config, device="cpu")
         assert len(results) == 1
         s_res = results[0]
         assert len(s_res["hits"]) > 0
@@ -1009,23 +1012,23 @@ class TestBulkSearch(MarqoTestCase):
 
         res_exists = tensor_search._bulk_vector_text_search(
             queries=[BulkSearchQueryEntity(index=self.index_name_1, q="", filter="my_list:tag1")],
-            config=self.config)
+            config=self.config, device="cpu")
         res_not_exists = tensor_search._bulk_vector_text_search(
             queries=[BulkSearchQueryEntity(index=self.index_name_1, q="", filter="my_list:tag55")],
-            config=self.config)
+            config=self.config, device="cpu")
         res_other = tensor_search._bulk_vector_text_search(
             queries=[BulkSearchQueryEntity(index=self.index_name_1, q="", filter="my_string:b")],
-            config=self.config)
+            config=self.config, device="cpu")
 
         # strings in lists are converted into keyword, which aren't filterable on a token basis.
         # Because the list member is "tag2 some" we can only exact match (incl. the space).
         # "tag2" by itself doesn't work, only "(tag2 some)"
         res_should_only_match_keyword_bad = tensor_search._bulk_vector_text_search(
             queries=[BulkSearchQueryEntity(index=self.index_name_1, q="", filter="my_list:tag2")],
-            config=self.config)
+            config=self.config, device="cpu")
         res_should_only_match_keyword_good = tensor_search._bulk_vector_text_search(
             queries=[BulkSearchQueryEntity(index=self.index_name_1, q="", filter="my_list:(tag2 some)")],
-            config=self.config)
+            config=self.config, device="cpu")
         assert res_exists[0]["hits"][0]["_id"] == "1235"
         assert res_exists[0]["hits"][0]["_highlights"] == {"abc": "some text"}
         assert len(res_exists[0]["hits"]) == 1
@@ -1056,7 +1059,7 @@ class TestBulkSearch(MarqoTestCase):
                 BulkSearchQueryEntity(index=self.index_name_1, q="some", filter="my_list:tag1"),
                 BulkSearchQueryEntity(index=self.index_name_1, q="some", filter="my_list:not_exist")
             ],
-            config=self.config
+            config=self.config, device="cpu"
         )
 
         assert len(response) == 4
@@ -1087,7 +1090,7 @@ class TestBulkSearch(MarqoTestCase):
         for i in range(len(filter_strings)):
             result = tensor_search._bulk_vector_text_search(
                 queries=[BulkSearchQueryEntity(index=self.index_name_1, q="some", filter=filter_strings[i])],
-                config=self.config
+                config=self.config, device="cpu"
             )
             assert len(result) == 1
             assert len(result[0]["hits"]) == len(expected_ids[i])
@@ -1113,7 +1116,7 @@ class TestBulkSearch(MarqoTestCase):
             queries=[BulkSearchQueryEntity(index=self.index_name_1, q="some", filter=f)
                 for f in filter_to_ids.keys()         
             ],
-            config=self.config
+            config=self.config, device="cpu"
         )
 
         assert len(response) == len(filter_to_ids.keys())

@@ -479,7 +479,8 @@ class TestLexicalSearch(MarqoTestCase):
 
         res = tensor_search._vector_text_search(config=self.config, index_name=self.index_name_1,
                                             query="horse",  searchable_attributes=["content"],
-                                            filter_string="filename: Important_File_1.pdf", result_count=8)
+                                            filter_string="filename: Important_File_1.pdf", result_count=8
+                                            , device="cpu")
 
         assert len(res["hits"]) == 1
         assert res["hits"][0]["_id"] == "123"
