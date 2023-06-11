@@ -10,6 +10,7 @@ from marqo import errors
 from marqo.tensor_search import tensor_search
 from marqo.marqo_logging import logger
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
+from marqo.errors import InvalidArgError
 from dataclasses import replace
 from marqo.config import Config
 
@@ -171,7 +172,7 @@ def add_documents_mp(
     ):
     """add documents using parallel processing using ray
     Args:
-        add_docs_params: parameters used by the add_docs call
+        add_docs_params: parameters used by the add_docs call (device should always be set here)
         config: Marqo configuration object
         batch_size: size of batch to be processed and sent to Marqo-os
         processes: number of processes to use
@@ -182,6 +183,11 @@ def add_documents_mp(
     Returns:
         _type_: _description_
     """
+
+    if not add_docs_params.device:
+        raise InvalidArgError("You cannot call add_documents_mp without device set!")
+    
+    
     n_documents = len(add_docs_params.docs)
 
     logger.info(f"found {n_documents} documents")

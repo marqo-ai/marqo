@@ -785,7 +785,6 @@ class TestBulkSearch(MarqoTestCase):
         call_arg = call_args[0].kwargs
         assert call_arg['query'] == "match with ranking"
         assert call_arg['model_name'] == '_testing'
-        assert call_arg['device'] == self.config.search_device
         assert call_arg['num_highlights'] == 1
         
     def test_bulk_search_rerank_invalid(self):
@@ -1129,9 +1128,8 @@ class TestBulkSearch(MarqoTestCase):
 
 
     def test_set_device(self):
-        """calling search with a specified device overrides device defined in config"""
+        """calling search with a specified device uses that device"""
         mock_config = copy.deepcopy(self.config)
-        mock_config.search_device = "cpu"
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
 
         mock_vectorise = mock.MagicMock()
@@ -1146,7 +1144,6 @@ class TestBulkSearch(MarqoTestCase):
         assert run()
         args, kwargs = mock_vectorise.call_args
         assert kwargs["device"] == "cuda:123"
-        assert mock_config.search_device == "cpu"
 
     def test_search_other_types_subsearch(self):
         add_docs_caller(

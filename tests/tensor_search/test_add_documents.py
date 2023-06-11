@@ -473,33 +473,8 @@ class TestAddDocuments(MarqoTestCase):
         assert add_res['errors'] is True
         assert all(['error' in item for item in add_res['items'] if item['_id'].startswith('to_fail')])
 
-    def test_add_documents_set_device(self):
-        """calling search with a specified device overrides device defined in config"""
-        mock_config = copy.deepcopy(self.config)
-        mock_config.search_device = "cpu"
-        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
-
-        mock_vectorise = mock.MagicMock()
-        mock_vectorise.return_value = [[0, 0, 0, 0]]
-
-        @mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
-        def run():
-            tensor_search.add_documents(
-                config=self.config, add_docs_params=AddDocsParams(
-                        index_name=self.index_name_1, device="cuda:411", docs=[{"some": "doc"}],
-                        auto_refresh=True
-                    )
-                )
-            return True
-
-        assert run()
-        assert mock_config.search_device == "cpu"
-        args, kwargs = mock_vectorise.call_args
-        assert kwargs["device"] == "cuda:411"
-
     def test_add_documents_orchestrator_set_device_single_process(self):
         mock_config = copy.deepcopy(self.config)
-        mock_config.search_device = "cpu"
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
 
         mock_vectorise = mock.MagicMock()
@@ -517,13 +492,11 @@ class TestAddDocuments(MarqoTestCase):
             return True
 
         assert run()
-        assert mock_config.search_device == "cpu"
         args, kwargs = mock_vectorise.call_args
         assert kwargs["device"] == "cuda:22"
 
     def test_add_documents_orchestrator_set_device_empty_batch(self):
         mock_config = copy.deepcopy(self.config)
-        mock_config.search_device = "cpu"
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
 
         mock_vectorise = mock.MagicMock()
@@ -541,7 +514,6 @@ class TestAddDocuments(MarqoTestCase):
             return True
 
         assert run()
-        assert mock_config.search_device == "cpu"
         args, kwargs = mock_vectorise.call_args
         assert kwargs["device"] == "cuda:22"
 
