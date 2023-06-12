@@ -211,3 +211,4 @@ class TestLargeModelEncoding(unittest.TestCase):
             for content in contents:
                 vectorise(model_name=model_name, content=content, device="cuda")
                 mock_autocast.assert_called_once()
+                mock_autocast.reset_mock()
