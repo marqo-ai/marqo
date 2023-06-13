@@ -265,3 +265,5 @@ class MarqoWelcome:
                                                                                                                         
         """
         print(message)
+
+        print(f"again:Best available device set to: {os.environ['_MARQO_BEST_AVAILABLE_DEVICE']}")

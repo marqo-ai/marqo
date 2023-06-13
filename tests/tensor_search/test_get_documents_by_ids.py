@@ -32,7 +32,7 @@ class TestGetDocuments(MarqoTestCase):
             add_docs_params=AddDocsParams(index_name=self.index_name_1, docs=[
                 {"_id": "1", "title 1": "content 1"}, {"_id": "2", "title 1": "content 1"},
                 {"_id": "3", "title 1": "content 1"}
-            ], auto_refresh=True)
+            ], auto_refresh=True, device="cpu")
         )
         res = tensor_search.get_documents_by_ids(
             config=self.config, index_name=self.index_name_1, document_ids=['1', '2', '3'],
@@ -46,7 +46,7 @@ class TestGetDocuments(MarqoTestCase):
                 ("some more content", "some cool desk", "5678")]
         tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
             index_name=self.index_name_1, docs=[dict(zip(k, v)) for k, v in zip(keys, vals)],
-            auto_refresh=True))
+            auto_refresh=True, device="cpu"))
         get_res = tensor_search.get_documents_by_ids(
             config=self.config, index_name=self.index_name_1,
             document_ids=["123", "5678"], show_vectors=True)['results']
@@ -87,7 +87,7 @@ class TestGetDocuments(MarqoTestCase):
             index_name=self.index_name_1, docs=[
                 {"_id": '456', "title": "alexandra"},
                 {'_id': '221', 'message': 'hello'}],
-            auto_refresh=True)
+            auto_refresh=True, device="cpu")
         )
         id_reqs = [
             (['123', '456'], [False, True]), ([['456', '789'], [True, False]]),

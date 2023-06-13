@@ -174,7 +174,7 @@ class TestCreateIndex(MarqoTestCase):
                 NsField.index_defaults: custom_settings})
         tensor_search.add_documents(
             config=self.config, add_docs_params=AddDocsParams(
-                index_name=self.index_name_1, docs=[{"Title": "wowow"}], auto_refresh=True))
+                index_name=self.index_name_1, docs=[{"Title": "wowow"}], auto_refresh=True, device="cpu"))
         mappings = requests.get(
             url=self.endpoint + "/" + self.index_name_1 + "/_mapping",
             verify=False
@@ -212,7 +212,7 @@ class TestCreateIndex(MarqoTestCase):
                 NsField.index_defaults: custom_settings})
         tensor_search.add_documents(
             config=self.config, add_docs_params=AddDocsParams(
-                index_name=self.index_name_1, docs=[{"Title": "wowow"}], auto_refresh=True))
+                index_name=self.index_name_1, docs=[{"Title": "wowow"}], auto_refresh=True, device="cpu"))
         mappings = requests.get(
             url=self.endpoint + "/" + self.index_name_1 + "/_mapping",
             verify=False
@@ -475,7 +475,7 @@ class TestCreateIndex(MarqoTestCase):
                             {f"f{i}": "some content" for i in range(lim)},
                             {"_id": "1234", **{f"f{i}": "new content" for i in range(lim)}},
                         ],
-                        auto_refresh=True),
+                        auto_refresh=True, device="cpu"),
                     config=self.config
                 )
                 assert not res_1['errors']
@@ -484,7 +484,7 @@ class TestCreateIndex(MarqoTestCase):
                             {'f0': 'this is fine, but there is no resiliency.'},
                             {f"f{i}": "some content" for i in range(lim // 2 + 1)},
                             {'f0': 'this is fine. Still no resilieny.'}],
-                        auto_refresh=True),
+                        auto_refresh=True, device="cpu"),
                     config=self.config
                 )
                 assert not res_1_2['errors']
@@ -493,7 +493,7 @@ class TestCreateIndex(MarqoTestCase):
                         add_docs_params=AddDocsParams(
                             index_name=self.index_name_1,
                             docs=[{'fx': "blah"}],
-                            auto_refresh=True),
+                            auto_refresh=True, device="cpu"),
                         config=self.config
                     )
                     raise AssertionError
@@ -512,7 +512,7 @@ class TestCreateIndex(MarqoTestCase):
                 {"f2": 49, "f3": 400.4, "f4": "alien message"}
             ]
             res_1 = tensor_search.add_documents(
-                add_docs_params=AddDocsParams(index_name=self.index_name_1, docs=docs, auto_refresh=True),
+                add_docs_params=AddDocsParams(index_name=self.index_name_1, docs=docs, auto_refresh=True, device="cpu"),
                 config=self.config
             )
             assert not res_1['errors']
@@ -521,7 +521,7 @@ class TestCreateIndex(MarqoTestCase):
                     add_docs_params=AddDocsParams(
                         index_name=self.index_name_1, docs=[
                             {'fx': "blah"}
-                        ], auto_refresh=True),
+                        ], auto_refresh=True, device="cpu"),
                     config=self.config
                 )
                 raise AssertionError
@@ -546,7 +546,7 @@ class TestCreateIndex(MarqoTestCase):
                 {"f2": 49, "f3": 400.4, "f4": "alien message", "_id": "rkjn"}
             ]
             res_1 = tensor_search.add_documents(
-                add_docs_params=AddDocsParams(index_name=self.index_name_1, docs=docs, auto_refresh=True),
+                add_docs_params=AddDocsParams(index_name=self.index_name_1, docs=docs, auto_refresh=True, device="cpu"),
                 config=self.config
             )
             mapping_info = requests.get(

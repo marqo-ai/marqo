@@ -56,7 +56,7 @@ class TestImageDownloadHeaders(MarqoTestCase):
         tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
             index_name=self.index_name_1, docs=[
                 {"_id": "1", "image": self.real_img_url}],
-            auto_refresh=True, image_download_headers=image_download_headers))
+            auto_refresh=True, image_download_headers=image_download_headers, device="cpu"))
 
         def pass_through_requests_get(url, *args, **kwargs):
             return requests_get(url, *args, **kwargs)
@@ -99,7 +99,7 @@ class TestImageDownloadHeaders(MarqoTestCase):
             tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
                 index_name=self.index_name_1, docs=[
                     { "_id": "1", "image": self.real_img_url}
-                ], auto_refresh=True, image_download_headers=image_download_headers
+                ], auto_refresh=True, image_download_headers=image_download_headers, device="cpu"
             ))
             # Check if load_image_from_path was called with the correct headers
             assert len(mock_load_image_from_path.call_args_list) == 1
@@ -135,7 +135,7 @@ class TestImageDownloadHeaders(MarqoTestCase):
                     "_id": "1",
                     "image": test_image_url,
                 }],
-                auto_refresh=True, image_download_headers=image_download_headers))
+                auto_refresh=True, image_download_headers=image_download_headers, device="cpu"))
 
         # Set up the mock GET
         mock_get = unittest.mock.MagicMock()
