@@ -1,4 +1,5 @@
 import copy
+import os
 import datetime
 import threading
 import time
@@ -24,6 +25,13 @@ class TestIndexMetaCache(MarqoTestCase):
         self.index_name_2 = "my-test-index-2"
         self.config = Config(self.authorized_url)
         self._delete_testing_indices()
+
+        # Any tests that call add_documents_orchestrator, search, bulk_search need this env var
+        self.device_patcher = mock.patch.dict(os.environ, {"_MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
+        self.device_patcher.start()
+
+    def tearDown(self):
+        self.device_patcher.stop()
 
     def _delete_testing_indices(self):
         for ix in [self.index_name_1, self.index_name_2]:
@@ -620,7 +628,7 @@ class TestIndexMetaCache(MarqoTestCase):
                 config=self.config,
                 add_docs_params=AddDocsParams(
                     **{
-                        "index_name": self.index_name_1, "auto_refresh": True, device:"cpu",
+                        "index_name": self.index_name_1, "auto_refresh": True, "device":"cpu",
                         "docs": [
                             {"Title": "Blah"}, {"Title": "blah2"},
                             {"Title": "Blah3"}, {"Title": "Blah4"}]
@@ -660,7 +668,7 @@ class TestIndexMetaCache(MarqoTestCase):
                     **{"config": self.config},
                     add_docs_params=AddDocsParams(
                         **{
-                            "index_name": self.index_name_1, "auto_refresh": True, device:"cpu",
+                            "index_name": self.index_name_1, "auto_refresh": True, "device":"cpu",
                             "docs": [
                                 {"Title": "Blah"}, {"Title": "blah2"},
                                 {"Title": "Blah3"}, {"Title": "Blah4"}]

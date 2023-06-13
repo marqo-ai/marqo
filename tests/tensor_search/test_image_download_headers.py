@@ -2,6 +2,7 @@
 Module for testing image download headers.
 """
 import unittest.mock
+import os
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 # we are renaming get to prevent inf. recursion while mocking get():
 from requests import get as requests_get
@@ -30,6 +31,10 @@ class TestImageDownloadHeaders(MarqoTestCase):
             tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         except IndexNotFoundError:
             pass
+        
+        # Any tests that call add_documents_orchestrator, search, bulk_search need this env var
+        self.device_patcher = mock.patch.dict(os.environ, {"_MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
+        self.device_patcher.start()
 
     @classmethod
     def tearDownClass(cls) -> None:
@@ -38,6 +43,9 @@ class TestImageDownloadHeaders(MarqoTestCase):
             tensor_search.delete_index(config=cls.config, index_name=cls.index_name_1)
         except IndexNotFoundError:
             pass
+        
+    def tearDown(self):
+        self.device_patcher.stop()
 
     def image_index_settings(self) -> dict:
         return {

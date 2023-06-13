@@ -4,6 +4,8 @@ import torch
 from tests.marqo_test import MarqoTestCase
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
+import os
+from unittest import mock
 
 class TestAddDocumentsPara(MarqoTestCase):
     """
@@ -18,6 +20,13 @@ class TestAddDocumentsPara(MarqoTestCase):
             tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         except IndexNotFoundError as s:
             pass
+        
+        # Any tests that call add_documents_orchestrator, search, bulk_search need this env var
+        self.device_patcher = mock.patch.dict(os.environ, {"_MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
+        self.device_patcher.start()
+
+    def tearDown(self):
+        self.device_patcher.stop()
     
     def test_get_device_ids(self) -> None:
         assert parallel.get_gpu_count('cpu') == 0

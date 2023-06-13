@@ -27,7 +27,7 @@ class TestOnStartScript(MarqoTestCase):
         ]
         for mock_environ, expected in environ_expected_models:
             mock_vectorise = mock.MagicMock()
-            @mock.patch("os.environ", mock_environ)
+            @mock.patch.dict(os.environ, mock_environ)
             @mock.patch("marqo.tensor_search.on_start_script.vectorise", mock_vectorise)
             def run():
                 model_caching_script = on_start_script.ModelsForCacheing()
@@ -38,7 +38,7 @@ class TestOnStartScript(MarqoTestCase):
             assert run()
 
     def test_preload_models_malformed(self):
-        @mock.patch("os.environ", {enums.EnvVars.MARQO_MODELS_TO_PRELOAD: "[not-good-json"})
+        @mock.patch.dict(os.environ, {enums.EnvVars.MARQO_MODELS_TO_PRELOAD: "[not-good-json"})
         def run():
             try:
                 model_caching_script = on_start_script.ModelsForCacheing()
@@ -93,7 +93,7 @@ class TestOnStartScript(MarqoTestCase):
         ]
         for mock_environ, expected in environ_expected_models:
             mock_vectorise = mock.MagicMock()
-            @mock.patch("os.environ", mock_environ)
+            @mock.patch.dict(os.environ, mock_environ)
             @mock.patch("marqo.tensor_search.on_start_script.vectorise", mock_vectorise)
             def run():
                 model_caching_script = on_start_script.ModelsForCacheing()
@@ -123,7 +123,7 @@ class TestOnStartScript(MarqoTestCase):
         }
         mock_vectorise = mock.MagicMock()
         @mock.patch("marqo.tensor_search.on_start_script.vectorise", mock_vectorise)
-        @mock.patch("os.environ", {enums.EnvVars.MARQO_MODELS_TO_PRELOAD: [open_clip_model_object]})
+        @mock.patch.dict(os.environ, {enums.EnvVars.MARQO_MODELS_TO_PRELOAD: [open_clip_model_object]})
         def run():
             try:
                 model_caching_script = on_start_script.ModelsForCacheing()
@@ -140,7 +140,7 @@ class TestOnStartScript(MarqoTestCase):
         }
         mock_vectorise = mock.MagicMock()
         @mock.patch("marqo.tensor_search.on_start_script.vectorise", mock_vectorise)
-        @mock.patch("os.environ", {enums.EnvVars.MARQO_MODELS_TO_PRELOAD: [open_clip_model_object]})
+        @mock.patch.dict(os.environ, {enums.EnvVars.MARQO_MODELS_TO_PRELOAD: [open_clip_model_object]})
         def run():
             try:
                 model_caching_script = on_start_script.ModelsForCacheing()

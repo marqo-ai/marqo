@@ -1,4 +1,5 @@
 import copy
+import os
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 import functools
 import json
@@ -28,6 +29,10 @@ class TestAddDocuments(MarqoTestCase):
             tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         except IndexNotFoundError as s:
             pass
+        
+        # Any tests that call add_documents_orchestrator, search, bulk_search need this env var
+        self.device_patcher = mock.patch.dict(os.environ, {"_MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
+        self.device_patcher.start()
 
     def tearDown(self) -> None:
         self.index_name_1 = "my-test-index-1"
@@ -35,6 +40,8 @@ class TestAddDocuments(MarqoTestCase):
             tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         except IndexNotFoundError as s:
             pass
+        
+        self.device_patcher.stop()
 
     def _match_all(self, index_name, verbose=False):
         """Helper function"""
@@ -1102,7 +1109,7 @@ class TestAddDocuments(MarqoTestCase):
         max_size = 400000
         mock_environ = {enums.EnvVars.MARQO_MAX_DOC_BYTES: str(max_size)}
 
-        @mock.patch("os.environ", mock_environ)
+        @mock.patch.dict(os.environ, {**os.environ, **mock_environ})
         def run():
             update_res = tensor_search.add_documents(
                 config=self.config, add_docs_params=AddDocsParams(
@@ -1126,7 +1133,7 @@ class TestAddDocuments(MarqoTestCase):
         max_size = 400000
         mock_environ = {enums.EnvVars.MARQO_MAX_DOC_BYTES: str(max_size)}
 
-        @mock.patch("os.environ", mock_environ)
+        @mock.patch.dict(os.environ, {**os.environ, **mock_environ})
         def run():
             update_res = tensor_search.add_documents(
                 config=self.config, add_docs_params=AddDocsParams(
@@ -1143,8 +1150,8 @@ class TestAddDocuments(MarqoTestCase):
         assert run()
 
     def test_doc_too_large_none_env_var(self):
-        for env_dict in [dict(), {enums.EnvVars.MARQO_MAX_DOC_BYTES: None}]:
-            @mock.patch("os.environ", env_dict)
+        for env_dict in [dict()]:
+            @mock.patch.dict(os.environ, {**os.environ, **env_dict})
             def run():
                 update_res = tensor_search.add_documents(
                     config=self.config, add_docs_params=AddDocsParams(

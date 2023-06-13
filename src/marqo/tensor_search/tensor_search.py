@@ -242,8 +242,12 @@ def add_documents_orchestrator(
     
     # Default device calculated here and not in add_documents call
     if add_docs_params.device is None:
-        add_docs_params.device = utils.read_env_vars_and_defaults("_MARQO_BEST_AVAILABLE_DEVICE")
-
+        selected_device = utils.read_env_vars_and_defaults("_MARQO_BEST_AVAILABLE_DEVICE")
+        add_docs_params_with_device = replace(add_docs_params, device=selected_device)
+        logger.debug(f"No device given for add_documents_orchestrator. Defaulting to best available device: {selected_device}")
+    else:
+        add_docs_params_with_device = add_docs_params
+    
     if batch_size is None or batch_size == 0:
         logger.debug(f"batch_size={batch_size} and processes={processes} - not doing any marqo side batching")
         return add_documents(config=config, add_docs_params=add_docs_params)
@@ -256,7 +260,7 @@ def add_documents_orchestrator(
             # using search instead of _vector_text_search since search calculates default device
             _vector_text_search(
                 config=config, index_name=add_docs_params.index_name, query='',
-                model_auth=add_docs_params.model_auth, device=add_docs_params.device,
+                model_auth=add_docs_params.model_auth, device=selected_device,
                 image_download_headers=add_docs_params.image_download_headers)
         except Exception as e:
             logger.warning(
@@ -267,7 +271,7 @@ def add_documents_orchestrator(
 
         logger.debug(f"batch_size={batch_size} and processes={processes} - using multi-processing")
         results = parallel.add_documents_mp(
-            config=config, batch_size=batch_size, processes=processes, add_docs_params=add_docs_params
+            config=config, batch_size=batch_size, processes=processes, add_docs_params=add_docs_params_with_device
         )
         # we need to force the cache to update as it does not propagate using mp
         # we just clear this index's entry and it will re-populate when needed next
@@ -280,7 +284,7 @@ def add_documents_orchestrator(
         if batch_size < 0:
             raise errors.InvalidArgError("Batch size can't be less than 1!")
         logger.debug(f"batch_size={batch_size} and processes={processes} - batching using a single process")
-        return _batch_request(config=config, verbose=False, add_docs_params=add_docs_params, batch_size=batch_size)
+        return _batch_request(config=config, verbose=False, add_docs_params=add_docs_params_with_device, batch_size=batch_size)
 
 
 def _batch_request(
@@ -959,8 +963,11 @@ def bulk_search(query: BulkSearchQuery, marqo_config: config.Config, verbose: bo
     if len(query.queries) == 0:
         return {"result": []}
 
-    selected_device = utils.read_env_vars_and_defaults("_MARQO_BEST_AVAILABLE_DEVICE") \
-        if device is None else device
+    if device is None:
+        selected_device = utils.read_env_vars_and_defaults("_MARQO_BEST_AVAILABLE_DEVICE")
+        logger.debug(f"No device given for bulk_search. Defaulting to best available device: {selected_device}")
+    else:
+        selected_device = device
 
     tensor_queries: Dict[int, BulkSearchQueryEntity] = dict(filter(lambda e: e[1].searchMethod == SearchMethod.TENSOR, enumerate(query.queries)))
     lexical_queries: Dict[int, BulkSearchQueryEntity] = dict(filter(lambda e: e[1].searchMethod == SearchMethod.LEXICAL, enumerate(query.queries)))
@@ -1068,6 +1075,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
     Returns:
 
     """
+
     # Validation for: result_count (limit) & offset
     # Validate neither is negative
     if result_count <= 0:
@@ -1112,8 +1120,11 @@ def search(config: Config, index_name: str, text: Union[str, dict],
         args=(config, index_name, REFRESH_INTERVAL_SECONDS))
     cache_update_thread.start()
 
-    selected_device = utils.read_env_vars_and_defaults("_MARQO_BEST_AVAILABLE_DEVICE") \
-        if device is None else device
+    if device is None:
+        selected_device = utils.read_env_vars_and_defaults("_MARQO_BEST_AVAILABLE_DEVICE")
+        logger.debug(f"No device given for search. Defaulting to best available device: {selected_device}")
+    else:
+        selected_device = device
     
     if search_method.upper() == SearchMethod.TENSOR:
         search_result = _vector_text_search(

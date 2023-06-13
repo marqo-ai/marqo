@@ -1,4 +1,5 @@
 import numpy as np
+import os
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.errors import IndexNotFoundError
 from marqo.s2_inference.errors import UnknownModelError, ModelLoadError
@@ -22,7 +23,10 @@ class TestGenericModelSupport(MarqoTestCase):
             tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         except IndexNotFoundError as e:
             pass
-
+        
+        # Any tests that call add_documents_orchestrator, search, bulk_search need this env var
+        self.device_patcher = mock.patch.dict(os.environ, {"_MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
+        self.device_patcher.start()
 
     def tearDown(self) -> None:
         try:
@@ -34,6 +38,7 @@ class TestGenericModelSupport(MarqoTestCase):
         except IndexNotFoundError as e:
             pass
         clear_loaded_models()
+        self.device_patcher.stop()
 
 
     def test_create_index_and_add_documents_with_generic_open_clip_model_properties_url(self):

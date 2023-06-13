@@ -27,6 +27,14 @@ class TestVectorSearch(MarqoTestCase):
         self.index_name_3 = "my-test-index-3"
         self._delete_test_indices()
 
+        # Any tests that call add_documents_orchestrator, search, bulk_search need this env var
+        # Ensure other os.environ patches in indiv tests do not erase this one.
+        self.device_patcher = mock.patch.dict(os.environ, {"_MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
+        self.device_patcher.start()
+
+    def tearDown(self):
+        self.device_patcher.stop()
+
     def _delete_test_indices(self, indices=None):
         if indices is None or not indices:
             ix_to_delete = [self.index_name_1, self.index_name_2, self.index_name_3]
@@ -57,7 +65,7 @@ class TestVectorSearch(MarqoTestCase):
         )
         assert len(search_res['hits']) == 2
 
-    @mock.patch('os.environ', {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': '2'}})
+    @mock.patch.dict(os.environ, {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': '2'}})
     def test_search_with_excessive_searchable_attributes(self):
         with self.assertRaises(InvalidArgError):
             add_docs_caller(
@@ -70,8 +78,7 @@ class TestVectorSearch(MarqoTestCase):
                 searchable_attributes=["abc", "def", "other field"]
             )
 
-
-    @mock.patch('os.environ', {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': '2'}})
+    @mock.patch.dict(os.environ, {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': '2'}})
     def test_search_with_allowable_num_searchable_attributes(self):
         add_docs_caller(
             config=self.config, index_name=self.index_name_1, docs=[
@@ -83,8 +90,8 @@ class TestVectorSearch(MarqoTestCase):
             searchable_attributes=["other field"]
         )
     
-    @mock.patch('os.environ', {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': None}})
     def test_search_with_searchable_attributes_max_attributes_is_none(self):
+        # No patch needed, MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES is not set
         add_docs_caller(
             config=self.config, index_name=self.index_name_1, docs=[
                 {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "5678"},
@@ -95,7 +102,7 @@ class TestVectorSearch(MarqoTestCase):
             searchable_attributes=["other field"]
         )
 
-    @mock.patch('os.environ', {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': f"{sys.maxsize}"}})
+    @mock.patch.dict(os.environ, {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': f"{sys.maxsize}"}})
     def test_search_with_no_searchable_attributes_but_max_searchable_attributes_env_set(self):
         with self.assertRaises(InvalidArgError):
             add_docs_caller(
@@ -817,7 +824,7 @@ class TestVectorSearch(MarqoTestCase):
             for max_doc in [0, 1, 2, 5, 10, 100, 1000]:
                 mock_environ = {EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: str(max_doc)}
 
-                @mock.patch("os.environ", mock_environ)
+                @mock.patch.dict(os.environ, {**os.environ, **mock_environ})
                 def run():
                     half_search = tensor_search.search(search_method=search_method,
                         config=self.config, index_name=self.index_name_1, text='a', result_count=max_doc//2)
@@ -855,9 +862,9 @@ class TestVectorSearch(MarqoTestCase):
         tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
 
         for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
-            for mock_environ in [dict(), {EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: None},
+            for mock_environ in [dict(),
                                  {EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: ''}]:
-                @mock.patch("os.environ", mock_environ)
+                @mock.patch.dict(os.environ, {**os.environ, **mock_environ})
                 def run():
                     lim = 500
                     half_search = tensor_search.search(
@@ -949,7 +956,7 @@ class TestVectorSearch(MarqoTestCase):
 
         # Going over 10,000 for offset + limit
         mock_environ = {EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: "10000"}
-        @mock.patch("os.environ", mock_environ)
+        @mock.patch.dict(os.environ, {**os.environ, **mock_environ})
         def run():
             for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
                 try:

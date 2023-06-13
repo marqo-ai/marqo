@@ -314,6 +314,13 @@ class TestBulkSearch(MarqoTestCase):
         self.index_name_3 = "my-test-index-3"
         self._delete_test_indices()
 
+        # Any tests that call add_documents_orchestrator, search, bulk_search need this env var
+        self.device_patcher = mock.patch.dict(os.environ, {"_MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
+        self.device_patcher.start()
+
+    def tearDown(self):
+        self.device_patcher.stop()
+
     def _delete_test_indices(self, indices=None):
         if indices is None or not indices:
             ix_to_delete = [self.index_name_1, self.index_name_2, self.index_name_3]
@@ -339,7 +346,7 @@ class TestBulkSearch(MarqoTestCase):
                 "parameter-not-expected": 1,
             }]))
 
-    @mock.patch('os.environ', {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': '0'}})
+    @mock.patch.dict(os.environ, {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': '0'}})
     def test_bulk_search_with_excessive_searchable_attributes(self):
         add_docs_caller(
             config=self.config, index_name=self.index_name_1, docs=[
@@ -355,7 +362,7 @@ class TestBulkSearch(MarqoTestCase):
                 "searchableAttributes": ["abc"]
             }]), marqo_config=self.config)
     
-    @mock.patch('os.environ', {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': '100'}})
+    @mock.patch.dict(os.environ, {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': '100'}})
     def test_bulk_search_with_max_searchable_attributes_no_searchable_attributes_field(self):
         add_docs_caller(
             config=self.config, index_name=self.index_name_1, docs=[
@@ -369,7 +376,7 @@ class TestBulkSearch(MarqoTestCase):
                 "q": "title about some doc",
             }]), marqo_config=self.config)
 
-    @mock.patch('os.environ', {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': '1'}})
+    @mock.patch.dict(os.environ, {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': '1'}})
     def test_bulk_search_with_excessive_searchable_attributes(self):
         add_docs_caller(
             config=self.config, index_name=self.index_name_1, docs=[
@@ -384,8 +391,7 @@ class TestBulkSearch(MarqoTestCase):
                 "searchableAttributes": ["abc", "other field"]
             }]), marqo_config=self.config)
 
-    @mock.patch('os.environ', {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': None}})
-    def test_bulk_search_with_no_max_searchable_attributes(self):
+    def test_bulk_search_with_no_env_vars_set(self):
         add_docs_caller(
             config=self.config, index_name=self.index_name_1, docs=[
                 {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "id1-first"},
@@ -397,20 +403,6 @@ class TestBulkSearch(MarqoTestCase):
             "q": "title about some doc",
             "searchableAttributes": ["abc", "other field"]
         }]), marqo_config=self.config, device="cpu")
-
-    @mock.patch('os.environ', {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': None}})
-    def test_bulk_search_with_no_max_searchable_attributes_no_searchable_attributes_field(self):
-        add_docs_caller(
-            config=self.config, index_name=self.index_name_1, docs=[
-                {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "id1-first"},
-                {"abc": "random text", "other field": "Close match hehehe", "_id": "id1-second"},
-            ], auto_refresh=True
-        ) 
-        api.bulk_search(BulkSearchQuery(queries=[{
-            "index": self.index_name_1,
-            "q": "title about some doc",
-        }]), marqo_config=self.config, device="cpu")
-
 
     def test_bulk_search_no_queries_return_early(self):
         add_docs_caller(
@@ -1344,7 +1336,7 @@ class TestBulkSearch(MarqoTestCase):
     
                 mock_environ = {EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: str(max_doc)}
     
-                @mock.patch("os.environ", mock_environ)
+                @mock.patch.dict(os.environ, {**os.environ, **mock_environ})
                 def run():
                     half_search = tensor_search.bulk_search(
                         marqo_config=self.config, query=BulkSearchQuery(
@@ -1417,9 +1409,9 @@ class TestBulkSearch(MarqoTestCase):
         tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
     
         for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
-            for mock_environ in [dict(), {EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: None},
+            for mock_environ in [dict(),
                                  {EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: ''}]:
-                @mock.patch("os.environ", mock_environ)
+                @mock.patch.dict(os.environ, {**os.environ, **mock_environ})
                 def run():
                     lim = 500
                     half_search = tensor_search.bulk_search(
@@ -1534,7 +1526,7 @@ class TestBulkSearch(MarqoTestCase):
     
         # Going over 10,000 for offset + limit
         mock_environ = {EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: "10000"}
-        @mock.patch("os.environ", mock_environ)
+        @mock.patch.dict(os.environ, {**os.environ, **mock_environ})
         def run():
             for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
                 try:

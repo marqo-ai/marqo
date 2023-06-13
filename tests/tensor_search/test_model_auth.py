@@ -150,6 +150,14 @@ class TestModelAuthLoadedS3(MarqoTestCase):
         _delete_file(cls.model_abs_path)
         tensor_search.eject_model(model_name=cls.custom_model_name, device=cls.device)
 
+    def setUp(self):
+        # Any tests that call add_documents_orchestrator, search, bulk_search need this env var
+        self.device_patcher = mock.patch.dict(os.environ, {"_MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
+        self.device_patcher.start()
+
+    def tearDown(self):
+        self.device_patcher.stop()
+
     def test_after_downloading_auth_doesnt_matter(self):
         """on this instance, at least"""
         res = tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
@@ -200,12 +208,18 @@ class TestModelAuthOpenCLIP(MarqoTestCase):
             tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         except IndexNotFoundError as s:
             pass
-
+        
+        # Any tests that call add_documents_orchestrator, search, bulk_search need this env var
+        self.device_patcher = mock.patch.dict(os.environ, {"_MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
+        self.device_patcher.start()
+        
     def tearDown(self) -> None:
         try:
             tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         except IndexNotFoundError as s:
             pass
+        
+        self.device_patcher.stop()
 
     def test_model_auth_hf(self):
         """
@@ -588,7 +602,7 @@ class TestModelAuthOpenCLIP(MarqoTestCase):
 
         for add_docs_method, kwargs in [
             (tensor_search.add_documents_orchestrator, {'batch_size': 10}),
-            (tensor_search.add_documents, {device: "cpu"})
+            (tensor_search.add_documents, {"device": "cpu"})
             # TODO: add add_documents_mp ?
         ]:
             try:
@@ -1107,6 +1121,14 @@ class TestModelAuthDownloadAndExtractS3HFModel(MarqoTestCase):
         _delete_file(cls.model_abs_path)
         tensor_search.eject_model(model_name=cls.custom_model_name, device=cls.device)
 
+    def setUp(self):
+        # Any tests that call add_documents_orchestrator, search, bulk_search need this env var
+        self.device_patcher = mock.patch.dict(os.environ, {"_MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
+        self.device_patcher.start()
+
+    def tearDown(self):
+        self.device_patcher.stop()
+
     def test_after_downloading_auth_doesnt_matter(self):
         """on this instance, at least"""
         res = tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
@@ -1174,6 +1196,9 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
         except IndexNotFoundError as s:
             pass
 
+        # Any tests that call add_documents_orchestrator, search, bulk_search need this env var
+        self.device_patcher = mock.patch.dict(os.environ, {"_MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
+        self.device_patcher.start()
 
     def tearDown(self) -> None:
         try:
@@ -1182,6 +1207,7 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
             pass
 
         clear_loaded_models()
+        self.device_patcher.stop()
 
     def test_1_load_model_from_hf_zip_file_with_auth_search(self):
         """
@@ -1988,6 +2014,10 @@ class TestS3ModelAuthlLoadForHFModelVariants(MarqoTestCase):
             tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         except IndexNotFoundError as s:
             pass
+        
+        # Any tests that call add_documents_orchestrator, search, bulk_search need this env var
+        self.device_patcher = mock.patch.dict(os.environ, {"_MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
+        self.device_patcher.start() 
 
     def tearDown(self) -> None:
         try:
@@ -1995,7 +2025,7 @@ class TestS3ModelAuthlLoadForHFModelVariants(MarqoTestCase):
         except IndexNotFoundError as s:
             pass
         clear_loaded_models()
-
+        self.device_patcher.stop()
 
     def test_model_auth_mismatch_param_s3_ix(self):
         """This test is finished in open_clip test"""
@@ -2165,7 +2195,7 @@ class TestS3ModelAuthlLoadForHFModelVariants(MarqoTestCase):
 
         for add_docs_method, kwargs in [
             (tensor_search.add_documents_orchestrator, {'batch_size': 10}),
-            (tensor_search.add_documents, {})
+            (tensor_search.add_documents, {"device": "cpu"})
             # TODO: add add_documents_mp ?
         ]:
             try:

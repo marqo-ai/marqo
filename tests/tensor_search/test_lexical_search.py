@@ -194,7 +194,7 @@ class TestLexicalSearch(MarqoTestCase):
             config=self.config, index_name=self.index_name_1, text="Marqo field",
             searchable_attributes=["field lambda", "FIELD omega"])
         res_search_entry_point = tensor_search.search(
-            config=self.config, index_name=self.index_name_1, text="Marqo field",
+            config=self.config, index_name=self.index_name_1, text="Marqo field", device="cpu",
             searchable_attributes=["field lambda", "FIELD omega"],
             search_method=enums.SearchMethod.LEXICAL)
         res_search_entry_point_no_processing_time = res_search_entry_point.copy()
@@ -413,7 +413,7 @@ class TestLexicalSearch(MarqoTestCase):
                 ], auto_refresh=True, non_tensor_fields=["my_list", "fun list", "my_cool_list"], device="cpu"))
         base_search_args = {
             'index_name': self.index_name_1, "config": self.config,
-            "search_method": enums.SearchMethod.LEXICAL
+            "search_method": enums.SearchMethod.LEXICAL, "device": "cpu"
         }
         res_exists = tensor_search.search(**{'text': "tag1", **base_search_args})
         assert len(res_exists['hits']) == 1
@@ -449,7 +449,7 @@ class TestLexicalSearch(MarqoTestCase):
         )
         base_search_args = {
             'index_name': self.index_name_1, "config": self.config,
-            "search_method": enums.SearchMethod.LEXICAL, 'text': "tag1"
+            "search_method": enums.SearchMethod.LEXICAL, 'text': "tag1", "device": "cpu"
         }
         res_exists = tensor_search.search(
             **{**base_search_args, "searchable_attributes": ["my_list"]})
