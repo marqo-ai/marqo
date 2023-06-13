@@ -433,15 +433,13 @@ class OPEN_CLIP(CLIP):
         self.model_name = self.model_properties.get("name", None)
         logger.info(f"The name of the custom clip model is {self.model_name}. We use open_clip load")
         try:
-            print("loading model")
             model, _, preprocess = open_clip.create_model_and_transforms(
                 model_name=self.model_name, jit=self.jit, pretrained=self.model_path, precision=self.precision,
                 image_mean=self.mean, image_std=self.std, device=self.device, cache_dir=ModelCache.clip_cache_path)
             return model, preprocess
         except Exception as e:
-            if isinstance(e, RuntimeError) and "The file might be corrupted" in str(e):
+            if (isinstance(e, RuntimeError) and "The file might be corrupted" in str(e)) or isinstance(e, AttributeError):
                 try:
-                    print("yes")
                     os.remove(self.model_path)
                 except Exception as remove_e:
                     raise RuntimeError(
