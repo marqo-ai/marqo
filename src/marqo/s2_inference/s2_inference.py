@@ -406,7 +406,6 @@ def _check_output_type(output: List[List[float]]) -> bool:
 def _float_tensor_to_list(output: FloatTensor) -> Union[
     List[List[float]], List[float]]:
     """
-
     Args:
         output (FloatTensor): _description_
 
@@ -414,9 +413,8 @@ def _float_tensor_to_list(output: FloatTensor) -> Union[
         List[List[float]]: _description_
     """
     
-    # Hardcoded since get_default_device() used to return "cpu" anyway
-    device = "cpu"
-    return output.detach().to(device).tolist()
+    # Hardcoded to CPU always
+    return output.detach().to("cpu").tolist()
 
 
 def _nd_array_to_list(output: ndarray) -> Union[List[List[float]], List[float]]:
