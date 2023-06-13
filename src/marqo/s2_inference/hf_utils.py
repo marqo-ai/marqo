@@ -203,8 +203,7 @@ def extract_huggingface_archive(path: str) -> str:
     '''
 
         This function takes the path as input. The path can must be a string that can be:
-        1. A downloaded archive file. If the provided path is a file, this function will extract
-        the model from the archive if necessary and return the directory path.
+        1. A downloaded archive file. This function will extract the model from the archive return the directory path.
         2. A repo_id in huggingface. This function will return the input string directly.
 
         path: the downloaded model archive path or a repo_id in huggingface
