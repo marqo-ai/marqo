@@ -602,7 +602,7 @@ class TestModelAuthOpenCLIP(MarqoTestCase):
 
         for add_docs_method, kwargs in [
             (tensor_search.add_documents_orchestrator, {'batch_size': 10}),
-            (tensor_search.add_documents, {"device": "cpu"})
+            (tensor_search.add_documents, {})
             # TODO: add add_documents_mp ?
         ]:
             try:
@@ -627,7 +627,7 @@ class TestModelAuthOpenCLIP(MarqoTestCase):
                     add_docs_params=AddDocsParams(
                         index_name=self.index_name_1,
                         model_auth=model_auth,
-                        auto_refresh=True,
+                        auto_refresh=True, device="cpu",
                         docs=[{
                             'my_combination_field': {
                                 'my_image': f"https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
@@ -2195,7 +2195,7 @@ class TestS3ModelAuthlLoadForHFModelVariants(MarqoTestCase):
 
         for add_docs_method, kwargs in [
             (tensor_search.add_documents_orchestrator, {'batch_size': 10}),
-            (tensor_search.add_documents, {"device": "cpu"})
+            (tensor_search.add_documents, {})
             # TODO: add add_documents_mp ?
         ]:
             try:
@@ -2218,7 +2218,7 @@ class TestS3ModelAuthlLoadForHFModelVariants(MarqoTestCase):
                     add_docs_params=AddDocsParams(
                         index_name=self.index_name_1,
                         model_auth=model_auth,
-                        auto_refresh=True,
+                        auto_refresh=True, device="cpu",
                         docs=[{
                             'my_combination_field': {
                                 'my_image': f"https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",

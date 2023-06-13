@@ -328,7 +328,7 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(actual, expected)
 
     def test_creates_env_var_if_not_exists(self):
-        @mock.patch.dict(os.environ, dict())
+        @mock.patch.dict(os.environ, {**os.environ, **dict()})
         def run():
             assert enums.EnvVars.MARQO_ROOT_PATH not in os.environ
             marqo_root = utils.get_marqo_root_from_env()

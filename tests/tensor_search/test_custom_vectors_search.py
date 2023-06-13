@@ -5,6 +5,7 @@ from marqo.tensor_search.enums import TensorField, IndexSettingsField, SearchMet
 from marqo.tensor_search.models.search import SearchContext
 from tests.marqo_test import MarqoTestCase
 from unittest.mock import patch
+from unittest import mock
 import numpy as np
 import os
 

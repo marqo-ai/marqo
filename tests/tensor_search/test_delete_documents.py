@@ -12,6 +12,7 @@ from unittest.mock import patch
 from marqo import errors
 from marqo.tensor_search import enums
 from tests.utils.transition import add_docs_caller
+import os
 
 class TestDeleteDocuments(MarqoTestCase):
     """module that has tests at the tensor_search level"""

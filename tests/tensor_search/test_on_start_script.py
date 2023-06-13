@@ -6,6 +6,7 @@ from marqo.tensor_search import enums, configs
 from marqo.tensor_search import on_start_script
 from marqo.s2_inference import s2_inference
 from marqo import errors
+import os
 
 
 class TestOnStartScript(MarqoTestCase):
@@ -27,7 +28,7 @@ class TestOnStartScript(MarqoTestCase):
         ]
         for mock_environ, expected in environ_expected_models:
             mock_vectorise = mock.MagicMock()
-            @mock.patch.dict(os.environ, mock_environ)
+            @mock.patch("os.environ", mock_environ)
             @mock.patch("marqo.tensor_search.on_start_script.vectorise", mock_vectorise)
             def run():
                 model_caching_script = on_start_script.ModelsForCacheing()
@@ -88,7 +89,6 @@ class TestOnStartScript(MarqoTestCase):
         
         # So far has clip and open clip tests
         environ_expected_models = [
-            ({enums.EnvVars.MARQO_MODELS_TO_PRELOAD: [clip_model_object, open_clip_model_object]}, [clip_model_expected, open_clip_model_expected]),
             ({enums.EnvVars.MARQO_MODELS_TO_PRELOAD: json.dumps([clip_model_object, open_clip_model_object])}, [clip_model_expected, open_clip_model_expected])
         ]
         for mock_environ, expected in environ_expected_models:
@@ -123,7 +123,7 @@ class TestOnStartScript(MarqoTestCase):
         }
         mock_vectorise = mock.MagicMock()
         @mock.patch("marqo.tensor_search.on_start_script.vectorise", mock_vectorise)
-        @mock.patch.dict(os.environ, {enums.EnvVars.MARQO_MODELS_TO_PRELOAD: [open_clip_model_object]})
+        @mock.patch.dict(os.environ, {enums.EnvVars.MARQO_MODELS_TO_PRELOAD: json.dumps([open_clip_model_object])})
         def run():
             try:
                 model_caching_script = on_start_script.ModelsForCacheing()
@@ -140,7 +140,7 @@ class TestOnStartScript(MarqoTestCase):
         }
         mock_vectorise = mock.MagicMock()
         @mock.patch("marqo.tensor_search.on_start_script.vectorise", mock_vectorise)
-        @mock.patch.dict(os.environ, {enums.EnvVars.MARQO_MODELS_TO_PRELOAD: [open_clip_model_object]})
+        @mock.patch.dict(os.environ, {enums.EnvVars.MARQO_MODELS_TO_PRELOAD: json.dumps([open_clip_model_object])})
         def run():
             try:
                 model_caching_script = on_start_script.ModelsForCacheing()
