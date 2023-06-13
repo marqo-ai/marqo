@@ -257,7 +257,8 @@ def add_documents_orchestrator(
         _check_and_create_index_if_not_exist(config=config, index_name=add_docs_params.index_name)
 
         try:
-            # using search instead of _vector_text_search since search calculates default device
+            # Empty text search:
+            # 1. loads model into memory, 2. updates cache for multiprocessing
             _vector_text_search(
                 config=config, index_name=add_docs_params.index_name, query='',
                 model_auth=add_docs_params.model_auth, device=selected_device,
