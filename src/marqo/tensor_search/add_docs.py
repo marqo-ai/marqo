@@ -40,6 +40,8 @@ def threaded_download_images(allocated_docs: List[dict], image_repo: dict,
     _id = hash("".join([d.get("_id", str(random.getrandbits(64))) for d in allocated_docs])) % 1000
     _id = f"threaded_download_images.{_id}"
     TIMEOUT_SECONDS=3
+    if metric_obj is None: # Occurs predominately in testing.
+        metric_obj = RequestMetrics.for_request()
 
     with metric_obj.time(f"{_id}.full_time"):
         for doc in allocated_docs:
