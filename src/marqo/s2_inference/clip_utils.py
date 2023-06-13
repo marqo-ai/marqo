@@ -438,7 +438,7 @@ class OPEN_CLIP(CLIP):
                 image_mean=self.mean, image_std=self.std, device=self.device, cache_dir=ModelCache.clip_cache_path)
             return model, preprocess
         except Exception as e:
-            if (isinstance(e, RuntimeError) and "The file might be corrupted" in str(e)) or isinstance(e, AttributeError):
+            if (isinstance(e, RuntimeError) and "The file might be corrupted" in str(e)):
                 try:
                     os.remove(self.model_path)
                 except Exception as remove_e:
@@ -458,7 +458,7 @@ class OPEN_CLIP(CLIP):
                     f"Please check and update your model properties and retry. "
                     f"You can find more details at `https://docs.marqo.ai/0.0.21/Models-Reference/bring_your_own_model/#bring-your-own-clip-model`")
 
-            elif "This could be because the operator doesn't exist for this backend" in str(e):
+            elif isinstance(e, AttributeError) or ("This could be because the operator doesn't exist for this backend" in str(e)):
                 raise InvalidModelPropertiesError(
                     f"Marqo encountered an error when loading custom open_clip model `{self.model_name}` with "
                     f"model properties = `{self.model_properties}`. \n"
