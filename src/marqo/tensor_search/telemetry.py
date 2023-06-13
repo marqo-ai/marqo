@@ -110,7 +110,7 @@ class RequestMetric:
     def json(self):
         return {
             "counter": dict(self.counter),
-            "times": dict(self.times)
+            "timesMs": dict(self.times)
         }
 
 
@@ -190,7 +190,12 @@ class TelemetryMiddleware(BaseHTTPMiddleware):
         
         # Inject telemetry and fix content-length header
         if isinstance(data, dict):
-            data["telemetry"] = RequestMetrics.for_request(request).json()
+            telemetry = RequestMetrics.for_request(request).json()
+            if len(telemetry["timesMs"]) == 0:
+                telemetry.pop("timesMs")
+            if len(telemetry["counter"]) == 0:
+                telemetry.pop("counter")
+            data["telemetry"] = telemetry
         else:
             get_logger(__name__).warning(
                 f"{self.telemetry_flag} set but response payload is not Dict. telemetry not returned"

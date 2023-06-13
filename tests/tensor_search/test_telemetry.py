@@ -98,7 +98,7 @@ class TestRequestMetrics(unittest.TestCase):
             metric.json(),
             {
                 "counter": {},
-                "times": {key: 1.0}
+                "timesMs": {key: 1.0}
             }
         )
         mock_timer_start.assert_called_once()
@@ -124,13 +124,15 @@ class TestRequestMetrics(unittest.TestCase):
             metric.json(),
             {
                 "counter": {},
-                "times": {key: 1.0}
+                "timesMs": {key: 1.0}
             }
         )
         self.assertEqual(1.0, elapsed_time)
         mock_timer_stop.assert_called_once()
 
     def test_increment_counter_with_value(self):
+        RequestMetrics.set_in_request(r=self.request) # As set by TelemetryMiddleware
+
         key = 'counter1'
         value = 5.0
         metric = RequestMetrics.for_request(self.request)
@@ -138,6 +140,8 @@ class TestRequestMetrics(unittest.TestCase):
         self.assertEqual(metric.counter, {key: value})
 
     def test_increment_counter_multiple_times(self):
+        RequestMetrics.set_in_request(r=self.request) # As set by TelemetryMiddleware
+
         key = 'counter1'
         metric = RequestMetrics.for_request(self.request)
         metric.increment_counter(key)
@@ -147,6 +151,8 @@ class TestRequestMetrics(unittest.TestCase):
     @patch.object(Timer, 'start')
     @patch.object(Timer, 'stop')
     def test_time_with_exception(self, mock_timer_stop, mock_timer_start):
+        RequestMetrics.set_in_request(r=self.request) # As set by TelemetryMiddleware
+
         mock_timer_stop.return_value = 1.0
         key = 'timer1'
         metric = RequestMetrics.for_request(self.request)
@@ -159,7 +165,7 @@ class TestRequestMetrics(unittest.TestCase):
             metric.json(),
             {
                 "counter": {},
-                "times": {key: 1.0}
+                "timesMs": {key: 1.0}
             }
         )
         mock_timer_start.assert_called_once()
@@ -167,6 +173,8 @@ class TestRequestMetrics(unittest.TestCase):
 
     @patch.object(Timer, 'stop')
     def test_stop_without_start(self, mock_timer_stop):
+        RequestMetrics.set_in_request(r=self.request) # As set by TelemetryMiddleware
+
         mock_timer_stop.side_effect = TimerError
         key = 'timer1'
         metric = RequestMetrics.for_request(self.request)
@@ -193,7 +201,7 @@ class TestRequestMetrics(unittest.TestCase):
         metric = RequestMetrics.for_request(self.request)
         metric.increment_counter(key)
         metric.times[key] = 1.0
-        expected_json = {"counter": {key: 1}, "times": {key: 1.0}}
+        expected_json = {"counter": {key: 1}, "timesMs": {key: 1.0}}
         self.assertEqual(expected_json, metric.json())
 
 
@@ -234,8 +242,7 @@ class TestTelemetryMiddleware(unittest.TestCase):
         response = self.client.get("/test?telemetry=true")
         self.assertIn("telemetry", response.json())
         self.assertEqual(response.json()["telemetry"], {
-            "counter": {"key": 1.0},
-            "times": {}
+            "counter": {"key": 1.0}
         })
 
     def test_timing_usage(self):
@@ -248,7 +255,7 @@ class TestTelemetryMiddleware(unittest.TestCase):
         
         response = self.client.get("/test?telemetry=true")
         self.assertIn("telemetry", response.json())
-        self.assertIn("key", response.json()["telemetry"]["times"])
+        self.assertIn("key", response.json()["telemetry"]["timesMs"])
 
 
     def test_with_timing_usage(self):
@@ -261,7 +268,7 @@ class TestTelemetryMiddleware(unittest.TestCase):
         
         response = self.client.get("/test?telemetry=true")
         self.assertIn("telemetry", response.json())
-        self.assertIn("key", response.json()["telemetry"]["times"])
+        self.assertIn("key", response.json()["telemetry"]["timesMs"])
 
     def test_custom_telemetry_flag(self):
         middleware = [

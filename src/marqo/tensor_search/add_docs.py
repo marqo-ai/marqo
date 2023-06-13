@@ -101,5 +101,42 @@ def download_images(docs: List[dict], thread_count: int, non_tensor_fields: Tupl
 
     for th in threads:
         th.join()
+
+    # Fix up metric_obj to make it not mention thread-ids
+    metric_obj.times = reduce_thread_metrics(metric_obj.times)
     return image_repo
 
+def reduce_thread_metrics(data):
+    """Reduce the metrics from each thread, as if they were run in a single thread.
+
+    e.g.
+    ```
+    {
+        "threaded_download_images.700.full_time": 1373.271582997404,
+        "threaded_download_images.700.https://www.ai-nc.com/images/pages/heat-map.png": 52.985392,
+        "threaded_download_images.729.full_time": 53.297404,
+        "threaded_download_images.729.https://www.ai-nc.com/images/pages/heat-map.png": 2052.617332985392,
+    }
+    ```
+    Becomes
+    ```
+    {
+        "threaded_download_images.full_time": [1373.271582997404, 53.297404],
+        "threaded_download_images.https://www.ai-nc.com/images/pages/heat-map.png": [2052.617332985392, 52.985392],
+    }
+    ```
+    Only applies to times that start with `threaded_download_images`.
+    """
+    result = {}
+    for key, value in data.items():
+        if key.startswith("threaded_download_images"):
+            parts = key.split('.')
+            new_key = '.'.join(parts[0:1] + parts[2:]) if parts[1] != 'full_time' else key
+            if new_key in result:
+                if isinstance(result[new_key], list):
+                    result[new_key].append(value)
+                else:
+                    result[new_key] = [result[new_key], value]
+            else:
+                result[new_key] = value
+    return result
