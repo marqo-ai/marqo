@@ -424,11 +424,12 @@ class OPEN_CLIP(CLIP):
             self.jit = self.model_properties.get("jit", False)
             self.mean = self.model_properties.get("mean", None)
             self.std = self.model_properties.get("std", None)
-            self.model, self.preprocess = self.custom_clip_load()
+            self.model, self.preprocess = self.custom_clip_load
             self.tokenizer = self.load_tokenizer()
 
             self.model.eval()
 
+    @property
     def custom_clip_load(self):
         self.model_name = self.model_properties.get("name", None)
         logger.info(f"The name of the custom clip model is {self.model_name}. We use open_clip load")
@@ -457,6 +458,7 @@ class OPEN_CLIP(CLIP):
                     f"3. you may have tried to load a `clip` model even though `model_properties['type']` is set to 'open_clip'. \n"
                     f"Please check and update your model properties and retry. "
                     f"You can find more details at `https://docs.marqo.ai/0.0.21/Models-Reference/bring_your_own_model/#bring-your-own-clip-model`")
+            # It is tricky to cacth the error when loading clip model using type = open_clip. Different pytorch version will raise different error.
             elif isinstance(e, (AttributeError, RuntimeError)) or ("This could be because the operator doesn't exist for this backend" in str(e)):
                 raise InvalidModelPropertiesError(
                     f"Marqo encountered an error when loading custom open_clip model `{self.model_name}` with "
