@@ -63,8 +63,8 @@ class TestTimer(unittest.TestCase):
 class TestRequestMetrics(unittest.TestCase):
 
     def setUp(self):
+        RequestMetrics.METRIC_STORES = {} # hard clear
         self.request = Request(scope={"type": "http"})
-
 
     def tearDown(self) -> None:
         RequestMetrics.clear_metrics_for(self.request)
@@ -239,6 +239,7 @@ class TestTelemetryMiddleware(unittest.TestCase):
         
         response = self.client.get("/test?telemetry=true")
         self.assertIn("telemetry", response.json())
+        self.assertIn("counter", response.json()["telemetry"])
         self.assertEqual(response.json()["telemetry"], {
             "counter": {"key": 1.0}
         })
@@ -253,6 +254,7 @@ class TestTelemetryMiddleware(unittest.TestCase):
         
         response = self.client.get("/test?telemetry=true")
         self.assertIn("telemetry", response.json())
+        self.assertIn("timesMs", response.json()["telemetry"])
         self.assertIn("key", response.json()["telemetry"]["timesMs"])
 
 
@@ -266,6 +268,7 @@ class TestTelemetryMiddleware(unittest.TestCase):
         
         response = self.client.get("/test?telemetry=true")
         self.assertIn("telemetry", response.json())
+        self.assertIn("timesMs", response.json()["telemetry"])
         self.assertIn("key", response.json()["telemetry"]["timesMs"])
 
     def test_custom_telemetry_flag(self):
