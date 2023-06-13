@@ -129,7 +129,7 @@ def reduce_thread_metrics(data):
     """
     result = {}
     for key, value in data.items():
-        if key.startswith("threaded_download_images"):
+        if key.startswith("threaded_download_images."):
             parts = key.split('.')
             new_key = '.'.join(parts[0:1] + parts[2:]) if parts[1] != 'full_time' else key
             if new_key in result:
