@@ -2,6 +2,7 @@ import copy
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 import functools
 import json
+from unittest.mock import MagicMock, patch
 import math
 import pprint
 from unittest import mock
@@ -71,9 +72,9 @@ class TestAddDocuments(MarqoTestCase):
                 "title 1": "content 1",
                 "desc 2": "content 2. blah blah blah"
             }
-    
+
     def test_add_documents_dupe_ids(self):
-        """ 
+        """
         Should only use the latest inserted ID. Make sure it doesn't get the first/middle one
         """
 
@@ -115,13 +116,13 @@ class TestAddDocuments(MarqoTestCase):
                 auto_refresh=True
             )
         )
-        
+
         doc_3_duped = tensor_search.get_document_by_id(
             config=self.config, index_name=self.index_name_1,
             document_id="3", show_vectors=True)
-        
+
         self.assertEqual(doc_3_solo, doc_3_duped)
-    
+
 
     def test_update_docs_update_chunks(self):
         """Updating a doc needs to update the corresponding chunks"
@@ -357,7 +358,7 @@ class TestAddDocuments(MarqoTestCase):
             assert all(['error' in item for item in add_res['items'] if item['_id'].startswith('to_fail')])
             assert all(['result' in item
                         for item in add_res['items'] if item['_id'].startswith('to_pass')])
-        
+
         # For replace, check with use_existing_tensors True and False
         for use_existing_tensors_flag in (True, False):
             for bad_doc_arg in bad_doc_args:
@@ -403,7 +404,7 @@ class TestAddDocuments(MarqoTestCase):
             for item in add_res['items']:
                 if 'result' in item:
                     succeeded_count += 1
-            
+
             assert succeeded_count == bad_doc_arg[1]
 
         # For replace, check with use_existing_tensors True and False
@@ -420,7 +421,7 @@ class TestAddDocuments(MarqoTestCase):
                 for item in add_res['items']:
                     if 'result' in item:
                         succeeded_count += 1
-                
+
                 assert succeeded_count == bad_doc_arg[1]
 
     def test_add_documents_list_non_tensor_validation(self):
