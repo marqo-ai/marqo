@@ -208,16 +208,14 @@ class TestRequestMetrics(unittest.TestCase):
 class TestTelemetryMiddleware(unittest.TestCase):
 
     def setUp(self):
-        self.app = Starlette(middleware = [
-            Middleware(TelemetryMiddleware)
-        ])
+        self.app = Starlette()
+        self.app.add_middleware(TelemetryMiddleware)
 
         @self.app.route("/", methods=["GET"])
         def test_endpoint(request):
             return JSONResponse({"data": "test"})
         
         self.client = TestClient(self.app)
-        self.middleware = TelemetryMiddleware(self.app)
         self.scope = {'type': 'http'}
         self.request = Request(self.scope)
 
@@ -333,8 +331,9 @@ class TestTelemetryMiddleware(unittest.TestCase):
     def test_telemetry_enabled_for_request(self):
         self.scope = {'type': 'http', 'query_string': b'telemetry=true'}
         self.request = Request(self.scope)
-        self.assertTrue(self.middleware.telemetry_enabled_for_request(self.request))
-
+        self.assertTrue(TelemetryMiddleware(self.app).telemetry_enabled_for_request(self.request))
+        
         self.scope = {'type': 'http', 'query_string': b'telemetry=false'}
         self.request = Request(self.scope)
-        self.assertFalse(self.middleware.telemetry_enabled_for_request(self.request))
+        self.assertFalse(TelemetryMiddleware(self.app).telemetry_enabled_for_request(self.request))
+        

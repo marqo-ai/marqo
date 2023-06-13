@@ -177,7 +177,6 @@ class TelemetryMiddleware(BaseHTTPMiddleware):
             call_next: A callable to the remaining request call-chain.
 
         """
-
         RequestMetrics.set_in_request(request)
 
         response = await call_next(request)
@@ -187,7 +186,7 @@ class TelemetryMiddleware(BaseHTTPMiddleware):
             return response
 
         data = await self.get_response_json(response)
-        
+
         # Inject telemetry and fix content-length header
         if isinstance(data, dict):
             telemetry = RequestMetrics.for_request(request).json()
