@@ -1,6 +1,5 @@
 """Functions used to fulfill the add_documents endpoint"""
 import copy
-import functools
 import math
 import threading
 import random
@@ -38,7 +37,7 @@ def threaded_download_images(allocated_docs: List[dict], image_repo: dict,
         None
     """
     # Generate pseudo-unique ID for thread metrics.
-    _id = hash("".join([d.get("_id", str(random.randbytes(8))) for d in allocated_docs])) % 1000
+    _id = hash("".join([d.get("_id", str(random.getrandbits(64))) for d in allocated_docs])) % 1000
     _id = f"threaded_download_images.{_id}"
     TIMEOUT_SECONDS=3
 
@@ -55,7 +54,7 @@ def threaded_download_images(allocated_docs: List[dict], image_repo: dict,
                             image_repo[doc[field]] = clip_utils.load_image_from_path(doc[field], image_download_headers, timeout=TIMEOUT_SECONDS)
                     except PIL.UnidentifiedImageError as e:
                         image_repo[doc[field]] = e
-                        metric_obj.increment_counter(f"{_id}.UnidentifiedImageError")
+                        metric_obj.increment_counter(f"{doc.get(field, '')}.UnidentifiedImageError")
                         continue
                 # For multimodal tensor combination
                 elif isinstance(doc[field], dict):
@@ -72,7 +71,7 @@ def threaded_download_images(allocated_docs: List[dict], image_repo: dict,
                                     )
                             except PIL.UnidentifiedImageError as e:
                                 image_repo[sub_field] = e
-                                metric_obj.increment_counter(f"{_id}.UnidentifiedImageError")
+                                metric_obj.increment_counter(f"{doc.get(field, '')}.UnidentifiedImageError")
                                 continue
 
 

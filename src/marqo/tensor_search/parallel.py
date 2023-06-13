@@ -115,7 +115,7 @@ class IndexChunk:
 
     def process(self) -> Tuple[List[Dict[str, Any]], RequestMetric]:
         # Generate pseudo-unique ID for thread metrics.
-        _id = hash("".join([d.get("_id", str(random.randbytes(8))) for d in self.add_docs_params.docs])) % 1000
+        _id = hash("".join([d.get("_id", str(random.getrandbits(64))) for d in self.add_docs_params.docs])) % 1000
 
         # We set a temporary key in 
         Request(scope={"type": "http"})
