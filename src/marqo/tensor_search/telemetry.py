@@ -7,10 +7,11 @@ from collections import defaultdict
 from contextlib import contextmanager
 import time
 from contextvars import ContextVar
+from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.tensor_search.tensor_search_logging import get_logger
 
 logger = get_logger(__name__)
-current_request: ContextVar[Request] = ContextVar('current_request')
+
 
 class TimerError(Exception):
     """An error occured whn operating on a metric timer (e.g. stopping a stopped timer)"""
@@ -29,63 +30,76 @@ class Timer:
             self.start_time = time.perf_counter()
 
     def stop(self) -> float:
-        """Stop the timer, and report the elapsed time"""
+        """Stop the timer, and report the elapsed time
+        
+        Return time is in Ms.
+        """
         if self.start_time is None:
             logger.warn(f"'.stop()' called on unstarted timer. '.start()' must be called before '.stop()'.")
             raise TimerError()
         else:
             elapsed_time = time.perf_counter() - self.start_time
             self.start_time = None
-            return elapsed_time
-        
+            return 1000 * elapsed_time
 
-class RequestMetrics():
-    METRIC_STORES: Dict[str, "RequestMetrics"] = {}
 
+class RequestMetric:
     @classmethod
-    def for_request(cls, r: Optional[Request] = None) -> "RequestMetrics":
-        if r is None:
-            r = current_request.get()
-            
-        return cls.METRIC_STORES[r]
+    def reduce_from_list(cls, metrics: List["RequestMetric"]) -> "RequestMetric":
+        assert len(metrics) > 0, "Cannot create RequestMetric from []"
+        m = metrics.pop(0)
+        for mm in metrics:
+            for k, count in mm.counter.items():
+                m.increment_counter(k, count)
 
-    @classmethod
-    def set_in_request(cls, r: Request) -> None:
-        if r not in cls.METRIC_STORES:
-            current_request.set(r)
-            cls.METRIC_STORES[r] = RequestMetrics()
+            for k, timer in mm.timers.items():
+                m.timers[k] = timer
 
-    @classmethod
-    def clear_metrics_for(cls, r: Request) -> None:
-        cls.METRIC_STORES.pop(r, None)
-
+            for k, time in mm.times.items():
+                m.add_time(k, time)
+        return m
 
     def __init__(self):
         self.counter: Dict[str, int] = defaultdict(int)
-        self.times: Dict[str, float] = defaultdict(float)
+
+        # Note: We default to float, but on multiple times for the same key, it gets converted to a List.
+        self.times: Dict[str, Union[float, List[float]]] = defaultdict(float)
         self.timers: Dict[str, Timer] = defaultdict(Timer)
 
     def increment_counter(self, k: str):
         self.counter[k]+=1
 
     @contextmanager
-    def time(self, k: str):
+    def time(self, k: str, callback: Optional[Callable[[float], None]] = None):
         self.start(k)
         try:
             yield
         finally:
-            elapsed_time = self.stop(k)
-            self.times[k] = elapsed_time
+            elapsed_time = self._stop(k)
+            if callback is not None:
+                callback(elapsed_time)
+            self.add_time(k, elapsed_time)
 
     def start(self, k: str):
         """Start a new timer for the given key"""
         self.timers[k].start()
 
+    def _stop(self, k: str) -> float:
+        return self.timers[k].stop()
+
+    def add_time(self, k: str, v: float):
+        if self.times.get(k, None) is None:
+            self.times[k] = v
+        elif isinstance(self.times.get(k), list):
+            self.times[k] = self.times[k] + [v]
+        else:
+            self.times[k] = [self.times[k], v]
+
     def stop(self, k: str) -> float:
         """Stop the timer for the given key, and report the elapsed time"""
         try:
-            elapsed_time = self.timers[k].stop()
-            self.times[k] += elapsed_time
+            elapsed_time = self._stop(k)
+            self.add_time(k, elapsed_time)
             return elapsed_time
         except TimerError:
             logger.warn(f"timer {k} stopped incorrectly. Time not recorded.")
@@ -98,6 +112,38 @@ class RequestMetrics():
             "counter": dict(self.counter),
             "times": dict(self.times)
         }
+
+
+class RequestMetrics():
+    current_request: ContextVar[Request] = ContextVar('current_request')
+    
+    METRIC_STORES: Dict[str, RequestMetric] = {}
+
+    @classmethod
+    def _set_request(cls, r: Request):
+        cls.current_request.set(r)
+
+    @classmethod
+    def _get_request(cls) -> Request:
+        return cls.current_request.get()
+
+    @classmethod
+    def for_request(cls, r: Optional[Request] = None) -> RequestMetric:
+        if r is None:
+            r = cls._get_request()
+            
+        return cls.METRIC_STORES[r]
+
+    @classmethod
+    def set_in_request(cls, r: Optional[Request] = None, metrics: Optional[RequestMetric] = None) -> None:
+        r = r if r is not None else cls._get_request()
+        cls._set_request(r)
+        cls.METRIC_STORES[r] = metrics if metrics is not None else RequestMetric()
+
+    @classmethod
+    def clear_metrics_for(cls, r: Request) -> None:
+        cls.METRIC_STORES.pop(r, None)
+
 
 class TelemetryMiddleware(BaseHTTPMiddleware):
     """
@@ -143,7 +189,14 @@ class TelemetryMiddleware(BaseHTTPMiddleware):
         data = await self.get_response_json(response)
         
         # Inject telemetry and fix content-length header
-        data["telemetry"] = RequestMetrics.for_request(request).json()
+        if isinstance(data, dict):
+            data["telemetry"] = RequestMetrics.for_request(request).json()
+        else:
+            get_logger(__name__).warning(
+                f"{self.telemetry_flag} set but response payload is not Dict. telemetry not returned"
+            )
+            get_logger(__name__).info(f"Telemetry data={json.dumps(RequestMetrics.for_request(request).json(), indent=2)}")
+
         RequestMetrics.clear_metrics_for(request)
 
         body = json.dumps(data).encode()

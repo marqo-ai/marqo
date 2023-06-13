@@ -3,14 +3,16 @@ import copy
 import functools
 import math
 import threading
-import warnings
-from typing import List, Tuple
+import random
+
+from typing import List, Optional, Tuple
 import PIL
 from marqo.s2_inference import clip_utils
+from marqo.tensor_search.telemetry import RequestMetrics, RequestMetric
 
 
 def threaded_download_images(allocated_docs: List[dict], image_repo: dict,
-                             non_tensor_fields: Tuple, image_download_headers: dict) -> None:
+                             non_tensor_fields: Tuple, image_download_headers: dict, metric_obj: Optional[RequestMetric] = None) -> None:
     """A thread calls this function to download images for its allocated documents
 
     This should be called only if treat URLs as images is True.
@@ -35,31 +37,43 @@ def threaded_download_images(allocated_docs: List[dict], image_repo: dict,
     Returns:
         None
     """
+    # Generate pseudo-unique ID for thread metrics.
+    _id = hash("".join([d.get("_id", str(random.randbytes(8))) for d in allocated_docs])) % 1000
+    _id = f"threaded_download_images.{_id}"
     TIMEOUT_SECONDS=3
-    for doc in allocated_docs:
-        for field in list(doc):
-            if field in non_tensor_fields:
-                continue
-            if isinstance(doc[field], str) and clip_utils._is_image(doc[field]):
-                if doc[field] in image_repo:
+
+    with metric_obj.time(f"{_id}.full_time"):
+        for doc in allocated_docs:
+            for field in list(doc):
+                if field in non_tensor_fields:
                     continue
-                try:
-                    image_repo[doc[field]] = clip_utils.load_image_from_path(doc[field], image_download_headers, timeout=TIMEOUT_SECONDS)
-                except PIL.UnidentifiedImageError as e:
-                    image_repo[doc[field]] = e
-                    continue
-            # For multimodal tensor combination
-            elif isinstance(doc[field], dict):
-                for sub_field in list(doc[field].values()):
-                    if isinstance(sub_field, str) and clip_utils._is_image(sub_field):
-                        if sub_field in image_repo:
-                            continue
-                        try:
-                            image_repo[sub_field] = clip_utils.load_image_from_path(sub_field, image_download_headers,
-                                                                          timeout=TIMEOUT_SECONDS)
-                        except PIL.UnidentifiedImageError as e:
-                            image_repo[sub_field] = e
-                            continue
+                if isinstance(doc[field], str) and clip_utils._is_image(doc[field]):
+                    if doc[field] in image_repo:
+                        continue
+                    try:
+                        with metric_obj.time(f"{_id}.{doc[field]}"):
+                            image_repo[doc[field]] = clip_utils.load_image_from_path(doc[field], image_download_headers, timeout=TIMEOUT_SECONDS)
+                    except PIL.UnidentifiedImageError as e:
+                        image_repo[doc[field]] = e
+                        metric_obj.increment_counter(f"{_id}.UnidentifiedImageError")
+                        continue
+                # For multimodal tensor combination
+                elif isinstance(doc[field], dict):
+                    for sub_field in list(doc[field].values()):
+                        if isinstance(sub_field, str) and clip_utils._is_image(sub_field):
+                            if sub_field in image_repo:
+                                continue
+                            try:
+                                with metric_obj.time(f"{_id}.{doc[field]}"):
+                                    image_repo[sub_field] = clip_utils.load_image_from_path(
+                                        sub_field,
+                                        image_download_headers,
+                                        timeout=TIMEOUT_SECONDS
+                                    )
+                            except PIL.UnidentifiedImageError as e:
+                                image_repo[sub_field] = e
+                                metric_obj.increment_counter(f"{_id}.UnidentifiedImageError")
+                                continue
 
 
 def download_images(docs: List[dict], thread_count: int, non_tensor_fields: Tuple, image_download_headers: dict) -> dict:
@@ -79,8 +93,9 @@ def download_images(docs: List[dict], thread_count: int, non_tensor_fields: Tupl
     docs_per_thread = math.ceil(len(docs)/thread_count)
     copied = copy.deepcopy(docs)
     image_repo = dict()
+    metric_obj = RequestMetrics.for_request()
     thread_allocated_docs = [copied[i: i + docs_per_thread] for i in range(len(copied))[::docs_per_thread]]
-    threads = [threading.Thread(target=threaded_download_images, args=(allocation, image_repo, non_tensor_fields, image_download_headers))
+    threads = [threading.Thread(target=threaded_download_images, args=(allocation, image_repo, non_tensor_fields, image_download_headers, metric_obj))
                for allocation in thread_allocated_docs]
     for th in threads:
         th.start()
