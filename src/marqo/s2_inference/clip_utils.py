@@ -457,7 +457,6 @@ class OPEN_CLIP(CLIP):
                     f"3. you may have tried to load a `clip` model even though `model_properties['type']` is set to 'open_clip'. \n"
                     f"Please check and update your model properties and retry. "
                     f"You can find more details at `https://docs.marqo.ai/0.0.21/Models-Reference/bring_your_own_model/#bring-your-own-clip-model`")
-
             elif isinstance(e, AttributeError) or ("This could be because the operator doesn't exist for this backend" in str(e)):
                 raise InvalidModelPropertiesError(
                     f"Marqo encountered an error when loading custom open_clip model `{self.model_name}` with "
