@@ -433,17 +433,22 @@ class OPEN_CLIP(CLIP):
         self.model_name = self.model_properties.get("name", None)
         logger.info(f"The name of the custom clip model is {self.model_name}. We use open_clip load")
         try:
+            print("loading model")
             model, _, preprocess = open_clip.create_model_and_transforms(
                 model_name=self.model_name, jit=self.jit, pretrained=self.model_path, precision=self.precision,
                 image_mean=self.mean, image_std=self.std, device=self.device, cache_dir=ModelCache.clip_cache_path)
+            return model, preprocess
         except Exception as e:
             if isinstance(e, RuntimeError) and "The file might be corrupted" in str(e):
                 try:
+                    print("yes")
                     os.remove(self.model_path)
                 except Exception as remove_e:
                     raise RuntimeError(
                         f"Marqo encountered an error while attempting to delete a corrupted file `{self.model_path}`. "
-                        f"Please manually check and remove the file. Error message: `{str(remove_e)}`"
+                        f"Please report this issue on Marqo's Github Repo and replace the problematic Marqo instance "
+                        f"with a new one. \n "
+                        f"Error message: `{str(remove_e)}`"
                     )
                 raise InvalidModelPropertiesError(
                     f"Marqo encountered a corrupted file when loading open_clip file `{self.model_path}`. "

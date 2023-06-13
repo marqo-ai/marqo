@@ -236,10 +236,11 @@ def extract_huggingface_archive(path: str) -> str:
                 os.remove(path)
             except Exception as remove_e:
                 raise RuntimeError(
-                    f"Marqo encountered an error while attempting to delete corrupted file `{path}`. "
-                    f"Please manually check and remove the file. Error message: `{str(remove_e)}`"
+                    f"Marqo encountered an error while attempting to delete a corrupted file `{path}`. "
+                    f"Please report this issue on Marqo's Github Repo and replace the problematic Marqo instance with "
+                    f"a new one. \n "
+                    f"Error message: `{str(remove_e)}`"
                 )
-
             raise InvalidModelPropertiesError(f'Marqo encountered an error while extracting the compressed model archive from `{path}`.\n '
                                               f'This is probably because the file is corrupted or the extension `{ext}` is not supported. '
                                               f'Marqo has removed the corrupted file from the disk.'

@@ -78,9 +78,9 @@ class TestCorruptFileInOpenCLIP(unittest.TestCase):
         with patch("marqo.s2_inference.clip_utils.download_model", return_value = self.dummpy_corrupted_file):
             for model_properties in self.dummpy_model_properties:
                 # Execute and Verify
-                with self.assertRaises(InvalidModelPropertiesError) as context:
+                with self.assertRaises(RuntimeError) as context:
                     _ = _load_model(**self.load_parameters, model_properties=model_properties)
-                self.assertIn("Marqo encountered an error while attempting to delete corrupted file",
+                self.assertIn("Marqo encountered an error while attempting to delete a corrupted file",
                               str(context.exception))
                 mock_os_remove.assert_called_once_with(self.dummpy_corrupted_file)
 
