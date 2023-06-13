@@ -1,14 +1,12 @@
 import unittest
-import os
 import torch
-
+from unittest.mock import MagicMock, patch
 from marqo.s2_inference.types import FloatTensor
 from marqo.s2_inference.s2_inference import clear_loaded_models, get_model_properties_from_registry
 from marqo.s2_inference.model_registry import load_model_properties, _get_open_clip_properties
 from marqo.s2_inference.s2_inference import _convert_tensor_to_numpy
 import numpy as np
 import functools
-from unittest.mock import MagicMock
 
 from marqo.s2_inference.s2_inference import (
     _check_output_type, vectorise,
@@ -432,3 +430,11 @@ class TestOpenClipModelEncoding(unittest.TestCase):
 
             clear_loaded_models()
 
+    @patch("torch.cuda.amp.autocast")
+    def test_autocast_called_when_cuda(self, mock_autocast):
+        names = self.open_clip_test_model
+        contents = ['this is a test sentence. so is this.', "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image0.jpg"]
+        for model_name in names:
+            for content in contents:
+                vectorise(model_name=model_name, content=content, device="cpu")
+                mock_autocast.assert_not_called()
