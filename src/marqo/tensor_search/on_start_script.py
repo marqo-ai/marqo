@@ -90,11 +90,11 @@ class CUDAAvailable:
             if it does, health check should throw a warning.
         """
         device_count = 0
-        os.environ["_MARQO_BEST_AVAILABLE_DEVICE"] = "cpu"
+        os.environ["MARQO_BEST_AVAILABLE_DEVICE"] = "cpu"
         if torch.cuda.is_available():
             device_count = torch.cuda.device_count()
-            os.environ["_MARQO_BEST_AVAILABLE_DEVICE"] = "cuda"
-        self.logger.info(f"Best available device set to: {os.environ['_MARQO_BEST_AVAILABLE_DEVICE']}")
+            os.environ["MARQO_BEST_AVAILABLE_DEVICE"] = "cuda"
+        self.logger.info(f"Best available device set to: {os.environ['MARQO_BEST_AVAILABLE_DEVICE']}")
 
         # use -1 for cpu
         device_ids = [-1]

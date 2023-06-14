@@ -2,7 +2,7 @@ import PIL
 from marqo.s2_inference import random_utils, s2_inference
 import unittest
 from unittest import mock
-from marqo.errors import ConfigurationError
+from marqo.errors import ConfigurationError, InternalError
 from marqo.tensor_search.enums import AvailableModelsKey
 import datetime
 
@@ -318,4 +318,19 @@ class TestVectoriseBatching(unittest.TestCase):
                     pass
             return True
         assert run()
+    
+    def test_vectorise_with_no_device_fails(self):
+        """
+            when device is not set,
+            vectorise call should raise an internal error
+        """
+        try:
+            s2_inference.available_models.update(self.mock_available_models)
+
+            # Test with a batch size of 1
+            s2_inference.vectorise(model_name='mock_model', content=self.content_list,
+                                model_properties=self.mock_model_props)
+            raise AssertionError
+        except InternalError:
+            pass
 

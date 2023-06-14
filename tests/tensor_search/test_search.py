@@ -29,7 +29,7 @@ class TestVectorSearch(MarqoTestCase):
 
         # Any tests that call add_documents_orchestrator, search, bulk_search need this env var
         # Ensure other os.environ patches in indiv tests do not erase this one.
-        self.device_patcher = mock.patch.dict(os.environ, {"_MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
+        self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
         self.device_patcher.start()
 
     def tearDown(self):

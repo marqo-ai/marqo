@@ -21,7 +21,7 @@ class TestGetDocuments(MarqoTestCase):
         self._delete_testing_indices()
         
         # Any tests that call add_documents_orchestrator, search, bulk_search need this env var
-        self.device_patcher = mock.patch.dict(os.environ, {"_MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
+        self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
         self.device_patcher.start()
 
     def tearDown(self):

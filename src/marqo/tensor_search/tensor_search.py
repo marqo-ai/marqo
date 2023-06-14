@@ -239,10 +239,9 @@ def add_documents_orchestrator(
         config: Config, add_docs_params: AddDocsParams,
         batch_size: int = 0, processes: int = 1,
     ):
-    
     # Default device calculated here and not in add_documents call
     if add_docs_params.device is None:
-        selected_device = utils.read_env_vars_and_defaults("_MARQO_BEST_AVAILABLE_DEVICE")
+        selected_device = utils.read_env_vars_and_defaults("MARQO_BEST_AVAILABLE_DEVICE")
         if selected_device is None:
             raise errors.InternalError("Best available device was not properly determined on Marqo startup.")
         add_docs_params_with_device = replace(add_docs_params, device=selected_device)
@@ -252,18 +251,16 @@ def add_documents_orchestrator(
     
     if batch_size is None or batch_size == 0:
         logger.debug(f"batch_size={batch_size} and processes={processes} - not doing any marqo side batching")
-        return add_documents(config=config, add_docs_params=add_docs_params)
+        return add_documents(config=config, add_docs_params=add_docs_params_with_device)
     elif processes is not None and processes > 1:
-
         # create beforehand or pull from the cache so it is up to date for the multi-processing
         _check_and_create_index_if_not_exist(config=config, index_name=add_docs_params.index_name)
-
         try:
             # Empty text search:
             # 1. loads model into memory, 2. updates cache for multiprocessing
             _vector_text_search(
                 config=config, index_name=add_docs_params.index_name, query='',
-                model_auth=add_docs_params.model_auth, device=selected_device,
+                model_auth=add_docs_params.model_auth, device=add_docs_params_with_device.device,
                 image_download_headers=add_docs_params.image_download_headers)
         except Exception as e:
             logger.warning(
@@ -967,7 +964,7 @@ def bulk_search(query: BulkSearchQuery, marqo_config: config.Config, verbose: bo
         return {"result": []}
 
     if device is None:
-        selected_device = utils.read_env_vars_and_defaults("_MARQO_BEST_AVAILABLE_DEVICE")
+        selected_device = utils.read_env_vars_and_defaults("MARQO_BEST_AVAILABLE_DEVICE")
         if selected_device is None:
             raise errors.InternalError("Best available device was not properly determined on Marqo startup.")
         logger.debug(f"No device given for bulk_search. Defaulting to best available device: {selected_device}")
@@ -1126,7 +1123,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
     cache_update_thread.start()
 
     if device is None:
-        selected_device = utils.read_env_vars_and_defaults("_MARQO_BEST_AVAILABLE_DEVICE")
+        selected_device = utils.read_env_vars_and_defaults("MARQO_BEST_AVAILABLE_DEVICE")
         if selected_device is None:
             raise errors.InternalError("Best available device was not properly determined on Marqo startup.")
         logger.debug(f"No device given for search. Defaulting to best available device: {selected_device}")

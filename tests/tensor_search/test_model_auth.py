@@ -152,7 +152,7 @@ class TestModelAuthLoadedS3(MarqoTestCase):
 
     def setUp(self):
         # Any tests that call add_documents_orchestrator, search, bulk_search need this env var
-        self.device_patcher = mock.patch.dict(os.environ, {"_MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
+        self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
         self.device_patcher.start()
 
     def tearDown(self):
@@ -210,7 +210,7 @@ class TestModelAuthOpenCLIP(MarqoTestCase):
             pass
         
         # Any tests that call add_documents_orchestrator, search, bulk_search need this env var
-        self.device_patcher = mock.patch.dict(os.environ, {"_MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
+        self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
         self.device_patcher.start()
         
     def tearDown(self) -> None:
@@ -1123,7 +1123,7 @@ class TestModelAuthDownloadAndExtractS3HFModel(MarqoTestCase):
 
     def setUp(self):
         # Any tests that call add_documents_orchestrator, search, bulk_search need this env var
-        self.device_patcher = mock.patch.dict(os.environ, {"_MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
+        self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
         self.device_patcher.start()
 
     def tearDown(self):
@@ -1197,7 +1197,7 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
             pass
 
         # Any tests that call add_documents_orchestrator, search, bulk_search need this env var
-        self.device_patcher = mock.patch.dict(os.environ, {"_MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
+        self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
         self.device_patcher.start()
 
     def tearDown(self) -> None:
@@ -2016,7 +2016,7 @@ class TestS3ModelAuthlLoadForHFModelVariants(MarqoTestCase):
             pass
         
         # Any tests that call add_documents_orchestrator, search, bulk_search need this env var
-        self.device_patcher = mock.patch.dict(os.environ, {"_MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
+        self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
         self.device_patcher.start() 
 
     def tearDown(self) -> None:

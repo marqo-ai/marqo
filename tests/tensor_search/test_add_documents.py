@@ -13,7 +13,7 @@ import numpy as np
 import requests
 from marqo.tensor_search.enums import TensorField, IndexSettingsField, SearchMethod
 from marqo.tensor_search import enums
-from marqo.errors import IndexNotFoundError, InvalidArgError, BadRequestError
+from marqo.errors import IndexNotFoundError, InvalidArgError, BadRequestError, InternalError
 from marqo.tensor_search import tensor_search, index_meta_cache, backend
 from tests.marqo_test import MarqoTestCase
 import time
@@ -31,7 +31,7 @@ class TestAddDocuments(MarqoTestCase):
             pass
         
         # Any tests that call add_documents_orchestrator, search, bulk_search need this env var
-        self.device_patcher = mock.patch.dict(os.environ, {"_MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
+        self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
         self.device_patcher.start()
 
     def tearDown(self) -> None:
@@ -1534,3 +1534,25 @@ class TestAddDocuments(MarqoTestCase):
             assert len(expected_repo_structure) == len(image_repo)
             for k in expected_repo_structure:
                 assert isinstance(image_repo[k], expected_repo_structure[k])
+    
+    def test_add_documents_with_no_device_fails(self):
+        """
+            when device is not set,
+            add documents call should raise an internal error
+        """
+        try:
+            tensor_search.add_documents(
+                config=self.config, add_docs_params=AddDocsParams(
+                    index_name=self.index_name_1,
+                    docs=[{
+                        "_id": "123",
+                        "id": "abcdefgh",
+                        "title 1": "content 1",
+                        "desc 2": "content 2. blah blah blah"
+                    }],
+                    auto_refresh=True
+                )
+            )
+            raise AssertionError
+        except InternalError:
+            pass
