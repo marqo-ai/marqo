@@ -2,7 +2,7 @@
 The functions defined here would have endpoints, later on.
 """
 import numpy as np
-from marqo.errors import ModelCacheManagementError, InvalidArgError
+from marqo.errors import ModelCacheManagementError, InvalidArgError, ConfigurationError, InternalError
 from marqo.s2_inference.errors import (
     VectoriseError, InvalidModelPropertiesError, ModelLoadError,
     UnknownModelError, ModelNotInCacheError, ModelDownloadError)
@@ -20,7 +20,6 @@ from marqo.tensor_search.models.private_models import ModelAuth
 import threading
 from marqo.tensor_search.utils import read_env_vars_and_defaults, generate_batches
 from marqo.tensor_search.configs import EnvVars
-from marqo.errors import ConfigurationError
 
 logger = get_logger(__name__)
 
@@ -55,7 +54,7 @@ def vectorise(model_name: str, content: Union[str, List[str]], model_properties:
     """
 
     if not device:
-        raise InvalidArgError(message=f"vectorise (internal function) cannot be called without setting device!")
+        raise InternalError(message=f"vectorise (internal function) cannot be called without setting device!")
     
     validated_model_properties = _validate_model_properties(model_name, model_properties)
     model_cache_key = _create_model_cache_key(model_name, device, validated_model_properties)

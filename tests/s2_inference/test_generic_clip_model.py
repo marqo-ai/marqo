@@ -12,6 +12,7 @@ from marqo.s2_inference.s2_inference import (
 )
 
 from tests.marqo_test import MarqoTestCase
+from unittest import mock
 
 
 class TestGenericModelSupport(MarqoTestCase):

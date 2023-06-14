@@ -243,6 +243,8 @@ def add_documents_orchestrator(
     # Default device calculated here and not in add_documents call
     if add_docs_params.device is None:
         selected_device = utils.read_env_vars_and_defaults("_MARQO_BEST_AVAILABLE_DEVICE")
+        if selected_device is None:
+            raise errors.InternalError("Best available device was not properly determined on Marqo startup.")
         add_docs_params_with_device = replace(add_docs_params, device=selected_device)
         logger.debug(f"No device given for add_documents_orchestrator. Defaulting to best available device: {selected_device}")
     else:
@@ -380,7 +382,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
     bulk_parent_dicts = []
 
     if not add_docs_params.device:
-        raise errors.InvalidArgError(message=f"add_documents (internal function) cannot be called without setting device!")
+        raise errors.InternalError("add_documents (internal function) cannot be called without setting device!")
     
     try:
         index_info = backend.get_index_info(config=config, index_name=add_docs_params.index_name)
@@ -966,6 +968,8 @@ def bulk_search(query: BulkSearchQuery, marqo_config: config.Config, verbose: bo
 
     if device is None:
         selected_device = utils.read_env_vars_and_defaults("_MARQO_BEST_AVAILABLE_DEVICE")
+        if selected_device is None:
+            raise errors.InternalError("Best available device was not properly determined on Marqo startup.")
         logger.debug(f"No device given for bulk_search. Defaulting to best available device: {selected_device}")
     else:
         selected_device = device
@@ -1123,6 +1127,8 @@ def search(config: Config, index_name: str, text: Union[str, dict],
 
     if device is None:
         selected_device = utils.read_env_vars_and_defaults("_MARQO_BEST_AVAILABLE_DEVICE")
+        if selected_device is None:
+            raise errors.InternalError("Best available device was not properly determined on Marqo startup.")
         logger.debug(f"No device given for search. Defaulting to best available device: {selected_device}")
     else:
         selected_device = device
