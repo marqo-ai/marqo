@@ -201,3 +201,14 @@ class TestLargeModelEncoding(unittest.TestCase):
 
             del model
             clear_loaded_models()
+
+    @patch("torch.cuda.amp.autocast")
+    def test_autocast_called_in_open_clip(self, mock_autocast):
+        names = ["open_clip/ViT-B-32/laion400m_e31"]
+        contents = ['this is a test sentence. so is this.',
+                    "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image0.jpg"]
+        for model_name in names:
+            for content in contents:
+                vectorise(model_name=model_name, content=content, device="cuda")
+                mock_autocast.assert_called_once()
+                mock_autocast.reset_mock()

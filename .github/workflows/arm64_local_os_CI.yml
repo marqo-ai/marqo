@@ -42,7 +42,7 @@ jobs:
 
           # ARM Runner Image
           ec2-image-id: ${{ secrets.ARM_EC2_IMAGE_ID }}
-          ec2-instance-type: a1.xlarge
+          ec2-instance-type: t4g.xlarge
           subnet-id: ${{ secrets.ARM_SUBNET_ID }}
           security-group-id: ${{ secrets.ARM_SECURITY_GROUP_ID }}
 
