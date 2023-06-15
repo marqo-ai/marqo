@@ -37,10 +37,6 @@ class TestDefaultDevice(MarqoTestCase):
             tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         except IndexNotFoundError as s:
             pass
-        
-        # Any tests that call add_documents_orchestrator, search, bulk_search need this env var
-        #self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
-        #self.device_patcher.start()
 
     def tearDown(self) -> None:
         self.index_name_1 = "my-test-index-1"
@@ -48,8 +44,6 @@ class TestDefaultDevice(MarqoTestCase):
             tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         except IndexNotFoundError as s:
             pass
-        
-        #self.device_patcher.stop()
 
     def test_add_docs_orchestrator_defaults_to_best_device(self):
         """
@@ -70,7 +64,6 @@ class TestDefaultDevice(MarqoTestCase):
                 "marqo.tensor_search.parallel.add_documents_mp"]),               # parallel
             ("cuda", {"batch_size": 2}, ["marqo.tensor_search.tensor_search._batch_request"]),    # server batched
         ]
-        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
         for best_available_device, extra_params, called_methods in test_cases:
             @mock.patch.dict(os.environ, {**os.environ, **{"MARQO_BEST_AVAILABLE_DEVICE": best_available_device}})
             def run():
@@ -95,9 +88,16 @@ class TestDefaultDevice(MarqoTestCase):
                         assert mocked_method.call_args[1]["add_docs_params"].device == best_available_device
                     else:
                         assert mocked_method.call_args[1]["device"] == best_available_device
+                
+                # Stop all the patchers (important, if not stopped, will leak into next tests)
+                for patcher in patchers:
+                    patcher.stop()
+
                 return True
 
             assert run()
+
+            
     
     def test_add_docs_orchestrator_uses_set_device(self):
         """
@@ -118,7 +118,6 @@ class TestDefaultDevice(MarqoTestCase):
                 "marqo.tensor_search.parallel.add_documents_mp"]),               # parallel
             ("cuda", "cuda", {"batch_size": 2}, ["marqo.tensor_search.tensor_search._batch_request"]),    # server batched
         ]
-        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
         for best_available_device, explicitly_set_device, extra_params, called_methods in test_cases:
             @mock.patch.dict(os.environ, {**os.environ, **{"MARQO_BEST_AVAILABLE_DEVICE": best_available_device}})
             def run():
@@ -143,6 +142,10 @@ class TestDefaultDevice(MarqoTestCase):
                         assert mocked_method.call_args[1]["add_docs_params"].device == explicitly_set_device
                     else:
                         assert mocked_method.call_args[1]["device"] == explicitly_set_device
+                
+                # Stop all the patchers (important, if not stopped, will leak into next tests)
+                for patcher in patchers:
+                    patcher.stop()
                 return True
 
             assert run()
@@ -157,7 +160,7 @@ class TestDefaultDevice(MarqoTestCase):
             ("cpu", {}, ["marqo.tensor_search.tensor_search._vector_text_search", "marqo.s2_inference.reranking.rerank.rerank_search_results"]),
             ("cuda", {}, ["marqo.tensor_search.tensor_search._vector_text_search", "marqo.s2_inference.reranking.rerank.rerank_search_results"]),
         ]
-        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
+
         for best_available_device, extra_params, called_methods in test_cases:
             @mock.patch.dict(os.environ, {**os.environ, **{"MARQO_BEST_AVAILABLE_DEVICE": best_available_device}})
             def run():
@@ -184,6 +187,10 @@ class TestDefaultDevice(MarqoTestCase):
                 # Confirm lower level functions were called with default device
                 for mocked_method in mocks:
                     assert mocked_method.call_args[1]["device"] == best_available_device
+                
+                # Stop all the patchers (important, if not stopped, will leak into next tests)
+                for patcher in patchers:
+                    patcher.stop()
                 return True
             assert run()
     
@@ -197,7 +204,7 @@ class TestDefaultDevice(MarqoTestCase):
             ("cpu", "cuda", {}, ["marqo.tensor_search.tensor_search._vector_text_search", "marqo.s2_inference.reranking.rerank.rerank_search_results"]),
             ("cuda", "cpu", {}, ["marqo.tensor_search.tensor_search._vector_text_search", "marqo.s2_inference.reranking.rerank.rerank_search_results"]),
         ]
-        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
+
         for best_available_device, explicitly_set_device, extra_params, called_methods in test_cases:
             @mock.patch.dict(os.environ, {**os.environ, **{"MARQO_BEST_AVAILABLE_DEVICE": best_available_device}})
             def run():
@@ -224,6 +231,10 @@ class TestDefaultDevice(MarqoTestCase):
                 # Confirm lower level functions were called with default device
                 for mocked_method in mocks:
                     assert mocked_method.call_args[1]["device"] == explicitly_set_device
+                
+                # Stop all the patchers (important, if not stopped, will leak into next tests)
+                for patcher in patchers:
+                    patcher.stop()
                 return True
             assert run()
     
@@ -234,12 +245,12 @@ class TestDefaultDevice(MarqoTestCase):
             with env var MARQO_BEST_AVAILABLE_DEVICE
         """
         test_cases = [
+            # separating vector search from reranking mocking
             ("cpu", {}, ["marqo.tensor_search.tensor_search._bulk_vector_text_search"]),
             ("cuda", {}, ["marqo.tensor_search.tensor_search._bulk_vector_text_search"]),
-        #    ("cpu", {}, ["marqo.tensor_search.tensor_search._bulk_vector_text_search", "marqo.s2_inference.reranking.rerank.rerank_search_results"]),
-        #    ("cuda", {}, ["marqo.tensor_search.tensor_search._bulk_vector_text_search", "marqo.s2_inference.reranking.rerank.rerank_search_results"]),
+            ("cpu", {}, ["marqo.s2_inference.reranking.rerank.rerank_search_results"]),
+            ("cuda", {}, ["marqo.s2_inference.reranking.rerank.rerank_search_results"]),
         ]
-        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
         for best_available_device, extra_params, called_methods in test_cases:
             @mock.patch.dict(os.environ, {**os.environ, **{"MARQO_BEST_AVAILABLE_DEVICE": best_available_device}})
             def run():
@@ -255,7 +266,7 @@ class TestDefaultDevice(MarqoTestCase):
                         {"abc": "random text", "other field": "Close match hehehe", "_id": "id1-second"}
                     ])
                 )
-                print(f"DEBUG: doc count {tensor_search.get_stats(config=self.config, index_name=self.index_name_1)}")
+
                 # Call bulk search
                 tensor_search.bulk_search(
                     marqo_config=self.config, 
@@ -263,13 +274,13 @@ class TestDefaultDevice(MarqoTestCase):
                         queries=[
                             BulkSearchQueryEntity(
                                 index=self.index_name_1, 
-                                #reRanker="owl/ViT-B/32",
+                                reRanker="owl/ViT-B/32",
                                 q="match", 
                                 searchableAttributes=["abc", "other field"],
                             ),
                             BulkSearchQueryEntity(
                                 index=self.index_name_1, 
-                                #reRanker="owl/ViT-B/32",
+                                reRanker="owl/ViT-B/32",
                                 q="match 2", 
                                 searchableAttributes=["abc", "other field"],
                             )
@@ -280,8 +291,11 @@ class TestDefaultDevice(MarqoTestCase):
                 )
                 # Confirm lower level functions were called with default device
                 for mocked_method in mocks:
-                    print(f"Testing method {mocked_method}")
                     assert mocked_method.call_args[1]["device"] == best_available_device
+                
+                # Stop all the patchers (important, if not stopped, will leak into next tests)
+                for patcher in patchers:
+                    patcher.stop()
                 return True
             assert run()
     
@@ -292,12 +306,13 @@ class TestDefaultDevice(MarqoTestCase):
             with explicitly set device
         """
         test_cases = [
+            # separating vector search from reranking mocking
             ("cpu", "cuda", {}, ["marqo.tensor_search.tensor_search._bulk_vector_text_search"]),
             ("cuda", "cpu", {}, ["marqo.tensor_search.tensor_search._bulk_vector_text_search"]),
-        #    ("cpu", {}, ["marqo.tensor_search.tensor_search._bulk_vector_text_search", "marqo.s2_inference.reranking.rerank.rerank_search_results"]),
-        #    ("cuda", {}, ["marqo.tensor_search.tensor_search._bulk_vector_text_search", "marqo.s2_inference.reranking.rerank.rerank_search_results"]),
+            ("cpu", "cuda", {}, ["marqo.s2_inference.reranking.rerank.rerank_search_results"]),
+            ("cuda", "cpu", {}, ["marqo.s2_inference.reranking.rerank.rerank_search_results"]),
         ]
-        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
+
         for best_available_device, explicitly_set_device, extra_params, called_methods in test_cases:
             @mock.patch.dict(os.environ, {**os.environ, **{"MARQO_BEST_AVAILABLE_DEVICE": best_available_device}})
             def run():
@@ -313,7 +328,7 @@ class TestDefaultDevice(MarqoTestCase):
                         {"abc": "random text", "other field": "Close match hehehe", "_id": "id1-second"}
                     ])
                 )
-                print(f"DEBUG: doc count {tensor_search.get_stats(config=self.config, index_name=self.index_name_1)}")
+
                 # Call bulk search
                 tensor_search.bulk_search(
                     marqo_config=self.config, 
@@ -322,13 +337,13 @@ class TestDefaultDevice(MarqoTestCase):
                         queries=[
                             BulkSearchQueryEntity(
                                 index=self.index_name_1, 
-                                #reRanker="owl/ViT-B/32",
+                                reRanker="owl/ViT-B/32",
                                 q="match", 
                                 searchableAttributes=["abc", "other field"],
                             ),
                             BulkSearchQueryEntity(
                                 index=self.index_name_1, 
-                                #reRanker="owl/ViT-B/32",
+                                reRanker="owl/ViT-B/32",
                                 q="match 2", 
                                 searchableAttributes=["abc", "other field"],
                             )
@@ -339,7 +354,10 @@ class TestDefaultDevice(MarqoTestCase):
                 )
                 # Confirm lower level functions were called with default device
                 for mocked_method in mocks:
-                    print(f"Testing method {mocked_method}")
                     assert mocked_method.call_args[1]["device"] == explicitly_set_device
+                # Stop all the patchers (important, if not stopped, will leak into next tests)
+                for patcher in patchers:
+                    patcher.stop()
+                
                 return True
             assert run()

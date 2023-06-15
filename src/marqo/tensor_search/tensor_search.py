@@ -369,7 +369,6 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
 
     """
     # ADD DOCS TIMER-LOGGER (3)
-
     start_time_3 = timer()
 
     if add_docs_params.mappings is not None:
@@ -380,7 +379,6 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
 
     if not add_docs_params.device:
         raise errors.InternalError("add_documents (internal function) cannot be called without setting device!")
-    
     try:
         index_info = backend.get_index_info(config=config, index_name=add_docs_params.index_name)
     except errors.IndexNotFoundError as s:
