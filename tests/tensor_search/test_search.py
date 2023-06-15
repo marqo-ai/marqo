@@ -581,6 +581,25 @@ class TestVectorSearch(MarqoTestCase):
         except InvalidArgError:
             pass
 
+    def test_set_device(self):
+        """calling search with a specified device overrides MARQO_BEST_AVAILABLE_DEVICE"""
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
+
+        mock_vectorise = mock.MagicMock()
+        mock_vectorise.return_value = [[0, 0, 0, 0]]
+
+        @mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
+        def run():
+            tensor_search.search(
+                config=self.config, index_name=self.index_name_1, text="some text",
+                search_method=SearchMethod.TENSOR, highlights=True, device="cuda:123")
+            return True
+
+        assert run()
+        assert os.environ["_MARQO_BEST_AVAILABLE_DEVICE"] == "cpu"
+        args, kwargs = mock_vectorise.call_args
+        assert kwargs["device"] == "cuda:123"
+    
     def test_search_other_types_subsearch(self):
         add_docs_caller(
             config=self.config, index_name=self.index_name_1, auto_refresh=True,

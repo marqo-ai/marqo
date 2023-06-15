@@ -153,6 +153,27 @@ class TestOnStartScript(MarqoTestCase):
     
     # TODO: test bad/no names/URLS in end-to-end tests, as this logic is done in vectorise call
 
+    def test_set_best_available_device(self):
+        """
+        Makes sure best available device corresponds to whether or not cuda is available
+        """
+        test_cases = [
+            (True, "cuda"),
+            (False, "cpu")
+        ]
+
+        for given_cuda_available, expected_device in test_cases:
+            @mock.patch("torch.cuda.is_available", given_cuda_available)
+            def run():
+                # make sure env var is empty first
+                os.environ.pop("MARQO_BEST_AVAILABLE_DEVICE", None)
+                assert "MARQO_BEST_AVAILABLE_DEVICE" not in os.environ
+
+                on_start_script.SetBestAvailableDevice()
+                assert os.environ["MARQO_BEST_AVAILABLE_DEVICE"] == expected_best_device
+                return True
+            
+            assert run()
 
 
 
