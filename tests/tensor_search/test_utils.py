@@ -323,12 +323,12 @@ class TestUtils(unittest.TestCase):
 
     def test_get_marqo_root_from_env_returns_env_var_if_exists(self):
         expected = "/Users/CoolUser/marqo/src/marqo"
-        with mock.patch.dict('os.environ', {enums.EnvVars.MARQO_ROOT_PATH: expected}):
+        with mock.patch.dict(os.environ, {enums.EnvVars.MARQO_ROOT_PATH: expected}):
             actual = utils.get_marqo_root_from_env()
         self.assertEqual(actual, expected)
 
-    def test_creates_env_var_if_not_exists(self):
-        @mock.patch.dict(os.environ, {**os.environ, **dict()})
+    def test_get_marqo_root_from_env_creates_env_var_if_not_exists(self):
+        @mock.patch.dict(os.environ, dict())
         def run():
             assert enums.EnvVars.MARQO_ROOT_PATH not in os.environ
             marqo_root = utils.get_marqo_root_from_env()
