@@ -1,4 +1,4 @@
-# Multimodal Vector Search with Personalization 
+# Multimodal Vector Search 
 
 *TL:DR We show how both text and images can be used for multimodal search. This allows for multi-part queries, multimodal queries, searching via prompting, promoting/suppressing content by themes, per query curation and personalization. Additionally, we show how other query independent signals can be used to rank documents in addition to similarity. These features allow the creation and curation of high-quality search experiences, particularly for e-commerce and image heavy applications. The article [contains many examples](https://github.com/marqo-ai/marqo/blob/mainline/examples/MultiModalSearch/article.md#2-multimodal-search-in-practice) of multimodal search and a [walkthrough](https://github.com/marqo-ai/marqo/blob/mainline/examples/MultiModalSearch/article.md#3-detailed-example) of the [code](https://github.com/marqo-ai/marqo/blob/mainline/examples/MultiModalSearch/index_and_search.py) to reproduce these.*
 
