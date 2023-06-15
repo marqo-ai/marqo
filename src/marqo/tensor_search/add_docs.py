@@ -38,7 +38,7 @@ def threaded_download_images(allocated_docs: List[dict], image_repo: dict,
     """
     # Generate pseudo-unique ID for thread metrics.
     _id = hash("".join([d.get("_id", str(random.getrandbits(64))) for d in allocated_docs])) % 1000
-    _id = f"threaded_download_images.{_id}"
+    _id = f"image_download.{_id}"
     TIMEOUT_SECONDS=3
     if metric_obj is None: # Occurs predominately in testing.
         metric_obj = RequestMetrics.for_request()
@@ -114,24 +114,24 @@ def reduce_thread_metrics(data):
     e.g.
     ```
     {
-        "threaded_download_images.700.full_time": 1373.271582997404,
-        "threaded_download_images.700.https://www.ai-nc.com/images/pages/heat-map.png": 52.985392,
-        "threaded_download_images.729.full_time": 53.297404,
-        "threaded_download_images.729.https://www.ai-nc.com/images/pages/heat-map.png": 2052.617332985392,
+        "image_download.700.full_time": 1373.271582997404,
+        "image_download.700.https://www.ai-nc.com/images/pages/heat-map.png": 52.985392,
+        "image_download.729.full_time": 53.297404,
+        "image_download.729.https://www.ai-nc.com/images/pages/heat-map.png": 2052.617332985392,
     }
     ```
     Becomes
     ```
     {
-        "threaded_download_images.full_time": [1373.271582997404, 53.297404],
-        "threaded_download_images.https://www.ai-nc.com/images/pages/heat-map.png": [2052.617332985392, 52.985392],
+        "image_download.full_time": [1373.271582997404, 53.297404],
+        "image_download.https://www.ai-nc.com/images/pages/heat-map.png": [2052.617332985392, 52.985392],
     }
     ```
-    Only applies to times that start with `threaded_download_images`.
+    Only applies to times that start with `image_download`.
     """
     result = {}
     for key, value in data.items():
-        if key.startswith("threaded_download_images."):
+        if key.startswith("image_download."):
             parts = key.split('.')
             new_key = '.'.join(parts[0:1] + parts[2:]) if parts[1] != 'full_time' else key
             if new_key in result:

@@ -405,7 +405,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
 
     if index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]:
         with RequestMetrics.for_request().time(
-            "threaded_download_images",
+            "add_documents.image_download",
             lambda t: logger.debug(
                 f"add_documents image download: took {t:.3f}ms to concurrently download "
                 f"images for {batch_size} docs using {add_docs_params.image_download_thread_count} threads"
@@ -584,7 +584,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
 
                     # ADD DOCS TIMER-LOGGER (4)
                     start_time = timer()
-                    with RequestMetrics.for_request().time(f"s2_inference.vectorise.{doc_id}"):
+                    with RequestMetrics.for_request().time(f"add_documents.create_vectors"):
                         vector_chunks = s2_inference.vectorise(
                             model_name=index_info.model_name,
                             model_properties=_get_model_properties(index_info), content=content_chunks,
@@ -729,7 +729,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
 
         # ADD DOCS TIMER-LOGGER (5)
         start_time_5 = timer()
-        with RequestMetrics.for_request().time("opensearch._bulk"):
+        with RequestMetrics.for_request().time("add_documents.opensearch._bulk"):
             index_parent_response = HttpRequests(config).post(
                 path="_bulk", body=utils.dicts_to_jsonl(bulk_parent_dicts)
             )
@@ -1505,7 +1505,7 @@ def vectorise_jobs(jobs: List[VectorisedJobs]) -> Dict[JHash, Dict[str, List[flo
         # TODO: Handle exception for single job, and allow others to run.
         try:
             if v.content:
-                with RequestMetrics.for_request().time(f"s2_inference.vectorise.{v.groupby_key()}"):
+                with RequestMetrics.for_request().time(f"vector_inference"):
                     vectors = s2_inference.vectorise(
                         model_name=v.model_name, model_properties=v.model_properties,
                         content=v.content, device=v.device,
@@ -1784,7 +1784,7 @@ def _vector_text_search(
     queries = [BulkSearchQueryEntity(
         q=query, searchableAttributes=searchable_attributes,searchMethod=SearchMethod.TENSOR, limit=result_count, offset=offset, showHighlights=False, filter=filter_string, attributesToRetrieve=attributes_to_retrieve, boost=boost, image_download_headers=image_download_headers, context=context, scoreModifiers=score_modifiers, index=index_name, modelAuth=model_auth
     )]
-    with RequestMetrics.for_request().time(f"search.vectorise"):
+    with RequestMetrics.for_request().time(f"search.create_vectors"):
         qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, selected_device)
     vectorised_text = list(qidx_to_vectors.values())[0]
 
@@ -2119,7 +2119,7 @@ def vectorise_multimodal_combination_field(
         start_time = timer()
         text_vectors = []
         if len(text_content_to_vectorise) > 0:
-            with RequestMetrics.for_request().time(f"s2_inference.vectorise.{doc_id}"):
+            with RequestMetrics.for_request().time(f"create_vectors"):
                 text_vectors = s2_inference.vectorise(
                     model_name=index_info.model_name,
                     model_properties=_get_model_properties(index_info), content=text_content_to_vectorise,
@@ -2128,7 +2128,7 @@ def vectorise_multimodal_combination_field(
                 )
         image_vectors = []
         if len(image_content_to_vectorise) > 0:
-            with RequestMetrics.for_request().time(f"s2_inference.vectorise.{doc_id}"):
+            with RequestMetrics.for_request().time(f"create_vectors"):
                 image_vectors = s2_inference.vectorise(
                     model_name=index_info.model_name,
                     model_properties=_get_model_properties(index_info), content=image_content_to_vectorise,
