@@ -155,10 +155,22 @@ def create_vector_index(
         """
         ix_settings_with_knn = ix_settings.copy()
         # TODO: use enum for vector field name
-        ix_settings_with_knn["mappings"]["properties"][f"{TensorField.vector_prefix}marqo"] = {
+        ix_settings_with_knn["mappings"]["properties"][TensorField.chunks]["properties"][TensorField.marqo_knn_field] = {
             "type": "knn_vector",
-            "dimension": ix_settings[NsField.index_defaults][NsField.model_properties]["dimensions"],
-            "method": ix_settings[NsField.index_defaults][NsField.ann_parameters],
+            "dimension": (
+                _get_model_properties_from_index_defaults(
+                    index_defaults=(
+                        ix_settings["mappings"]["_meta"]
+                        ["index_settings"][NsField.index_defaults]),
+                    model_name=(
+                        ix_settings["mappings"]["_meta"]
+                        ["index_settings"][NsField.index_defaults][NsField.model])
+                )["dimensions"]
+            ),
+            "method": (
+                ix_settings["mappings"]["_meta"]
+                ["index_settings"][NsField.index_defaults][NsField.ann_parameters]
+            )
         }
         return ix_settings_with_knn
 
@@ -1989,19 +2001,27 @@ def _select_model_from_media_type(media_type: Union[MediaType, str]) -> Union[Ml
                          "Received unknown media type: {}".format(media_type))
 
 
+# TODO: move to index_info file
 def _get_model_properties(index_info):
     index_defaults = index_info.get_index_settings()["index_defaults"]
+    return _get_model_properties_from_index_defaults(
+        index_defaults=index_defaults, model_name=index_info.model_name
+    )
+
+# TODO: move to index_info file
+def _get_model_properties_from_index_defaults(index_defaults: Dict, model_name: str):
+    """ Gets model_properties from index defaults if available
+    """
     try:
         model_properties = index_defaults[NsField.model_properties]
     except KeyError:
         try:
-            model_properties = s2_inference.get_model_properties_from_registry(index_info.model_name)
+            model_properties = s2_inference.get_model_properties_from_registry(model_name)
         except s2_inference_errors.UnknownModelError:
             raise s2_inference_errors.UnknownModelError(
-                f"Could not find model properties for model={index_info.model_name}. "
+                f"Could not find model properties for model={model_name}. "
                 f"Please check that the model name is correct. "
                 f"Please provide model_properties if the model is a custom model and is not supported by default")
-
     return model_properties
 
 

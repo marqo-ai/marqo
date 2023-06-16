@@ -87,7 +87,14 @@ def add_customer_field_properties(config: Config, index_name: str,
         multimodal_customer_field_names = set([(field_name, "_") for field_name in list(multimodal_combination_fields)])
         knn_field_names = knn_field_names.union(multimodal_customer_field_names)
 
-
+    body = {
+        "properties": {
+            enums.TensorField.chunks: {
+                "type": "nested",
+                "properties": {}
+            }
+        }
+    }
     new_index_properties = existing_info.properties.copy()
 
     # copy fields to the chunk for prefiltering. If it is text, convert it to a keyword type to save space
