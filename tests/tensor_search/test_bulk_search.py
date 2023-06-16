@@ -10,7 +10,8 @@ from marqo.s2_inference.s2_inference import vectorise
 import unittest
 from marqo.tensor_search.enums import TensorField, SearchMethod, EnvVars, IndexSettingsField
 from marqo.errors import (
-    BackendCommunicationError, IndexNotFoundError, InvalidArgError, IllegalRequestedDocCount, BadRequestError
+    BackendCommunicationError, IndexNotFoundError, InvalidArgError, IllegalRequestedDocCount, BadRequestError,
+    InternalError
 )
 
 from marqo.tensor_search import api, tensor_search, index_meta_cache, utils
@@ -815,6 +816,18 @@ class TestBulkSearch(MarqoTestCase):
         )
         assert len(search_res) == 1
         assert len(search_res[0]['hits']) == 2
+
+
+    def test_bulk_vector_text_search_no_device(self):
+        try:
+            tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
+            search_res = tensor_search._bulk_vector_text_search(
+                config=self.config, queries=[BulkSearchQueryEntity(index=self.index_name_1, q=" efgh ", limit=10)]
+            )
+            raise AssertionError
+        except InternalError:
+            pass
+
 
     def test_bulk_vector_text_search_against_empty_index(self):
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)

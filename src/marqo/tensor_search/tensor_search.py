@@ -1042,7 +1042,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
            searchable_attributes: Iterable[str] = None, verbose: int = 0,
            reranker: Union[str, Dict] = None, filter: str = None,
            attributes_to_retrieve: Optional[List[str]] = None,
-           device=None, boost: Optional[Dict] = None,
+           device: str = None, boost: Optional[Dict] = None,
            image_download_headers: Optional[Dict] = None,
            context: Optional[SearchContext] = None,
            score_modifiers: Optional[ScoreModifier] = None,
@@ -1671,7 +1671,7 @@ def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity],
     )
     return qidx_to_vectors
 
-def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity], device=None) -> List[Dict]:
+def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity], device: str = None) -> List[Dict]:
     """Resolve a batch of search queries in parallel.
 
     Args:
@@ -1688,7 +1688,7 @@ def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity
         return []
 
     if not device:
-        raise InternalError("_bulk_vector_text_search cannot be called without `device`!")
+        raise errors.InternalError("_bulk_vector_text_search cannot be called without `device`!")
 
     start_preprocessing_time = timer()
     qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, device)
@@ -1797,7 +1797,7 @@ def _vector_text_search(
     # # SEARCH TIMER-LOGGER (pre-processing)
     start_preprocess_time = timer()
     if not device:
-        raise InternalError("_vector_text_search cannot be called without `device`!")
+        raise errors.InternalError("_vector_text_search cannot be called without `device`!")
     try:
         index_info = get_index_info(config=config, index_name=index_name)
     except KeyError as e:

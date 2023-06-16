@@ -11,7 +11,7 @@ import typing
 from marqo.tensor_search.enums import TensorField, SearchMethod, EnvVars, IndexSettingsField
 from marqo.errors import (
     MarqoApiError, MarqoError, IndexNotFoundError, InvalidArgError,
-    InvalidFieldNameError, IllegalRequestedDocCount, BadRequestError
+    InvalidFieldNameError, IllegalRequestedDocCount, BadRequestError, InternalError
 )
 from marqo.tensor_search import tensor_search, constants, index_meta_cache
 import copy
@@ -114,6 +114,16 @@ class TestVectorSearch(MarqoTestCase):
                 config=self.config, index_name=self.index_name_1, text="Exact match hehehe"
             )
 
+    def test_vector_text_search_no_device(self):
+        try:
+            tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
+            search_res = tensor_search._vector_text_search(
+                    config=self.config, index_name=self.index_name_1,
+                    result_count=5, query="some text...")
+            raise AssertionError
+        except InternalError:
+            pass
+    
     def test_vector_search_against_empty_index(self):
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
         search_res = tensor_search._vector_text_search(

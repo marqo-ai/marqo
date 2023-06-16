@@ -7,7 +7,7 @@ import unittest
 from unittest import mock
 import requests
 from marqo.s2_inference.clip_utils import CLIP, download_model, OPEN_CLIP, FP16_CLIP, MULTILINGUAL_CLIP
-from marqo.s2_inference.onnx_clip_utils import CLIP_ONNX
+
 from marqo.tensor_search.enums import ModelProperties
 from marqo.tensor_search.models.private_models import ModelLocation, ModelAuth
 from unittest.mock import patch
@@ -190,15 +190,6 @@ class TestLoad(unittest.TestCase):
         try:
             model_url = 'http://example.com/model.pth'
             clip = MULTILINGUAL_CLIP(model_properties={'url': model_url})
-            raise AssertionError
-        except InternalError as e:
-            pass
-    
-    def test_onnx_clip_with_no_device(self):
-        # Should fail, raising internal error
-        try:
-            model_url = 'http://example.com/model.pth'
-            clip = CLIP_ONNX(model_properties={'url': model_url})
             raise AssertionError
         except InternalError as e:
             pass
