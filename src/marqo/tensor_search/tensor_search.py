@@ -179,6 +179,8 @@ def create_vector_index(
     vector_index_settings["mappings"]["_meta"]["model"] = model_name
 
     vector_index_settings_with_knn = add_knn_field(ix_settings=vector_index_settings)
+
+    logger.debug(f"Creating index {index_name} with settings: {vector_index_settings_with_knn}")
     response = HttpRequests(config).put(path=index_name, body=vector_index_settings_with_knn)
 
     get_cache()[index_name] = IndexInfo(
@@ -753,8 +755,10 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
 
         # ADD DOCS TIMER-LOGGER (5)
         start_time_5 = timer()
+        serialised_body = utils.dicts_to_jsonl(bulk_parent_dicts)
         index_parent_response = HttpRequests(config).post(
-            path="_bulk", body=utils.dicts_to_jsonl(bulk_parent_dicts))
+            path="_bulk", body=serialised_body)
+        logger.debug(f"add_documents sent request to Marqo-os:\n{serialised_body}")
         end_time_5 = timer()
         total_http_time = end_time_5 - start_time_5
         total_index_time = index_parent_response["took"] * 0.001
@@ -1398,7 +1402,9 @@ def bulk_msearch(config: Config, body: List[Dict]) -> List[Dict]:
     """Send an `/_msearch` request to MarqoOS and translate errors into a user-friendly format."""
     start_search_http_time = timer()
     try:
-        response = HttpRequests(config).get(path=F"_msearch", body=utils.dicts_to_jsonl(body))
+        serialised_search_body = utils.dicts_to_jsonl(body)
+        response = HttpRequests(config).get(path=F"_msearch", body=serialised_search_body)
+        logger.debug(f"sent search request to Marqo-os with body: {serialised_search_body}")
         end_search_http_time = timer()
         total_search_http_time = end_search_http_time - start_search_http_time
         total_os_process_time = response["took"] * 0.001
