@@ -293,6 +293,9 @@ def _batch_request(
         ) -> List[Dict[str, Any]]:
     """Batch by the number of documents"""
 
+    if not add_docs_params.device:
+        raise errors.InternalError("_batch_request (internal function) cannot be called without setting device!")
+
     logger.info(f"starting batch ingestion in sizes of {batch_size}")
 
     deeper = ((doc, i, batch_size) for i, doc in enumerate(add_docs_params.docs))

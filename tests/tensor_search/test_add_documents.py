@@ -1556,3 +1556,26 @@ class TestAddDocuments(MarqoTestCase):
             raise AssertionError
         except InternalError:
             pass
+    
+    def test_batch_request_with_no_device_fails(self):
+        """
+            when device is not set,
+            _batch_request call should raise an internal error
+        """
+        try:
+            tensor_search._batch_request(
+                config=self.config, add_docs_params=AddDocsParams(
+                    index_name=self.index_name_1,
+                    docs=[{
+                        "_id": "123",
+                        "id": "abcdefgh",
+                        "title 1": "content 1",
+                        "desc 2": "content 2. blah blah blah"
+                    }],
+                    auto_refresh=True
+                ),
+                batch_size=101
+            )
+            raise AssertionError
+        except InternalError:
+            pass

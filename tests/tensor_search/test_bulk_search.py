@@ -105,8 +105,6 @@ class TestGetQueryVectorsFromJobs(MarqoTestCase):
         self.assertEqual(len(qidx_to_vectors), 0) 
 
 
-
-
 class TestRunVectorisePipeline(MarqoTestCase):
     def setUp(self):
         self.queries = [

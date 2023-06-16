@@ -10,7 +10,7 @@ from marqo import errors
 from marqo.tensor_search import tensor_search
 from marqo.marqo_logging import logger
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
-from marqo.errors import InvalidArgError
+from marqo.errors import InvalidArgError, InternalError
 from dataclasses import replace
 from marqo.config import Config
 
@@ -185,7 +185,7 @@ def add_documents_mp(
     """
 
     if not add_docs_params.device:
-        raise InvalidArgError("You cannot call add_documents_mp without device set!")
+        raise InternalError("You cannot call add_documents_mp without device set!")
     
     
     n_documents = len(add_docs_params.docs)

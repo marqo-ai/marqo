@@ -6,6 +6,7 @@ from marqo.tensor_search import tensor_search
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 import os
 from unittest import mock
+from marqo.errors import InternalError
 
 class TestAddDocumentsPara(MarqoTestCase):
     """
@@ -55,3 +56,15 @@ class TestAddDocumentsPara(MarqoTestCase):
                 index_name=self.index_name_1, docs=data, auto_refresh=True),
             batch_size=10, processes=1)
         res = tensor_search.search(config=self.config, text='something', index_name=self.index_name_1)
+    
+    def test_add_documents_mp_no_device(self) -> None:
+        
+        data = [{'text':f'something {str(i)}', '_id': str(i)} for i in range(100)]
+        try:
+            res = parallel.add_documents_mp(config=self.config, add_docs_params=AddDocsParams(
+                    index_name=self.index_name_1, docs=data, auto_refresh=True),
+                batch_size=10, processes=2)
+            raise AssertionError
+        except InternalError:
+            pass
+        

@@ -4,6 +4,7 @@ from typing import Optional, Union, Any, Sequence
 import numpy as np
 from marqo.tensor_search.models.private_models import ModelAuth
 from typing import List
+from marqo.errors import InternalError
 
 
 class AddDocsParamsConfig:
@@ -49,9 +50,14 @@ class AddDocsParams:
 @dataclass(frozen=True, config=AddDocsParamsConfig)
 class AddDocsParamsWithDevice(AddDocsParams):
     """
+        TODO: Replace instances of AddDocsParams with this.
         Add Docs Params but with device required. 
         This is created by tensor_search.add_documents_orchestrator.
         _batch_request, add_documents, add_documents_mp, will accept this as parameter.
     """
-    
+
     device: str  # This field is required
+
+    def __post_init__(self):
+        if not self.device:
+            raise InternalError("`device` parameter is required for AddDocsParamsWithDevice!")
