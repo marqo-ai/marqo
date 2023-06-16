@@ -596,7 +596,7 @@ class TestVectorSearch(MarqoTestCase):
             return True
 
         assert run()
-        assert os.environ["_MARQO_BEST_AVAILABLE_DEVICE"] == "cpu"
+        assert os.environ["MARQO_BEST_AVAILABLE_DEVICE"] == "cpu"
         args, kwargs = mock_vectorise.call_args
         assert kwargs["device"] == "cuda:123"
     

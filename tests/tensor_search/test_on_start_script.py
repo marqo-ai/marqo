@@ -161,15 +161,18 @@ class TestOnStartScript(MarqoTestCase):
             (True, "cuda"),
             (False, "cpu")
         ]
+        mock_cuda_is_available = mock.MagicMock()
 
-        for given_cuda_available, expected_device in test_cases:
-            @mock.patch("torch.cuda.is_available", given_cuda_available)
+        for given_cuda_available, expected_best_device in test_cases:
+            mock_cuda_is_available.return_value = given_cuda_available
+            @mock.patch("torch.cuda.is_available", mock_cuda_is_available)
             def run():
                 # make sure env var is empty first
                 os.environ.pop("MARQO_BEST_AVAILABLE_DEVICE", None)
                 assert "MARQO_BEST_AVAILABLE_DEVICE" not in os.environ
 
-                on_start_script.SetBestAvailableDevice()
+                set_best_available_device_script = on_start_script.SetBestAvailableDevice()
+                set_best_available_device_script.run()
                 assert os.environ["MARQO_BEST_AVAILABLE_DEVICE"] == expected_best_device
                 return True
             

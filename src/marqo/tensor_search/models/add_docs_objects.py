@@ -44,3 +44,14 @@ class AddDocsParams:
     use_existing_tensors: bool = False
     mappings: Optional[dict] = None
     model_auth: Optional[ModelAuth] = None
+
+
+@dataclass(frozen=True, config=AddDocsParamsConfig)
+class AddDocsParamsWithDevice(AddDocsParams):
+    """
+        Add Docs Params but with device required. 
+        This is created by tensor_search.add_documents_orchestrator.
+        _batch_request, add_documents, add_documents_mp, will accept this as parameter.
+    """
+    
+    device: str  # This field is required

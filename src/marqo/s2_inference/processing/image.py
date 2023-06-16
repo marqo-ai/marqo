@@ -37,6 +37,8 @@ from marqo.s2_inference.processing.image_utils import (
     generate_boxes
 )
 
+from marqo.errors import InternalError
+
 logger = get_logger(__name__)
 
 
@@ -172,6 +174,9 @@ class PatchifyModel:
 
         # this is the resized size 
         self.size = size
+        
+        if not device:
+            raise InternalError("`device` is required for loading CLIP models!")
         self.device = device
 
         self.min_area = min_area

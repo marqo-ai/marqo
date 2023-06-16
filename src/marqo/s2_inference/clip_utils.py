@@ -17,6 +17,7 @@ from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normal
 from marqo.s2_inference.processing.custom_clip_utils import HFTokenizer, download_model
 from torchvision.transforms import InterpolationMode
 from marqo.s2_inference.configs import ModelCache
+from marqo.errors import InternalError
 
 logger = get_logger(__name__)
 
@@ -196,6 +197,9 @@ class CLIP:
                             truncate: bool = True, **kwargs) -> None:
 
         self.model_type = model_type
+
+        if not device:
+            raise InternalError("`device` is required for loading CLIP models!")
         self.device = device
         self.model = None
         self.tokenizer = None
@@ -509,6 +513,9 @@ class MULTILINGUAL_CLIP(CLIP):
     def __init__(self, model_type: str = "multilingual-clip/ViT-L/14", device: str = None,  embedding_dim: int = None,
                             truncate: bool = True, **kwargs) -> None:
 
+        if not device:
+            raise InternalError("`device` is required for loading MULTILINGUAL CLIP models!")
+        
         self.model_name = model_type
         self.model_info = get_multilingual_clip_properties()[self.model_name]
         self.visual_name = self.model_info["visual_model"]

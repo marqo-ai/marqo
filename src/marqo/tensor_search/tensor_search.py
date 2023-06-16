@@ -1683,9 +1683,12 @@ def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity
         - Search results are in the same order as `queries`.
         - device should ALWAYS be set, because it is only called by _bulk_search with the parameter specified
     """
+
     if len(queries) == 0:
         return []
 
+    if not device:
+        raise InternalError("_bulk_vector_text_search cannot be called without `device`!")
 
     start_preprocessing_time = timer()
     qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, device)
@@ -1793,6 +1796,8 @@ def _vector_text_search(
     """
     # # SEARCH TIMER-LOGGER (pre-processing)
     start_preprocess_time = timer()
+    if not device:
+        raise InternalError("_vector_text_search cannot be called without `device`!")
     try:
         index_info = get_index_info(config=config, index_name=index_name)
     except KeyError as e:

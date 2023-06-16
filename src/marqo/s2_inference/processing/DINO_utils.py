@@ -90,12 +90,15 @@ def DINO_inference(model: Any, transform: Any, img: ImageType = None,
         transform (Any): _get_DINO_transform
         img (ImageType, optional): the image to infer on. Defaults to None.
         patch_size (int, optional): the patch size the model architecture uses. Defaults to None.
-        device (str, optional): device for the model to run on. Required to be set
+        device (str): device for the model to run on. Required to be set
 
     Returns:
         FloatTensor: returns N x w x h tensor
     """
     
+    if not device:
+        raise InternalError("`device` is required for DINO inference!")
+
     img = transform(img)
 
     # make the image divisible by the patch size

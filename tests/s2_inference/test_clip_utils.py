@@ -6,7 +6,8 @@ from marqo.s2_inference import clip_utils, types
 import unittest
 from unittest import mock
 import requests
-from marqo.s2_inference.clip_utils import CLIP, download_model, OPEN_CLIP
+from marqo.s2_inference.clip_utils import CLIP, download_model, OPEN_CLIP, FP16_CLIP, MULTILINGUAL_CLIP
+from marqo.s2_inference.onnx_clip_utils import CLIP_ONNX
 from marqo.tensor_search.enums import ModelProperties
 from marqo.tensor_search.models.private_models import ModelLocation, ModelAuth
 from unittest.mock import patch
@@ -14,6 +15,7 @@ import pytest
 from marqo.tensor_search.models.private_models import ModelLocation, ModelAuth
 from marqo.tensor_search.models.private_models import S3Auth, S3Location, HfModelLocation
 from marqo.s2_inference.configs import ModelCache
+from marqo.errors import InternalError
 
 
 class TestEncoding(unittest.TestCase):
@@ -164,6 +166,43 @@ class TestLoad(unittest.TestCase):
         clip.load()
         mock_download_from_repo.assert_called_once()
         mock_clip_load.assert_called_once_with(name='downloaded_model.pth', device='cpu', jit=False, download_root=ModelCache.clip_cache_path)
+    
+    def test_clip_with_no_device(self):
+        # Should fail, raising internal error
+        try:
+            model_url = 'http://example.com/model.pth'
+            clip = CLIP(model_properties={'url': model_url})
+            raise AssertionError
+        except InternalError as e:
+            pass
+    
+    def test_fp16_clip_with_no_device(self):
+        # Should fail, raising internal error
+        try:
+            model_url = 'http://example.com/model.pth'
+            clip = FP16_CLIP(model_properties={'url': model_url})
+            raise AssertionError
+        except InternalError as e:
+            pass
+    
+    def test_multilingual_clip_with_no_device(self):
+        # Should fail, raising internal error
+        try:
+            model_url = 'http://example.com/model.pth'
+            clip = MULTILINGUAL_CLIP(model_properties={'url': model_url})
+            raise AssertionError
+        except InternalError as e:
+            pass
+    
+    def test_onnx_clip_with_no_device(self):
+        # Should fail, raising internal error
+        try:
+            model_url = 'http://example.com/model.pth'
+            clip = CLIP_ONNX(model_properties={'url': model_url})
+            raise AssertionError
+        except InternalError as e:
+            pass
+        
 
 class TestOpenClipLoad(unittest.TestCase):
 
@@ -215,3 +254,12 @@ class TestOpenClipLoad(unittest.TestCase):
         mock_open_clip_create_model_and_transforms.assert_called_once_with(
             model_name=open_clip.model_name, jit=False, pretrained='model.pth', precision='fp32',
             image_mean=None, image_std=None, device='cpu', cache_dir=ModelCache.clip_cache_path)
+    
+    def test_open_clip_with_no_device(self):
+        # Should fail, raising internal error
+        try:
+            model_url = 'http://example.com/model.pth'
+            clip = OPEN_CLIP(model_properties={'url': model_url})
+            raise AssertionError
+        except InternalError as e:
+            pass
