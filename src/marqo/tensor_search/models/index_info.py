@@ -36,6 +36,15 @@ class IndexInfo(NamedTuple):
         bool fields.
 
         """
+        # get_text_properties will flatten the object properties
+        # Example: left-text_properties   right-true_text_properties
+        # {'Description': {'type': 'text'},                                                         {'Description': {'type': 'text'},
+        #  'Genre': {'type': 'text'},                                                                'Genre': {'type': 'text'},
+        #  'Title': {'type': 'text'},                                                                'Title': {'type': 'text'},
+        #  'my_combination_field': {'properties': {'lexical_field': {'type': 'text'}, ----->         'my_combination_field.lexical_field': {'type': 'text'},
+        #                                          'my_image': {'type': 'text'},                     'my_combination_field.my_image': {'type': 'text'},
+        #                                          'some_text': {'type': 'text'}}}}                   'my_combination_field.some_text': {'type': 'text'}}
+
         text_props_dict = {}
         for text_field, text_props in self.properties.items():
             if not text_field.startswith(enums.TensorField.vector_prefix) and not text_field in enums.TensorField.__dict__.values():
@@ -46,14 +55,28 @@ class IndexInfo(NamedTuple):
                             text_props_dict[f"{text_field}.{sub_field}"] = sub_field_props
         return text_props_dict
 
-        # get_text_properties will flatten the object properties
-        # Example: left-text_properties   right-true_text_properties
-        # {'Description': {'type': 'text'},                                                         {'Description': {'type': 'text'},
-        #  'Genre': {'type': 'text'},                                                                'Genre': {'type': 'text'},
-        #  'Title': {'type': 'text'},                                                                'Title': {'type': 'text'},
-        #  'my_combination_field': {'properties': {'lexical_field': {'type': 'text'}, ----->         'my_combination_field.lexical_field': {'type': 'text'},
-        #                                          'my_image': {'type': 'text'},                     'my_combination_field.my_image': {'type': 'text'},
-        #                                          'some_text': {'type': 'text'}}}}                   'my_combination_field.some_text': {'type': 'text'}}
+    def get_possible_tensor_fields(self) -> set:
+        """returns all fields that have are, or have the potential to be, kNN fields
+
+        These are:
+            1. text fields
+            2. object fields
+
+        TODO: consider keeping track of fields that have just been marked tensor fields
+            - Perhaps this would optimise the filtering step
+        """
+        possible_tensor_fields = set()
+        for text_field, text_props in self.properties.items():
+            if not text_field.startswith(
+                    enums.TensorField.vector_prefix) and not text_field in enums.TensorField.__dict__.values():
+                if text_props["type"] == enums.OpenSearchDataType.text:
+                    possible_tensor_fields.add(text_field)
+                elif "properties" in text_props:
+                    # TODO: this couples all opensearch object fields to tensor fields
+                    #  (when this may not be the case in the future)
+                    possible_tensor_fields.add(text_field)
+        return possible_tensor_fields
+
 
     def get_true_text_properties(self) -> dict:
         """returns a dict containing only names and properties of fields that

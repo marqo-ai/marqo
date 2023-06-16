@@ -144,14 +144,33 @@ def create_vector_index(
     if max_marqo_fields is not None:
         max_os_fields = _marqo_field_limit_to_os_limit(int(max_marqo_fields))
         vector_index_settings["settings"]["mapping"] = {"total_fields": {"limit": int(max_os_fields)}}
+
+    # TODO: move this into own function
+    def add_knn_field(ix_settings: dict):
+        """
+        this adds the OpenSearch knn field to the index's mappings
+
+        Args:
+            ix_settings:
+        """
+        ix_settings_with_knn = ix_settings.copy()
+        # TODO: use enum for vector field name
+        ix_settings_with_knn["mappings"]["properties"][f"{TensorField.vector_prefix}marqo"] = {
+            "type": "knn_vector",
+            "dimension": ix_settings[NsField.index_defaults][NsField.model_properties]["dimensions"],
+            "method": ix_settings[NsField.index_defaults][NsField.ann_parameters],
+        }
+        return ix_settings_with_knn
+
     model_name = the_index_settings[NsField.index_defaults][NsField.model]
     vector_index_settings["mappings"]["_meta"][NsField.index_settings] = the_index_settings
     vector_index_settings["mappings"]["_meta"]["model"] = model_name
 
-    response = HttpRequests(config).put(path=index_name, body=vector_index_settings)
+    vector_index_settings_with_knn = add_knn_field(ix_settings=vector_index_settings)
+    response = HttpRequests(config).put(path=index_name, body=vector_index_settings_with_knn)
 
     get_cache()[index_name] = IndexInfo(
-        model_name=model_name, properties=vector_index_settings["mappings"]["properties"].copy(),
+        model_name=model_name, properties=vector_index_settings_with_knn["mappings"]["properties"].copy(),
         index_settings=the_index_settings
     )
     return response
@@ -613,7 +632,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                 for text_chunk, vector_chunk in zip(text_chunks, vector_chunks):
                     # We do not put in metadata yet at this stage.
                     chunks_to_append.append({
-                        utils.generate_vector_name(field): vector_chunk,
+                        TensorField.marqo_knn_field: vector_chunk,
                         TensorField.field_content: text_chunk,
                         TensorField.field_name: field
                     })
@@ -1303,51 +1322,62 @@ def get_vector_properties_to_search(searchable_attributes: Union[None, List[str]
     if searchable_attributes is None:
         properties_to_search = index_info.get_vector_properties().keys()
     else:
-        searchable_attributes_as_vectors = {
-            utils.generate_vector_name(field_name=attribute) for attribute in searchable_attributes
-        }
+        searchable_attributes_set = set(searchable_attributes)
+
         # discard searchable attributes that aren't found in the cache:
-        properties_to_search = list(searchable_attributes_as_vectors.intersection(
-            index_info.get_vector_properties().keys()
+        properties_to_search = list(searchable_attributes_set.intersection(
+            index_info.get_possible_tensor_fields()
         ))
-    
+
+    # We can now support pagination for multi-field searches, to be tested.
+    # TODO: delete the following legacy validation (if OK to do so)
     # Validation for offset (pagination is single field) if offset not provided, validation is not run.
-    if len(properties_to_search) != 1 and offset > 0:
-        human_readable_vector_properties = [v.replace(TensorField.vector_prefix, '') for v in
-                                            list(properties_to_search)]
-        raise errors.InvalidArgError(
-            f"Pagination (offset > 0) is only supported for single field searches!"
-            f" Your search currently has {len(properties_to_search)} vectorisable fields: {human_readable_vector_properties}"
-        )
+    # if len(properties_to_search) != 1 and offset > 0:
+    #     human_readable_vector_properties = list(properties_to_search)
+    #     raise errors.InvalidArgError(
+    #         f"Pagination (offset > 0) is only supported for single field searches!"
+    #         f" Your search currently has {len(properties_to_search)} vectorisable fields: {human_readable_vector_properties}"
+    #     )
     return properties_to_search
 
 
 def construct_msearch_body_elements(searchableAttributes: List[str], offset: int, filter_string: str, index_info: IndexInfo, result_count: int, query_vector: List[float], attributes_to_retrieve: List[str], index_name: str, score_modifiers: Optional[ScoreModifier] = None) -> List[Dict[str, Any]]:
     """Constructs the body payload of a `/_msearch` request for a single bulk search query"""
-    contextualised_filter = utils.contextualise_filter(filter_string=filter_string, simple_properties=index_info.get_text_properties())
     vector_properties_to_search = get_vector_properties_to_search(searchableAttributes, index_info, offset=offset)
+    filter_for_opensearch = utils.build_tensor_search_filter(
+        filter_string=filter_string, simple_properties=index_info.get_text_properties(),
+        vector_properties_to_search=vector_properties_to_search
+    )
     body = []
 
-    for vector_field in vector_properties_to_search:
-        if score_modifiers is not None:
-            search_query = _create_score_modifiers_tensor_search_query(score_modifiers, result_count, offset, vector_field, query_vector)
-            if filter_string is not None:
-                search_query["query"]["function_score"]["query"]["nested"]["query"]["function_score"]["query"]\
-                    ["knn"][f"{TensorField.chunks}.{vector_field}"][
-                    "filter"] = {
-                    "query_string": {"query": f"{contextualised_filter}"}
-                } 
-        else: 
-            search_query = _create_normal_tensor_search_query(result_count, offset, vector_field, query_vector)
-            if filter_string is not None:
-                search_query["query"]["nested"]["query"]["knn"][f"{TensorField.chunks}.{vector_field}"][
-                    "filter"] = {
-                    "query_string": {"query": f"{contextualised_filter}"}
+    if score_modifiers is not None:
+        search_query = _create_score_modifiers_tensor_search_query(
+            score_modifiers,
+            result_count,
+            offset,
+            TensorField.marqo_knn_field,
+            query_vector
+        )
+        if filter_string is not None:
+            (search_query["query"]["function_score"]
+                ["query"]["nested"]
+                ["query"]["function_score"]
+                ["query"]["knn"]
+                [f"{TensorField.chunks}.{TensorField.marqo_knn_field}"]["filter"]) = {
+                    "query_string": {"query": f"{filter_for_opensearch}"}
+                }
+    else:
+        search_query = _create_normal_tensor_search_query(result_count, offset, TensorField.marqo_knn_field, query_vector)
+        if filter_string is not None:
+            (search_query["query"]["nested"]
+                ["query"]["knn"]
+                [f"{TensorField.chunks}.{TensorField.marqo_knn_field}"]["filter"]) = {
+                    "query_string": {"query": f"{filter_for_opensearch}"}
                 }
 
-        if attributes_to_retrieve is not None:
-            search_query["_source"] = {"include": attributes_to_retrieve} if len(attributes_to_retrieve) > 0 else False
-        body += [{"index": index_name}, search_query]
+    if attributes_to_retrieve is not None:
+        search_query["_source"] = {"include": attributes_to_retrieve} if len(attributes_to_retrieve) > 0 else False
+    body += [{"index": index_name}, search_query]
 
     return body
 
@@ -1778,7 +1808,8 @@ def _vector_text_search(
     qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, selected_device)
     vectorised_text = list(qidx_to_vectors.values())[0]
 
-    contextualised_filter = utils.contextualise_filter(filter_string=filter_string, simple_properties=index_info.get_text_properties())
+    # TODO: delete the following
+    # contextualised_filter = utils.contextualise_user_filter(filter_string=filter_string, simple_properties=index_info.get_text_properties())
     body = construct_msearch_body_elements(
         searchable_attributes, offset, filter_string, index_info, result_count, vectorised_text, attributes_to_retrieve, index_name, score_modifiers
     )
@@ -2155,7 +2186,7 @@ def vectorise_multimodal_combination_field(
     vector_chunk = vector_chunk.tolist()
 
     combo_chunk = dict({
-        utils.generate_vector_name(field): vector_chunk,
+        TensorField.marqo_knn_field: vector_chunk,
         TensorField.field_content: json.dumps(multimodal_object),
         TensorField.field_name: field,
     })

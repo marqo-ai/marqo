@@ -17,3 +17,8 @@ ALLOWED_CUSTOMER_FIELD_TYPES = [str, int, float, bool, list, dict]
 NON_TENSORISABLE_FIELD_TYPES = [int, float, bool, list]
 
 ALLOWED_MULTIMODAL_FIELD_TYPES = [str]
+
+LUCENE_SPECIAL_CHARS = {
+    '/', '*', '^', '\\', '!', '[', '||', '?',
+    '&&', '"', ']', '-', '{', '~', '+', '}', ':', ')', '('
+}

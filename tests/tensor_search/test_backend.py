@@ -68,7 +68,7 @@ class TestBackend(MarqoTestCase):
         args, kwargs0 = mock__put.call_args_list[0]
         sent_dict = json.loads(kwargs0["body"])
         assert "lucene" == sent_dict["properties"][enums.TensorField.chunks
-            ]["properties"][utils.generate_vector_name(field_name="f1")]["method"]["engine"]
+            ]["properties"][enums.TensorField.marqo_knn_field]["method"]["engine"]
     
     def test_add_customer_field_properties_default_ann_parameters(self):
         mock_config = copy.deepcopy(self.config)

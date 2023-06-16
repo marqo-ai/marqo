@@ -22,7 +22,7 @@ def get_default_index_settings():
             NsFields.ann_parameters: get_default_ann_parameters()
         },
         NsFields.number_of_shards: 5,
-        NsFields.number_of_replicas : 1,
+        NsFields.number_of_replicas: 1,
     }
 
 def get_default_ann_parameters():

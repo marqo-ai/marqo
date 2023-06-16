@@ -41,7 +41,7 @@ class TestUtils(unittest.TestCase):
              f"({enums.TensorField.chunks}.an_int:[0 TO 30] and {enums.TensorField.chunks}.an_int:2) AND {enums.TensorField.chunks}.abc:(some text)")
         ]
         for given, expected in expected_mappings:
-            assert expected == utils.contextualise_filter(
+            assert expected == utils.contextualise_user_filter(
                 given, simple_properties=["an_int", "abc"]
             )
 

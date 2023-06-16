@@ -5,7 +5,7 @@ import json
 from timeit import default_timer as timer
 import torch
 from marqo import errors
-from marqo.tensor_search import enums, configs
+from marqo.tensor_search import enums, configs, constants
 from typing import (
     List, Optional, Union, Callable, Iterable, Sequence, Dict, Tuple
 )
@@ -89,9 +89,58 @@ def construct_authorized_url(url_base: str, username: str, password: str) -> str
     return f"{http_part}{http_sep}{username}:{password}@{domain_part}"
 
 
-def contextualise_filter(filter_string: Optional[str], simple_properties: typing.Iterable) -> str:
-    """adds the chunk prefix to the start of properties found in simple string
+# TODO: move filtering logic to dedicated file
+def build_tensor_search_filter(
+        filter_string: str, simple_properties: dict,
+        vector_properties_to_search: Sequence):
+    """Builds a Lucene-DSL filter string for OpenSearch, that combines the user's filter string
+    with searchable_attributes
 
+    """
+    searchable_attribs_filter = build_searchable_attributes_filter(
+        vector_properties_to_search=vector_properties_to_search)
+    contextualised_user_filter = contextualise_user_filter(
+        filter_string=filter_string, simple_properties=simple_properties)
+
+    if contextualised_user_filter and searchable_attribs_filter:
+        return f"{searchable_attribs_filter} AND {contextualised_user_filter}"
+    else:
+        return f"{searchable_attribs_filter}{contextualised_user_filter}"
+
+
+def build_searchable_attributes_filter(vector_properties_to_search: Sequence) -> str:
+    """Constructs the filter used to narrow the search down to specific searchable attributes"""
+    if len(vector_properties_to_search) == 0:
+        return ""
+
+    vector_prop_count = len(vector_properties_to_search)
+
+    # brackets surround field name, in case it contains a space:
+    sanitised_attr_name = f"({sanitise_lucene_special_chars(vector_properties_to_search.pop())})"
+
+    if vector_prop_count == 1:
+        return f"{enums.TensorField.chunks}.{enums.TensorField.field_name}:{sanitised_attr_name}"
+    else:
+        return (
+            f"{enums.TensorField.chunks}.{enums.TensorField.field_name}:{sanitised_attr_name}"
+            f" OR {build_searchable_attributes_filter(vector_properties_to_search=vector_properties_to_search)}")
+
+def sanitise_lucene_special_chars(user_str: str) -> str:
+    """Santitises Lucene's special chars.
+
+    See here for more info:
+    https://lucene.apache.org/core/6_0_0/queryparser/org/apache/lucene/queryparser/classic/package-summary.html#Escaping_Special_Characters
+
+    TODO: what is the tradeoff of us escaping this, vs our users
+    """
+    for char in constants.LUCENE_SPECIAL_CHARS:
+        user_str = user_str.replace(char, f'\\{char}')
+    return user_str
+
+
+def contextualise_user_filter(filter_string: Optional[str], simple_properties: typing.Iterable) -> str:
+    """adds the chunk prefix to the start of properties found in simple string
+    TODO: this needs to be re-tested for field names that contain special lucene chars
     This allows for filtering within chunks.
 
     Args:
