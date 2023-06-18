@@ -42,8 +42,9 @@ def threaded_download_images(allocated_docs: List[dict], image_repo: dict,
     TIMEOUT_SECONDS=3
     if metric_obj is None: # Occurs predominately in testing.
         metric_obj = RequestMetrics.for_request()
+        RequestMetrics.set_in_request(metrics=metric_obj)
 
-    with metric_obj.time(f"{_id}.full_time"):
+    with metric_obj.time(f"{_id}.thread_time"):
         for doc in allocated_docs:
             for field in list(doc):
                 if field in non_tensor_fields:
@@ -52,8 +53,7 @@ def threaded_download_images(allocated_docs: List[dict], image_repo: dict,
                     if doc[field] in image_repo:
                         continue
                     try:
-                        with metric_obj.time(f"{_id}.{doc[field]}"):
-                            image_repo[doc[field]] = clip_utils.load_image_from_path(doc[field], image_download_headers, timeout=TIMEOUT_SECONDS)
+                        image_repo[doc[field]] = clip_utils.load_image_from_path(doc[field], image_download_headers, timeout=TIMEOUT_SECONDS, metrics_obj=metric_obj)
                     except PIL.UnidentifiedImageError as e:
                         image_repo[doc[field]] = e
                         metric_obj.increment_counter(f"{doc.get(field, '')}.UnidentifiedImageError")
@@ -65,12 +65,12 @@ def threaded_download_images(allocated_docs: List[dict], image_repo: dict,
                             if sub_field in image_repo:
                                 continue
                             try:
-                                with metric_obj.time(f"{_id}.{doc[field]}"):
-                                    image_repo[sub_field] = clip_utils.load_image_from_path(
-                                        sub_field,
-                                        image_download_headers,
-                                        timeout=TIMEOUT_SECONDS
-                                    )
+                                image_repo[sub_field] = clip_utils.load_image_from_path(
+                                    sub_field,
+                                    image_download_headers,
+                                    timeout=TIMEOUT_SECONDS,
+                                    metrics_obj=metric_obj
+                                )
                             except PIL.UnidentifiedImageError as e:
                                 image_repo[sub_field] = e
                                 metric_obj.increment_counter(f"{doc.get(field, '')}.UnidentifiedImageError")
@@ -94,10 +94,12 @@ def download_images(docs: List[dict], thread_count: int, non_tensor_fields: Tupl
     docs_per_thread = math.ceil(len(docs)/thread_count)
     copied = copy.deepcopy(docs)
     image_repo = dict()
-    metric_obj = RequestMetrics.for_request()
+
+    m = [RequestMetric() for i in range(thread_count)]
     thread_allocated_docs = [copied[i: i + docs_per_thread] for i in range(len(copied))[::docs_per_thread]]
-    threads = [threading.Thread(target=threaded_download_images, args=(allocation, image_repo, non_tensor_fields, image_download_headers, metric_obj))
-               for allocation in thread_allocated_docs]
+    threads = [threading.Thread(target=threaded_download_images, args=(allocation, image_repo, non_tensor_fields, image_download_headers, m[i]))
+               for i, allocation in enumerate(thread_allocated_docs)]
+
     for th in threads:
         th.start()
 
@@ -105,6 +107,8 @@ def download_images(docs: List[dict], thread_count: int, non_tensor_fields: Tupl
         th.join()
 
     # Fix up metric_obj to make it not mention thread-ids
+    metric_obj = RequestMetrics.for_request()
+    metric_obj = RequestMetric.reduce_from_list([metric_obj] + m)
     metric_obj.times = reduce_thread_metrics(metric_obj.times)
     return image_repo
 
@@ -114,16 +118,16 @@ def reduce_thread_metrics(data):
     e.g.
     ```
     {
-        "image_download.700.full_time": 1373.271582997404,
+        "image_download.700.thread_time": 1373.271582997404,
         "image_download.700.https://www.ai-nc.com/images/pages/heat-map.png": 52.985392,
-        "image_download.729.full_time": 53.297404,
+        "image_download.729.thread_time": 53.297404,
         "image_download.729.https://www.ai-nc.com/images/pages/heat-map.png": 2052.617332985392,
     }
     ```
     Becomes
     ```
     {
-        "image_download.full_time": [1373.271582997404, 53.297404],
+        "image_download.thread_time": [1373.271582997404, 53.297404],
         "image_download.https://www.ai-nc.com/images/pages/heat-map.png": [2052.617332985392, 52.985392],
     }
     ```

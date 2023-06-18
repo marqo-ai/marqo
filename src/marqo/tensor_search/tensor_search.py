@@ -359,6 +359,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
     """
     # ADD DOCS TIMER-LOGGER (3)
 
+    RequestMetrics.for_request().start("add_documents.preprocess")
     start_time_3 = timer()
 
     if add_docs_params.mappings is not None:
@@ -405,7 +406,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
 
     if index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]:
         with RequestMetrics.for_request().time(
-            "add_documents.image_download",
+            "image_download.full_time",
             lambda t: logger.debug(
                 f"add_documents image download: took {t:.3f}ms to concurrently download "
                 f"images for {batch_size} docs using {add_docs_params.image_download_thread_count} threads"
@@ -713,8 +714,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                     }
                 })
 
-    end_time_3 = timer()
-    total_preproc_time = end_time_3 - start_time_3
+    total_preproc_time = 0.001 * RequestMetrics.for_request().stop("add_documents.preprocess")
     logger.debug(f"      add_documents pre-processing: took {(total_preproc_time):.3f}s total for {batch_size} docs, "
                 f"for an average of {(total_preproc_time / batch_size):.3f}s per doc.")
 
@@ -733,6 +733,8 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
             index_parent_response = HttpRequests(config).post(
                 path="_bulk", body=utils.dicts_to_jsonl(bulk_parent_dicts)
             )
+        RequestMetrics.for_request().add_time("add_documents.opensearch._bulk.internal", float(index_parent_response["took"]))
+
         end_time_5 = timer()
         total_http_time = end_time_5 - start_time_5
         total_index_time = index_parent_response["took"] * 0.001
@@ -746,41 +748,42 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
     else:
         index_parent_response = None
 
-    if add_docs_params.auto_refresh:
-        HttpRequests(config).post(path=F"{add_docs_params.index_name}/_refresh")
+    with RequestMetrics.for_request().time("add_documents.postprocess"):
+        if add_docs_params.auto_refresh:
+            HttpRequests(config).post(path=F"{add_docs_params.index_name}/_refresh")
 
-    t1 = timer()
+        t1 = timer()
 
-    def translate_add_doc_response(response: Optional[dict], time_diff: float) -> dict:
-        """translates OpenSearch response dict into Marqo dict"""
-        item_fields_to_remove = ['_index', '_primary_term', '_seq_no', '_shards', '_version']
-        result_dict = {}
-        new_items = []
+        def translate_add_doc_response(response: Optional[dict], time_diff: float) -> dict:
+            """translates OpenSearch response dict into Marqo dict"""
+            item_fields_to_remove = ['_index', '_primary_term', '_seq_no', '_shards', '_version']
+            result_dict = {}
+            new_items = []
 
-        if response is not None:
-            copied_res = copy.deepcopy(response)
+            if response is not None:
+                copied_res = copy.deepcopy(response)
 
-            result_dict['errors'] = copied_res['errors']
-            actioned = "index" if add_docs_params.update_mode == 'replace' else 'update'
+                result_dict['errors'] = copied_res['errors']
+                actioned = "index" if add_docs_params.update_mode == 'replace' else 'update'
 
-            for item in copied_res["items"]:
-                for to_remove in item_fields_to_remove:
-                    if to_remove in item[actioned]:
-                        del item[actioned][to_remove]
-                new_items.append(item[actioned])
+                for item in copied_res["items"]:
+                    for to_remove in item_fields_to_remove:
+                        if to_remove in item[actioned]:
+                            del item[actioned][to_remove]
+                    new_items.append(item[actioned])
 
-        if unsuccessful_docs:
-            result_dict['errors'] = True
+            if unsuccessful_docs:
+                result_dict['errors'] = True
 
-        for loc, error_info in unsuccessful_docs:
-            new_items.insert(loc, error_info)
+            for loc, error_info in unsuccessful_docs:
+                new_items.insert(loc, error_info)
 
-        result_dict["processingTimeMs"] = time_diff * 1000
-        result_dict["index_name"] = add_docs_params.index_name
-        result_dict["items"] = new_items
-        return result_dict
+            result_dict["processingTimeMs"] = time_diff * 1000
+            result_dict["index_name"] = add_docs_params.index_name
+            result_dict["items"] = new_items
+            return result_dict
 
-    return translate_add_doc_response(response=index_parent_response, time_diff=t1 - t0)
+        return translate_add_doc_response(response=index_parent_response, time_diff=t1 - t0)
 
 
 def get_document_by_id(
@@ -1256,6 +1259,7 @@ def _lexical_search(
     start_search_http_time = timer()
     with RequestMetrics.for_request().time("search.opensearch._search"):
         search_res = HttpRequests(config).get(path=f"{index_name}/_search", body=body)
+    RequestMetrics.for_request().add_time("search.opensearch._search.internal", search_res["took"] * 0.001) # internal, not round trip time
 
     end_search_http_time = timer()
     total_search_http_time = end_search_http_time - start_search_http_time
@@ -1367,6 +1371,8 @@ def bulk_msearch(config: Config, body: List[Dict]) -> List[Dict]:
     try:
         with RequestMetrics.for_request().time("search.opensearch._msearch"):
             response = HttpRequests(config).get(path=F"_msearch", body=utils.dicts_to_jsonl(body))
+        RequestMetrics.for_request().add_time("search.opensearch._msearch.internal", float(response["took"])) # internal, not round trip time
+
         end_search_http_time = timer()
         total_search_http_time = end_search_http_time - start_search_http_time
         total_os_process_time = response["took"] * 0.001
