@@ -14,7 +14,7 @@ class TestVectorise(unittest.TestCase):
         mock_model = mock.MagicMock()
         mock_model.encode = mock.MagicMock()
 
-        random_model = random_utils.Random(model_name='mock_model', embedding_dim=128)
+        random_model = random_utils.Random(model_name='mock_model', embedding_dim=128, device="cpu")
 
         def func(*args,**kwargs):
             return random_model.encode(*args, **kwargs)
@@ -49,7 +49,7 @@ class TestVectorise(unittest.TestCase):
         mock_model = mock.MagicMock()
         mock_model.encode = mock.MagicMock()
 
-        random_model = random_utils.Random(model_name='mock_model', embedding_dim=128)
+        random_model = random_utils.Random(model_name='mock_model', embedding_dim=128, device="cpu")
 
         def func(*args, **kwargs):
             return random_model.encode(*args, **kwargs)
@@ -87,7 +87,7 @@ class TestVectorise(unittest.TestCase):
         mock_model = mock.MagicMock()
         mock_model.encode = mock.MagicMock()
 
-        random_model = random_utils.Random(model_name='mock_model', embedding_dim=128)
+        random_model = random_utils.Random(model_name='mock_model', embedding_dim=128, device="cpu")
 
         def func(*args, **kwargs):
             return random_model.encode(*args, **kwargs)
@@ -146,7 +146,7 @@ class TestVectorise(unittest.TestCase):
         mock_model = mock.MagicMock()
         mock_model.encode = mock.MagicMock()
 
-        random_model = random_utils.Random(model_name='mock_model', embedding_dim=128)
+        random_model = random_utils.Random(model_name='mock_model', embedding_dim=128, device="cpu")
 
         def func(*args, **kwargs):
             return random_model.encode(*args, **kwargs)
@@ -205,7 +205,7 @@ class TestVectoriseBatching(unittest.TestCase):
         self.mock_model = mock.MagicMock()
         self.mock_model.encode = mock.MagicMock()
 
-        random_model = random_utils.Random(model_name='mock_model', embedding_dim=128)
+        random_model = random_utils.Random(model_name='mock_model', embedding_dim=128, device="cpu")
 
         def func(*args, **kwargs):
             return random_model.encode(*args, **kwargs)

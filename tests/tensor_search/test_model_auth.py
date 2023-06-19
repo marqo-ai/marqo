@@ -27,11 +27,11 @@ from marqo.tensor_search.models.private_models import ModelLocation
 from pydantic.error_wrappers import ValidationError
 
 def fake_vectorise(*args, **_kwargs):
-    random_model = Random(model_name='blah', embedding_dim=512)
+    random_model = Random(model_name='blah', embedding_dim=512, device="cpu")
     return _convert_vectorized_output(random_model.encode(_kwargs['content']))
 
 def fake_vectorise_384(*args, **_kwargs):
-    random_model = Random(model_name='blah', embedding_dim=384)
+    random_model = Random(model_name='blah', embedding_dim=384, device="cpu")
     return _convert_vectorized_output(random_model.encode(_kwargs['content']))
 
 def _delete_file(file_path):
@@ -531,7 +531,7 @@ class TestModelAuthOpenCLIP(MarqoTestCase):
         s3_settings['index_defaults']['model_properties'] = model_properties
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings=s3_settings)
 
-        random_model = Random(model_name='blah', embedding_dim=512)
+        random_model = Random(model_name='blah', embedding_dim=512, device="cpu")
 
         try:
             tensor_search.eject_model(model_name='my_model', device=self.device)
@@ -597,7 +597,7 @@ class TestModelAuthOpenCLIP(MarqoTestCase):
         s3_settings['index_defaults']['model_properties'] = model_properties
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings=s3_settings)
 
-        random_model = Random(model_name='blah', embedding_dim=512)
+        random_model = Random(model_name='blah', embedding_dim=512, device="cpu")
 
 
         for add_docs_method, kwargs in [
