@@ -20,3 +20,12 @@ class TestSbertLoad(unittest.TestCase):
             raise AssertionError
         except InternalError as e:
             pass
+    
+    def test_model_with_no_device(self):
+        # Should fail, raising internal error
+        try:
+            model_url = 'http://example.com/model.pth'
+            model = Model(model_properties={'url': model_url})
+            raise AssertionError
+        except InternalError as e:
+            pass
