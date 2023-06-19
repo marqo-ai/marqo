@@ -14,7 +14,6 @@ from marqo.errors import (
 from marqo.tensor_search.enums import TensorField, SearchMethod
 from marqo.tensor_search import constants
 from marqo.tensor_search.models.search import SearchContext
-
 from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest
 from marqo.tensor_search.models.settings_object import settings_schema
 from marqo.tensor_search.models.mappings_object import mappings_schema, multimodal_combination_schema
@@ -280,38 +279,6 @@ def validate_field_name(field_name) -> str:
         raise InvalidFieldNameError(f"field name can't be a protected field. Please rename this field: {field_name}")
 
 
-def validate_doc(doc: Dict) -> dict:
-    """
-    Args:
-        doc: a document indexed by the client
-
-    Raises:
-        errors.InvalidArgError
-
-    Returns
-        doc if all validations pass
-    """
-    if not isinstance(doc, dict):
-        raise InvalidArgError("Docs must be dicts")
-
-    if len(doc) <= 0:
-        raise InvalidArgError("Can't index an empty dict.")
-
-    max_doc_size = utils.read_env_vars_and_defaults(var=enums.EnvVars.MARQO_MAX_DOC_BYTES)
-    if max_doc_size is not None:
-        try:
-            serialized = json.dumps(doc)
-        except TypeError as e:
-            raise InvalidArgError(f"Unable to index document: it is not serializable! Document: `{doc}` ")
-        if len(serialized) > int(max_doc_size):
-            maybe_id = f" _id:`{doc['_id']}`" if '_id' in doc else ''
-            raise DocTooLargeError(
-                f"Document{maybe_id} with length `{len(serialized)}` exceeds "
-                f"the allowed document size limit of [{max_doc_size}]."
-            )
-    return doc
-
-
 def validate_vector_name(name: str):
     """Checks that the vector name is valid.
     It should have the form __vector_{customer field name}
@@ -429,7 +396,7 @@ def validate_settings_object(settings_object):
         )
 
 
-def validate_dict(field: str, field_content: Dict, is_non_tensor_field: bool, mappings: Dict):
+def validate_dict(field: str, field_content: Dict, is_non_tensor_field: bool, mappings: Optional[Dict[str, "MappingObject"]]):
     '''
 
     Args:
@@ -457,13 +424,13 @@ def validate_dict(field: str, field_content: Dict, is_non_tensor_field: bool, ma
             f"If you aim to use dictionary filed content as a special field,"
             f"please check `https://docs.marqo.ai/0.0.15/Advanced-Usage/document_fields/#multimodal-combination-object` for more info.")
 
-    if mappings[field]["type"] == "multimodal_combination":
+    if mappings[field].type == "multimodal_combination":
         validate_multimodal_combination(field_content, is_non_tensor_field, mappings[field])
 
     return field_content
 
 
-def validate_multimodal_combination(field_content, is_non_tensor_field, field_mapping):
+def validate_multimodal_combination(field_content: Dict[str, Any], is_non_tensor_field: bool, field_mapping: "MappingObject"):
     '''
 
     Args:
@@ -488,11 +455,10 @@ def validate_multimodal_combination(field_content, is_non_tensor_field, field_ma
                 f"Multimodal-combination field content `{key}:{value}` \n  "
                 f"of type `{type(key).__name__} : {type(value).__name__}` is not of valid content type (one of {constants.ALLOWED_MULTIMODAL_FIELD_TYPES})."
             )
-
-        if not key in field_mapping["weights"]:
+        if not key in field_mapping.weights.dict():
             raise InvalidArgError(
                 f"Multimodal-combination field content `{key}:{value}` \n  "
-                f"is not in the multimodal_field mappings weights `{field_mapping['weights']}`. Each sub_field requires a weights."
+                f"is not in the multimodal_field mappings weights `{field_mapping.weights}`. Each sub_field requires a weights."
                 f"Please add the `{key}` to the mappings."
                 f"please check `https://docs.marqo.ai/0.0.15/Advanced-Usage/document_fields/#multimodal-combination-object` for more info.")
 
@@ -505,87 +471,6 @@ def validate_multimodal_combination(field_content, is_non_tensor_field, field_ma
         )
     return True
 
-def validate_mappings_object(mappings_object: Dict):
-    """validates the mappings object.
-    Returns
-        The given mappings object if validation has passed
-
-    Raises an InvalidArgError if the settings object is badly formatted
-    """
-    try:
-        jsonschema.validate(instance=mappings_object, schema=mappings_schema)
-        for field_name, config in mappings_object.items():
-            if config["type"] == enums.MappingsObjectType.multimodal_combination:
-                validate_multimodal_combination_object(config)
-        return mappings_object
-    except jsonschema.ValidationError as e:
-        raise InvalidArgError(
-            f"Error validating mappings object. Reason: \n{str(e)}"
-            f"\nRead about the mappings object here: https://docs.marqo.ai/0.0.15/API-Reference/mappings/"
-        )
-
-
-def validate_multimodal_combination_object(multimodal_mappings: Dict):
-    """Validates the multimodal mappings object
-
-    Args:
-        multimodal_mappings:
-
-    Returns:
-        The original object, if it passes validation
-    Raises InvalidArgError if the object is badly formatted
-    """
-    try:
-        jsonschema.validate(instance=multimodal_mappings, schema=multimodal_combination_schema)
-        return multimodal_mappings
-    except jsonschema.ValidationError as e:
-        raise InvalidArgError(
-            f"Error validating multimodal combination object. Reason: \n{str(e)}"
-            f"\nRead about the mappings object here: https://docs.marqo.ai/0.0.15/API-Reference/mappings/"
-        )
-
-
-def validate_mappings(mappings: Dict):
-    '''
-    Args:
-        mappings:  a dictionary to help handle object content field
-    Returns:
-    '''
-    for field, field_mapping in mappings.items():
-        validate_field_name(field)
-        if field_mapping["type"] not in constants.MARQO_OBJECT_TYPES:
-            raise InvalidArgError(
-                f"The type `{field_mapping['type']}` in mappings for filed `{field}` is not supported."
-                f"Please check the type of your mappings."
-                f"Supported mappings can be found in `https://docs.marqo.ai/0.0.15/API-Reference/mappings/`."
-            )
-        if field_mapping["type"] == "multimodal_combination":
-            validate_multimodal_combination_mapping(field_mapping)
-
-    return True
-
-
-def validate_multimodal_combination_mapping(field_mapping: Dict):
-    if "weights" not in field_mapping:
-        raise InvalidArgError(
-            f"The multimodal_combination mapping `{field_mapping}` does not contain `weights`"
-            f"Please check `https://docs.marqo.ai/0.0.15/Advanced-Usage/document_fields/#multimodal-combination-object` for more info."
-        )
-
-    for child_field, weight in field_mapping["weights"].items():
-        if type(child_field) not in constants.ALLOWED_MULTIMODAL_FIELD_TYPES:
-            raise InvalidArgError(
-                f"The multimodal_combination mapping `{field_mapping}` has an invalid child_field `{child_field}` of type `{type(child_field).__name__}`."
-                f"In multimodal_combination fields, it must be a string."
-                f"Please check `https://docs.marqo.ai/0.0.15/Advanced-Usage/document_fields/#multimodal-combination-object` for more info."
-            )
-
-        if not isinstance(weight, (float, int)):
-            raise InvalidArgError(
-                f"The multimodal_combination mapping `{field_mapping}` has an invalid weight `{weight}` of type `{type(weight).__name__}`."
-                f"In multimodal_combination fields, weight must be an int or float."
-                f"Please check `https://docs.marqo.ai/0.0.15/Advanced-Usage/document_fields/#multimodal-combination-object` for more info."
-            )
 
 def validate_delete_docs_request(delete_request: MqDeleteDocsRequest, max_delete_docs_count: int):
     """Validates a delete docs request from the user.

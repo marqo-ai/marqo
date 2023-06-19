@@ -5,6 +5,7 @@ from marqo.tensor_search import enums
 import unittest
 from unittest import mock
 from unittest.mock import patch
+from marqo.tensor_search.models.add_docs_objects import MappingObject
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifier
 from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest
 from marqo.tensor_search.models.search import SearchContext
@@ -97,13 +98,6 @@ class TestValidation(unittest.TestCase):
             raise AssertionError
         except InvalidFieldNameError as s:
             assert "protected prefix" in str(s)
-
-    def test_validate_doc_empty(self):
-        try:
-            validation.validate_doc({})
-            raise AssertionError
-        except InvalidArgError as s:
-            pass
 
     def test_validate_vector_name(self):
         good_name = "__vector_Title 1"
@@ -233,26 +227,6 @@ class TestValidation(unittest.TestCase):
         ]
         for good_content in good_ids:
             assert good_content == validation.validate_id(good_content)
-
-    def test_validate_doc_max_size(self):
-        max_size = 1234567
-        mock_environ = {enums.EnvVars.MARQO_MAX_DOC_BYTES: str(max_size)}
-
-        @mock.patch("os.environ", mock_environ)
-        def run():
-            good_doc = {"abcd": "a" * (max_size - 500)}
-            good_back = validation.validate_doc(doc=good_doc)
-            assert good_back == good_doc
-
-            bad_doc = {"abcd": "a" * max_size}
-            try:
-                validation.validate_doc(doc=bad_doc)
-                raise AssertionError
-            except DocTooLargeError:
-                pass
-            return True
-
-        assert run()
 
     def test_index_name_validation(self):
         assert "my-index-name" == validation.validate_index_name("my-index-name")
@@ -705,8 +679,8 @@ class TestValidateIndexSettings(unittest.TestCase):
             },
         ]
         for d in mappings:
-            assert d == validation.validate_mappings_object(d)
-
+            for _field_name, mapping_dict in d.items():
+                assert mapping_dict == MappingObject(**mapping_dict).dict()
 
     def test_validate_mappings_invalid(self):
         mappings = [
@@ -764,36 +738,16 @@ class TestValidateIndexSettings(unittest.TestCase):
                         "nontext": True  # non-number
                     },
                 }
-            },
-            { # needs more nesting
-                "type": "multimodal_combination",
-                "weights": {
-                    "some_text": 0.5
-                }
-            },
-            {
-                "my_combination_field": { # this dict is OK
-                    "type": "multimodal_combination",
-                    "weights": {
-                        "some_text": 0.5
-                    }
-                },
-                "other_field": {
-                    "type": "multimodal_combination",
-                    "weights": {
-                        "some_text": 0.7,
-                        "bugs": [0.5, -1.3]  # this is bad array
-                    }
-                },
-            },
+            }
         ]
-        for mapping in mappings:
-            try:
-                validation.validate_mappings_object(mapping)
-                raise AssertionError
-            except InvalidArgError as e:
-                pass
-
+        for d in mappings:
+            for _field_name, mapping_dict in d.items():
+                try:
+                    should_be_invalid = MappingObject(**mapping_dict).dict()
+                    raise AssertionError(_field_name, mapping_dict, should_be_invalid)
+                except InvalidArgError:
+                    pass
+        
     def test_validate_multimodal_combination_object(self):
         mappings = [
             {
@@ -827,7 +781,7 @@ class TestValidateIndexSettings(unittest.TestCase):
             },
         ]
         for d in mappings:
-            assert d == validation.validate_multimodal_combination_object(d)
+            assert d == MappingObject(**d).dict()
 
     def test_validate_multimodal_combination_object_invalid(self):
         mappings = [
@@ -883,9 +837,9 @@ class TestValidateIndexSettings(unittest.TestCase):
         ]
         for mapping in mappings:
             try:
-                validation.validate_multimodal_combination_object(mapping)
-                raise AssertionError
-            except InvalidArgError as e:
+                should_be_invalid = MappingObject(**mapping).dict()
+                raise AssertionError(mapping, should_be_invalid)
+            except InvalidArgError:
                 pass
 
     def test_validate_valid_context_object(self):

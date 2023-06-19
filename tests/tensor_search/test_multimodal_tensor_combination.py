@@ -2,9 +2,10 @@ import unittest.mock
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.errors import IndexNotFoundError, InvalidArgError
 from marqo.tensor_search import tensor_search
-from marqo.tensor_search.enums import TensorField, IndexSettingsField, SearchMethod
+from marqo.tensor_search.models.add_docs_objects import MappingObject
+from marqo.tensor_search.enums import TensorField, IndexSettingsField
 from tests.marqo_test import MarqoTestCase
-from marqo.tensor_search.tensor_search import add_documents, vectorise_multimodal_combination_field
+from marqo.tensor_search.tensor_search import vectorise_multimodal_combination_field
 from marqo.errors import DocumentNotFoundError
 import numpy as np
 from marqo.tensor_search.validation import validate_dict
@@ -34,6 +35,8 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         except:
             pass
+
+
     def test_add_documents(self):
         tensor_search.create_vector_index(
             index_name=self.index_name_1, config=self.config, index_settings={
@@ -74,15 +77,13 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         for key, value in expected_doc.items():
             assert expected_doc[key] == added_doc[key]
 
-        tensor_field = added_doc["_tensor_facets"]
-
-        # for "Title" : "Horse Rider"
-        assert "_embedding" in tensor_field[0]
-        assert tensor_field[0]["Title"] == expected_doc["Title"]
-        #
-        # for combo filed
-        assert "_embedding" in tensor_field[1]
-        assert tensor_field[1]["combo_text_image"] == json.dumps(expected_doc["combo_text_image"])
+        # Order of '_tensor_facets' maps is not deterministic
+        assert ("Title", "_embedding") in [tuple(t.keys()) for t in added_doc["_tensor_facets"]]
+        assert ("combo_text_image", "_embedding") in [tuple(t.keys()) for t in added_doc["_tensor_facets"]]
+        
+        combined = {k: v for d in added_doc["_tensor_facets"] for k, v in d.items()}
+        assert combined["Title"] == expected_doc["Title"]
+        assert combined["combo_text_image"] == json.dumps(expected_doc["combo_text_image"])
 
     def test_multimodal_tensor_combination_score(self):
         def get_score(document):
@@ -433,9 +434,9 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             pass
 
     def test_validate_dict(self):
-        test_mappings = {"my_combo_field":{"type":"multimodal_combination", "weights":{
+        test_mappings = {"my_combo_field": MappingObject(type="multimodal_combination", weights = {
             "test_1":0.5, "test_2":0.5
-        }}}
+        })}
         field = "my_combo_field"
         valid_dict = {"test_1": "test", "test_2": "test_test"}
 
@@ -746,7 +747,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         assert res["hits"][0]["_id"] == "article_591"
 
         res = tensor_search._lexical_search(config=self.config, index_name=self.index_name_1, text="test_search here")
-        assert res["hits"][0]["_id"] == "article_592"
+        assert res["hits"][0][ "_id"] == "article_592"
 
     def test_overwrite_multimodal_tensor_field(self):
         tensor_search.create_vector_index(
@@ -834,7 +835,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                         "weights": {
                             "my_image": 0.5,
                             "some_text": 0.5,
-                            "filter_field": 0,
+                            "filter_field": 0.0,
                     }
                 }},
                 auto_refresh=True
@@ -891,7 +892,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                         "weights": {
                             "my_image": 0.5,
                             "some_text": 0.5,
-                            "filter_field": 0,
+                            "filter_field": 0.0,
                         }
                 }},
                 auto_refresh=True))

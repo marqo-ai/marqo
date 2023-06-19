@@ -339,8 +339,6 @@ class TestAddDocuments(MarqoTestCase):
             [{"blahblah": {1243}, "_id": "to_fail_123"}],
             [{"blahblah": None, "_id": "to_fail_123"}],
             [{"_id": "to_fail_123", "blahblah": [None], "hehehe": 123},
-             {"_id": "to_fail_567", "some other obj": "finnne", 123: "heehee"}],
-            [{"_id": "to_fail_123", "blahblah": [None], "hehehe": 123},
              {"_id": "to_fail_567", "some other obj": AssertionError}],
             [{"_id": "to_fail_567", "blahblah": max}]
         ]
@@ -614,26 +612,6 @@ class TestAddDocuments(MarqoTestCase):
         tensor_search.create_vector_index(
             config=self.config, index_name=self.index_name_1)
         docs_results = [
-            # handle empty dicts
-            ([{"_id": "123", "my_field": "legitimate text"},
-             {},
-             {"_id": "456", "my_field": "awesome stuff!"}],
-             [("123", "result"), (None, 'error'), ('456', 'result')]
-             ),
-            ([{}], [(None, 'error')]),
-            ([{}, {}], [(None, 'error'), (None, 'error')]),
-            ([{}, {}, {"some_dict": "yep"}], [(None, 'error'), (None, 'error'), (None, 'result')]),
-            # handle invalid dicts
-            ([{"this is a set, lmao"}, "this is a string", {"some_dict": "yep"}], [(None, 'error'), (None, 'error'), (None, 'result')]),
-            ([1234], [(None, 'error')]), ([None], [(None, 'error')]),
-            # handle invalid field names
-            ([{123: "bad"}, {"_id": "cool"}], [(None, 'error'), ("cool", 'result')]),
-            ([{"__chunks": "bad"}, {"_id": "1511", "__vector_a": "some content"}, {"_id": "cool"},
-              {"_id": "144451", "__field_content": "some content"}],
-             [(None, 'error'), ("1511", 'error'), ("cool", 'result'), ("144451", "error")]),
-            ([{123: "bad", "_id": "12345"}, {"_id": "cool"}], [("12345", 'error'), ("cool", 'result')]),
-            ([{None: "bad", "_id": "12345"}, {"_id": "cool"}], [("12345", 'error'), ("cool", 'result')]),
-            # handle bad content
             ([{"bad": None, "_id": "12345"}, {"_id": "cool"}], [(None, 'error'), ("cool", 'result')]),
             ([{"bad": [1, 2, 3, 4], "_id": "12345"}, {"_id": "cool"}], [("12345", 'error'), ("cool", 'result')]),
             ([{"bad": ("cat", "dog"), "_id": "12345"}, {"_id": "cool"}], [("12345", 'error'), ("cool", 'result')]),
@@ -644,11 +622,6 @@ class TestAddDocuments(MarqoTestCase):
             ([{"bad": "hehehe", "_id": 12345}, {"_id": "cool"}, {"bad": "hehehe", "_id": None}, {"field": "yep"},
               {"_id": (1, 2), "efgh": "abc"}, {"_id": 1.234, "cool": "wowowow"}],
              [(None, 'error'), ("cool", 'result'), (None, 'error'), (None, 'result'), (None, 'error'), (None, 'error')]),
-            # mixed
-            ([{(1, 2, 3): set(), "_id": "12345"}, {"_id": "cool"}, {"bad": [1, 2, 3], "_id": None}, {"field": "yep"},
-              {}, "abcdefgh"],
-             [(None, 'error'), ("cool", 'result'), (None, 'error'), (None, 'result'), (None, 'error'),
-              (None, 'error')]),
         ]
         for update_mode in ('update', 'replace'):
             for docs, expected_results in docs_results:
@@ -659,6 +632,7 @@ class TestAddDocuments(MarqoTestCase):
                     )
                 )
                 assert len(add_res['items']) == len(expected_results)
+
                 for i, res_dict in enumerate(add_res['items']):
                     # if the expected id is None, then it assumed the id is
                     # generated and can't be asserted against
@@ -686,11 +660,11 @@ class TestAddDocuments(MarqoTestCase):
              ({"my_field"}, {})
              ),
             # invalid fields
-            ([{"_id": "14g", (12, 14): "some content"}, {"_id": "1511", None: "some content"},
+            ([{"_id": "14g"}, {"_id": "1511"},
               {"_id": "1511", "__vector_a": "some content"}, {"_id": "1234f", "__chunks": "some content"},
               {"_id": "144451", "__field_content": "some content"},
               {"_id": "sv4124", "good_field_3": "some content 2 " , "good_field_4": 3.65}],
-             ({"good_field_3", "good_field_4"}, {(12, 14), None, "__vector_a", "__chunks", "__field_content"})
+             ({"good_field_3", "good_field_4"}, {"__vector_a", "__chunks", "__field_content"})
              ),
             # invalid content
             ([{"_id": "f24f4", "bad_field_1": []}, {"_id": "4t6g5g5", "bad_field_1": {}},
@@ -1081,11 +1055,8 @@ class TestAddDocuments(MarqoTestCase):
         resp = tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="789", show_vectors=True)
 
         assert len(resp[enums.TensorField.tensor_facets]) == 2
-        assert enums.TensorField.embedding in resp[enums.TensorField.tensor_facets][0]
-        assert enums.TensorField.embedding in resp[enums.TensorField.tensor_facets][1]
-        # the order doesn't really matter. We can test for both orderings if this breaks in the future
-        assert "Title" in resp[enums.TensorField.tensor_facets][0]
-        assert "Description" in resp[enums.TensorField.tensor_facets][1]
+        assert ("Title", "_embedding") in [tuple(t.keys()) for t in resp[enums.TensorField.tensor_facets]]
+        assert ("Description", "_embedding") in [tuple(t.keys()) for t in resp[enums.TensorField.tensor_facets]]
 
     def test_add_document_with_non_tensor_field(self):
         docs_ = [{"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}]

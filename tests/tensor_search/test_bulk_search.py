@@ -4,7 +4,7 @@ import math
 import requests
 import random
 from unittest import mock
-from marqo.tensor_search.models.add_docs_objects import AddDocsParams
+from marqo.tensor_search.models.add_docs_objects import AddDocsParams, Document
 from marqo.s2_inference.errors import UnknownModelError
 from marqo.s2_inference.s2_inference import vectorise
 import unittest
@@ -1411,8 +1411,9 @@ class TestBulkSearch(MarqoTestCase):
         vocab = requests.get(vocab_source).text.splitlines()
         tensor_search.add_documents_orchestrator(
             config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1,
-            docs=[{"Title": "a " + (" ".join(random.choices(population=vocab, k=25)))}
-                  for _ in range(700)], auto_refresh=False), processes=4, batch_size=50
+            docs=[
+                Document(Title ="a " + (" ".join(random.choices(population=vocab, k=25)))) for _ in range(700)
+            ], auto_refresh=False), processes=4, batch_size=50
         )
         tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
     
