@@ -97,8 +97,26 @@ class TestDefaultDevice(MarqoTestCase):
 
             assert run()
 
-            
-    
+    @mock.patch("os.environ", dict())
+    def test_add_docs_orchestrator_fails_with_no_default(self):
+        """
+            If no best available device is set, this function should raise internal error.
+        """
+        self.assertNotIn("MARQO_BEST_AVAILABLE_DEVICE", os.environ)
+        # Call orchestrator
+        try:
+            tensor_search.add_documents_orchestrator(
+                config=self.config,
+                add_docs_params=AddDocsParams(index_name=self.index_name_1, 
+                                docs=[{"Title": "blah"} for i in range(5)], 
+                                auto_refresh=True,
+                                # no device set, so should default to best
+                            ),
+            )
+            raise AssertionError
+        except InternalError:
+            pass
+        
     def test_add_docs_orchestrator_uses_set_device(self):
         """
             when device is explicitly set,
@@ -238,6 +256,30 @@ class TestDefaultDevice(MarqoTestCase):
                 return True
             assert run()
     
+    @mock.patch("os.environ", dict())
+    def test_search_fails_with_no_default(self):
+        """
+            If no best available device is set, this function should raise internal error.
+        """
+        self.assertNotIn("MARQO_BEST_AVAILABLE_DEVICE", os.environ)
+        # Add docs
+        tensor_search.add_documents(config=self.config, add_docs_params = AddDocsParams(
+            auto_refresh=True, device="cpu", index_name=self.index_name_1, docs=[{"test": "blah"}])
+        )
+
+        try:
+            # Call search
+            tensor_search.search(
+                config=self.config, 
+                index_name=self.index_name_1, 
+                text="random search lol",
+                reranker="owl/ViT-B/32",
+                searchable_attributes=["test"],
+            )
+            raise AssertionError
+        except InternalError:
+            pass
+
     def test_bulk_search_defaults_to_best_device(self):
         """
             when no device is set,
@@ -361,3 +403,40 @@ class TestDefaultDevice(MarqoTestCase):
                 
                 return True
             assert run()
+
+    @mock.patch("os.environ", dict())
+    def test_bulk_search_fails_with_no_default(self):
+        """
+            If no best available device is set, this function should raise internal error.
+        """
+        self.assertNotIn("MARQO_BEST_AVAILABLE_DEVICE", os.environ)
+        # Add docs
+        tensor_search.add_documents(config=self.config, add_docs_params = AddDocsParams(
+            auto_refresh=True, device="cpu", index_name=self.index_name_1, docs=[{"test": "blah"}])
+        )
+
+        try:
+            # Call bulk search
+            tensor_search.bulk_search(
+                marqo_config=self.config, 
+                query=BulkSearchQuery(
+                    queries=[
+                        BulkSearchQueryEntity(
+                            index=self.index_name_1, 
+                            reRanker="owl/ViT-B/32",
+                            q="match", 
+                            searchableAttributes=["abc", "other field"],
+                        ),
+                        BulkSearchQueryEntity(
+                            index=self.index_name_1, 
+                            reRanker="owl/ViT-B/32",
+                            q="match 2", 
+                            searchableAttributes=["abc", "other field"],
+                        )
+                    ],
+                    # no device set, so should use default
+                )
+            )
+            raise AssertionError
+        except InternalError:
+            pass
