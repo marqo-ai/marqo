@@ -98,10 +98,13 @@ def load_image_from_path(image_path: str, image_download_headers: dict, timeout=
         img = Image.open(image_path)
     elif validators.url(image_path):
         try:
-            if metrics_obj is None:
-                metrics_obj = RequestMetrics.for_request()
-            with metrics_obj.time(f"image_download.{image_path}"):
-                resp = requests.get(image_path, stream=True, timeout=timeout, headers=image_download_headers)
+            if metrics_obj is not None:
+                metrics_obj.start(f"image_download.{image_path}")
+
+            resp = requests.get(image_path, stream=True, timeout=timeout, headers=image_download_headers)
+
+            if metrics_obj is not None:
+                metrics_obj.stop(f"image_download.{image_path}")
         except (requests.exceptions.ConnectTimeout, requests.exceptions.ConnectionError,
                 requests.exceptions.RequestException
                 ) as e:
