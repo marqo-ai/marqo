@@ -14,9 +14,6 @@ class Model:
     def __init__(self, model_name: Optional[str] = None, device: str = None, batch_size: int = 2048, embedding_dim=None, max_seq_length=None , **kwargs) -> None:
 
         self.model_name = model_name
-        
-        if not device:
-            raise InternalError("`device` is required for loading models!")
         self.device = device
         self.model = None
         self.embedding_dimension = embedding_dim
@@ -45,6 +42,8 @@ class SBERT(Model):
     """
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
+        if not self.device:
+            raise InternalError("`device` is required for loading SBERT models!")
 
     def load(self) -> None:
         self.model = SentenceTransformer(self.model_name, device=self.device)
