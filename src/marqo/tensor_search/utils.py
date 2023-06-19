@@ -103,7 +103,7 @@ def build_tensor_search_filter(
         filter_string=filter_string, simple_properties=simple_properties)
 
     if contextualised_user_filter and searchable_attribs_filter:
-        return f"{searchable_attribs_filter} AND {contextualised_user_filter}"
+        return f"({searchable_attribs_filter}) AND ({contextualised_user_filter})"
     else:
         return f"{searchable_attribs_filter}{contextualised_user_filter}"
 
