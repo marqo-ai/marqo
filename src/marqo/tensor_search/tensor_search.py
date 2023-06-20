@@ -1511,15 +1511,14 @@ def vectorise_jobs(jobs: List[VectorisedJobs]) -> Dict[JHash, Dict[str, List[flo
         # TODO: Handle exception for single job, and allow others to run.
         try:
             if v.content:
-                with RequestMetrics.for_request().time(f"vector_inference"):
-                    vectors = s2_inference.vectorise(
-                        model_name=v.model_name, model_properties=v.model_properties,
-                        content=v.content, device=v.device,
-                        normalize_embeddings=v.normalize_embeddings,
-                        image_download_headers=v.image_download_headers,
-                        model_auth=v.model_auth
-                    )
-                    result[v.groupby_key()] = dict(zip(v.content, vectors))
+                vectors = s2_inference.vectorise(
+                    model_name=v.model_name, model_properties=v.model_properties,
+                    content=v.content, device=v.device,
+                    normalize_embeddings=v.normalize_embeddings,
+                    image_download_headers=v.image_download_headers,
+                    model_auth=v.model_auth
+                )
+                result[v.groupby_key()] = dict(zip(v.content, vectors))
 
         # TODO: This is a temporary addition.
         except (s2_inference_errors.UnknownModelError,
@@ -1679,7 +1678,8 @@ def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity
         lambda t : logger.debug(f"bulk search (tensor) pre-processing: took {t:.3f}ms")
     ):
         selected_device = config.indexing_device if device is None else device
-        qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, selected_device)
+        with RequestMetrics.for_request().time(f"bulk_search.create_vectors"):
+            qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, selected_device)
 
         ## 4. Create msearch request bodies and combine to aggregate.
         query_to_body_parts: Dict[Qidx, List[Dict]] = dict()
