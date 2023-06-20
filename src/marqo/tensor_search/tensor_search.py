@@ -1678,7 +1678,7 @@ def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity
         lambda t : logger.debug(f"bulk search (tensor) pre-processing: took {t:.3f}ms")
     ):
         selected_device = config.indexing_device if device is None else device
-        with RequestMetrics.for_request().time(f"bulk_search.create_vectors"):
+        with RequestMetrics.for_request().time(f"bulk_search.vector_inference_full_pipeline"):
             qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, selected_device)
 
         ## 4. Create msearch request bodies and combine to aggregate.
@@ -1790,7 +1790,7 @@ def _vector_text_search(
     queries = [BulkSearchQueryEntity(
         q=query, searchableAttributes=searchable_attributes,searchMethod=SearchMethod.TENSOR, limit=result_count, offset=offset, showHighlights=False, filter=filter_string, attributesToRetrieve=attributes_to_retrieve, boost=boost, image_download_headers=image_download_headers, context=context, scoreModifiers=score_modifiers, index=index_name, modelAuth=model_auth
     )]
-    with RequestMetrics.for_request().time(f"search.create_vectors"):
+    with RequestMetrics.for_request().time(f"search.vector_inference_full_pipeline"):
         qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, selected_device)
     vectorised_text = list(qidx_to_vectors.values())[0]
 
