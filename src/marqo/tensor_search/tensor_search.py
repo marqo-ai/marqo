@@ -359,7 +359,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
     """
     # ADD DOCS TIMER-LOGGER (3)
 
-    RequestMetrics.for_request().start("add_documents.preprocess")
+    RequestMetrics.for_request().start("add_documents.processing_before_opensearch")
     start_time_3 = timer()
 
     if add_docs_params.mappings is not None:
@@ -714,7 +714,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                     }
                 })
 
-    total_preproc_time = 0.001 * RequestMetrics.for_request().stop("add_documents.preprocess")
+    total_preproc_time = 0.001 * RequestMetrics.for_request().stop("add_documents.processing_before_opensearch")
     logger.debug(f"      add_documents pre-processing: took {(total_preproc_time):.3f}s total for {batch_size} docs, "
                 f"for an average of {(total_preproc_time / batch_size):.3f}s per doc.")
 
@@ -1197,7 +1197,7 @@ def _lexical_search(
             f"Query arg: {text}")
 
     # SEARCH TIMER-LOGGER (pre-processing)
-    RequestMetrics.for_request().start("search.lexical.preprocess")
+    RequestMetrics.for_request().start("search.lexical.processing_before_opensearch")
     if searchable_attributes is not None and searchable_attributes:
         fields_to_search = searchable_attributes
     else:
@@ -1253,7 +1253,7 @@ def _lexical_search(
         if body["_source"] is not False:
             body["_source"]["exclude"] = [f"*{TensorField.vector_prefix}*"]
 
-    total_preprocess_time = RequestMetrics.for_request().stop("search.lexical.preprocess")
+    total_preprocess_time = RequestMetrics.for_request().stop("search.lexical.processing_before_opensearch")
     logger.debug(f"search (lexical) pre-processing: took {(total_preprocess_time):.3f}ms to process query.")
 
     start_search_http_time = timer()
@@ -1674,7 +1674,7 @@ def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity
     if len(queries) == 0:
         return []
 
-    with RequestMetrics.for_request().time("bulk_search.vector.preprocess",
+    with RequestMetrics.for_request().time("bulk_search.vector.processing_before_opensearch",
         lambda t : logger.debug(f"bulk search (tensor) pre-processing: took {t:.3f}ms")
     ):
         selected_device = config.indexing_device if device is None else device
@@ -1780,7 +1780,7 @@ def _vector_text_search(
         - searching a non existent index should return a HTTP-type error
     """
     # # SEARCH TIMER-LOGGER (pre-processing)
-    RequestMetrics.for_request().start("search.vector.preprocess")
+    RequestMetrics.for_request().start("search.vector.processing_before_opensearch")
     try:
         index_info = get_index_info(config=config, index_name=index_name)
     except KeyError as e:
@@ -1818,7 +1818,7 @@ def _vector_text_search(
         # This probably means the index is emtpy
         return {"hits": []}
 
-    total_preprocess_time = RequestMetrics.for_request().stop("search.vector.preprocess")
+    total_preprocess_time = RequestMetrics.for_request().stop("search.vector.processing_before_opensearch")
     logger.debug(f"search (tensor) pre-processing: took {(total_preprocess_time):.3f}ms to vectorize and process query.")
 
     # SEARCH TIMER-LOGGER (roundtrip)
