@@ -35,18 +35,19 @@ class Timer:
         Return time is in Ms.
         """
         if self.start_time is None:
-            logger.warn(f"'.stop()' called on unstarted timer. '.start()' must be called before '.stop()'.")
-            raise TimerError()
+            raise TimerError(
+                f"'.stop()' called on unstarted timer. '.start()' must be called before '.stop()'."
+            )
         else:
             elapsed_time = time.perf_counter() - self.start_time
             self.start_time = None
             return 1000 * elapsed_time
 
 
-class RequestMetric:
+class RequestMetrics:
     @classmethod
-    def reduce_from_list(cls, metrics: List["RequestMetric"]) -> "RequestMetric":
-        assert len(metrics) > 0, "Cannot create RequestMetric from []"
+    def reduce_from_list(cls, metrics: List["RequestMetrics"]) -> "RequestMetrics":
+        assert len(metrics) > 0, "Cannot create RequestMetrics from []"
         m = metrics.pop(0)
         for mm in metrics:
             for k, count in mm.counter.items():
@@ -114,10 +115,10 @@ class RequestMetric:
         }
 
 
-class RequestMetrics():
+class RequestMetricsStore():
     current_request: ContextVar[Request] = ContextVar('current_request')
     
-    METRIC_STORES: Dict[str, RequestMetric] = {}
+    METRIC_STORES: Dict[Request, RequestMetrics] = {}
 
     @classmethod
     def _set_request(cls, r: Request):
@@ -128,17 +129,20 @@ class RequestMetrics():
         return cls.current_request.get()
 
     @classmethod
-    def for_request(cls, r: Optional[Request] = None) -> RequestMetric:
+    def for_request(cls, r: Optional[Request] = None) -> RequestMetrics:
         if r is None:
             r = cls._get_request()
             
         return cls.METRIC_STORES[r]
 
     @classmethod
-    def set_in_request(cls, r: Optional[Request] = None, metrics: Optional[RequestMetric] = None) -> None:
+    def set_in_request(cls, r: Optional[Request] = None, metrics: Optional[RequestMetrics] = None) -> None:
+        """
+        NOTE: this function should only be used in TelemetryMiddleware, and threading edge cases.
+        """
         r = r if r is not None else cls._get_request()
         cls._set_request(r)
-        cls.METRIC_STORES[r] = metrics if metrics is not None else RequestMetric()
+        cls.METRIC_STORES[r] = metrics if metrics is not None else RequestMetrics()
 
     @classmethod
     def clear_metrics_for(cls, r: Request) -> None:
@@ -177,7 +181,7 @@ class TelemetryMiddleware(BaseHTTPMiddleware):
             call_next: A callable to the remaining request call-chain.
 
         """
-        RequestMetrics.set_in_request(request)
+        RequestMetricsStore.set_in_request(request)
 
         response = await call_next(request)
 
@@ -189,7 +193,7 @@ class TelemetryMiddleware(BaseHTTPMiddleware):
 
         # Inject telemetry and fix content-length header
         if isinstance(data, dict):
-            telemetry = RequestMetrics.for_request(request).json()
+            telemetry = RequestMetricsStore.for_request(request).json()
             if len(telemetry["timesMs"]) == 0:
                 telemetry.pop("timesMs")
             if len(telemetry["counter"]) == 0:
@@ -199,9 +203,9 @@ class TelemetryMiddleware(BaseHTTPMiddleware):
             get_logger(__name__).warning(
                 f"{self.telemetry_flag} set but response payload is not Dict. telemetry not returned"
             )
-            get_logger(__name__).info(f"Telemetry data={json.dumps(RequestMetrics.for_request(request).json(), indent=2)}")
+            get_logger(__name__).info(f"Telemetry data={json.dumps(RequestMetricsStore.for_request(request).json(), indent=2)}")
 
-        RequestMetrics.clear_metrics_for(request)
+        RequestMetricsStore.clear_metrics_for(request)
 
         body = json.dumps(data).encode()
         response.headers["content-length"] = str(len(body))

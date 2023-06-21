@@ -14,7 +14,7 @@ from marqo.marqo_logging import logger
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from dataclasses import replace
 from marqo.config import Config
-from marqo.tensor_search.telemetry import RequestMetric, RequestMetrics, Timer
+from marqo.tensor_search.telemetry import RequestMetrics, RequestMetricsStore, Timer
 
 
 try:
@@ -97,7 +97,7 @@ class IndexChunk:
             self,
             add_docs_params: AddDocsParams,
             config: Config,
-            request_metric: RequestMetric,
+            request_metric: RequestMetrics,
             batch_size: int = 50,
             process_id: int = 0,
             threads_per_process: int = None,
@@ -113,13 +113,15 @@ class IndexChunk:
         self.config.indexing_device = add_docs_params.device if add_docs_params.device is not None else self.config.indexing_device
         self.threads_per_process = threads_per_process
 
-    def process(self) -> Tuple[List[Dict[str, Any]], RequestMetric]:
+    def process(self) -> Tuple[List[Dict[str, Any]], RequestMetrics]:
         # Generate pseudo-unique ID for thread metrics.
         _id = hash("".join([d.get("_id", str(random.getrandbits(64))) for d in self.add_docs_params.docs])) % 1000
 
-        # We set a temporary key in 
-        Request(scope={"type": "http"})
-        RequestMetrics.set_in_request(r=f"IndexChunk.{_id}", metrics=self.request_metric)
+        # We set a temporary key in the thread to allow it to reference `self.request_metric`
+        RequestMetricsStore.set_in_request(
+            r=Request(scope={"type": "http", "unique_metrics_key": f"IndexChunk.{_id}"}),
+            metrics=self.request_metric
+        )
 
         # hf tokenizers setting
         os.environ['TOKENIZERS_PARALLELISM'] = 'false'
@@ -163,7 +165,7 @@ class IndexChunk:
         return round(100*percent, rounding)
 
 
-def _run_chunker(chunker: IndexChunk) -> Tuple[List[Dict[str, Any]], RequestMetric]:
+def _run_chunker(chunker: IndexChunk) -> Tuple[List[Dict[str, Any]], RequestMetrics]:
     """helper function to run the multiprocess by activating the chunker
     Args:
         chunker (IndexChunk): _description_
@@ -215,8 +217,8 @@ def add_documents_mp(
     device_ids = get_device_ids(n_processes, selected_device)
 
     start = time.time()
-    initial_metrics = RequestMetrics.for_request()
-    request = RequestMetrics._get_request()
+    initial_metrics = RequestMetricsStore.for_request()
+    request = RequestMetricsStore._get_request()
 
     chunkers = [
         IndexChunk(
@@ -229,12 +231,12 @@ def add_documents_mp(
     logger.info(f'Performing parallel now across devices {device_ids}...')
 
     with mp.Pool(n_processes) as pool:
-        results: List[Tuple[List[Dict[str, Any]], RequestMetric]] = pool.map(_run_chunker, chunkers)
+        results: List[Tuple[List[Dict[str, Any]], RequestMetrics]] = pool.map(_run_chunker, chunkers)
 
-    metrics: List[RequestMetric] = [r[1] for r in results]
+    metrics: List[RequestMetrics] = [r[1] for r in results]
     results: List[Tuple[List[Dict[str, Any]]]] = [r[0] for r in results]
 
-    RequestMetrics.set_in_request(r=request, metrics=RequestMetric.reduce_from_list(metrics))
+    RequestMetricsStore.set_in_request(r=request, metrics=RequestMetrics.reduce_from_list(metrics))
     
     end = time.time()
     logger.info(f"finished indexing all documents. took {end - start} seconds to index {n_documents} documents")

@@ -7,11 +7,11 @@ import random
 from typing import List, Optional, Tuple
 import PIL
 from marqo.s2_inference import clip_utils
-from marqo.tensor_search.telemetry import RequestMetrics, RequestMetric
+from marqo.tensor_search.telemetry import RequestMetricsStore, RequestMetrics
 
 
 def threaded_download_images(allocated_docs: List[dict], image_repo: dict,
-                             non_tensor_fields: Tuple, image_download_headers: dict, metric_obj: Optional[RequestMetric] = None) -> None:
+                             non_tensor_fields: Tuple, image_download_headers: dict, metric_obj: Optional[RequestMetrics] = None) -> None:
     """A thread calls this function to download images for its allocated documents
 
     This should be called only if treat URLs as images is True.
@@ -41,8 +41,8 @@ def threaded_download_images(allocated_docs: List[dict], image_repo: dict,
     _id = f"image_download.{_id}"
     TIMEOUT_SECONDS=3
     if metric_obj is None: # Occurs predominately in testing.
-        metric_obj = RequestMetrics.for_request()
-        RequestMetrics.set_in_request(metrics=metric_obj)
+        metric_obj = RequestMetricsStore.for_request()
+        RequestMetricsStore.set_in_request(metrics=metric_obj)
 
     with metric_obj.time(f"{_id}.thread_time"):
         for doc in allocated_docs:
@@ -95,7 +95,7 @@ def download_images(docs: List[dict], thread_count: int, non_tensor_fields: Tupl
     copied = copy.deepcopy(docs)
     image_repo = dict()
 
-    m = [RequestMetric() for i in range(thread_count)]
+    m = [RequestMetrics() for i in range(thread_count)]
     thread_allocated_docs = [copied[i: i + docs_per_thread] for i in range(len(copied))[::docs_per_thread]]
     threads = [threading.Thread(target=threaded_download_images, args=(allocation, image_repo, non_tensor_fields, image_download_headers, m[i]))
                for i, allocation in enumerate(thread_allocated_docs)]
@@ -107,8 +107,8 @@ def download_images(docs: List[dict], thread_count: int, non_tensor_fields: Tupl
         th.join()
 
     # Fix up metric_obj to make it not mention thread-ids
-    metric_obj = RequestMetrics.for_request()
-    metric_obj = RequestMetric.reduce_from_list([metric_obj] + m)
+    metric_obj = RequestMetricsStore.for_request()
+    metric_obj = RequestMetrics.reduce_from_list([metric_obj] + m)
     metric_obj.times = reduce_thread_metrics(metric_obj.times)
     return image_repo
 

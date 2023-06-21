@@ -17,7 +17,7 @@ from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normal
 from marqo.s2_inference.processing.custom_clip_utils import HFTokenizer, download_model
 from torchvision.transforms import InterpolationMode
 from marqo.s2_inference.configs import ModelCache
-from marqo.tensor_search.telemetry import RequestMetric, RequestMetrics
+from marqo.tensor_search.telemetry import RequestMetrics, RequestMetricsStore
 
 logger = get_logger(__name__)
 
@@ -80,7 +80,7 @@ def format_and_load_CLIP_images(images: List[Union[str, ndarray, ImageType]], im
     return results
 
 
-def load_image_from_path(image_path: str, image_download_headers: dict, timeout=3, metrics_obj: Optional[RequestMetric] = None) -> ImageType:
+def load_image_from_path(image_path: str, image_download_headers: dict, timeout=3, metrics_obj: Optional[RequestMetrics] = None) -> ImageType:
     """Loads an image into PIL from a string path that is either local or a url
 
     Args:

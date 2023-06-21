@@ -21,7 +21,7 @@ from marqo.tensor_search.throttling.redis_throttle import throttle
 from marqo.tensor_search.utils import add_timing
 import pydantic
 
-from marqo.tensor_search.telemetry import RequestMetrics, TelemetryMiddleware
+from marqo.tensor_search.telemetry import RequestMetricsStore, TelemetryMiddleware
 
 
 def replace_host_localhosts(OPENSEARCH_IS_INTERNAL: str, OS_URL: str):
@@ -139,7 +139,7 @@ def create_index(index_name: str, settings: Dict = None, marqo_config: config.Co
 @throttle(RequestType.SEARCH)
 @add_timing
 def bulk_search(query: BulkSearchQuery, device: str = Depends(api_validation.validate_device), marqo_config: config.Config = Depends(generate_config)):
-    with RequestMetrics.for_request().time(f"POST /indexes/bulk/search"):
+    with RequestMetricsStore.for_request().time(f"POST /indexes/bulk/search"):
         return tensor_search.bulk_search(query, marqo_config, device=device)
 
 @app.post("/indexes/{index_name}/search")
@@ -147,7 +147,7 @@ def bulk_search(query: BulkSearchQuery, device: str = Depends(api_validation.val
 def search(search_query: SearchQuery, index_name: str, device: str = Depends(api_validation.validate_device),
            marqo_config: config.Config = Depends(generate_config)):
     
-    with RequestMetrics.for_request().time(f"POST /indexes/{index_name}/search"):
+    with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/search"):
         return tensor_search.search(
             config=marqo_config, text=search_query.q,
             index_name=index_name, highlights=search_query.showHighlights,
@@ -191,7 +191,7 @@ def add_or_replace_documents(
         use_existing_tensors=use_existing_tensors, image_download_headers=image_download_headers,
         mappings=mappings, model_auth=model_auth
     )
-    with RequestMetrics.for_request().time(f"POST /indexes/{index_name}/documents"):
+    with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/documents"):
         return tensor_search.add_documents_orchestrator(
             config=marqo_config, add_docs_params=add_docs_params,
             batch_size=batch_size, processes=processes

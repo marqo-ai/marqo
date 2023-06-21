@@ -58,7 +58,7 @@ from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQue
 from marqo.tensor_search.models.search import Qidx, JHash, SearchContext, VectorisedJobs, VectorisedJobPointer
 from marqo.tensor_search.models.index_info import IndexInfo
 from marqo.tensor_search.models.external_apis.abstract_classes import ExternalAuth
-from marqo.tensor_search.telemetry import RequestMetrics
+from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.tensor_search.utils import add_timing
 from marqo.tensor_search import delete_docs
 from marqo.s2_inference.processing import text as text_processor
@@ -359,7 +359,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
     """
     # ADD DOCS TIMER-LOGGER (3)
 
-    RequestMetrics.for_request().start("add_documents.processing_before_opensearch")
+    RequestMetricsStore.for_request().start("add_documents.processing_before_opensearch")
     start_time_3 = timer()
 
     if add_docs_params.mappings is not None:
@@ -405,7 +405,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
     image_repo = {}
 
     if index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]:
-        with RequestMetrics.for_request().time(
+        with RequestMetricsStore.for_request().time(
             "image_download.full_time",
             lambda t: logger.debug(
                 f"add_documents image download: took {t:.3f}ms to concurrently download "
@@ -585,7 +585,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
 
                     # ADD DOCS TIMER-LOGGER (4)
                     start_time = timer()
-                    with RequestMetrics.for_request().time(f"add_documents.create_vectors"):
+                    with RequestMetricsStore.for_request().time(f"add_documents.create_vectors"):
                         vector_chunks = s2_inference.vectorise(
                             model_name=index_info.model_name,
                             model_properties=_get_model_properties(index_info), content=content_chunks,
@@ -714,7 +714,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                     }
                 })
 
-    total_preproc_time = 0.001 * RequestMetrics.for_request().stop("add_documents.processing_before_opensearch")
+    total_preproc_time = 0.001 * RequestMetricsStore.for_request().stop("add_documents.processing_before_opensearch")
     logger.debug(f"      add_documents pre-processing: took {(total_preproc_time):.3f}s total for {batch_size} docs, "
                 f"for an average of {(total_preproc_time / batch_size):.3f}s per doc.")
 
@@ -729,11 +729,11 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
 
         # ADD DOCS TIMER-LOGGER (5)
         start_time_5 = timer()
-        with RequestMetrics.for_request().time("add_documents.opensearch._bulk"):
+        with RequestMetricsStore.for_request().time("add_documents.opensearch._bulk"):
             index_parent_response = HttpRequests(config).post(
                 path="_bulk", body=utils.dicts_to_jsonl(bulk_parent_dicts)
             )
-        RequestMetrics.for_request().add_time("add_documents.opensearch._bulk.internal", float(index_parent_response["took"]))
+        RequestMetricsStore.for_request().add_time("add_documents.opensearch._bulk.internal", float(index_parent_response["took"]))
 
         end_time_5 = timer()
         total_http_time = end_time_5 - start_time_5
@@ -748,7 +748,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
     else:
         index_parent_response = None
 
-    with RequestMetrics.for_request().time("add_documents.postprocess"):
+    with RequestMetricsStore.for_request().time("add_documents.postprocess"):
         if add_docs_params.auto_refresh:
             HttpRequests(config).post(path=F"{add_docs_params.index_name}/_refresh")
 
@@ -983,7 +983,7 @@ def bulk_search(query: BulkSearchQuery, marqo_config: config.Config, verbose: bo
     combined_results.sort()
     search_results = [r[1] for r in combined_results]
 
-    with RequestMetrics.for_request().time(f"bulk_search.rerank"):
+    with RequestMetricsStore.for_request().time(f"bulk_search.rerank"):
         for i, s in enumerate(search_results):
             q = query.queries[i]
             s["query"] = q.q
@@ -997,7 +997,7 @@ def bulk_search(query: BulkSearchQuery, marqo_config: config.Config, verbose: bo
 
             if q.reRanker is not None:
                 logger.debug(f"reranking {i}th query using {q.reRanker}")
-                with RequestMetrics.for_request().time(f"bulk_search.{i}.rerank"):
+                with RequestMetricsStore.for_request().time(f"bulk_search.{i}.rerank"):
                     rerank_query(q, s, q.reRanker, selected_device, 1)
 
     return {
@@ -1139,13 +1139,13 @@ def search(config: Config, index_name: str, text: Union[str, dict],
                 f"searchable_attributes cannot be None when re-ranking. Specify which fields to search and rerank over.")
         try:
             # SEARCH TIMER-LOGGER (reranking)
-            RequestMetrics.for_request().start(f"search.rerank")
+            RequestMetricsStore.for_request().start(f"search.rerank")
             rerank.rerank_search_results(search_result=search_result, query=text,
                                          model_name=reranker,
                                          device=config.indexing_device if device is None else device,
                                          searchable_attributes=searchable_attributes,
                                          num_highlights=1)
-            total_rerank_time = RequestMetrics.for_request().stop(f"search.rerank")
+            total_rerank_time = RequestMetricsStore.for_request().stop(f"search.rerank")
             logger.debug(
                 f"search ({search_method.lower()}) reranking using {reranker}: took {(total_rerank_time):.3f}ms to rerank results."
             )
@@ -1197,7 +1197,7 @@ def _lexical_search(
             f"Query arg: {text}")
 
     # SEARCH TIMER-LOGGER (pre-processing)
-    RequestMetrics.for_request().start("search.lexical.processing_before_opensearch")
+    RequestMetricsStore.for_request().start("search.lexical.processing_before_opensearch")
     if searchable_attributes is not None and searchable_attributes:
         fields_to_search = searchable_attributes
     else:
@@ -1253,13 +1253,13 @@ def _lexical_search(
         if body["_source"] is not False:
             body["_source"]["exclude"] = [f"*{TensorField.vector_prefix}*"]
 
-    total_preprocess_time = RequestMetrics.for_request().stop("search.lexical.processing_before_opensearch")
+    total_preprocess_time = RequestMetricsStore.for_request().stop("search.lexical.processing_before_opensearch")
     logger.debug(f"search (lexical) pre-processing: took {(total_preprocess_time):.3f}ms to process query.")
 
     start_search_http_time = timer()
-    with RequestMetrics.for_request().time("search.opensearch._search"):
+    with RequestMetricsStore.for_request().time("search.opensearch._search"):
         search_res = HttpRequests(config).get(path=f"{index_name}/_search", body=body)
-    RequestMetrics.for_request().add_time("search.opensearch._search.internal", search_res["took"] * 0.001) # internal, not round trip time
+    RequestMetricsStore.for_request().add_time("search.opensearch._search.internal", search_res["took"] * 0.001) # internal, not round trip time
 
     end_search_http_time = timer()
     total_search_http_time = end_search_http_time - start_search_http_time
@@ -1271,7 +1271,7 @@ def _lexical_search(
         f"  search (lexical) Marqo-os processing time: took {(total_os_process_time):.3f}s for Marqo-os to execute the search.")
 
     # SEARCH TIMER-LOGGER (post-processing)
-    RequestMetrics.for_request().start("search.lexical.postprocess")
+    RequestMetricsStore.for_request().start("search.lexical.postprocess")
     res_list = []
     for doc in search_res['hits']['hits']:
         just_doc = _clean_doc(doc["_source"].copy()) if "_source" in doc else dict()
@@ -1279,7 +1279,7 @@ def _lexical_search(
         just_doc["_score"] = doc["_score"]
         res_list.append({**just_doc, "_highlights": []})
 
-    total_postprocess_time = RequestMetrics.for_request().stop("search.lexical.postprocess")
+    total_postprocess_time = RequestMetricsStore.for_request().stop("search.lexical.postprocess")
     logger.debug(
         f"search (lexical) post-processing: took {(total_postprocess_time):.3f}ms to format {len(res_list)} results.")
 
@@ -1369,9 +1369,9 @@ def bulk_msearch(config: Config, body: List[Dict]) -> List[Dict]:
     """Send an `/_msearch` request to MarqoOS and translate errors into a user-friendly format."""
     start_search_http_time = timer()
     try:
-        with RequestMetrics.for_request().time("search.opensearch._msearch"):
+        with RequestMetricsStore.for_request().time("search.opensearch._msearch"):
             response = HttpRequests(config).get(path=F"_msearch", body=utils.dicts_to_jsonl(body))
-        RequestMetrics.for_request().add_time("search.opensearch._msearch.internal", float(response["took"])) # internal, not round trip time
+        RequestMetricsStore.for_request().add_time("search.opensearch._msearch.internal", float(response["took"])) # internal, not round trip time
 
         end_search_http_time = timer()
         total_search_http_time = end_search_http_time - start_search_http_time
@@ -1674,11 +1674,11 @@ def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity
     if len(queries) == 0:
         return []
 
-    with RequestMetrics.for_request().time("bulk_search.vector.processing_before_opensearch",
+    with RequestMetricsStore.for_request().time("bulk_search.vector.processing_before_opensearch",
         lambda t : logger.debug(f"bulk search (tensor) pre-processing: took {t:.3f}ms")
     ):
         selected_device = config.indexing_device if device is None else device
-        with RequestMetrics.for_request().time(f"bulk_search.vector_inference_full_pipeline"):
+        with RequestMetricsStore.for_request().time(f"bulk_search.vector_inference_full_pipeline"):
             qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, selected_device)
 
         ## 4. Create msearch request bodies and combine to aggregate.
@@ -1700,7 +1700,7 @@ def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity
     ## 5. POST aggregate  to /_msearch
     responses = bulk_msearch(config, aggregate_body)
 
-    with RequestMetrics.for_request().time("bulk_search.vector.postprocess",
+    with RequestMetricsStore.for_request().time("bulk_search.vector.postprocess",
         lambda t : logger.debug(f"bulk search (tensor) post-processing: took {t:.3f}ms")
     ):
         # 6. Get documents back to each query, perform "gather" operation
@@ -1780,7 +1780,7 @@ def _vector_text_search(
         - searching a non existent index should return a HTTP-type error
     """
     # # SEARCH TIMER-LOGGER (pre-processing)
-    RequestMetrics.for_request().start("search.vector.processing_before_opensearch")
+    RequestMetricsStore.for_request().start("search.vector.processing_before_opensearch")
     try:
         index_info = get_index_info(config=config, index_name=index_name)
     except KeyError as e:
@@ -1790,7 +1790,7 @@ def _vector_text_search(
     queries = [BulkSearchQueryEntity(
         q=query, searchableAttributes=searchable_attributes,searchMethod=SearchMethod.TENSOR, limit=result_count, offset=offset, showHighlights=False, filter=filter_string, attributesToRetrieve=attributes_to_retrieve, boost=boost, image_download_headers=image_download_headers, context=context, scoreModifiers=score_modifiers, index=index_name, modelAuth=model_auth
     )]
-    with RequestMetrics.for_request().time(f"search.vector_inference_full_pipeline"):
+    with RequestMetricsStore.for_request().time(f"search.vector_inference_full_pipeline"):
         qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, selected_device)
     vectorised_text = list(qidx_to_vectors.values())[0]
 
@@ -1818,14 +1818,14 @@ def _vector_text_search(
         # This probably means the index is emtpy
         return {"hits": []}
 
-    total_preprocess_time = RequestMetrics.for_request().stop("search.vector.processing_before_opensearch")
+    total_preprocess_time = RequestMetricsStore.for_request().stop("search.vector.processing_before_opensearch")
     logger.debug(f"search (tensor) pre-processing: took {(total_preprocess_time):.3f}ms to vectorize and process query.")
 
     # SEARCH TIMER-LOGGER (roundtrip)
     responses = bulk_msearch(config, body)
 
     # SEARCH TIMER-LOGGER (post-processing)
-    RequestMetrics.for_request().start("search.vector.postprocess")
+    RequestMetricsStore.for_request().start("search.vector.postprocess")
     gathered_docs = gather_documents_from_response(responses)
 
     if boost is not None:
@@ -1842,7 +1842,7 @@ def _vector_text_search(
 
     res = _format_ordered_docs_simple(ordered_docs_w_chunks=completely_sorted, result_count=result_count)
 
-    total_postprocess_time = RequestMetrics.for_request().stop("search.vector.postprocess")
+    total_postprocess_time = RequestMetricsStore.for_request().stop("search.vector.postprocess")
     logger.debug(
         f"search (tensor) post-processing: took {(total_postprocess_time):.3f}ms to sort and format {len(completely_sorted)} results from Marqo-os.")
     return res
@@ -2125,7 +2125,7 @@ def vectorise_multimodal_combination_field(
         start_time = timer()
         text_vectors = []
         if len(text_content_to_vectorise) > 0:
-            with RequestMetrics.for_request().time(f"create_vectors"):
+            with RequestMetricsStore.for_request().time(f"create_vectors"):
                 text_vectors = s2_inference.vectorise(
                     model_name=index_info.model_name,
                     model_properties=_get_model_properties(index_info), content=text_content_to_vectorise,
@@ -2134,7 +2134,7 @@ def vectorise_multimodal_combination_field(
                 )
         image_vectors = []
         if len(image_content_to_vectorise) > 0:
-            with RequestMetrics.for_request().time(f"create_vectors"):
+            with RequestMetricsStore.for_request().time(f"create_vectors"):
                 image_vectors = s2_inference.vectorise(
                     model_name=index_info.model_name,
                     model_properties=_get_model_properties(index_info), content=image_content_to_vectorise,
