@@ -122,7 +122,8 @@ def populate_cache(config: Config):
         try:
             found_index_info = backend.get_index_info(config=config, index_name=ix_name)
             index_info_cache[ix_name] = found_index_info
-        except errors.NonTensorIndexError as e:
+        # IndexNotFoundError is excepted in case an index is deleted after get_cluster_indices runs
+        except (errors.NonTensorIndexError, errors.IndexNotFoundError) as e:
             pass
 
 
