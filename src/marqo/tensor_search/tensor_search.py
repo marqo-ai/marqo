@@ -1336,7 +1336,7 @@ def construct_vector_input_batches(query: Union[str, Dict], index_info: IndexInf
 
 def get_vector_properties_to_search(searchable_attributes: Union[None, List[str]], index_info: IndexInfo, offset: int = 0) -> List[str]:
     if searchable_attributes is None:
-        properties_to_search = index_info.get_vector_properties().keys()
+        properties_to_search = list(index_info.get_vector_properties().keys())
     else:
         searchable_attributes_set = set(searchable_attributes)
 
