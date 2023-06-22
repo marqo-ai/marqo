@@ -26,7 +26,7 @@ jobs:
         with:
           mode: start
           github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
-          ec2-image-id: ${{ secrets.CUDA_EC2_IMAGE_ID }}
+          ec2-image-id: ami-004d69a27ad86db36
           ec2-instance-type: g4dn.xlarge
           subnet-id: ${{ secrets.CUDA_SUBNET_ID }}
           security-group-id: ${{ secrets.CUDA_SECURITY_GROUP_ID }}
