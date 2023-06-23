@@ -16,7 +16,7 @@ from marqo.s2_inference.s2_inference import vectorise
 
 
 def on_start(marqo_os_url: str):
-    raise ValueError("FOR TESTING VERSION DETECTED!")
+    raise ValueError("FOR TESTING VERSION DETECTED! - 2")
     to_run_on_start = (
                         PopulateCache(marqo_os_url),
                         DownloadStartText(),
