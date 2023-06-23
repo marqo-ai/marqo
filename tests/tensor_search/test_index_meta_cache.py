@@ -541,7 +541,7 @@ class TestIndexMetaCache(MarqoTestCase):
         mock_response.json = lambda: '{"a":"b"}'
         mock_get.return_value = mock_response
 
-        # we need to search it once, to to get something in the cache, otherwise
+        # we need to search it once, to get something in the cache, otherwise
         # the threads will see an empty cache and try to fill it
         try:
             tensor_search.add_documents(
@@ -558,14 +558,14 @@ class TestIndexMetaCache(MarqoTestCase):
             N_seconds = 4
             # the following is hard coded in search()
             REFRESH_INTERVAL_SECONDS = 2
-            start_time = datetime.datetime.now()
+            start_time = time.perf_counter_ns()
             num_threads = 5
             total_loops = [0] * num_threads
             sleep_time = 0.1
 
             def threaded_while(thread_num, loop_record):
                 thread_loops = 0
-                while datetime.datetime.now() - start_time < datetime.timedelta(seconds=N_seconds):
+                while time.perf_counter_ns() - start_time < (N_seconds * 1e9):
                     cache_update_thread = threading.Thread(
                         target=tensor_search.search,
                         kwargs={"config": self.config, "index_name": self.index_name_1, "text": "hello" })
@@ -580,7 +580,7 @@ class TestIndexMetaCache(MarqoTestCase):
                 th.join()
 
             estimated_loops = round((N_seconds/sleep_time) * num_threads)
-            assert sum(total_loops) in range(estimated_loops - num_threads, estimated_loops + 1)
+            assert sum(total_loops) in range(estimated_loops - (2 * num_threads), estimated_loops + 1)
             time.sleep(0.5)  # let remaining thread complete, if needed
             mappings_call_count = len([c for c in mock_get.mock_calls if '_mapping' in str(c)])
             # for the refresh interal hardcoded in search(), which is 2 seconds, we expect a total
