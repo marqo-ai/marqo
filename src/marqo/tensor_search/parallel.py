@@ -1,8 +1,10 @@
 import os
+import random
 import time
 import json
-from typing import List, Dict, Optional
+from typing import Any, List, Dict, Optional, Tuple, Union
 import copy
+from fastapi import Request
 import torch
 import numpy as np
 from torch import multiprocessing as mp
@@ -12,6 +14,7 @@ from marqo.marqo_logging import logger
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from dataclasses import replace
 from marqo.config import Config
+from marqo.tensor_search.telemetry import RequestMetrics, RequestMetricsStore, Timer
 
 
 try:
@@ -84,6 +87,7 @@ def get_device_ids(n_processes: int, device: str):
 
     raise ValueError(f"expected on of 'cpu', 'cuda' or 'cuda:#' but received {device}")
 
+
 class IndexChunk:
 
     """wrapper to pass through documents to be indexed to multiprocessing
@@ -93,10 +97,13 @@ class IndexChunk:
             self,
             add_docs_params: AddDocsParams,
             config: Config,
+            request_metric: RequestMetrics,
             batch_size: int = 50,
             process_id: int = 0,
-            threads_per_process: int = None):
-
+            threads_per_process: int = None,
+            ):
+        self.request_metric = request_metric
+    
         self.config = copy.deepcopy(config)
         self.add_docs_params = add_docs_params
         self.n_batch = batch_size
@@ -106,7 +113,15 @@ class IndexChunk:
         self.config.indexing_device = add_docs_params.device if add_docs_params.device is not None else self.config.indexing_device
         self.threads_per_process = threads_per_process
 
-    def process(self):  
+    def process(self) -> Tuple[List[Dict[str, Any]], RequestMetrics]:
+        # Generate pseudo-unique ID for thread metrics.
+        _id = hash("".join([d.get("_id", str(random.getrandbits(64))) for d in self.add_docs_params.docs])) % 1000
+
+        # We set a temporary key in the thread to allow it to reference `self.request_metric`
+        RequestMetricsStore.set_in_request(
+            r=Request(scope={"type": "http", "unique_metrics_key": f"IndexChunk.{_id}"}),
+            metrics=self.request_metric
+        )
 
         # hf tokenizers setting
         os.environ['TOKENIZERS_PARALLELISM'] = 'false'
@@ -142,7 +157,7 @@ class IndexChunk:
 
         end = time.time()
         logger.info(f'took {end - start} sec for {self.n_docs} documents')
-        return results
+        return (results, self.request_metric)
 
     @staticmethod
     def _calculate_percent_done(current_step, total_steps, rounding=0):
@@ -150,7 +165,7 @@ class IndexChunk:
         return round(100*percent, rounding)
 
 
-def _run_chunker(chunker: IndexChunk):
+def _run_chunker(chunker: IndexChunk) -> Tuple[List[Dict[str, Any]], RequestMetrics]:
     """helper function to run the multiprocess by activating the chunker
     Args:
         chunker (IndexChunk): _description_
@@ -202,16 +217,27 @@ def add_documents_mp(
     device_ids = get_device_ids(n_processes, selected_device)
 
     start = time.time()
+    initial_metrics = RequestMetricsStore.for_request()
+    request = RequestMetricsStore._get_request()
 
     chunkers = [
         IndexChunk(
+            request_metric=initial_metrics,
             config=config,  batch_size=batch_size,
             process_id=p_id, threads_per_process=threads_per_process,
-            add_docs_params=replace(add_docs_params, docs=_docs, device=device_ids[p_id]))
+            add_docs_params=replace(add_docs_params, docs=_docs, device=device_ids[p_id])
+        )
         for p_id,_docs in enumerate(np.array_split(add_docs_params.docs, n_processes))]
     logger.info(f'Performing parallel now across devices {device_ids}...')
+
     with mp.Pool(n_processes) as pool:
-        results = pool.map(_run_chunker, chunkers)
+        results: List[Tuple[List[Dict[str, Any]], RequestMetrics]] = pool.map(_run_chunker, chunkers)
+
+    metrics: List[RequestMetrics] = [r[1] for r in results]
+    results: List[Tuple[List[Dict[str, Any]]]] = [r[0] for r in results]
+
+    RequestMetricsStore.set_in_request(r=request, metrics=RequestMetrics.reduce_from_list(metrics))
+    
     end = time.time()
     logger.info(f"finished indexing all documents. took {end - start} seconds to index {n_documents} documents")
     return results
