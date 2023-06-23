@@ -424,12 +424,11 @@ class OPEN_CLIP(CLIP):
             self.jit = self.model_properties.get("jit", False)
             self.mean = self.model_properties.get("mean", None)
             self.std = self.model_properties.get("std", None)
-            self.model, self.preprocess = self.custom_clip_load
+            self.model, self.preprocess = self.custom_clip_load()
             self.tokenizer = self.load_tokenizer()
 
             self.model.eval()
 
-    @property
     def custom_clip_load(self):
         self.model_name = self.model_properties.get("name", None)
         logger.info(f"The name of the custom clip model is {self.model_name}. We use open_clip load")

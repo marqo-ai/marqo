@@ -27,7 +27,7 @@ from marqo.s2_inference.processing.image_utils import (
     _keep_topk,
     rescale_box,
     clip_boxes,
-    _PIL_to_opencv, 
+    _PIL_to__clopencv,
     str2bool,
     get_default_size,
     _process_patch_method,
