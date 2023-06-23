@@ -17,6 +17,7 @@ from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normal
 from marqo.s2_inference.processing.custom_clip_utils import HFTokenizer, download_model
 from torchvision.transforms import InterpolationMode
 from marqo.s2_inference.configs import ModelCache
+from marqo.tensor_search.telemetry import RequestMetrics, RequestMetricsStore
 
 logger = get_logger(__name__)
 
@@ -79,7 +80,7 @@ def format_and_load_CLIP_images(images: List[Union[str, ndarray, ImageType]], im
     return results
 
 
-def load_image_from_path(image_path: str, image_download_headers: dict, timeout=3) -> ImageType:
+def load_image_from_path(image_path: str, image_download_headers: dict, timeout=3, metrics_obj: Optional[RequestMetrics] = None) -> ImageType:
     """Loads an image into PIL from a string path that is either local or a url
 
     Args:
@@ -97,7 +98,13 @@ def load_image_from_path(image_path: str, image_download_headers: dict, timeout=
         img = Image.open(image_path)
     elif validators.url(image_path):
         try:
+            if metrics_obj is not None:
+                metrics_obj.start(f"image_download.{image_path}")
+
             resp = requests.get(image_path, stream=True, timeout=timeout, headers=image_download_headers)
+
+            if metrics_obj is not None:
+                metrics_obj.stop(f"image_download.{image_path}")
         except (requests.exceptions.ConnectTimeout, requests.exceptions.ConnectionError,
                 requests.exceptions.RequestException
                 ) as e:
