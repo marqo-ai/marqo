@@ -28,8 +28,8 @@ def get_index_info(config: Config, index_name: str) -> IndexInfo:
         IndexInfo of the index
 
     Raises:
-        NonTensorIndexError, if the index's mapping doesn't conform to a Tensor Search index
-
+        NonTensorIndexError: If the index's mapping doesn't conform to a Tensor Search index.
+        IndexNotFoundError: If index does not exist.
     """
     res = HttpRequests(config).get(path=F"{index_name}/_mapping")
 
