@@ -1,14 +1,31 @@
 import unittest
+from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.tensor_search.utils import construct_authorized_url
 from marqo import config
+from unittest.mock import patch, Mock
 
 
 class MarqoTestCase(unittest.TestCase):
 
     @classmethod
-    def setUpClass(cls) -> None:
-        # Set up the Marqo root dir (for use in model caches)
+    def configure_request_metrics(cls):
+        """Mock RequestMetricsStore to avoid complications with not having TelemetryMiddleware configuring metrics.
+        """
+        cls.mock_request = Mock()
+        cls.patcher = patch('marqo.tensor_search.telemetry.RequestMetricsStore._get_request')
+        cls.mock_get_request = cls.patcher.start()
+        cls.mock_get_request.return_value = cls.mock_request
+        RequestMetricsStore.set_in_request(cls.mock_request)
 
+    @classmethod
+    def tearDownClass(cls):
+        cls.patcher.stop()
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.configure_request_metrics()
+
+        # Set up the Marqo root dir (for use in model caches)
         local_opensearch_settings = {
             "url": 'https://localhost:9200',
             "main_user": "admin",

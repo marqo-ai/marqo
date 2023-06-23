@@ -135,7 +135,6 @@ class HF_MODEL(Model):
             self.load()
 
         self.model.normalize = normalize
-
         inputs = self.tokenizer(sentence, padding=True, truncation=True, max_length=self.max_seq_length,
                                 return_tensors="pt").to(self.device)
 
