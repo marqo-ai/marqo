@@ -6,7 +6,8 @@ from marqo.s2_inference import clip_utils, types
 import unittest
 from unittest import mock
 import requests
-from marqo.s2_inference.clip_utils import CLIP, download_model, OPEN_CLIP
+from marqo.s2_inference.clip_utils import CLIP, download_model, OPEN_CLIP, FP16_CLIP, MULTILINGUAL_CLIP
+
 from marqo.tensor_search.enums import ModelProperties
 from marqo.tensor_search.models.private_models import ModelLocation, ModelAuth
 from unittest.mock import patch
@@ -14,6 +15,7 @@ import pytest
 from marqo.tensor_search.models.private_models import ModelLocation, ModelAuth
 from marqo.tensor_search.models.private_models import S3Auth, S3Location, HfModelLocation
 from marqo.s2_inference.configs import ModelCache
+from marqo.errors import InternalError
 
 
 class TestEncoding(unittest.TestCase):
@@ -94,7 +96,7 @@ class TestDownloadFromRepo(unittest.TestCase):
             's3': s3_auth.dict()
         }
 
-        clip = CLIP(model_properties=model_props, model_auth=auth)
+        clip = CLIP(model_properties=model_props, model_auth=auth, device="cpu")
         assert clip._download_from_repo() == 'model.pth'
         mock_download_model.assert_called_once_with(repo_location=location, auth=auth)
 
@@ -108,7 +110,7 @@ class TestDownloadFromRepo(unittest.TestCase):
             ModelProperties.model_location: location.dict(),
         }
 
-        clip = CLIP(model_properties=model_props)
+        clip = CLIP(model_properties=model_props, device="cpu")
         assert clip._download_from_repo() == 'model.pth'
         mock_download_model.assert_called_once_with(repo_location=location)
 
@@ -122,7 +124,7 @@ class TestDownloadFromRepo(unittest.TestCase):
             ModelProperties.model_location: location.dict(),
         }
 
-        clip = CLIP(model_properties=model_props)
+        clip = CLIP(model_properties=model_props, device="cpu")
 
         with pytest.raises(RuntimeError):
             clip._download_from_repo()
@@ -133,7 +135,7 @@ class TestLoad(unittest.TestCase):
     """tests the CLIP.load() method"""
     @patch('marqo.s2_inference.clip_utils.clip.load', return_value=(mock.Mock(), mock.Mock()))
     def test_load_without_model_properties(self, mock_clip_load):
-        clip = CLIP()
+        clip = CLIP(device="cpu")
         clip.load()
         mock_clip_load.assert_called_once_with('ViT-B/32', device='cpu', jit=False, download_root=ModelCache.clip_cache_path)
 
@@ -141,7 +143,7 @@ class TestLoad(unittest.TestCase):
     @patch('os.path.isfile', return_value=True)
     def test_load_with_local_file(self, mock_isfile, mock_clip_load):
         model_path = 'localfile.pth'
-        clip = CLIP(model_properties={'localpath': model_path})
+        clip = CLIP(model_properties={'localpath': model_path}, device="cpu")
         clip.load()
         mock_clip_load.assert_called_once_with(name=model_path, device='cpu', jit=False, download_root=ModelCache.clip_cache_path)
 
@@ -151,7 +153,7 @@ class TestLoad(unittest.TestCase):
     @patch('validators.url', return_value=True)
     def test_load_with_url(self, mock_url_valid, mock_isfile, mock_clip_load, mock_download_model):
         model_url = 'http://example.com/model.pth'
-        clip = CLIP(model_properties={'url': model_url})
+        clip = CLIP(model_properties={'url': model_url}, device="cpu")
         clip.load()
         mock_download_model.assert_called_once_with(url=model_url)
         mock_clip_load.assert_called_once_with(name='downloaded_model.pth', device='cpu', jit=False, download_root=ModelCache.clip_cache_path)
@@ -160,10 +162,38 @@ class TestLoad(unittest.TestCase):
     @patch('marqo.s2_inference.clip_utils.clip.load', return_value=(mock.Mock(), mock.Mock()))
     def test_load_with_model_location(self, mock_clip_load, mock_download_from_repo):
         model_location = ModelLocation(s3=S3Location(Bucket='some_bucket', Key='some_key'))
-        clip = CLIP(model_properties={ModelProperties.model_location: model_location.dict()})
+        clip = CLIP(model_properties={ModelProperties.model_location: model_location.dict()}, device="cpu")
         clip.load()
         mock_download_from_repo.assert_called_once()
         mock_clip_load.assert_called_once_with(name='downloaded_model.pth', device='cpu', jit=False, download_root=ModelCache.clip_cache_path)
+    
+    def test_clip_with_no_device(self):
+        # Should fail, raising internal error
+        try:
+            model_url = 'http://example.com/model.pth'
+            clip = CLIP(model_properties={'url': model_url})
+            raise AssertionError
+        except InternalError as e:
+            pass
+    
+    def test_fp16_clip_with_no_device(self):
+        # Should fail, raising internal error
+        try:
+            model_url = 'http://example.com/model.pth'
+            clip = FP16_CLIP(model_properties={'url': model_url})
+            raise AssertionError
+        except InternalError as e:
+            pass
+    
+    def test_multilingual_clip_with_no_device(self):
+        # Should fail, raising internal error
+        try:
+            model_url = 'http://example.com/model.pth'
+            clip = MULTILINGUAL_CLIP(model_properties={'url': model_url})
+            raise AssertionError
+        except InternalError as e:
+            pass
+        
 
 class TestOpenClipLoad(unittest.TestCase):
 
@@ -171,7 +201,7 @@ class TestOpenClipLoad(unittest.TestCase):
            return_value=(mock.Mock(), mock.Mock(), mock.Mock()))
     def test_load_without_model_properties(self, mock_open_clip_create_model_and_transforms):
         """By default laion400m_e32 is loaded..."""
-        open_clip = OPEN_CLIP()
+        open_clip = OPEN_CLIP(device="cpu")
         open_clip.load()
         mock_open_clip_create_model_and_transforms.assert_called_once_with(
             'ViT-B-32-quickgelu', pretrained='laion400m_e32', 
@@ -182,7 +212,7 @@ class TestOpenClipLoad(unittest.TestCase):
     @patch('os.path.isfile', return_value=True)
     def test_load_with_local_file(self, mock_isfile, mock_open_clip_create_model_and_transforms):
         model_path = 'localfile.pth'
-        open_clip = OPEN_CLIP(model_properties={'localpath': model_path})
+        open_clip = OPEN_CLIP(model_properties={'localpath': model_path}, device="cpu")
         open_clip.load()
         mock_open_clip_create_model_and_transforms.assert_called_once_with(
             model_name=open_clip.model_name, jit=False, pretrained=model_path,
@@ -195,7 +225,7 @@ class TestOpenClipLoad(unittest.TestCase):
     @patch('marqo.s2_inference.clip_utils.download_model', return_value='model.pth')
     def test_load_with_url(self, mock_download_model, mock_validators_url, mock_open_clip_create_model_and_transforms):
         model_url = 'http://model.com/model.pth'
-        open_clip = OPEN_CLIP(model_properties={'url': model_url})
+        open_clip = OPEN_CLIP(model_properties={'url': model_url}, device="cpu")
         open_clip.load()
         mock_download_model.assert_called_once_with(url=model_url)
         mock_open_clip_create_model_and_transforms.assert_called_once_with(
@@ -209,9 +239,18 @@ class TestOpenClipLoad(unittest.TestCase):
     def test_load_with_model_location(self, mock_download_from_repo, mock_open_clip_create_model_and_transforms):
         open_clip = OPEN_CLIP(model_properties={
             ModelProperties.model_location: ModelLocation(
-                auth_required=True, hf=HfModelLocation(repo_id='someId', filename='some_file.pt')).dict()})
+                auth_required=True, hf=HfModelLocation(repo_id='someId', filename='some_file.pt')).dict()}, device="cpu")
         open_clip.load()
         mock_download_from_repo.assert_called_once()
         mock_open_clip_create_model_and_transforms.assert_called_once_with(
             model_name=open_clip.model_name, jit=False, pretrained='model.pth', precision='fp32',
             image_mean=None, image_std=None, device='cpu', cache_dir=ModelCache.clip_cache_path)
+    
+    def test_open_clip_with_no_device(self):
+        # Should fail, raising internal error
+        try:
+            model_url = 'http://example.com/model.pth'
+            clip = OPEN_CLIP(model_properties={'url': model_url})
+            raise AssertionError
+        except InternalError as e:
+            pass

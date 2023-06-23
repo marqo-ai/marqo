@@ -33,7 +33,7 @@ class Test_HttpRequests(MarqoTestCase):
                 res = tensor_search.add_documents(
                     config=self.config, add_docs_params=AddDocsParams(
                         index_name=self.index_name_1,
-                        docs=[{"some ": "doc"}], auto_refresh=True
+                        docs=[{"some ": "doc"}], auto_refresh=True, device="cpu"
                     )
                 )
                 raise AssertionError

@@ -17,6 +17,7 @@ from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normal
 from marqo.s2_inference.processing.custom_clip_utils import HFTokenizer, download_model
 from torchvision.transforms import InterpolationMode
 from marqo.s2_inference.configs import ModelCache
+from marqo.errors import InternalError
 from marqo.tensor_search.telemetry import RequestMetrics, RequestMetricsStore
 
 logger = get_logger(__name__)
@@ -199,10 +200,13 @@ class CLIP:
     conveniance class wrapper to make clip work easily for both text and image encoding
     """
 
-    def __init__(self, model_type: str = "ViT-B/32", device: str = 'cpu',  embedding_dim: int = None,
+    def __init__(self, model_type: str = "ViT-B/32", device: str = None,  embedding_dim: int = None,
                             truncate: bool = True, **kwargs) -> None:
 
         self.model_type = model_type
+
+        if not device:
+            raise InternalError("`device` is required for loading CLIP models!")
         self.device = device
         self.model = None
         self.tokenizer = None
@@ -247,6 +251,7 @@ class CLIP:
         path = self.model_properties.get("localpath", None) or self.model_properties.get("url",None)
 
         if path is None and not model_location_presence:
+            # We must load the model into CPU then transfer it to the desired device, always
             # The original method to load the openai clip model
             # https://github.com/openai/CLIP/issues/30
             self.model, self.preprocess = clip.load(self.model_type, device='cpu', jit=False, download_root=ModelCache.clip_cache_path)
@@ -281,6 +286,7 @@ class CLIP:
         self.model_name = self.model_properties.get("name", None)
 
         logger.info(f"The name of the custom clip model is {self.model_name}. We use openai clip load")
+        # We must load the model into CPU then transfer it to the desired device, always
         model, preprocess = clip.load(name=self.model_path, device="cpu", jit= self.jit, download_root=ModelCache.clip_cache_path)
         model = model.to(self.device)
         return model, preprocess
@@ -364,7 +370,7 @@ class CLIP:
 
 
 class FP16_CLIP(CLIP):
-    def __init__(self, model_type: str = "fp16/ViT-B/32", device: str = 'cuda',  embedding_dim: int = None,
+    def __init__(self, model_type: str = "fp16/ViT-B/32", device: str = None,  embedding_dim: int = None,
                             truncate: bool = True, **kwargs) -> None:
         super().__init__(model_type, device, embedding_dim, truncate, **kwargs)
         '''This class loads the provided clip model directly from cuda in float16 version. The inference time is halved
@@ -390,7 +396,7 @@ class FP16_CLIP(CLIP):
 
 
 class OPEN_CLIP(CLIP):
-    def __init__(self, model_type: str = "open_clip/ViT-B-32-quickgelu/laion400m_e32", device: str = 'cpu',  embedding_dim: int = None,
+    def __init__(self, model_type: str = "open_clip/ViT-B-32-quickgelu/laion400m_e32", device: str = None,  embedding_dim: int = None,
                             truncate: bool = True, **kwargs) -> None:
         super().__init__(model_type, device,  embedding_dim, truncate , **kwargs)
         self.model_name = model_type.split("/", 3)[1] if model_type.startswith("open_clip/") else model_type
@@ -511,9 +517,12 @@ class OPEN_CLIP(CLIP):
 
 
 class MULTILINGUAL_CLIP(CLIP):
-    def __init__(self, model_type: str = "multilingual-clip/ViT-L/14", device: str = 'cpu',  embedding_dim: int = None,
+    def __init__(self, model_type: str = "multilingual-clip/ViT-L/14", device: str = None,  embedding_dim: int = None,
                             truncate: bool = True, **kwargs) -> None:
 
+        if not device:
+            raise InternalError("`device` is required for loading MULTILINGUAL CLIP models!")
+        
         self.model_name = model_type
         self.model_info = get_multilingual_clip_properties()[self.model_name]
         self.visual_name = self.model_info["visual_model"]
@@ -526,6 +535,8 @@ class MULTILINGUAL_CLIP(CLIP):
     def load(self) -> None:
         if self.visual_name.startswith("openai/"):
             clip_name = self.visual_name.replace("openai/", "")
+            # We must load the model into CPU then transfer it to the desired device, always
+            # The reason is this issue: https://github.com/openai/CLIP/issues/30
             self.visual_model, self.preprocess = clip.load(name = clip_name, device = "cpu", jit = False, download_root=ModelCache.clip_cache_path)
             self.visual_model = self.visual_model.to(self.device)
             self.visual_model = self.visual_model.visual

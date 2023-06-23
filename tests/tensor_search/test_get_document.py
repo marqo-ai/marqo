@@ -31,7 +31,7 @@ class TestGetDocument(MarqoTestCase):
                     "_id": "123",
                     "title 1": "content 1",
                     "desc 2": "content 2. blah blah blah"
-                }], auto_refresh=True)
+                }], auto_refresh=True, device="cpu")
         )
         assert tensor_search.get_document_by_id(
             config=self.config, index_name=self.index_name_1,
@@ -76,7 +76,7 @@ class TestGetDocument(MarqoTestCase):
         vals = ("content 1", "content 2. blah blah blah")
         tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
             index_name=self.index_name_1, docs=[{"_id": "123", **dict(zip(keys, vals))}],
-            auto_refresh=True)
+            auto_refresh=True, device="cpu")
         )
         res = tensor_search.get_document_by_id(
             config=self.config, index_name=self.index_name_1,

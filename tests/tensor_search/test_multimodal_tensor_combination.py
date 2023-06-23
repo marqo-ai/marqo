@@ -1,4 +1,3 @@
-import unittest.mock
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.errors import IndexNotFoundError, InvalidArgError
 from marqo.tensor_search import tensor_search
@@ -12,8 +11,10 @@ from marqo.s2_inference.s2_inference import vectorise
 import requests
 from marqo.s2_inference.clip_utils import load_image_from_path
 import json
+from unittest import mock
 from unittest.mock import patch
 from marqo.errors import MarqoWebError
+import os
 
 
 class TestMultimodalTensorCombination(MarqoTestCase):
@@ -28,12 +29,18 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         except IndexNotFoundError as e:
             pass
+        
+        # Any tests that call add_documents_orchestrator, search, bulk_search need this env var
+        self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
+        self.device_patcher.start()
 
     def tearDown(self) -> None:
         try:
             tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         except:
             pass
+        self.device_patcher.stop()
+
     def test_add_documents(self):
         tensor_search.create_vector_index(
             index_name=self.index_name_1, config=self.config, index_settings={
@@ -67,7 +74,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                 "combo_text_image": {"type": "multimodal_combination", "weights" : {
                     "text" : 0.5, "image" : 0.8}
             }},
-            auto_refresh=True)
+            auto_refresh=True, device= "cpu")
         )
         added_doc = tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="0",
                                                      show_vectors=True)
@@ -104,7 +111,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                 config=self.config, add_docs_params=AddDocsParams(
                     index_name=self.index_name_1, docs=[document],
                     auto_refresh=True, mappings = {"combo_text_image" : {"type":"multimodal_combination",
-                        "weights": {"image_field":0.5, "text_field":0.5}}}
+                        "weights": {"image_field":0.5, "text_field":0.5}}}, device= "cpu"
                 )
             )
             self.assertEqual(1, tensor_search.get_stats(config=self.config, index_name=self.index_name_1)[
@@ -197,7 +204,8 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                     "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
                     "_id": "4"
                 }],
-            auto_refresh=True,
+            auto_refresh=True, 
+            device= "cpu",
             mappings = {
                 "combo_text_image" : {
                     "type":"multimodal_combination",
@@ -256,7 +264,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
 
             tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
                 index_name=self.index_name_1, docs=[document],
-                auto_refresh=True, mappings = {
+                auto_refresh=True, device= "cpu", mappings = {
                     "combo_text_image" : {
                         "type": "multimodal_combination",
                         "weights": {"image_field": 0,"text_field": 1}}}
@@ -299,10 +307,10 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             """
             return vectorise_multimodal_combination_field(*arg, **kwargs)
 
-        mock_multimodal_combination = unittest.mock.MagicMock()
+        mock_multimodal_combination = mock.MagicMock()
         mock_multimodal_combination.side_effect = pass_through_multimodal
 
-        @unittest.mock.patch("marqo.tensor_search.tensor_search.vectorise_multimodal_combination_field",
+        @mock.patch("marqo.tensor_search.tensor_search.vectorise_multimodal_combination_field",
                              mock_multimodal_combination)
         def run():
             tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
@@ -329,7 +337,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                     "combo_text_image" : {
                     "type":"multimodal_combination",
                     "weights": {"image_field": 0.5,"text_field": 0.5}}},
-                auto_refresh=True
+                auto_refresh=True, device= "cpu"
             ))
 
             # first multimodal-doc
@@ -379,7 +387,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                 },
                 "_id": "123",
             }],
-            mappings=self.mappings, auto_refresh=True)
+            mappings=self.mappings, auto_refresh=True, device= "cpu")
         )
         assert res_0["errors"]
         assert not json.loads(requests.get(url = f"{self.endpoint}/{self.index_name_1}/_doc/123", verify=False).text)["found"]
@@ -402,7 +410,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                     },
                     "_id": "123",
                 }],
-                mappings=self.mappings, auto_refresh=True))
+                mappings=self.mappings, auto_refresh=True, device= "cpu"))
         assert res_1["errors"]
         assert not json.loads(requests.get(url = f"{self.endpoint}/{self.index_name_1}/_doc/123", verify=False).text)["found"]
         try:
@@ -423,7 +431,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                 "_id": "123",
             }],
             mappings = self.mappings,
-            auto_refresh=True))
+            auto_refresh=True, device= "cpu"))
         assert res_2["errors"]
         assert not json.loads(requests.get(url = f"{self.endpoint}/{self.index_name_1}/_doc/123", verify=False).text)["found"]
         try:
@@ -532,10 +540,10 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             """
             return vectorise(*arg, **kwargs)
 
-        mock_vectorise = unittest.mock.MagicMock()
+        mock_vectorise = mock.MagicMock()
         mock_vectorise.side_effect = pass_through_vectorise
 
-        @unittest.mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
+        @mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
         def run():
             tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
                 index_name=self.index_name_1, docs=[
@@ -558,7 +566,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                     "text_0" : 0.1, "text_1" : 0.1, "text_2" : 0.1, "text_3" : 0.1, "text_4" : 0.1,
                     "image_0" : 0.1,"image_1" : 0.1,"image_2" : 0.1,"image_3" : 0.1,"image_4" : 0.1,
                 }}},
-                auto_refresh=True))
+                auto_refresh=True, device= "cpu"))
             # Ensure the doc is added
             assert tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="111")
             # Ensure that vectorise is only called twice
@@ -591,10 +599,10 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             """
             return vectorise(*arg, **kwargs)
 
-        mock_vectorise = unittest.mock.MagicMock()
+        mock_vectorise = mock.MagicMock()
         mock_vectorise.side_effect = pass_through_vectorise
 
-        @unittest.mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
+        @mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
         def run():
             tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
                 index_name=self.index_name_1, docs=[
@@ -618,7 +626,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                         "text_0" : 0.1, "text_1" : 0.1, "text_2" : 0.1, "text_3" : 0.1, "text_4" : 0.1,
                         "image_0" : 0.1,"image_1" : 0.1,"image_2" : 0.1,"image_3" : 0.1,"image_4" : 0.1,
                 }}},
-                auto_refresh=True)
+                auto_refresh=True, device= "cpu")
             )
             # Ensure the doc is added
             assert tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="111")
@@ -651,10 +659,10 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         def pass_through_load_image_from_path(*arg, **kwargs):
             return load_image_from_path(*arg, **kwargs)
 
-        mock_load_image_from_path = unittest.mock.MagicMock()
+        mock_load_image_from_path = mock.MagicMock()
         mock_load_image_from_path.side_effect = pass_through_load_image_from_path
 
-        @unittest.mock.patch("marqo.s2_inference.clip_utils.load_image_from_path", mock_load_image_from_path)
+        @mock.patch("marqo.s2_inference.clip_utils.load_image_from_path", mock_load_image_from_path)
         def run():
             tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
                 index_name=self.index_name_1, docs=[
@@ -678,7 +686,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                     "text_0": 0.1, "text_1": 0.1, "text_2": 0.1, "text_3": 0.1, "text_4": 0.1,
                     "image_0": 0.1, "image_1": 0.1, "image_2": 0.1, "image_3": 0.1, "image_4": 0.1,
                 }}},
-                auto_refresh=True))
+                auto_refresh=True, device= "cpu"))
             assert tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="111")
             # Ensure that vectorise is only called twice
             assert len(mock_load_image_from_path.call_args_list) == 5
@@ -715,7 +723,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                         "additional_field" : 0.2,
                     }
             }},
-            auto_refresh=True
+            auto_refresh=True, device= "cpu"
         ))
 
         tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
@@ -740,7 +748,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                         "additional_field_1" : 0.2,
                     }
                 }},
-            auto_refresh=True)
+            auto_refresh=True, device= "cpu")
         )
         res = tensor_search._lexical_search(config=self.config, index_name=self.index_name_1, text="search me please")
         assert res["hits"][0]["_id"] == "article_591"
@@ -766,7 +774,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                  "Genre": "Science",
                  "my_combination_field": "dummy"
                  }],
-            auto_refresh=True
+            auto_refresh=True, device= "cpu"
         ))
 
         try:
@@ -792,7 +800,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                             "additional_field_1" : 0.2,
                         }
                     }},
-                auto_refresh=True))
+                auto_refresh=True, device= "cpu"))
             raise AssertionError
         except MarqoWebError:
             pass
@@ -837,7 +845,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                             "filter_field": 0,
                     }
                 }},
-                auto_refresh=True
+                auto_refresh=True, device= "cpu"
             ))
         res_exist_0 = tensor_search.search(index_name=self.index_name_1, config=self.config,
                                            text = "", filter="my_combination_field.filter_field: test_this_0")
@@ -894,7 +902,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                             "filter_field": 0,
                         }
                 }},
-                auto_refresh=True))
+                auto_refresh=True, device= "cpu"))
         pre_res_0 = tensor_search.search(index_name=self.index_name_1, config=self.config,
                                            text = "", filter="my_combination_field.filter_field: test_this_0")
         pre_res_1 = tensor_search.search(index_name=self.index_name_1, config=self.config,
@@ -942,7 +950,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                         "lexical_field": 0.1,
                     }
             }},
-            auto_refresh=True))
+            auto_refresh=True, device= "cpu"))
 
         tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
             index_name=self.index_name_1, docs=[
@@ -966,7 +974,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                         "additional_field": 0.2,
                     }
             }},
-            auto_refresh=True)
+            auto_refresh=True, device= "cpu")
         )
         true_text_fields = tensor_search.get_index_info(self.config, index_name=self.index_name_1).get_true_text_properties()
         # 3 from multimodal_field_0, 4 from multimodal_field_1, 3 common fields
@@ -998,7 +1006,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             self.config,
             add_docs_params=AddDocsParams(
                 docs = [test_doc],
-                auto_refresh=True, index_name=self.index_name_1,
+                auto_refresh=True, index_name=self.index_name_1, device= "cpu",
                 mappings={"my_combination_field": {"type":"multimodal_combination", "weights":{
                     "text":0.5, "image":0.5
                 }}}
@@ -1089,7 +1097,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                 ], mappings={"combo_text_image": {"type": "multimodal_combination",
                                                   "weights": {"image_field_1": 0.2, "image_field_2": -1,
                                                               "text_field_1": 0.38, "text_field_2": 0}}},
-                auto_refresh=True)
+                auto_refresh=True, device= "cpu")
             )
             args_list = [args[0] for args in mock_mean.call_args_list]
 
@@ -1162,7 +1170,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                         "weights": {
                             "image_field_1": 0.2, "image_field_2": -1,
                             "text_field_1": 0.38, "text_field_2": 0}}},
-                auto_refresh=True)
+                auto_refresh=True, device= "cpu")
             )
             docs = tensor_search.get_documents_by_ids(
                 config=self.config, document_ids=["d0", "d1", "d2", "d3"],
