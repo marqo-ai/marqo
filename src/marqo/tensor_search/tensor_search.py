@@ -1767,7 +1767,7 @@ def create_bulk_search_response(queries: List[BulkSearchQueryEntity], query_to_b
         docs_chunks_sorted = sort_chunks(gathered_docs)
         results.append(
             _format_ordered_docs_simple(ordered_docs_w_chunks=docs_chunks_sorted, result_count=query.limit)
-        ) 
+        )
 
     return results
 
