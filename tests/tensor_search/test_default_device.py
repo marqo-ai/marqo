@@ -411,7 +411,6 @@ class TestDefaultDevice(MarqoTestCase):
                 for method, mock_obj in zip(called_methods, mocks):
                     if method == "marqo.tensor_search.tensor_search._bulk_vector_text_search":
                         mock_obj.return_value = self.mock_bulk_vector_text_search_results
-                
 
                 # Add docs
                 tensor_search.add_documents(config=self.config, add_docs_params = AddDocsParams(
