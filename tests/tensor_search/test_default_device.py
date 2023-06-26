@@ -33,6 +33,51 @@ class TestDefaultDevice(MarqoTestCase):
         self.endpoint = self.authorized_url
         self.generic_header = {"Content-type": "application/json"}
         self.index_name_1 = "my-test-index-1"
+
+        self.mock_bulk_vector_text_search_results = \
+        [
+            {'hits': [
+                {
+                    'abc': 'Exact match hehehe', 
+                    'other field': 'baaadd', 
+                    '_id': 'id1-first', 
+                    '_highlights': {
+                        'abc': 'Exact match hehehe'
+                    }, 
+                    '_score': 0.8317631
+                }, 
+                {
+                    'abc': 'random text', 
+                    'other field': 'Close match hehehe', 
+                    '_id': 'id1-second', 
+                    '_highlights': {
+                        'other field': 'Close match hehehe'
+                    }, 
+                    '_score': 0.82157063
+                }
+            ]}, 
+            {'hits': [
+                {
+                    'abc': 'Exact match hehehe', 
+                    'other field': 'baaadd', 
+                    '_id': 'id1-first', 
+                    '_highlights': {
+                        'abc': 'Exact match hehehe'
+                    }, 
+                    '_score': 0.83613795
+                }, 
+                {
+                    'abc': 'random text', 
+                    'other field': 'Close match hehehe', 
+                    '_id': 'id1-second', 
+                    '_highlights': {
+                        'other field': 'Close match hehehe'
+                    }, 
+                    '_score': 0.82666266
+                }
+            ]}
+        ]
+
         try:
             tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         except IndexNotFoundError as s:
@@ -287,11 +332,8 @@ class TestDefaultDevice(MarqoTestCase):
             with env var MARQO_BEST_AVAILABLE_DEVICE
         """
         test_cases = [
-            # separating vector search from reranking mocking
-            ("cpu", {}, ["marqo.tensor_search.tensor_search._bulk_vector_text_search"]),
-            ("cuda", {}, ["marqo.tensor_search.tensor_search._bulk_vector_text_search"]),
-            ("cpu", {}, ["marqo.s2_inference.reranking.rerank.rerank_search_results"]),
-            ("cuda", {}, ["marqo.s2_inference.reranking.rerank.rerank_search_results"]),
+            ("cpu", {}, ["marqo.tensor_search.tensor_search._bulk_vector_text_search", "marqo.s2_inference.reranking.rerank.rerank_search_results"]),
+            ("cuda", {}, ["marqo.tensor_search.tensor_search._bulk_vector_text_search", "marqo.s2_inference.reranking.rerank.rerank_search_results"]),
         ]
         for best_available_device, extra_params, called_methods in test_cases:
             @mock.patch.dict(os.environ, {**os.environ, **{"MARQO_BEST_AVAILABLE_DEVICE": best_available_device}})
@@ -300,6 +342,11 @@ class TestDefaultDevice(MarqoTestCase):
                 # Create and start a patcher for each method
                 patchers = [mock.patch(method) for method in called_methods]
                 mocks = [patcher.start() for patcher in patchers]
+
+                # Mock bulk vector test search results
+                for method, mock_obj in zip(called_methods, mocks):
+                    if method == "marqo.tensor_search.tensor_search._bulk_vector_text_search":
+                        mock_obj.return_value = self.mock_bulk_vector_text_search_results
 
                 # Add docs
                 tensor_search.add_documents(config=self.config, add_docs_params = AddDocsParams(
@@ -348,11 +395,8 @@ class TestDefaultDevice(MarqoTestCase):
             with explicitly set device
         """
         test_cases = [
-            # separating vector search from reranking mocking
-            ("cpu", "cuda", {}, ["marqo.tensor_search.tensor_search._bulk_vector_text_search"]),
-            ("cuda", "cpu", {}, ["marqo.tensor_search.tensor_search._bulk_vector_text_search"]),
-            ("cpu", "cuda", {}, ["marqo.s2_inference.reranking.rerank.rerank_search_results"]),
-            ("cuda", "cpu", {}, ["marqo.s2_inference.reranking.rerank.rerank_search_results"]),
+            ("cpu", "cuda", {}, ["marqo.tensor_search.tensor_search._bulk_vector_text_search", "marqo.s2_inference.reranking.rerank.rerank_search_results"]),
+            ("cuda", "cpu", {}, ["marqo.tensor_search.tensor_search._bulk_vector_text_search", "marqo.s2_inference.reranking.rerank.rerank_search_results"]),
         ]
 
         for best_available_device, explicitly_set_device, extra_params, called_methods in test_cases:
@@ -362,6 +406,11 @@ class TestDefaultDevice(MarqoTestCase):
                 # Create and start a patcher for each method
                 patchers = [mock.patch(method) for method in called_methods]
                 mocks = [patcher.start() for patcher in patchers]
+
+                # Mock bulk vector test search results
+                for method, mock_obj in zip(called_methods, mocks):
+                    if method == "marqo.tensor_search.tensor_search._bulk_vector_text_search":
+                        mock_obj.return_value = self.mock_bulk_vector_text_search_results
 
                 # Add docs
                 tensor_search.add_documents(config=self.config, add_docs_params = AddDocsParams(
