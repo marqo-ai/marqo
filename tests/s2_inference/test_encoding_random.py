@@ -37,7 +37,7 @@ class TestRandomOutputs(unittest.TestCase):
 
     def test_check_output(self):
         texts = ['a', ['a'], ['a', 'b', 'longer text. with more stuff']]
-        model = _load_model('random', model_properties=get_model_properties_from_registry('random'))
+        model = _load_model('random', model_properties=get_model_properties_from_registry('random'), device="cpu")
 
         for text in texts:
             output = model.encode(text)

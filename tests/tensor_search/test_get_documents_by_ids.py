@@ -10,6 +10,7 @@ from marqo.tensor_search import tensor_search
 from tests.marqo_test import MarqoTestCase
 from unittest import mock
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
+import os
 
 
 class TestGetDocuments(MarqoTestCase):
@@ -19,6 +20,13 @@ class TestGetDocuments(MarqoTestCase):
         self.index_name_1 = "my-test-index-1"  # standard index created by setUp
         self.index_name_2 = "my-test-index-2"  # for tests that need custom index config
         self._delete_testing_indices()
+        
+        # Any tests that call add_documents_orchestrator, search, bulk_search need this env var
+        self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
+        self.device_patcher.start()
+
+    def tearDown(self):
+        self.device_patcher.stop()
 
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
 
@@ -35,7 +43,7 @@ class TestGetDocuments(MarqoTestCase):
             add_docs_params=AddDocsParams(index_name=self.index_name_1, docs=[
                 {"_id": "1", "title 1": "content 1"}, {"_id": "2", "title 1": "content 1"},
                 {"_id": "3", "title 1": "content 1"}
-            ], auto_refresh=True)
+            ], auto_refresh=True, device="cpu")
         )
         res = tensor_search.get_documents_by_ids(
             config=self.config, index_name=self.index_name_1, document_ids=['1', '2', '3'],
@@ -48,7 +56,7 @@ class TestGetDocuments(MarqoTestCase):
                 ("some more content", "some cool desk", "5678")]
         tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
             index_name=self.index_name_1, docs=[dict(zip(k, v)) for k, v in zip(keys, vals)],
-            auto_refresh=True))
+            auto_refresh=True, device="cpu"))
         get_res = tensor_search.get_documents_by_ids(
             config=self.config, index_name=self.index_name_1,
             document_ids=["123", "5678"], show_vectors=True)['results']
@@ -87,7 +95,7 @@ class TestGetDocuments(MarqoTestCase):
             index_name=self.index_name_1, docs=[
                 {"_id": '456', "title": "alexandra"},
                 {'_id': '221', 'message': 'hello'}],
-            auto_refresh=True)
+            auto_refresh=True, device="cpu")
         )
         id_reqs = [
             (['123', '456'], [False, True]), ([['456', '789'], [True, False]]),
@@ -137,7 +145,7 @@ class TestGetDocuments(MarqoTestCase):
         for max_doc in [0, 1, 2, 5, 10, 100, 1000]:
             mock_environ = {enums.EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: str(max_doc)}
 
-            @mock.patch("os.environ", mock_environ)
+            @mock.patch.dict(os.environ, {**os.environ, **mock_environ})
             def run():
                 half_search = tensor_search.get_documents_by_ids(
                    config=self.config, index_name=self.index_name_2,
@@ -177,9 +185,9 @@ class TestGetDocuments(MarqoTestCase):
         )
         tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
 
-        for mock_environ in [dict(), {enums.EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: None},
+        for mock_environ in [dict(),
                              {enums.EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: ''}]:
-            @mock.patch("os.environ", mock_environ)
+            @mock.patch.dict(os.environ, {**os.environ, **mock_environ})
             def run():
                 sample_size = 500
                 limit_search = tensor_search.get_documents_by_ids(

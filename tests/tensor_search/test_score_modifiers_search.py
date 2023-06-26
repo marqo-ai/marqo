@@ -1,5 +1,5 @@
 import copy
-import unittest.mock
+from unittest import mock
 from tests.utils.transition import add_docs_caller
 from marqo.errors import IndexNotFoundError, InvalidArgError
 from marqo.tensor_search import tensor_search
@@ -10,6 +10,7 @@ from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQue
 from pprint import pprint
 from marqo.tensor_search.tensor_search import _create_normal_tensor_search_query
 from pydantic.error_wrappers import ValidationError
+import os
 
 class TestScoreModifiersSearch(MarqoTestCase):
 
@@ -136,11 +137,16 @@ class TestScoreModifiersSearch(MarqoTestCase):
              },
         ]
 
+        # Any tests that call add_documents_orchestrator, search, bulk_search need this env var
+        self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
+        self.device_patcher.start()
+        
     def tearDown(self) -> None:
         try:
             tensor_search.delete_index(config=self.config, index_name=self.index_name)
         except:
             pass
+        self.device_patcher.stop()
 
     def test_search_result_not_affected_if_fields_not_exist(self):
         documents = [
@@ -531,10 +537,10 @@ class TestScoreModifiersSearch(MarqoTestCase):
         def pass_create_normal_tensor_search_query(*arg, **kwargs):
             return _create_normal_tensor_search_query(*arg, **kwargs)
 
-        mock_create_normal_tensor_search_query = unittest.mock.MagicMock()
+        mock_create_normal_tensor_search_query = mock.MagicMock()
         mock_create_normal_tensor_search_query.side_effect = pass_create_normal_tensor_search_query
 
-        @unittest.mock.patch("marqo.tensor_search.tensor_search._create_normal_tensor_search_query", mock_create_normal_tensor_search_query)
+        @mock.patch("marqo.tensor_search.tensor_search._create_normal_tensor_search_query", mock_create_normal_tensor_search_query)
         def run():
             tensor_search.search(config=self.config, index_name=self.index_name,
                                               text="what is the rider doing?", score_modifiers=None, result_count=10)

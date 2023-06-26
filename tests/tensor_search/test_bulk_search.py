@@ -10,7 +10,8 @@ from marqo.s2_inference.s2_inference import vectorise
 import unittest
 from marqo.tensor_search.enums import TensorField, SearchMethod, EnvVars, IndexSettingsField
 from marqo.errors import (
-    BackendCommunicationError, IndexNotFoundError, InvalidArgError, IllegalRequestedDocCount, BadRequestError
+    BackendCommunicationError, IndexNotFoundError, InvalidArgError, IllegalRequestedDocCount, BadRequestError,
+    InternalError
 )
 
 from marqo.tensor_search import api, tensor_search, index_meta_cache, utils
@@ -102,8 +103,6 @@ class TestGetQueryVectorsFromJobs(MarqoTestCase):
         
         qidx_to_vectors = tensor_search.get_query_vectors_from_jobs(self.queries, qidx_to_job_with_no_matching_jobs, self.job_to_vectors, self.config, self.jobs)
         self.assertEqual(len(qidx_to_vectors), 0) 
-
-
 
 
 class TestRunVectorisePipeline(MarqoTestCase):
@@ -315,6 +314,13 @@ class TestBulkSearch(MarqoTestCase):
         self._delete_test_indices()
         self._create_test_indices()
 
+        # Any tests that call add_documents_orchestrator, search, bulk_search need this env var
+        self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
+        self.device_patcher.start()
+
+    def tearDown(self):
+        self.device_patcher.stop()
+
     def _delete_test_indices(self, indices=None):
         if indices is None or not indices:
             ix_to_delete = [self.index_name_1, self.index_name_2, self.index_name_3]
@@ -348,7 +354,7 @@ class TestBulkSearch(MarqoTestCase):
                 "parameter-not-expected": 1,
             }]))
 
-    @mock.patch('os.environ', {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': '0'}})
+    @mock.patch.dict(os.environ, {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': '0'}})
     def test_bulk_search_with_excessive_searchable_attributes(self):
         add_docs_caller(
             config=self.config, index_name=self.index_name_1, docs=[
@@ -364,7 +370,7 @@ class TestBulkSearch(MarqoTestCase):
                 "searchableAttributes": ["abc"]
             }]), marqo_config=self.config)
     
-    @mock.patch('os.environ', {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': '100'}})
+    @mock.patch.dict(os.environ, {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': '100'}})
     def test_bulk_search_with_max_searchable_attributes_no_searchable_attributes_field(self):
         add_docs_caller(
             config=self.config, index_name=self.index_name_1, docs=[
@@ -378,7 +384,7 @@ class TestBulkSearch(MarqoTestCase):
                 "q": "title about some doc",
             }]), marqo_config=self.config)
 
-    @mock.patch('os.environ', {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': '1'}})
+    @mock.patch.dict(os.environ, {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': '1'}})
     def test_bulk_search_with_excessive_searchable_attributes(self):
         add_docs_caller(
             config=self.config, index_name=self.index_name_1, docs=[
@@ -393,8 +399,7 @@ class TestBulkSearch(MarqoTestCase):
                 "searchableAttributes": ["abc", "other field"]
             }]), marqo_config=self.config)
 
-    @mock.patch('os.environ', {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': None}})
-    def test_bulk_search_with_no_max_searchable_attributes(self):
+    def test_bulk_search_with_no_env_vars_set(self):
         add_docs_caller(
             config=self.config, index_name=self.index_name_1, docs=[
                 {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "id1-first"},
@@ -406,20 +411,6 @@ class TestBulkSearch(MarqoTestCase):
             "q": "title about some doc",
             "searchableAttributes": ["abc", "other field"]
         }]), marqo_config=self.config, device="cpu")
-
-    @mock.patch('os.environ', {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': None}})
-    def test_bulk_search_with_no_max_searchable_attributes_no_searchable_attributes_field(self):
-        add_docs_caller(
-            config=self.config, index_name=self.index_name_1, docs=[
-                {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "id1-first"},
-                {"abc": "random text", "other field": "Close match hehehe", "_id": "id1-second"},
-            ], auto_refresh=True
-        ) 
-        api.bulk_search(BulkSearchQuery(queries=[{
-            "index": self.index_name_1,
-            "q": "title about some doc",
-        }]), marqo_config=self.config, device="cpu")
-
 
     def test_bulk_search_no_queries_return_early(self):
         add_docs_caller(
@@ -794,7 +785,6 @@ class TestBulkSearch(MarqoTestCase):
         call_arg = call_args[0].kwargs
         assert call_arg['query'] == "match with ranking"
         assert call_arg['model_name'] == '_testing'
-        assert call_arg['device'] == self.config.search_device
         assert call_arg['num_highlights'] == 1
         
     def test_bulk_search_rerank_invalid(self):
@@ -828,14 +818,28 @@ class TestBulkSearch(MarqoTestCase):
                  "_id": "1234", "finally": "Random text here efgh "},
             ], auto_refresh=True)
         search_res = tensor_search._bulk_vector_text_search(
-            config=self.config, queries=[BulkSearchQueryEntity(index=self.index_name_1, q=" efgh ", limit=10)]
+            config=self.config, queries=[BulkSearchQueryEntity(index=self.index_name_1, q=" efgh ", limit=10)],
+            device="cpu"
         )
         assert len(search_res) == 1
         assert len(search_res[0]['hits']) == 2
 
+
+    def test_bulk_vector_text_search_no_device(self):
+        try:
+            tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
+            search_res = tensor_search._bulk_vector_text_search(
+                config=self.config, queries=[BulkSearchQueryEntity(index=self.index_name_1, q=" efgh ", limit=10)]
+            )
+            raise AssertionError
+        except InternalError:
+            pass
+
+
     def test_bulk_vector_text_search_against_empty_index(self):
         search_res = tensor_search._bulk_vector_text_search(
-            config=self.config, queries=[BulkSearchQueryEntity(index=self.index_name_1, q=" efgh ", limit=10)]
+            config=self.config, queries=[BulkSearchQueryEntity(index=self.index_name_1, q=" efgh ", limit=10)],
+            device="cpu"
         )
         assert len(search_res) > 0
         assert len(search_res[0]['hits']) == 0
@@ -845,7 +849,8 @@ class TestBulkSearch(MarqoTestCase):
         self._delete_test_indices()
         try:
             tensor_search._bulk_vector_text_search(
-                config=self.config, queries=[BulkSearchQueryEntity(index=self.index_name_1, q=" efgh ", limit=10)]
+                config=self.config, queries=[BulkSearchQueryEntity(index=self.index_name_1, q=" efgh ", limit=10)],
+                device="cpu"
             )
             raise AssertionError
         except IndexNotFoundError:
@@ -863,7 +868,7 @@ class TestBulkSearch(MarqoTestCase):
             ], auto_refresh=True)
         search_res = tensor_search._bulk_vector_text_search(
             config=self.config, queries=[BulkSearchQueryEntity(index=self.index_name_1, q=query_text)],
-
+            device="cpu"
         )
         assert len(search_res) == 1
         assert len(search_res[0]['hits']) == 2
@@ -1003,7 +1008,7 @@ class TestBulkSearch(MarqoTestCase):
 
         results = tensor_search._bulk_vector_text_search(
             queries=[BulkSearchQueryEntity(index=self.index_name_1, q="88")],
-            config=self.config)
+            config=self.config, device="cpu")
         assert len(results) == 1
         s_res = results[0]
         assert len(s_res["hits"]) > 0
@@ -1018,23 +1023,23 @@ class TestBulkSearch(MarqoTestCase):
 
         res_exists = tensor_search._bulk_vector_text_search(
             queries=[BulkSearchQueryEntity(index=self.index_name_1, q="", filter="my_list:tag1")],
-            config=self.config)
+            config=self.config, device="cpu")
         res_not_exists = tensor_search._bulk_vector_text_search(
             queries=[BulkSearchQueryEntity(index=self.index_name_1, q="", filter="my_list:tag55")],
-            config=self.config)
+            config=self.config, device="cpu")
         res_other = tensor_search._bulk_vector_text_search(
             queries=[BulkSearchQueryEntity(index=self.index_name_1, q="", filter="my_string:b")],
-            config=self.config)
+            config=self.config, device="cpu")
 
         # strings in lists are converted into keyword, which aren't filterable on a token basis.
         # Because the list member is "tag2 some" we can only exact match (incl. the space).
         # "tag2" by itself doesn't work, only "(tag2 some)"
         res_should_only_match_keyword_bad = tensor_search._bulk_vector_text_search(
             queries=[BulkSearchQueryEntity(index=self.index_name_1, q="", filter="my_list:tag2")],
-            config=self.config)
+            config=self.config, device="cpu")
         res_should_only_match_keyword_good = tensor_search._bulk_vector_text_search(
             queries=[BulkSearchQueryEntity(index=self.index_name_1, q="", filter="my_list:(tag2 some)")],
-            config=self.config)
+            config=self.config, device="cpu")
         assert res_exists[0]["hits"][0]["_id"] == "1235"
         assert res_exists[0]["hits"][0]["_highlights"] == {"abc": "some text"}
         assert len(res_exists[0]["hits"]) == 1
@@ -1066,7 +1071,7 @@ class TestBulkSearch(MarqoTestCase):
                 BulkSearchQueryEntity(index=self.index_name_1, q="some", filter="my_list:tag1"),
                 BulkSearchQueryEntity(index=self.index_name_1, q="some", filter="my_list:not_exist")
             ],
-            config=self.config
+            config=self.config, device="cpu"
         )
 
         assert len(response) == 4
@@ -1097,7 +1102,7 @@ class TestBulkSearch(MarqoTestCase):
         for i in range(len(filter_strings)):
             result = tensor_search._bulk_vector_text_search(
                 queries=[BulkSearchQueryEntity(index=self.index_name_1, q="some", filter=filter_strings[i])],
-                config=self.config
+                config=self.config, device="cpu"
             )
             assert len(result) == 1
             assert len(result[0]["hits"]) == len(expected_ids[i])
@@ -1123,7 +1128,7 @@ class TestBulkSearch(MarqoTestCase):
             queries=[BulkSearchQueryEntity(index=self.index_name_1, q="some", filter=f)
                 for f in filter_to_ids.keys()         
             ],
-            config=self.config
+            config=self.config, device="cpu"
         )
 
         assert len(response) == len(filter_to_ids.keys())
@@ -1136,9 +1141,8 @@ class TestBulkSearch(MarqoTestCase):
 
 
     def test_set_device(self):
-        """calling search with a specified device overrides device defined in config"""
+        """calling search with a specified device uses that device"""
         mock_config = copy.deepcopy(self.config)
-        mock_config.search_device = "cpu"
 
         mock_vectorise = mock.MagicMock()
         mock_vectorise.return_value = [[0, 0, 0, 0]]
@@ -1152,7 +1156,6 @@ class TestBulkSearch(MarqoTestCase):
         assert run()
         args, kwargs = mock_vectorise.call_args
         assert kwargs["device"] == "cuda:123"
-        assert mock_config.search_device == "cpu"
 
     def test_search_other_types_subsearch(self):
         add_docs_caller(
@@ -1352,7 +1355,7 @@ class TestBulkSearch(MarqoTestCase):
     
                 mock_environ = {EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: str(max_doc)}
     
-                @mock.patch("os.environ", mock_environ)
+                @mock.patch.dict(os.environ, {**os.environ, **mock_environ})
                 def run():
                     half_search = tensor_search.bulk_search(
                         marqo_config=self.config, query=BulkSearchQuery(
@@ -1425,9 +1428,9 @@ class TestBulkSearch(MarqoTestCase):
         tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
     
         for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
-            for mock_environ in [dict(), {EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: None},
+            for mock_environ in [dict(),
                                  {EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: ''}]:
-                @mock.patch("os.environ", mock_environ)
+                @mock.patch.dict(os.environ, {**os.environ, **mock_environ})
                 def run():
                     lim = 500
                     half_search = tensor_search.bulk_search(
@@ -1541,7 +1544,7 @@ class TestBulkSearch(MarqoTestCase):
     
         # Going over 10,000 for offset + limit
         mock_environ = {EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: "10000"}
-        @mock.patch("os.environ", mock_environ)
+        @mock.patch.dict(os.environ, {**os.environ, **mock_environ})
         def run():
             for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
                 try:
@@ -1980,7 +1983,8 @@ class TestBulkSearch(MarqoTestCase):
             weighted_vectors = []
             for q, weight in multi_query.items():
                 vec = vectorise(model_name="ViT-B/16", content=[q, ],
-                                image_download_headers=None, normalize_embeddings=True)[0]
+                                image_download_headers=None, normalize_embeddings=True,
+                                device="cpu")[0]
                 weighted_vectors.append(np.asarray(vec) * weight)
 
             manually_combined = np.mean(weighted_vectors, axis=0)
@@ -2073,7 +2077,8 @@ class TestBulkSearch(MarqoTestCase):
             weighted_vectors = []
             for q, weight in multi_query.items():
                 vec = vectorise(model_name="ViT-B/16", content=[q, ],
-                                image_download_headers=None, normalize_embeddings=True)[0]
+                                image_download_headers=None, normalize_embeddings=True,
+                                device="cpu")[0]
                 weighted_vectors.append(np.asarray(vec) * weight)
 
             manually_combined = np.mean(weighted_vectors, axis=0)

@@ -7,8 +7,6 @@ class Config:
         self,
         url: str,
         timeout: Optional[int] = None,
-        indexing_device: Optional[Union[enums.Device, str]] = None,
-        search_device: Optional[Union[enums.Device, str]] = None,
         backend: Optional[Union[enums.SearchDb, str]] = None,
     ) -> None:
         """
@@ -20,10 +18,6 @@ class Config:
         self.cluster_is_remote = False
         self.url = self.set_url(url)
         self.timeout = timeout
-        default_device = enums.Device.cpu
-
-        self.indexing_device = indexing_device if indexing_device is not None else default_device
-        self.search_device = search_device if search_device is not None else default_device
         self.backend = backend if backend is not None else enums.SearchDb.opensearch
 
     def set_url(self, url):

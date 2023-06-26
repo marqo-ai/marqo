@@ -11,14 +11,14 @@ import threading, queue
 
 def normal_vectorise_call(test_model, test_content, q):
     # Function used to threading test
-    _ = vectorise(model_name=test_model, content=test_content)
+    _ = vectorise(model_name=test_model, content=test_content, device="cpu")
     q.put("success")
 
 
 def racing_vectorise_call(test_model, test_content, q):
     # Function used to threading test
     try:
-        _ = vectorise(model_name=test_model, content=test_content)
+        _ = vectorise(model_name=test_model, content=test_content, device="cpu")
         q.put(AssertionError)
     except ModelCacheManagementError as e:
         q.put(e)

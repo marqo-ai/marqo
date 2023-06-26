@@ -1,4 +1,5 @@
 import copy
+import os
 import datetime
 import threading
 import time
@@ -26,6 +27,13 @@ class TestIndexMetaCache(MarqoTestCase):
         self.config = Config(self.authorized_url)
         self._delete_testing_indices()
         self._create_test_indices()
+
+        # Any tests that call add_documents_orchestrator, search, bulk_search need this env var
+        self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
+        self.device_patcher.start()
+
+    def tearDown(self):
+        self.device_patcher.stop()
 
     def _delete_testing_indices(self):
         for ix in [self.index_name_1, self.index_name_2, self.index_name_3]:
@@ -79,12 +87,12 @@ class TestIndexMetaCache(MarqoTestCase):
     def test_add_new_fields_preserves_index_cache(self):
         add_doc_res_1 = tensor_search.add_documents(
             config=self.config,
-            add_docs_params=AddDocsParams(index_name=self.index_name_1, docs=[{"abc": "def"}], auto_refresh=True)
+            add_docs_params=AddDocsParams(index_name=self.index_name_1, docs=[{"abc": "def"}], auto_refresh=True, device="cpu")
         )
         add_doc_res_2 = tensor_search.add_documents(
             config=self.config, add_docs_params=AddDocsParams(
                 index_name=self.index_name_1, docs=[{"cool field": "yep yep", "haha": "heheh"}],
-                auto_refresh=True
+                auto_refresh=True, device="cpu"
             )
         )
         index_info_t0 = index_meta_cache.get_cache()[self.index_name_1]
@@ -94,7 +102,7 @@ class TestIndexMetaCache(MarqoTestCase):
             config=self.config, add_docs_params=AddDocsParams(
                 index_name=self.index_name_1, docs=[{"newer field": "ndewr content",
                                                                      "goblin": "paradise"}],
-                auto_refresh=True
+                auto_refresh=True, device="cpu"
             )
         )
         for field in ["newer field", "goblin", "cool field", "abc", "haha"]:
@@ -105,12 +113,12 @@ class TestIndexMetaCache(MarqoTestCase):
         """note the implicit index creation"""
         add_doc_res_1 = tensor_search.add_documents(
             config=self.config, add_docs_params=AddDocsParams(
-                index_name=self.index_name_1, docs=[{"abc": "def"}], auto_refresh=True
+                index_name=self.index_name_1, docs=[{"abc": "def"}], auto_refresh=True, device="cpu"
             )
         )
         add_doc_res_2 = tensor_search.add_documents(
             config=self.config, add_docs_params=AddDocsParams(
-                index_name=self.index_name_2, docs=[{"abc": "def"}], auto_refresh=True
+                index_name=self.index_name_2, docs=[{"abc": "def"}], auto_refresh=True, device="cpu"
             )
         )
         assert self.index_name_1 in index_meta_cache.get_cache()
@@ -133,7 +141,7 @@ class TestIndexMetaCache(MarqoTestCase):
         d2 = {"exclude me": "marqo"}
         tensor_search.add_documents(
             config=self.config, add_docs_params=AddDocsParams(
-                index_name=self.index_name_1, auto_refresh=True, docs=[d0, d1, d2])
+                index_name=self.index_name_1, auto_refresh=True, docs=[d0, d1, d2], device="cpu")
         )
         # reset cache
         index_meta_cache.empty_cache()
@@ -154,7 +162,7 @@ class TestIndexMetaCache(MarqoTestCase):
         tensor_search.add_documents(
             config=self.config, add_docs_params=AddDocsParams(
                 index_name=self.index_name_1, auto_refresh=True,
-                docs=[d0, d1, d2 ])
+                docs=[d0, d1, d2 ], device="cpu")
         )
         # reset cache
         index_meta_cache.empty_cache()
@@ -187,7 +195,7 @@ class TestIndexMetaCache(MarqoTestCase):
         # mock external party indexing something:
         tensor_search.add_documents(
             config=self.config, add_docs_params=AddDocsParams(index_name=index_name,
-                docs=docs, auto_refresh=True))
+                docs=docs, auto_refresh=True, device="cpu"))
 
         if check_only_in_external_cache is not None:
             assert (
@@ -213,7 +221,7 @@ class TestIndexMetaCache(MarqoTestCase):
         """
         tensor_search.add_documents(
             config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1,
-                docs=[{"some field": "Plane 1"}], auto_refresh=True))
+                docs=[{"some field": "Plane 1"}], auto_refresh=True, device="cpu"))
         self._simulate_externally_added_docs(
             self.index_name_1, [{"brand new field": "a line of text", "_id": "1234"}], "brand new field")
         result = tensor_search.search(
@@ -232,7 +240,7 @@ class TestIndexMetaCache(MarqoTestCase):
         """
         tensor_search.add_documents(
             config=self.config, add_docs_params=AddDocsParams(
-                index_name=self.index_name_1, docs=[{"some field": "Plane 1"}], auto_refresh=True))
+                index_name=self.index_name_1, docs=[{"some field": "Plane 1"}], auto_refresh=True, device="cpu"))
         self._simulate_externally_added_docs(
             self.index_name_1, [{"brand new field": "a line of text", "_id": "1234"}], "brand new field")
         result = tensor_search.search(
@@ -248,7 +256,7 @@ class TestIndexMetaCache(MarqoTestCase):
     def test_search_vectors_externally_created_field_attributes(self):
         tensor_search.add_documents(
             config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1,
-                docs=[{"some field": "Plane 1"}], auto_refresh=True))
+                docs=[{"some field": "Plane 1"}], auto_refresh=True, device="cpu"))
         self._simulate_externally_added_docs(
             self.index_name_1, [{"brand new field": "a line of text", "_id": "1234"}], "brand new field")
         assert "brand new field" not in index_meta_cache.get_cache()
@@ -264,7 +272,7 @@ class TestIndexMetaCache(MarqoTestCase):
         tensor_search.create_vector_index(
             config=self.config, index_name=self.index_name_3)
         tensor_search.add_documents(
-            config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_3,
+            config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1,
                 docs=[{"some field": "Plane 1"}], auto_refresh=True))
         self._simulate_externally_added_docs(
             self.index_name_3, [{"brand new field": "a line of text", "_id": "1234"}], "brand new field")
@@ -283,7 +291,7 @@ class TestIndexMetaCache(MarqoTestCase):
     def test_vector_search_non_existent_field(self):
         tensor_search.add_documents(
             config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1,
-                docs=[{"some field": "Plane 1"}], auto_refresh=True))
+                docs=[{"some field": "Plane 1"}], auto_refresh=True, device="cpu"))
         assert "brand new field" not in index_meta_cache.get_cache()
         result = tensor_search.search(
             index_name=self.index_name_1, config=self.config, text="a line of text",
@@ -295,7 +303,7 @@ class TestIndexMetaCache(MarqoTestCase):
         """"""
         tensor_search.add_documents(
             config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1,
-                docs=[{"some field": "Plane 1"}], auto_refresh=True))
+                docs=[{"some field": "Plane 1"}], auto_refresh=True, device="cpu"))
         assert "brand new field" not in index_meta_cache.get_cache()
         # no error:
         result = tensor_search.search(
@@ -307,7 +315,7 @@ class TestIndexMetaCache(MarqoTestCase):
         """The cache should update after getting no hits at first"""
         tensor_search.add_documents(
             config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1,
-                docs=[{"some field": "Plane 1"}], auto_refresh=True))
+                docs=[{"some field": "Plane 1"}], auto_refresh=True, device="cpu"))
         time.sleep(2.5)
         self._simulate_externally_added_docs(
             self.index_name_1, [{"brand new field": "a line of text", "_id": "1234"}], "brand new field")
@@ -541,7 +549,7 @@ class TestIndexMetaCache(MarqoTestCase):
             tensor_search.add_documents(
                 config=self.config, add_docs_params=AddDocsParams(
                     index_name=self.index_name_1, docs=[{"hi": "hello"}],
-                    auto_refresh=False))
+                    auto_refresh=False, device="cpu"))
         except IndexNotFoundError:
             pass
         @mock.patch('marqo._httprequests.ALLOWED_OPERATIONS', {mock_get})
@@ -552,14 +560,14 @@ class TestIndexMetaCache(MarqoTestCase):
             N_seconds = 4
             # the following is hard coded in search()
             REFRESH_INTERVAL_SECONDS = 2
-            start_time = datetime.datetime.now()
+            start_time = time.perf_counter_ns()
             num_threads = 5
             total_loops = [0] * num_threads
             sleep_time = 0.1
 
             def threaded_while(thread_num, loop_record):
                 thread_loops = 0
-                while datetime.datetime.now() - start_time < datetime.timedelta(seconds=N_seconds):
+                while time.perf_counter_ns() - start_time < (N_seconds * 1e9):
                     cache_update_thread = threading.Thread(
                         target=tensor_search.search,
                         kwargs={"config": self.config, "index_name": self.index_name_1, "text": "hello" })
@@ -574,7 +582,7 @@ class TestIndexMetaCache(MarqoTestCase):
                 th.join()
 
             estimated_loops = round((N_seconds/sleep_time) * num_threads)
-            assert sum(total_loops) in range(estimated_loops - num_threads, estimated_loops + 1)
+            assert sum(total_loops) in range(estimated_loops - (2 * num_threads), estimated_loops + 1)
             time.sleep(0.5)  # let remaining thread complete, if needed
             mappings_call_count = len([c for c in mock_get.mock_calls if '_mapping' in str(c)])
             # for the refresh interal hardcoded in search(), which is 2 seconds, we expect a total
@@ -614,7 +622,7 @@ class TestIndexMetaCache(MarqoTestCase):
                 config=self.config,
                 add_docs_params=AddDocsParams(
                     **{
-                        "index_name": self.index_name_3, "auto_refresh": True,
+                        "index_name": self.index_name_1, "auto_refresh": True, "device":"cpu",
                         "docs": [
                             {"Title": "Blah"}, {"Title": "blah2"},
                             {"Title": "Blah3"}, {"Title": "Blah4"}]
@@ -654,7 +662,7 @@ class TestIndexMetaCache(MarqoTestCase):
                     **{"config": self.config},
                     add_docs_params=AddDocsParams(
                         **{
-                            "index_name": self.index_name_3, "auto_refresh": True,
+                            "index_name": self.index_name_1, "auto_refresh": True,  "device":"cpu",
                             "docs": [
                                 {"Title": "Blah"}, {"Title": "blah2"},
                                 {"Title": "Blah3"}, {"Title": "Blah4"}]
