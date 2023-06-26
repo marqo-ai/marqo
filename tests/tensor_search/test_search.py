@@ -26,6 +26,7 @@ class TestVectorSearch(MarqoTestCase):
         self.index_name_2 = "my-test-index-2"
         self.index_name_3 = "my-test-index-3"
         self._delete_test_indices()
+        self._create_test_indices()
 
     def _delete_test_indices(self, indices=None):
         if indices is None or not indices:
@@ -37,6 +38,14 @@ class TestVectorSearch(MarqoTestCase):
                 tensor_search.delete_index(config=self.config, index_name=ix_name)
             except IndexNotFoundError as s:
                 pass
+
+    def _create_test_indices(self, indices=None):
+        if indices is None or not indices:
+            ix_to_create = [self.index_name_1, self.index_name_2, self.index_name_3]
+        else:
+            ix_to_create = indices
+        for ix_name in ix_to_create:
+            tensor_search.create_vector_index(config=self.config, index_name=ix_name)
 
     def test_vector_search_searchable_attributes_non_existent(self):
         """TODO: non existent attrib."""
@@ -108,7 +117,6 @@ class TestVectorSearch(MarqoTestCase):
             )
 
     def test_vector_search_against_empty_index(self):
-        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
         search_res = tensor_search._vector_text_search(
                 config=self.config, index_name=self.index_name_1,
                 result_count=5, query="some text...")
@@ -211,8 +219,6 @@ class TestVectorSearch(MarqoTestCase):
 
     def test_search_format_empty(self):
         """Is the result formatted correctly? - on an emtpy index?"""
-        tensor_search.create_vector_index(
-            config=self.config, index_name=self.index_name_1)
         search_res = tensor_search.search(
             config=self.config, index_name=self.index_name_1, text=""
         )
@@ -411,6 +417,7 @@ class TestVectorSearch(MarqoTestCase):
 
     def test_filtering_list_case_image(self):
         settings = {"index_defaults": {"treat_urls_and_pointers_as_images": True, "model": "ViT-B/32"}}
+        tensor_search.delete_index(self.config, self.index_name_1)
         tensor_search.create_vector_index(index_name=self.index_name_1, index_settings=settings, config=self.config)
         hippo_img = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
         add_docs_caller(
@@ -578,7 +585,6 @@ class TestVectorSearch(MarqoTestCase):
         """calling search with a specified device overrides device defined in config"""
         mock_config = copy.deepcopy(self.config)
         mock_config.search_device = "cpu"
-        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
 
         mock_vectorise = mock.MagicMock()
         mock_vectorise.return_value = [[0, 0, 0, 0]]
@@ -743,7 +749,6 @@ class TestVectorSearch(MarqoTestCase):
                 assert set(k for k in res.keys() if k not in TensorField.__dict__.values()) == {"_id"}
 
     def test_attributes_to_retrieve_empty_index(self):
-        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
         assert 0 == tensor_search.get_stats(config=self.config, index_name=self.index_name_1)['numberOfDocuments']
         for to_retrieve in [[], ["some field name"], ["some field name", "wowowow field"]]:
             for method in ("LEXICAL", "TENSOR"):
@@ -937,7 +942,6 @@ class TestVectorSearch(MarqoTestCase):
                     # assert full_search_results["hits"] == paginated_search_results["hits"]
                     
     def test_pagination_break_limitations(self):
-        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
         # Negative offset
         for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
             for lim in [1, 10, 1000]:
@@ -1049,6 +1053,7 @@ class TestVectorSearch(MarqoTestCase):
                 "treat_urls_and_pointers_as_images": True,
                 "model": "ViT-B/32",
             }}
+        tensor_search.delete_index(self.config, self.index_name_1)
         tensor_search.create_vector_index(
             index_name=self.index_name_1, index_settings=settings, config=self.config
         )
@@ -1118,6 +1123,7 @@ class TestVectorSearch(MarqoTestCase):
                 IndexSettingsField.treat_urls_and_pointers_as_images: True
             }
         }
+        tensor_search.delete_index(self.config, self.index_name_1)
         tensor_search.create_vector_index(
             config=self.config, index_name=self.index_name_1, index_settings=image_index_config)
         add_docs_caller(
@@ -1167,6 +1173,7 @@ class TestVectorSearch(MarqoTestCase):
                 IndexSettingsField.treat_urls_and_pointers_as_images: True
             }
         }
+        tensor_search.delete_index(self.config, self.index_name_1)
         tensor_search.create_vector_index(
             config=self.config, index_name=self.index_name_1, index_settings=image_index_config)
         add_docs_caller(
@@ -1245,6 +1252,7 @@ class TestVectorSearch(MarqoTestCase):
                 IndexSettingsField.treat_urls_and_pointers_as_images: True
             }
         }
+        tensor_search.delete_index(self.config, self.index_name_1)
         tensor_search.create_vector_index(
             config=self.config, index_name=self.index_name_1, index_settings=image_index_config)
         add_docs_caller(
@@ -1278,6 +1286,7 @@ class TestVectorSearch(MarqoTestCase):
                 IndexSettingsField.treat_urls_and_pointers_as_images: True
             }
         }
+        tensor_search.delete_index(self.config, self.index_name_1)
         tensor_search.create_vector_index(
             config=self.config, index_name=self.index_name_1, index_settings=image_index_config)
         add_docs_caller(
@@ -1336,6 +1345,7 @@ class TestVectorSearch(MarqoTestCase):
                 IndexSettingsField.treat_urls_and_pointers_as_images: True
             }
         }
+        tensor_search.delete_index(self.config, self.index_name_1)
         tensor_search.create_vector_index(
             config=self.config, index_name=self.index_name_1, index_settings=image_index_config)
         add_docs_caller(
