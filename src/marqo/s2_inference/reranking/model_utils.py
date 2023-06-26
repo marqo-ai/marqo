@@ -98,12 +98,12 @@ def _verify_model_inputs(list_of_lists: List[List]) -> bool:
     """
     return all(isinstance(x, (list, tuple)) for x in list_of_lists)
 
-def convert_device_id_to_int(device: str = 'cpu'):
+def convert_device_id_to_int(device: str):
     """maps the string device, 'cpu', 'cuda', 'cuda:#'
     to an int for HF pipelines device representation
 
     Args:
-        device (str, optional): _description_. Defaults to 'cpu'.
+        device (str, optional): No default.
 
     Raises:
         ValueError: _description_
@@ -153,7 +153,7 @@ class HFClassificationOnnx:
         _type_: _description_
     """
     
-    def __init__(self, model_name: str, device: str = 'cpu', max_length: int = 512) -> None:
+    def __init__(self, model_name: str, device: str, max_length: int = 512) -> None:
 
         self.model_name = model_name
         self.save_path = None
@@ -239,7 +239,7 @@ class HFClassificationOnnx:
         return self.outputs
 
 
-def load_sbert_cross_encoder_model(model_name: str, device: str = 'cpu', max_length: int = 512) -> Dict:
+def load_sbert_cross_encoder_model(model_name: str, device: str, max_length: int = 512) -> Dict:
     """    
     https://huggingface.co/cross-encoder/ms-marco-TinyBERT-L-2
     scores = model.predict([('Query', 'Paragraph1'), ('Query', 'Paragraph2') , ('Query', 'Paragraph3')])
@@ -273,7 +273,7 @@ def load_sbert_cross_encoder_model(model_name: str, device: str = 'cpu', max_len
     return {'model':model}
 
 
-def load_hf_cross_encoder_model(model_name: str, device: str = 'cpu') -> Dict:
+def load_hf_cross_encoder_model(model_name: str, device: str) -> Dict:
     """    
     
     features = tokenizer(['How many people live in Berlin?', 'How many people live in Berlin?'], ['Berlin has a population of 3,520,031 registered inhabitants in an area of 891.82 square kilometers.', 'New York City is famous for the Metropolitan Museum of Art.'],  padding=True, truncation=True, return_tensors="pt")
@@ -301,12 +301,12 @@ def load_hf_cross_encoder_model(model_name: str, device: str = 'cpu') -> Dict:
     
     return {'model':model, 'tokenizer':tokenizer}
 
-def load_owl_vit(model_name: str, device: str = 'cpu') -> Dict:
+def load_owl_vit(model_name: str, device: str) -> Dict:
     """loader for owl vit for image reranking
 
     Args:
         model_name (str): _description_
-        device (str, optional): _description_. Defaults to 'cpu'.
+        device (str, optional): _description_. No default.
 
     Returns:
         Dict: _description_

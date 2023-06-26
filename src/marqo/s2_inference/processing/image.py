@@ -37,6 +37,8 @@ from marqo.s2_inference.processing.image_utils import (
     generate_boxes
 )
 
+from marqo.errors import InternalError
+
 logger = get_logger(__name__)
 
 
@@ -151,13 +153,13 @@ class PatchifySimple:
 class PatchifyModel:
     """class to do the patching. this is the base class for model based chunking
     """
-    def __init__(self, device: str = 'cpu', size: Tuple = (224, 224), min_area: float = 60*60, 
+    def __init__(self, device: str = None, size: Tuple = (224, 224), min_area: float = 60*60, 
                 nms: bool = True, replace_small: bool = True, top_k: int = 10, 
                 filter_bb: bool = True, min_area_replace: float = 60*60, **kwargs):
         """_summary_
 
         Args:
-            device (str, optional): the device to run the model on. Defaults to 'cpu'.
+            device (str): the device to run the model on. Required to be set.
             size (Tuple, optional): the final image size to go to the model. Defaults to (224, 224).
             min_area (float, optional): the min area (pixels) that a box must meet to be kept. 
                 areas lower than this are removed. Defaults to 60*60.
@@ -172,6 +174,9 @@ class PatchifyModel:
 
         # this is the resized size 
         self.size = size
+        
+        if not device:
+            raise InternalError("`device` is required for loading CLIP models!")
         self.device = device
 
         self.min_area = min_area

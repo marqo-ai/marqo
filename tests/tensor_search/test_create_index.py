@@ -2,6 +2,7 @@ import pprint
 from typing import Any, Dict
 from unittest.mock import patch
 import requests
+import os
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.tensor_search.enums import IndexSettingsField, EnvVars
 from marqo.errors import MarqoApiError, MarqoError, IndexNotFoundError
@@ -25,11 +26,16 @@ class TestCreateIndex(MarqoTestCase):
         except IndexNotFoundError as s:
             pass
 
+        # Any tests that call add_documents_orchestrator, search, bulk_search need this env var
+        self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
+        self.device_patcher.start()
+
     def tearDown(self) -> None:
         try:
             tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         except IndexNotFoundError as s:
             pass
+        self.device_patcher.stop()
 
     def test_create_vector_index_default_index_settings(self):
         try:
@@ -174,7 +180,7 @@ class TestCreateIndex(MarqoTestCase):
                 NsField.index_defaults: custom_settings})
         tensor_search.add_documents(
             config=self.config, add_docs_params=AddDocsParams(
-                index_name=self.index_name_1, docs=[{"Title": "wowow"}], auto_refresh=True))
+                index_name=self.index_name_1, docs=[{"Title": "wowow"}], auto_refresh=True, device="cpu"))
         mappings = requests.get(
             url=self.endpoint + "/" + self.index_name_1 + "/_mapping",
             verify=False
@@ -212,7 +218,7 @@ class TestCreateIndex(MarqoTestCase):
                 NsField.index_defaults: custom_settings})
         tensor_search.add_documents(
             config=self.config, add_docs_params=AddDocsParams(
-                index_name=self.index_name_1, docs=[{"Title": "wowow"}], auto_refresh=True))
+                index_name=self.index_name_1, docs=[{"Title": "wowow"}], auto_refresh=True, device="cpu"))
         mappings = requests.get(
             url=self.endpoint + "/" + self.index_name_1 + "/_mapping",
             verify=False
@@ -467,7 +473,7 @@ class TestCreateIndex(MarqoTestCase):
             mock_read_env_vars = mock.MagicMock()
             mock_read_env_vars.return_value = lim
 
-            @mock.patch("os.environ", {EnvVars.MARQO_MAX_INDEX_FIELDS: str(lim)})
+            @mock.patch.dict(os.environ, {**os.environ, **{EnvVars.MARQO_MAX_INDEX_FIELDS: str(lim)}})
             def run():
                 res_1 = tensor_search.add_documents(
                     add_docs_params=AddDocsParams(
@@ -475,7 +481,7 @@ class TestCreateIndex(MarqoTestCase):
                             {f"f{i}": "some content" for i in range(lim)},
                             {"_id": "1234", **{f"f{i}": "new content" for i in range(lim)}},
                         ],
-                        auto_refresh=True),
+                        auto_refresh=True, device="cpu"),
                     config=self.config
                 )
                 assert not res_1['errors']
@@ -484,7 +490,7 @@ class TestCreateIndex(MarqoTestCase):
                             {'f0': 'this is fine, but there is no resiliency.'},
                             {f"f{i}": "some content" for i in range(lim // 2 + 1)},
                             {'f0': 'this is fine. Still no resilieny.'}],
-                        auto_refresh=True),
+                        auto_refresh=True, device="cpu"),
                     config=self.config
                 )
                 assert not res_1_2['errors']
@@ -493,7 +499,7 @@ class TestCreateIndex(MarqoTestCase):
                         add_docs_params=AddDocsParams(
                             index_name=self.index_name_1,
                             docs=[{'fx': "blah"}],
-                            auto_refresh=True),
+                            auto_refresh=True, device="cpu"),
                         config=self.config
                     )
                     raise AssertionError
@@ -503,7 +509,7 @@ class TestCreateIndex(MarqoTestCase):
             assert run()
 
     def test_field_limit_non_text_types(self):
-        @mock.patch("os.environ", {EnvVars.MARQO_MAX_INDEX_FIELDS: "5"})
+        @mock.patch.dict(os.environ, {**os.environ, **{EnvVars.MARQO_MAX_INDEX_FIELDS: "5"}})
         def run():
             docs = [
                 {"f1": "fgrrvb", "f2": 1234, "f3": 1.4, "f4": "hello hello", "f5": False, "_id": "hehehehe"},
@@ -512,7 +518,7 @@ class TestCreateIndex(MarqoTestCase):
                 {"f2": 49, "f3": 400.4, "f4": "alien message"}
             ]
             res_1 = tensor_search.add_documents(
-                add_docs_params=AddDocsParams(index_name=self.index_name_1, docs=docs, auto_refresh=True),
+                add_docs_params=AddDocsParams(index_name=self.index_name_1, docs=docs, auto_refresh=True, device="cpu"),
                 config=self.config
             )
             assert not res_1['errors']
@@ -521,7 +527,7 @@ class TestCreateIndex(MarqoTestCase):
                     add_docs_params=AddDocsParams(
                         index_name=self.index_name_1, docs=[
                             {'fx': "blah"}
-                        ], auto_refresh=True),
+                        ], auto_refresh=True, device="cpu"),
                     config=self.config
                 )
                 raise AssertionError
@@ -546,7 +552,7 @@ class TestCreateIndex(MarqoTestCase):
                 {"f2": 49, "f3": 400.4, "f4": "alien message", "_id": "rkjn"}
             ]
             res_1 = tensor_search.add_documents(
-                add_docs_params=AddDocsParams(index_name=self.index_name_1, docs=docs, auto_refresh=True),
+                add_docs_params=AddDocsParams(index_name=self.index_name_1, docs=docs, auto_refresh=True, device="cpu"),
                 config=self.config
             )
             mapping_info = requests.get(

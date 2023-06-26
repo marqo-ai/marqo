@@ -31,7 +31,7 @@ class TestGetStats(MarqoTestCase):
             config=self.config, add_docs_params=AddDocsParams(
                 docs=[{"1": "2"},{"134": "2"},{"14": "62"}],
                 index_name=self.index_name_1,
-                auto_refresh=True
+                auto_refresh=True, device="cpu"
             )
         )
         assert tensor_search.get_stats(config=self.config, index_name=self.index_name_1)["numberOfDocuments"] == 3

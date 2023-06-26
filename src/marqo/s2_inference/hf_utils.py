@@ -25,7 +25,7 @@ class HF_MODEL(Model):
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-
+        
         if self.max_seq_length is None:
             self.max_seq_length = 128
         self.model_properties = kwargs.get("model_properties", dict())

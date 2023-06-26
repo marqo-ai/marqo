@@ -18,6 +18,7 @@ import marqo.s2_inference.model_registry as model_registry
 from zipfile import ZipFile
 from huggingface_hub.utils import RevisionNotFoundError,RepositoryNotFoundError, EntryNotFoundError, LocalEntryNotFoundError
 from marqo.s2_inference.errors import ModelDownloadError
+from marqo.errors import InternalError
 
 # Loading shared functions from clip_utils.py. This part should be decoupled from models in the future
 from marqo.s2_inference.clip_utils import get_allowed_image_types, format_and_load_CLIP_image, \
@@ -56,11 +57,13 @@ class CLIP_ONNX(object):
     Load a clip model and convert it to onnx version for faster inference
     """
 
-    def __init__(self, model_name="onnx32/openai/ViT-L/14", device="cpu", embedding_dim: int = None,
+    def __init__(self, model_name: str ="onnx32/openai/ViT-L/14", device: str = None, embedding_dim: int = None,
                  truncate: bool = True,
                  load=True, **kwargs):
         self.model_name = model_name
         self.onnx_type, self.source, self.clip_model = self.model_name.split("/", 2)
+        if not device:
+            raise InternalError("`device` is required for loading CLIP ONNX models!")
         self.device = device
         self.truncate = truncate
         self.provider = ['CUDAExecutionProvider', "CPUExecutionProvider"] if self.device.startswith("cuda") else [

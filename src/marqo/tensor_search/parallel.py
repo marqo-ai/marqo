@@ -12,6 +12,7 @@ from marqo import errors
 from marqo.tensor_search import tensor_search
 from marqo.marqo_logging import logger
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
+from marqo.errors import InvalidArgError, InternalError
 from dataclasses import replace
 from marqo.config import Config
 from marqo.tensor_search.telemetry import RequestMetrics, RequestMetricsStore, Timer
@@ -110,7 +111,6 @@ class IndexChunk:
         self.n_docs = len(add_docs_params.docs)
         self.n_chunks = max(1, self.n_docs // self.n_batch)
         self.process_id = process_id
-        self.config.indexing_device = add_docs_params.device if add_docs_params.device is not None else self.config.indexing_device
         self.threads_per_process = threads_per_process
 
     def process(self) -> Tuple[List[Dict[str, Any]], RequestMetrics]:
@@ -187,7 +187,7 @@ def add_documents_mp(
     ):
     """add documents using parallel processing using ray
     Args:
-        add_docs_params: parameters used by the add_docs call
+        add_docs_params: parameters used by the add_docs call (device should always be set here)
         config: Marqo configuration object
         batch_size: size of batch to be processed and sent to Marqo-os
         processes: number of processes to use
@@ -199,13 +199,15 @@ def add_documents_mp(
         _type_: _description_
     """
 
-    selected_device = add_docs_params.device if add_docs_params.device is not None else config.indexing_device
-
+    if not add_docs_params.device:
+        raise InternalError("You cannot call add_documents_mp without device set!")
+    
+    
     n_documents = len(add_docs_params.docs)
 
     logger.info(f"found {n_documents} documents")
 
-    n_processes = get_processes(selected_device, processes)
+    n_processes = get_processes(add_docs_params.device, processes)
     if n_documents < n_processes:
         n_processes = max(1, n_documents)
     
@@ -214,7 +216,7 @@ def add_documents_mp(
     logger.info(f"using {n_processes} processes")
 
     # get the device ids for each process based on the process count and available devices
-    device_ids = get_device_ids(n_processes, selected_device)
+    device_ids = get_device_ids(n_processes, add_docs_params.device)
 
     start = time.time()
     initial_metrics = RequestMetricsStore.for_request()
