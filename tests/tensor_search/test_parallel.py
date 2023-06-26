@@ -18,6 +18,8 @@ class TestAddDocumentsPara(MarqoTestCase):
             tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         except IndexNotFoundError as s:
             pass
+
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
     
     def test_get_device_ids(self) -> None:
         assert parallel.get_gpu_count('cpu') == 0
