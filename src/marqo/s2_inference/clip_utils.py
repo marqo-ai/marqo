@@ -437,7 +437,6 @@ class OPEN_CLIP(CLIP):
             self.jit = self.model_properties.get("jit", False)
             self.mean = self.model_properties.get("mean", None)
             self.std = self.model_properties.get("std", None)
-
             self.model, self.preprocess = self.custom_clip_load()
             self.tokenizer = self.load_tokenizer()
 
@@ -445,13 +444,51 @@ class OPEN_CLIP(CLIP):
 
     def custom_clip_load(self):
         self.model_name = self.model_properties.get("name", None)
-
         logger.info(f"The name of the custom clip model is {self.model_name}. We use open_clip load")
-        model, _, preprocess = open_clip.create_model_and_transforms(
-            model_name=self.model_name, jit = self.jit, pretrained=self.model_path, precision = self.precision,
-            image_mean=self.mean, image_std=self.std, device = self.device, cache_dir=ModelCache.clip_cache_path)
+        try:
+            model, _, preprocess = open_clip.create_model_and_transforms(
+                model_name=self.model_name, jit=self.jit, pretrained=self.model_path, precision=self.precision,
+                image_mean=self.mean, image_std=self.std, device=self.device, cache_dir=ModelCache.clip_cache_path)
+            return model, preprocess
+        except Exception as e:
+            if (isinstance(e, RuntimeError) and "The file might be corrupted" in str(e)):
+                try:
+                    os.remove(self.model_path)
+                except Exception as remove_e:
+                    raise RuntimeError(
+                        f"Marqo encountered an error while attempting to delete a corrupted file `{self.model_path}`. "
+                        f"Please report this issue on Marqo's Github Repo and replace the problematic Marqo instance "
+                        f"with a new one. \n "
+                        f"Error message: `{str(remove_e)}`"
+                    )
+                raise InvalidModelPropertiesError(
+                    f"Marqo encountered a corrupted file when loading open_clip file `{self.model_path}`. "
+                    f"Marqo has removed this file from the disk. "
+                    f"Some possible causes are: \n"
+                    f"1. the file was not a valid open_clip checkpoint, \n"
+                    f"2. the file was corrupted during download or incompletely downloaded, \n"
+                    f"3. you may have tried to load a `clip` model even though `model_properties['type']` is set to 'open_clip'. \n"
+                    f"Please check and update your model properties and retry. "
+                    f"You can find more details at `https://docs.marqo.ai/0.0.21/Models-Reference/bring_your_own_model/#bring-your-own-clip-model`")
+            # It is tricky to cacth the error when loading clip model using type = open_clip. Different pytorch version will raise different error.
+            elif isinstance(e, (AttributeError, RuntimeError)) or ("This could be because the operator doesn't exist for this backend" in str(e)):
+                raise InvalidModelPropertiesError(
+                    f"Marqo encountered an error when loading custom open_clip model `{self.model_name}` with "
+                    f"model properties = `{self.model_properties}`. \n"
+                    f"The error message is `{str(e)}`. \n"
+                    f"You may have tried to load a `clip` model even though `model_properties['type']` is set to 'open_clip' \n"
+                    f"Please check and update your model properties and retry. "
+                    f"You can find more details at `https://docs.marqo.ai/0.0.21/Models-Reference/bring_your_own_model/#bring-your-own-clip-model`"
+                )
 
-        return model, preprocess
+            else:
+                raise RuntimeError(
+                    f"Marqo encountered an error when loading custom open_clip model `{self.model_name}` with "
+                    f"model properties = `{self.model_properties}`. \n"
+                    f"The error message is `{str(e)}`. \n"
+                    f"Please check and update your model properties and retry. "
+                    f"You can find more details at `https://docs.marqo.ai/0.0.21/Models-Reference/bring_your_own_model/#bring-your-own-clip-model`"
+                )
 
     def load_tokenizer(self):
         tokenizer_name = self.model_properties.get("tokenizer", "clip")
