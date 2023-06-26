@@ -99,6 +99,8 @@ class TestBoostFieldScoresComparison(MarqoTestCase):
         except IndexNotFoundError as e:
             pass
 
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
+
     def test_boost_multiple_fields(self):
         add_docs_caller(config=self.config, index_name=self.index_name_1, docs=[
             {

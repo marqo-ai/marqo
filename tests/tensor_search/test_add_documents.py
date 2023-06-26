@@ -23,8 +23,8 @@ class TestAddDocuments(MarqoTestCase):
     def setUp(self) -> None:
         self.endpoint = self.authorized_url
         self.generic_header = {"Content-type": "application/json"}
-        self.index_name_1 = "my-test-index-1" # standard index created by setUp
-        self.index_name_2 = "my-test-index-2" # for tests that need custom index config
+        self.index_name_1 = "my-test-index-1"  # standard index created by setUp
+        self.index_name_2 = "my-test-index-2"  # for tests that need custom index config
         try:
             tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
             tensor_search.delete_index(config=self.config, index_name=self.index_name_2)

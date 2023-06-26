@@ -313,6 +313,7 @@ class TestBulkSearch(MarqoTestCase):
         self.index_name_2 = "my-test-index-2"
         self.index_name_3 = "my-test-index-3"
         self._delete_test_indices()
+        self._create_test_indices()
 
     def _delete_test_indices(self, indices=None):
         if indices is None or not indices:
@@ -324,6 +325,14 @@ class TestBulkSearch(MarqoTestCase):
                 tensor_search.delete_index(config=self.config, index_name=ix_name)
             except IndexNotFoundError as s:
                 pass
+
+    def _create_test_indices(self, indices=None):
+        if indices is None or not indices:
+            ix_to_create = [self.index_name_1, self.index_name_2, self.index_name_3]
+        else:
+            ix_to_create = indices
+        for ix_name in ix_to_create:
+            tensor_search.create_vector_index(config=self.config, index_name=ix_name)
 
     def test_bulk_search_w_extra_parameters__raise_exception(self):
         add_docs_caller(
@@ -498,6 +507,9 @@ class TestBulkSearch(MarqoTestCase):
         assert res['result'][0]["hits"][0]["_score"] == res['result'][0]["hits"][1]["_score"]
 
     def test_bulk_search_works_on_uncached_field(self):
+        self._delete_test_indices()
+
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
         add_docs_caller(
             config=self.config, index_name=self.index_name_1, docs=[
                 {"abc": "Exact match hehehe efgh ", "other field": "baaadd efgh ",
@@ -599,7 +611,6 @@ class TestBulkSearch(MarqoTestCase):
                 {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "id2-first"},
                 {"abc": "random text", "other field": "Close match hehehe", "_id": "id2-second"},
             ], auto_refresh=True)
-        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_3)
 
         resp = tensor_search.bulk_search(
             query=BulkSearchQuery(queries=[
@@ -621,7 +632,6 @@ class TestBulkSearch(MarqoTestCase):
 
     @mock.patch("marqo.tensor_search.tensor_search.bulk_msearch")
     def test_bulk_search_multiple_queries_single_msearch_request(self, mock_bulk_msearch):
-        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
         add_docs_caller(
             config=self.config, index_name=self.index_name_1, docs=[
                 {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "id1-first"},
@@ -645,6 +655,7 @@ class TestBulkSearch(MarqoTestCase):
 
         @unittest.mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
         def run():
+            self._delete_test_indices()
             tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings={
                 "index_defaults": {
                     "normalize_embeddings": False,
@@ -690,8 +701,6 @@ class TestBulkSearch(MarqoTestCase):
         mock_vectorise.side_effect = pass_through_vectorise
         @unittest.mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
         def run ():
-            tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
-            tensor_search.create_vector_index(config=self.config, index_name=self.index_name_2)
             tensor_search.bulk_search(
                 query=BulkSearchQuery(queries=[
                     BulkSearchQueryEntity(index=self.index_name_1, q="one thing"),
@@ -825,7 +834,6 @@ class TestBulkSearch(MarqoTestCase):
         assert len(search_res[0]['hits']) == 2
 
     def test_bulk_vector_text_search_against_empty_index(self):
-        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
         search_res = tensor_search._bulk_vector_text_search(
             config=self.config, queries=[BulkSearchQueryEntity(index=self.index_name_1, q=" efgh ", limit=10)]
         )
@@ -834,6 +842,7 @@ class TestBulkSearch(MarqoTestCase):
 
 
     def test_bulk_vector_text_search_against_non_existent_index(self):
+        self._delete_test_indices()
         try:
             tensor_search._bulk_vector_text_search(
                 config=self.config, queries=[BulkSearchQueryEntity(index=self.index_name_1, q=" efgh ", limit=10)]
@@ -1039,6 +1048,7 @@ class TestBulkSearch(MarqoTestCase):
         assert len(res_should_only_match_keyword_good[0]["hits"]) == 1
 
     def test_filtering_list_case_image(self):
+        self._delete_test_indices()
         settings = {"index_defaults": {"treat_urls_and_pointers_as_images": True, "model": "ViT-B/32"}}
         tensor_search.create_vector_index(index_name=self.index_name_1, index_settings=settings, config=self.config)
         hippo_img = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
@@ -1129,7 +1139,6 @@ class TestBulkSearch(MarqoTestCase):
         """calling search with a specified device overrides device defined in config"""
         mock_config = copy.deepcopy(self.config)
         mock_config.search_device = "cpu"
-        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
 
         mock_vectorise = mock.MagicMock()
         mock_vectorise.return_value = [[0, 0, 0, 0]]
@@ -1240,7 +1249,6 @@ class TestBulkSearch(MarqoTestCase):
                 assert set(k for k in res.keys() if k not in TensorField.__dict__.values()) == {"_id"}
     
     def test_attributes_to_retrieve_empty_index(self):
-        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
         assert 0 == tensor_search.get_stats(config=self.config, index_name=self.index_name_1)['numberOfDocuments']
         for to_retrieve in [[], ["some field name"], ["some field name", "wowowow field"]]:
             for method in ("LEXICAL", "TENSOR"):
@@ -1493,7 +1501,6 @@ class TestBulkSearch(MarqoTestCase):
     
 
     def test_pagination_break_limitations(self):
-        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
         # Negative offset
         for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
             for lim in [1, 10, 1000]:
@@ -1626,6 +1633,7 @@ class TestBulkSearch(MarqoTestCase):
 
     def test_image_search_highlights(self):
         """does the URL get returned as the highlight? (it should - because no rerankers are being used)"""
+        self._delete_test_indices()
         settings = {
             "index_defaults": {
                 "treat_urls_and_pointers_as_images": True,
@@ -1709,6 +1717,7 @@ class TestBulkSearch(MarqoTestCase):
                 IndexSettingsField.treat_urls_and_pointers_as_images: True
             }
         }
+        self._delete_test_indices()
         tensor_search.create_vector_index(
             config=self.config, index_name=self.index_name_1, index_settings=image_index_config)
         add_docs_caller(
@@ -1758,6 +1767,7 @@ class TestBulkSearch(MarqoTestCase):
                 IndexSettingsField.treat_urls_and_pointers_as_images: True
             }
         }
+        self._delete_test_indices()
         tensor_search.create_vector_index(
             config=self.config, index_name=self.index_name_1, index_settings=image_index_config)
         add_docs_caller(
@@ -1793,6 +1803,7 @@ class TestBulkSearch(MarqoTestCase):
                 IndexSettingsField.treat_urls_and_pointers_as_images: True
             }
         }
+        self._delete_test_indices()
         tensor_search.create_vector_index(
             config=self.config, index_name=self.index_name_1, index_settings=image_index_config)
         add_docs_caller(
@@ -1831,6 +1842,7 @@ class TestBulkSearch(MarqoTestCase):
                 IndexSettingsField.treat_urls_and_pointers_as_images: True
             }
         }
+        self._delete_test_indices()
         tensor_search.create_vector_index(
             config=self.config, index_name=self.index_name_1, index_settings=image_index_config)
         add_docs_caller(
@@ -1910,6 +1922,7 @@ class TestBulkSearch(MarqoTestCase):
                 IndexSettingsField.treat_urls_and_pointers_as_images: True
             }
         }
+        self._delete_test_indices()
         tensor_search.create_vector_index(
             config=self.config, index_name=self.index_name_1, index_settings=image_index_config)
         add_docs_caller(
@@ -1996,6 +2009,7 @@ class TestBulkSearch(MarqoTestCase):
                 IndexSettingsField.treat_urls_and_pointers_as_images: True
             }
         }
+        self._delete_test_indices()
         tensor_search.create_vector_index(
             config=self.config, index_name=self.index_name_1, index_settings=image_index_config)
         add_docs_caller(
