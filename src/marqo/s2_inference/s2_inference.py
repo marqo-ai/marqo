@@ -5,7 +5,7 @@ import numpy as np
 from marqo.errors import ModelCacheManagementError, InvalidArgError, ConfigurationError, InternalError
 from marqo.s2_inference.errors import (
     VectoriseError, InvalidModelPropertiesError, ModelLoadError,
-    UnknownModelError, ModelNotInCacheError, ModelDownloadError)
+    UnknownModelError, ModelNotInCacheError, ModelDownloadError, S2InferenceError)
 from PIL import UnidentifiedImageError
 from marqo.s2_inference.model_registry import load_model_properties
 from marqo.s2_inference.configs import get_default_normalization, get_default_seq_length
@@ -170,6 +170,7 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
                     f"If you are trying to load a custom model, "
                     f"please check that model_properties={validated_model_properties} is correct "
                     f"and Marqo has access to the weights file.")
+
     else:
         most_recently_used_time = datetime.datetime.now()
         logger.debug(f'renewed {model_name} on device {device} with new most recently time={most_recently_used_time}.')

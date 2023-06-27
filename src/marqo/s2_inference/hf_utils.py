@@ -200,12 +200,14 @@ class AutoModelForSentenceEmbedding(nn.Module):
 
 def extract_huggingface_archive(path: str) -> str:
     '''
-        This function extracts the model from a huggingface archive if necessary.
-        Unlike open clip models that can loaded from a single .pt or .bin file,
-        Huggingface models are loaded from a directory. Please avoid using this function
-        for CLIP or Open CLIP models.
+
+        This function takes the path as input. The path can must be a string that can be:
+        1. A downloaded archive file. This function will extract the model from the archive return the directory path.
+        2. A repo_id in huggingface. This function will return the input string directly.
+
+        path: the downloaded model archive path or a repo_id in huggingface
     Returns:
-        The directory path to the model
+        The directory path to the model or the repo_id in huggingface
     '''
     if os.path.isfile(path):
         # if it's a file, check if it's a compressed file
@@ -219,6 +221,7 @@ def extract_huggingface_archive(path: str) -> str:
             os.makedirs(new_dir, exist_ok=True)
 
             # extract the compressed file
+            # If the target directory already exists, it will be overwritten by default without warning.
             if ext == '.zip':
                 with zipfile.ZipFile(path, 'r') as zip_ref:
                     zip_ref.extractall(new_dir)
@@ -228,16 +231,26 @@ def extract_huggingface_archive(path: str) -> str:
             # return the path to the new directory
             return new_dir
         except (tarfile.ReadError, zipfile.BadZipfile):
-            raise InvalidModelPropertiesError(f'Marqo encountered an error while extracting the compressed model archive from {path}.\n '
-                                              f'This is probably because the file is corrupted or the extionsion {ext} is not supported. '
+            try:
+                os.remove(path)
+            except Exception as remove_e:
+                raise RuntimeError(
+                    f"Marqo encountered an error while attempting to delete a corrupted file `{path}`. "
+                    f"Please report this issue on Marqo's Github Repo and replace the problematic Marqo instance with "
+                    f"a new one. \n "
+                    f"Error message: `{str(remove_e)}`"
+                )
+            raise InvalidModelPropertiesError(f'Marqo encountered an error while extracting the compressed model archive from `{path}`.\n '
+                                              f'This is probably because the file is corrupted or the extension `{ext}` is not supported. '
+                                              f'Marqo has removed the corrupted file from the disk.'
                                               f'Please ensure that the file is a valid compressed file and try again.')
         # will this error really happen?
-        except (PermissionError):
-            raise InvalidModelPropertiesError(f'Marqo encountered an error while extracting the compressed model archive from {path}. '
+        except PermissionError:
+            raise InvalidModelPropertiesError(f'Marqo encountered an error while extracting the compressed model archive from `{path}`. '
                                               f'This is probably because the Marqo does not have the permission to write to the directory. '
                                               f'Please check the access permission of Marqo and try again.')
         except Exception as e:
-            raise InvalidModelPropertiesError(f'Marqo encountered an error while extracting the compressed model archive from {path}. '
+            raise RuntimeError(f'Marqo encountered an error while extracting the compressed model archive from `{path}`. '
                                               f'The original error message is `{str(e)}`')
     else:
         # return the directory path or repo_id directory
