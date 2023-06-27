@@ -453,3 +453,33 @@ class TestDeleteDocumentsEndpoint(MarqoTestCase):
             return True
 
         assert run()
+
+    def test_delete_documents_refresh_true(self):
+        add_docs_caller(
+            config=self.config, index_name=self.index_name_1,
+            docs=[
+                {"f1": "cat dog sat mat", "Sydney": "Australia contains Sydney", "_id": "455"},
+                {"Lime": "Tree tee", "Magnificent": "Waterfall out yonder"},
+            ], auto_refresh=True)
+        with patch("marqo.tensor_search.delete_docs.delete_documents_marqo_os") as mock_delete_documents_marqo_os:
+            marqo.tensor_search.tensor_search.delete_documents(config=self.config, index_name=self.index_name_1, doc_ids=["455"],
+                                                               auto_refresh=True)
+
+        mock_delete_documents_marqo_os.assert_called_once()
+        self.assertEqual(mock_delete_documents_marqo_os.call_args_list[0][1]['deletion_instruction'].auto_refresh, True)
+
+    def test_delete_documents_refresh_false(self):
+        add_docs_caller(
+            config=self.config, index_name=self.index_name_1,
+            docs=[
+                {"f1": "cat dog sat mat", "Sydney": "Australia contains Sydney", "_id": "455"},
+                {"Lime": "Tree tee", "Magnificent": "Waterfall out yonder"},
+            ], auto_refresh=True)
+        with patch("marqo.tensor_search.delete_docs.delete_documents_marqo_os") as mock_delete_documents_marqo_os:
+            marqo.tensor_search.tensor_search.delete_documents(config=self.config, index_name=self.index_name_1,
+                                                               doc_ids=["455"],
+                                                               auto_refresh=False)
+
+        mock_delete_documents_marqo_os.assert_called_once()
+        self.assertEqual(mock_delete_documents_marqo_os.call_args_list[0][1]['deletion_instruction'].auto_refresh,
+                         False)

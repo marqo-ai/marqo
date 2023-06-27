@@ -17,7 +17,6 @@ from marqo.tensor_search import enums
 from marqo.errors import IndexNotFoundError, InvalidArgError, BadRequestError, InternalError
 from marqo.tensor_search import tensor_search, index_meta_cache, backend
 from tests.marqo_test import MarqoTestCase
-import time
 from marqo.tensor_search import add_docs
 
 class TestAddDocuments(MarqoTestCase):
@@ -1580,3 +1579,50 @@ class TestAddDocuments(MarqoTestCase):
             raise AssertionError
         except InternalError:
             pass
+    @patch("marqo.tensor_search.tensor_search.refresh_index")
+    def test_add_documents_auto_refresh_true(self, mock_refresh_index):
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
+        tensor_search.add_documents(
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1,
+                docs=[{
+                    "_id": "123",
+                    "id": "abcdefgh",
+                    "title 1": "content 1",
+                    "desc 2": "content 2. blah blah blah"
+                    },
+                    {
+                        "_id": "456",
+                        "id": "abcdefgh",
+                        "title 1": "content 1",
+                        "desc 2": "content 2. blah blah blah"
+                    }
+                ],
+                auto_refresh=False, device="cpu"
+            )
+        )
+        mock_refresh_index.assert_not_called()
+
+    @patch("marqo.tensor_search.tensor_search.refresh_index")
+    def test_add_documents_auto_refresh_true(self, mock_refresh_index):
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
+        tensor_search.add_documents(
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1,
+                docs=[{
+                    "_id": "123",
+                    "id": "abcdefgh",
+                    "title 1": "content 1",
+                    "desc 2": "content 2. blah blah blah"
+                    },
+                    {
+                        "_id": "456",
+                        "id": "abcdefgh",
+                        "title 1": "content 1",
+                        "desc 2": "content 2. blah blah blah"
+                    }
+                ],
+                auto_refresh=True, device="cpu"
+            )
+        )
+        mock_refresh_index.assert_called_once_with(self.config, self.index_name_1)
