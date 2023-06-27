@@ -42,8 +42,10 @@ class TestAddDocuments(MarqoTestCase):
 
     def tearDown(self) -> None:
         self.index_name_1 = "my-test-index-1"
+        self.index_name_2 = "my-test-index-2"
         try:
             tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+            tensor_search.delete_index(config=self.config, index_name=self.index_name_2)
         except IndexNotFoundError as s:
             pass
 
@@ -576,7 +578,7 @@ class TestAddDocuments(MarqoTestCase):
             ]
             for docs, expected_results in docs_results:
                 add_res = tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
-                    index_name=self.index_name_1, docs=docs, auto_refresh=True, device="cpu"))
+                    index_name=self.index_name_2, docs=docs, auto_refresh=True, device="cpu"))
                 assert len(add_res['items']) == len(expected_results)
                 for i, res_dict in enumerate(add_res['items']):
                     assert res_dict["_id"] == expected_results[i][0]

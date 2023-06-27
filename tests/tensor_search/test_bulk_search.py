@@ -827,7 +827,6 @@ class TestBulkSearch(MarqoTestCase):
 
     def test_bulk_vector_text_search_no_device(self):
         try:
-            tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
             search_res = tensor_search._bulk_vector_text_search(
                 config=self.config, queries=[BulkSearchQueryEntity(index=self.index_name_1, q=" efgh ", limit=10)]
             )

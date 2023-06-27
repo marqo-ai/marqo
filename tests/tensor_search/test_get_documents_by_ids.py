@@ -20,6 +20,8 @@ class TestGetDocuments(MarqoTestCase):
         self.index_name_1 = "my-test-index-1"  # standard index created by setUp
         self.index_name_2 = "my-test-index-2"  # for tests that need custom index config
         self._delete_testing_indices()
+
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
         
         # Any tests that call add_documents_orchestrator, search, bulk_search need this env var
         self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
@@ -27,8 +29,6 @@ class TestGetDocuments(MarqoTestCase):
 
     def tearDown(self):
         self.device_patcher.stop()
-
-        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
 
     def _delete_testing_indices(self):
         for ix in [self.index_name_1, self.index_name_2]:
