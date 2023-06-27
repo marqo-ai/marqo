@@ -247,8 +247,11 @@ def add_documents_orchestrator(
         return add_documents(config=config, add_docs_params=add_docs_params_with_device)
     elif processes is not None and processes > 1:
 
-        # create beforehand or pull from the cache so it is up to date for the multi-processing
-        _check_and_create_index_if_not_exist(config=config, index_name=add_docs_params.index_name)
+        # verify index exists and update cache
+        try:
+            backend.get_index_info(config=config, index_name=add_docs_params.index_name)
+        except errors.IndexNotFoundError:
+            raise errors.IndexNotFoundError(f"Cannot add documents to non-existent index {add_docs_params.index_name}")
 
         try:
             # Empty text search:
