@@ -7,6 +7,7 @@ from marqo._httprequests import HttpRequests
 from marqo.config import Config
 from marqo.tensor_search import validation, utils, enums
 from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsResponse, MqDeleteDocsRequest
+from marqo.tensor_search.tensor_search import refresh_index
 
 # -- Marqo delete endpoint interface: --
 
@@ -64,7 +65,7 @@ def delete_documents_marqo_os(config: Config, deletion_instruction: MqDeleteDocs
     )
 
     if deletion_instruction.auto_refresh:
-        refresh_response = HttpRequests(config).post(path=f"{deletion_instruction.index_name}/_refresh")
+        refresh_response = refresh_index(config=config, index_name=deletion_instruction.index_name)
 
     t1 = datetime.datetime.utcnow()
     deleted_documents_count = sum(1 for item in delete_res_backend["items"] if "delete" in item and item["delete"]["status"] == 200)
