@@ -256,7 +256,9 @@ class TestValidation(unittest.TestCase):
 
     def test_index_name_validation(self):
         assert "my-index-name" == validation.validate_index_name("my-index-name")
-        bad_names = ['.opendistro_security', 'security-auditlog-', 'security-auditlog-100']
+        bad_names = ['.opendistro_security', 'security-auditlog-', 'security-auditlog-100',
+                     '.opendistro_alerting_config', '.opendistro-alerting-config-', '.kibana',
+                     '.kibana-2']
         for n in bad_names:
             try:
                 validation.validate_index_name(n)
