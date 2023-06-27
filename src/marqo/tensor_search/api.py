@@ -170,7 +170,7 @@ def search(search_query: SearchQuery, index_name: str, device: str = Depends(api
 def add_or_replace_documents(
         docs: List[Dict],
         index_name: str,
-        refresh: bool = True,
+        refresh: bool = False,
         marqo_config: config.Config = Depends(generate_config),
         batch_size: int = 0,
         processes: int = 1,
@@ -203,7 +203,7 @@ def add_or_replace_documents(
 def add_or_update_documents(
         docs: List[Dict],
         index_name: str,
-        refresh: bool = True,
+        refresh: bool = False,
         marqo_config: config.Config = Depends(generate_config),
         batch_size: int = 0, processes: int = 1,
         non_tensor_fields: List[str] = Query(default=[]),
@@ -254,7 +254,7 @@ def delete_index(index_name: str, marqo_config: config.Config = Depends(generate
 
 
 @app.post("/indexes/{index_name}/documents/delete-batch")
-def delete_docs(index_name: str, documentIds: List[str], refresh: bool = True,
+def delete_docs(index_name: str, documentIds: List[str], refresh: bool = False,
                       marqo_config: config.Config = Depends(generate_config)):
     return tensor_search.delete_documents(
         index_name=index_name, config=marqo_config, doc_ids=documentIds,

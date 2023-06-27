@@ -765,7 +765,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
 
     with RequestMetricsStore.for_request().time("add_documents.postprocess"):
         if add_docs_params.auto_refresh:
-            HttpRequests(config).post(path=F"{add_docs_params.index_name}/_refresh")
+            refresh_index(config, add_docs_params.index_name)
 
         t1 = timer()
 
