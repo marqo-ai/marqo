@@ -7,7 +7,6 @@ from marqo._httprequests import HttpRequests
 from marqo.config import Config
 from marqo.tensor_search import validation, utils, enums
 from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsResponse, MqDeleteDocsRequest
-from marqo.tensor_search.tensor_search import refresh_index
 
 # -- Marqo delete endpoint interface: --
 
