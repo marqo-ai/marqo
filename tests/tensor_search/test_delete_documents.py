@@ -12,6 +12,7 @@ from unittest.mock import patch
 from marqo import errors
 from marqo.tensor_search import enums
 from tests.utils.transition import add_docs_caller
+import os
 
 class TestDeleteDocuments(MarqoTestCase):
     """module that has tests at the tensor_search level"""
@@ -417,7 +418,7 @@ class TestDeleteDocumentsEndpoint(MarqoTestCase):
 
         doc_ids = [f"id_{x}" for x in range(max_delete_docs + 5)]
 
-        @patch("os.environ", mock_environ)
+        @patch.dict(os.environ, mock_environ)
         def run():
             tensor_search.create_vector_index(
                 index_name=self.index_name_1, index_settings={"index_defaults": {"model": 'random'}}, config=self.config)
@@ -445,7 +446,7 @@ class TestDeleteDocumentsEndpoint(MarqoTestCase):
     def test_max_doc_delete_default_limit(self):
         default_limit = 10000
 
-        @patch("os.environ", dict())
+        @patch.dict(os.environ, dict())
         def run():
             assert default_limit == tensor_search.utils.read_env_vars_and_defaults_ints(
                 enums.EnvVars.MARQO_MAX_DELETE_DOCS_COUNT)

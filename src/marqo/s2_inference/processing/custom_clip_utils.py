@@ -1,14 +1,13 @@
 import regex as re
-from typing import Union, List
-import torch
+from typing import Union, List, Optional
 import ftfy
 import html
 import os
 import urllib
 from tqdm import tqdm
-from marqo.s2_inference.configs import ModelCache
-from typing import Optional
+import torch
 from urllib.error import HTTPError
+from marqo.s2_inference.configs import ModelCache
 from marqo.s2_inference.errors import ModelDownloadError, InvalidModelPropertiesError
 from marqo.tensor_search.models.private_models import ModelAuth, ModelLocation
 from marqo.s2_inference.model_downloading.from_s3 import (
@@ -66,7 +65,6 @@ def download_model(
     Returns:
         The path of the downloaded model
     """
-
     single_weight_location_validation_msg = (
         "only exactly one of parameters (repo_location, url) is allowed to be specified.")
     if repo_location is None and url is None:
@@ -127,7 +125,7 @@ def download_pretrained_from_s3(
 def download_pretrained_from_url(
         url: str,
         cache_dir: Union[str, None] = None,
-        cache_file_name: Optional[str] = None
+        cache_file_name: Optional[str] = None,
 ):
     '''
     This function takes a clip model checkpoint url as input, downloads the model if it doesn't exist locally,
@@ -167,4 +165,3 @@ def download_pretrained_from_url(
                 loop.update(len(buffer))
 
     return download_target
-

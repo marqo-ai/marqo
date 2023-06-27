@@ -238,7 +238,7 @@ class TestValidation(unittest.TestCase):
         max_size = 1234567
         mock_environ = {enums.EnvVars.MARQO_MAX_DOC_BYTES: str(max_size)}
 
-        @mock.patch("os.environ", mock_environ)
+        @mock.patch.dict(os.environ, mock_environ)
         def run():
             good_doc = {"abcd": "a" * (max_size - 500)}
             good_back = validation.validate_doc(doc=good_doc)

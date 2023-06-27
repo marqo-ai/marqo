@@ -2,26 +2,24 @@
 The functions defined here would have endpoints, later on.
 """
 import numpy as np
-from marqo.errors import ModelCacheManagementError
+from marqo.errors import ModelCacheManagementError, InvalidArgError, ConfigurationError, InternalError
 from marqo.s2_inference.errors import (
     VectoriseError, InvalidModelPropertiesError, ModelLoadError,
-    UnknownModelError, ModelNotInCacheError, ModelDownloadError)
+    UnknownModelError, ModelNotInCacheError, ModelDownloadError, S2InferenceError)
 from PIL import UnidentifiedImageError
 from marqo.s2_inference.model_registry import load_model_properties
-from marqo.s2_inference.configs import get_default_device, get_default_normalization, get_default_seq_length
+from marqo.s2_inference.configs import get_default_normalization, get_default_seq_length
 from marqo.s2_inference.types import *
 from marqo.s2_inference.logger import get_logger
 import torch
 import datetime
 from marqo.s2_inference import constants
-from marqo.tensor_search.utils import read_env_vars_and_defaults
 from marqo.tensor_search.enums import AvailableModelsKey
 from marqo.tensor_search.configs import EnvVars
 from marqo.tensor_search.models.private_models import ModelAuth
 import threading
 from marqo.tensor_search.utils import read_env_vars_and_defaults, generate_batches
 from marqo.tensor_search.configs import EnvVars
-from marqo.errors import ConfigurationError
 
 logger = get_logger(__name__)
 
@@ -34,7 +32,7 @@ MODEL_PROPERTIES = load_model_properties()
 
 
 def vectorise(model_name: str, content: Union[str, List[str]], model_properties: dict = None,
-              device: str = get_default_device(), normalize_embeddings: bool = get_default_normalization(),
+              device: str = None, normalize_embeddings: bool = get_default_normalization(),
               model_auth: ModelAuth = None, **kwargs) -> List[List[float]]:
     """vectorizes the content by model name
 
@@ -55,6 +53,9 @@ def vectorise(model_name: str, content: Union[str, List[str]], model_properties:
         VectoriseError: if the content can't be vectorised, for some reason.
     """
 
+    if not device:
+        raise InternalError(message=f"vectorise (internal function) cannot be called without setting device!")
+    
     validated_model_properties = _validate_model_properties(model_name, model_properties)
     model_cache_key = _create_model_cache_key(model_name, device, validated_model_properties)
 
@@ -169,6 +170,7 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
                     f"If you are trying to load a custom model, "
                     f"please check that model_properties={validated_model_properties} is correct "
                     f"and Marqo has access to the weights file.")
+
     else:
         most_recently_used_time = datetime.datetime.now()
         logger.debug(f'renewed {model_name} on device {device} with new most recently time={most_recently_used_time}.')
@@ -311,7 +313,7 @@ def get_model_size(model_name: str, model_properties: dict) -> (int, float):
 
 
 def _load_model(
-        model_name: str, model_properties: dict, device: Optional[str] = None,
+        model_name: str, model_properties: dict, device: str,
         calling_func: str = None, model_auth: Optional[ModelAuth] = None
 ) -> Any:
     """_summary_
@@ -319,7 +321,7 @@ def _load_model(
     Args:
         model_name (str): Actual model_name to be fetched from external library
                         prefer passing it in the form of model_properties['name']
-        device (str, optional): _description_. Defaults to 'cpu'.
+        device (str): Required. Should always be passed when loading model
         model_auth: Authorisation details for downloading a model (if required)
 
     Returns:
@@ -330,7 +332,6 @@ def _load_model(
                            f"`unit_test` or `_update_available_models` for threading safeness.")
 
     print(f"loading for: model_name={model_name} and properties={model_properties}")
-    if device is None: device = get_default_device()
     loader = _get_model_loader(model_properties.get('name', None), model_properties)
 
     max_sequence_length = model_properties.get('tokens', get_default_seq_length())
@@ -402,18 +403,18 @@ def _check_output_type(output: List[List[float]]) -> bool:
     return True
 
 
-def _float_tensor_to_list(output: FloatTensor, device: str = get_default_device()) -> Union[
+def _float_tensor_to_list(output: FloatTensor) -> Union[
     List[List[float]], List[float]]:
     """
-
     Args:
         output (FloatTensor): _description_
 
     Returns:
         List[List[float]]: _description_
     """
-
-    return output.detach().to(device).tolist()
+    
+    # Hardcoded to CPU always
+    return output.detach().to("cpu").tolist()
 
 
 def _nd_array_to_list(output: ndarray) -> Union[List[List[float]], List[float]]:

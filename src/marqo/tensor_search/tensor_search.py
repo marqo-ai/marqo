@@ -58,6 +58,7 @@ from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQue
 from marqo.tensor_search.models.search import Qidx, JHash, SearchContext, VectorisedJobs, VectorisedJobPointer
 from marqo.tensor_search.models.index_info import IndexInfo
 from marqo.tensor_search.models.external_apis.abstract_classes import ExternalAuth
+from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.tensor_search.utils import add_timing
 from marqo.tensor_search import delete_docs
 from marqo.s2_inference.processing import text as text_processor
@@ -239,30 +240,39 @@ def add_documents_orchestrator(
         config: Config, add_docs_params: AddDocsParams,
         batch_size: int = 0, processes: int = 1,
     ):
-
+    # Default device calculated here and not in add_documents call
+    if add_docs_params.device is None:
+        selected_device = utils.read_env_vars_and_defaults("MARQO_BEST_AVAILABLE_DEVICE")
+        if selected_device is None:
+            raise errors.InternalError("Best available device was not properly determined on Marqo startup.")
+        add_docs_params_with_device = replace(add_docs_params, device=selected_device)
+        logger.debug(f"No device given for add_documents_orchestrator. Defaulting to best available device: {selected_device}")
+    else:
+        add_docs_params_with_device = add_docs_params
+    
     if batch_size is None or batch_size == 0:
         logger.debug(f"batch_size={batch_size} and processes={processes} - not doing any marqo side batching")
-        return add_documents(config=config, add_docs_params=add_docs_params)
+        return add_documents(config=config, add_docs_params=add_docs_params_with_device)
     elif processes is not None and processes > 1:
-
         # create beforehand or pull from the cache so it is up to date for the multi-processing
         _check_and_create_index_if_not_exist(config=config, index_name=add_docs_params.index_name)
-
         try:
+            # Empty text search:
+            # 1. loads model into memory, 2. updates cache for multiprocessing
             _vector_text_search(
                 config=config, index_name=add_docs_params.index_name, query='',
-                model_auth=add_docs_params.model_auth,
+                model_auth=add_docs_params.model_auth, device=add_docs_params_with_device.device,
                 image_download_headers=add_docs_params.image_download_headers)
         except Exception as e:
             logger.warning(
-                f"add_documents orchestrator's call to _vector_text_search, prior to parallel add_docs, raised an error. "
+                f"add_documents orchestrator's call to vector text search, prior to parallel add_docs, raised an error. "
                 f"Continuing to parallel add_docs. "
                 f"Message: {e}"
             )
 
         logger.debug(f"batch_size={batch_size} and processes={processes} - using multi-processing")
         results = parallel.add_documents_mp(
-            config=config, batch_size=batch_size, processes=processes, add_docs_params=add_docs_params
+            config=config, batch_size=batch_size, processes=processes, add_docs_params=add_docs_params_with_device
         )
         # we need to force the cache to update as it does not propagate using mp
         # we just clear this index's entry and it will re-populate when needed next
@@ -275,7 +285,7 @@ def add_documents_orchestrator(
         if batch_size < 0:
             raise errors.InvalidArgError("Batch size can't be less than 1!")
         logger.debug(f"batch_size={batch_size} and processes={processes} - batching using a single process")
-        return _batch_request(config=config, verbose=False, add_docs_params=add_docs_params, batch_size=batch_size)
+        return _batch_request(config=config, verbose=False, add_docs_params=add_docs_params_with_device, batch_size=batch_size)
 
 
 def _batch_request(
@@ -283,6 +293,9 @@ def _batch_request(
         verbose: bool = True, batch_size: int = 100
         ) -> List[Dict[str, Any]]:
     """Batch by the number of documents"""
+
+    if not add_docs_params.device:
+        raise errors.InternalError("_batch_request (internal function) cannot be called without setting device!")
 
     logger.info(f"starting batch ingestion in sizes of {batch_size}")
 
@@ -355,9 +368,13 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
         add_docs_params: add_documents()'s parameters
     Returns:
 
+    Note:
+    - add_docs_params.device default should always be set by the orchestrator beforehand
+
     """
     # ADD DOCS TIMER-LOGGER (3)
 
+    RequestMetricsStore.for_request().start("add_documents.processing_before_opensearch")
     start_time_3 = timer()
 
     if add_docs_params.mappings is not None:
@@ -366,6 +383,8 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
     t0 = timer()
     bulk_parent_dicts = []
 
+    if not add_docs_params.device:
+        raise errors.InternalError("add_documents (internal function) cannot be called without setting device!")
     try:
         index_info = backend.get_index_info(config=config, index_name=add_docs_params.index_name)
     except errors.IndexNotFoundError as s:
@@ -395,21 +414,23 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
     # Check backend to see the differences between multimodal_fields and new_fields
     new_obj_fields = dict()
 
-    selected_device = config.indexing_device if add_docs_params.device is None else add_docs_params.device
-
     unsuccessful_docs = []
     total_vectorise_time = 0
     batch_size = len(add_docs_params.docs)
     image_repo = {}
 
     if index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]:
-        ti_0 = timer()
-        image_repo = add_docs.download_images(docs=add_docs_params.docs, thread_count=20,
-                                              non_tensor_fields=tuple(add_docs_params.non_tensor_fields),
-                                              image_download_headers=add_docs_params.image_download_headers)
-        logger.debug(f"          add_documents image download: took {(timer() - ti_0):.3f}s to concurrently download "
-                    f"images for {batch_size} docs using {add_docs_params.image_download_thread_count} threads ")
-
+        with RequestMetricsStore.for_request().time(
+            "image_download.full_time",
+            lambda t: logger.debug(
+                f"add_documents image download: took {t:.3f}ms to concurrently download "
+                f"images for {batch_size} docs using {add_docs_params.image_download_thread_count} threads"
+            )
+        ):
+            image_repo = add_docs.download_images(docs=add_docs_params.docs, thread_count=20,
+                                                non_tensor_fields=tuple(add_docs_params.non_tensor_fields),
+                                                image_download_headers=add_docs_params.image_download_headers)
+        
     if add_docs_params.update_mode == 'replace' and add_docs_params.use_existing_tensors:
         doc_ids = []
 
@@ -553,7 +574,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                             image_data = field_content
                         if image_method not in [None, 'none', '', "None", ' ']:
                             content_chunks, text_chunks = image_processor.chunk_image(
-                                image_data, device=selected_device, method=image_method)
+                                image_data, device=add_docs_params.device, method=image_method)
                         else:
                             # if we are not chunking, then we set the chunks as 1-len lists
                             # content_chunk is the PIL image
@@ -579,11 +600,13 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
 
                     # ADD DOCS TIMER-LOGGER (4)
                     start_time = timer()
-                    vector_chunks = s2_inference.vectorise(
-                        model_name=index_info.model_name,
-                        model_properties=_get_model_properties(index_info), content=content_chunks,
-                        device=selected_device, normalize_embeddings=normalize_embeddings,
-                        infer=infer_if_image, model_auth=add_docs_params.model_auth)
+                    with RequestMetricsStore.for_request().time(f"add_documents.create_vectors"):
+                        vector_chunks = s2_inference.vectorise(
+                            model_name=index_info.model_name,
+                            model_properties=_get_model_properties(index_info), content=content_chunks,
+                            device=add_docs_params.device, normalize_embeddings=normalize_embeddings,
+                            infer=infer_if_image, model_auth=add_docs_params.model_auth
+                        )
 
                     end_time = timer()
                     total_vectorise_time += (end_time - start_time)
@@ -623,7 +646,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                     (combo_chunk, combo_document_is_valid,
                      unsuccessful_doc_to_append, combo_vectorise_time_to_add,
                      new_fields_from_multimodal_combination) = vectorise_multimodal_combination_field(
-                            field, field_content, copied, i, doc_id, selected_device, index_info,
+                            field, field_content, copied, i, doc_id, add_docs_params.device, index_info,
                             image_repo, add_docs_params.mappings[field], model_auth=add_docs_params.model_auth)
                     total_vectorise_time = total_vectorise_time + combo_vectorise_time_to_add
                     if combo_document_is_valid is False:
@@ -706,8 +729,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                     }
                 })
 
-    end_time_3 = timer()
-    total_preproc_time = end_time_3 - start_time_3
+    total_preproc_time = 0.001 * RequestMetricsStore.for_request().stop("add_documents.processing_before_opensearch")
     logger.debug(f"      add_documents pre-processing: took {(total_preproc_time):.3f}s total for {batch_size} docs, "
                 f"for an average of {(total_preproc_time / batch_size):.3f}s per doc.")
 
@@ -722,8 +744,12 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
 
         # ADD DOCS TIMER-LOGGER (5)
         start_time_5 = timer()
-        index_parent_response = HttpRequests(config).post(
-            path="_bulk", body=utils.dicts_to_jsonl(bulk_parent_dicts))
+        with RequestMetricsStore.for_request().time("add_documents.opensearch._bulk"):
+            index_parent_response = HttpRequests(config).post(
+                path="_bulk", body=utils.dicts_to_jsonl(bulk_parent_dicts)
+            )
+        RequestMetricsStore.for_request().add_time("add_documents.opensearch._bulk.internal", float(index_parent_response["took"]))
+
         end_time_5 = timer()
         total_http_time = end_time_5 - start_time_5
         total_index_time = index_parent_response["took"] * 0.001
@@ -737,41 +763,42 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
     else:
         index_parent_response = None
 
-    if add_docs_params.auto_refresh:
-        refresh_response = HttpRequests(config).post(path=F"{add_docs_params.index_name}/_refresh")
+    with RequestMetricsStore.for_request().time("add_documents.postprocess"):
+        if add_docs_params.auto_refresh:
+            HttpRequests(config).post(path=F"{add_docs_params.index_name}/_refresh")
 
-    t1 = timer()
+        t1 = timer()
 
-    def translate_add_doc_response(response: Optional[dict], time_diff: float) -> dict:
-        """translates OpenSearch response dict into Marqo dict"""
-        item_fields_to_remove = ['_index', '_primary_term', '_seq_no', '_shards', '_version']
-        result_dict = {}
-        new_items = []
+        def translate_add_doc_response(response: Optional[dict], time_diff: float) -> dict:
+            """translates OpenSearch response dict into Marqo dict"""
+            item_fields_to_remove = ['_index', '_primary_term', '_seq_no', '_shards', '_version']
+            result_dict = {}
+            new_items = []
 
-        if response is not None:
-            copied_res = copy.deepcopy(response)
+            if response is not None:
+                copied_res = copy.deepcopy(response)
 
-            result_dict['errors'] = copied_res['errors']
-            actioned = "index" if add_docs_params.update_mode == 'replace' else 'update'
+                result_dict['errors'] = copied_res['errors']
+                actioned = "index" if add_docs_params.update_mode == 'replace' else 'update'
 
-            for item in copied_res["items"]:
-                for to_remove in item_fields_to_remove:
-                    if to_remove in item[actioned]:
-                        del item[actioned][to_remove]
-                new_items.append(item[actioned])
+                for item in copied_res["items"]:
+                    for to_remove in item_fields_to_remove:
+                        if to_remove in item[actioned]:
+                            del item[actioned][to_remove]
+                    new_items.append(item[actioned])
 
-        if unsuccessful_docs:
-            result_dict['errors'] = True
+            if unsuccessful_docs:
+                result_dict['errors'] = True
 
-        for loc, error_info in unsuccessful_docs:
-            new_items.insert(loc, error_info)
+            for loc, error_info in unsuccessful_docs:
+                new_items.insert(loc, error_info)
 
-        result_dict["processingTimeMs"] = time_diff * 1000
-        result_dict["index_name"] = add_docs_params.index_name
-        result_dict["items"] = new_items
-        return result_dict
+            result_dict["processingTimeMs"] = time_diff * 1000
+            result_dict["index_name"] = add_docs_params.index_name
+            result_dict["items"] = new_items
+            return result_dict
 
-    return translate_add_doc_response(response=index_parent_response, time_diff=t1 - t0)
+        return translate_add_doc_response(response=index_parent_response, time_diff=t1 - t0)
 
 
 def get_document_by_id(
@@ -924,7 +951,7 @@ def refresh_index(config: Config, index_name: str):
 
 
 @add_timing
-def bulk_search(query: BulkSearchQuery, marqo_config: config.Config, verbose: bool = True, device=None):
+def bulk_search(query: BulkSearchQuery, marqo_config: config.Config, verbose: bool = True, device: str = None):
     """Performs a set of search operations in parallel.
 
     Args:
@@ -950,7 +977,13 @@ def bulk_search(query: BulkSearchQuery, marqo_config: config.Config, verbose: bo
     if len(query.queries) == 0:
         return {"result": []}
 
-    selected_device = marqo_config.indexing_device if device is None else device
+    if device is None:
+        selected_device = utils.read_env_vars_and_defaults("MARQO_BEST_AVAILABLE_DEVICE")
+        if selected_device is None:
+            raise errors.InternalError("Best available device was not properly determined on Marqo startup.")
+        logger.debug(f"No device given for bulk_search. Defaulting to best available device: {selected_device}")
+    else:
+        selected_device = device
 
     tensor_queries: Dict[int, BulkSearchQueryEntity] = dict(filter(lambda e: e[1].searchMethod == SearchMethod.TENSOR, enumerate(query.queries)))
     lexical_queries: Dict[int, BulkSearchQueryEntity] = dict(filter(lambda e: e[1].searchMethod == SearchMethod.LEXICAL, enumerate(query.queries)))
@@ -971,20 +1004,22 @@ def bulk_search(query: BulkSearchQuery, marqo_config: config.Config, verbose: bo
     combined_results.sort()
     search_results = [r[1] for r in combined_results]
 
-    for i, s in enumerate(search_results):
-        q = query.queries[i]
-        s["query"] = q.q
-        s["limit"] = q.limit
-        s["offset"] = q.offset
+    with RequestMetricsStore.for_request().time(f"bulk_search.rerank"):
+        for i, s in enumerate(search_results):
+            q = query.queries[i]
+            s["query"] = q.q
+            s["limit"] = q.limit
+            s["offset"] = q.offset
 
-        ## TODO: filter out highlights within `_lexical_search`
-        if not q.showHighlights:
-            for hit in s["hits"]:
-                del hit["_highlights"]
+            ## TODO: filter out highlights within `_lexical_search`
+            if not q.showHighlights:
+                for hit in s["hits"]:
+                    del hit["_highlights"]
 
-        if q.reRanker is not None:
-            logger.debug(f"reranking {i}th query using {q.reRanker}")
-            rerank_query(q, s, q.reRanker, selected_device, 1)
+            if q.reRanker is not None:
+                logger.debug(f"reranking {i}th query using {q.reRanker}")
+                with RequestMetricsStore.for_request().time(f"bulk_search.{i}.rerank"):
+                    rerank_query(q, s, q.reRanker, selected_device, 1)
 
     return {
         "result": search_results
@@ -1025,7 +1060,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
            searchable_attributes: Iterable[str] = None, verbose: int = 0,
            reranker: Union[str, Dict] = None, filter: str = None,
            attributes_to_retrieve: Optional[List[str]] = None,
-           device=None, boost: Optional[Dict] = None,
+           device: str = None, boost: Optional[Dict] = None,
            image_download_headers: Optional[Dict] = None,
            context: Optional[SearchContext] = None,
            score_modifiers: Optional[ScoreModifier] = None,
@@ -1048,6 +1083,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
         search_method:
         searchable_attributes:
         verbose:
+        device: May be none, we calculate default device here
         num_highlights: number of highlights to return for each doc
         boost: boosters to re-weight the scores of individual fields
         image_download_headers: headers for downloading images
@@ -1057,6 +1093,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
     Returns:
 
     """
+
     # Validation for: result_count (limit) & offset
     # Validate neither is negative
     if result_count <= 0:
@@ -1101,11 +1138,19 @@ def search(config: Config, index_name: str, text: Union[str, dict],
         args=(config, index_name, REFRESH_INTERVAL_SECONDS))
     cache_update_thread.start()
 
+    if device is None:
+        selected_device = utils.read_env_vars_and_defaults("MARQO_BEST_AVAILABLE_DEVICE")
+        if selected_device is None:
+            raise errors.InternalError("Best available device was not properly determined on Marqo startup.")
+        logger.debug(f"No device given for search. Defaulting to best available device: {selected_device}")
+    else:
+        selected_device = device
+    
     if search_method.upper() == SearchMethod.TENSOR:
         search_result = _vector_text_search(
             config=config, index_name=index_name, query=text, result_count=result_count, offset=offset,
             searchable_attributes=searchable_attributes, verbose=verbose,
-            filter_string=filter, device=device, attributes_to_retrieve=attributes_to_retrieve, boost=boost,
+            filter_string=filter, device=selected_device, attributes_to_retrieve=attributes_to_retrieve, boost=boost,
             image_download_headers=image_download_headers, context=context, score_modifiers=score_modifiers,
             model_auth=model_auth
         )
@@ -1125,16 +1170,16 @@ def search(config: Config, index_name: str, text: Union[str, dict],
                 f"searchable_attributes cannot be None when re-ranking. Specify which fields to search and rerank over.")
         try:
             # SEARCH TIMER-LOGGER (reranking)
-            start_rerank_time = timer()
+            RequestMetricsStore.for_request().start(f"search.rerank")
             rerank.rerank_search_results(search_result=search_result, query=text,
                                          model_name=reranker,
-                                         device=config.indexing_device if device is None else device,
+                                         device=selected_device,
                                          searchable_attributes=searchable_attributes,
                                          num_highlights=1)
-            end_rerank_time = timer()
-            total_rerank_time = end_rerank_time - start_rerank_time
+            total_rerank_time = RequestMetricsStore.for_request().stop(f"search.rerank")
             logger.debug(
-                f"search ({search_method.lower()}) reranking using {reranker}: took {(total_rerank_time):.3f}s to rerank results.")
+                f"search ({search_method.lower()}) reranking using {reranker}: took {(total_rerank_time):.3f}ms to rerank results."
+            )
         except Exception as e:
             raise errors.BadRequestError(f"reranking failure due to {str(e)}")
 
@@ -1183,7 +1228,7 @@ def _lexical_search(
             f"Query arg: {text}")
 
     # SEARCH TIMER-LOGGER (pre-processing)
-    start_preprocess_time = timer()
+    RequestMetricsStore.for_request().start("search.lexical.processing_before_opensearch")
     if searchable_attributes is not None and searchable_attributes:
         fields_to_search = searchable_attributes
     else:
@@ -1239,12 +1284,13 @@ def _lexical_search(
         if body["_source"] is not False:
             body["_source"]["exclude"] = [f"*{TensorField.vector_prefix}*"]
 
-    end_preprocess_time = timer()
-    total_preprocess_time = end_preprocess_time - start_preprocess_time
-    logger.debug(f"search (lexical) pre-processing: took {(total_preprocess_time):.3f}s to process query.")
+    total_preprocess_time = RequestMetricsStore.for_request().stop("search.lexical.processing_before_opensearch")
+    logger.debug(f"search (lexical) pre-processing: took {(total_preprocess_time):.3f}ms to process query.")
 
     start_search_http_time = timer()
-    search_res = HttpRequests(config).get(path=f"{index_name}/_search", body=body)
+    with RequestMetricsStore.for_request().time("search.opensearch._search"):
+        search_res = HttpRequests(config).get(path=f"{index_name}/_search", body=body)
+    RequestMetricsStore.for_request().add_time("search.opensearch._search.internal", search_res["took"] * 0.001) # internal, not round trip time
 
     end_search_http_time = timer()
     total_search_http_time = end_search_http_time - start_search_http_time
@@ -1256,8 +1302,7 @@ def _lexical_search(
         f"  search (lexical) Marqo-os processing time: took {(total_os_process_time):.3f}s for Marqo-os to execute the search.")
 
     # SEARCH TIMER-LOGGER (post-processing)
-    start_postprocess_time = timer()
-
+    RequestMetricsStore.for_request().start("search.lexical.postprocess")
     res_list = []
     for doc in search_res['hits']['hits']:
         just_doc = _clean_doc(doc["_source"].copy()) if "_source" in doc else dict()
@@ -1265,10 +1310,9 @@ def _lexical_search(
         just_doc["_score"] = doc["_score"]
         res_list.append({**just_doc, "_highlights": []})
 
-    end_postprocess_time = timer()
-    total_postprocess_time = end_postprocess_time - start_postprocess_time
+    total_postprocess_time = RequestMetricsStore.for_request().stop("search.lexical.postprocess")
     logger.debug(
-        f"search (lexical) post-processing: took {(total_postprocess_time):.3f}s to format {len(res_list)} results.")
+        f"search (lexical) post-processing: took {(total_postprocess_time):.3f}ms to format {len(res_list)} results.")
 
     return {'hits': res_list}
 
@@ -1356,7 +1400,10 @@ def bulk_msearch(config: Config, body: List[Dict]) -> List[Dict]:
     """Send an `/_msearch` request to MarqoOS and translate errors into a user-friendly format."""
     start_search_http_time = timer()
     try:
-        response = HttpRequests(config).get(path=F"_msearch", body=utils.dicts_to_jsonl(body))
+        with RequestMetricsStore.for_request().time("search.opensearch._msearch"):
+            response = HttpRequests(config).get(path=F"_msearch", body=utils.dicts_to_jsonl(body))
+        RequestMetricsStore.for_request().add_time("search.opensearch._msearch.internal", float(response["took"])) # internal, not round trip time
+
         end_search_http_time = timer()
         total_search_http_time = end_search_http_time - start_search_http_time
         total_os_process_time = response["took"] * 0.001
@@ -1463,7 +1510,7 @@ def assign_query_to_vector_job(
     return ptrs
 
 
-def create_vector_jobs(queries: List[BulkSearchQueryEntity], config: Config, selected_device: str) -> Tuple[Dict[Qidx, List[VectorisedJobPointer]], Dict[JHash, VectorisedJobs]]:
+def create_vector_jobs(queries: List[BulkSearchQueryEntity], config: Config, device: str) -> Tuple[Dict[Qidx, List[VectorisedJobPointer]], Dict[JHash, VectorisedJobs]]:
     """
         For each query:
             - Find what needs to be vectorised
@@ -1481,7 +1528,7 @@ def create_vector_jobs(queries: List[BulkSearchQueryEntity], config: Config, sel
         index_info = get_index_info(config=config, index_name=q.index)
         # split images from text:
         to_be_vectorised: Tuple[List[str], List[str]] = construct_vector_input_batches(q.q, index_info)
-        qidx_to_job[i] = assign_query_to_vector_job(q, jobs, to_be_vectorised, index_info, selected_device)
+        qidx_to_job[i] = assign_query_to_vector_job(q, jobs, to_be_vectorised, index_info, device)
     
     return qidx_to_job, jobs
 
@@ -1625,11 +1672,11 @@ def create_empty_query_response(queries: List[BulkSearchQueryEntity]) -> List[Di
         )
     )
 
-def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity], selected_device: Union[Device, str]) -> Dict[Qidx, List[float]]:
+def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity], device: Union[Device, str]) -> Dict[Qidx, List[float]]:
     """Run the query vectorisation process"""
     # 1. Pre-process inputs ready for s2_inference.vectorise
     # we can still use qidx_to_job. But the jobs structure may need to be different
-    vector_jobs_tuple: Tuple[Dict[Qidx, List[VectorisedJobPointer]], Dict[JHash, VectorisedJobs]] = create_vector_jobs(queries, config, selected_device)
+    vector_jobs_tuple: Tuple[Dict[Qidx, List[VectorisedJobPointer]], Dict[JHash, VectorisedJobs]] = create_vector_jobs(queries, config, device)
 
     qidx_to_jobs, jobs = vector_jobs_tuple
 
@@ -1644,7 +1691,7 @@ def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity],
     )
     return qidx_to_vectors
 
-def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity], device=None) -> List[Dict]:
+def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity], device: str = None) -> List[Dict]:
     """Resolve a batch of search queries in parallel.
 
     Args:
@@ -1654,43 +1701,46 @@ def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity
         A list of search query responses (see `_format_ordered_docs_simple` for structure of individual entities).
     Note:
         - Search results are in the same order as `queries`.
+        - device should ALWAYS be set, because it is only called by _bulk_search with the parameter specified
     """
+
     if len(queries) == 0:
         return []
 
+    if not device:
+        raise errors.InternalError("_bulk_vector_text_search cannot be called without `device`!")
+    
+    with RequestMetricsStore.for_request().time("bulk_search.vector.processing_before_opensearch",
+        lambda t : logger.debug(f"bulk search (tensor) pre-processing: took {t:.3f}ms")
+    ):
 
+        with RequestMetricsStore.for_request().time(f"bulk_search.vector_inference_full_pipeline"):
+            qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, device)
 
-    start_preprocessing_time = timer()
-    selected_device = config.indexing_device if device is None else device
-    qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, selected_device)
+        ## 4. Create msearch request bodies and combine to aggregate.
+        query_to_body_parts: Dict[Qidx, List[Dict]] = dict()
+        query_to_body_count: Dict[Qidx, int] = dict() # Keep track of count, so we can separate after msearch call.
+        for qidx, q in enumerate(queries):
+            index_info = get_index_info(config=config, index_name=q.index)
+            body = construct_msearch_body_elements(q.searchableAttributes, q.offset, q.filter, index_info, q.limit, qidx_to_vectors[qidx], q.attributesToRetrieve, q.index, q.scoreModifiers)
 
-    ## 4. Create msearch request bodies and combine to aggregate.
-    query_to_body_parts: Dict[Qidx, List[Dict]] = dict()
-    query_to_body_count: Dict[Qidx, int] = dict() # Keep track of count, so we can separate after msearch call.
-    for qidx, q in enumerate(queries):
-        index_info = get_index_info(config=config, index_name=q.index)
-        body = construct_msearch_body_elements(q.searchableAttributes, q.offset, q.filter, index_info, q.limit, qidx_to_vectors[qidx], q.attributesToRetrieve, q.index, q.scoreModifiers)
+            query_to_body_parts[qidx] = body
+            query_to_body_count[qidx] = len(body)
 
-        query_to_body_parts[qidx] = body
-        query_to_body_count[qidx] = len(body)
-
-    # Combine all msearch request bodies into one request body.
-    aggregate_body = functools.reduce(lambda x, y: x + y, query_to_body_parts.values())
-    if not aggregate_body:
-        # Must return empty response, per search query
-        return create_empty_query_response(queries)
-
-    logger.debug(f"search (tensor) pre-processing: took {(timer() - start_preprocessing_time):.3f}s to vectorize and process query.")
-
+        # Combine all msearch request bodies into one request body.
+        aggregate_body = functools.reduce(lambda x, y: x + y, query_to_body_parts.values())
+        if not aggregate_body:
+            # Must return empty response, per search query
+            return create_empty_query_response(queries)
+    
     ## 5. POST aggregate  to /_msearch
     responses = bulk_msearch(config, aggregate_body)
-    start_postprocess_time = timer()
 
-    # 6. Get documents back to each query, perform "gather" operation
-    results = create_bulk_search_response(queries, query_to_body_count, responses)
-
-    logger.debug(f"bulk search (tensor) post-processing: took {(timer() - start_postprocess_time):.3f}s")
-    return results
+    with RequestMetricsStore.for_request().time("bulk_search.vector.postprocess",
+        lambda t : logger.debug(f"bulk search (tensor) post-processing: took {t:.3f}ms")
+    ):
+        # 6. Get documents back to each query, perform "gather" operation
+        return create_bulk_search_response(queries, query_to_body_count, responses)
 
 
 def create_bulk_search_response(queries: List[BulkSearchQueryEntity], query_to_body_count: Dict[Qidx, int], responses) -> List[Dict]:
@@ -1723,11 +1773,12 @@ def create_bulk_search_response(queries: List[BulkSearchQueryEntity], query_to_b
 
 def _vector_text_search(
         config: Config, index_name: str, query: Union[str, dict], result_count: int = 5, offset: int = 0,
-        searchable_attributes: Iterable[str] = None, verbose=0, filter_string: str = None, device=None,
+        searchable_attributes: Iterable[str] = None, verbose=0, filter_string: str = None, device: str = None,
         attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None, 
         image_download_headers: Optional[Dict] = None, context: Optional[Dict] = None,
         score_modifiers: Optional[ScoreModifier] = None, model_auth: Optional[ModelAuth] = None):
     """
+    
     Args:
         config:
         index_name:
@@ -1751,6 +1802,7 @@ def _vector_text_search(
         ridiculous number of attributes
         - Should not be directly called by client - the search() method should
         be called. The search() method adds syncing
+        - device should ALWAYS be set
 
     Output format:
         [
@@ -1765,17 +1817,21 @@ def _vector_text_search(
         - searching a non existent index should return a HTTP-type error
     """
     # # SEARCH TIMER-LOGGER (pre-processing)
-    start_preprocess_time = timer()
+    if not device:
+        raise errors.InternalError("_vector_text_search cannot be called without `device`!")
+    
+    RequestMetricsStore.for_request().start("search.vector.processing_before_opensearch")
+
     try:
         index_info = get_index_info(config=config, index_name=index_name)
     except KeyError as e:
         raise errors.IndexNotFoundError(message="Tried to search a non-existent index: {}".format(index_name))
 
-    selected_device = config.indexing_device if device is None else device
     queries = [BulkSearchQueryEntity(
         q=query, searchableAttributes=searchable_attributes,searchMethod=SearchMethod.TENSOR, limit=result_count, offset=offset, showHighlights=False, filter=filter_string, attributesToRetrieve=attributes_to_retrieve, boost=boost, image_download_headers=image_download_headers, context=context, scoreModifiers=score_modifiers, index=index_name, modelAuth=model_auth
     )]
-    qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, selected_device)
+    with RequestMetricsStore.for_request().time(f"search.vector_inference_full_pipeline"):
+        qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, device)
     vectorised_text = list(qidx_to_vectors.values())[0]
 
     contextualised_filter = utils.contextualise_filter(filter_string=filter_string, simple_properties=index_info.get_text_properties())
@@ -1802,15 +1858,14 @@ def _vector_text_search(
         # This probably means the index is emtpy
         return {"hits": []}
 
-    end_preprocess_time = timer()
-    total_preprocess_time = end_preprocess_time - start_preprocess_time
-    logger.debug(f"search (tensor) pre-processing: took {(total_preprocess_time):.3f}s to vectorize and process query.")
+    total_preprocess_time = RequestMetricsStore.for_request().stop("search.vector.processing_before_opensearch")
+    logger.debug(f"search (tensor) pre-processing: took {(total_preprocess_time):.3f}ms to vectorize and process query.")
 
     # SEARCH TIMER-LOGGER (roundtrip)
     responses = bulk_msearch(config, body)
 
     # SEARCH TIMER-LOGGER (post-processing)
-    start_postprocess_time = timer()
+    RequestMetricsStore.for_request().start("search.vector.postprocess")
     gathered_docs = gather_documents_from_response(responses)
 
     if boost is not None:
@@ -1827,10 +1882,9 @@ def _vector_text_search(
 
     res = _format_ordered_docs_simple(ordered_docs_w_chunks=completely_sorted, result_count=result_count)
 
-    end_postprocess_time = timer()
-    total_postprocess_time = end_postprocess_time - start_postprocess_time
+    total_postprocess_time = RequestMetricsStore.for_request().stop("search.vector.postprocess")
     logger.debug(
-        f"search (tensor) post-processing: took {(total_postprocess_time):.3f}s to sort and format {len(completely_sorted)} results from Marqo-os.")
+        f"search (tensor) post-processing: took {(total_postprocess_time):.3f}ms to sort and format {len(completely_sorted)} results from Marqo-os.")
     return res
 
 def _format_ordered_docs_simple(ordered_docs_w_chunks: List[dict], result_count: int) -> dict:
@@ -2017,7 +2071,7 @@ def get_cuda_info() -> dict:
 
 def vectorise_multimodal_combination_field(
         field: str, multimodal_object: Dict[str, dict], doc: dict, doc_index: int,
-        doc_id:str, selected_device:str, index_info, image_repo, field_map:dict,
+        doc_id:str, device:str, index_info, image_repo, field_map:dict,
         model_auth: Optional[ModelAuth] = None
 ):
     '''
@@ -2035,7 +2089,7 @@ def vectorise_multimodal_combination_field(
         total_vectorise_time: total vectorise time in the main body
         doc_index: the index of the document. This is an interator variable `i` in the main body to iterator throught the docs
         doc_id: the document id
-        selected_device: device from main body
+        device: device from main body
         index_info: index_info from main body,
         model_auth: Model download authorisation information (if required)
     Returns:
@@ -2111,18 +2165,22 @@ def vectorise_multimodal_combination_field(
         start_time = timer()
         text_vectors = []
         if len(text_content_to_vectorise) > 0:
-            text_vectors = s2_inference.vectorise(
-                model_name=index_info.model_name,
-                model_properties=_get_model_properties(index_info), content=text_content_to_vectorise,
-                device=selected_device, normalize_embeddings=normalize_embeddings,
-                infer=infer_if_image, model_auth=model_auth)
+            with RequestMetricsStore.for_request().time(f"create_vectors"):
+                text_vectors = s2_inference.vectorise(
+                    model_name=index_info.model_name,
+                    model_properties=_get_model_properties(index_info), content=text_content_to_vectorise,
+                    device=device, normalize_embeddings=normalize_embeddings,
+                    infer=infer_if_image, model_auth=model_auth
+                )
         image_vectors = []
         if len(image_content_to_vectorise) > 0:
-            image_vectors = s2_inference.vectorise(
-                model_name=index_info.model_name,
-                model_properties=_get_model_properties(index_info), content=image_content_to_vectorise,
-                device=selected_device, normalize_embeddings=normalize_embeddings,
-                infer=infer_if_image, model_auth=model_auth)
+            with RequestMetricsStore.for_request().time(f"create_vectors"):
+                image_vectors = s2_inference.vectorise(
+                    model_name=index_info.model_name,
+                    model_properties=_get_model_properties(index_info), content=image_content_to_vectorise,
+                    device=device, normalize_embeddings=normalize_embeddings,
+                    infer=infer_if_image, model_auth=model_auth
+                )
         end_time = timer()
         combo_vectorise_time_to_add += (end_time - start_time)
     except (s2_inference_errors.UnknownModelError,
