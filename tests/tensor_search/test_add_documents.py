@@ -11,6 +11,7 @@ import PIL
 import marqo.tensor_search.utils as marqo_utils
 import numpy as np
 import requests
+import pytest
 from marqo.tensor_search.enums import TensorField, IndexSettingsField, SearchMethod
 from marqo.tensor_search import enums
 from marqo.errors import IndexNotFoundError, InvalidArgError, BadRequestError, InternalError
@@ -133,7 +134,19 @@ class TestAddDocuments(MarqoTestCase):
             document_id="3", show_vectors=True)
         
         self.assertEqual(doc_3_solo, doc_3_duped)
-    
+
+    def test_add_documents_with_missing_index_fails(self):
+        r1 = requests.get(
+            url=f"{self.endpoint}/{self.index_name_2}",
+            verify=False
+        )
+        assert r1.status_code == 404
+        with pytest.raises(IndexNotFoundError):
+            tensor_search.add_documents(
+                config=self.config, add_docs_params=AddDocsParams(
+                    index_name=self.index_name_2, docs=[{"abc": "def"}], auto_refresh=True, device="cpu"
+                )
+            )
 
     def test_update_docs_update_chunks(self):
         """Updating a doc needs to update the corresponding chunks"
@@ -174,23 +187,6 @@ class TestAddDocuments(MarqoTestCase):
         )
         count1 = count1_res.json()["count"]
         assert count1 == count0
-
-    # def test_implicit_create_index(self):
-    #     r1 = requests.get(
-    #         url=f"{self.endpoint}/{self.index_name_1}",
-    #         verify=False
-    #     )
-    #     assert r1.status_code == 404
-    #     add_doc_res = tensor_search.add_documents(
-    #         config=self.config, add_docs_params=AddDocsParams(
-    #             index_name=self.index_name_1, docs=[{"abc": "def"}], auto_refresh=True, device="cpu"
-    #         )
-    #     )
-    #     r2 = requests.get(
-    #         url=f"{self.endpoint}/{self.index_name_1}",
-    #         verify=False
-    #     )
-    #     assert r2.status_code == 200
 
     def test_default_index_settings(self):
         index_info = requests.get(
