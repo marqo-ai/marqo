@@ -125,7 +125,6 @@ class TestVectorSearch(MarqoTestCase):
 
     def test_vector_text_search_no_device(self):
         try:
-            tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
             search_res = tensor_search._vector_text_search(
                     config=self.config, index_name=self.index_name_1,
                     result_count=5, query="some text...")
