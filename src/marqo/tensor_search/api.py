@@ -198,26 +198,6 @@ def add_or_replace_documents(
         )
 
 
-@app.put("/indexes/{index_name}/documents")
-@throttle(RequestType.INDEX)
-def add_or_update_documents(
-        docs: List[Dict],
-        index_name: str,
-        refresh: bool = True,
-        marqo_config: config.Config = Depends(generate_config),
-        batch_size: int = 0, processes: int = 1,
-        non_tensor_fields: List[str] = Query(default=[]),
-        device: str = Depends(api_validation.validate_device)):
-    """WILL BE DEPRECATED SOON. update add_documents endpoint"""
-    add_docs_params = AddDocsParams(
-        index_name=index_name, docs=docs, auto_refresh=refresh,
-        device=device, update_mode='update', non_tensor_fields=non_tensor_fields
-    )
-    return tensor_search.add_documents_orchestrator(
-        config=marqo_config, add_docs_params=add_docs_params,
-        batch_size=batch_size, processes=processes,
-    )
-
 @app.get("/indexes/{index_name}/documents/{document_id}")
 def get_document_by_id(index_name: str, document_id: str,
                              marqo_config: config.Config = Depends(generate_config),

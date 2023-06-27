@@ -39,7 +39,6 @@ class AddDocsParams:
     auto_refresh: bool
     non_tensor_fields: List = Field(default_factory=list)
     device: Optional[str] = None
-    update_mode: str = "replace"
     image_download_thread_count: int = 20
     image_download_headers: dict = Field(default_factory=dict)
     use_existing_tensors: bool = False
