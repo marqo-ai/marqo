@@ -360,6 +360,22 @@ def _get_chunks_for_field(field_name: str, doc_id: str, doc):
     return [chunk for chunk in doc["_source"]["__chunks"] if chunk["__field_name"] == field_name]
 
 
+def truncate_meta_data_fields(doc: dict) -> dict:
+    """This function truncates text metadata fields to 100 tokens"""
+    # PARAMS
+    SPLIT_BY = 'word'
+    SPLIT_LENGTH = 20
+
+    meta_data_dict = dict()
+    for k in doc.keys():
+        if k == '_id':
+            continue
+        if isinstance(doc[k], str):
+            meta_data_dict[k] = text_processor.split_text(doc[k], split_by=SPLIT_BY, split_length=SPLIT_LENGTH)
+        else:
+            meta_data_dict[k] = doc[k]
+    return meta_data_dict
+
 def add_documents(config: Config, add_docs_params: AddDocsParams):
     """
 
@@ -375,7 +391,6 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
     # ADD DOCS TIMER-LOGGER (3)
 
     RequestMetricsStore.for_request().start("add_documents.processing_before_opensearch")
-    start_time_3 = timer()
 
     if add_docs_params.mappings is not None:
         validation.validate_mappings_object(mappings_object=add_docs_params.mappings)
@@ -446,6 +461,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
         indexing_instructions = {
             'index' if add_docs_params.update_mode == 'replace' else 'update': {"_index": add_docs_params.index_name}}
         copied = copy.deepcopy(doc)
+        truncated_doc = truncate_meta_data_fields(doc)
 
         document_is_valid = True
         new_fields_from_doc = set()
@@ -488,7 +504,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
         # Only add chunk values which are string, boolean, numeric or dictionary.
         # Dictionary keys will be store in a list.
         chunk_values_for_filtering = {}
-        for key, value in copied.items():
+        for key, value in truncated_doc.items():
             if not (isinstance(value, str) or isinstance(value, float)
                     or isinstance(value, bool) or isinstance(value, int)
                     or isinstance(value, list) or isinstance(value, dict)):
@@ -667,9 +683,10 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
         if document_is_valid:
             new_fields = new_fields.union(new_fields_from_doc)
             if add_docs_params.update_mode == 'replace':
-                copied[TensorField.chunks] = chunks
+                # todo: consider using a different doc/ add commentary that truncated will become the parent doc
+                truncated_doc[TensorField.chunks] = chunks
                 bulk_parent_dicts.append(indexing_instructions)
-                bulk_parent_dicts.append(copied)
+                bulk_parent_dicts.append(truncated_doc)
             else:
                 to_upsert = copied.copy()
                 to_upsert[TensorField.chunks] = chunks
