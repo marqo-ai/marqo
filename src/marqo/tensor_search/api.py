@@ -187,7 +187,7 @@ def add_or_replace_documents(
     """add_documents endpoint (replace existing docs with the same id)"""
     add_docs_params = AddDocsParams(
         index_name=index_name, docs=docs, auto_refresh=refresh,
-        device=device, update_mode='replace', non_tensor_fields=non_tensor_fields,
+        device=device, non_tensor_fields=non_tensor_fields,
         use_existing_tensors=use_existing_tensors, image_download_headers=image_download_headers,
         mappings=mappings, model_auth=model_auth
     )

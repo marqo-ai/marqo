@@ -542,7 +542,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
             # Add doc normally without use_existing_tensors
             add_res = tensor_search.add_documents(
                 config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1, 
-                    docs=doc_arg, auto_refresh=True, update_mode='replace', device="cpu"))
+                    docs=doc_arg, auto_refresh=True, device="cpu"))
 
             d1 = tensor_search.get_documents_by_ids(
                 config=self.config, index_name=self.index_name_1,
@@ -551,7 +551,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
             # Then replace doc with use_existing_tensors
             add_res = tensor_search.add_documents(
                 config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1, 
-                docs=doc_arg, auto_refresh=True, update_mode='replace', use_existing_tensors=True, device="cpu"))
+                docs=doc_arg, auto_refresh=True, use_existing_tensors=True, device="cpu"))
             
             d2 = tensor_search.get_documents_by_ids(
                 config=self.config, index_name=self.index_name_1,
