@@ -353,19 +353,6 @@ class TestAddDocuments(MarqoTestCase):
             [{"_id": "to_fail_567", "blahblah": max}]
         ]
 
-        # For update
-        for bad_doc_arg in bad_doc_args:
-            add_res = tensor_search.add_documents(
-                config=self.config, add_docs_params=AddDocsParams(
-                    index_name=self.index_name_1,
-                    docs=bad_doc_arg, auto_refresh=True, device="cpu"
-                )
-            )
-            assert add_res['errors'] is True
-            assert all(['error' in item for item in add_res['items'] if item['_id'].startswith('to_fail')])
-            assert all(['result' in item
-                        for item in add_res['items'] if item['_id'].startswith('to_pass')])
-
         # For replace, check with use_existing_tensors True and False
         for use_existing_tensors_flag in (True, False):
             for bad_doc_arg in bad_doc_args:
@@ -396,23 +383,6 @@ class TestAddDocuments(MarqoTestCase):
             {"_id": ["bad", "id"], "field_1": "zzz"},
             {"_id": "proper id 2", "field_1": 90}], 2)
         ]
-
-        # For update
-        for bad_doc_arg in bad_doc_args:
-            add_res = tensor_search.add_documents(
-                config=self.config, add_docs_params=AddDocsParams(
-                    index_name=self.index_name_1, docs=bad_doc_arg[0],
-                    auto_refresh=True, device="cpu"
-                )
-            )
-            assert add_res['errors'] is True
-
-            succeeded_count = 0
-            for item in add_res['items']:
-                if 'result' in item:
-                    succeeded_count += 1
-
-            assert succeeded_count == bad_doc_arg[1]
 
         # For replace, check with use_existing_tensors True and False
         for use_existing_tensors_flag in (True, False):
