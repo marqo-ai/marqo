@@ -83,7 +83,7 @@ logger = get_logger(__name__)
 
 def create_vector_index(
         config: Config, index_name: str, media_type: Union[str, MediaType] = MediaType.default,
-        refresh_interval: str = "1s", index_settings=None):
+        refresh_interval: str = "30s", index_settings=None):
     """
     Args:
         media_type: 'text'|'image'
