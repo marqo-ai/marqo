@@ -423,7 +423,7 @@ class TestDeleteDocumentsEndpoint(MarqoTestCase):
                 config=self.config, index_name=self.index_name_1, docs=[
                     {"_id": x, 'Bad field': "blh "} for x in doc_ids
                 ],
-                auto_refresh=True, update_mode='update')
+                auto_refresh=True)
             try:
                 tensor_search.delete_documents(config=self.config, index_name=self.index_name_1, doc_ids=doc_ids, auto_refresh=True)
                 raise AssertionError
