@@ -172,7 +172,7 @@ class TestAddDocuments(MarqoTestCase):
         count1 = count1_res.json()["count"]
         assert count1 == count0
 
-    def test_add_documents_whitespcae(self):
+    def test_add_documents_whitespace(self):
         """Index fields consisting of only whitespace"""
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
         docs = [
