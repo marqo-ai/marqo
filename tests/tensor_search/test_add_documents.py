@@ -30,7 +30,7 @@ class TestAddDocuments(MarqoTestCase):
             tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         except IndexNotFoundError as s:
             pass
-        
+
         # Any tests that call add_documents_orchestrator, search, bulk_search need this env var
         self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
         self.device_patcher.start()
@@ -41,7 +41,7 @@ class TestAddDocuments(MarqoTestCase):
             tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         except IndexNotFoundError as s:
             pass
-        
+
         self.device_patcher.stop()
 
     def _match_all(self, index_name, verbose=False):
@@ -171,6 +171,31 @@ class TestAddDocuments(MarqoTestCase):
         )
         count1 = count1_res.json()["count"]
         assert count1 == count0
+
+    def test_add_documents_whitespcae(self):
+        """Index fields consisting of only whitespace"""
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
+        docs = [
+            {"test": ""},
+            {"test": " "},
+            {"test": "  "},
+            {"test": "\r"},
+            {"test": "\r "},
+            {"test": "\r\r"},
+            {"test": "\r\t\n"},
+        ]
+        tensor_search.add_documents(
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1, docs=docs, auto_refresh=True, device="cpu"
+            )
+        )
+        count = requests.post(
+            F"{self.endpoint}/{self.index_name_1}/_count",
+            timeout=self.config.timeout,
+            verify=False
+        ).json()["count"]
+
+        assert count == len(docs)
 
     def test_implicit_create_index(self):
         r1 = requests.get(
@@ -1535,7 +1560,7 @@ class TestAddDocuments(MarqoTestCase):
             assert len(expected_repo_structure) == len(image_repo)
             for k in expected_repo_structure:
                 assert isinstance(image_repo[k], expected_repo_structure[k])
-    
+
     def test_add_documents_with_no_device_fails(self):
         """
             when device is not set,
@@ -1557,7 +1582,7 @@ class TestAddDocuments(MarqoTestCase):
             raise AssertionError
         except InternalError:
             pass
-    
+
     def test_batch_request_with_no_device_fails(self):
         """
             when device is not set,
