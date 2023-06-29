@@ -23,7 +23,6 @@ class AddDocsParams:
           make tensors for all fields.
         use_existing_tensors: Whether to use the vectors already in doc (for update docs)
         device: Device used to carry out the document update.
-        update_mode: {'replace' | 'update'}. If set to replace (default) just
         image_download_thread_count: number of threads used to concurrently download images
         image_download_headers: headers to authenticate image download
         mappings: a dictionary used to handle all the object field content in the doc,
@@ -39,7 +38,6 @@ class AddDocsParams:
     auto_refresh: bool
     non_tensor_fields: List = Field(default_factory=list)
     device: Optional[str] = None
-    update_mode: str = "replace"
     image_download_thread_count: int = 20
     image_download_headers: dict = Field(default_factory=dict)
     use_existing_tensors: bool = False
