@@ -50,7 +50,7 @@ from marqo.tensor_search.enums import (
     EnvVars
 )
 from marqo.tensor_search.enums import IndexSettingsField as NsField
-from marqo.tensor_search import utils, backend, validation, configs, parallel, add_docs
+from marqo.tensor_search import utils, backend, validation, configs, add_docs
 from marqo.tensor_search.formatting import _clean_doc
 from marqo.tensor_search.index_meta_cache import get_cache, get_index_info
 from marqo.tensor_search import index_meta_cache
@@ -253,34 +253,6 @@ def add_documents_orchestrator(
     if batch_size is None or batch_size == 0:
         logger.debug(f"batch_size={batch_size} and processes={processes} - not doing any marqo side batching")
         return add_documents(config=config, add_docs_params=add_docs_params_with_device)
-    elif processes is not None and processes > 1:
-        # create beforehand or pull from the cache so it is up to date for the multi-processing
-        _check_and_create_index_if_not_exist(config=config, index_name=add_docs_params.index_name)
-        try:
-            # Empty text search:
-            # 1. loads model into memory, 2. updates cache for multiprocessing
-            _vector_text_search(
-                config=config, index_name=add_docs_params.index_name, query='',
-                model_auth=add_docs_params.model_auth, device=add_docs_params_with_device.device,
-                image_download_headers=add_docs_params.image_download_headers)
-        except Exception as e:
-            logger.warning(
-                f"add_documents orchestrator's call to vector text search, prior to parallel add_docs, raised an error. "
-                f"Continuing to parallel add_docs. "
-                f"Message: {e}"
-            )
-
-        logger.debug(f"batch_size={batch_size} and processes={processes} - using multi-processing")
-        results = parallel.add_documents_mp(
-            config=config, batch_size=batch_size, processes=processes, add_docs_params=add_docs_params_with_device
-        )
-        # we need to force the cache to update as it does not propagate using mp
-        # we just clear this index's entry and it will re-populate when needed next
-        if add_docs_params.index_name in get_cache():
-            logger.info(f'deleting cache entry for {add_docs_params.index_name} after parallel add documents')
-            del get_cache()[add_docs_params.index_name]
-
-        return results
     else:
         if batch_size < 0:
             raise errors.InvalidArgError("Batch size can't be less than 1!")
