@@ -1,4 +1,7 @@
 import unittest
+
+from marqo.errors import IndexNotFoundError
+from marqo.tensor_search import tensor_search
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.tensor_search.utils import construct_authorized_url
 from marqo import config
@@ -20,6 +23,13 @@ class MarqoTestCase(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         cls.patcher.stop()
+
+        # Delete any test indices my-test-index-i (up to 5)
+        for ix_name in [f"my-test-index-{i}" for i in range(1, 6)]:
+            try:
+                tensor_search.delete_index(config=cls.config, index_name=ix_name)
+            except IndexNotFoundError:
+                pass
 
     @classmethod
     def setUpClass(cls) -> None:
