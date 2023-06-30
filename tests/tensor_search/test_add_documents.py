@@ -448,7 +448,7 @@ class TestAddDocuments(MarqoTestCase):
         assert add_res['errors'] is True
         assert all(['error' in item for item in add_res['items'] if item['_id'].startswith('to_fail')])
 
-    def test_add_documents_orchestrator_set_device_single_process(self):
+    def test_add_documents_orchestrator_set_device(self):
         mock_config = copy.deepcopy(self.config)
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
 
