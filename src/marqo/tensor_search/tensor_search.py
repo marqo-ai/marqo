@@ -238,8 +238,7 @@ def _check_and_create_index_if_not_exist(config: Config, index_name: str):
 
 def add_documents_orchestrator(
         config: Config, add_docs_params: AddDocsParams,
-        batch_size: int = 0, processes: int = 1,
-    ):
+        batch_size: int = 0):
     # Default device calculated here and not in add_documents call
     if add_docs_params.device is None:
         selected_device = utils.read_env_vars_and_defaults("MARQO_BEST_AVAILABLE_DEVICE")
