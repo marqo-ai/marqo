@@ -250,12 +250,12 @@ def add_documents_orchestrator(
         add_docs_params_with_device = add_docs_params
     
     if batch_size is None or batch_size == 0:
-        logger.debug(f"batch_size={batch_size} and processes={processes} - not doing any marqo side batching")
+        logger.debug(f"batch_size={batch_size} - not doing any marqo side batching")
         return add_documents(config=config, add_docs_params=add_docs_params_with_device)
     else:
         if batch_size < 0:
             raise errors.InvalidArgError("Batch size can't be less than 1!")
-        logger.debug(f"batch_size={batch_size} and processes={processes} - batching using a single process")
+        logger.debug(f"batch_size={batch_size} - batching using a single process")
         return _batch_request(config=config, verbose=False, add_docs_params=add_docs_params_with_device, batch_size=batch_size)
 
 
