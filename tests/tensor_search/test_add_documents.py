@@ -193,7 +193,6 @@ class TestAddDocuments(MarqoTestCase):
 
     def test_add_documents_whitespace(self):
         """Index fields consisting of only whitespace"""
-        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
         docs = [
             {"test": ""},
             {"test": " "},
