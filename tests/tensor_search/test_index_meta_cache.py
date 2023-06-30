@@ -541,7 +541,7 @@ class TestIndexMetaCache(MarqoTestCase):
         mock_response.json = lambda: '{"a":"b"}'
         mock_get.return_value = mock_response
 
-        # we need to search it once, to to get something in the cache, otherwise
+        # we need to search it once, to get something in the cache, otherwise
         # the threads will see an empty cache and try to fill it
         try:
             tensor_search.add_documents(
