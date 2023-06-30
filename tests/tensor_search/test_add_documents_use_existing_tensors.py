@@ -14,11 +14,15 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
     def setUp(self) -> None:
         self.endpoint = self.authorized_url
         self.generic_header = {"Content-type": "application/json"}
-        self.index_name_1 = "my-test-index-1"
+        self.index_name_1 = "my-test-index-1"  # standard index created by setUp
+        self.index_name_2 = "my-test-index-2"  # for tests that need custom index config
         try:
             tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+            tensor_search.delete_index(config=self.config, index_name=self.index_name_2)
         except IndexNotFoundError as s:
             pass
+
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
 
     def test_use_existing_tensors_resilience(self):
         """should if one doc fails validation, the rest should still be inserted
@@ -78,6 +82,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
             document_id="123", show_vectors=True)
 
         tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
 
         tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
             index_name=self.index_name_1, docs=[
@@ -123,6 +128,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
             document_id="3", show_vectors=True)
 
         tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
         tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
             index_name=self.index_name_1, docs=[
                 {
@@ -424,11 +430,11 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
             }
         }
         tensor_search.create_vector_index(
-            index_name=self.index_name_1, index_settings=index_settings, config=self.config)
+            index_name=self.index_name_2, index_settings=index_settings, config=self.config)
         hippo_img = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
         artefact_hippo_img = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png'
         tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
-            index_name=self.index_name_1, docs=[
+            index_name=self.index_name_2, docs=[
             {
                 "_id": "123",
                 "txt_to_be_the_same": "some text to leave unchanged. I repeat, unchanged",
@@ -463,7 +469,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
                 "non-tensor-field": ["it", "is", "9", "o clock"]
             }
             tensor_search.add_documents(
-                config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1, docs=[{"_id": "123", **use_existing_tensor_doc}],
+                config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_2, docs=[{"_id": "123", **use_existing_tensor_doc}],
                 auto_refresh=True, non_tensor_fields=["non-tensor-field"],
                 use_existing_tensors=True, device="cpu"))
 
@@ -477,7 +483,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
             assert vectorised_content == expected_to_be_vectorised
 
             updated_doc = requests.get(
-                url=F"{self.endpoint}/{self.index_name_1}/_doc/123",
+                url=F"{self.endpoint}/{self.index_name_2}/_doc/123",
                 verify=False
             )
 

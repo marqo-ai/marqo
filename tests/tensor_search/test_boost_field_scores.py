@@ -107,7 +107,9 @@ class TestBoostFieldScoresComparison(MarqoTestCase):
             tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         except IndexNotFoundError as e:
             pass
-        
+
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
+
         # Any tests that call add_documents_orchestrator, search, bulk_search need this env var
         self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
         self.device_patcher.start()

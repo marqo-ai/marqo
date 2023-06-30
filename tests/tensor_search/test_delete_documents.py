@@ -25,6 +25,8 @@ class TestDeleteDocuments(MarqoTestCase):
 
         self._delete_testing_indices()
 
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
+
     def _delete_testing_indices(self):
         for ix in [self.index_name_1]:
             try:
@@ -114,7 +116,6 @@ class TestDeleteDocuments(MarqoTestCase):
 
     def test_delete_multiple_documents(self):
         # Create an index and add documents
-        tensor_search.create_vector_index(index_name=self.index_name_1, config=self.config)
         add_docs_caller(
             config=self.config, index_name=self.index_name_1,
             docs=[
@@ -180,9 +181,6 @@ class TestDeleteDocuments(MarqoTestCase):
                                              document_id="unique_id_2")
 
     def test_delete_non_existent_document(self):
-        # Create an index
-        tensor_search.create_vector_index(index_name=self.index_name_1, config=self.config)
-
         # Attempt to delete a non-existent document
         response = tensor_search.delete_documents(
             config=self.config, index_name=self.index_name_1, doc_ids=["non_existent_id"], auto_refresh=True
@@ -214,8 +212,7 @@ class TestDeleteDocuments(MarqoTestCase):
             )
 
     def test_delete_already_deleted_document(self):
-        # Create an index and add a document
-        tensor_search.create_vector_index(index_name=self.index_name_1, config=self.config)
+        # Add a document
         add_docs_caller(
             config=self.config, index_name=self.index_name_1,
             docs=[
@@ -245,8 +242,7 @@ class TestDeleteDocuments(MarqoTestCase):
         self.assertEqual(response["index_name"], self.index_name_1)
 
     def test_delete_documents_mixed_valid_invalid_ids(self):
-        # Create an index and add documents
-        tensor_search.create_vector_index(index_name=self.index_name_1, config=self.config)
+        # Add documents
         add_docs_caller(
             config=self.config, index_name=self.index_name_1,
             docs=[

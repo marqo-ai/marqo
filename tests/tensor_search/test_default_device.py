@@ -83,6 +83,8 @@ class TestDefaultDevice(MarqoTestCase):
         except IndexNotFoundError as s:
             pass
 
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
+
     def tearDown(self) -> None:
         self.index_name_1 = "my-test-index-1"
         try:

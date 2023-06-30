@@ -26,6 +26,7 @@ class TestVectorSearch(MarqoTestCase):
         self.index_name_2 = "my-test-index-2"
         self.index_name_3 = "my-test-index-3"
         self._delete_test_indices()
+        self._create_test_indices()
 
         # Any tests that call add_documents_orchestrator, search, bulk_search need this env var
         # Ensure other os.environ patches in indiv tests do not erase this one.
@@ -45,6 +46,14 @@ class TestVectorSearch(MarqoTestCase):
                 tensor_search.delete_index(config=self.config, index_name=ix_name)
             except IndexNotFoundError as s:
                 pass
+
+    def _create_test_indices(self, indices=None):
+        if indices is None or not indices:
+            ix_to_create = [self.index_name_1, self.index_name_2, self.index_name_3]
+        else:
+            ix_to_create = indices
+        for ix_name in ix_to_create:
+            tensor_search.create_vector_index(config=self.config, index_name=ix_name)
 
     def test_vector_search_searchable_attributes_non_existent(self):
         """TODO: non existent attrib."""
@@ -89,7 +98,7 @@ class TestVectorSearch(MarqoTestCase):
             config=self.config, index_name=self.index_name_1, text="Exact match hehehe",
             searchable_attributes=["other field"]
         )
-    
+
     def test_search_with_searchable_attributes_max_attributes_is_none(self):
         # No patch needed, MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES is not set
         add_docs_caller(
@@ -116,16 +125,14 @@ class TestVectorSearch(MarqoTestCase):
 
     def test_vector_text_search_no_device(self):
         try:
-            tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
             search_res = tensor_search._vector_text_search(
                     config=self.config, index_name=self.index_name_1,
                     result_count=5, query="some text...")
             raise AssertionError
         except InternalError:
             pass
-    
+
     def test_vector_search_against_empty_index(self):
-        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
         search_res = tensor_search._vector_text_search(
                 config=self.config, index_name=self.index_name_1,
                 result_count=5, query="some text...", device="cpu")
@@ -228,8 +235,6 @@ class TestVectorSearch(MarqoTestCase):
 
     def test_search_format_empty(self):
         """Is the result formatted correctly? - on an emtpy index?"""
-        tensor_search.create_vector_index(
-            config=self.config, index_name=self.index_name_1)
         search_res = tensor_search.search(
             config=self.config, index_name=self.index_name_1, text=""
         )
@@ -428,6 +433,7 @@ class TestVectorSearch(MarqoTestCase):
 
     def test_filtering_list_case_image(self):
         settings = {"index_defaults": {"treat_urls_and_pointers_as_images": True, "model": "ViT-B/32"}}
+        tensor_search.delete_index(self.config, self.index_name_1)
         tensor_search.create_vector_index(index_name=self.index_name_1, index_settings=settings, config=self.config)
         hippo_img = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
         add_docs_caller(
@@ -593,7 +599,6 @@ class TestVectorSearch(MarqoTestCase):
 
     def test_set_device(self):
         """calling search with a specified device overrides MARQO_BEST_AVAILABLE_DEVICE"""
-        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
 
         mock_vectorise = mock.MagicMock()
         mock_vectorise.return_value = [[0, 0, 0, 0]]
@@ -609,7 +614,7 @@ class TestVectorSearch(MarqoTestCase):
         assert os.environ["MARQO_BEST_AVAILABLE_DEVICE"] == "cpu"
         args, kwargs = mock_vectorise.call_args
         assert kwargs["device"] == "cuda:123"
-    
+
     def test_search_other_types_subsearch(self):
         add_docs_caller(
             config=self.config, index_name=self.index_name_1, auto_refresh=True,
@@ -758,7 +763,6 @@ class TestVectorSearch(MarqoTestCase):
                 assert set(k for k in res.keys() if k not in TensorField.__dict__.values()) == {"_id"}
 
     def test_attributes_to_retrieve_empty_index(self):
-        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
         assert 0 == tensor_search.get_stats(config=self.config, index_name=self.index_name_1)['numberOfDocuments']
         for to_retrieve in [[], ["some field name"], ["some field name", "wowowow field"]]:
             for method in ("LEXICAL", "TENSOR"):
@@ -951,7 +955,6 @@ class TestVectorSearch(MarqoTestCase):
                     # assert full_search_results["hits"] == paginated_search_results["hits"]
                     
     def test_pagination_break_limitations(self):
-        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
         # Negative offset
         for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
             for lim in [1, 10, 1000]:
@@ -1063,6 +1066,7 @@ class TestVectorSearch(MarqoTestCase):
                 "treat_urls_and_pointers_as_images": True,
                 "model": "ViT-B/32",
             }}
+        tensor_search.delete_index(self.config, self.index_name_1)
         tensor_search.create_vector_index(
             index_name=self.index_name_1, index_settings=settings, config=self.config
         )
@@ -1132,6 +1136,7 @@ class TestVectorSearch(MarqoTestCase):
                 IndexSettingsField.treat_urls_and_pointers_as_images: True
             }
         }
+        tensor_search.delete_index(self.config, self.index_name_1)
         tensor_search.create_vector_index(
             config=self.config, index_name=self.index_name_1, index_settings=image_index_config)
         add_docs_caller(
@@ -1181,6 +1186,7 @@ class TestVectorSearch(MarqoTestCase):
                 IndexSettingsField.treat_urls_and_pointers_as_images: True
             }
         }
+        tensor_search.delete_index(self.config, self.index_name_1)
         tensor_search.create_vector_index(
             config=self.config, index_name=self.index_name_1, index_settings=image_index_config)
         add_docs_caller(
@@ -1260,6 +1266,7 @@ class TestVectorSearch(MarqoTestCase):
                 IndexSettingsField.treat_urls_and_pointers_as_images: True
             }
         }
+        tensor_search.delete_index(self.config, self.index_name_1)
         tensor_search.create_vector_index(
             config=self.config, index_name=self.index_name_1, index_settings=image_index_config)
         add_docs_caller(
@@ -1293,6 +1300,7 @@ class TestVectorSearch(MarqoTestCase):
                 IndexSettingsField.treat_urls_and_pointers_as_images: True
             }
         }
+        tensor_search.delete_index(self.config, self.index_name_1)
         tensor_search.create_vector_index(
             config=self.config, index_name=self.index_name_1, index_settings=image_index_config)
         add_docs_caller(
@@ -1351,6 +1359,7 @@ class TestVectorSearch(MarqoTestCase):
                 IndexSettingsField.treat_urls_and_pointers_as_images: True
             }
         }
+        tensor_search.delete_index(self.config, self.index_name_1)
         tensor_search.create_vector_index(
             config=self.config, index_name=self.index_name_1, index_settings=image_index_config)
         add_docs_caller(

@@ -228,14 +228,6 @@ def get_stats(config: Config, index_name: str):
     }
 
 
-def _check_and_create_index_if_not_exist(config: Config, index_name: str):
-    try:
-        index_info = backend.get_index_info(config=config, index_name=index_name)
-    except errors.IndexNotFoundError as s:
-        create_vector_index(config=config, index_name=index_name)
-        index_info = backend.get_index_info(config=config, index_name=index_name)
-
-
 def add_documents_orchestrator(
         config: Config, add_docs_params: AddDocsParams,
         batch_size: int = 0):
@@ -358,9 +350,8 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
         raise errors.InternalError("add_documents (internal function) cannot be called without setting device!")
     try:
         index_info = backend.get_index_info(config=config, index_name=add_docs_params.index_name)
-    except errors.IndexNotFoundError as s:
-        create_vector_index(config=config, index_name=add_docs_params.index_name)
-        index_info = backend.get_index_info(config=config, index_name=add_docs_params.index_name)
+    except errors.IndexNotFoundError:
+        raise errors.IndexNotFoundError(f"Cannot add documents to non-existent index {add_docs_params.index_name}")
 
     if len(add_docs_params.docs) == 0:
         raise errors.BadRequestError(message="Received empty add documents request")
@@ -393,7 +384,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
             image_repo = add_docs.download_images(docs=add_docs_params.docs, thread_count=20,
                                                 non_tensor_fields=tuple(add_docs_params.non_tensor_fields),
                                                 image_download_headers=add_docs_params.image_download_headers)
-        
+
     if add_docs_params.use_existing_tensors:
         doc_ids = []
 
@@ -599,7 +590,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                         TensorField.field_content: text_chunk,
                         TensorField.field_name: field
                     })
-            
+
             elif isinstance(field_content, dict):
                 if add_docs_params.mappings[field]["type"] == "multimodal_combination":
                     (combo_chunk, combo_document_is_valid,
@@ -1045,7 +1036,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
         logger.debug(f"No device given for search. Defaulting to best available device: {selected_device}")
     else:
         selected_device = device
-    
+
     if search_method.upper() == SearchMethod.TENSOR:
         search_result = _vector_text_search(
             config=config, index_name=index_name, query=text, result_count=result_count, offset=offset,
@@ -1280,8 +1271,8 @@ def construct_msearch_body_elements(searchableAttributes: List[str], offset: int
                     ["knn"][f"{TensorField.chunks}.{vector_field}"][
                     "filter"] = {
                     "query_string": {"query": f"{contextualised_filter}"}
-                } 
-        else: 
+                }
+        else:
             search_query = _create_normal_tensor_search_query(result_count, offset, vector_field, query_vector)
             if filter_string is not None:
                 search_query["query"]["nested"]["query"]["knn"][f"{TensorField.chunks}.{vector_field}"][
@@ -1508,11 +1499,11 @@ def get_query_vectors_from_jobs(
             ]
             # TODO how doe we ensure order?
             weighted_vectors = [np.asarray(vec) * weight for vec, weight, content in vectorised_ordered_queries]
-            
-            context_tensors = q.get_context_tensor() 
+
+            context_tensors = q.get_context_tensor()
             if context_tensors is not None:
                 weighted_vectors += [np.asarray(v.vector) * v.weight for v in context_tensors]
-            
+
             try:
                 merged_vector = np.mean(weighted_vectors, axis=0)
             except ValueError as e:
@@ -1719,7 +1710,7 @@ def _vector_text_search(
     # # SEARCH TIMER-LOGGER (pre-processing)
     if not device:
         raise errors.InternalError("_vector_text_search cannot be called without `device`!")
-    
+
     RequestMetricsStore.for_request().start("search.vector.processing_before_opensearch")
 
     try:
@@ -1772,7 +1763,7 @@ def _vector_text_search(
         gathered_docs = boost_score(gathered_docs, boost, searchable_attributes)
 
     completely_sorted = sort_chunks(gathered_docs)
-    
+
     if verbose:
         print("Chunk vector search, sorted result:")
         if verbose == 1:
