@@ -98,13 +98,13 @@ class TestDefaultDevice(MarqoTestCase):
         """
         test_cases = [
             ("cpu", {}, ["marqo.tensor_search.tensor_search.add_documents"]),   # normal
-            ("cpu", {"batch_size": 2, "processes": 2}, [
+            ("cpu", {"batch_size": 2}, [
                 "marqo.tensor_search.tensor_search._vector_text_search", 
                 "marqo.tensor_search.parallel.add_documents_mp"]),               # parallel
             ("cpu", {"batch_size": 2}, ["marqo.tensor_search.tensor_search._batch_request"]),    # server batched
             
             ("cuda", {}, ["marqo.tensor_search.tensor_search.add_documents"]),   # normal
-            ("cuda", {"batch_size": 2, "processes": 2}, [
+            ("cuda", {"batch_size": 2}, [
                 "marqo.tensor_search.tensor_search._vector_text_search", 
                 "marqo.tensor_search.parallel.add_documents_mp"]),               # parallel
             ("cuda", {"batch_size": 2}, ["marqo.tensor_search.tensor_search._batch_request"]),    # server batched
@@ -170,13 +170,13 @@ class TestDefaultDevice(MarqoTestCase):
         """
         test_cases = [
             ("cpu", "cuda", {}, ["marqo.tensor_search.tensor_search.add_documents"]),   # normal
-            ("cpu", "cuda", {"batch_size": 2, "processes": 2}, [
+            ("cpu", "cuda", {"batch_size": 2}, [
                 "marqo.tensor_search.tensor_search._vector_text_search", 
                 "marqo.tensor_search.parallel.add_documents_mp"]),               # parallel
             ("cpu", "cuda", {"batch_size": 2}, ["marqo.tensor_search.tensor_search._batch_request"]),    # server batched
             
             ("cuda", "cpu", {}, ["marqo.tensor_search.tensor_search.add_documents"]),   # normal
-            ("cuda", "cpu", {"batch_size": 2, "processes": 2}, [
+            ("cuda", "cpu", {"batch_size": 2}, [
                 "marqo.tensor_search.tensor_search._vector_text_search", 
                 "marqo.tensor_search.parallel.add_documents_mp"]),               # parallel
             ("cuda", "cuda", {"batch_size": 2}, ["marqo.tensor_search.tensor_search._batch_request"]),    # server batched

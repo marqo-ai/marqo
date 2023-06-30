@@ -885,8 +885,7 @@ class TestVectorSearch(MarqoTestCase):
         tensor_search.add_documents_orchestrator(
             config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1,
                 docs=[{"Title": "a " + (" ".join(random.choices(population=vocab, k=25)))}
-                      for _ in range(700)], auto_refresh=False),
-            processes=4, batch_size=50
+                      for _ in range(700)], auto_refresh=False), batch_size=50
         )
         tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
 

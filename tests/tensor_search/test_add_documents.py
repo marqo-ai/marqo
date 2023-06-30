@@ -462,7 +462,7 @@ class TestAddDocuments(MarqoTestCase):
                     index_name=self.index_name_1, device="cuda:22", docs=[{"some": "doc"}, {"som other": "doc"}],
                     auto_refresh=True,
                 ),
-                batch_size=1, processes=1
+                batch_size=1
             )
             return True
 

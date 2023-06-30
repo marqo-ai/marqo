@@ -137,7 +137,7 @@ class TestGetDocuments(MarqoTestCase):
             }})
         docs = [{"Title": "a", "_id": uuid.uuid4().__str__()} for _ in range(2000)]
         tensor_search.add_documents_orchestrator(
-            config=self.config, batch_size=50, processes=4, add_docs_params=AddDocsParams(
+            config=self.config, batch_size=50, add_docs_params=AddDocsParams(
                 index_name=self.index_name_1,
                 docs=docs, auto_refresh=False
             )
@@ -182,7 +182,7 @@ class TestGetDocuments(MarqoTestCase):
                 index_name=self.index_name_1,
                 docs=docs, auto_refresh=False
             ),
-            batch_size=50, processes=4
+            batch_size=50
         )
         tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
 
