@@ -173,7 +173,6 @@ def add_or_replace_documents(
         refresh: bool = True,
         marqo_config: config.Config = Depends(generate_config),
         batch_size: int = 0,
-        processes: int = None,
         non_tensor_fields: List[str] = Query(default=[]),
         device: str = Depends(api_validation.validate_device),
         use_existing_tensors: bool = False,
@@ -185,10 +184,6 @@ def add_or_replace_documents(
         ),
         mappings: typing.Optional[dict] = Depends(api_utils.decode_mappings)):
     """add_documents endpoint (replace existing docs with the same id)"""
-    if processes is not None:
-        raise InvalidArgError("The parameter `process` is no longer supported anymore. Please check the documentation for more information. \n"
-                              "https://docs.marqo.ai/latest/API-Reference/documents/")
-
     add_docs_params = AddDocsParams(
         index_name=index_name, docs=docs, auto_refresh=refresh,
         device=device, non_tensor_fields=non_tensor_fields,
