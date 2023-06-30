@@ -674,3 +674,20 @@ class TestIndexMetaCache(MarqoTestCase):
             return True
 
         assert run()
+
+    def test_populate_cache_concurrency(self):
+        """What happens if an index is retrieved from get_cluster_indices,
+        but disappears before its mappings are retrieved?"""
+        raise NotImplementedError
+        mock_get = mock.MagicMock()
+        mock_get.side_effect = [
+            mock.MagicMock(status_code=200, json=mock.MagicMock(return_value={"indices": {"index1": {}, "index2": {}}})),
+            mock.MagicMock(status_code=200, json=mock.MagicMock(return_value={"index1": {"mappings": {}}})),
+            mock.MagicMock(status_code=404, json=mock.MagicMock(return_value={"index1": {"mappings": {}}})),
+        ]
+        @mock.patch('requests.get', mock_get)
+        def run():
+
+            return 3
+
+        assert run() == 3
