@@ -95,20 +95,14 @@ class TestDefaultDevice(MarqoTestCase):
     def test_add_docs_orchestrator_defaults_to_best_device(self):
         """
             when no device is set,
-            add docs orchestrator should call add_documents / _batch_request / add_documents_mp
+            add docs orchestrator should call add_documents / _batch_request
             with env var MARQO_BEST_AVAILABLE_DEVICE
         """
         test_cases = [
             ("cpu", {}, ["marqo.tensor_search.tensor_search.add_documents"]),   # normal
-            ("cpu", {"batch_size": 2, "processes": 2}, [
-                "marqo.tensor_search.tensor_search._vector_text_search", 
-                "marqo.tensor_search.parallel.add_documents_mp"]),               # parallel
             ("cpu", {"batch_size": 2}, ["marqo.tensor_search.tensor_search._batch_request"]),    # server batched
             
             ("cuda", {}, ["marqo.tensor_search.tensor_search.add_documents"]),   # normal
-            ("cuda", {"batch_size": 2, "processes": 2}, [
-                "marqo.tensor_search.tensor_search._vector_text_search", 
-                "marqo.tensor_search.parallel.add_documents_mp"]),               # parallel
             ("cuda", {"batch_size": 2}, ["marqo.tensor_search.tensor_search._batch_request"]),    # server batched
         ]
         for best_available_device, extra_params, called_methods in test_cases:
@@ -167,20 +161,14 @@ class TestDefaultDevice(MarqoTestCase):
     def test_add_docs_orchestrator_uses_set_device(self):
         """
             when device is explicitly set,
-            add docs orchestrator should call add_documents / _batch_request / add_documents_mp
+            add docs orchestrator should call add_documents / _batch_request
             with set device, ignoring MARQO_BEST_AVAILABLE_DEVICE
         """
         test_cases = [
             ("cpu", "cuda", {}, ["marqo.tensor_search.tensor_search.add_documents"]),   # normal
-            ("cpu", "cuda", {"batch_size": 2, "processes": 2}, [
-                "marqo.tensor_search.tensor_search._vector_text_search", 
-                "marqo.tensor_search.parallel.add_documents_mp"]),               # parallel
             ("cpu", "cuda", {"batch_size": 2}, ["marqo.tensor_search.tensor_search._batch_request"]),    # server batched
             
             ("cuda", "cpu", {}, ["marqo.tensor_search.tensor_search.add_documents"]),   # normal
-            ("cuda", "cpu", {"batch_size": 2, "processes": 2}, [
-                "marqo.tensor_search.tensor_search._vector_text_search", 
-                "marqo.tensor_search.parallel.add_documents_mp"]),               # parallel
             ("cuda", "cuda", {"batch_size": 2}, ["marqo.tensor_search.tensor_search._batch_request"]),    # server batched
         ]
         for best_available_device, explicitly_set_device, extra_params, called_methods in test_cases:

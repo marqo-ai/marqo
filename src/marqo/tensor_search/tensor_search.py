@@ -50,7 +50,7 @@ from marqo.tensor_search.enums import (
     EnvVars
 )
 from marqo.tensor_search.enums import IndexSettingsField as NsField
-from marqo.tensor_search import utils, backend, validation, configs, parallel, add_docs
+from marqo.tensor_search import utils, backend, validation, configs, add_docs
 from marqo.tensor_search.formatting import _clean_doc
 from marqo.tensor_search.index_meta_cache import get_cache, get_index_info
 from marqo.tensor_search import index_meta_cache
@@ -230,8 +230,7 @@ def get_stats(config: Config, index_name: str):
 
 def add_documents_orchestrator(
         config: Config, add_docs_params: AddDocsParams,
-        batch_size: int = 0, processes: int = 1,
-    ):
+        batch_size: int = 0):
     # Default device calculated here and not in add_documents call
     if add_docs_params.device is None:
         selected_device = utils.read_env_vars_and_defaults("MARQO_BEST_AVAILABLE_DEVICE")
@@ -241,47 +240,14 @@ def add_documents_orchestrator(
         logger.debug(f"No device given for add_documents_orchestrator. Defaulting to best available device: {selected_device}")
     else:
         add_docs_params_with_device = add_docs_params
-
+    
     if batch_size is None or batch_size == 0:
-        logger.debug(f"batch_size={batch_size} and processes={processes} - not doing any marqo side batching")
+        logger.debug(f"batch_size={batch_size} - not doing any marqo side batching")
         return add_documents(config=config, add_docs_params=add_docs_params_with_device)
-    elif processes is not None and processes > 1:
-
-        # verify index exists and update cache
-        try:
-            backend.get_index_info(config=config, index_name=add_docs_params.index_name)
-        except errors.IndexNotFoundError:
-            raise errors.IndexNotFoundError(f"Cannot add documents to non-existent index {add_docs_params.index_name}")
-
-        try:
-            # Empty text search:
-            # 1. loads model into memory, 2. updates cache for multiprocessing
-            _vector_text_search(
-                config=config, index_name=add_docs_params.index_name, query='',
-                model_auth=add_docs_params.model_auth, device=add_docs_params_with_device.device,
-                image_download_headers=add_docs_params.image_download_headers)
-        except Exception as e:
-            logger.warning(
-                f"add_documents orchestrator's call to vector text search, prior to parallel add_docs, raised an error. "
-                f"Continuing to parallel add_docs. "
-                f"Message: {e}"
-            )
-
-        logger.debug(f"batch_size={batch_size} and processes={processes} - using multi-processing")
-        results = parallel.add_documents_mp(
-            config=config, batch_size=batch_size, processes=processes, add_docs_params=add_docs_params_with_device
-        )
-        # we need to force the cache to update as it does not propagate using mp
-        # we just clear this index's entry and it will re-populate when needed next
-        if add_docs_params.index_name in get_cache():
-            logger.info(f'deleting cache entry for {add_docs_params.index_name} after parallel add documents')
-            del get_cache()[add_docs_params.index_name]
-
-        return results
     else:
         if batch_size < 0:
             raise errors.InvalidArgError("Batch size can't be less than 1!")
-        logger.debug(f"batch_size={batch_size} and processes={processes} - batching using a single process")
+        logger.debug(f"batch_size={batch_size} - batching inside marqo")
         return _batch_request(config=config, verbose=False, add_docs_params=add_docs_params_with_device, batch_size=batch_size)
 
 
@@ -643,7 +609,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                         # TODO: we may want to use chunks_to_append here to make it uniform with use_existing_tensors and normal vectorisation
                         chunks.append({**combo_chunk, **chunk_values_for_filtering})
                         continue
-
+            
             # Add chunks_to_append along with doc metadata to total chunks
             for chunk in chunks_to_append:
                 chunks.append({**chunk, **chunk_values_for_filtering})
@@ -1279,7 +1245,7 @@ def get_vector_properties_to_search(searchable_attributes: Union[None, List[str]
         properties_to_search = list(searchable_attributes_as_vectors.intersection(
             index_info.get_vector_properties().keys()
         ))
-
+    
     # Validation for offset (pagination is single field) if offset not provided, validation is not run.
     if len(properties_to_search) != 1 and offset > 0:
         human_readable_vector_properties = [v.replace(TensorField.vector_prefix, '') for v in
@@ -1634,7 +1600,7 @@ def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity
 
     if not device:
         raise errors.InternalError("_bulk_vector_text_search cannot be called without `device`!")
-
+    
     with RequestMetricsStore.for_request().time("bulk_search.vector.processing_before_opensearch",
         lambda t : logger.debug(f"bulk search (tensor) pre-processing: took {t:.3f}ms")
     ):
@@ -1657,7 +1623,7 @@ def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity
         if not aggregate_body:
             # Must return empty response, per search query
             return create_empty_query_response(queries)
-
+    
     ## 5. POST aggregate  to /_msearch
     responses = bulk_msearch(config, aggregate_body)
 

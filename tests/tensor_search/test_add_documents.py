@@ -454,7 +454,7 @@ class TestAddDocuments(MarqoTestCase):
         assert add_res['errors'] is True
         assert all(['error' in item for item in add_res['items'] if item['_id'].startswith('to_fail')])
 
-    def test_add_documents_orchestrator_set_device_single_process(self):
+    def test_add_documents_orchestrator_set_device(self):
         mock_config = copy.deepcopy(self.config)
 
         mock_vectorise = mock.MagicMock()
@@ -467,7 +467,7 @@ class TestAddDocuments(MarqoTestCase):
                     index_name=self.index_name_1, device="cuda:22", docs=[{"some": "doc"}, {"som other": "doc"}],
                     auto_refresh=True,
                 ),
-                batch_size=1, processes=1
+                batch_size=1
             )
             return True
 
