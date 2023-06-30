@@ -17,8 +17,11 @@ class TestGetDocuments(MarqoTestCase):
 
     def setUp(self) -> None:
         self.generic_header = {"Content-type": "application/json"}
-        self.index_name_1 = "my-test-index-1"
+        self.index_name_1 = "my-test-index-1"  # standard index created by setUp
+        self.index_name_2 = "my-test-index-2"  # for tests that need custom index config
         self._delete_testing_indices()
+
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
         
         # Any tests that call add_documents_orchestrator, search, bulk_search need this env var
         self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
@@ -28,7 +31,7 @@ class TestGetDocuments(MarqoTestCase):
         self.device_patcher.stop()
 
     def _delete_testing_indices(self):
-        for ix in [self.index_name_1]:
+        for ix in [self.index_name_1, self.index_name_2]:
             try:
                 tensor_search.delete_index(config=self.config, index_name=ix)
             except IndexNotFoundError as s:
@@ -48,7 +51,6 @@ class TestGetDocuments(MarqoTestCase):
         pprint.pprint(res)
 
     def test_get_documents_vectors_format(self):
-        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
         keys = [("title 1", "desc 2", "_id"), ("title 1", "desc 2", "_id")]
         vals = [("content 1", "content 2. blah blah blah", "123"),
                 ("some more content", "some cool desk", "5678")]
@@ -75,7 +77,6 @@ class TestGetDocuments(MarqoTestCase):
                 assert enums.TensorField.embedding in facet
 
     def test_get_document_vectors_non_existent(self):
-        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
         id_reqs = [
             ['123', '456'], ['124']
         ]
@@ -90,7 +91,6 @@ class TestGetDocuments(MarqoTestCase):
                     assert not doc_res['_found']
 
     def test_get_document_vectors_resilient(self):
-        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
         tensor_search.add_documents(config=self.config,  add_docs_params=AddDocsParams(
             index_name=self.index_name_1, docs=[
                 {"_id": '456', "title": "alexandra"},
@@ -116,7 +116,6 @@ class TestGetDocuments(MarqoTestCase):
                         assert 'title' in doc_res or 'message' in doc_res
 
     def test_get_document_vectors_failures(self):
-        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
         for show_vectors_option in (True, False):
             for bad_get in [[123], [None], [set()], list(), 1.3, dict(),
                             None, 123, ['123', 456], ['123', 45, '445'], [14, '58']]:
@@ -131,41 +130,41 @@ class TestGetDocuments(MarqoTestCase):
 
     def test_get_documents_env_limit(self):
         tensor_search.create_vector_index(
-            config=self.config, index_name=self.index_name_1,
+            config=self.config, index_name=self.index_name_2,
             index_settings={enums.IndexSettingsField.index_defaults: {
                 enums.IndexSettingsField.model: enums.MlModel.bert
             }})
         docs = [{"Title": "a", "_id": uuid.uuid4().__str__()} for _ in range(2000)]
         tensor_search.add_documents_orchestrator(
             config=self.config, batch_size=50, processes=4, add_docs_params=AddDocsParams(
-                index_name=self.index_name_1,
+                index_name=self.index_name_2,
                 docs=docs, auto_refresh=False
             )
         )
-        tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
+        tensor_search.refresh_index(config=self.config, index_name=self.index_name_2)
         for max_doc in [0, 1, 2, 5, 10, 100, 1000]:
             mock_environ = {enums.EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: str(max_doc)}
 
             @mock.patch.dict(os.environ, {**os.environ, **mock_environ})
             def run():
                 half_search = tensor_search.get_documents_by_ids(
-                   config=self.config, index_name=self.index_name_1,
+                   config=self.config, index_name=self.index_name_2,
                    document_ids=[docs[i]['_id'] for i in range(max_doc // 2)])
                 assert len(half_search['results']) == max_doc // 2
                 limit_search = tensor_search.get_documents_by_ids(
-                    config=self.config, index_name=self.index_name_1,
+                    config=self.config, index_name=self.index_name_2,
                     document_ids=[docs[i]['_id'] for i in range(max_doc)])
                 assert len(limit_search['results']) == max_doc
                 try:
                     oversized_search = tensor_search.get_documents_by_ids(
-                        config=self.config, index_name=self.index_name_1,
+                        config=self.config, index_name=self.index_name_2,
                         document_ids=[docs[i]['_id'] for i in range(max_doc + 1)])
                     raise AssertionError
                 except IllegalRequestedDocCount:
                     pass
                 try:
                     very_oversized_search = tensor_search.get_documents_by_ids(
-                         config=self.config, index_name=self.index_name_1,
+                         config=self.config, index_name=self.index_name_2,
                          document_ids=[docs[i]['_id'] for i in range(max_doc * 2)])
                     raise AssertionError
                 except IllegalRequestedDocCount:

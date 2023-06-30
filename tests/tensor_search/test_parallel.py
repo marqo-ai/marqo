@@ -21,14 +21,16 @@ class TestAddDocumentsPara(MarqoTestCase):
             tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         except IndexNotFoundError as s:
             pass
-        
+
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
+
         # Any tests that call add_documents_orchestrator, search, bulk_search need this env var
         self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
         self.device_patcher.start()
 
     def tearDown(self):
         self.device_patcher.stop()
-    
+
     def test_get_device_ids(self) -> None:
         assert parallel.get_gpu_count('cpu') == 0
 
@@ -56,9 +58,9 @@ class TestAddDocumentsPara(MarqoTestCase):
                 index_name=self.index_name_1, docs=data, auto_refresh=True),
             batch_size=10, processes=1)
         res = tensor_search.search(config=self.config, text='something', index_name=self.index_name_1)
-    
+
     def test_add_documents_mp_no_device(self) -> None:
-        
+
         data = [{'text':f'something {str(i)}', '_id': str(i)} for i in range(100)]
         try:
             res = parallel.add_documents_mp(config=self.config, add_docs_params=AddDocsParams(
@@ -67,4 +69,3 @@ class TestAddDocumentsPara(MarqoTestCase):
             raise AssertionError
         except InternalError:
             pass
-        

@@ -27,6 +27,7 @@ class TestGetStats(MarqoTestCase):
             tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         except IndexNotFoundError as s:
             pass
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
         tensor_search.add_documents(
             config=self.config, add_docs_params=AddDocsParams(
                 docs=[{"1": "2"},{"134": "2"},{"14": "62"}],

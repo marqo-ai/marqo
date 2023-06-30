@@ -475,6 +475,7 @@ class TestCreateIndex(MarqoTestCase):
 
             @mock.patch.dict(os.environ, {**os.environ, **{EnvVars.MARQO_MAX_INDEX_FIELDS: str(lim)}})
             def run():
+                tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
                 res_1 = tensor_search.add_documents(
                     add_docs_params=AddDocsParams(
                         index_name=self.index_name_1, docs=[
@@ -517,6 +518,7 @@ class TestCreateIndex(MarqoTestCase):
                 {"f1": "water is healthy", "f5": True},
                 {"f2": 49, "f3": 400.4, "f4": "alien message"}
             ]
+            tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
             res_1 = tensor_search.add_documents(
                 add_docs_params=AddDocsParams(index_name=self.index_name_1, docs=docs, auto_refresh=True, device="cpu"),
                 config=self.config
@@ -551,6 +553,7 @@ class TestCreateIndex(MarqoTestCase):
                 {"f1": "water is healthy", "f5": True},
                 {"f2": 49, "f3": 400.4, "f4": "alien message", "_id": "rkjn"}
             ]
+            tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
             res_1 = tensor_search.add_documents(
                 add_docs_params=AddDocsParams(index_name=self.index_name_1, docs=docs, auto_refresh=True, device="cpu"),
                 config=self.config
