@@ -4,6 +4,7 @@ from typing import Optional, Union, Any, Sequence
 import numpy as np
 from marqo.tensor_search.models.private_models import ModelAuth
 from typing import List
+from marqo.errors import InternalError
 
 
 class AddDocsParamsConfig:
@@ -22,7 +23,6 @@ class AddDocsParams:
           make tensors for all fields.
         use_existing_tensors: Whether to use the vectors already in doc (for update docs)
         device: Device used to carry out the document update.
-        update_mode: {'replace' | 'update'}. If set to replace (default) just
         image_download_thread_count: number of threads used to concurrently download images
         image_download_headers: headers to authenticate image download
         mappings: a dictionary used to handle all the object field content in the doc,
@@ -38,9 +38,24 @@ class AddDocsParams:
     auto_refresh: bool
     non_tensor_fields: List = Field(default_factory=list)
     device: Optional[str] = None
-    update_mode: str = "replace"
     image_download_thread_count: int = 20
     image_download_headers: dict = Field(default_factory=dict)
     use_existing_tensors: bool = False
     mappings: Optional[dict] = None
     model_auth: Optional[ModelAuth] = None
+
+
+@dataclass(frozen=True, config=AddDocsParamsConfig)
+class AddDocsParamsWithDevice(AddDocsParams):
+    """
+        TODO: Replace instances of AddDocsParams with this.
+        Add Docs Params but with device required. 
+        This is created by tensor_search.add_documents_orchestrator.
+        _batch_request, add_documents, add_documents_mp, will accept this as parameter.
+    """
+
+    device: str  # This field is required
+
+    def __post_init__(self):
+        if not self.device:
+            raise InternalError("`device` parameter is required for AddDocsParamsWithDevice!")

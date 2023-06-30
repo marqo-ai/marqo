@@ -13,6 +13,7 @@ from marqo import errors
 from marqo.tensor_search.throttling.redis_throttle import throttle
 from marqo.connections import redis_driver
 from marqo.s2_inference.s2_inference import vectorise
+import torch
 
 
 def on_start(marqo_os_url: str):
@@ -21,6 +22,7 @@ def on_start(marqo_os_url: str):
                         PopulateCache(marqo_os_url),
                         DownloadStartText(),
                         CUDAAvailable(), 
+                        SetBestAvailableDevice(),
                         ModelsForCacheing(), 
                         InitializeRedis("localhost", 6379),    # TODO, have these variable
                         DownloadFinishText(),
@@ -78,13 +80,11 @@ class CUDAAvailable:
         pass
 
     def run(self):
-        import torch
-
         def id_to_device(id):
             if id < 0:
                 return ['cpu']
             return [torch.cuda.get_device_name(id)]
-        
+
         device_count = 0 if not torch.cuda.is_available() else torch.cuda.device_count()
 
         # use -1 for cpu
@@ -94,7 +94,30 @@ class CUDAAvailable:
         device_names = []
         for device_id in device_ids:
             device_names.append( {'id':device_id, 'name':id_to_device(device_id)})
+
         self.logger.info(f"found devices {device_names}")
+
+
+class SetBestAvailableDevice:
+
+    """sets the MARQO_BEST_AVAILABLE_DEVICE env var
+    """
+    logger = get_logger('SetBestAvailableDevice')
+
+    def __init__(self):
+        pass
+
+    def run(self):
+        """
+            This is set once at startup time. We assume it will NOT change,
+            if it does, health check should throw a warning.
+        """
+        if torch.cuda.is_available():
+            os.environ["MARQO_BEST_AVAILABLE_DEVICE"] = "cuda"
+        else:
+            os.environ["MARQO_BEST_AVAILABLE_DEVICE"] = "cpu"
+        
+        self.logger.info(f"Best available device set to: {os.environ['MARQO_BEST_AVAILABLE_DEVICE']}")
 
 
 class ModelsForCacheing:
@@ -103,7 +126,6 @@ class ModelsForCacheing:
     logger = get_logger('ModelsForStartup')
 
     def __init__(self):
-        import torch
         warmed_models = utils.read_env_vars_and_defaults(EnvVars.MARQO_MODELS_TO_PRELOAD)
         if warmed_models is None:
             self.models = []

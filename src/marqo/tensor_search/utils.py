@@ -299,7 +299,7 @@ def get_marqo_root_from_env() -> str:
     If it isn't found, it creates the env var and returns it.
 
     Returns:
-        str that doesn't end in a forward in forward slash.
+        str that doesn't end in a forward slash.
         for example: "/Users/CoolUser/marqo/src/marqo"
     """
     try:
