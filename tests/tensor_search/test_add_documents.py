@@ -226,22 +226,6 @@ class TestAddDocuments(MarqoTestCase):
         assert "__field_name" in \
                index_info.json()[self.index_name_1]["mappings"]["properties"][TensorField.chunks]["properties"]
 
-    def test_default_index_settings_implicitly_created(self):
-        add_doc_res = tensor_search.add_documents(
-            config=self.config,
-            add_docs_params=AddDocsParams(
-                index_name=self.index_name_1, docs=[{"abc": "def"}], auto_refresh=True, device="cpu"
-            )
-        )
-        index_info = requests.get(
-            url=f"{self.endpoint}/{self.index_name_1}",
-            verify=False
-        )
-        assert "model" in index_info.json()[self.index_name_1]["mappings"]["_meta"]
-        assert "media_type" in index_info.json()[self.index_name_1]["mappings"]["_meta"]
-        assert "__field_name" in \
-               index_info.json()[self.index_name_1]["mappings"]["properties"][TensorField.chunks]["properties"]
-
     def test_add_new_fields_on_the_fly(self):
         add_doc_res = tensor_search.add_documents(
             config=self.config, add_docs_params=AddDocsParams(
