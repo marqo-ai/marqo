@@ -1213,7 +1213,7 @@ class TestVectorSearch(MarqoTestCase):
                 query_dict = search_dicts[1]
 
                 query_vec = query_dict['query']['nested']['query']['knn'][
-                    f"{TensorField.chunks}.{utils.generate_vector_name('loc a')}"]['vector']
+                    f"{TensorField.chunks}.{TensorField.marqo_knn_field}"]['vector']
                 return query_vec
             # manually calculate weights:
             weighted_vectors =[]

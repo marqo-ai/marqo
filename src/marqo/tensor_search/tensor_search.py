@@ -1362,7 +1362,7 @@ def construct_msearch_body_elements(searchableAttributes: List[str], offset: int
     vector_properties_to_search = get_vector_properties_to_search(searchableAttributes, index_info, offset=offset)
     filter_for_opensearch = utils.build_tensor_search_filter(
         filter_string=filter_string, simple_properties=index_info.get_text_properties(),
-        vector_properties_to_search=vector_properties_to_search
+        searchable_attribs=searchableAttributes
     )
     body = []
 
@@ -1374,7 +1374,7 @@ def construct_msearch_body_elements(searchableAttributes: List[str], offset: int
             TensorField.marqo_knn_field,
             query_vector
         )
-        if filter_string is not None:
+        if (filter_string is not None) or (searchableAttributes is not None):
             (search_query["query"]["function_score"]
                 ["query"]["nested"]
                 ["query"]["function_score"]
@@ -1384,7 +1384,7 @@ def construct_msearch_body_elements(searchableAttributes: List[str], offset: int
                 }
     else:
         search_query = _create_normal_tensor_search_query(result_count, offset, TensorField.marqo_knn_field, query_vector)
-        if filter_string is not None:
+        if (filter_string is not None) or (searchableAttributes is not None):
             (search_query["query"]["nested"]
                 ["query"]["knn"]
                 [f"{TensorField.chunks}.{TensorField.marqo_knn_field}"]["filter"]) = {
