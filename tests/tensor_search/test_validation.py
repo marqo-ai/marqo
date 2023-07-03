@@ -238,7 +238,7 @@ class TestValidation(unittest.TestCase):
         max_size = 1234567
         mock_environ = {enums.EnvVars.MARQO_MAX_DOC_BYTES: str(max_size)}
 
-        @mock.patch("os.environ", mock_environ)
+        @mock.patch.dict(os.environ, mock_environ)
         def run():
             good_doc = {"abcd": "a" * (max_size - 500)}
             good_back = validation.validate_doc(doc=good_doc)
@@ -256,7 +256,9 @@ class TestValidation(unittest.TestCase):
 
     def test_index_name_validation(self):
         assert "my-index-name" == validation.validate_index_name("my-index-name")
-        bad_names = ['.opendistro_security', 'security-auditlog-', 'security-auditlog-100']
+        bad_names = ['.opendistro_security', 'security-auditlog-', 'security-auditlog-100',
+                     '.opendistro_alerting_config', '.opendistro-alerting-config-', '.kibana',
+                     '.kibana-2']
         for n in bad_names:
             try:
                 validation.validate_index_name(n)

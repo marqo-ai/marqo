@@ -2,6 +2,8 @@ from marqo.errors import IndexNotFoundError, InvalidArgError
 from marqo.tensor_search import tensor_search
 from tests.utils.transition import add_docs_caller
 from tests.marqo_test import MarqoTestCase
+import os
+from unittest import mock
 
 
 class TestBoostFieldScores(MarqoTestCase):
@@ -29,6 +31,13 @@ class TestBoostFieldScores(MarqoTestCase):
                     "_id": "article_591"
                 }
             ], auto_refresh=True)
+        
+        # Any tests that call add_documents_orchestrator, search, bulk_search need this env var
+        self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
+        self.device_patcher.start()
+
+    def tearDown(self):
+        self.device_patcher.stop()
 
     def test_score_is_boosted(self):
         q = "What is the best outfit to wear on the moon?"
@@ -98,6 +107,15 @@ class TestBoostFieldScoresComparison(MarqoTestCase):
             tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         except IndexNotFoundError as e:
             pass
+
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
+
+        # Any tests that call add_documents_orchestrator, search, bulk_search need this env var
+        self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
+        self.device_patcher.start()
+
+    def tearDown(self):
+        self.device_patcher.stop()
 
     def test_boost_multiple_fields(self):
         add_docs_caller(config=self.config, index_name=self.index_name_1, docs=[

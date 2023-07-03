@@ -53,6 +53,26 @@ class TestBackend(MarqoTestCase):
         assert isinstance(cluster_indices, set)
         assert self.index_name_1 in cluster_indices
 
+    def test_get_cluster_indices_mocked(self):
+        mock__get = mock.MagicMock()
+        mock__get.return_value = {
+            '.opendistro_security': {'aliases': {}},
+            'my-test-index-99': {'aliases': {}},
+            'security-auditlog-2023.06.15': {'aliases': {}},
+            'security-auditlog-2023.06.16': {'aliases': {}},
+            'security-auditlog-2023.06.20': {'aliases': {}},
+            'test_index': {'aliases': {}},
+            '.kibana': {'aliases': {}},
+            '.kibana_1': {'aliases': {}},
+        }
+
+        @mock.patch("marqo._httprequests.HttpRequests.get", mock__get)
+        def run():
+            return backend.get_cluster_indices(config=self.config)
+        cluster_indices = run()
+        assert cluster_indices == {'my-test-index-99', 'test_index'}
+        assert isinstance(cluster_indices, set)
+
     def test_add_customer_field_properties_defaults_lucene(self):
         mock_config = copy.deepcopy(self.config)
         mock__put = mock.MagicMock()
@@ -86,7 +106,6 @@ class TestBackend(MarqoTestCase):
         sent_dict = json.loads(kwargs0["body"])
         assert sent_dict["properties"][enums.TensorField.chunks]["properties"][utils.generate_vector_name(field_name="f1")]["method"] == get_default_ann_parameters()
 
-
     def test_add_customer_field_properties_index_ann_parameters(self):
         mock_config = copy.deepcopy(self.config)
         mock__put = mock.MagicMock()
@@ -118,3 +137,23 @@ class TestBackend(MarqoTestCase):
                             enums.IndexSettingsField.hnsw_ef_construction: 1,
                             enums.IndexSettingsField.hnsw_m: 2
                         }
+
+    def test__remove_system_indices(self):
+        index_names = ['.kibana', 'my-index', '.opendistro_security', 'some-other-index', '.kibana-100']
+        assert backend._remove_system_indices(index_names) == {'my-index', 'some-other-index'}
+
+    def test__remove_system_indices_empty(self):
+        index_names = []
+        assert backend._remove_system_indices(index_names) == set()
+
+    def test__remove_system_indices_only_system_indices(self):
+        index_names = ['.kibana', '.opendistro_security', '.kibana-100']
+        assert backend._remove_system_indices(index_names) == set()
+
+    def test__remove_system_indices_non_list_input(self):
+        index_names = ('.kibana', 'my-index', '.opendistro_security', 'some-other-index', '.kibana-100')
+        assert backend._remove_system_indices(index_names) == {'my-index', 'some-other-index'}
+
+    def test__remove_system_indices_case_sensitivity(self):
+        index_names = ['.Kibana', 'My-Index', '.Opendistro_Security', 'Some-Other-Index', '.Kibana-100']
+        assert backend._remove_system_indices(index_names) == set(index_names)

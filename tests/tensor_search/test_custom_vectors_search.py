@@ -5,7 +5,9 @@ from marqo.tensor_search.enums import TensorField, IndexSettingsField, SearchMet
 from marqo.tensor_search.models.search import SearchContext
 from tests.marqo_test import MarqoTestCase
 from unittest.mock import patch
+from unittest import mock
 import numpy as np
+import os
 
 
 class TestMultimodalTensorCombination(MarqoTestCase):
@@ -33,12 +35,17 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                 "text_field": "A rider is riding a horse jumping over the barrier.",
                 "_id": "1"
             }], auto_refresh=True)
+        
+        # Any tests that call add_documents_orchestrator, search, bulk_search need this env var
+        self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
+        self.device_patcher.start()
 
     def tearDown(self) -> None:
         try:
             tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         except:
             pass
+        self.device_patcher.stop()
 
     def test_search(self):
         query = {
