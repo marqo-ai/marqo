@@ -95,17 +95,15 @@ class TestDefaultDevice(MarqoTestCase):
     def test_add_docs_orchestrator_defaults_to_best_device(self):
         """
             when no device is set,
-            add docs orchestrator should call add_documents / _batch_request
+            add docs orchestrator should call add_documents
             with env var MARQO_BEST_AVAILABLE_DEVICE
         """
         test_cases = [
             ("cpu", {}, ["marqo.tensor_search.tensor_search.add_documents"]),   # normal
-            ("cpu", {"batch_size": 2}, ["marqo.tensor_search.tensor_search._batch_request"]),    # server batched
-            
             ("cuda", {}, ["marqo.tensor_search.tensor_search.add_documents"]),   # normal
-            ("cuda", {"batch_size": 2}, ["marqo.tensor_search.tensor_search._batch_request"]),    # server batched
+
         ]
-        for best_available_device, extra_params, called_methods in test_cases:
+        for best_available_device, called_methods in test_cases:
             @mock.patch.dict(os.environ, {**os.environ, **{"MARQO_BEST_AVAILABLE_DEVICE": best_available_device}})
             def run():
                 # Mock inner methods
@@ -113,15 +111,14 @@ class TestDefaultDevice(MarqoTestCase):
                 patchers = [mock.patch(method) for method in called_methods]
                 mocks = [patcher.start() for patcher in patchers]
 
-                # Call orchestrator
-                tensor_search.add_documents_orchestrator(
+                # Call add_documents
+                tensor_search.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(index_name=self.index_name_1, 
                                     docs=[{"Title": "blah"} for i in range(5)], 
                                     auto_refresh=True,
                                     # no device set, so should default to best
                                 ),
-                    **extra_params
                 )
                 # Confirm lower level functions were called with default device
                 for mocked_method in mocks:
@@ -146,7 +143,7 @@ class TestDefaultDevice(MarqoTestCase):
         self.assertNotIn("MARQO_BEST_AVAILABLE_DEVICE", os.environ)
         # Call orchestrator
         try:
-            tensor_search.add_documents_orchestrator(
+            tensor_search.add_documents(
                 config=self.config,
                 add_docs_params=AddDocsParams(index_name=self.index_name_1, 
                                 docs=[{"Title": "blah"} for i in range(5)], 
@@ -161,15 +158,12 @@ class TestDefaultDevice(MarqoTestCase):
     def test_add_docs_orchestrator_uses_set_device(self):
         """
             when device is explicitly set,
-            add docs orchestrator should call add_documents / _batch_request
+            add docs orchestrator should call add_documents
             with set device, ignoring MARQO_BEST_AVAILABLE_DEVICE
         """
         test_cases = [
             ("cpu", "cuda", {}, ["marqo.tensor_search.tensor_search.add_documents"]),   # normal
-            ("cpu", "cuda", {"batch_size": 2}, ["marqo.tensor_search.tensor_search._batch_request"]),    # server batched
-            
             ("cuda", "cpu", {}, ["marqo.tensor_search.tensor_search.add_documents"]),   # normal
-            ("cuda", "cuda", {"batch_size": 2}, ["marqo.tensor_search.tensor_search._batch_request"]),    # server batched
         ]
         for best_available_device, explicitly_set_device, extra_params, called_methods in test_cases:
             @mock.patch.dict(os.environ, {**os.environ, **{"MARQO_BEST_AVAILABLE_DEVICE": best_available_device}})
@@ -180,7 +174,7 @@ class TestDefaultDevice(MarqoTestCase):
                 mocks = [patcher.start() for patcher in patchers]
 
                 # Call orchestrator
-                tensor_search.add_documents_orchestrator(
+                tensor_search.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(index_name=self.index_name_1, 
                                     docs=[{"Title": "blah"} for i in range(5)], 

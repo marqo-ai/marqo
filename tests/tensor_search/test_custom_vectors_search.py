@@ -36,7 +36,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                 "_id": "1"
             }], auto_refresh=True)
         
-        # Any tests that call add_documents_orchestrator, search, bulk_search need this env var
+        # Any tests that call add_documents, search, bulk_search need this env var
         self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
         self.device_patcher.start()
 

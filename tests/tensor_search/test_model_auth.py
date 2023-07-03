@@ -151,7 +151,7 @@ class TestModelAuthLoadedS3(MarqoTestCase):
         tensor_search.eject_model(model_name=cls.custom_model_name, device=cls.device)
 
     def setUp(self):
-        # Any tests that call add_documents_orchestrator, search, bulk_search need this env var
+        # Any tests that call add_documents, search, bulk_search need this env var
         self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
         self.device_patcher.start()
 
@@ -209,7 +209,7 @@ class TestModelAuthOpenCLIP(MarqoTestCase):
         except IndexNotFoundError as s:
             pass
         
-        # Any tests that call add_documents_orchestrator, search, bulk_search need this env var
+        # Any tests that call add_documents, search, bulk_search need this env var
         self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
         self.device_patcher.start()
         
@@ -461,7 +461,7 @@ class TestModelAuthOpenCLIP(MarqoTestCase):
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings=s3_settings)
 
         for add_docs_method, kwargs in [
-                (tensor_search.add_documents_orchestrator, {'batch_size': 10}),
+                (tensor_search.add_document, {'batch_size': 10}),
                 # TODO: add add_documents and add_documents_mp ?
             ]:
             try:
@@ -601,7 +601,7 @@ class TestModelAuthOpenCLIP(MarqoTestCase):
 
 
         for add_docs_method, kwargs in [
-            (tensor_search.add_documents_orchestrator, {'batch_size': 10}),
+            (tensor_search.add_document, {'batch_size': 10}),
             (tensor_search.add_documents, {})
             # TODO: add add_documents_mp ?
         ]:
@@ -1122,7 +1122,7 @@ class TestModelAuthDownloadAndExtractS3HFModel(MarqoTestCase):
         tensor_search.eject_model(model_name=cls.custom_model_name, device=cls.device)
 
     def setUp(self):
-        # Any tests that call add_documents_orchestrator, search, bulk_search need this env var
+        # Any tests that call add_document, search, bulk_search need this env var
         self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
         self.device_patcher.start()
 
@@ -1196,7 +1196,7 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
         except IndexNotFoundError as s:
             pass
 
-        # Any tests that call add_documents_orchestrator, search, bulk_search need this env var
+        # Any tests that call add_document, search, bulk_search need this env var
         self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
         self.device_patcher.start()
 
@@ -2014,7 +2014,7 @@ class TestS3ModelAuthlLoadForHFModelVariants(MarqoTestCase):
         except IndexNotFoundError as s:
             pass
         
-        # Any tests that call add_documents_orchestrator, search, bulk_search need this env var
+        # Any tests that call add_document, search, bulk_search need this env var
         self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
         self.device_patcher.start() 
 
@@ -2064,7 +2064,7 @@ class TestS3ModelAuthlLoadForHFModelVariants(MarqoTestCase):
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings=s3_settings)
 
         for add_docs_method, kwargs in [
-                (tensor_search.add_documents_orchestrator, {'batch_size': 10}),
+                (tensor_search.add_document, {'batch_size': 10}),
                 # TODO: add add_documents and add_documents_mp ?
             ]:
             try:
@@ -2193,7 +2193,7 @@ class TestS3ModelAuthlLoadForHFModelVariants(MarqoTestCase):
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings=s3_settings)
 
         for add_docs_method, kwargs in [
-            (tensor_search.add_documents_orchestrator, {'batch_size': 10}),
+            (tensor_search.add_document, {'batch_size': 10}),
             (tensor_search.add_documents, {})
             # TODO: add add_documents_mp ?
         ]:

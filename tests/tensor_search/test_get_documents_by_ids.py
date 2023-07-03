@@ -23,7 +23,7 @@ class TestGetDocuments(MarqoTestCase):
 
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
 
-        # Any tests that call add_documents_orchestrator, search, bulk_search need this env var
+        # Any tests that call add_documents, search, bulk_search need this env var
         self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
         self.device_patcher.start()
 
@@ -135,7 +135,7 @@ class TestGetDocuments(MarqoTestCase):
                 enums.IndexSettingsField.model: enums.MlModel.bert
             }})
         docs = [{"Title": "a", "_id": uuid.uuid4().__str__()} for _ in range(2000)]
-        tensor_search.add_documents_orchestrator(
+        tensor_search.add_documents(
             config=self.config, batch_size=50, add_docs_params=AddDocsParams(
                 index_name=self.index_name_2,
                 docs=docs, auto_refresh=False
@@ -176,7 +176,7 @@ class TestGetDocuments(MarqoTestCase):
         """if env var isn't set or is None"""
         docs = [{"Title": "a", "_id": uuid.uuid4().__str__()} for _ in range(2000)]
 
-        tensor_search.add_documents_orchestrator(
+        tensor_search.add_documents(
             config=self.config, add_docs_params=AddDocsParams(
                 index_name=self.index_name_1,
                 docs=docs, auto_refresh=False
