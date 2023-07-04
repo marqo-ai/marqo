@@ -32,6 +32,9 @@ by the user.
 - Improve handling of whitespace when indexing documents (https://github.com/marqo-ai/marqo/pull/521).
 - Update CUDA version to 11.4.3 (https://github.com/marqo-ai/marqo/pull/525).
 
+## Contributor shout-outs
+- Thank you to our 3.1k stargazers!
+
 # Release 0.0.21
 
 ## New features
