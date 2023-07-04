@@ -15,15 +15,6 @@ class AddDocsParamsConfig:
     arbitrary_types_allowed = True
 
 
-def _get_default_device() -> str:
-    '''Return the default device for AddDocsParams.device.
-    An InternalError will be raised if the default device cannot be determined.'''
-    device = read_env_vars_and_defaults(EnvVars.MARQO_BEST_AVAILABLE_DEVICE)
-    if not device:
-        raise InternalError("Best available device was not properly determined on Marqo startup.")
-    return device
-
-
 class AddDocsParams(BaseModel):
     """Represents the parameters of the tensor_search.add_documents() function
 

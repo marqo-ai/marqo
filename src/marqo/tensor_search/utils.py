@@ -355,7 +355,7 @@ def generate_batches(seq: Sequence, batch_size: int):
 
 def get_best_available_device() -> str:
     device = read_env_vars_and_defaults(EnvVars.MARQO_BEST_AVAILABLE_DEVICE)
-    if (device is None) or not (device == "cpu" or device.startswith("cuda")):
+    if device is None or not check_device_is_available(device):
         raise errors.InternalError(f"Marqo encountered an error when loading device from environment variable `MARQO_BEST_AVAILABLE_DEVICE`. "
                            f"Invalid device: {device}. Must be either 'cpu' or start with 'cuda'.")
     return device
