@@ -354,6 +354,7 @@ def generate_batches(seq: Sequence, batch_size: int):
         yield seq[i:i + batch_size]
 
 def get_best_available_device() -> str:
+    """Get the best available device for Marqo to use and validate it."""
     device = read_env_vars_and_defaults(EnvVars.MARQO_BEST_AVAILABLE_DEVICE)
     if device is None or not check_device_is_available(device):
         raise errors.InternalError(f"Marqo encountered an error when loading device from environment variable `MARQO_BEST_AVAILABLE_DEVICE`. "
