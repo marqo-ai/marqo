@@ -2,17 +2,25 @@
 
 ## New features
 - Telemetry. Marqo now includes various timing metrics for many API endpoints when 
-the query parameter `telemetry=True` is specified (https://github.com/marqo-ai/marqo/pull/506).
-- Consolidate default device to CUDA when available (https://github.com/marqo-ai/marqo/pull/508).
-- Model download integrity verification (https://github.com/marqo-ai/marqo/pull/502).
+the query parameter `telemetry=True` is specified (https://github.com/marqo-ai/marqo/pull/506). The metrics will be
+returned in the response body and provide a breakdown of latencies for various stages of the API call.
+- Consolidate default device to CUDA when available (https://github.com/marqo-ai/marqo/pull/508). By default,
+Marqo now uses CUDA devices for search and indexing if available.
+See [here](https://docs.marqo.ai/0.1.0/API-Reference/search/#query-parameters) for more information. This helps ensure
+you get the best indexing and search experience without having to explicitly add the device parameter to search and
+add_documents calls.
+- Model download integrity verification (https://github.com/marqo-ai/marqo/pull/502). Model files are validated and
+removed if corrupted during download. This helps ensure that models are not loaded if they are corrupted.
 
 ## Breaking changes
 - Remove deprecated `add_or_update_documents` endpoint (https://github.com/marqo-ai/marqo/pull/517).
 - Disable automatic index creation. Marqo will no longer automatically create an index if it does not exist 
 (https://github.com/marqo-ai/marqo/pull/516).
-Attempting to add documents to a non-existent index will now result in an error (https://github.com/marqo-ai/marqo/pull/516).
+Attempting to add documents to a non-existent index will now result in an error. This helps provide more certainty about
+the properties of the index you are adding documents to, and also helps prevent accidental indexing to the wrong index.
 - Remove parallel indexing (https://github.com/marqo-ai/marqo/pull/523). Marqo no longer supports server-side parallel
-indexing. Parallelisation can still be implemented by the client.
+indexing. This helps deliver a more stable and efficient indexing experience. Parallelisation can still be implemented
+by the user.
 
 ## Bug fixes and minor changes
 - Improve error messages (https://github.com/marqo-ai/marqo/pull/494, https://github.com/marqo-ai/marqo/pull/499).
