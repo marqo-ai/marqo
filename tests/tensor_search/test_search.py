@@ -886,10 +886,10 @@ class TestVectorSearch(MarqoTestCase):
 
         vocab = requests.get(vocab_source).text.splitlines()
 
-        tensor_search.add_document(
+        tensor_search.add_documents(
             config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1,
                 docs=[{"Title": "a " + (" ".join(random.choices(population=vocab, k=25)))}
-                      for _ in range(700)], auto_refresh=False), batch_size=50
+                      for _ in range(700)], auto_refresh=False)
         )
         tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
 
