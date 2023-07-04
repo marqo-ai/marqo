@@ -7,10 +7,13 @@ from typing import List
 from marqo.tensor_search.utils import read_env_vars_and_defaults
 from marqo.tensor_search.enums import EnvVars
 from marqo.errors import InternalError
+from pydantic import BaseModel
+from marqo.tensor_search.utils import get_best_available_device
 
 
 class AddDocsParamsConfig:
     arbitrary_types_allowed = True
+
 
 def _get_default_device() -> str:
     '''Return the default device for AddDocsParams.device.
@@ -20,8 +23,8 @@ def _get_default_device() -> str:
         raise InternalError("Best available device was not properly determined on Marqo startup.")
     return device
 
-@dataclass(frozen=True, config=AddDocsParamsConfig)
-class AddDocsParams:
+
+class AddDocsParams(BaseModel):
     """Represents the parameters of the tensor_search.add_documents() function
 
     Params:
@@ -41,6 +44,10 @@ class AddDocsParams:
 
     """
 
+    class Config:
+        arbitrary_types_allowed = True
+        allow_mutation = False
+
     # this should only accept Sequences of dicts, but currently validation lies elsewhere
     docs: Union[Sequence[Union[dict, Any]], np.ndarray]
 
@@ -54,7 +61,8 @@ class AddDocsParams:
     mappings: Optional[dict] = None
     model_auth: Optional[ModelAuth] = None
 
-    @validator('device')
-    def _validate_device(cls, v):
-        # Apply when None is provided as the device
-        return v or _get_default_device()
+    def __init__(self, **data: dict):
+        # Ensure `None` and passing nothing are treated the same for device
+        if "device" not in data or data["device"] is None:
+            data["device"] = get_best_available_device()
+        super().__init__(**data)

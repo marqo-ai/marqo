@@ -83,24 +83,24 @@ class TestDefaultDevice(MarqoTestCase):
 
     def test_add_documents_defaults_to_best_available_device(self):
         """
-            when no device is None, add_documents will decide the value based on EnvVars.MARQO_BEST_AVAILABLE_DEVICE
+            when device is None or not specified, add_documents will decide the value based on EnvVars.MARQO_BEST_AVAILABLE_DEVICE
             and pass it to vectorise
         """
         dummy_vector = [[0.0, ] * 384, ]
         devices_list = ["cpu", "cuda", "cuda:0", "cuda:1"]
+        AddDocsParams_kwargs_list = [{"index_name": self.index_name_1, "docs": [{"Title": "blah"} for _ in range(5)], "auto_refresh": True, "device": None},
+                           {"index_name": self.index_name_1, "docs": [{"Title": "blah"} for _ in range(5)], "auto_refresh": True,}]
+
         for best_available_device in devices_list:
-            with patch.dict("marqo.tensor_search.utils.os.environ", {EnvVars.MARQO_BEST_AVAILABLE_DEVICE: best_available_device}),\
-                 patch("marqo.s2_inference.s2_inference.vectorise", return_value=dummy_vector) as mock_vectorise:
-                    tensor_search.add_documents(
-                    config=self.config,
-                    add_docs_params=AddDocsParams(index_name=self.index_name_1,
-                                    docs=[{"Title": "blah"} for _ in range(5)],
-                                    auto_refresh=True,
-                                    device = None,
-                                ),
-                    )
-                    assert mock_vectorise.call_args.kwargs["device"] == best_available_device
-                    mock_vectorise.reset_mock()
+            for AddDocsParams_kwargs in AddDocsParams_kwargs_list:
+                with patch.dict("marqo.tensor_search.utils.os.environ", {EnvVars.MARQO_BEST_AVAILABLE_DEVICE: best_available_device}),\
+                     patch("marqo.s2_inference.s2_inference.vectorise", return_value=dummy_vector) as mock_vectorise:
+                        tensor_search.add_documents(
+                        config=self.config,
+                        add_docs_params=AddDocsParams(**AddDocsParams_kwargs)
+                        )
+                        assert mock_vectorise.call_args.kwargs["device"] == best_available_device
+                        mock_vectorise.reset_mock()
 
 
     @mock.patch("os.environ", dict())
@@ -109,43 +109,20 @@ class TestDefaultDevice(MarqoTestCase):
             If no best available device is set, this function should raise internal error.
         """
         self.assertNotIn("MARQO_BEST_AVAILABLE_DEVICE", os.environ)
-        # Call orchestrator
-        try:
-            tensor_search.add_documents(
-                config=self.config,
-                add_docs_params=AddDocsParams(index_name=self.index_name_1, 
-                                docs=[{"Title": "blah"} for i in range(5)], 
-                                auto_refresh=True,
-                                device = None,
-                            ),
-            )
-            raise AssertionError
-        except InternalError as e:
-            assert "Best available device was not properly determined on Marqo startup." in str(e)
-            pass
 
-    def test_add_documents_with_no_device(self):
-        """
-            when device is not set, add documents call should raise an internal error
-            this is because AddDocsParams.device only accept `str` or `None`.
-        """
-        try:
-            tensor_search.add_documents(
-                config=self.config, add_docs_params=AddDocsParams(
-                    index_name=self.index_name_1,
-                    docs=[{
-                        "_id": "123",
-                        "id": "abcdefgh",
-                        "title 1": "content 1",
-                        "desc 2": "content 2. blah blah blah"
-                    }],
-                    auto_refresh=True
+        AddDocsParams_kwargs_list = [{"index_name": self.index_name_1, "docs": [{"Title": "blah"} for _ in range(5)], "auto_refresh": True, "device": None},
+                           {"index_name": self.index_name_1, "docs": [{"Title": "blah"} for _ in range(5)], "auto_refresh": True,}]
+
+        for AddDocsParams_kwargs in AddDocsParams_kwargs_list:
+            try:
+                tensor_search.add_documents(
+                config=self.config,
+                add_docs_params=AddDocsParams(**AddDocsParams_kwargs)
                 )
-            )
-            raise AssertionError
-        except TypeError as e:
-            assert "missing 1 required positional argument: 'device'" in str(e)
-            pass
+                raise AssertionError
+            except InternalError as e:
+                assert "Marqo encountered an error when loading device from environment variable `MARQO_BEST_AVAILABLE_DEVICE`" in str(e)
+                pass
         
     def test_add_document_uses_set_device(self):
         """
@@ -157,7 +134,7 @@ class TestDefaultDevice(MarqoTestCase):
         devices_list = ["cpu", "cuda", "cuda:0", "cuda:1"]
         for explicitly_set_device in devices_list:
             with patch("marqo.s2_inference.s2_inference.vectorise", return_value=dummy_vector) as mock_vectorise,\
-                 patch("marqo.tensor_search.models.add_docs_objects._get_default_device") as mock_get_default_device:
+                 patch("marqo.tensor_search.models.add_docs_objects.get_best_available_device") as mock_get_default_device:
                     tensor_search.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(index_name=self.index_name_1,
