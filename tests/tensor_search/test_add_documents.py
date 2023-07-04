@@ -3,7 +3,6 @@ import os
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 import functools
 import json
-from unittest.mock import MagicMock, patch
 import math
 import pprint
 from unittest import mock
@@ -1140,10 +1139,10 @@ class TestAddDocuments(MarqoTestCase):
             for k in expected_repo_structure:
                 assert isinstance(image_repo[k], expected_repo_structure[k])
 
-    def test_add_documents_with_no_device_fails(self):
+    def test_add_documents_with_no_device(self):
         """
-            when device is not set,
-            add documents call should raise an internal error
+            when device is not set, add documents call should raise an internal error
+            this is because AddDocsParams.device only accept `str` or `None`.
         """
         try:
             tensor_search.add_documents(
@@ -1159,6 +1158,7 @@ class TestAddDocuments(MarqoTestCase):
                 )
             )
             raise AssertionError
-        except InternalError:
+        except TypeError as e:
+            assert "missing 1 required positional argument: 'device'" in str(e)
             pass
 

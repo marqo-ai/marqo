@@ -1,24 +1,13 @@
-import copy
 import os
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
-import functools
-import json
-import math
-import pprint
 from unittest import mock
-from marqo.s2_inference import types
-import PIL
-import marqo.tensor_search.utils as marqo_utils
-import numpy as np
-import requests
-from marqo.tensor_search.enums import TensorField, IndexSettingsField, SearchMethod
-from marqo.tensor_search import enums
-from marqo.errors import IndexNotFoundError, InvalidArgError, BadRequestError, InternalError
-from marqo.tensor_search import tensor_search, index_meta_cache, backend
+from marqo.errors import IndexNotFoundError, InternalError
+from marqo.tensor_search import tensor_search
 from tests.marqo_test import MarqoTestCase
-import time
-from marqo.tensor_search import add_docs
+from unittest.mock import patch, ANY
 from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQueryEntity
+from marqo.tensor_search.enums import EnvVars
+from marqo.tensor_search.models.add_docs_objects import _get_default_device
 
 class TestDefaultDevice(MarqoTestCase):
 
@@ -92,51 +81,30 @@ class TestDefaultDevice(MarqoTestCase):
         except IndexNotFoundError as s:
             pass
 
-    def test_add_docs_orchestrator_defaults_to_best_device(self):
+    def test_add_documents_defaults_to_best_available_device(self):
         """
-            when no device is set,
-            add docs orchestrator should call add_documents
-            with env var MARQO_BEST_AVAILABLE_DEVICE
+            when no device is None, add_documents will decide the value based on EnvVars.MARQO_BEST_AVAILABLE_DEVICE
+            and pass it to vectorise
         """
-        test_cases = [
-            ("cpu", {}, ["marqo.tensor_search.tensor_search.add_documents"]),   # normal
-            ("cuda", {}, ["marqo.tensor_search.tensor_search.add_documents"]),   # normal
-
-        ]
-        for best_available_device, called_methods in test_cases:
-            @mock.patch.dict(os.environ, {**os.environ, **{"MARQO_BEST_AVAILABLE_DEVICE": best_available_device}})
-            def run():
-                # Mock inner methods
-                # Create and start a patcher for each method
-                patchers = [mock.patch(method) for method in called_methods]
-                mocks = [patcher.start() for patcher in patchers]
-
-                # Call add_documents
-                tensor_search.add_documents(
+        dummy_vector = [[0.0, ] * 384, ]
+        devices_list = ["cpu", "cuda", "cuda:0", "cuda:1"]
+        for best_available_device in devices_list:
+            with patch.dict("marqo.tensor_search.utils.os.environ", {EnvVars.MARQO_BEST_AVAILABLE_DEVICE: best_available_device}),\
+                 patch("marqo.s2_inference.s2_inference.vectorise", return_value=dummy_vector) as mock_vectorise:
+                    tensor_search.add_documents(
                     config=self.config,
-                    add_docs_params=AddDocsParams(index_name=self.index_name_1, 
-                                    docs=[{"Title": "blah"} for i in range(5)], 
+                    add_docs_params=AddDocsParams(index_name=self.index_name_1,
+                                    docs=[{"Title": "blah"} for _ in range(5)],
                                     auto_refresh=True,
-                                    # no device set, so should default to best
+                                    device = None,
                                 ),
-                )
-                # Confirm lower level functions were called with default device
-                for mocked_method in mocks:
-                    if "add_docs_params" in mocked_method.call_args[1]:
-                        assert mocked_method.call_args[1]["add_docs_params"].device == best_available_device
-                    else:
-                        assert mocked_method.call_args[1]["device"] == best_available_device
-                
-                # Stop all the patchers (important, if not stopped, will leak into next tests)
-                for patcher in patchers:
-                    patcher.stop()
+                    )
+                    assert mock_vectorise.call_args.kwargs["device"] == best_available_device
+                    mock_vectorise.reset_mock()
 
-                return True
-
-            assert run()
 
     @mock.patch("os.environ", dict())
-    def test_add_docs_orchestrator_fails_with_no_default(self):
+    def test_add_documents_fails_with_no_default(self):
         """
             If no best available device is set, this function should raise internal error.
         """
@@ -148,54 +116,59 @@ class TestDefaultDevice(MarqoTestCase):
                 add_docs_params=AddDocsParams(index_name=self.index_name_1, 
                                 docs=[{"Title": "blah"} for i in range(5)], 
                                 auto_refresh=True,
-                                # no device set, so should default to best
+                                device = None,
                             ),
             )
             raise AssertionError
-        except InternalError:
+        except InternalError as e:
+            assert "Best available device was not properly determined on Marqo startup." in str(e)
+            pass
+
+    def test_add_documents_with_no_device(self):
+        """
+            when device is not set, add documents call should raise an internal error
+            this is because AddDocsParams.device only accept `str` or `None`.
+        """
+        try:
+            tensor_search.add_documents(
+                config=self.config, add_docs_params=AddDocsParams(
+                    index_name=self.index_name_1,
+                    docs=[{
+                        "_id": "123",
+                        "id": "abcdefgh",
+                        "title 1": "content 1",
+                        "desc 2": "content 2. blah blah blah"
+                    }],
+                    auto_refresh=True
+                )
+            )
+            raise AssertionError
+        except TypeError as e:
+            assert "missing 1 required positional argument: 'device'" in str(e)
             pass
         
-    def test_add_docs_orchestrator_uses_set_device(self):
+    def test_add_document_uses_set_device(self):
         """
             when device is explicitly set,
             add docs orchestrator should call add_documents
             with set device, ignoring MARQO_BEST_AVAILABLE_DEVICE
         """
-        test_cases = [
-            ("cpu", "cuda", {}, ["marqo.tensor_search.tensor_search.add_documents"]),   # normal
-            ("cuda", "cpu", {}, ["marqo.tensor_search.tensor_search.add_documents"]),   # normal
-        ]
-        for best_available_device, explicitly_set_device, extra_params, called_methods in test_cases:
-            @mock.patch.dict(os.environ, {**os.environ, **{"MARQO_BEST_AVAILABLE_DEVICE": best_available_device}})
-            def run():
-                # Mock inner methods
-                # Create and start a patcher for each method
-                patchers = [mock.patch(method) for method in called_methods]
-                mocks = [patcher.start() for patcher in patchers]
-
-                # Call orchestrator
-                tensor_search.add_documents(
+        dummy_vector = [[0.0, ] * 384, ]
+        devices_list = ["cpu", "cuda", "cuda:0", "cuda:1"]
+        for explicitly_set_device in devices_list:
+            with patch("marqo.s2_inference.s2_inference.vectorise", return_value=dummy_vector) as mock_vectorise,\
+                 patch("marqo.tensor_search.models.add_docs_objects._get_default_device") as mock_get_default_device:
+                    tensor_search.add_documents(
                     config=self.config,
-                    add_docs_params=AddDocsParams(index_name=self.index_name_1, 
-                                    docs=[{"Title": "blah"} for i in range(5)], 
+                    add_docs_params=AddDocsParams(index_name=self.index_name_1,
+                                    docs=[{"Title": "blah"} for _ in range(5)],
                                     auto_refresh=True,
-                                    device=explicitly_set_device
+                                    device = explicitly_set_device,
                                 ),
-                    **extra_params
-                )
-                # Confirm lower level functions were called with default device
-                for mocked_method in mocks:
-                    if "add_docs_params" in mocked_method.call_args[1]:
-                        assert mocked_method.call_args[1]["add_docs_params"].device == explicitly_set_device
-                    else:
-                        assert mocked_method.call_args[1]["device"] == explicitly_set_device
-                
-                # Stop all the patchers (important, if not stopped, will leak into next tests)
-                for patcher in patchers:
-                    patcher.stop()
-                return True
-
-            assert run()
+                    )
+                    mock_get_default_device.assert_not_called()
+                    assert mock_vectorise.call_args.kwargs["device"] == explicitly_set_device
+                    mock_vectorise.reset_mock()
     
     def test_search_defaults_to_best_device(self):
         """

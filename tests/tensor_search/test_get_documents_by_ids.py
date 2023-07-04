@@ -138,7 +138,7 @@ class TestGetDocuments(MarqoTestCase):
         tensor_search.add_documents(
             config=self.config, batch_size=50, add_docs_params=AddDocsParams(
                 index_name=self.index_name_2,
-                docs=docs, auto_refresh=False
+                docs=docs, auto_refresh=False, device="cpu"
             )
         )
         tensor_search.refresh_index(config=self.config, index_name=self.index_name_2)
@@ -179,9 +179,8 @@ class TestGetDocuments(MarqoTestCase):
         tensor_search.add_documents(
             config=self.config, add_docs_params=AddDocsParams(
                 index_name=self.index_name_1,
-                docs=docs, auto_refresh=False
+                docs=docs, auto_refresh=False, device = "cpu"
             ),
-            batch_size=50
         )
         tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
 

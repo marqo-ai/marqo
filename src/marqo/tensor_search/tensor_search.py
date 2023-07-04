@@ -337,8 +337,6 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
     t0 = timer()
     bulk_parent_dicts = []
 
-    if not add_docs_params.device:
-        raise errors.InternalError("add_documents (internal function) cannot be called without setting device!")
     try:
         index_info = backend.get_index_info(config=config, index_name=add_docs_params.index_name)
     except errors.IndexNotFoundError:
@@ -567,7 +565,6 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                              'code': image_err.code})
                     )
                     break
-
                 if (len(vector_chunks) != len(text_chunks)):
                     raise RuntimeError(
                         f"the input content after preprocessing and its vectorized counterparts must be the same length."
