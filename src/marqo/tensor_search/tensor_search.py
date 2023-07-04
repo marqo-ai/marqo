@@ -267,6 +267,9 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
     RequestMetricsStore.for_request().start("add_documents.processing_before_opensearch")
     start_time_3 = timer()
 
+    if add_docs_params.mappings is not None:
+        validation.validate_mappings_object(mappings_object=add_docs_params.mappings)
+
     t0 = timer()
     bulk_parent_dicts = []
 
