@@ -92,13 +92,18 @@ def construct_authorized_url(url_base: str, username: str, password: str) -> str
 # TODO: move filtering logic to dedicated file
 def build_tensor_search_filter(
         filter_string: str, simple_properties: dict,
-        vector_properties_to_search: Sequence):
+        searchable_attribs: Sequence):
     """Builds a Lucene-DSL filter string for OpenSearch, that combines the user's filter string
     with searchable_attributes
 
     """
-    searchable_attribs_filter = build_searchable_attributes_filter(
-        vector_properties_to_search=vector_properties_to_search)
+    if searchable_attribs is not None:
+        copied_searchable_attribs = copy.deepcopy(searchable_attribs)
+        searchable_attribs_filter = build_searchable_attributes_filter(
+            searchable_attribs=copied_searchable_attribs)
+    else:
+        searchable_attribs_filter = ""
+
     contextualised_user_filter = contextualise_user_filter(
         filter_string=filter_string, simple_properties=simple_properties)
 
@@ -108,22 +113,22 @@ def build_tensor_search_filter(
         return f"{searchable_attribs_filter}{contextualised_user_filter}"
 
 
-def build_searchable_attributes_filter(vector_properties_to_search: Sequence) -> str:
+def build_searchable_attributes_filter(searchable_attribs: Sequence) -> str:
     """Constructs the filter used to narrow the search down to specific searchable attributes"""
-    if len(vector_properties_to_search) == 0:
+    if len(searchable_attribs) == 0:
         return ""
 
-    vector_prop_count = len(vector_properties_to_search)
+    vector_prop_count = len(searchable_attribs)
 
     # brackets surround field name, in case it contains a space:
-    sanitised_attr_name = f"({sanitise_lucene_special_chars(vector_properties_to_search.pop())})"
+    sanitised_attr_name = f"({sanitise_lucene_special_chars(searchable_attribs.pop())})"
 
     if vector_prop_count == 1:
         return f"{enums.TensorField.chunks}.{enums.TensorField.field_name}:{sanitised_attr_name}"
     else:
         return (
             f"{enums.TensorField.chunks}.{enums.TensorField.field_name}:{sanitised_attr_name}"
-            f" OR {build_searchable_attributes_filter(vector_properties_to_search=vector_properties_to_search)}")
+            f" OR {build_searchable_attributes_filter(searchable_attribs=searchable_attribs)}")
 
 def sanitise_lucene_special_chars(user_str: str) -> str:
     """Santitises Lucene's special chars.
