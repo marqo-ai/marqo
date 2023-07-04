@@ -1,3 +1,29 @@
+# Release 0.1.0
+
+## New features
+- Telemetry. Marqo now includes various timing metrics for many API endpoints when 
+the query parameter `telemetry=True` is specified (https://github.com/marqo-ai/marqo/pull/506).
+- Consolidate default device to CUDA when available (https://github.com/marqo-ai/marqo/pull/508).
+- Model download integrity verification (https://github.com/marqo-ai/marqo/pull/502).
+
+## Breaking changes
+- Remove deprecated `add_or_update_documents` endpoint (https://github.com/marqo-ai/marqo/pull/517).
+- Disable automatic index creation. Marqo will no longer automatically create an index if it does not exist 
+(https://github.com/marqo-ai/marqo/pull/516).
+Attempting to add documents to a non-existent index will now result in an error (https://github.com/marqo-ai/marqo/pull/516).
+- Remove parallel indexing (https://github.com/marqo-ai/marqo/pull/523). Marqo no longer supports server-side parallel
+indexing. Parallelisation can still be implemented by the client.
+
+## Bug fixes and minor changes
+- Improve error messages (https://github.com/marqo-ai/marqo/pull/494, https://github.com/marqo-ai/marqo/pull/499).
+- Improve API request validation (https://github.com/marqo-ai/marqo/pull/495).
+- Add new multimodal search example (https://github.com/marqo-ai/marqo/pull/503).
+- Remove autocast for CPU to speed up vectorisation on ARM64 machines (https://github.com/marqo-ai/marqo/pull/491).
+- Enhance test stability (https://github.com/marqo-ai/marqo/pull/514).
+- Ignore `.kibana` index (https://github.com/marqo-ai/marqo/pull/512).
+- Improve handling of whitespace when indexing documents (https://github.com/marqo-ai/marqo/pull/521).
+- Update CUDA version to 11.4.3 (https://github.com/marqo-ai/marqo/pull/525).
+
 # Release 0.0.21
 
 ## New features
