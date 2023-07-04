@@ -7,7 +7,6 @@ from tests.marqo_test import MarqoTestCase
 from unittest.mock import patch, ANY
 from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQueryEntity
 from marqo.tensor_search.enums import EnvVars
-from marqo.tensor_search.models.add_docs_objects import _get_default_device
 
 class TestDefaultDevice(MarqoTestCase):
 
@@ -134,7 +133,7 @@ class TestDefaultDevice(MarqoTestCase):
         devices_list = ["cpu", "cuda", "cuda:0", "cuda:1"]
         for explicitly_set_device in devices_list:
             with patch("marqo.s2_inference.s2_inference.vectorise", return_value=dummy_vector) as mock_vectorise,\
-                 patch("marqo.tensor_search.models.add_docs_objects.get_best_available_device") as mock_get_default_device:
+                 patch("marqo.tensor_search.models.add_docs_objects.get_best_available_device") as mock_get_best_available_device:
                     tensor_search.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(index_name=self.index_name_1,
@@ -143,7 +142,7 @@ class TestDefaultDevice(MarqoTestCase):
                                     device = explicitly_set_device,
                                 ),
                     )
-                    mock_get_default_device.assert_not_called()
+                    mock_get_best_available_device.assert_not_called()
                     assert mock_vectorise.call_args.kwargs["device"] == explicitly_set_device
                     mock_vectorise.reset_mock()
     
