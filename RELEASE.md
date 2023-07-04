@@ -1,8 +1,8 @@
 # Release 0.1.0
 
 ## New features
-- Telemetry. Marqo now includes various timing metrics for many API endpoints when 
-the query parameter `telemetry=True` is specified (https://github.com/marqo-ai/marqo/pull/506). The metrics will be
+- Telemetry. Marqo now includes various timing metrics for the `search`, `bulk_search` and `add_documents` endpoints
+when the query parameter `telemetry=True` is specified (https://github.com/marqo-ai/marqo/pull/506). The metrics will be
 returned in the response body and provide a breakdown of latencies for various stages of the API call.
 - Consolidate default device to CUDA when available (https://github.com/marqo-ai/marqo/pull/508). By default,
 Marqo now uses CUDA devices for search and indexing if available.
