@@ -93,6 +93,7 @@ class TestDefaultDevice(MarqoTestCase):
         for best_available_device in devices_list:
             for AddDocsParams_kwargs in AddDocsParams_kwargs_list:
                 with patch.dict("marqo.tensor_search.utils.os.environ", {EnvVars.MARQO_BEST_AVAILABLE_DEVICE: best_available_device}),\
+                     patch("marqo.tensor_search.utils.check_device_is_available", return_value=True) as mock_check_device_is_available,\
                      patch("marqo.s2_inference.s2_inference.vectorise", return_value=dummy_vector) as mock_vectorise:
                         tensor_search.add_documents(
                         config=self.config,
@@ -100,7 +101,8 @@ class TestDefaultDevice(MarqoTestCase):
                         )
                         assert mock_vectorise.call_args.kwargs["device"] == best_available_device
                         mock_vectorise.reset_mock()
-
+                        mock_check_device_is_available.assert_called_once_with(best_available_device)
+                        mock_check_device_is_available.reset_mock()
 
     @mock.patch("os.environ", dict())
     def test_add_documents_fails_with_no_default(self):

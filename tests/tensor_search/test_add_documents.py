@@ -1137,25 +1137,3 @@ class TestAddDocuments(MarqoTestCase):
             assert len(expected_repo_structure) == len(image_repo)
             for k in expected_repo_structure:
                 assert isinstance(image_repo[k], expected_repo_structure[k])
-
-    def test_add_documents_defaults_to_best_available_device(self):
-        """
-            when device is None or not specified, add_documents will decide the value based on EnvVars.MARQO_BEST_AVAILABLE_DEVICE
-            and pass it to vectorise
-        """
-        dummy_vector = [[0.0, ] * 384, ]
-        devices_list = ["cpu", "cuda", "cuda:0", "cuda:1"]
-        AddDocsParams_kwargs_list = [{"index_name": self.index_name_1, "docs": [{"Title": "blah"} for _ in range(5)], "auto_refresh": True, "device": None},
-                           {"index_name": self.index_name_1, "docs": [{"Title": "blah"} for _ in range(5)], "auto_refresh": True,}]
-
-        for best_available_device in devices_list:
-            for AddDocsParams_kwargs in AddDocsParams_kwargs_list:
-                with patch.dict("marqo.tensor_search.utils.os.environ", {EnvVars.MARQO_BEST_AVAILABLE_DEVICE: best_available_device}),\
-                     patch("marqo.s2_inference.s2_inference.vectorise", return_value=dummy_vector) as mock_vectorise:
-                        tensor_search.add_documents(
-                        config=self.config,
-                        add_docs_params=AddDocsParams(**AddDocsParams_kwargs)
-                        )
-                        assert mock_vectorise.call_args.kwargs["device"] == best_available_device
-                        mock_vectorise.reset_mock()
-
