@@ -136,7 +136,7 @@ class TestGetDocuments(MarqoTestCase):
             }})
         docs = [{"Title": "a", "_id": uuid.uuid4().__str__()} for _ in range(2000)]
         tensor_search.add_documents(
-            config=self.config, batch_size=50, add_docs_params=AddDocsParams(
+            config=self.config, add_docs_params=AddDocsParams(
                 index_name=self.index_name_2,
                 docs=docs, auto_refresh=False, device="cpu"
             )
