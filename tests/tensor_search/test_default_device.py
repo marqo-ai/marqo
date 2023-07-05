@@ -424,6 +424,7 @@ class TestDefaultDevice(MarqoTestCase):
             raise AssertionError
         except InternalError:
             pass
+
     def test_get_best_available_device_cpu(self):
         '''Test the get_best_available_device function when CPU is the only available device'''
         available_devices_list = ['cpu']
