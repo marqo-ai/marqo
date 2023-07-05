@@ -398,7 +398,7 @@ class TestUtils(unittest.TestCase):
         for unavailable_device in unavailable_devices_list:
             with patch('torch.cuda.is_available', return_value=False), \
                 patch('torch.cuda.device_count', return_value=2), \
-                patch.dict('os.environ', dict()):
+                patch.dict('os.environ', {enums.EnvVars.MARQO_BEST_AVAILABLE_DEVICE: unavailable_device}):
                 try:
                     utils.get_best_available_device()
                     raise AssertionError
