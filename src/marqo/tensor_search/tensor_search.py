@@ -203,13 +203,13 @@ def _marqo_field_limit_to_os_limit(marqo_index_field_limit: int) -> int:
     """Translates a Marqo Index Field limit (that a Marqo user will set)
     into the equivalent limit for Marqo-OS
 
-    Each Marqo field generates 3 Marqo-OS fields:
+    Each Marqo field generates 2 Marqo-OS fields:
         - One for its content
-        - One for its vector
         - One for filtering
 
-    There are also 3 fields that will be generated on a Marqo index, in most
+    There are also 4 fields that will be generated on a Marqo index, in most
     cases:
+        - one for __vector_marqo_knn_field
         - one for the chunks field
         - one for chunk's __field_content
         - one for chunk's __field_name
@@ -217,7 +217,7 @@ def _marqo_field_limit_to_os_limit(marqo_index_field_limit: int) -> int:
     Returns:
         The corresponding Marqo-OS limit
     """
-    return (marqo_index_field_limit * 3) + 3
+    return (marqo_index_field_limit * 2) + 4
 
 
 def _autofill_index_settings(index_settings: dict):

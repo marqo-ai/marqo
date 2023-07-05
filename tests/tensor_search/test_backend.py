@@ -13,6 +13,7 @@ from unittest import mock
 class TestBackend(MarqoTestCase):
 
     def setUp(self) -> None:
+        self.endpoint = self.authorized_url
         self.generic_header = {"Content-type": "application/json"}
         self.index_name_1 = "my-test-index-1"
         try:
@@ -59,62 +60,76 @@ class TestBackend(MarqoTestCase):
 
         tensor_search.create_vector_index(
             config=mock_config, index_name=self.index_name_1)
-        @mock.patch("marqo._httprequests.HttpRequests.put", mock__put)
-        def run():
-            add_docs_caller(config=mock_config, docs=[{"f1": "doc"}, {"f2":"C"}],
-                            index_name=self.index_name_1, auto_refresh=True)
-            return True
-        assert run()
-        args, kwargs0 = mock__put.call_args_list[0]
-        sent_dict = json.loads(kwargs0["body"])
-        assert "lucene" == sent_dict["properties"][enums.TensorField.chunks
-            ]["properties"][enums.TensorField.marqo_knn_field]["method"]["engine"]
-    
+        
+        settings = requests.get(
+            url=f"{self.endpoint}/{self.index_name_1}/_mapping",
+            verify=False
+        ).json()
+        retrieved_settings = settings[self.index_name_1]["mappings"]["_meta"][enums.IndexSettingsField.index_settings]
+
+        # check meta has lucene engine
+        assert retrieved_settings[enums.IndexSettingsField.index_defaults][enums.IndexSettingsField.ann_parameters][enums.IndexSettingsField.ann_engine] \
+            == "lucene"
+
+        # check mappings has lucene engine
+        params = settings[self.index_name_1]['mappings']['properties']['__chunks']['properties'][enums.TensorField.marqo_knn_field]['method']
+        assert params['engine'] == 'lucene'
+        
     def test_add_customer_field_properties_default_ann_parameters(self):
         mock_config = copy.deepcopy(self.config)
         mock__put = mock.MagicMock()
 
         tensor_search.create_vector_index(
             config=mock_config, index_name=self.index_name_1)
-        @mock.patch("marqo._httprequests.HttpRequests.put", mock__put)
-        def run():
-            add_docs_caller(config=mock_config, docs=[{"f1": "doc"}, {"f2":"C"}],
-                                        index_name=self.index_name_1, auto_refresh=True)
-            return True
-        assert run()
-        args, kwargs0 = mock__put.call_args_list[0]
-        sent_dict = json.loads(kwargs0["body"])
-        assert sent_dict["properties"][enums.TensorField.chunks]["properties"][utils.generate_vector_name(field_name="f1")]["method"] == get_default_ann_parameters()
+        
+        settings = requests.get(
+            url=f"{self.endpoint}/{self.index_name_1}/_mapping",
+            verify=False
+        ).json()
+        retrieved_settings = settings[self.index_name_1]["mappings"]["_meta"][enums.IndexSettingsField.index_settings]
+
+        # check ann parameters in meta are correct
+        assert retrieved_settings[enums.IndexSettingsField.index_defaults][enums.IndexSettingsField.ann_parameters] \
+            == get_default_ann_parameters()
+
+        # check ann parameters in mappings are correct
+        params = settings[self.index_name_1]['mappings']['properties']['__chunks']['properties'][enums.TensorField.marqo_knn_field]['method']
+        assert params \
+            == get_default_ann_parameters()
 
 
     def test_add_customer_field_properties_index_ann_parameters(self):
         mock_config = copy.deepcopy(self.config)
         mock__put = mock.MagicMock()
 
+        custom_settings = {
+            enums.IndexSettingsField.index_defaults: {
+                enums.IndexSettingsField.ann_parameters: {
+                    enums.IndexSettingsField.ann_method_parameters: {
+                        enums.IndexSettingsField.hnsw_ef_construction: 1,
+                        enums.IndexSettingsField.hnsw_m: 2
+                    }
+                }
+            }   
+        }
         tensor_search.create_vector_index(
             config=mock_config,
             index_name=self.index_name_1,
-            index_settings={
-                enums.IndexSettingsField.index_defaults: {
-                    enums.IndexSettingsField.ann_parameters: {
-                        enums.IndexSettingsField.ann_method_parameters: {
-                            enums.IndexSettingsField.hnsw_ef_construction: 1,
-                            enums.IndexSettingsField.hnsw_m: 2
-                        }
-                    }
-                }   
-            }
+            index_settings=custom_settings
         )
-        @mock.patch("marqo._httprequests.HttpRequests.put", mock__put)
-        def run():
-            add_docs_caller(config=mock_config, docs=[{"f1": "doc"}, {"f2":"C"}],
-                                        index_name=self.index_name_1, auto_refresh=True)
-            return True
-        assert run()
-        args, kwargs0 = mock__put.call_args_list[0]
-        sent_dict = json.loads(kwargs0["body"])
-        assert sent_dict["properties"][enums.TensorField.chunks]["properties"][utils.generate_vector_name(field_name="f1")]["method"]['engine'] == "lucene"
-        assert sent_dict["properties"][enums.TensorField.chunks]["properties"][utils.generate_vector_name(field_name="f1")]["method"]["parameters"] == {
-                            enums.IndexSettingsField.hnsw_ef_construction: 1,
-                            enums.IndexSettingsField.hnsw_m: 2
-                        }
+
+        settings = requests.get(
+            url=f"{self.endpoint}/{self.index_name_1}/_mapping",
+            verify=False
+        ).json()
+        retrieved_settings = settings[self.index_name_1]["mappings"]["_meta"][enums.IndexSettingsField.index_settings]
+
+        # check ann parameters in meta are correct
+        assert custom_settings[enums.IndexSettingsField.index_defaults][enums.IndexSettingsField.ann_parameters][enums.IndexSettingsField.ann_method_parameters] \
+            == retrieved_settings[enums.IndexSettingsField.index_defaults][enums.IndexSettingsField.ann_parameters][enums.IndexSettingsField.ann_method_parameters]
+
+        # check ann parameters in mappings are correct
+        params = settings[self.index_name_1]['mappings']['properties']['__chunks']['properties'][enums.TensorField.marqo_knn_field]['method']
+        assert params['parameters'] \
+            == custom_settings[enums.IndexSettingsField.index_defaults][enums.IndexSettingsField.ann_parameters][enums.IndexSettingsField.ann_method_parameters]
+

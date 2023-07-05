@@ -8,7 +8,7 @@ from marqo.errors import MarqoApiError, MarqoError, IndexNotFoundError
 from marqo.tensor_search import tensor_search, configs, backend
 from marqo.tensor_search.utils import read_env_vars_and_defaults
 from tests.marqo_test import MarqoTestCase
-from marqo.tensor_search.enums import IndexSettingsField as NsField
+from marqo.tensor_search.enums import IndexSettingsField as NsField, TensorField
 from unittest import mock
 from marqo.tensor_search.models.settings_object import settings_schema
 from marqo import errors
@@ -179,7 +179,7 @@ class TestCreateIndex(MarqoTestCase):
             url=self.endpoint + "/" + self.index_name_1 + "/_mapping",
             verify=False
         ).json()
-        params = mappings[self.index_name_1]['mappings']['properties']['__chunks']['properties']['__vector_Title']['method']
+        params = mappings[self.index_name_1]['mappings']['properties']['__chunks']['properties'][TensorField.marqo_knn_field]['method']
         assert params['engine'] == 'lucene'
         assert params['space_type'] == 'cosinesimil'
         assert params['parameters'] == {'ef_construction': 128, 'm': 16}
@@ -217,7 +217,7 @@ class TestCreateIndex(MarqoTestCase):
             url=self.endpoint + "/" + self.index_name_1 + "/_mapping",
             verify=False
         ).json()
-        params = mappings[self.index_name_1]['mappings']['properties']['__chunks']['properties']['__vector_Title']['method']
+        params = mappings[self.index_name_1]['mappings']['properties']['__chunks']['properties'][TensorField.marqo_knn_field]['method']
         assert params['engine'] == 'lucene'
         assert params['space_type'] == 'l2'
         assert params['parameters'] == {'ef_construction': 133, 'm': 17}
