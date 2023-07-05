@@ -387,11 +387,13 @@ class TestUtils(unittest.TestCase):
         '''Test the get_best_available_device function when CPU is the only available device'''
         available_devices_list = ['cpu']
         unavailable_devices_list = ['cuda', 'cuda:0', 'cuda:1']
+
         # Available devices
         for available_device in available_devices_list:
             with patch('torch.cuda.is_available', return_value=False),\
                  patch.dict('os.environ', {enums.EnvVars.MARQO_BEST_AVAILABLE_DEVICE: available_device}):
                 self.assertEqual(utils.get_best_available_device(), available_device)
+
         # Unavailable devices
         for unavailable_device in unavailable_devices_list:
             with patch('torch.cuda.is_available', return_value=False), \
@@ -402,6 +404,7 @@ class TestUtils(unittest.TestCase):
                     raise AssertionError
                 except errors.InternalError as e:
                     self.assertIn(f"Invalid device: {unavailable_device}.", str(e))
+
         # EnvVar not set
         with patch('torch.cuda.is_available', return_value=False), \
             patch('torch.cuda.device_count', return_value=2), \
