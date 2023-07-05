@@ -408,7 +408,7 @@ class TestUtils(unittest.TestCase):
         # EnvVar not set
         with patch('torch.cuda.is_available', return_value=False), \
             patch('torch.cuda.device_count', return_value=2), \
-            patch.dict('os.environ', {}):
+            patch.dict('marqo.tensor_search.utils.os.environ',{}):
             try:
                 utils.get_best_available_device()
                 raise AssertionError
@@ -440,8 +440,8 @@ class TestUtils(unittest.TestCase):
 
         # EnvVars not set
         with patch('torch.cuda.is_available', return_value=True), \
-                patch('torch.cuda.device_count', return_value=2), \
-                patch.dict('os.environ', dict()):
+            patch('torch.cuda.device_count', return_value=2), \
+            patch.dict('marqo.tensor_search.utils.os.environ',{}):
             try:
                 utils.get_best_available_device()
                 raise AssertionError
