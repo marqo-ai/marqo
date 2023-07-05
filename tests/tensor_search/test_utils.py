@@ -7,7 +7,7 @@ from marqo.tensor_search import utils
 from marqo.tensor_search import enums
 from marqo import errors
 from unittest import mock
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 
 class TestUtils(unittest.TestCase):
@@ -405,10 +405,12 @@ class TestUtils(unittest.TestCase):
                 except errors.InternalError as e:
                     self.assertIn(f"Invalid device: {unavailable_device}.", str(e))
 
+        mock_environ = MagicMock()
+
         # EnvVar not set
         with patch('torch.cuda.is_available', return_value=False), \
             patch('torch.cuda.device_count', return_value=2), \
-            patch.dict('marqo.tensor_search.utils.os.environ',{}):
+            patch.dict('os.environ', mock_environ):
             try:
                 utils.get_best_available_device()
                 raise AssertionError
@@ -438,10 +440,11 @@ class TestUtils(unittest.TestCase):
                 except errors.InternalError as e:
                     self.assertIn(f"Invalid device: {unavailable_device}.", str(e))
 
+        mock_environ = MagicMock()
         # EnvVars not set
         with patch('torch.cuda.is_available', return_value=True), \
             patch('torch.cuda.device_count', return_value=2), \
-            patch.dict('marqo.tensor_search.utils.os.environ',{}):
+            patch.dict('os.environ', mock_environ):
             try:
                 utils.get_best_available_device()
                 raise AssertionError
