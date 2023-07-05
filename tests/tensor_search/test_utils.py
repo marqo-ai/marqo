@@ -397,7 +397,6 @@ class TestUtils(unittest.TestCase):
         # Unavailable devices
         for unavailable_device in unavailable_devices_list:
             with patch('torch.cuda.is_available', return_value=False), \
-                patch('torch.cuda.device_count', return_value=2), \
                 patch.dict('os.environ', {enums.EnvVars.MARQO_BEST_AVAILABLE_DEVICE: unavailable_device}):
                 try:
                     utils.get_best_available_device()
@@ -405,12 +404,10 @@ class TestUtils(unittest.TestCase):
                 except errors.InternalError as e:
                     self.assertIn(f"Invalid device: {unavailable_device}.", str(e))
 
-        mock_environ = MagicMock()
 
         # EnvVar not set
         with patch('torch.cuda.is_available', return_value=False), \
-            patch('torch.cuda.device_count', return_value=2), \
-            patch.dict('os.environ', mock_environ):
+            patch.dict('os.environ', {}):
             try:
                 utils.get_best_available_device()
                 raise AssertionError
@@ -440,11 +437,10 @@ class TestUtils(unittest.TestCase):
                 except errors.InternalError as e:
                     self.assertIn(f"Invalid device: {unavailable_device}.", str(e))
 
-        mock_environ = MagicMock()
         # EnvVars not set
         with patch('torch.cuda.is_available', return_value=True), \
             patch('torch.cuda.device_count', return_value=2), \
-            patch.dict('os.environ', mock_environ):
+            patch.dict('os.environ', {}):
             try:
                 utils.get_best_available_device()
                 raise AssertionError
