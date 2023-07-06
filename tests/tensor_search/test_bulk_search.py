@@ -6,9 +6,9 @@ import random
 from unittest import mock
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.s2_inference.errors import UnknownModelError
-from marqo.s2_inference.s2_inference import vectorise
+from marqo.s2_inference.s2_inference import vectorise, get_model_properties_from_registry
 import unittest
-from marqo.tensor_search.enums import TensorField, SearchMethod, EnvVars, IndexSettingsField
+from marqo.tensor_search.enums import TensorField, SearchMethod, EnvVars, IndexSettingsField, MlModel
 from marqo.errors import (
     BackendCommunicationError, IndexNotFoundError, InvalidArgError, IllegalRequestedDocCount, BadRequestError,
     InternalError
@@ -177,7 +177,7 @@ class TestCreateVectorJobs(MarqoTestCase):
         vector_job_pointers: List[VectorisedJobPointer] = qidx_to_job[0]
         self.assertTrue(mock_get_index_info.called_with(self.config, query.index))
         
-        assert(2, len(vector_job_pointers))
+        self.assertEqual(2, len(vector_job_pointers))
         jobs[vector_job_pointers[0].job_hash].content = query.q
         jobs[vector_job_pointers[0].job_hash].model_name = "model_name"
         jobs[vector_job_pointers[1].job_hash].content = []
@@ -198,7 +198,7 @@ class TestCreateVectorJobs(MarqoTestCase):
 
             vector_job_pointers: List[VectorisedJobPointer] = qidx_to_job[idx]
             
-            assert(2, len(vector_job_pointers))
+            self.assertEqual(2, len(vector_job_pointers))
             jobs[vector_job_pointers[0].job_hash].content = query.q
             jobs[vector_job_pointers[0].job_hash].model_name = "model_name"
             jobs[vector_job_pointers[1].job_hash].content = []
@@ -218,7 +218,7 @@ class TestCreateVectorJobs(MarqoTestCase):
 
             vector_job_pointers: List[VectorisedJobPointer] = qidx_to_job[idx]
             
-            assert(2, len(vector_job_pointers))
+            self.assertEqual(2, len(vector_job_pointers))
             jobs[vector_job_pointers[0].job_hash].content = query.q
             jobs[vector_job_pointers[0].job_hash].model_name = "model_name"
             jobs[vector_job_pointers[1].job_hash].content = []
@@ -1144,7 +1144,9 @@ class TestBulkSearch(MarqoTestCase):
         mock_config = copy.deepcopy(self.config)
 
         mock_vectorise = mock.MagicMock()
-        mock_vectorise.return_value = [[0, 0, 0, 0]]
+
+        DEFAULT_MODEL_DIMENSION = get_model_properties_from_registry(MlModel.bert)["dimensions"]
+        mock_vectorise.return_value = [[0 for i in range(DEFAULT_MODEL_DIMENSION)]]
 
         @mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
         def run():
@@ -1565,7 +1567,69 @@ class TestBulkSearch(MarqoTestCase):
     
         assert run()
 
-    def test_pagination_multi_field_error(self):
+    def test_empty_searchable_attributes(self):
+        # Result should be empty whether paginated or not.
+        docs = [
+            {
+                "field_a": 0,
+                "field_b": 0, 
+                "field_c": 0
+            },
+            {
+                "field_a": 1,
+                "field_b": 1, 
+                "field_c": 1
+            }
+        ]
+
+        add_docs_caller(
+            config=self.config, index_name=self.index_name_1,
+            docs=docs, auto_refresh=False
+        )
+
+        tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
+        
+        res = tensor_search.bulk_search(
+                            marqo_config=self.config, query=BulkSearchQuery(
+                            queries=[BulkSearchQueryEntity(
+                                index=self.index_name_1, q="some text",
+                                searchableAttributes=[], searchMethod="TENSOR"
+                            )])
+        )
+        assert res['result'][0]["hits"] == []
+    
+    def test_pagination_empty_searchable_attributes(self):
+        # Result should be empty whether paginated or not.
+        docs = [
+            {
+                "field_a": 0,
+                "field_b": 0, 
+                "field_c": 0
+            },
+            {
+                "field_a": 1,
+                "field_b": 1, 
+                "field_c": 1
+            }
+        ]
+
+        add_docs_caller(
+            config=self.config, index_name=self.index_name_1,
+            docs=docs, auto_refresh=False
+        )
+
+        tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
+        
+        res = tensor_search.bulk_search(
+                            marqo_config=self.config, query=BulkSearchQuery(
+                            queries=[BulkSearchQueryEntity(
+                                index=self.index_name_1, q="some text",
+                                searchableAttributes=[], searchMethod="TENSOR", offset=1
+                            )])
+        )
+        assert res['result'][0]["hits"] == []
+    
+    def test_pagination_multi_field(self):
         # Try pagination with 0, 2, and 3 fields
         # To be removed when multi-field pagination is added.
         docs = [
@@ -1589,49 +1653,9 @@ class TestBulkSearch(MarqoTestCase):
         tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
     
         for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
-            try:
-                tensor_search.bulk_search(
-                    marqo_config=self.config, query=BulkSearchQuery(
-                    queries=[BulkSearchQueryEntity(
-                        index=self.index_name_1,
-                        q=" ",
-                        searchMethod=search_method,
-                        searchableAttributes=["field_a", "field_b"],
-                        offset=1
-                    )]
-                ))
-                raise AssertionError
-            except InvalidArgError:
-                pass
-    
-            try:
-                tensor_search.bulk_search(
-                    marqo_config=self.config, query=BulkSearchQuery(
-                    queries=[BulkSearchQueryEntity(
-                        index=self.index_name_1,
-                        q=" ",
-                        searchMethod=search_method,
-                        offset=1
-                    )]
-                ))
-                raise AssertionError
-            except InvalidArgError:
-                pass
-    
-            try:
-                tensor_search.bulk_search(
-                    marqo_config=self.config, query=BulkSearchQuery(
-                    queries=[BulkSearchQueryEntity(
-                        index=self.index_name_1,
-                        q=" ",
-                        searchMethod=search_method,
-                        searchableAttributes=[],
-                        offset=1
-                    )]
-                ))
-                raise AssertionError
-            except InvalidArgError:
-                pass
+            # TODO: search with 2 and 3 searchable attribs, make sure result count is correct
+            # You can copy logic from test_pagination_single_field
+            pass
 
     def test_image_search_highlights(self):
         """does the URL get returned as the highlight? (it should - because no rerankers are being used)"""
@@ -1975,7 +1999,7 @@ class TestBulkSearch(MarqoTestCase):
                 query_dict = search_dicts[1]
 
                 query_vec = query_dict['query']['nested']['query']['knn'][
-                    f"{TensorField.chunks}.{utils.generate_vector_name('loc a')}"]['vector']
+                    f"{TensorField.chunks}.{TensorField.marqo_knn_field}"]['vector']
                 return query_vec
 
             # manually calculate weights:
@@ -2065,7 +2089,7 @@ class TestBulkSearch(MarqoTestCase):
             query_dicts = [elem for i, elem in enumerate(search_dicts) if i % 2 == 1]
 
             query_vecs = [query_dict['query']['nested']['query']['knn'][
-                f"{TensorField.chunks}.{utils.generate_vector_name('loc a')}"]['vector']
+                f"{TensorField.chunks}.{TensorField.marqo_knn_field}"]['vector']
                            for query_dict in query_dicts]
             return query_vecs
         combined_queries = run()

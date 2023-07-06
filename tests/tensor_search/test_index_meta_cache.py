@@ -105,9 +105,15 @@ class TestIndexMetaCache(MarqoTestCase):
                 auto_refresh=True, device="cpu"
             )
         )
+
+        # None of these vector fields should exist
         for field in ["newer field", "goblin", "cool field", "abc", "haha"]:
             assert utils.generate_vector_name(field) \
-                   in index_meta_cache.get_cache()[self.index_name_1].properties[TensorField.chunks]["properties"]
+                   not in index_meta_cache.get_cache()[self.index_name_1].properties[TensorField.chunks]["properties"]
+        
+        # Only 1 vector field should exist
+        assert TensorField.marqo_knn_field \
+            in index_meta_cache.get_cache()[self.index_name_1].properties[TensorField.chunks]["properties"]
 
     def test_delete_removes_index_from_cache(self):
         """note the implicit index creation"""
@@ -352,7 +358,6 @@ class TestIndexMetaCache(MarqoTestCase):
     def test_index_settings_after_cache_refresh(self):
         expected_index_settings = configs.get_default_index_settings()
         expected_index_settings[IndexSettingsField.index_defaults][IndexSettingsField.model] = "special_model_1"
-
         index_meta_cache.empty_cache()
         assert self.index_name_3 not in index_meta_cache.get_cache()
         tensor_search.create_vector_index(

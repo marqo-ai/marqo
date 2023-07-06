@@ -4,11 +4,11 @@ import sys
 from tests.utils.transition import add_docs_caller
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from unittest import mock
-from marqo.s2_inference.s2_inference import vectorise
+from marqo.s2_inference.s2_inference import vectorise, get_model_properties_from_registry
 import numpy as np
 from marqo.tensor_search import utils
 import typing
-from marqo.tensor_search.enums import TensorField, SearchMethod, EnvVars, IndexSettingsField
+from marqo.tensor_search.enums import TensorField, SearchMethod, EnvVars, IndexSettingsField, MlModel
 from marqo.errors import (
     MarqoApiError, MarqoError, IndexNotFoundError, InvalidArgError,
     InvalidFieldNameError, IllegalRequestedDocCount, BadRequestError, InternalError
@@ -601,7 +601,10 @@ class TestVectorSearch(MarqoTestCase):
         """calling search with a specified device overrides MARQO_BEST_AVAILABLE_DEVICE"""
 
         mock_vectorise = mock.MagicMock()
-        mock_vectorise.return_value = [[0, 0, 0, 0]]
+
+        # Get vector dimension of the default BERT model
+        DEFAULT_MODEL_DIMENSION = get_model_properties_from_registry(MlModel.bert)["dimensions"]
+        mock_vectorise.return_value = [[0 for i in range(DEFAULT_MODEL_DIMENSION)]]
 
         @mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
         def run():
@@ -1003,8 +1006,8 @@ class TestVectorSearch(MarqoTestCase):
 
         assert run()
 
-
-    def test_pagination_no_searchable_attributes(self):
+    def test_empty_searchable_attributes(self):
+        # Result should be empty whether paginated or not.
         docs = [
             {
                 "field_a": 0,
@@ -1025,15 +1028,42 @@ class TestVectorSearch(MarqoTestCase):
 
         tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
 
-        for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
-            res = tensor_search.search(
-                config=self.config, index_name=self.index_name_1, text="some text",
-                searchable_attributes=[], search_method=SearchMethod.LEXICAL, offset=1
-            )
+        res = tensor_search.search(
+            config=self.config, index_name=self.index_name_1, text="some text",
+            searchable_attributes=[], search_method="TENSOR"
+        )
+        assert res["hits"] == []
+    
+    def test_pagination_empty_searchable_attributes(self):
+        # Result should be empty whether paginated or not.
+        docs = [
+            {
+                "field_a": 0,
+                "field_b": 0, 
+                "field_c": 0
+            },
+            {
+                "field_a": 1,
+                "field_b": 1, 
+                "field_c": 1
+            }
+        ]
+
+        add_docs_caller(
+            config=self.config, index_name=self.index_name_1,
+            docs=docs, auto_refresh=False
+        )
+
+        tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
+
+        res = tensor_search.search(
+            config=self.config, index_name=self.index_name_1, text="some text",
+            searchable_attributes=[], search_method="TENSOR", offset=1
+        )
+        assert res["hits"] == []
 
     def test_pagination_multi_field(self):
-        # Try pagination with 2, and 3 fields
-        # TODO: Add better testing for this
+        # Try pagination with 2 and 3 fields
         docs = [
             {
                 "field_a": 0,
@@ -1053,8 +1083,9 @@ class TestVectorSearch(MarqoTestCase):
         )
 
         tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
-
         for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
+            # TODO: search with 2 and 3 searchable attribs, make sure result count is correct
+            # You can copy logic from test_pagination_single_field
             pass
     
     def test_image_search_highlights(self):
