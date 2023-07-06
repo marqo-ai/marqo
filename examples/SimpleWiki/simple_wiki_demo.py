@@ -89,9 +89,6 @@ client.create_index(index_name, model='onnx/all_datasets_v4_MiniLM-L6')
 
 device = 'cpu'
 
-# here we use parallel indexing to speed up the task
-# Note: to use multiprocessing you will want at least 8GB of RAM and the maximum number 
-# of processes that can be supported will be system dependent. 
 responses = client.index(index_name).add_documents(data, device=device, client_batch_size=20)
 
 # optionally take a look at the responses

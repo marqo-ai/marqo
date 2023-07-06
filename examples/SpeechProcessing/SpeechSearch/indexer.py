@@ -24,8 +24,7 @@ def index_transciptions(
         annotated_transcriptions,
         non_tensor_fields=non_tensor_fields,
         device=device,
-        client_batch_size=batch_size,
-        server_batch_size=batch_size,
+        client_batch_size=batch_size
     )
 
     return response

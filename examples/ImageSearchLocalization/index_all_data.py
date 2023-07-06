@@ -44,8 +44,7 @@ client = Client()
 index_name_prefix = "visual-search"
 patch_methods = ["dino/v1", None, "yolox"] #["dino/v1", "dino/v2", "frcnn", None, "yolox"]
 model_name = "ViT-B/32"
-n_processes = 3
-batch_size = 50
+batch_size = 24
 
 # set this to false if you do not want to delete the previous index of the same name
 delete_index = True
@@ -81,5 +80,4 @@ for patch_method in patch_methods:
     response = client.create_index(index_name, settings_dict=settings)
 
 
-    response = client.index(index_name).add_documents(documents, device='cuda', 
-                                server_batch_size=batch_size, processes=n_processes)
+    response = client.index(index_name).add_documents(documents, device='cuda', client_batch_size=batch_size)

@@ -46,7 +46,8 @@ format of podcast_data -
 ####################################################
 index_name = "marqo-podcast-search-demo"
 mq = marqo.Client(url='http://localhost:8882')  # Connection to Marqo Docker Container
-mq.index(index_name).add_documents(podcast_data)  # If the index doesn't exist, Marqo will create it
+mq.create_index(index_name)
+mq.index(index_name).add_documents(podcast_data)
 stats = mq.index(index_name).get_stats()  # get the stats for the index
 print(f"{stats['numberOfDocuments']} documents added to index: {index_name}")
 

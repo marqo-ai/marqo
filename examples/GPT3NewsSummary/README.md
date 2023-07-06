@@ -79,6 +79,9 @@ DOC_INDEX_NAME = ''news-index'
 print('Establishing connection to marqo client.')
 mq = marqo.Client(url='http://localhost:8882')
 
+print('creating a Marqo index')
+mq.create_index(DOC_INDEX_NAME)
+
 print('Indexing documents')
 mq.index(DOC_INDEX_NAME).add_documents(MARQO_DOCUMENTS)
 ```  
