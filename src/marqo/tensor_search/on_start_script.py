@@ -113,11 +113,11 @@ class SetBestAvailableDevice:
             if it does, health check should throw a warning.
         """
         if torch.cuda.is_available():
-            os.environ["MARQO_BEST_AVAILABLE_DEVICE"] = "cuda"
+            os.environ[EnvVars.MARQO_BEST_AVAILABLE_DEVICE] = "cuda"
         else:
-            os.environ["MARQO_BEST_AVAILABLE_DEVICE"] = "cpu"
+            os.environ[EnvVars.MARQO_BEST_AVAILABLE_DEVICE] = "cpu"
         
-        self.logger.info(f"Best available device set to: {os.environ['MARQO_BEST_AVAILABLE_DEVICE']}")
+        self.logger.info(f"Best available device set to: {os.environ[EnvVars.MARQO_BEST_AVAILABLE_DEVICE]}")
 
 
 class ModelsForCacheing:

@@ -3,14 +3,13 @@ import os
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 import functools
 import json
-from unittest.mock import MagicMock, patch
 import math
 import pprint
 from unittest import mock
+from unittest.mock import patch
+from marqo.tensor_search.enums import EnvVars
 from marqo.s2_inference import types
 import PIL
-import marqo.tensor_search.utils as marqo_utils
-import numpy as np
 import requests
 import pytest
 from marqo.tensor_search.enums import TensorField, IndexSettingsField, SearchMethod
@@ -18,7 +17,6 @@ from marqo.tensor_search import enums
 from marqo.errors import IndexNotFoundError, InvalidArgError, BadRequestError, InternalError
 from marqo.tensor_search import tensor_search, index_meta_cache, backend
 from tests.marqo_test import MarqoTestCase
-import time
 from marqo.tensor_search import add_docs
 
 class TestAddDocuments(MarqoTestCase):
@@ -34,7 +32,7 @@ class TestAddDocuments(MarqoTestCase):
         except IndexNotFoundError as s:
             pass
 
-        # Any tests that call add_documents_orchestrator, search, bulk_search need this env var
+        # Any tests that call add_documents, search, bulk_search need this env var
         self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
         self.device_patcher.start()
 
@@ -454,7 +452,7 @@ class TestAddDocuments(MarqoTestCase):
         assert add_res['errors'] is True
         assert all(['error' in item for item in add_res['items'] if item['_id'].startswith('to_fail')])
 
-    def test_add_documents_orchestrator_set_device(self):
+    def test_add_documents_set_device(self):
         mock_config = copy.deepcopy(self.config)
 
         mock_vectorise = mock.MagicMock()
@@ -462,33 +460,11 @@ class TestAddDocuments(MarqoTestCase):
 
         @mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
         def run():
-            tensor_search.add_documents_orchestrator(
+            tensor_search.add_documents(
                 config=self.config, add_docs_params=AddDocsParams(
                     index_name=self.index_name_1, device="cuda:22", docs=[{"some": "doc"}, {"som other": "doc"}],
                     auto_refresh=True,
                 ),
-                batch_size=1
-            )
-            return True
-
-        assert run()
-        args, kwargs = mock_vectorise.call_args
-        assert kwargs["device"] == "cuda:22"
-
-    def test_add_documents_orchestrator_set_device_empty_batch(self):
-        mock_config = copy.deepcopy(self.config)
-
-        mock_vectorise = mock.MagicMock()
-        mock_vectorise.return_value = [[0, 0, 0, 0]]
-
-        @mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
-        def run():
-            tensor_search.add_documents_orchestrator(
-                config=self.config, add_docs_params=AddDocsParams(
-                    index_name=self.index_name_1, device="cuda:22", docs=[{"some": "doc"}, {"som other": "doc"}],
-                    auto_refresh=True
-                ),
-                batch_size=0
             )
             return True
 
@@ -1161,48 +1137,3 @@ class TestAddDocuments(MarqoTestCase):
             assert len(expected_repo_structure) == len(image_repo)
             for k in expected_repo_structure:
                 assert isinstance(image_repo[k], expected_repo_structure[k])
-
-    def test_add_documents_with_no_device_fails(self):
-        """
-            when device is not set,
-            add documents call should raise an internal error
-        """
-        try:
-            tensor_search.add_documents(
-                config=self.config, add_docs_params=AddDocsParams(
-                    index_name=self.index_name_1,
-                    docs=[{
-                        "_id": "123",
-                        "id": "abcdefgh",
-                        "title 1": "content 1",
-                        "desc 2": "content 2. blah blah blah"
-                    }],
-                    auto_refresh=True
-                )
-            )
-            raise AssertionError
-        except InternalError:
-            pass
-
-    def test_batch_request_with_no_device_fails(self):
-        """
-            when device is not set,
-            _batch_request call should raise an internal error
-        """
-        try:
-            tensor_search._batch_request(
-                config=self.config, add_docs_params=AddDocsParams(
-                    index_name=self.index_name_1,
-                    docs=[{
-                        "_id": "123",
-                        "id": "abcdefgh",
-                        "title 1": "content 1",
-                        "desc 2": "content 2. blah blah blah"
-                    }],
-                    auto_refresh=True
-                ),
-                batch_size=101
-            )
-            raise AssertionError
-        except InternalError:
-            pass
