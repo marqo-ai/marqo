@@ -133,7 +133,7 @@ def create_vector_index(
                             "type": "keyword"
                         },
                         TensorField.field_content: {
-                            "type": "text"
+                            "type": "keyword"
                         },
                     }
                 }
