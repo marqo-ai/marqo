@@ -986,9 +986,8 @@ class TestVectorSearch(MarqoTestCase):
 
         assert run()
 
-    def test_pagination_multi_field_error(self):
-        # Try pagination with 0, 2, and 3 fields
-        # To be removed when multi-field pagination is added.
+
+    def test_pagination_no_searchable_attributes(self):
         docs = [
             {
                 "field_a": 0,
@@ -1010,37 +1009,36 @@ class TestVectorSearch(MarqoTestCase):
         tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
 
         for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
-            try:
-                tensor_search.search(text=" ",
-                                    index_name=self.index_name_1, 
-                                    config=self.config, 
-                                    offset=1,
-                                    searchable_attributes=["field_a", "field_b"],
-                                    search_method=search_method)
-                raise AssertionError
-            except InvalidArgError:
-                pass
-        
-            try:
-                tensor_search.search(text=" ",
-                                    index_name=self.index_name_1, 
-                                    config=self.config, 
-                                    offset=1,
-                                    search_method=search_method)
-                raise AssertionError
-            except InvalidArgError:
-                pass
-            
-            try:
-                tensor_search.search(text=" ",
-                                    index_name=self.index_name_1, 
-                                    config=self.config, 
-                                    offset=1,
-                                    searchable_attributes=[],
-                                    search_method=search_method)
-                raise AssertionError
-            except InvalidArgError:
-                pass
+            res = tensor_search.search(
+                config=self.config, index_name=self.index_name_1, text="some text",
+                searchable_attributes=[], search_method=SearchMethod.LEXICAL, offset=1
+            )
+
+    def test_pagination_multi_field(self):
+        # Try pagination with 2, and 3 fields
+        # TODO: Add better testing for this
+        docs = [
+            {
+                "field_a": 0,
+                "field_b": 0, 
+                "field_c": 0
+            },
+            {
+                "field_a": 1,
+                "field_b": 1, 
+                "field_c": 1
+            }
+        ]
+
+        add_docs_caller(
+            config=self.config, index_name=self.index_name_1,
+            docs=docs, auto_refresh=False
+        )
+
+        tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
+
+        for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
+            pass
     
     def test_image_search_highlights(self):
         """does the URL get returned as the highlight? (it should - because no rerankers are being used)"""

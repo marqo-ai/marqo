@@ -1226,7 +1226,7 @@ def _lexical_search(
             config=config, index_name=index_name
         ).get_true_text_properties()
 
-    # Validation for offset (pagination is single field)
+    # Validation for offset (pagination not supported for 0 fields)
     if len(fields_to_search) != 1 and offset > 0:
         raise errors.InvalidArgError(
             f"Pagination (offset > 0) is only supported for single field searches! Your search currently has {len(fields_to_search)} fields: {fields_to_search}")
