@@ -100,7 +100,7 @@ if __name__ == "__main__":
         }
     }
 
-    # create the index - if no settings are present then sensible deffaults are used    
+    # create the index - if no settings are present then sensible defaults are used
     mq.create_index(index_name, settings_dict=index_settings)
     res = mq.index(index_name).add_documents(documents)
 
