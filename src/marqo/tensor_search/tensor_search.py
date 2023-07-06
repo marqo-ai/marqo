@@ -1856,11 +1856,7 @@ def _vector_text_search(
     logger.debug(f"search (tensor) pre-processing: took {(total_preprocess_time):.3f}s to vectorize and process query.")
 
     # SEARCH TIMER-LOGGER (roundtrip)
-    #print("DEBUG: body")
-    #pprint.pprint(body)
     responses = bulk_msearch(config, body)
-    #print("DEBUG: OpenSearch Response")
-    #pprint.pprint(responses)
 
     # SEARCH TIMER-LOGGER (post-processing)
     start_postprocess_time = timer()
