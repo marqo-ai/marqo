@@ -32,6 +32,7 @@ def load_pytorch(model_name: str, device: str):
 
 def load_pretrained_mobilenet():
     """"
+    TODO: Remove, not used anywhere in the repo
     loads marqo trained model
     """
     model = fasterrcnn_mobilenet_v3_large_fpn(device='cpu', num_classes=1204,
@@ -51,6 +52,7 @@ def load_pretrained_mobilenet():
 
 def load_pretrained_mobilenet320():
     """"
+    TODO: Remove, not used anywhere in the repo
     loads marqo trained model
     """
     model = fasterrcnn_mobilenet_v3_large_fpn(device='cpu', num_classes=1204,

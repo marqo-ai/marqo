@@ -13,6 +13,7 @@ from marqo.marqo_logging import logger
 import copy
 import datetime
 import pathlib
+from marqo.tensor_search.enums import EnvVars
 
 
 def dicts_to_jsonl(dicts: List[dict]) -> str:
@@ -353,7 +354,7 @@ def get_marqo_root_from_env() -> str:
     If it isn't found, it creates the env var and returns it.
 
     Returns:
-        str that doesn't end in a forward in forward slash.
+        str that doesn't end in a forward slash.
         for example: "/Users/CoolUser/marqo/src/marqo"
     """
     try:
@@ -405,3 +406,12 @@ def generate_batches(seq: Sequence, batch_size: int):
 
     for i in range(0, len(seq), batch_size):
         yield seq[i:i + batch_size]
+
+def get_best_available_device() -> str:
+    """Get the best available device for Marqo to use and validate it."""
+    device = read_env_vars_and_defaults(EnvVars.MARQO_BEST_AVAILABLE_DEVICE)
+    if device is None or not check_device_is_available(device):
+        raise errors.InternalError(f"Marqo encountered an error when loading device from environment variable `MARQO_BEST_AVAILABLE_DEVICE`. "
+                           f"Invalid device: {device}. Must be either 'cpu' or start with 'cuda'.")
+    return device
+

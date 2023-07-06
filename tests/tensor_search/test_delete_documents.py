@@ -12,6 +12,7 @@ from unittest.mock import patch
 from marqo import errors
 from marqo.tensor_search import enums
 from tests.utils.transition import add_docs_caller
+import os
 
 class TestDeleteDocuments(MarqoTestCase):
     """module that has tests at the tensor_search level"""
@@ -23,6 +24,8 @@ class TestDeleteDocuments(MarqoTestCase):
         self.index_name_1 = "my-test-index-1"
 
         self._delete_testing_indices()
+
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
 
     def _delete_testing_indices(self):
         for ix in [self.index_name_1]:
@@ -113,7 +116,6 @@ class TestDeleteDocuments(MarqoTestCase):
 
     def test_delete_multiple_documents(self):
         # Create an index and add documents
-        tensor_search.create_vector_index(index_name=self.index_name_1, config=self.config)
         add_docs_caller(
             config=self.config, index_name=self.index_name_1,
             docs=[
@@ -179,9 +181,6 @@ class TestDeleteDocuments(MarqoTestCase):
                                              document_id="unique_id_2")
 
     def test_delete_non_existent_document(self):
-        # Create an index
-        tensor_search.create_vector_index(index_name=self.index_name_1, config=self.config)
-
         # Attempt to delete a non-existent document
         response = tensor_search.delete_documents(
             config=self.config, index_name=self.index_name_1, doc_ids=["non_existent_id"], auto_refresh=True
@@ -213,8 +212,7 @@ class TestDeleteDocuments(MarqoTestCase):
             )
 
     def test_delete_already_deleted_document(self):
-        # Create an index and add a document
-        tensor_search.create_vector_index(index_name=self.index_name_1, config=self.config)
+        # Add a document
         add_docs_caller(
             config=self.config, index_name=self.index_name_1,
             docs=[
@@ -244,8 +242,7 @@ class TestDeleteDocuments(MarqoTestCase):
         self.assertEqual(response["index_name"], self.index_name_1)
 
     def test_delete_documents_mixed_valid_invalid_ids(self):
-        # Create an index and add documents
-        tensor_search.create_vector_index(index_name=self.index_name_1, config=self.config)
+        # Add documents
         add_docs_caller(
             config=self.config, index_name=self.index_name_1,
             docs=[
@@ -417,7 +414,7 @@ class TestDeleteDocumentsEndpoint(MarqoTestCase):
 
         doc_ids = [f"id_{x}" for x in range(max_delete_docs + 5)]
 
-        @patch("os.environ", mock_environ)
+        @patch.dict(os.environ, mock_environ)
         def run():
             tensor_search.create_vector_index(
                 index_name=self.index_name_1, index_settings={"index_defaults": {"model": 'random'}}, config=self.config)
@@ -426,7 +423,7 @@ class TestDeleteDocumentsEndpoint(MarqoTestCase):
                 config=self.config, index_name=self.index_name_1, docs=[
                     {"_id": x, 'Bad field': "blh "} for x in doc_ids
                 ],
-                auto_refresh=True, update_mode='update')
+                auto_refresh=True)
             try:
                 tensor_search.delete_documents(config=self.config, index_name=self.index_name_1, doc_ids=doc_ids, auto_refresh=True)
                 raise AssertionError
@@ -445,7 +442,7 @@ class TestDeleteDocumentsEndpoint(MarqoTestCase):
     def test_max_doc_delete_default_limit(self):
         default_limit = 10000
 
-        @patch("os.environ", dict())
+        @patch.dict(os.environ, dict())
         def run():
             assert default_limit == tensor_search.utils.read_env_vars_and_defaults_ints(
                 enums.EnvVars.MARQO_MAX_DELETE_DOCS_COUNT)

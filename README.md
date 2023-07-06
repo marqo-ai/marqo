@@ -103,6 +103,8 @@ import marqo
 
 mq = marqo.Client(url='http://localhost:8882')
 
+mq.create_index(index_name="my-first-index")
+
 mq.index("my-first-index").add_documents([
     {
         "Title": "The Travels of Marco Polo",
@@ -122,11 +124,10 @@ results = mq.index("my-first-index").search(
 
 ```
 
-- `mq` is the client that wraps the `marqo` API
+- `mq` is the client that wraps the `marqo` API.
+- `create_index()` creates a new index with default settings.
 - `add_documents()` takes a list of documents, represented as python dicts for indexing.
-- `add_documents()` creates an index with default settings, if one does not already exist.
 - You can optionally set a document's ID with the special `_id` field. Otherwise, Marqo will generate one.
-- If the index doesn't exist, Marqo will create it. If it exists then Marqo will add the documents to the index.
 
 Let's have a look at the results:
 
@@ -272,6 +273,8 @@ import marqo
 import pprint
 
 mq = marqo.Client(url="http://localhost:8882")
+
+mq.create_index("my-weighted-query-index")
 
 mq.index("my-weighted-query-index").add_documents(
     [

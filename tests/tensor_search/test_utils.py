@@ -7,6 +7,7 @@ from marqo.tensor_search import utils
 from marqo.tensor_search import enums
 from marqo import errors
 from unittest import mock
+from unittest.mock import patch, MagicMock
 
 
 class TestUtils(unittest.TestCase):
@@ -166,7 +167,7 @@ class TestUtils(unittest.TestCase):
             mock_default_env_vars.return_value = default_vars
 
             @mock.patch("marqo.tensor_search.configs.default_env_vars", mock_default_env_vars)
-            @mock.patch("os.environ", mock_real_environ)
+            @mock.patch.dict(os.environ, mock_real_environ)
             def run():
                 assert expected == utils.read_env_vars_and_defaults(var=key)
                 return True
@@ -193,7 +194,7 @@ class TestUtils(unittest.TestCase):
             mock_default_env_vars.return_value = default_vars
 
             @mock.patch("marqo.tensor_search.configs.default_env_vars", mock_default_env_vars)
-            @mock.patch("os.environ", mock_real_environ)
+            @mock.patch.dict(os.environ, mock_real_environ)
             def run():
                 result = utils.read_env_vars_and_defaults_ints(var=key)
                 assert result == expected, f"Expected {expected}, got {result}"
@@ -213,7 +214,7 @@ class TestUtils(unittest.TestCase):
             mock_default_env_vars.return_value = default_vars
 
             @mock.patch("marqo.tensor_search.configs.default_env_vars", mock_default_env_vars)
-            @mock.patch("os.environ", mock_real_environ)
+            @mock.patch.dict(os.environ, mock_real_environ)
             def run():
                 with self.assertRaises(errors.ConfigurationError):
                     utils.read_env_vars_and_defaults_ints(var=key)
@@ -323,11 +324,12 @@ class TestUtils(unittest.TestCase):
 
     def test_get_marqo_root_from_env_returns_env_var_if_exists(self):
         expected = "/Users/CoolUser/marqo/src/marqo"
-        with mock.patch.dict('os.environ', {enums.EnvVars.MARQO_ROOT_PATH: expected}):
+        with mock.patch.dict(os.environ, {enums.EnvVars.MARQO_ROOT_PATH: expected}):
             actual = utils.get_marqo_root_from_env()
         self.assertEqual(actual, expected)
 
-    def test_creates_env_var_if_not_exists(self):
+    def test_get_marqo_root_from_env_creates_env_var_if_not_exists(self):
+        # Empty entire dict
         @mock.patch("os.environ", dict())
         def run():
             assert enums.EnvVars.MARQO_ROOT_PATH not in os.environ
@@ -380,4 +382,3 @@ class TestUtils(unittest.TestCase):
             raise AssertionError
         except ValueError as e:
             assert "must be greater than 0" in str(e)
-

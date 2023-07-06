@@ -92,7 +92,7 @@ def check_make_string_valid(text: str, coerce: bool = True) -> str:
     if text in [[], None, '', "", empty_string] and coerce:
         return empty_string
 
-    if set(text) == set(" "):
+    if text.isspace():
         return empty_string
 
     if not isinstance(text, str):

@@ -9,6 +9,7 @@ import torch
 
 from marqo.s2_inference.types import List, Dict, ImageType
 from marqo.s2_inference.s2_inference import clear_loaded_models
+from marqo.errors import InternalError
 
 from marqo.s2_inference.processing.DINO_utils import (
     _load_DINO_model,
@@ -56,6 +57,16 @@ class TestImageUtils(unittest.TestCase):
 
         assert len(attentions[0]) > 1
         assert attentions.shape[1:] == self.size
+    
+    def test_dino_inference_no_device(self):
+        try:
+            model, tform = _load_DINO_model(arch='vit_small', device=self.device, 
+                                            patch_size=16, image_size=self.size)
+            attentions = DINO_inference(model=model, transform=tform, img=self.test_image,
+                            patch_size=16)
+            raise AssertionError
+        except InternalError as e:
+            pass
 
     def test_rescale_image(self):
         _img = np.array(self.test_image)*.9

@@ -11,7 +11,7 @@ import typing
 from marqo.tensor_search.enums import TensorField, SearchMethod, EnvVars, IndexSettingsField
 from marqo.errors import (
     MarqoApiError, MarqoError, IndexNotFoundError, InvalidArgError,
-    InvalidFieldNameError, IllegalRequestedDocCount, BadRequestError
+    InvalidFieldNameError, IllegalRequestedDocCount, BadRequestError, InternalError
 )
 from marqo.tensor_search import tensor_search, constants, index_meta_cache
 import copy
@@ -26,6 +26,15 @@ class TestVectorSearch(MarqoTestCase):
         self.index_name_2 = "my-test-index-2"
         self.index_name_3 = "my-test-index-3"
         self._delete_test_indices()
+        self._create_test_indices()
+
+        # Any tests that call add_document, search, bulk_search need this env var
+        # Ensure other os.environ patches in indiv tests do not erase this one.
+        self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
+        self.device_patcher.start()
+
+    def tearDown(self):
+        self.device_patcher.stop()
 
     def _delete_test_indices(self, indices=None):
         if indices is None or not indices:
@@ -37,6 +46,14 @@ class TestVectorSearch(MarqoTestCase):
                 tensor_search.delete_index(config=self.config, index_name=ix_name)
             except IndexNotFoundError as s:
                 pass
+
+    def _create_test_indices(self, indices=None):
+        if indices is None or not indices:
+            ix_to_create = [self.index_name_1, self.index_name_2, self.index_name_3]
+        else:
+            ix_to_create = indices
+        for ix_name in ix_to_create:
+            tensor_search.create_vector_index(config=self.config, index_name=ix_name)
 
     def test_vector_search_searchable_attributes_non_existent(self):
         """TODO: non existent attrib."""
@@ -53,11 +70,11 @@ class TestVectorSearch(MarqoTestCase):
                  "_id": "1234", "finally": "Random text here efgh "},
             ], auto_refresh=True)
         search_res = tensor_search._vector_text_search(
-            config=self.config, index_name=self.index_name_1, query=" efgh ", result_count=10
+            config=self.config, index_name=self.index_name_1, query=" efgh ", result_count=10, device="cpu"
         )
         assert len(search_res['hits']) == 2
 
-    @mock.patch('os.environ', {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': '2'}})
+    @mock.patch.dict(os.environ, {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': '2'}})
     def test_search_with_excessive_searchable_attributes(self):
         with self.assertRaises(InvalidArgError):
             add_docs_caller(
@@ -70,8 +87,7 @@ class TestVectorSearch(MarqoTestCase):
                 searchable_attributes=["abc", "def", "other field"]
             )
 
-
-    @mock.patch('os.environ', {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': '2'}})
+    @mock.patch.dict(os.environ, {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': '2'}})
     def test_search_with_allowable_num_searchable_attributes(self):
         add_docs_caller(
             config=self.config, index_name=self.index_name_1, docs=[
@@ -82,9 +98,9 @@ class TestVectorSearch(MarqoTestCase):
             config=self.config, index_name=self.index_name_1, text="Exact match hehehe",
             searchable_attributes=["other field"]
         )
-    
-    @mock.patch('os.environ', {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': None}})
+
     def test_search_with_searchable_attributes_max_attributes_is_none(self):
+        # No patch needed, MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES is not set
         add_docs_caller(
             config=self.config, index_name=self.index_name_1, docs=[
                 {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "5678"},
@@ -95,7 +111,7 @@ class TestVectorSearch(MarqoTestCase):
             searchable_attributes=["other field"]
         )
 
-    @mock.patch('os.environ', {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': f"{sys.maxsize}"}})
+    @mock.patch.dict(os.environ, {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': f"{sys.maxsize}"}})
     def test_search_with_no_searchable_attributes_but_max_searchable_attributes_env_set(self):
         with self.assertRaises(InvalidArgError):
             add_docs_caller(
@@ -107,18 +123,26 @@ class TestVectorSearch(MarqoTestCase):
                 config=self.config, index_name=self.index_name_1, text="Exact match hehehe"
             )
 
+    def test_vector_text_search_no_device(self):
+        try:
+            search_res = tensor_search._vector_text_search(
+                    config=self.config, index_name=self.index_name_1,
+                    result_count=5, query="some text...")
+            raise AssertionError
+        except InternalError:
+            pass
+
     def test_vector_search_against_empty_index(self):
-        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
         search_res = tensor_search._vector_text_search(
                 config=self.config, index_name=self.index_name_1,
-                result_count=5, query="some text...")
+                result_count=5, query="some text...", device="cpu")
         assert {'hits': []} == search_res
 
     def test_vector_search_against_non_existent_index(self):
         try:
             tensor_search._vector_text_search(
                 config=self.config, index_name="some-non-existent-index",
-                result_count=5, query="some text...")
+                result_count=5, query="some text...", device="cpu")
         except IndexNotFoundError as s:
             pass
 
@@ -133,7 +157,7 @@ class TestVectorSearch(MarqoTestCase):
                  "Steps": "1. Cook meat. 2: Dice Onions. 3: Serve."},
             ], auto_refresh=True)
         tensor_search._vector_text_search(
-            config=self.config, index_name=self.index_name_1, query=query_text
+            config=self.config, index_name=self.index_name_1, query=query_text, device="cpu"
         )
 
     def test_vector_search_searchable_attributes(self):
@@ -211,8 +235,6 @@ class TestVectorSearch(MarqoTestCase):
 
     def test_search_format_empty(self):
         """Is the result formatted correctly? - on an emtpy index?"""
-        tensor_search.create_vector_index(
-            config=self.config, index_name=self.index_name_1)
         search_res = tensor_search.search(
             config=self.config, index_name=self.index_name_1, text=""
         )
@@ -411,6 +433,7 @@ class TestVectorSearch(MarqoTestCase):
 
     def test_filtering_list_case_image(self):
         settings = {"index_defaults": {"treat_urls_and_pointers_as_images": True, "model": "ViT-B/32"}}
+        tensor_search.delete_index(self.config, self.index_name_1)
         tensor_search.create_vector_index(index_name=self.index_name_1, index_settings=settings, config=self.config)
         hippo_img = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
         add_docs_caller(
@@ -575,10 +598,7 @@ class TestVectorSearch(MarqoTestCase):
             pass
 
     def test_set_device(self):
-        """calling search with a specified device overrides device defined in config"""
-        mock_config = copy.deepcopy(self.config)
-        mock_config.search_device = "cpu"
-        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
+        """calling search with a specified device overrides MARQO_BEST_AVAILABLE_DEVICE"""
 
         mock_vectorise = mock.MagicMock()
         mock_vectorise.return_value = [[0, 0, 0, 0]]
@@ -591,7 +611,7 @@ class TestVectorSearch(MarqoTestCase):
             return True
 
         assert run()
-        assert mock_config.search_device == "cpu"
+        assert os.environ["MARQO_BEST_AVAILABLE_DEVICE"] == "cpu"
         args, kwargs = mock_vectorise.call_args
         assert kwargs["device"] == "cuda:123"
 
@@ -610,7 +630,7 @@ class TestVectorSearch(MarqoTestCase):
 
             )
             assert "hits" in tensor_search._vector_text_search(
-                query=str(to_search), config=self.config, index_name=self.index_name_1
+                query=str(to_search), config=self.config, index_name=self.index_name_1, device="cpu"
             )
 
     def test_search_other_types_top_search(self):
@@ -743,7 +763,6 @@ class TestVectorSearch(MarqoTestCase):
                 assert set(k for k in res.keys() if k not in TensorField.__dict__.values()) == {"_id"}
 
     def test_attributes_to_retrieve_empty_index(self):
-        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
         assert 0 == tensor_search.get_stats(config=self.config, index_name=self.index_name_1)['numberOfDocuments']
         for to_retrieve in [[], ["some field name"], ["some field name", "wowowow field"]]:
             for method in ("LEXICAL", "TENSOR"):
@@ -838,7 +857,7 @@ class TestVectorSearch(MarqoTestCase):
             for max_doc in [0, 1, 2, 5, 10, 100, 1000]:
                 mock_environ = {EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: str(max_doc)}
 
-                @mock.patch("os.environ", mock_environ)
+                @mock.patch.dict(os.environ, {**os.environ, **mock_environ})
                 def run():
                     half_search = tensor_search.search(search_method=search_method,
                         config=self.config, index_name=self.index_name_1, text='a', result_count=max_doc//2)
@@ -867,18 +886,17 @@ class TestVectorSearch(MarqoTestCase):
 
         vocab = requests.get(vocab_source).text.splitlines()
 
-        tensor_search.add_documents_orchestrator(
+        tensor_search.add_documents(
             config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1,
                 docs=[{"Title": "a " + (" ".join(random.choices(population=vocab, k=25)))}
-                      for _ in range(700)], auto_refresh=False),
-            processes=4, batch_size=50
+                      for _ in range(700)], auto_refresh=False, device = "cpu")
         )
         tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
 
         for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
-            for mock_environ in [dict(), {EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: None},
+            for mock_environ in [dict(),
                                  {EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: ''}]:
-                @mock.patch("os.environ", mock_environ)
+                @mock.patch.dict(os.environ, {**os.environ, **mock_environ})
                 def run():
                     lim = 500
                     half_search = tensor_search.search(
@@ -937,7 +955,6 @@ class TestVectorSearch(MarqoTestCase):
                     # assert full_search_results["hits"] == paginated_search_results["hits"]
                     
     def test_pagination_break_limitations(self):
-        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
         # Negative offset
         for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
             for lim in [1, 10, 1000]:
@@ -970,7 +987,7 @@ class TestVectorSearch(MarqoTestCase):
 
         # Going over 10,000 for offset + limit
         mock_environ = {EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: "10000"}
-        @mock.patch("os.environ", mock_environ)
+        @mock.patch.dict(os.environ, {**os.environ, **mock_environ})
         def run():
             for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
                 try:
@@ -1047,6 +1064,7 @@ class TestVectorSearch(MarqoTestCase):
                 "treat_urls_and_pointers_as_images": True,
                 "model": "ViT-B/32",
             }}
+        tensor_search.delete_index(self.config, self.index_name_1)
         tensor_search.create_vector_index(
             index_name=self.index_name_1, index_settings=settings, config=self.config
         )
@@ -1116,6 +1134,7 @@ class TestVectorSearch(MarqoTestCase):
                 IndexSettingsField.treat_urls_and_pointers_as_images: True
             }
         }
+        tensor_search.delete_index(self.config, self.index_name_1)
         tensor_search.create_vector_index(
             config=self.config, index_name=self.index_name_1, index_settings=image_index_config)
         add_docs_caller(
@@ -1165,6 +1184,7 @@ class TestVectorSearch(MarqoTestCase):
                 IndexSettingsField.treat_urls_and_pointers_as_images: True
             }
         }
+        tensor_search.delete_index(self.config, self.index_name_1)
         tensor_search.create_vector_index(
             config=self.config, index_name=self.index_name_1, index_settings=image_index_config)
         add_docs_caller(
@@ -1217,7 +1237,8 @@ class TestVectorSearch(MarqoTestCase):
             weighted_vectors =[]
             for q, weight in multi_query.items():
                 vec = vectorise(model_name="ViT-B/16", content=[q, ],
-                                image_download_headers=None, normalize_embeddings=True)[0]
+                                image_download_headers=None, normalize_embeddings=True,
+                                device="cpu")[0]
                 weighted_vectors.append(np.asarray(vec) * weight)
 
             manually_combined = np.mean(weighted_vectors, axis=0)
@@ -1243,6 +1264,7 @@ class TestVectorSearch(MarqoTestCase):
                 IndexSettingsField.treat_urls_and_pointers_as_images: True
             }
         }
+        tensor_search.delete_index(self.config, self.index_name_1)
         tensor_search.create_vector_index(
             config=self.config, index_name=self.index_name_1, index_settings=image_index_config)
         add_docs_caller(
@@ -1276,6 +1298,7 @@ class TestVectorSearch(MarqoTestCase):
                 IndexSettingsField.treat_urls_and_pointers_as_images: True
             }
         }
+        tensor_search.delete_index(self.config, self.index_name_1)
         tensor_search.create_vector_index(
             config=self.config, index_name=self.index_name_1, index_settings=image_index_config)
         add_docs_caller(
@@ -1334,6 +1357,7 @@ class TestVectorSearch(MarqoTestCase):
                 IndexSettingsField.treat_urls_and_pointers_as_images: True
             }
         }
+        tensor_search.delete_index(self.config, self.index_name_1)
         tensor_search.create_vector_index(
             config=self.config, index_name=self.index_name_1, index_settings=image_index_config)
         add_docs_caller(

@@ -28,8 +28,8 @@ def get_index_info(config: Config, index_name: str) -> IndexInfo:
         IndexInfo of the index
 
     Raises:
-        NonTensorIndexError, if the index's mapping doesn't conform to a Tensor Search index
-
+        NonTensorIndexError: If the index's mapping doesn't conform to a Tensor Search index.
+        IndexNotFoundError: If index does not exist.
     """
     res = HttpRequests(config).get(path=F"{index_name}/_mapping")
 
@@ -159,7 +159,7 @@ def add_customer_field_properties(config: Config, index_name: str,
     return mapping_res
 
 
-def get_cluster_indices(config: Config):
+def get_cluster_indices(config: Config) -> set:
     """Gets the name of all indices, excluding system indices"""
     res = HttpRequests(config).get(path="_aliases")
     return _remove_system_indices(res.keys())

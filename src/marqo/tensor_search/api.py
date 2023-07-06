@@ -21,6 +21,8 @@ from marqo.tensor_search.throttling.redis_throttle import throttle
 from marqo.tensor_search.utils import add_timing
 import pydantic
 
+from marqo.tensor_search.telemetry import RequestMetricsStore, TelemetryMiddleware
+
 
 def replace_host_localhosts(OPENSEARCH_IS_INTERNAL: str, OS_URL: str):
     """Replaces a host's localhost URL with one that can be referenced from
@@ -56,6 +58,7 @@ app = FastAPI(
     title="Marqo",
     version=version.get_version()
 )
+app.add_middleware(TelemetryMiddleware)
 
 
 def generate_config() -> config.Config:
@@ -136,26 +139,30 @@ def create_index(index_name: str, settings: Dict = None, marqo_config: config.Co
 @throttle(RequestType.SEARCH)
 @add_timing
 def bulk_search(query: BulkSearchQuery, device: str = Depends(api_validation.validate_device), marqo_config: config.Config = Depends(generate_config)):
-    return tensor_search.bulk_search(query, marqo_config, device=device)
+    with RequestMetricsStore.for_request().time(f"POST /indexes/bulk/search"):
+        return tensor_search.bulk_search(query, marqo_config, device=device)
 
 @app.post("/indexes/{index_name}/search")
 @throttle(RequestType.SEARCH)
 def search(search_query: SearchQuery, index_name: str, device: str = Depends(api_validation.validate_device),
            marqo_config: config.Config = Depends(generate_config)):
-    return tensor_search.search(
-        config=marqo_config, text=search_query.q,
-        index_name=index_name, highlights=search_query.showHighlights,
-        searchable_attributes=search_query.searchableAttributes,
-        search_method=search_query.searchMethod,
-        result_count=search_query.limit, offset=search_query.offset,
-        reranker=search_query.reRanker, 
-        filter=search_query.filter, device=device,
-        attributes_to_retrieve=search_query.attributesToRetrieve, boost=search_query.boost,
-        image_download_headers=search_query.image_download_headers,
-        context=search_query.context,
-        score_modifiers=search_query.scoreModifiers,
-        model_auth=search_query.modelAuth
-    )
+    
+    with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/search"):
+        return tensor_search.search(
+            config=marqo_config, text=search_query.q,
+            index_name=index_name, highlights=search_query.showHighlights,
+            searchable_attributes=search_query.searchableAttributes,
+            search_method=search_query.searchMethod,
+            result_count=search_query.limit, offset=search_query.offset,
+            reranker=search_query.reRanker, 
+            filter=search_query.filter, device=device,
+            attributes_to_retrieve=search_query.attributesToRetrieve, boost=search_query.boost,
+            image_download_headers=search_query.image_download_headers,
+            context=search_query.context,
+            score_modifiers=search_query.scoreModifiers,
+            model_auth=search_query.modelAuth
+        )
+
 
 
 @app.post("/indexes/{index_name}/documents")
@@ -165,8 +172,6 @@ def add_or_replace_documents(
         index_name: str,
         refresh: bool = True,
         marqo_config: config.Config = Depends(generate_config),
-        batch_size: int = 0,
-        processes: int = 1,
         non_tensor_fields: List[str] = Query(default=[]),
         device: str = Depends(api_validation.validate_device),
         use_existing_tensors: bool = False,
@@ -180,35 +185,15 @@ def add_or_replace_documents(
     """add_documents endpoint (replace existing docs with the same id)"""
     add_docs_params = AddDocsParams(
         index_name=index_name, docs=docs, auto_refresh=refresh,
-        device=device, update_mode='replace', non_tensor_fields=non_tensor_fields,
+        device=device, non_tensor_fields=non_tensor_fields,
         use_existing_tensors=use_existing_tensors, image_download_headers=image_download_headers,
         mappings=mappings, model_auth=model_auth
     )
-    return tensor_search.add_documents_orchestrator(
-        config=marqo_config, add_docs_params=add_docs_params,
-        batch_size=batch_size, processes=processes
-    )
+    with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/documents"):
+        return tensor_search.add_documents(
+            config=marqo_config, add_docs_params=add_docs_params
+        )
 
-
-@app.put("/indexes/{index_name}/documents")
-@throttle(RequestType.INDEX)
-def add_or_update_documents(
-        docs: List[Dict],
-        index_name: str,
-        refresh: bool = True,
-        marqo_config: config.Config = Depends(generate_config),
-        batch_size: int = 0, processes: int = 1,
-        non_tensor_fields: List[str] = Query(default=[]),
-        device: str = Depends(api_validation.validate_device)):
-    """WILL BE DEPRECATED SOON. update add_documents endpoint"""
-    add_docs_params = AddDocsParams(
-        index_name=index_name, docs=docs, auto_refresh=refresh,
-        device=device, update_mode='update', non_tensor_fields=non_tensor_fields
-    )
-    return tensor_search.add_documents_orchestrator(
-        config=marqo_config, add_docs_params=add_docs_params,
-        batch_size=batch_size, processes=processes,
-    )
 
 @app.get("/indexes/{index_name}/documents/{document_id}")
 def get_document_by_id(index_name: str, document_id: str,

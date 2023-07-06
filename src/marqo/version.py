@@ -1,4 +1,5 @@
-__version__ = "0.0.21-SINGLE_KNN_FIELD_POC"
+# TODO: Change this if running a recall test on container
+__version__ = "0.1.0"
 
 
 def get_version() -> str:
