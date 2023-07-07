@@ -357,12 +357,13 @@ class TestIndexMetaCache(MarqoTestCase):
 
     def test_index_settings_after_cache_refresh(self):
         expected_index_settings = configs.get_default_index_settings()
-        expected_index_settings[IndexSettingsField.index_defaults][IndexSettingsField.model] = "special_model_1"
+        # Create index with some random model
+        expected_index_settings[IndexSettingsField.index_defaults][IndexSettingsField.model] = "open_clip/RN50/openai"
         index_meta_cache.empty_cache()
         assert self.index_name_3 not in index_meta_cache.get_cache()
         tensor_search.create_vector_index(
             config=self.config, index_name=self.index_name_3, index_settings={
-                IndexSettingsField.index_defaults: {IndexSettingsField.model: "special_model_1"}}
+                IndexSettingsField.index_defaults: {IndexSettingsField.model: "open_clip/RN50/openai"}}
         )
         ix_info = index_meta_cache.get_index_info(config=self.config, index_name=self.index_name_3)
         assert ix_info.index_settings == expected_index_settings
