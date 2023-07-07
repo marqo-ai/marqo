@@ -172,7 +172,6 @@ def add_or_replace_documents(
         index_name: str,
         refresh: bool = True,
         marqo_config: config.Config = Depends(generate_config),
-        batch_size: int = 0,
         non_tensor_fields: List[str] = Query(default=[]),
         device: str = Depends(api_validation.validate_device),
         use_existing_tensors: bool = False,
@@ -191,9 +190,8 @@ def add_or_replace_documents(
         mappings=mappings, model_auth=model_auth
     )
     with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/documents"):
-        return tensor_search.add_documents_orchestrator(
-            config=marqo_config, add_docs_params=add_docs_params,
-            batch_size=batch_size
+        return tensor_search.add_documents(
+            config=marqo_config, add_docs_params=add_docs_params
         )
 
 

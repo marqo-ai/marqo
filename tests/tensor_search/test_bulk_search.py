@@ -314,7 +314,7 @@ class TestBulkSearch(MarqoTestCase):
         self._delete_test_indices()
         self._create_test_indices()
 
-        # Any tests that call add_documents_orchestrator, search, bulk_search need this env var
+        # Any tests that call add_documents, search, bulk_search need this env var
         self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
         self.device_patcher.start()
 
@@ -1419,10 +1419,10 @@ class TestBulkSearch(MarqoTestCase):
         vocab_source = "https://www.mit.edu/~ecprice/wordlist.10000"
     
         vocab = requests.get(vocab_source).text.splitlines()
-        tensor_search.add_documents_orchestrator(
+        tensor_search.add_documents(
             config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1,
             docs=[{"Title": "a " + (" ".join(random.choices(population=vocab, k=25)))}
-                  for _ in range(700)], auto_refresh=False), batch_size=50
+                  for _ in range(700)], auto_refresh=False, device="cpu")
         )
         tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
     

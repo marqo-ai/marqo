@@ -7,6 +7,7 @@ from marqo.tensor_search import utils
 from marqo.tensor_search import enums
 from marqo import errors
 from unittest import mock
+from unittest.mock import patch, MagicMock
 
 
 class TestUtils(unittest.TestCase):
@@ -381,4 +382,3 @@ class TestUtils(unittest.TestCase):
             raise AssertionError
         except ValueError as e:
             assert "must be greater than 0" in str(e)
-

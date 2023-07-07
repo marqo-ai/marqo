@@ -28,7 +28,7 @@ class TestIndexMetaCache(MarqoTestCase):
         self._delete_testing_indices()
         self._create_test_indices()
 
-        # Any tests that call add_documents_orchestrator, search, bulk_search need this env var
+        # Any tests that call add_documents, search, bulk_search need this env var
         self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
         self.device_patcher.start()
 

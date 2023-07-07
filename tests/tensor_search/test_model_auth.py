@@ -151,7 +151,7 @@ class TestModelAuthLoadedS3(MarqoTestCase):
         tensor_search.eject_model(model_name=cls.custom_model_name, device=cls.device)
 
     def setUp(self):
-        # Any tests that call add_documents_orchestrator, search, bulk_search need this env var
+        # Any tests that call add_documents, search, bulk_search need this env var
         self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
         self.device_patcher.start()
 
@@ -209,7 +209,7 @@ class TestModelAuthOpenCLIP(MarqoTestCase):
         except IndexNotFoundError as s:
             pass
         
-        # Any tests that call add_documents_orchestrator, search, bulk_search need this env var
+        # Any tests that call add_documents, search, bulk_search need this env var
         self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
         self.device_patcher.start()
         
@@ -460,53 +460,49 @@ class TestModelAuthOpenCLIP(MarqoTestCase):
         s3_settings['index_defaults']['model_properties'] = model_properties
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings=s3_settings)
 
-        for add_docs_method, kwargs in [
-                (tensor_search.add_documents_orchestrator, {'batch_size': 10}),
-                # TODO: add add_documents and add_documents_mp ?
-            ]:
-            try:
-                tensor_search.eject_model(model_name='my_model' ,device=self.device)
-            except ModelNotInCacheError:
-                pass
-            # Create a mock Boto3 client
-            mock_s3_client = mock.MagicMock()
+        try:
+            tensor_search.eject_model(model_name='my_model' ,device=self.device)
+        except ModelNotInCacheError:
+            pass
+        # Create a mock Boto3 client
+        mock_s3_client = mock.MagicMock()
 
-            # Mock the generate_presigned_url method of the mock Boto3 client with a real OpenCLIP model, so that
-            # the rest of the logic works.
-            mock_s3_client.generate_presigned_url.return_value = "https://some_non_existent_model.pt"
+        # Mock the generate_presigned_url method of the mock Boto3 client with a real OpenCLIP model, so that
+        # the rest of the logic works.
+        mock_s3_client.generate_presigned_url.return_value = "https://some_non_existent_model.pt"
 
-            with unittest.mock.patch('boto3.client', return_value=mock_s3_client) as mock_boto3_client:
-                with self.assertRaises(BadRequestError) as cm:
-                    with unittest.mock.patch(
-                        'marqo.s2_inference.processing.custom_clip_utils.download_pretrained_from_url'
-                    ) as mock_download_pretrained_from_url:
-                        add_docs_method(
-                            config=self.config,
-                            add_docs_params=AddDocsParams(
-                                index_name=self.index_name_1,
-                                model_auth=ModelAuth(s3=S3Auth(
-                                    aws_access_key_id=fake_access_key_id,
-                                    aws_secret_access_key=fake_secret_key)),
-                                auto_refresh=True,
-                                docs=[{f'Title': "something {i} good"} for i in range(20)]
-                            ),
-                            **kwargs
-                        )
-            mock_download_pretrained_from_url.assert_called_once_with(
-                url='https://some_non_existent_model.pt', cache_dir=None, cache_file_name='secret_model.pt')
-            mock_s3_client.generate_presigned_url.assert_called_with(
-                'get_object',
-                Params={'Bucket': 'your-bucket-name', 'Key': s3_object_key}
-            )
-            mock_boto3_client.assert_called_once_with(
-                's3',
-                aws_access_key_id=fake_access_key_id,
-                aws_secret_access_key=fake_secret_key,
-                aws_session_token=None
-            )
-            mock_download_pretrained_from_url.reset_mock()
-            mock_s3_client.reset_mock()
-            mock_boto3_client.reset_mock()
+        with unittest.mock.patch('boto3.client', return_value=mock_s3_client) as mock_boto3_client:
+            with self.assertRaises(BadRequestError) as cm:
+                with unittest.mock.patch(
+                    'marqo.s2_inference.processing.custom_clip_utils.download_pretrained_from_url'
+                ) as mock_download_pretrained_from_url:
+                    tensor_search.add_documents(
+                        config=self.config,
+                        add_docs_params=AddDocsParams(
+                            index_name=self.index_name_1,
+                            model_auth=ModelAuth(s3=S3Auth(
+                                aws_access_key_id=fake_access_key_id,
+                                aws_secret_access_key=fake_secret_key)),
+                            auto_refresh=True,
+                            docs=[{f'Title': "something {i} good"} for i in range(20)],
+                            device="cpu"
+                        ),
+                    )
+        mock_download_pretrained_from_url.assert_called_once_with(
+            url='https://some_non_existent_model.pt', cache_dir=None, cache_file_name='secret_model.pt')
+        mock_s3_client.generate_presigned_url.assert_called_with(
+            'get_object',
+            Params={'Bucket': 'your-bucket-name', 'Key': s3_object_key}
+        )
+        mock_boto3_client.assert_called_once_with(
+            's3',
+            aws_access_key_id=fake_access_key_id,
+            aws_secret_access_key=fake_secret_key,
+            aws_session_token=None
+        )
+        mock_download_pretrained_from_url.reset_mock()
+        mock_s3_client.reset_mock()
+        mock_boto3_client.reset_mock()
 
     def test_model_loads_from_multi_search(self):
         s3_object_key = 'path/to/your/secret_model.pt'
@@ -600,64 +596,58 @@ class TestModelAuthOpenCLIP(MarqoTestCase):
         random_model = Random(model_name='blah', embedding_dim=512, device="cpu")
 
 
-        for add_docs_method, kwargs in [
-            (tensor_search.add_documents_orchestrator, {'batch_size': 10}),
-            (tensor_search.add_documents, {})
-            # TODO: add add_documents_mp ?
-        ]:
-            try:
-                tensor_search.eject_model(model_name='my_model', device=self.device)
-            except ModelNotInCacheError:
-                pass
-            # Create a mock Boto3 client
-            mock_s3_client = mock.MagicMock()
+        try:
+            tensor_search.eject_model(model_name='my_model', device=self.device)
+        except ModelNotInCacheError:
+            pass
+        # Create a mock Boto3 client
+        mock_s3_client = mock.MagicMock()
 
-            # Mock the generate_presigned_url method of the mock Boto3 client with a real OpenCLIP model, so that
-            # the rest of the logic works.
-            mock_s3_client.generate_presigned_url.return_value = "https://some_non_existent_model.pt"
+        # Mock the generate_presigned_url method of the mock Boto3 client with a real OpenCLIP model, so that
+        # the rest of the logic works.
+        mock_s3_client.generate_presigned_url.return_value = "https://some_non_existent_model.pt"
 
-            with unittest.mock.patch('marqo.s2_inference.s2_inference.vectorise', side_effect=fake_vectorise) as mock_vectorise:
-                model_auth = ModelAuth(
-                    s3=S3Auth(
-                    aws_access_key_id=fake_access_key_id,
-                    aws_secret_access_key=fake_secret_key)
-                )
-                res = add_docs_method(
-                    config=self.config,
-                    add_docs_params=AddDocsParams(
-                        index_name=self.index_name_1,
-                        model_auth=model_auth,
-                        auto_refresh=True, device="cpu",
-                        docs=[{
-                            'my_combination_field': {
-                                'my_image': f"https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
-                                'some_text': f"my text {i}"}} for i in range(20)],
-                        mappings={
-                            "my_combination_field": {
-                                "type": "multimodal_combination",
-                                "weights": {
-                                    "my_image": 0.5,
-                                    "some_text": 0.5
-                                }
+        with unittest.mock.patch('marqo.s2_inference.s2_inference.vectorise', side_effect=fake_vectorise) as mock_vectorise:
+            model_auth = ModelAuth(
+                s3=S3Auth(
+                aws_access_key_id=fake_access_key_id,
+                aws_secret_access_key=fake_secret_key)
+            )
+            res = tensor_search.add_documents(
+                config=self.config,
+                add_docs_params=AddDocsParams(
+                    index_name=self.index_name_1,
+                    model_auth=model_auth,
+                    auto_refresh=True, device="cpu",
+                    docs=[{
+                        'my_combination_field': {
+                            'my_image': f"https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+                            'some_text': f"my text {i}"}} for i in range(20)],
+                    mappings={
+                        "my_combination_field": {
+                            "type": "multimodal_combination",
+                            "weights": {
+                                "my_image": 0.5,
+                                "some_text": 0.5
                             }
                         }
-                    ),
-                    **kwargs
-                )
-                if isinstance(res, list):
-                    assert all([not batch_res ['errors'] for batch_res in res])
-                else:
-                    assert not res['errors']
-                mock_vectorise.assert_called()
-                for _args, _kwargs in mock_vectorise.call_args_list:
-                    assert _kwargs['model_properties']['model_location'] == {
-                        "s3": {
-                            "Bucket": s3_bucket,
-                            "Key": s3_object_key,
-                        },
-                        "auth_required": True
                     }
-                    assert _kwargs['model_auth'] == model_auth
+                ),
+            )
+            if isinstance(res, list):
+                assert all([not batch_res ['errors'] for batch_res in res])
+            else:
+                assert not res['errors']
+            mock_vectorise.assert_called()
+            for _args, _kwargs in mock_vectorise.call_args_list:
+                assert _kwargs['model_properties']['model_location'] == {
+                    "s3": {
+                        "Bucket": s3_bucket,
+                        "Key": s3_object_key,
+                    },
+                    "auth_required": True
+                }
+                assert _kwargs['model_auth'] == model_auth
 
     def test_no_creds_error(self):
         """in s3, if there aren't creds"""
@@ -1122,7 +1112,7 @@ class TestModelAuthDownloadAndExtractS3HFModel(MarqoTestCase):
         tensor_search.eject_model(model_name=cls.custom_model_name, device=cls.device)
 
     def setUp(self):
-        # Any tests that call add_documents_orchestrator, search, bulk_search need this env var
+        # Any tests that call add_document, search, bulk_search need this env var
         self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
         self.device_patcher.start()
 
@@ -1196,7 +1186,7 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
         except IndexNotFoundError as s:
             pass
 
-        # Any tests that call add_documents_orchestrator, search, bulk_search need this env var
+        # Any tests that call add_document, search, bulk_search need this env var
         self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
         self.device_patcher.start()
 
@@ -2014,7 +2004,7 @@ class TestS3ModelAuthlLoadForHFModelVariants(MarqoTestCase):
         except IndexNotFoundError as s:
             pass
         
-        # Any tests that call add_documents_orchestrator, search, bulk_search need this env var
+        # Any tests that call add_document, search, bulk_search need this env var
         self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
         self.device_patcher.start() 
 
@@ -2063,54 +2053,49 @@ class TestS3ModelAuthlLoadForHFModelVariants(MarqoTestCase):
         s3_settings['index_defaults']['model_properties'] = model_properties
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings=s3_settings)
 
-        for add_docs_method, kwargs in [
-                (tensor_search.add_documents_orchestrator, {'batch_size': 10}),
-                # TODO: add add_documents and add_documents_mp ?
-            ]:
-            try:
-                tensor_search.eject_model(model_name='my_model' ,device=self.device)
-            except ModelNotInCacheError:
-                pass
-            # Create a mock Boto3 client
-            mock_s3_client = mock.MagicMock()
+        try:
+            tensor_search.eject_model(model_name='my_model' ,device=self.device)
+        except ModelNotInCacheError:
+            pass
+        # Create a mock Boto3 client
+        mock_s3_client = mock.MagicMock()
 
-            # Mock the generate_presigned_url method of the mock Boto3 client with a real OpenCLIP model, so that
-            # the rest of the logic works.
-            public_url = "https://marqo-cache-sentence-transformers.s3.us-west-2.amazonaws.com/all-MiniLM-L6-v1/all-MiniLM-L6-v2.zip"
-            mock_s3_client.generate_presigned_url.return_value = public_url
+        # Mock the generate_presigned_url method of the mock Boto3 client with a real OpenCLIP model, so that
+        # the rest of the logic works.
+        public_url = "https://marqo-cache-sentence-transformers.s3.us-west-2.amazonaws.com/all-MiniLM-L6-v1/all-MiniLM-L6-v2.zip"
+        mock_s3_client.generate_presigned_url.return_value = public_url
 
-            with unittest.mock.patch('boto3.client', return_value=mock_s3_client) as mock_boto3_client:
-                with self.assertRaises(BadRequestError) as cm:
-                    with unittest.mock.patch(
-                        'marqo.s2_inference.processing.custom_clip_utils.download_pretrained_from_url'
-                    ) as mock_download_pretrained_from_url:
-                        add_docs_method(
-                            config=self.config,
-                            add_docs_params=AddDocsParams(
-                                index_name=self.index_name_1,
-                                model_auth=ModelAuth(s3=S3Auth(
-                                    aws_access_key_id=fake_access_key_id,
-                                    aws_secret_access_key=fake_secret_key)),
-                                auto_refresh=True,
-                                docs=[{f'Title': "something {i} good"} for i in range(20)]
-                            ),
-                            **kwargs
-                        )
-            mock_download_pretrained_from_url.assert_called_once_with(
-                url=public_url, cache_dir=ModelCache.hf_cache_path, cache_file_name='secret_model.zip')
-            mock_s3_client.generate_presigned_url.assert_called_with(
-                'get_object',
-                Params={'Bucket': 'your-bucket-name', 'Key': s3_object_key}
-            )
-            mock_boto3_client.assert_called_once_with(
-                's3',
-                aws_access_key_id=fake_access_key_id,
-                aws_secret_access_key=fake_secret_key,
-                aws_session_token=None
-            )
-            mock_download_pretrained_from_url.reset_mock()
-            mock_s3_client.reset_mock()
-            mock_boto3_client.reset_mock()
+        with unittest.mock.patch('boto3.client', return_value=mock_s3_client) as mock_boto3_client:
+            with self.assertRaises(BadRequestError) as cm:
+                with unittest.mock.patch(
+                    'marqo.s2_inference.processing.custom_clip_utils.download_pretrained_from_url'
+                ) as mock_download_pretrained_from_url:
+                    tensor_search.add_documents(
+                        config=self.config,
+                        add_docs_params=AddDocsParams(
+                            index_name=self.index_name_1,
+                            model_auth=ModelAuth(s3=S3Auth(
+                                aws_access_key_id=fake_access_key_id,
+                                aws_secret_access_key=fake_secret_key)),
+                            auto_refresh=True,
+                            docs=[{f'Title': "something {i} good"} for i in range(20)], device="cpu"
+                        ),
+                    )
+        mock_download_pretrained_from_url.assert_called_once_with(
+            url=public_url, cache_dir=ModelCache.hf_cache_path, cache_file_name='secret_model.zip')
+        mock_s3_client.generate_presigned_url.assert_called_with(
+            'get_object',
+            Params={'Bucket': 'your-bucket-name', 'Key': s3_object_key}
+        )
+        mock_boto3_client.assert_called_once_with(
+            's3',
+            aws_access_key_id=fake_access_key_id,
+            aws_secret_access_key=fake_secret_key,
+            aws_session_token=None
+        )
+        mock_download_pretrained_from_url.reset_mock()
+        mock_s3_client.reset_mock()
+        mock_boto3_client.reset_mock()
 
     def test_model_loads_from_multi_search(self):
         s3_object_key = 'path/to/your/secret_model.pt'
@@ -2192,62 +2177,57 @@ class TestS3ModelAuthlLoadForHFModelVariants(MarqoTestCase):
         s3_settings['index_defaults']['model_properties'] = model_properties
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings=s3_settings)
 
-        for add_docs_method, kwargs in [
-            (tensor_search.add_documents_orchestrator, {'batch_size': 10}),
-            (tensor_search.add_documents, {})
-            # TODO: add add_documents_mp ?
-        ]:
-            try:
-                tensor_search.eject_model(model_name='my_model', device=self.device)
-            except ModelNotInCacheError:
-                pass
-            # Create a mock Boto3 client
-            mock_s3_client = mock.MagicMock()
 
-            mock_s3_client.generate_presigned_url.return_value = "https://random_model.zip"
+        try:
+            tensor_search.eject_model(model_name='my_model', device=self.device)
+        except ModelNotInCacheError:
+            pass
+        # Create a mock Boto3 client
+        mock_s3_client = mock.MagicMock()
 
-            with unittest.mock.patch('marqo.s2_inference.s2_inference.vectorise', side_effect=fake_vectorise_384) as mock_vectorise:
-                model_auth = ModelAuth(
-                    s3=S3Auth(
-                    aws_access_key_id=fake_access_key_id,
-                    aws_secret_access_key=fake_secret_key)
-                )
-                res = add_docs_method(
-                    config=self.config,
-                    add_docs_params=AddDocsParams(
-                        index_name=self.index_name_1,
-                        model_auth=model_auth,
-                        auto_refresh=True, device="cpu",
-                        docs=[{
-                            'my_combination_field': {
-                                'my_image': f"https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
-                                'some_text': f"my text {i}"}} for i in range(20)],
-                        mappings={
-                            "my_combination_field": {
-                                "type": "multimodal_combination",
-                                "weights": {
-                                    "my_image": 0.5,
-                                    "some_text": 0.5
-                                }
+        mock_s3_client.generate_presigned_url.return_value = "https://random_model.zip"
+
+        with unittest.mock.patch('marqo.s2_inference.s2_inference.vectorise', side_effect=fake_vectorise_384) as mock_vectorise:
+            model_auth = ModelAuth(
+                s3=S3Auth(
+                aws_access_key_id=fake_access_key_id,
+                aws_secret_access_key=fake_secret_key)
+            )
+            res = tensor_search.add_documents(
+                config=self.config,
+                add_docs_params=AddDocsParams(
+                    index_name=self.index_name_1,
+                    model_auth=model_auth,
+                    auto_refresh=True, device="cpu",
+                    docs=[{
+                        'my_combination_field': {
+                            'my_image': f"https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+                            'some_text': f"my text {i}"}} for i in range(20)],
+                    mappings={
+                        "my_combination_field": {
+                            "type": "multimodal_combination",
+                            "weights": {
+                                "my_image": 0.5,
+                                "some_text": 0.5
                             }
                         }
-                    ),
-                    **kwargs
-                )
-                if isinstance(res, list):
-                    assert all([not batch_res ['errors'] for batch_res in res])
-                else:
-                    assert not res['errors']
-                mock_vectorise.assert_called()
-                for _args, _kwargs in mock_vectorise.call_args_list:
-                    assert _kwargs['model_properties']['model_location'] == {
-                        "s3": {
-                            "Bucket": s3_bucket,
-                            "Key": s3_object_key,
-                        },
-                        "auth_required": True
                     }
-                    assert _kwargs['model_auth'] == model_auth
+                ),
+            )
+            if isinstance(res, list):
+                assert all([not batch_res ['errors'] for batch_res in res])
+            else:
+                assert not res['errors']
+            mock_vectorise.assert_called()
+            for _args, _kwargs in mock_vectorise.call_args_list:
+                assert _kwargs['model_properties']['model_location'] == {
+                    "s3": {
+                        "Bucket": s3_bucket,
+                        "Key": s3_object_key,
+                    },
+                    "auth_required": True
+                }
+                assert _kwargs['model_auth'] == model_auth
 
     def test_no_creds_error(self):
         """in s3, if there aren't creds"""
