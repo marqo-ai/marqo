@@ -81,6 +81,47 @@ from marqo.tensor_search.tensor_search_logging import get_logger
 logger = get_logger(__name__)
 
 
+def _get_dimension_from_model_properties(model_properties: dict):
+    """
+    Args:
+        model_properties: dict containing model properties
+    """
+    try:
+        return model_properties["dimensions"]
+    except KeyError:
+        raise errors.InvalidArgError(
+            "The given model properties must contain a 'dimensions' key"
+        )
+
+
+def add_knn_field(ix_settings: dict):
+    """
+    This adds the OpenSearch knn field to the index's mappings
+
+    Args:
+        ix_settings: the index settings
+    """
+    model_prop = _get_model_properties_from_index_defaults(
+        index_defaults=(
+            ix_settings["mappings"]["_meta"]
+            ["index_settings"][NsField.index_defaults]),
+        model_name=(
+            ix_settings["mappings"]["_meta"]
+            ["index_settings"][NsField.index_defaults][NsField.model])
+    )
+    
+    ix_settings_with_knn = ix_settings.copy()
+    ix_settings_with_knn["mappings"]["properties"][TensorField.chunks]["properties"][TensorField.marqo_knn_field] = {
+        "type": "knn_vector",
+        "dimension": _get_dimension_from_model_properties(model_prop),
+        "method": (
+            ix_settings["mappings"]["_meta"]
+            ["index_settings"][NsField.index_defaults][NsField.ann_parameters]
+        )
+    }
+    return ix_settings_with_knn
+
+
 def create_vector_index(
         config: Config, index_name: str, media_type: Union[str, MediaType] = MediaType.default,
         refresh_interval: str = "1s", index_settings=None):
@@ -145,35 +186,6 @@ def create_vector_index(
     if max_marqo_fields is not None:
         max_os_fields = _marqo_field_limit_to_os_limit(int(max_marqo_fields))
         vector_index_settings["settings"]["mapping"] = {"total_fields": {"limit": int(max_os_fields)}}
-
-    # TODO: move this into own function
-    def add_knn_field(ix_settings: dict):
-        """
-        this adds the OpenSearch knn field to the index's mappings
-
-        Args:
-            ix_settings:
-        """
-        ix_settings_with_knn = ix_settings.copy()
-        # TODO: use enum for vector field name
-        ix_settings_with_knn["mappings"]["properties"][TensorField.chunks]["properties"][TensorField.marqo_knn_field] = {
-            "type": "knn_vector",
-            "dimension": (
-                _get_model_properties_from_index_defaults(
-                    index_defaults=(
-                        ix_settings["mappings"]["_meta"]
-                        ["index_settings"][NsField.index_defaults]),
-                    model_name=(
-                        ix_settings["mappings"]["_meta"]
-                        ["index_settings"][NsField.index_defaults][NsField.model])
-                )["dimensions"]
-            ),
-            "method": (
-                ix_settings["mappings"]["_meta"]
-                ["index_settings"][NsField.index_defaults][NsField.ann_parameters]
-            )
-        }
-        return ix_settings_with_knn
 
     model_name = the_index_settings[NsField.index_defaults][NsField.model]
     vector_index_settings["mappings"]["_meta"][NsField.index_settings] = the_index_settings
@@ -1890,7 +1902,7 @@ def _get_model_properties_from_index_defaults(index_defaults: Dict, model_name: 
         try:
             model_properties = s2_inference.get_model_properties_from_registry(model_name)
         except s2_inference_errors.UnknownModelError:
-            raise s2_inference_errors.UnknownModelError(
+            raise errors.InvalidArgError(
                 f"Could not find model properties for model={model_name}. "
                 f"Please check that the model name is correct. "
                 f"Please provide model_properties if the model is a custom model and is not supported by default")

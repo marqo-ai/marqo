@@ -252,7 +252,8 @@ class TestIndexMetaCache(MarqoTestCase):
         result = tensor_search.search(
             index_name=self.index_name_1, config=self.config, text="a line of text",
              search_method=SearchMethod.TENSOR)
-        assert "1234" not in [h["_id"] for h in result["hits"]]
+        # With single KNN Field, correct result appears even when field is not in cache!
+        assert "1234" in [h["_id"] for h in result["hits"]]
         assert len([h["_id"] for h in result["hits"]]) > 0
         result_2 = tensor_search.search(
             index_name=self.index_name_1, config=self.config, text="a line of text",
@@ -265,12 +266,13 @@ class TestIndexMetaCache(MarqoTestCase):
                 docs=[{"some field": "Plane 1"}], auto_refresh=True, device="cpu"))
         self._simulate_externally_added_docs(
             self.index_name_1, [{"brand new field": "a line of text", "_id": "1234"}], "brand new field")
-        assert "brand new field" not in index_meta_cache.get_cache()
+        assert "brand new field" not in index_meta_cache.get_cache()[self.index_name_1].properties
         result = tensor_search.search(
             index_name=self.index_name_1, config=self.config, text="a line of text",
             searchable_attributes=["brand new field"],
              search_method=SearchMethod.TENSOR)
-        assert result['hits'] == []
+        # With single KNN Field, correct result appears even when field is not in cache!
+        assert result["hits"][0]["_id"] == "1234"
 
     def test_search_lexical_externally_created_field_attributes(self):
         """lexical search doesn't need an up-to-date cache to work"""
@@ -282,7 +284,7 @@ class TestIndexMetaCache(MarqoTestCase):
                 docs=[{"some field": "Plane 1"}], auto_refresh=True, device="cpu"))
         self._simulate_externally_added_docs(
             self.index_name_3, [{"brand new field": "a line of text", "_id": "1234"}], "brand new field")
-        assert "brand new field" not in index_meta_cache.get_cache()
+        assert "brand new field" not in index_meta_cache.get_cache()[self.index_name_1].properties
         result = tensor_search.search(
             index_name=self.index_name_3, config=self.config, text="a line of text",
             searchable_attributes=["brand new field"],
@@ -298,7 +300,7 @@ class TestIndexMetaCache(MarqoTestCase):
         tensor_search.add_documents(
             config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1,
                 docs=[{"some field": "Plane 1"}], auto_refresh=True, device="cpu"))
-        assert "brand new field" not in index_meta_cache.get_cache()
+        assert "brand new field" not in index_meta_cache.get_cache()[self.index_name_1].properties
         result = tensor_search.search(
             index_name=self.index_name_1, config=self.config, text="a line of text",
             searchable_attributes=["brand new field"],
@@ -310,27 +312,30 @@ class TestIndexMetaCache(MarqoTestCase):
         tensor_search.add_documents(
             config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1,
                 docs=[{"some field": "Plane 1"}], auto_refresh=True, device="cpu"))
-        assert "brand new field" not in index_meta_cache.get_cache()
+        assert "brand new field" not in index_meta_cache.get_cache()[self.index_name_1].properties
         # no error:
         result = tensor_search.search(
             index_name=self.index_name_1, config=self.config, text="sftstsbtdts",
             searchable_attributes=["brand new field"],
              search_method=SearchMethod.LEXICAL)
 
-    def test_search_vectors_externally_created_field_attributes_cache_update(self):
-        """The cache should update after getting no hits at first"""
+    def test_cache_update_on_search(self):
+        """
+        The cache should update after search
+        With single KNN field, doc should be found even if field is not in cache
+        """
         tensor_search.add_documents(
             config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1,
                 docs=[{"some field": "Plane 1"}], auto_refresh=True, device="cpu"))
         time.sleep(2.5)
         self._simulate_externally_added_docs(
             self.index_name_1, [{"brand new field": "a line of text", "_id": "1234"}], "brand new field")
-        assert "brand new field" not in index_meta_cache.get_cache()
+        assert "brand new field" not in index_meta_cache.get_cache()[self.index_name_1].properties
         result = tensor_search.search(
             index_name=self.index_name_1, config=self.config, text="a line of text",
             searchable_attributes=["brand new field"],
              search_method=SearchMethod.TENSOR)
-        assert result['hits'] == []
+        assert result["hits"][0]["_id"] == "1234"
         time.sleep(0.5)
         if self.config.cluster_is_remote:
             # Allow extra time if using a remote cluster
@@ -339,6 +344,7 @@ class TestIndexMetaCache(MarqoTestCase):
             index_name=self.index_name_1, config=self.config, text="a line of text",
             searchable_attributes=["brand new field"],
              search_method=SearchMethod.TENSOR)
+        assert "brand new field" in index_meta_cache.get_cache()[self.index_name_1].properties
         assert result_2["hits"][0]["_id"] == "1234"
 
     def test_populate_cache(self):
