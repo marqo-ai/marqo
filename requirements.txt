@@ -15,7 +15,7 @@ nltk==3.7
 torch==2.0.1
 torchvision==0.15.2
 Pillow==9.3.0
-numpy==1.23.4
+numpy==1.24.1
 validators==0.20.0
 sentence-transformers==2.2.2
 open_clip_torch==2.18.0
@@ -37,8 +37,8 @@ timm==0.6.13
 transformers==4.29.0
 
 flatbuffers==23.5.9
-certifi==2019.11.28
-idna==2.8
+certifi==2022.12.7
+idna==3.4
 six==1.14.0
 typing-extensions==4.5.0
-urllib3==1.25.8
+urllib3==1.26.13
