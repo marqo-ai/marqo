@@ -1,27 +1,28 @@
 """The API entrypoint for Tensor Search"""
-import typing
-from fastapi.responses import JSONResponse
-from fastapi import Request, Depends
-from marqo.tensor_search.models.add_docs_objects import AddDocsParams
-from marqo.tensor_search.models.add_docs_objects import ModelAuth
-from marqo.errors import InvalidArgError, MarqoWebError, MarqoError
-from fastapi import FastAPI, Query
 import json
-from marqo.tensor_search import tensor_search
-from marqo import config
-from typing import List, Dict
 import os
-from marqo.tensor_search.models.api_models import BulkSearchQuery, SearchQuery
-from marqo.tensor_search.web import api_validation, api_utils
-from marqo.tensor_search.on_start_script import on_start
+import typing
+from typing import List, Dict, Optional, Union
+
+import pydantic
+from fastapi import FastAPI, Query
+from fastapi import Request, Depends
+from fastapi.responses import JSONResponse
+
+from marqo import config
 from marqo import version
+from marqo.errors import InvalidArgError, MarqoWebError, MarqoError, BadRequestError
+from marqo.tensor_search import tensor_search
 from marqo.tensor_search.backend import get_index_info
 from marqo.tensor_search.enums import RequestType
+from marqo.tensor_search.models.add_docs_objects import (AddDocsParams, ModelAuth, AddDocsBodyParamsOld,
+                                                         AddDocsBodyParamsNew)
+from marqo.tensor_search.models.api_models import BulkSearchQuery, SearchQuery
+from marqo.tensor_search.on_start_script import on_start
+from marqo.tensor_search.telemetry import RequestMetricsStore, TelemetryMiddleware
 from marqo.tensor_search.throttling.redis_throttle import throttle
 from marqo.tensor_search.utils import add_timing
-import pydantic
-
-from marqo.tensor_search.telemetry import RequestMetricsStore, TelemetryMiddleware
+from marqo.tensor_search.web import api_validation, api_utils
 
 
 def replace_host_localhosts(OPENSEARCH_IS_INTERNAL: str, OS_URL: str):
@@ -168,20 +169,38 @@ def search(search_query: SearchQuery, index_name: str, device: str = Depends(api
 @app.post("/indexes/{index_name}/documents")
 @throttle(RequestType.INDEX)
 def add_or_replace_documents(
-        docs: List[Dict],
+        body: typing.Union[AddDocsBodyParamsNew, AddDocsBodyParamsOld],
         index_name: str,
         refresh: bool = True,
         marqo_config: config.Config = Depends(generate_config),
-        non_tensor_fields: List[str] = Query(default=[]),
+        non_tensor_fields: Optional[List[str]] = Query(default=[]),
         device: str = Depends(api_validation.validate_device),
-        use_existing_tensors: bool = False,
-        image_download_headers: typing.Optional[dict] = Depends(
+        use_existing_tensors: Optional[bool] = False,
+        image_download_headers: Optional[dict] = Depends(
             api_utils.decode_image_download_headers
         ),
-        model_auth: typing.Optional[ModelAuth] = Depends(
+        model_auth: Optional[ModelAuth] = Depends(
             api_utils.decode_query_string_model_auth
         ),
-        mappings: typing.Optional[dict] = Depends(api_utils.decode_mappings)):
+        mappings: Optional[dict] = Depends(api_utils.decode_mappings)):
+
+    if isinstance(body, AddDocsBodyParamsNew):
+        if any([non_tensor_fields, use_existing_tensors, image_download_headers, model_auth, mappings]) and \
+                any([body.non_tensor_fields, body.use_existing_tensors, body.image_download_headers,
+                     body.model_auth, body.mappings]):
+            raise BadRequestError("Parameters provided in both body and query string")
+
+        docs = body.documents
+        mappings = body.mappings or mappings
+        non_tensor_fields = body.non_tensor_fields or non_tensor_fields
+        use_existing_tensors = body.use_existing_tensors if body.use_existing_tensors is not None else use_existing_tensors
+        model_auth = body.model_auth or model_auth
+        image_download_headers = body.image_download_headers or image_download_headers
+    elif isinstance(body, AddDocsBodyParamsOld):
+        docs = body.__root__
+    else:
+        raise BadRequestError("Invalid request body")
+
     """add_documents endpoint (replace existing docs with the same id)"""
     add_docs_params = AddDocsParams(
         index_name=index_name, docs=docs, auto_refresh=refresh,
@@ -193,6 +212,7 @@ def add_or_replace_documents(
         return tensor_search.add_documents(
             config=marqo_config, add_docs_params=add_docs_params
         )
+
 
 
 @app.get("/indexes/{index_name}/documents/{document_id}")

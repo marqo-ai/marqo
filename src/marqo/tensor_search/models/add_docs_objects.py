@@ -9,11 +9,23 @@ from marqo.tensor_search.enums import EnvVars
 from marqo.errors import InternalError
 from pydantic import BaseModel
 from marqo.tensor_search.utils import get_best_available_device
+from typing import List, Dict
 
 
 class AddDocsParamsConfig:
     arbitrary_types_allowed = True
 
+
+class AddDocsBodyParamsOld(BaseModel):
+    __root__: List[Dict]
+
+class AddDocsBodyParamsNew(BaseModel):
+    non_tensor_fields: List[str] = []
+    use_existing_tensors: bool = False
+    image_download_headers: Optional[dict]
+    model_auth: Optional[ModelAuth]
+    mappings: Optional[dict]
+    documents: List[Dict]
 
 class AddDocsParams(BaseModel):
     """Represents the parameters of the tensor_search.add_documents() function
