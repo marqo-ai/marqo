@@ -17,7 +17,7 @@ class AddDocsParamsConfig:
 
 
 class AddDocsBodyParamsOld(BaseModel):
-    __root__: List[Dict]
+    documents: List[Dict]
 
 class AddDocsBodyParamsNew(BaseModel):
     non_tensor_fields: List[str] = []

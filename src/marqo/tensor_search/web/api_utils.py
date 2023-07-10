@@ -7,6 +7,7 @@ from marqo.tensor_search.utils import construct_authorized_url
 from marqo.tensor_search.models.add_docs_objects import ModelAuth
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams, AddDocsBodyParamsOld, AddDocsBodyParamsNew
 from marqo.errors import BadRequestError
+from typing import Union, List, Optional, Dict
 
 
 def upconstruct_authorized_url(opensearch_url: str) -> str:
@@ -50,7 +51,7 @@ def translate_api_device(device: Optional[str]) -> Optional[str]:
             lowered_device.startswith(acceptable),
             lowered_device.replace(acceptable, ""),
             acceptable
-         )
+        )
         for acceptable in acceptable_devices]
 
     try:
@@ -132,10 +133,14 @@ def decode_mappings(mappings: Optional[str] = None) -> dict:
         except json.JSONDecodeError as e:
             raise InvalidArgError(f"Error parsing mappings. Message: {e}")
 
-def add_docs_params_ochestrator(index_name, body, auto_refresh,
-        device, non_tensor_fields, use_existing_tensors,
-        image_download_headers, mappings, model_auth) -> AddDocsParams:
+
+def add_docs_params_ochestrator(index_name: str, body: Union[AddDocsBodyParamsOld, AddDocsBodyParamsNew],
+                                device: str, non_tensor_fields: Optional[List[str]], mappings: Optional[dict],
+                                model_auth: Optional[ModelAuth], image_download_headers: Optional[dict],
+                                use_existing_tensors: Optional[bool] = False,
+                                auto_refresh: bool = True) -> AddDocsParams:
     """An orchestrator for the add_documents API to support both old and new versions of the API.
+    All the arguments are decoded and validated in the API function. This function is only responsible for orchestrating.
 
     Returns:
         AddDocsParams: An AddDocsParams object for internal use
@@ -146,7 +151,7 @@ def add_docs_params_ochestrator(index_name, body, auto_refresh,
 
         # Check for parameter duplication
         if any([non_tensor_fields, use_existing_tensors, image_download_headers, model_auth, mappings]) and \
-                any([body.non_tensor_fields, body.use_existing_tensors is not None, body.image_download_headers,
+                any([body.non_tensor_fields, body.use_existing_tensors, body.image_download_headers,
                      body.model_auth, body.mappings]):
             raise BadRequestError("Parameters provided in both body and query string")
 
@@ -157,7 +162,7 @@ def add_docs_params_ochestrator(index_name, body, auto_refresh,
         image_download_headers = body.image_download_headers
 
     elif isinstance(body, AddDocsBodyParamsOld):
-        docs = body.__root__
+        docs = body.documents
 
     else:
         raise BadRequestError("Invalid request body")
@@ -168,4 +173,3 @@ def add_docs_params_ochestrator(index_name, body, auto_refresh,
         use_existing_tensors=use_existing_tensors, image_download_headers=image_download_headers,
         mappings=mappings, model_auth=model_auth
     )
-
