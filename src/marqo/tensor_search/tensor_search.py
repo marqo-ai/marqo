@@ -1089,17 +1089,16 @@ def _lexical_search(
 
     # SEARCH TIMER-LOGGER (pre-processing)
     RequestMetricsStore.for_request().start("search.lexical.processing_before_opensearch")
-    if searchable_attributes is not None and searchable_attributes:
+    if searchable_attributes is not None:
+        # Empty searchable attributes should produce empty results.
+        if len(searchable_attributes) == 0:
+            return {"hits": []}
+        
         fields_to_search = searchable_attributes
     else:
         fields_to_search = index_meta_cache.get_index_info(
             config=config, index_name=index_name
         ).get_true_text_properties()
-
-    # Validation for offset (pagination not supported for 0 fields)
-    if len(fields_to_search) != 1 and offset > 0:
-        raise errors.InvalidArgError(
-            f"Pagination (offset > 0) is only supported for single field searches! Your search currently has {len(fields_to_search)} fields: {fields_to_search}")
 
     # Parse text into required and optional terms.
     (required_terms, optional_blob) = utils.parse_lexical_query(text)
@@ -1133,6 +1132,7 @@ def _lexical_search(
         "size": result_count,
         "from": offset
     }
+    print(f"body: {body}")
     if filter_string is not None:
         body["query"]["bool"]["filter"] = [{
             "query_string": {"query": filter_string}}]
@@ -1214,15 +1214,6 @@ def get_vector_properties_to_search(searchable_attributes: Union[None, List[str]
             index_info.get_possible_tensor_fields()
         ))
 
-    # We can now support pagination for multi-field searches, to be tested.
-    # TODO: delete the following legacy validation (if OK to do so)
-    # Validation for offset (pagination is single field) if offset not provided, validation is not run.
-    # if len(properties_to_search) != 1 and offset > 0:
-    #     human_readable_vector_properties = list(properties_to_search)
-    #     raise errors.InvalidArgError(
-    #         f"Pagination (offset > 0) is only supported for single field searches!"
-    #         f" Your search currently has {len(properties_to_search)} vectorisable fields: {human_readable_vector_properties}"
-    #     )
     return properties_to_search
 
 
@@ -2099,6 +2090,7 @@ def vectorise_multimodal_combination_field(
         TensorField.field_name: field,
     })
     return combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add, new_fields_from_multimodal_combination
+
 
 def _create_normal_tensor_search_query(result_count, offset, vector_field, vectorised_text) -> dict:
     search_query = {
