@@ -184,30 +184,11 @@ def add_or_replace_documents(
         ),
         mappings: Optional[dict] = Depends(api_utils.decode_mappings)):
 
-    if isinstance(body, AddDocsBodyParamsNew):
-        if any([non_tensor_fields, use_existing_tensors, image_download_headers, model_auth, mappings]) and \
-                any([body.non_tensor_fields, body.use_existing_tensors, body.image_download_headers,
-                     body.model_auth, body.mappings]):
-            raise BadRequestError("Parameters provided in both body and query string")
-
-        docs = body.documents
-        mappings = body.mappings or mappings
-        non_tensor_fields = body.non_tensor_fields or non_tensor_fields
-        use_existing_tensors = body.use_existing_tensors if body.use_existing_tensors is not None else use_existing_tensors
-        model_auth = body.model_auth or model_auth
-        image_download_headers = body.image_download_headers or image_download_headers
-    elif isinstance(body, AddDocsBodyParamsOld):
-        docs = body.__root__
-    else:
-        raise BadRequestError("Invalid request body")
-
     """add_documents endpoint (replace existing docs with the same id)"""
-    add_docs_params = AddDocsParams(
-        index_name=index_name, docs=docs, auto_refresh=refresh,
-        device=device, non_tensor_fields=non_tensor_fields,
-        use_existing_tensors=use_existing_tensors, image_download_headers=image_download_headers,
-        mappings=mappings, model_auth=model_auth
-    )
+    add_docs_params = api_utils.add_docs_params_ochestrator(index_name=index_name, body=body, auto_refresh=refresh,
+        device=device, non_tensor_fields=non_tensor_fields, use_existing_tensors=use_existing_tensors,
+        image_download_headers=image_download_headers, mappings=mappings, model_auth=model_auth)
+
     with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/documents"):
         return tensor_search.add_documents(
             config=marqo_config, add_docs_params=add_docs_params
