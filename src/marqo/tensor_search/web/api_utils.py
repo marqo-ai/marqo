@@ -135,7 +135,7 @@ def decode_mappings(mappings: Optional[str] = None) -> dict:
             raise InvalidArgError(f"Error parsing mappings. Message: {e}")
 
 
-def add_docs_params_ochestrator(request: Request, index_name: str, body: Union[AddDocsBodyParamsOld, AddDocsBodyParamsNew],
+def add_docs_params_orchestrator(request: Request, index_name: str, body: Union[AddDocsBodyParamsOld, AddDocsBodyParamsNew],
                                 device: str, auto_refresh: bool = True, non_tensor_fields: Optional[List[str]] = [],
                                 mappings: Optional[dict] = dict(), model_auth: Optional[ModelAuth] = None,
                                 image_download_headers: Optional[dict] = dict(),

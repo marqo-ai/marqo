@@ -1,7 +1,7 @@
 import pydantic
 from marqo.tensor_search.models.add_docs_objects import ModelAuth, AddDocsParams, AddDocsBodyParamsOld, \
     AddDocsBodyParamsNew
-from marqo.tensor_search.web.api_utils import add_docs_params_ochestrator
+from marqo.tensor_search.web.api_utils import add_docs_params_orchestrator
 from marqo.tensor_search.models.private_models import S3Auth
 import urllib.parse
 from marqo.tensor_search.web import api_utils
@@ -101,8 +101,8 @@ class TestAddDocsParamsOchestrator(unittest.TestCase):
         mappings = dict()
 
         # Call the function with the arguments
-        result = add_docs_params_ochestrator(index_name, body, device, auto_refresh, non_tensor_fields, mappings,
-                                             model_auth, image_download_headers, use_existing_tensors)
+        result = add_docs_params_orchestrator(index_name, body, device, auto_refresh, non_tensor_fields, mappings,
+                                              model_auth, image_download_headers, use_existing_tensors)
 
         # Assert that the result is as expected
         assert isinstance(result, AddDocsParams)
@@ -130,8 +130,8 @@ class TestAddDocsParamsOchestrator(unittest.TestCase):
         auto_refresh = True
 
         # Call the function with the arguments
-        result = add_docs_params_ochestrator(index_name, body, device, auto_refresh, non_tensor_fields, mappings,
-                                             model_auth, image_download_headers, use_existing_tensors)
+        result = add_docs_params_orchestrator(index_name, body, device, auto_refresh, non_tensor_fields, mappings,
+                                              model_auth, image_download_headers, use_existing_tensors)
 
         # Assert that the result is as expected
         assert isinstance(result, AddDocsParams)
@@ -160,8 +160,8 @@ class TestAddDocsParamsOchestrator(unittest.TestCase):
 
         # Use pytest.raises to check for the error
         try:
-           _ = add_docs_params_ochestrator(index_name, body, device, auto_refresh, non_tensor_fields, mappings,
-                                                 model_auth, image_download_headers, use_existing_tensors)
+           _ = add_docs_params_orchestrator(index_name, body, device, auto_refresh, non_tensor_fields, mappings,
+                                            model_auth, image_download_headers, use_existing_tensors)
         except BadRequestError as e:
             self.assertIn("Invalid request body", str(e))
 
@@ -186,6 +186,6 @@ class TestAddDocsParamsOchestrator(unittest.TestCase):
             kwargs = {key: None for key in params.keys()}
             kwargs[param] = value
             try:
-                add_docs_params_ochestrator(index_name, body, device, **kwargs, auto_refresh=auto_refresh)
+                add_docs_params_orchestrator(index_name, body, device, auto_refresh=auto_refresh, **kwargs)
             except BadRequestError as e:
                 self.assertIn("Marqo is not accepting any of the following parameters in the query string", str(e))
