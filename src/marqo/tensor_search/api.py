@@ -169,6 +169,7 @@ def search(search_query: SearchQuery, index_name: str, device: str = Depends(api
 @app.post("/indexes/{index_name}/documents")
 @throttle(RequestType.INDEX)
 def add_or_replace_documents(
+        request: Request,
         body: typing.Union[AddDocsBodyParamsNew, AddDocsBodyParamsOld],
         index_name: str,
         refresh: bool = True,
@@ -185,7 +186,7 @@ def add_or_replace_documents(
         mappings: Optional[dict] = Depends(api_utils.decode_mappings)):
 
     """add_documents endpoint (replace existing docs with the same id)"""
-    add_docs_params = api_utils.add_docs_params_ochestrator(index_name=index_name, body=body, auto_refresh=refresh,
+    add_docs_params = api_utils.add_docs_params_ochestrator(request=request, index_name=index_name, body=body, auto_refresh=refresh,
         device=device, non_tensor_fields=non_tensor_fields, use_existing_tensors=use_existing_tensors,
         image_download_headers=image_download_headers, mappings=mappings, model_auth=model_auth)
 

@@ -85,10 +85,10 @@ class TestAddDocsParamsOchestrator(unittest.TestCase):
         # Set up the arguments for the function
         index_name = "test-index"
         body = AddDocsBodyParamsNew(documents=[{"test": "doc"}],
-                                    non_tensor_fields=["field1"],
-                                    use_existing_tensors=True,
-                                    image_download_headers={"header1": "value1"},
-                                    model_auth=ModelAuth(s3=S3Auth(aws_secret_access_key="test", aws_access_key_id="test")),
+                                    nonTensorFields=["field1"],
+                                    useExistingTensors=True,
+                                    imageDownloadHeaders={"header1": "value1"},
+                                    modelAuth=ModelAuth(s3=S3Auth(aws_secret_access_key="test", aws_access_key_id="test")),
                                     mappings={"map1": "value1"})
         device = "test-device"
         auto_refresh = True
@@ -119,7 +119,7 @@ class TestAddDocsParamsOchestrator(unittest.TestCase):
         index_name = "test-index"
         model_auth = ModelAuth(s3=S3Auth(aws_secret_access_key="test", aws_access_key_id="test"))
 
-        body = AddDocsBodyParamsOld(documents=[{"test": "doc"}])
+        body = AddDocsBodyParamsOld(__root__= [{"test": "doc"}])
 
         device = "test-device"
         non_tensor_fields = ["field1"]
@@ -136,7 +136,7 @@ class TestAddDocsParamsOchestrator(unittest.TestCase):
         # Assert that the result is as expected
         assert isinstance(result, AddDocsParams)
         assert result.index_name == "test-index"
-        assert result.docs == body.documents
+        assert result.docs == body.__root__
         assert result.device == "test-device"
         assert result.non_tensor_fields == ["field1"]
         assert result.use_existing_tensors == True
@@ -172,10 +172,10 @@ class TestAddDocsParamsOchestrator(unittest.TestCase):
         device = "test-device"
         auto_refresh = True
         body = AddDocsBodyParamsNew(documents=[{"test": "doc"}],
-                                    non_tensor_fields=["field1"],
-                                    use_existing_tensors=True,
-                                    image_download_headers={"header1": "value1"},
-                                    model_auth=model_auth,
+                                    nonTensorFields=["field1"],
+                                    useExistingTensors=True,
+                                    imageDownloadHeaders={"header1": "value1"},
+                                    modelAuth=ModelAuth(s3=S3Auth(aws_secret_access_key="test", aws_access_key_id="test")),
                                     mappings={"map1": "value1"})
 
         params = {"non_tensor_fields": ["what"], "use_existing_tensors": True,

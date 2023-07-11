@@ -25,10 +25,10 @@ class AddDocsBodyParamsNew(BaseModel):
         arbitrary_types_allowed = True
         allow_mutation = False
 
-    non_tensor_fields: List = Field(default_factory=list)
-    use_existing_tensors: bool = False
-    image_download_headers: dict = Field(default_factory=dict)
-    model_auth: Optional[ModelAuth] = None
+    nonTensorFields: List = Field(default_factory=list)
+    useExistingTensors: bool = False
+    imageDownloadHeaders: dict = Field(default_factory=dict)
+    modelAuth: Optional[ModelAuth] = None
     mappings: Optional[dict] = None
     documents: Union[Sequence[Union[dict, Any]], np.ndarray]
 
