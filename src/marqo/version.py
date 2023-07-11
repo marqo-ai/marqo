@@ -1,5 +1,4 @@
-# TODO: Change this if running a recall test on container
-__version__ = "0.1.0"
+__version__ = "1.0.0"
 
 
 def get_version() -> str:

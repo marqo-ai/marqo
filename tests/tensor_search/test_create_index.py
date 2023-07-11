@@ -616,3 +616,98 @@ class TestCreateIndex(MarqoTestCase):
             "number_of_replicas": 1
         }
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings=good_settings)
+
+    def test_custom_model_with_no_model_properties_fails(self):
+        try:
+            tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+        except IndexNotFoundError:
+            pass
+        bad_settings = {
+            "index_defaults": {
+                "model": "my-custom-model",
+            },
+        }
+        try:
+            tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings=bad_settings)
+            raise AssertionError
+        except errors.InvalidArgError as e:
+            print(e)
+            pass
+    
+    def test_custom_model_with_no_dimensions_fails(self):
+        try:
+            tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+        except IndexNotFoundError:
+            pass
+        bad_settings = {
+            "index_defaults": {
+                "model": "my-custom-model",
+                "model_properties": {
+                    "url": "https://www.random.com",
+                    "type": "open_clip"
+                    # no dimensions here
+                }
+            },
+        }
+        try:
+            tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings=bad_settings)
+            raise AssertionError
+        except errors.InvalidArgError as e:
+            print(e)
+            pass
+    
+    def test_custom_model_with_dimensions_wrong_type_fails(self):
+        try:
+            tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+        except IndexNotFoundError:
+            pass
+        bad_settings = {
+            "index_defaults": {
+                "model": "my-custom-model",
+                "model_properties": {
+                    "url": "https://www.random.com",
+                    "type": "open_clip",
+                    "dimensions": "BAD DATATYPE!! should be int."
+                }
+            },
+        }
+        try:
+            tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings=bad_settings)
+            raise AssertionError
+        # TODO: This 500 is fine as user sees their mistake, but we should change it to a 400 later.
+        except errors.MarqoWebError as e:
+            print(e)
+            pass
+    
+    def test_custom_model_with_bad_properties_fails_add_docs(self):
+        try:
+            tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+        except IndexNotFoundError:
+            pass
+        bad_settings = {
+            "index_defaults": {
+                "model": "my-custom-model",
+                "model_properties": {
+                    "url": "https://www.random.com",
+                    "type": "open_clip",
+                    "dimensions": 123  # random number, should be 512
+                }
+            },
+        }
+        
+        # creating index should work fine
+        # but when you add docs, it fails (when trying to load the model)
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings=bad_settings)
+        docs = [
+            {"f1": "water is healthy", "f5": True},
+            {"f2": 49, "f3": 400.4, "f4": "alien message", "_id": "rkjn"}
+        ]
+        try:
+            tensor_search.add_documents(
+                add_docs_params=AddDocsParams(index_name=self.index_name_1, docs=docs, auto_refresh=True, device="cpu"),
+                config=self.config
+            )
+            raise AssertionError
+        except errors.MarqoWebError as e:
+            print(e)
+            pass

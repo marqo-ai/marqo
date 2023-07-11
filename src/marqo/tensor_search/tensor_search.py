@@ -50,13 +50,13 @@ from marqo.tensor_search.enums import (
     EnvVars
 )
 from marqo.tensor_search.enums import IndexSettingsField as NsField
-from marqo.tensor_search import utils, backend, validation, configs, add_docs
+from marqo.tensor_search import utils, backend, validation, configs, add_docs, filtering
 from marqo.tensor_search.formatting import _clean_doc
 from marqo.tensor_search.index_meta_cache import get_cache, get_index_info
 from marqo.tensor_search import index_meta_cache
 from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQueryEntity, ScoreModifier
 from marqo.tensor_search.models.search import Qidx, JHash, SearchContext, VectorisedJobs, VectorisedJobPointer
-from marqo.tensor_search.models.index_info import IndexInfo
+from marqo.tensor_search.models.index_info import IndexInfo, get_model_properties_from_index_defaults
 from marqo.tensor_search.models.external_apis.abstract_classes import ExternalAuth
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.tensor_search.utils import add_timing
@@ -101,7 +101,7 @@ def add_knn_field(ix_settings: dict):
     Args:
         ix_settings: the index settings
     """
-    model_prop = _get_model_properties_from_index_defaults(
+    model_prop = get_model_properties_from_index_defaults(
         index_defaults=(
             ix_settings["mappings"]["_meta"]
             ["index_settings"][NsField.index_defaults]),
@@ -523,7 +523,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                     with RequestMetricsStore.for_request().time(f"add_documents.create_vectors"):
                         vector_chunks = s2_inference.vectorise(
                             model_name=index_info.model_name,
-                            model_properties=_get_model_properties(index_info), content=content_chunks,
+                            model_properties=index_info.get_model_properties(), content=content_chunks,
                             device=add_docs_params.device, normalize_embeddings=normalize_embeddings,
                             infer=infer_if_image, model_auth=add_docs_params.model_auth
                         )
@@ -600,7 +600,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
         # the HttpRequest wrapper handles error logic
         update_mapping_response = backend.add_customer_field_properties(
             config=config, index_name=add_docs_params.index_name, customer_field_names=new_fields,
-            model_properties=_get_model_properties(index_info), multimodal_combination_fields=new_obj_fields)
+            model_properties=index_info.get_model_properties(), multimodal_combination_fields=new_obj_fields)
 
         # ADD DOCS TIMER-LOGGER (5)
         start_time_5 = timer()
@@ -1220,7 +1220,7 @@ def get_vector_properties_to_search(searchable_attributes: Union[None, List[str]
 def construct_msearch_body_elements(searchableAttributes: List[str], offset: int, filter_string: str, index_info: IndexInfo, result_count: int, query_vector: List[float], attributes_to_retrieve: List[str], index_name: str, score_modifiers: Optional[ScoreModifier] = None) -> List[Dict[str, Any]]:
     """Constructs the body payload of a `/_msearch` request for a single bulk search query"""
     vector_properties_to_search = get_vector_properties_to_search(searchableAttributes, index_info, offset=offset)
-    filter_for_opensearch = utils.build_tensor_search_filter(
+    filter_for_opensearch = filtering.build_tensor_search_filter(
         filter_string=filter_string, simple_properties=index_info.get_text_properties(),
         searchable_attribs=searchableAttributes
     )
@@ -1351,7 +1351,7 @@ def assign_query_to_vector_job(
         content_type = 'text' if i == 0 else 'image'
         vector_job = VectorisedJobs(
             model_name=index_info.model_name,
-            model_properties=_get_model_properties(index_info),
+            model_properties=index_info.get_model_properties(),
             content=grouped_content,
             device=device,
             normalize_embeddings=index_info.index_settings['index_defaults']['normalize_embeddings'],
@@ -1697,8 +1697,6 @@ def _vector_text_search(
         qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, device)
     vectorised_text = list(qidx_to_vectors.values())[0]
 
-    # TODO: delete the following
-    # contextualised_filter = utils.contextualise_user_filter(filter_string=filter_string, simple_properties=index_info.get_text_properties())
     body = construct_msearch_body_elements(
         searchable_attributes, offset, filter_string, index_info, result_count, vectorised_text, attributes_to_retrieve, index_name, score_modifiers
     )
@@ -1877,31 +1875,6 @@ def _select_model_from_media_type(media_type: Union[MediaType, str]) -> Union[Ml
         raise ValueError("_select_model_from_media_type(): "
                          "Received unknown media type: {}".format(media_type))
 
-
-# TODO: move to index_info file
-def _get_model_properties(index_info):
-    index_defaults = index_info.get_index_settings()["index_defaults"]
-    return _get_model_properties_from_index_defaults(
-        index_defaults=index_defaults, model_name=index_info.model_name
-    )
-
-# TODO: move to index_info file
-def _get_model_properties_from_index_defaults(index_defaults: Dict, model_name: str):
-    """ Gets model_properties from index defaults if available
-    """
-    try:
-        model_properties = index_defaults[NsField.model_properties]
-    except KeyError:
-        try:
-            model_properties = s2_inference.get_model_properties_from_registry(model_name)
-        except s2_inference_errors.UnknownModelError:
-            raise errors.InvalidArgError(
-                f"Could not find model properties for model={model_name}. "
-                f"Please check that the model name is correct. "
-                f"Please provide model_properties if the model is a custom model and is not supported by default")
-    return model_properties
-
-
 def get_loaded_models() -> dict:
     available_models = s2_inference.get_available_models()
     message = {"models": []}
@@ -2042,7 +2015,7 @@ def vectorise_multimodal_combination_field(
             with RequestMetricsStore.for_request().time(f"create_vectors"):
                 text_vectors = s2_inference.vectorise(
                     model_name=index_info.model_name,
-                    model_properties=_get_model_properties(index_info), content=text_content_to_vectorise,
+                    model_properties=index_info.get_model_properties(), content=text_content_to_vectorise,
                     device=device, normalize_embeddings=normalize_embeddings,
                     infer=infer_if_image, model_auth=model_auth
                 )
@@ -2051,7 +2024,7 @@ def vectorise_multimodal_combination_field(
             with RequestMetricsStore.for_request().time(f"create_vectors"):
                 image_vectors = s2_inference.vectorise(
                     model_name=index_info.model_name,
-                    model_properties=_get_model_properties(index_info), content=image_content_to_vectorise,
+                    model_properties=index_info.get_model_properties(), content=image_content_to_vectorise,
                     device=device, normalize_embeddings=normalize_embeddings,
                     infer=infer_if_image, model_auth=model_auth
                 )
