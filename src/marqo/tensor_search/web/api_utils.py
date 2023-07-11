@@ -163,7 +163,7 @@ def add_docs_params_ochestrator(index_name: str, body: Union[AddDocsBodyParamsOl
         image_download_headers = body.image_download_headers
 
     elif isinstance(body, AddDocsBodyParamsOld):
-        docs = body.documents
+        docs = body.__root__
 
     else:
         raise BadRequestError("Invalid request body")

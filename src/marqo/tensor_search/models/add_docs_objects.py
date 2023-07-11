@@ -17,11 +17,8 @@ class AddDocsParamsConfig:
 
 
 class AddDocsBodyParamsOld(BaseModel):
-    class Config:
-        arbitrary_types_allowed = True
-        allow_mutation = False
+    __root__: List[Union[dict, Any]]
 
-    documents: Union[Sequence[Union[dict, Any]], np.ndarray]
 
 class AddDocsBodyParamsNew(BaseModel):
     class Config:
