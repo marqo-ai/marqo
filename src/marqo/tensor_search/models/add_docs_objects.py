@@ -24,7 +24,7 @@ class AddDocsBodyParamsNew(BaseModel):
     class Config:
         arbitrary_types_allowed = True
         allow_mutation = False
-        extra = "forbi" # Raise error on unknown fields
+        extra = "forbid" # Raise error on unknown fields
 
     nonTensorFields: List = Field(default_factory=list)
     useExistingTensors: bool = False
