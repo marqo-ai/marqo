@@ -191,7 +191,8 @@ def add_or_replace_documents(
                                                              non_tensor_fields=non_tensor_fields, mappings=mappings,
                                                              model_auth=model_auth,
                                                              image_download_headers=image_download_headers,
-                                                             use_existing_tensors=use_existing_tensors, query_parameters=request.query_params)
+                                                             use_existing_tensors=use_existing_tensors,
+                                                             query_parameters=request.query_params)
 
     with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/documents"):
         return tensor_search.add_documents(
