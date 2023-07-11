@@ -168,7 +168,8 @@ def add_docs_params_orchestrator(index_name: str, body: Union[AddDocsBodyParamsO
         docs = body.__root__
 
     else:
-        raise BadRequestError("Invalid request body")
+        raise BadRequestError("Invalid request body type for `/documents` API. "
+                              "Please check `https://docs.marqo.ai/latest/API-Reference/documents/` for the correct APIs.")
 
     return AddDocsParams(
         index_name=index_name, docs=docs, auto_refresh=auto_refresh,
