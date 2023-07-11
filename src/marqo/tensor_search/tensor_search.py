@@ -1132,7 +1132,7 @@ def _lexical_search(
         "size": result_count,
         "from": offset
     }
-    print(f"body: {body}")
+
     if filter_string is not None:
         body["query"]["bool"]["filter"] = [{
             "query_string": {"query": filter_string}}]
@@ -1795,8 +1795,10 @@ def boost_score(docs: dict, boosters: dict, searchable_attributes) -> dict:
             if field_name in boosters.keys():
                 booster = boosters[field_name]
                 if len(booster) == 2:
+                    # weight and bias are given
                     chunk['_score'] = chunk['_score'] * booster[0] + booster[1]
                 else:
+                    # only weight is given
                     chunk['_score'] = chunk['_score'] * booster[0]
                 boosted_fields.add(field_name)
     return to_be_boosted

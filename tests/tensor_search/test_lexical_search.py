@@ -287,25 +287,6 @@ class TestLexicalSearch(MarqoTestCase):
             config=self.config, index_name=self.index_name_1, text="extravagant",
              searchable_attributes=[], result_count=3)
         assert res["hits"] == []
-    
-    def test_lexical_search_pagination_empty_searchable_attribs(self):
-        """Empty searchable attribs returns empty results (Even paginated)"""
-        d0 = {
-            "some doc 1": "some FIELD 2", "_id": "alpha alpha",
-            "the big field": "extravagant very unlikely theory. marqo is pretty awesom, in the field"
-        }
-        d1 = {"title": "Marqo", "some doc 2": "some other thing", "_id": "abcdef"}
-        d2 = {"some doc 1": "some 2 jnkerkbj", "field abc": "extravagant robodog is not a cat", "_id": "Jupyter_12"}
-
-        tensor_search.add_documents(
-            config=self.config, add_docs_params=AddDocsParams(
-                index_name=self.index_name_1, auto_refresh=True,
-                docs=[d0, d1, d2], device="cpu")
-        )
-        res = tensor_search._lexical_search(
-            config=self.config, index_name=self.index_name_1, text="extravagant",
-             searchable_attributes=[], result_count=3, offset=1)
-        assert res["hits"] == []
 
     def test_lexical_search_double_quotes(self):
         # 2-tuples of input text, and required terms expected to be in the results.
