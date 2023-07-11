@@ -1,4 +1,4 @@
-__version__ = "0.0.21-torch2"
+__version__ = "0.0.21-torch2-1"
 
 
 def get_version() -> str:
