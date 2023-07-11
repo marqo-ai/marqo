@@ -8,7 +8,7 @@ from marqo import errors
 from marqo.s2_inference import errors as s2_inference_errors
 
 
-# Can be used outside of this module
+# For use outside of this module
 def get_model_properties_from_index_defaults(index_defaults: Dict, model_name: str):
     """ Gets model_properties from index defaults if available
     """

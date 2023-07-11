@@ -63,7 +63,7 @@ def sanitise_lucene_special_chars(user_str: str) -> str:
 
 
 def contextualise_user_filter(filter_string: Optional[str], simple_properties: typing.Iterable) -> str:
-    """adds the chunk prefix to the start of properties found in simple string
+    """adds the chunk prefix to the start of properties found in simple string (filter_string)
     This allows for filtering within chunks.
 
     Args:

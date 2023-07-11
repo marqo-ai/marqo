@@ -1203,23 +1203,12 @@ def construct_vector_input_batches(query: Union[str, Dict], index_info: IndexInf
             return [k for k, _ in ordered_queries], []
 
 
-def get_vector_properties_to_search(searchable_attributes: Union[None, List[str]], index_info: IndexInfo, offset: int = 0) -> List[str]:
-    if searchable_attributes is None:
-        properties_to_search = list(index_info.get_vector_properties().keys())
-    else:
-        searchable_attributes_set = set(searchable_attributes)
-
-        # discard searchable attributes that aren't found in the cache:
-        properties_to_search = list(searchable_attributes_set.intersection(
-            index_info.get_possible_tensor_fields()
-        ))
-
-    return properties_to_search
-
-
 def construct_msearch_body_elements(searchableAttributes: List[str], offset: int, filter_string: str, index_info: IndexInfo, result_count: int, query_vector: List[float], attributes_to_retrieve: List[str], index_name: str, score_modifiers: Optional[ScoreModifier] = None) -> List[Dict[str, Any]]:
     """Constructs the body payload of a `/_msearch` request for a single bulk search query"""
-    vector_properties_to_search = get_vector_properties_to_search(searchableAttributes, index_info, offset=offset)
+
+    # search filter has 2 components:
+    # 1. searchable_attributes filter: filters out results that are not part of the searchable attributes
+    # 2. filter_string: filters out results that do not match the filter string
     filter_for_opensearch = filtering.build_tensor_search_filter(
         filter_string=filter_string, simple_properties=index_info.get_text_properties(),
         searchable_attribs=searchableAttributes
