@@ -163,7 +163,7 @@ class TestAddDocsParamsOchestrator(unittest.TestCase):
            _ = add_docs_params_orchestrator(index_name, body, device, auto_refresh, non_tensor_fields, mappings,
                                             model_auth, image_download_headers, use_existing_tensors)
         except BadRequestError as e:
-            self.assertIn("Invalid request body", str(e))
+            self.assertIn("Invalid request body type for `/documents` API.", str(e))
 
     def test_add_docs_params_orchestrator_depreciated_query_parameters_error(self):
         # Test the case where the function should raise an error due to depreciated query parameters
