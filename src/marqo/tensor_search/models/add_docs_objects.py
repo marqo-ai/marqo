@@ -17,15 +17,23 @@ class AddDocsParamsConfig:
 
 
 class AddDocsBodyParamsOld(BaseModel):
-    documents: List[Dict]
+    class Config:
+        arbitrary_types_allowed = True
+        allow_mutation = False
+
+    documents: Union[Sequence[Union[dict, Any]], np.ndarray]
 
 class AddDocsBodyParamsNew(BaseModel):
-    non_tensor_fields: List[str] = []
+    class Config:
+        arbitrary_types_allowed = True
+        allow_mutation = False
+
+    non_tensor_fields: List = Field(default_factory=list)
     use_existing_tensors: bool = False
-    image_download_headers: Optional[dict]
-    model_auth: Optional[ModelAuth]
-    mappings: Optional[dict]
-    documents: List[Dict]
+    image_download_headers: dict = Field(default_factory=dict)
+    model_auth: Optional[ModelAuth] = None
+    mappings: Optional[dict] = None
+    documents: Union[Sequence[Union[dict, Any]], np.ndarray]
 
 class AddDocsParams(BaseModel):
     """Represents the parameters of the tensor_search.add_documents() function

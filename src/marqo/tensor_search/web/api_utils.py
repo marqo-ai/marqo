@@ -135,10 +135,10 @@ def decode_mappings(mappings: Optional[str] = None) -> dict:
 
 
 def add_docs_params_ochestrator(index_name: str, body: Union[AddDocsBodyParamsOld, AddDocsBodyParamsNew],
-                                device: str, non_tensor_fields: Optional[List[str]], mappings: Optional[dict],
-                                model_auth: Optional[ModelAuth], image_download_headers: Optional[dict],
-                                use_existing_tensors: Optional[bool] = False,
-                                auto_refresh: bool = True) -> AddDocsParams:
+                                device: str, auto_refresh: bool = True, non_tensor_fields: Optional[List[str]] = [],
+                                mappings: Optional[dict] = dict(), model_auth: Optional[ModelAuth] = None,
+                                image_download_headers: Optional[dict] = dict(),
+                                use_existing_tensors: Optional[bool] = False,) -> AddDocsParams:
     """An orchestrator for the add_documents API to support both old and new versions of the API.
     All the arguments are decoded and validated in the API function. This function is only responsible for orchestrating.
 
@@ -149,11 +149,12 @@ def add_docs_params_ochestrator(index_name: str, body: Union[AddDocsBodyParamsOl
     if isinstance(body, AddDocsBodyParamsNew):
         docs = body.documents
 
-        # Check for parameter duplication
-        if any([non_tensor_fields, use_existing_tensors, image_download_headers, model_auth, mappings]) and \
-                any([body.non_tensor_fields, body.use_existing_tensors, body.image_download_headers,
-                     body.model_auth, body.mappings]):
-            raise BadRequestError("Parameters provided in both body and query string")
+        # Check for query parameters that are not supported in the new API
+        if any([non_tensor_fields, use_existing_tensors is not False, image_download_headers, model_auth, mappings]):
+            raise BadRequestError("Marqo is not accepting any of the following parameters in the query string: "
+                                  "`non_tensor_fields`, `use_existing_tensors`, `image_download_headers`, "
+                                  "`model_auth`, `mappings`. "
+                                  "Please move these parameters to the request body instead and try again.")
 
         mappings = body.mappings
         non_tensor_fields = body.non_tensor_fields
