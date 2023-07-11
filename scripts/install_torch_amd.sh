@@ -7,5 +7,5 @@ if ! [[ "$TARGETPLATFORM" ]]; then
 fi
 
 if [[ "$TARGETPLATFORM" != "linux/arm64" ]]; then
-  pip3 install numpy --pre torch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2 --force-reinstall --index-url https://download.pytorch.org/whl/cu117
+  pip3 install numpy --pre torch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2 --force-reinstall --index-url https://download.pytorch.org/whl/cu118
 fi
