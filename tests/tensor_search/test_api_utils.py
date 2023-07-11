@@ -165,8 +165,8 @@ class TestAddDocsParamsOchestrator(unittest.TestCase):
         except BadRequestError as e:
             self.assertIn("Invalid request body", str(e))
 
-    def test_add_docs_params_orchestrator_duplication_error(self):
-        # Test the case where the function should raise an error due to parameter duplication
+    def test_add_docs_params_orchestrator_depreciated_query_parameters_error(self):
+        # Test the case where the function should raise an error due to depreciated query parameters
         index_name = "test-index"
         model_auth = ModelAuth(s3=S3Auth(aws_secret_access_key="test", aws_access_key_id="test"))
         device = "test-device"
@@ -186,6 +186,7 @@ class TestAddDocsParamsOchestrator(unittest.TestCase):
             kwargs = {key: None for key in params.keys()}
             kwargs[param] = value
             try:
-                add_docs_params_orchestrator(index_name, body, device, auto_refresh=auto_refresh, **kwargs)
+                add_docs_params_orchestrator(index_name, body, device, auto_refresh=auto_refresh,
+                                             query_parameters=kwargs, **kwargs)
             except BadRequestError as e:
                 self.assertIn("Marqo is not accepting any of the following parameters in the query string", str(e))

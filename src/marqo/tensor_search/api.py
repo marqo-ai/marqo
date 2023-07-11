@@ -186,12 +186,12 @@ def add_or_replace_documents(
         mappings: Optional[dict] = Depends(api_utils.decode_mappings)):
 
     """add_documents endpoint (replace existing docs with the same id)"""
-    add_docs_params = api_utils.add_docs_params_orchestrator(request=request, index_name=index_name, body=body,
+    add_docs_params = api_utils.add_docs_params_orchestrator(index_name=index_name, body=body,
                                                              device=device, auto_refresh=refresh,
                                                              non_tensor_fields=non_tensor_fields, mappings=mappings,
                                                              model_auth=model_auth,
                                                              image_download_headers=image_download_headers,
-                                                             use_existing_tensors=use_existing_tensors)
+                                                             use_existing_tensors=use_existing_tensors, query_parameters=request.query_params)
 
     with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/documents"):
         return tensor_search.add_documents(
