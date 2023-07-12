@@ -57,8 +57,10 @@ def sanitise_lucene_special_chars(user_str: str) -> str:
     https://lucene.apache.org/core/6_0_0/queryparser/org/apache/lucene/queryparser/classic/package-summary.html#Escaping_Special_Characters
 
     """
+    print(f'User string: {user_str}')
     for char in constants.LUCENE_SPECIAL_CHARS:
         user_str = user_str.replace(char, f'\\{char}')
+    print(f'Sanitised user string: {user_str}')
     return user_str
 
 
