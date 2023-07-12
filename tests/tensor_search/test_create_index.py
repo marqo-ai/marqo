@@ -711,3 +711,108 @@ class TestCreateIndex(MarqoTestCase):
         except errors.MarqoWebError as e:
             print(e)
             pass
+    
+    def _fill_in_test_model_data(self, test_model_data):
+        """
+        Helper function to fill in test model data with index defaults
+        Returns index settings object with no knn field
+        """
+        return {
+            'settings': {
+                'index': {
+                    'knn': True, 
+                    'knn.algo_param.ef_search': 100, 
+                    'refresh_interval': '1s', 
+                    'store.hybrid.mmap.extensions': ['nvd', 'dvd', 'tim', 'tip', 'dim', 'kdd', 'kdi', 'cfs', 'doc', 'vec', 'vex']
+                }, 
+                'number_of_shards': 5, 
+                'number_of_replicas': 1
+            }, 
+            'mappings': {
+                '_meta': {
+                    'media_type': 'text', 
+                    'index_settings': {
+                        'index_defaults': {
+                            'treat_urls_and_pointers_as_images': False, 
+                            **test_model_data,  # has model and possibly model_properties
+                            'normalize_embeddings': True, 
+                            'text_preprocessing': {
+                                'split_length': 2, 
+                                'split_overlap': 0, 
+                                'split_method': 'sentence'
+                            }, 
+                            'image_preprocessing': {'patch_method': None}, 
+                            'ann_parameters': {
+                                'name': 'hnsw', 
+                                'space_type': 'cosinesimil', 
+                                'engine': 'lucene', 
+                                'parameters': {'ef_construction': 128, 'm': 16}
+                            }
+                        }, 
+                        'number_of_shards': 5, 
+                        'number_of_replicas': 1
+                    }, 
+                    'model': 'hf/all_datasets_v4_MiniLM-L6'
+                }, 
+                'dynamic_templates': [{
+                    'strings': {
+                        'match_mapping_type': 'string', 
+                        'mapping': {'type': 'text'}
+                    }
+                }], 
+                'properties': {
+                    '__chunks': {
+                        'type': 'nested', 
+                        'properties': {
+                            '__field_name': {'type': 'keyword'}, 
+                            '__field_content': {'type': 'text'}
+                        }
+                    }
+                }
+            }
+        }
+
+    def test_add_knn_field(self):
+        """
+        Tests helper function to add OpenSearch KNN Field to index mappings
+        """
+        test_cases = (
+            # format: (model_data, expected_knn_properties)
+            # model in registry
+            (
+                {"model": "hf/all_datasets_v4_MiniLM-L6"}, 
+                {
+                    'type': 'knn_vector', 
+                    'dimension': 384, 
+                    'method': {
+                        'name': 'hnsw', 
+                        'space_type': 'cosinesimil', 
+                        'engine': 'lucene', 
+                        'parameters': {'ef_construction': 128, 'm': 16}
+                    }
+                }
+            ),
+            # custom model
+            (
+                {"model": "my-custom-model", "model_properties": {"url": "https://www.random.com", "type": "open_clip", "dimensions": 512}},
+                {
+                    'type': 'knn_vector', 
+                    'dimension': 512,   # dimension should match custom model properties
+                    'method': {
+                        'name': 'hnsw', 
+                        'space_type': 'cosinesimil', 
+                        'engine': 'lucene', 
+                        'parameters': {'ef_construction': 128, 'm': 16}
+                    }
+                }
+            )
+        )
+
+        for model_data, expected_knn_properties in test_cases:
+            # create raw index settings object
+            index_settings_no_knn = self._fill_in_test_model_data(model_data)
+            # add knn field
+            index_settings_with_knn = tensor_search.add_knn_field(index_settings_no_knn)
+            # check that knn field was added
+            assert index_settings_with_knn["mappings"]["properties"][TensorField.chunks]["properties"][TensorField.marqo_knn_field] \
+                == expected_knn_properties
