@@ -177,6 +177,10 @@ def create_vector_index(
                             "type": "text"
                         },
                     }
+                },
+                # this will contain the original doc:
+                TensorField.original_doc: {
+                    "type": "nested"
                 }
             }
         }

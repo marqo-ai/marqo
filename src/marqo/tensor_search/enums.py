@@ -31,6 +31,7 @@ class TensorField:
     vector_prefix = "__vector_"
     marqo_knn_field = "__vector_marqo_knn_field"
     chunks = "__chunks"
+    original_doc = "__original_doc"
     output_highlights = "_highlights"
     output_score = "_score"
     # output fields:
