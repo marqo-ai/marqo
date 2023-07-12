@@ -156,7 +156,8 @@ def add_docs_params_orchestrator(index_name: str, body: Union[AddDocsBodyParamsO
             raise BadRequestError("Marqo is not accepting any of the following parameters in the query string: "
                                   "`non_tensor_fields`, `use_existing_tensors`, `image_download_headers`, `model_auth`, `mappings`. "
                                   "Please move these parameters to the request body as "
-                                  "`nonTensorFields, useExistingTensors, imageDownloadHeaders, modelAuth, mappings`. and try again.")
+                                  "`nonTensorFields, useExistingTensors, imageDownloadHeaders, modelAuth, mappings`. and try again. "
+                                  "Please check `https://docs.marqo.ai/latest/API-Reference/documents/` for the correct APIs.")
 
         mappings = body.mappings
         non_tensor_fields = body.nonTensorFields
