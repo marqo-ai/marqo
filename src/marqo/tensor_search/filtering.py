@@ -98,6 +98,9 @@ def contextualise_user_filter(filter_string: Optional[str], simple_properties: t
     """
     if filter_string is None:
         return ''
+    if simple_properties is None:
+        return filter_string
+    
     contextualised_filter = filter_string
 
     for field in simple_properties:

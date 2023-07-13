@@ -24,9 +24,9 @@ class TestFiltering(unittest.TestCase):
                 f"{enums.TensorField.chunks}.spaced\\ int:[0 TO 30]"
             ),
             (   # fields with special chars
-                "field\\&&\\||withspecialchars:(random value)",
+                "field\\&&\\||withspecialchars:(random \\+value)",
                 ["field&&||withspecialchars"],
-                f"{enums.TensorField.chunks}.field\\&&\\||withspecialchars:(random value)"
+                f"{enums.TensorField.chunks}.field\\&&\\||withspecialchars:(random \\+value)"
             ),
             (   # field in string not in properties
                 "field_not_in_properties:random AND normal_field:3",
@@ -133,7 +133,11 @@ class TestFiltering(unittest.TestCase):
             (["field:with:colons"],
                 f"{enums.TensorField.chunks}.{enums.TensorField.field_name}:(field\\:with\\:colons)"),
             # searchable attribute with parenthesis in it
+            (["field(with)parenthesis"],
+                f"{enums.TensorField.chunks}.{enums.TensorField.field_name}:(field\\(with\\)parenthesis)"),
             # searchable attribute with special characters in it
+            (["field\\with&&special+characters"],
+                f"{enums.TensorField.chunks}.{enums.TensorField.field_name}:(field\\\\with\\&&special\\+characters)"),
             ([], ""),
             (None, "")
         ]
@@ -146,20 +150,80 @@ class TestFiltering(unittest.TestCase):
         test_cases = (
             {
                 "filter_string": "abc:(some text)",
-                "simple_properties": {"abc": "xyz"},
+                "simple_properties": {"abc": {'type': 'text'}},
                 "searchable_attributes": ["abc"],
                 "expected": f"({enums.TensorField.chunks}.{enums.TensorField.field_name}:(abc)) AND ({enums.TensorField.chunks}.abc:(some text))"
             },
             # parenthesis in searchable attribute
+            {
+                "filter_string": "abc:(some text)",
+                "simple_properties": {"abc": {'type': 'text'}},
+                "searchable_attributes": ["abc(with)parenthesis"],
+                "expected": f"({enums.TensorField.chunks}.{enums.TensorField.field_name}:(abc\\(with\\)parenthesis)) AND ({enums.TensorField.chunks}.abc:(some text))"
+            },
             # empty searchable attributes
+            {
+                "filter_string": "abc:(some text)",
+                "simple_properties": {"abc": {'type': 'text'}},
+                "searchable_attributes": [],
+                "expected": f"{enums.TensorField.chunks}.abc:(some text)"
+            },
             # None searchable attributes
+            {
+                "filter_string": "abc:(some text)",
+                "simple_properties": {"abc": {'type': 'text'}},
+                "searchable_attributes": None,
+                "expected": f"{enums.TensorField.chunks}.abc:(some text)"
+            },
             # parenthesis in filter string (escaped)
+            {
+                "filter_string": "abc\\(:(some te\\)xt)",
+                "simple_properties": {"abc(": {'type': 'text'}},
+                "searchable_attributes": ["def"],
+                "expected": f"({enums.TensorField.chunks}.{enums.TensorField.field_name}:(def)) AND ({enums.TensorField.chunks}.abc\\(:(some te\\)xt))"
+            },
             # empty filter string
+            {
+                "filter_string": "",
+                "simple_properties": {"abc": {'type': 'text'}},
+                "searchable_attributes": ["def"],
+                "expected": f"{enums.TensorField.chunks}.{enums.TensorField.field_name}:(def)"
+            },
             # None filter string
+            {
+                "filter_string": None,
+                "simple_properties": {"abc": {'type': 'text'}},
+                "searchable_attributes": ["def"],
+                "expected": f"{enums.TensorField.chunks}.{enums.TensorField.field_name}:(def)"
+            },
             # : in searchable attribute and filter string
+            {
+                "filter_string": "colon\\:here:(some text)",
+                "simple_properties": {"colon:here": {'type': 'text'}},
+                "searchable_attributes": ["colon:here:also"],
+                "expected": f"({enums.TensorField.chunks}.{enums.TensorField.field_name}:(colon\\:here\\:also)) AND ({enums.TensorField.chunks}.colon\\:here:(some text))"
+            },
             # empty simple properties
+            {
+                "filter_string": "abc:(some text)",     # chunks prefix will NOT be added
+                "simple_properties": {},
+                "searchable_attributes": ["def"],
+                "expected": f"({enums.TensorField.chunks}.{enums.TensorField.field_name}:(def)) AND (abc:(some text))"
+            },
             # None simple properties
+            {
+                "filter_string": "abc:(some text)",     # chunks prefix will NOT be added
+                "simple_properties": None,
+                "searchable_attributes": ["def"],
+                "expected": f"({enums.TensorField.chunks}.{enums.TensorField.field_name}:(def)) AND (abc:(some text))"
+            },
             # empty all
+            {
+                "filter_string": "",
+                "simple_properties": {},
+                "searchable_attributes": [],
+                "expected": ""
+            }
         )
         for case in test_cases:
             tensor_search_filter = filtering.build_tensor_search_filter(
