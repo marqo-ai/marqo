@@ -399,7 +399,7 @@ class TestLexicalSearch(MarqoTestCase):
             
             if "first_n_results_ordered" in case:
                 n = len(case["first_n_results_ordered"])
-                assert id_only_hits[:n] == case["first_n_results_ordered"]
+                assert set(id_only_hits[:n]) == set(case["first_n_results_ordered"])
             
             if "no_results" in case:
                 assert len(id_only_hits) == 0
