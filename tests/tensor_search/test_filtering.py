@@ -33,6 +33,16 @@ class TestFiltering(unittest.TestCase):
                 ["normal_field", "field_not_in_string"],
                 f"{enums.TensorField.chunks}.normal_field:3"
             ),
+            (
+                None,
+                ["random_field_1", "random_field_2"],
+                ""
+            ),
+            (
+                "",
+                ["random_field_1", "random_field_2"],
+                ""
+            )
         ]
         for given_filter_string, given_simple_properties, expected in expected_mappings:
             contextualised_user_filter = filtering.contextualise_user_filter(
@@ -40,7 +50,7 @@ class TestFiltering(unittest.TestCase):
                 simple_properties=given_simple_properties,
             )
             assert expected == contextualised_user_filter
-    
+
     def test_build_searchable_attributes_filter(self):
         expected_mappings = [
             (["an_int", "abc"],
@@ -72,7 +82,7 @@ class TestFiltering(unittest.TestCase):
                 searchable_attribs=case["searchable_attributes"]
             )
             assert case["expected"] == tensor_search_filter
-    
+
     def test_sanitise_lucene_special_chars(self):
         expected_mappings = [
             ("some text", "some\\ text"),
