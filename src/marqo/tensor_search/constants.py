@@ -21,3 +21,9 @@ LUCENE_SPECIAL_CHARS = {
     '/', '*', '^', '\\', '!', '[', '||', '?',
     '&&', '"', ']', '-', '{', '~', '+', '}', ':', ')', '('
 }
+
+# these are chars that are not officially listed as Lucene special chars, but
+# aren't treated as normal chars either
+NON_OFFICIAL_LUCENE_SPECIAL_CHARS = {
+    ' '
+}

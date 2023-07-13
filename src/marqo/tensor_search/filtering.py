@@ -50,26 +50,41 @@ def build_searchable_attributes_filter(searchable_attribs: Sequence) -> str:
             f"{enums.TensorField.chunks}.{enums.TensorField.field_name}:{sanitised_attr_name}"
             f" OR {build_searchable_attributes_filter(searchable_attribs=searchable_attribs)}")
 
-def sanitise_lucene_special_chars(user_str: str) -> str:
-    """Santitises Lucene's special chars.
+
+def sanitise_lucene_special_chars(to_be_sanitised: str) -> str:
+    """Santitises Lucene's special chars in a string.
+
+    We shouldn't apply this to the user's filter string, as they can choose to escape
+    Lucene's special chars themselves.
+
+    This should be used to sanitise a filter string constructed for users behind the
+    scenes (such as for searchable attributes).
 
     See here for more info:
     https://lucene.apache.org/core/6_0_0/queryparser/org/apache/lucene/queryparser/classic/package-summary.html#Escaping_Special_Characters
 
     """
-    print(f'User string: {user_str}')
-    for char in constants.LUCENE_SPECIAL_CHARS:
-        user_str = user_str.replace(char, f'\\{char}')
-    print(f'Sanitised user string: {user_str}')
-    return user_str
+    # this prevents us from double-escaping backslashes. This may be unnecessary.
+    non_backslash_chars = constants.LUCENE_SPECIAL_CHARS.union(constants.NON_OFFICIAL_LUCENE_SPECIAL_CHARS) - {'\\'}
+
+    for char in non_backslash_chars:
+        to_be_sanitised = to_be_sanitised.replace(char, f'\\{char}')
+    return to_be_sanitised
 
 
 def contextualise_user_filter(filter_string: Optional[str], simple_properties: typing.Iterable) -> str:
     """adds the chunk prefix to the start of properties found in simple string (filter_string)
     This allows for filtering within chunks.
 
+    Because this is a user-defined filter, if they want to filter on a field names that contain
+    special characters, we expect them to escape the special characters themselves.
+
+    In order to search chunks we need to append the chunk prefix to the start of the field name.
+    This will only work if they escape the special characters in the field names themselves in
+    the exact same way that we do.
+
     Args:
-        filter_string:
+        filter_string: the user defined filter string
         simple_properties: simple properties of an index (such as text or floats
             and bools)
 
@@ -79,10 +94,24 @@ def contextualise_user_filter(filter_string: Optional[str], simple_properties: t
     if filter_string is None:
         return ''
     contextualised_filter = filter_string
+
     for field in simple_properties:
-        if ' ' in field:
-            field_with_escaped_space = field.replace(' ', r'\ ') # monitor this: fixed the invalid escape sequence (Deprecation warning).
-            contextualised_filter = contextualised_filter.replace(f'{field_with_escaped_space}:', f'{enums.TensorField.chunks}.{field_with_escaped_space}:')
-        else:
-            contextualised_filter = contextualised_filter.replace(f'{field}:', f'{enums.TensorField.chunks}.{field}:')
+        escaped_field_name = sanitise_lucene_special_chars(field)
+        if escaped_field_name in filter_string:
+            # we want to replace only the field name that directly corresponds to the simple property,
+            # not any other field names that contain the simple property as a substring.
+
+            if (filter_string.startswith(escaped_field_name)
+                    # for cases like filter_string:"z_z_z:foo", escaped_field_name=z
+                    # where the field name is a substring at the start and end
+                    # of the field name
+                    and len(filter_string.split(':')[0]) == len(escaped_field_name)):
+                contextualised_filter = contextualised_filter.replace(
+                    f'{escaped_field_name}:', f'{enums.TensorField.chunks}.{escaped_field_name}:')
+            else:
+                # the case where the field name is not at the start of the filter string
+                # e.g.: "field_a:foo AND field_b:bar, escaped_field_name=field_b"
+                contextualised_filter = contextualised_filter.replace(
+                    f' {escaped_field_name}:', f' {enums.TensorField.chunks}.{escaped_field_name}:')
+        print('contextualised_filter', repr(contextualised_filter))
     return contextualised_filter
