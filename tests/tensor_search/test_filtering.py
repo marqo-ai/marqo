@@ -63,6 +63,7 @@ class TestFiltering(unittest.TestCase):
                 ["field_a", "another_field_a"],
                 f"{enums.TensorField.chunks}.field_a:a AND {enums.TensorField.chunks}.another_field_a:b"
             ),
+            # we may need to make out own tokenizer to fix this edge case.
             #(   # field is not at start and is ending substring of another field with space or parenthesis before it
             #    "random:random OR field_a:a AND another\\ field_a:b",
             #    ["field_a", "another field_a"],
@@ -119,11 +120,22 @@ class TestFiltering(unittest.TestCase):
 
     def test_build_searchable_attributes_filter(self):
         expected_mappings = [
+            # multiple searchable attributes
             (["an_int", "abc"],
              f"{enums.TensorField.chunks}.{enums.TensorField.field_name}:(abc) OR {enums.TensorField.chunks}.{enums.TensorField.field_name}:(an_int)"),
+            # single searchable attribute
             (["an_int"],
              f"{enums.TensorField.chunks}.{enums.TensorField.field_name}:(an_int)"),
-            ([], "")
+            # searchable attribute with space in it
+            (["field with spaces"],
+                f"{enums.TensorField.chunks}.{enums.TensorField.field_name}:(field\\ with\\ spaces)"),
+            # searchable attribute with : in it
+            (["field:with:colons"],
+                f"{enums.TensorField.chunks}.{enums.TensorField.field_name}:(field\\:with\\:colons)"),
+            # searchable attribute with parenthesis in it
+            # searchable attribute with special characters in it
+            ([], ""),
+            (None, "")
         ]
         for given, expected in expected_mappings:
             assert expected == filtering.build_searchable_attributes_filter(
@@ -138,8 +150,16 @@ class TestFiltering(unittest.TestCase):
                 "searchable_attributes": ["abc"],
                 "expected": f"({enums.TensorField.chunks}.{enums.TensorField.field_name}:(abc)) AND ({enums.TensorField.chunks}.abc:(some text))"
             },
-            # special character in searchable attribute
-            # escaped space in filter string
+            # parenthesis in searchable attribute
+            # empty searchable attributes
+            # None searchable attributes
+            # parenthesis in filter string (escaped)
+            # empty filter string
+            # None filter string
+            # : in searchable attribute and filter string
+            # empty simple properties
+            # None simple properties
+            # empty all
         )
         for case in test_cases:
             tensor_search_filter = filtering.build_tensor_search_filter(

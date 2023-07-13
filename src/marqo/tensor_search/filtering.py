@@ -34,15 +34,16 @@ def build_tensor_search_filter(
 
 
 def build_searchable_attributes_filter(searchable_attribs: Sequence) -> str:
-    """Constructs the filter used to narrow the search down to specific searchable attributes"""
-    if len(searchable_attribs) == 0:
+    """Recursively constructs the filter used to narrow the search down to specific searchable attributes"""
+    if searchable_attribs is None or len(searchable_attribs) == 0:
         return ""
 
     vector_prop_count = len(searchable_attribs)
 
     # brackets surround field name, in case it contains a space:
     sanitised_attr_name = f"({sanitise_lucene_special_chars(searchable_attribs.pop())})"
-
+    
+    # base case
     if vector_prop_count == 1:
         return f"{enums.TensorField.chunks}.{enums.TensorField.field_name}:{sanitised_attr_name}"
     else:
