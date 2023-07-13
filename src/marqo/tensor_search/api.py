@@ -15,8 +15,8 @@ from marqo.errors import InvalidArgError, MarqoWebError, MarqoError, BadRequestE
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.backend import get_index_info
 from marqo.tensor_search.enums import RequestType
-from marqo.tensor_search.models.add_docs_objects import (AddDocsParams, ModelAuth, AddDocsBodyParamsOld,
-                                                         AddDocsBodyParamsNew)
+from marqo.tensor_search.models.add_docs_objects import (AddDocsParams, ModelAuth,
+                                                         AddDocsBodyParams)
 from marqo.tensor_search.models.api_models import BulkSearchQuery, SearchQuery
 from marqo.tensor_search.on_start_script import on_start
 from marqo.tensor_search.telemetry import RequestMetricsStore, TelemetryMiddleware
@@ -170,7 +170,7 @@ def search(search_query: SearchQuery, index_name: str, device: str = Depends(api
 @throttle(RequestType.INDEX)
 def add_or_replace_documents(
         request: Request,
-        body: typing.Union[AddDocsBodyParamsNew, List[Dict]],
+        body: typing.Union[AddDocsBodyParams, List[Dict]],
         index_name: str,
         refresh: bool = True,
         marqo_config: config.Config = Depends(generate_config),
