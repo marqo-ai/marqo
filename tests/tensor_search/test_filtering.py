@@ -19,9 +19,9 @@ class TestFiltering(unittest.TestCase):
                 f"({enums.TensorField.chunks}.an_int:[0 TO 30] AND {enums.TensorField.chunks}.an_int:2) AND {enums.TensorField.chunks}.abc:(some text)"
             ),
             (   # fields with spaces
-                "(spaced\ int):[0 TO 30]",
+                "spaced\\ int:[0 TO 30]",
                 ["spaced int"],
-                f"({enums.TensorField.chunks}.spaced\ int):[0 TO 30])"
+                f"{enums.TensorField.chunks}.spaced\\ int:[0 TO 30]"
             ),
             (   # field in string not in properties
                 "field_not_in_properties:random AND normal_field:3",
@@ -33,27 +33,20 @@ class TestFiltering(unittest.TestCase):
                 ["normal_field", "field_not_in_string"],
                 f"{enums.TensorField.chunks}.normal_field:3"
             ),
-            (
-                None,
-                ""
-            ),
-            (
-                "",
-                ""
-            )
         ]
         for given_filter_string, given_simple_properties, expected in expected_mappings:
-            assert expected == filtering.contextualise_user_filter(
-                filter_string=given_filter_string, 
+            contextualised_user_filter = filtering.contextualise_user_filter(
+                filter_string=given_filter_string,
                 simple_properties=given_simple_properties,
             )
+            assert expected == contextualised_user_filter
     
     def test_build_searchable_attributes_filter(self):
         expected_mappings = [
             (["an_int", "abc"],
              f"{enums.TensorField.chunks}.{enums.TensorField.field_name}:(abc) OR {enums.TensorField.chunks}.{enums.TensorField.field_name}:(an_int)"),
             (["an_int"],
-             f"{enums.TensorField.chunks}.{enums.TensorField.field_name}:(an_int)")
+             f"{enums.TensorField.chunks}.{enums.TensorField.field_name}:(an_int)"),
             ([], "")
         ]
         for given, expected in expected_mappings:
@@ -65,29 +58,32 @@ class TestFiltering(unittest.TestCase):
         test_cases = (
             {
                 "filter_string": "abc:(some text)",
-                "simple_properties": ["abc"],
+                "simple_properties": {"abc": "xyz"},
                 "searchable_attributes": ["abc"],
-                "expected": f"{enums.TensorField.chunks}.{enums.TensorField.field_name}:abc AND ({enums.TensorField.chunks}.abc:(some text))"
+                "expected": f"({enums.TensorField.chunks}.{enums.TensorField.field_name}:(abc)) AND ({enums.TensorField.chunks}.abc:(some text))"
             },
             # special character in searchable attribute
             # escaped space in filter string
         )
         for case in test_cases:
-            assert case["expected"] == filtering.build_tensor_search_filter(
+            tensor_search_filter = filtering.build_tensor_search_filter(
                 filter_string=case["filter_string"],
                 simple_properties=case["simple_properties"],
-                searchable_attributes=case["searchable_attributes"]
+                searchable_attribs=case["searchable_attributes"]
             )
+            assert case["expected"] == tensor_search_filter
     
     def test_sanitise_lucene_special_chars(self):
         expected_mappings = [
-            ("some text", "some text"),
-            ("some text!", "some text\!"),
-            ("some text?", "some text\?"),
-            ("some text&&", "some text\&&"),
-            ("some text&", "some text&")        # no change, & is not a special char
+            ("some text", "some\\ text"),
+            ("text!", "text\\!"),
+            ("some text!", "some\\ text\\!"),
+            ("text?", "text\\?"),
+            ("text&&", "text\\&&"),
+            ("text&", "text&")        # no change, & is not a special char
         ]
         for given, expected in expected_mappings:
-            assert expected == filtering.sanitise_lucene_special_chars(
+            escaped_output = filtering.sanitise_lucene_special_chars(
                 given
             )
+            assert expected == escaped_output

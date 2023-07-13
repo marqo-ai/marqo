@@ -67,6 +67,8 @@ def sanitise_lucene_special_chars(to_be_sanitised: str) -> str:
     # this prevents us from double-escaping backslashes. This may be unnecessary.
     non_backslash_chars = constants.LUCENE_SPECIAL_CHARS.union(constants.NON_OFFICIAL_LUCENE_SPECIAL_CHARS) - {'\\'}
 
+    to_be_sanitised.replace("\\", "\\\\")
+
     for char in non_backslash_chars:
         to_be_sanitised = to_be_sanitised.replace(char, f'\\{char}')
     return to_be_sanitised
@@ -100,18 +102,29 @@ def contextualise_user_filter(filter_string: Optional[str], simple_properties: t
         if escaped_field_name in filter_string:
             # we want to replace only the field name that directly corresponds to the simple property,
             # not any other field names that contain the simple property as a substring.
+            if (
+                    # this is for the case where the field name is at the start of the filter string
+                    filter_string.startswith(escaped_field_name) and
 
-            if (filter_string.startswith(escaped_field_name)
                     # for cases like filter_string:"z_z_z:foo", escaped_field_name=z
-                    # where the field name is a substring at the start and end
-                    # of the field name
-                    and len(filter_string.split(':')[0]) == len(escaped_field_name)):
+                    # where the field name is a substring at the start of the field name
+                    # in the filter string.
+                    # This prevents us from accidentally generating the filter_string:
+                    # "__chunks_.z___chunks_.z___chunks_.z:foo":
+                    len(filter_string.split(':')[0]) == len(escaped_field_name)
+            ):
                 contextualised_filter = contextualised_filter.replace(
                     f'{escaped_field_name}:', f'{enums.TensorField.chunks}.{escaped_field_name}:')
             else:
                 # the case where the field name is not at the start of the filter string
+
+                # the case where the field name is after as space
                 # e.g.: "field_a:foo AND field_b:bar, escaped_field_name=field_b"
                 contextualised_filter = contextualised_filter.replace(
                     f' {escaped_field_name}:', f' {enums.TensorField.chunks}.{escaped_field_name}:')
-        print('contextualised_filter', repr(contextualised_filter))
+
+                # the case where the field name is directly after an opening bracket
+                contextualised_filter = contextualised_filter.replace(
+                    f'({escaped_field_name}:', f'({enums.TensorField.chunks}.{escaped_field_name}:')
+
     return contextualised_filter
