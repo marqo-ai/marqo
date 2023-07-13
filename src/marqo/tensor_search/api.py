@@ -170,7 +170,7 @@ def search(search_query: SearchQuery, index_name: str, device: str = Depends(api
 @throttle(RequestType.INDEX)
 def add_or_replace_documents(
         request: Request,
-        body: typing.Union[AddDocsBodyParamsNew, AddDocsBodyParamsOld],
+        body: typing.Union[AddDocsBodyParamsNew, List[Dict]],
         index_name: str,
         refresh: bool = True,
         marqo_config: config.Config = Depends(generate_config),

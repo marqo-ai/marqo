@@ -1,6 +1,5 @@
 import pydantic
-from marqo.tensor_search.models.add_docs_objects import ModelAuth, AddDocsParams, AddDocsBodyParamsOld, \
-    AddDocsBodyParamsNew
+from marqo.tensor_search.models.add_docs_objects import ModelAuth, AddDocsParams, AddDocsBodyParams
 from marqo.tensor_search.web.api_utils import add_docs_params_orchestrator
 from marqo.tensor_search.models.private_models import S3Auth
 import urllib.parse
@@ -80,11 +79,11 @@ class TestDecodeQueryStringModelAuth(MarqoTestCase):
             api_utils.decode_query_string_model_auth("invalid_url_encoded_string")
 
 
-class TestAddDocsParamsOchestrator(unittest.TestCase):
-    def test_add_docs_params_orchestrator_new(self):
+class TestAddDocsParamsOrchestrator(unittest.TestCase):
+    def test_add_docs_params_orchestrator(self):
         # Set up the arguments for the function
         index_name = "test-index"
-        body = AddDocsBodyParamsNew(documents=[{"test": "doc"}],
+        body = AddDocsBodyParams(documents=[{"test": "doc"}],
                                     nonTensorFields=["field1"],
                                     useExistingTensors=True,
                                     imageDownloadHeaders={"header1": "value1"},
@@ -114,12 +113,12 @@ class TestAddDocsParamsOchestrator(unittest.TestCase):
         assert result.docs == [{"test": "doc"}]
         assert result.image_download_headers == {"header1": "value1"}
 
-    def test_add_docs_params_orchestrator_old(self):
+    def test_add_docs_params_orchestrator_deprecated_query_parameters(self):
         # Set up the arguments for the function
         index_name = "test-index"
         model_auth = ModelAuth(s3=S3Auth(aws_secret_access_key="test", aws_access_key_id="test"))
 
-        body = AddDocsBodyParamsOld(__root__= [{"test": "doc"}])
+        body = [{"test": "doc"}]
 
         device = "test-device"
         non_tensor_fields = ["field1"]
@@ -136,7 +135,7 @@ class TestAddDocsParamsOchestrator(unittest.TestCase):
         # Assert that the result is as expected
         assert isinstance(result, AddDocsParams)
         assert result.index_name == "test-index"
-        assert result.docs == body.__root__
+        assert result.docs == body
         assert result.device == "test-device"
         assert result.non_tensor_fields == ["field1"]
         assert result.use_existing_tensors == True
@@ -145,7 +144,7 @@ class TestAddDocsParamsOchestrator(unittest.TestCase):
 
     def test_add_docs_params_orchestrator_error(self):
         # Test the case where the function should raise an error due to invalid input
-        body = "invalid body type"  # Not an instance of AddDocsBodyParamsNew or AddDocsBodyParamsOld
+        body = "invalid body type"  # Not an instance of AddDocsBodyParams or List[Dict]
 
         index_name = "test-index"
         model_auth = ModelAuth(s3=S3Auth(aws_secret_access_key="test", aws_access_key_id="test"))
@@ -171,7 +170,7 @@ class TestAddDocsParamsOchestrator(unittest.TestCase):
         model_auth = ModelAuth(s3=S3Auth(aws_secret_access_key="test", aws_access_key_id="test"))
         device = "test-device"
         auto_refresh = True
-        body = AddDocsBodyParamsNew(documents=[{"test": "doc"}],
+        body = AddDocsBodyParams(documents=[{"test": "doc"}],
                                     nonTensorFields=["field1"],
                                     useExistingTensors=True,
                                     imageDownloadHeaders={"header1": "value1"},

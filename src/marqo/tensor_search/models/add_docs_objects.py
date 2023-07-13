@@ -16,11 +16,8 @@ class AddDocsParamsConfig:
     arbitrary_types_allowed = True
 
 
-class AddDocsBodyParamsOld(BaseModel):
-    __root__: List[Union[dict, Any]]
-
-
-class AddDocsBodyParamsNew(BaseModel):
+class AddDocsBodyParams(BaseModel):
+    """The parameters of the body parameters of tensor_search_add_documents() function"""
     class Config:
         arbitrary_types_allowed = True
         allow_mutation = False
@@ -32,6 +29,7 @@ class AddDocsBodyParamsNew(BaseModel):
     modelAuth: Optional[ModelAuth] = None
     mappings: Optional[dict] = None
     documents: Union[Sequence[Union[dict, Any]], np.ndarray]
+
 
 class AddDocsParams(BaseModel):
     """Represents the parameters of the tensor_search.add_documents() function

@@ -5,7 +5,7 @@ from marqo.tensor_search import enums
 from typing import Optional
 from marqo.tensor_search.utils import construct_authorized_url
 from marqo.tensor_search.models.add_docs_objects import ModelAuth
-from marqo.tensor_search.models.add_docs_objects import AddDocsParams, AddDocsBodyParamsOld, AddDocsBodyParamsNew
+from marqo.tensor_search.models.add_docs_objects import AddDocsParams, AddDocsBodyParams
 from marqo.errors import BadRequestError
 from typing import Union, List, Optional, Dict
 from fastapi import Request
@@ -135,7 +135,7 @@ def decode_mappings(mappings: Optional[str] = None) -> dict:
             raise InvalidArgError(f"Error parsing mappings. Message: {e}")
 
 
-def add_docs_params_orchestrator(index_name: str, body: Union[AddDocsBodyParamsOld, AddDocsBodyParamsNew],
+def add_docs_params_orchestrator(index_name: str, body: Union[AddDocsBodyParams, List[Dict]],
                                 device: str, auto_refresh: bool = True, non_tensor_fields: Optional[List[str]] = [],
                                 mappings: Optional[dict] = dict(), model_auth: Optional[ModelAuth] = None,
                                 image_download_headers: Optional[dict] = dict(),
@@ -147,7 +147,7 @@ def add_docs_params_orchestrator(index_name: str, body: Union[AddDocsBodyParamsO
         AddDocsParams: An AddDocsParams object for internal use
     """
 
-    if isinstance(body, AddDocsBodyParamsNew):
+    if isinstance(body, AddDocsBodyParams):
         docs = body.documents
 
         # Check for query parameters that are not supported in the new API
@@ -165,8 +165,8 @@ def add_docs_params_orchestrator(index_name: str, body: Union[AddDocsBodyParamsO
         model_auth = body.modelAuth
         image_download_headers = body.imageDownloadHeaders
 
-    elif isinstance(body, AddDocsBodyParamsOld):
-        docs = body.__root__
+    elif isinstance(body, list) and all(isinstance(item, dict) for item in body):
+        docs = body
 
     else:
         raise BadRequestError("Invalid request body type for `/documents` API. "
