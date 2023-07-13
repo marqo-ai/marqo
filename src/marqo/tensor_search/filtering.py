@@ -64,10 +64,12 @@ def sanitise_lucene_special_chars(to_be_sanitised: str) -> str:
     https://lucene.apache.org/core/6_0_0/queryparser/org/apache/lucene/queryparser/classic/package-summary.html#Escaping_Special_Characters
 
     """
-    # this prevents us from double-escaping backslashes. This may be unnecessary.
-    non_backslash_chars = constants.LUCENE_SPECIAL_CHARS.union(constants.NON_OFFICIAL_LUCENE_SPECIAL_CHARS) - {'\\'}
+    
+    # always escape backslashes before the other special chars
+    to_be_sanitised = to_be_sanitised.replace("\\", "\\\\")
 
-    to_be_sanitised.replace("\\", "\\\\")
+    # this prevents us from double-escaping backslashes.
+    non_backslash_chars = constants.LUCENE_SPECIAL_CHARS.union(constants.NON_OFFICIAL_LUCENE_SPECIAL_CHARS) - {'\\'}
 
     for char in non_backslash_chars:
         to_be_sanitised = to_be_sanitised.replace(char, f'\\{char}')
@@ -78,7 +80,7 @@ def contextualise_user_filter(filter_string: Optional[str], simple_properties: t
     """adds the chunk prefix to the start of properties found in simple string (filter_string)
     This allows for filtering within chunks.
 
-    Because this is a user-defined filter, if they want to filter on a field names that contain
+    Because this is a user-defined filter, if they want to filter on field names that contain
     special characters, we expect them to escape the special characters themselves.
 
     In order to search chunks we need to append the chunk prefix to the start of the field name.
@@ -100,31 +102,24 @@ def contextualise_user_filter(filter_string: Optional[str], simple_properties: t
     for field in simple_properties:
         escaped_field_name = sanitise_lucene_special_chars(field)
         if escaped_field_name in filter_string:
-            # we want to replace only the field name that directly corresponds to the simple property,
+            # we want to replace the field name that directly corresponds to the simple property,
             # not any other field names that contain the simple property as a substring.
-            if (
-                    # this is for the case where the field name is at the start of the filter string
-                    filter_string.startswith(escaped_field_name) and
 
-                    # for cases like filter_string:"z_z_z:foo", escaped_field_name=z
-                    # where the field name is a substring at the start of the field name
-                    # in the filter string.
-                    # This prevents us from accidentally generating the filter_string:
-                    # "__chunks_.z___chunks_.z___chunks_.z:foo":
-                    len(filter_string.split(':')[0]) == len(escaped_field_name)
-            ):
-                contextualised_filter = contextualised_filter.replace(
-                    f'{escaped_field_name}:', f'{enums.TensorField.chunks}.{escaped_field_name}:')
-            else:
-                # the case where the field name is not at the start of the filter string
+            # case 0: field name is at the start of the filter string
+            # it must be followed by a colon, otherwise it is a substring of another field name
+            # edge case example: "field_a_excess_chars:a, escaped_field_name=field_a"
+            if filter_string.startswith(escaped_field_name + ":"):
+                # add the chunk prefix ONLY to the start of the field name
+                contextualised_filter = f'{enums.TensorField.chunks}.{contextualised_filter}'
+            
+            # next we check every occurence of field name NOT at the start of the filter string
+            # note: we do this even if it was also at the start
+            # case 1: field name is after a space
+            # e.g.: "field_a:foo AND field_b:bar, escaped_field_name=field_b"
+            contextualised_filter = contextualised_filter.replace(
+                f' {escaped_field_name}:', f' {enums.TensorField.chunks}.{escaped_field_name}:')
 
-                # the case where the field name is after as space
-                # e.g.: "field_a:foo AND field_b:bar, escaped_field_name=field_b"
-                contextualised_filter = contextualised_filter.replace(
-                    f' {escaped_field_name}:', f' {enums.TensorField.chunks}.{escaped_field_name}:')
-
-                # the case where the field name is directly after an opening bracket
-                contextualised_filter = contextualised_filter.replace(
-                    f'({escaped_field_name}:', f'({enums.TensorField.chunks}.{escaped_field_name}:')
-
+            # case 2: field name is directly after an opening parenthesis
+            contextualised_filter = contextualised_filter.replace(
+                f'({escaped_field_name}:', f'({enums.TensorField.chunks}.{escaped_field_name}:')
     return contextualised_filter

@@ -13,7 +13,7 @@ from unittest.mock import patch, MagicMock
 class TestFiltering(unittest.TestCase):
     def test_contextualise_user_filter(self):
         expected_mappings = [
-            (   # fields with no spaces
+            (   # multiple fields with no spaces
                 "(an_int:[0 TO 30] AND an_int:2) AND abc:(some text)",
                 ["an_int", "abc"],
                 f"({enums.TensorField.chunks}.an_int:[0 TO 30] AND {enums.TensorField.chunks}.an_int:2) AND {enums.TensorField.chunks}.abc:(some text)"
@@ -22,6 +22,11 @@ class TestFiltering(unittest.TestCase):
                 "spaced\\ int:[0 TO 30]",
                 ["spaced int"],
                 f"{enums.TensorField.chunks}.spaced\\ int:[0 TO 30]"
+            ),
+            (   # fields with special chars
+                "field\\&&\\||withspecialchars:(random value)",
+                ["field&&||withspecialchars"],
+                f"{enums.TensorField.chunks}.field\\&&\\||withspecialchars:(random value)"
             ),
             (   # field in string not in properties
                 "field_not_in_properties:random AND normal_field:3",
@@ -33,12 +38,73 @@ class TestFiltering(unittest.TestCase):
                 ["normal_field", "field_not_in_string"],
                 f"{enums.TensorField.chunks}.normal_field:3"
             ),
-            (
+            (   # field is substring of start of filter string, should be ignored
+                "field_field_field:foo",
+                ["field"],
+                "field_field_field:foo"
+            ),
+            (   # field name at start
+                "field_field_field:foo",
+                ["field_field_field"],
+                f"{enums.TensorField.chunks}.field_field_field:foo"
+            ),
+            (   # field name at start with parenthesis
+                "(field_a:a OR field_b:b) AND field_c:c",
+                ["field_a"],
+                f"({enums.TensorField.chunks}.field_a:a OR field_b:b) AND field_c:c"
+            ),
+            (   # field name at start and has : in it
+                "field\\:a:a",
+                ["field:a"],
+                f"{enums.TensorField.chunks}.field\\:a:a"
+            ),
+            (   # field is at start and is ending substring of another field
+                "field_a:a AND another_field_a:b",
+                ["field_a", "another_field_a"],
+                f"{enums.TensorField.chunks}.field_a:a AND {enums.TensorField.chunks}.another_field_a:b"
+            ),
+            #(   # field is not at start and is ending substring of another field with space or parenthesis before it
+            #    "random:random OR field_a:a AND another\\ field_a:b",
+            #    ["field_a", "another field_a"],
+            #    f"random:random OR {enums.TensorField.chunks}.field_a:a AND {enums.TensorField.chunks}.another\\ field_a:b"
+            #),
+            (   # field name in the middle and has : in it
+                "random:random OR field\\:a:a",
+                ["field:a"],
+                f"random:random OR {enums.TensorField.chunks}.field\\:a:a"
+            ),
+            (   # field appears multiple times in filter string
+                "field_a:a AND field_b:b OR (field_a:c OR field_a:d)",
+                ["field_a"],
+                f"{enums.TensorField.chunks}.field_a:a AND field_b:b OR ({enums.TensorField.chunks}.field_a:c OR {enums.TensorField.chunks}.field_a:d)"
+            ),
+            
+            (   # field is substring of another field
+                "field_a:a AND field_a_another:b",
+                ["field_a", "field_a_another"],
+                f"{enums.TensorField.chunks}.field_a:a AND {enums.TensorField.chunks}.field_a_another:b"
+            ),
+            (   # field name in the middle
+                "field_a:a AND field_b:b OR field_c:c",
+                ["field_b"],
+                f"field_a:a AND {enums.TensorField.chunks}.field_b:b OR field_c:c"
+            ),
+            (   # field name in the middle with parenthesis
+                "field_a:a AND (field_b:b OR field_c:c)",
+                ["field_b"],
+                f"field_a:a AND ({enums.TensorField.chunks}.field_b:b OR field_c:c)"
+            ),
+            (   # content has field name in it
+                "field_a:field_a",
+                ["field_a"],
+                f"{enums.TensorField.chunks}.field_a:field_a"
+            ),
+            (   # None filter string
                 None,
                 ["random_field_1", "random_field_2"],
                 ""
             ),
-            (
+            (   # empty filter string
                 "",
                 ["random_field_1", "random_field_2"],
                 ""
@@ -85,15 +151,15 @@ class TestFiltering(unittest.TestCase):
 
     def test_sanitise_lucene_special_chars(self):
         expected_mappings = [
-            ("some text", "some\\ text"),
-            ("text!", "text\\!"),
-            ("some text!", "some\\ text\\!"),
-            ("text?", "text\\?"),
-            ("text&&", "text\\&&"),
-            ("text&", "text&")        # no change, & is not a special char
+            ("text with space", "text\\ with\\ space"),
+            ("exclamation!", "exclamation\\!"),
+            ("sometext?", "sometext\\?"),
+            ("sometext&&", "sometext\\&&"),
+            ("sometext\\", "sometext\\\\"),
+            ("everything ||&?\\combined", "everything\\ \\||&\\?\\\\combined"),
+            ("sometext&", "sometext&")        # no change, & is not a special char
         ]
         for given, expected in expected_mappings:
-            escaped_output = filtering.sanitise_lucene_special_chars(
+            assert expected == filtering.sanitise_lucene_special_chars(
                 given
             )
-            assert expected == escaped_output
