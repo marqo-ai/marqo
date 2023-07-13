@@ -57,10 +57,16 @@ def sanitise_lucene_special_chars(user_str: str) -> str:
     https://lucene.apache.org/core/6_0_0/queryparser/org/apache/lucene/queryparser/classic/package-summary.html#Escaping_Special_Characters
 
     """
-    print(f'User string: {user_str}')
+
+    # Add backslash to backslash:
+    # We do this first, so that we don't double-escape the backslashes
+    user_str = user_str.replace("\\", "\\\\")
+
+    # Add backslash to all other special chars:
     for char in constants.LUCENE_SPECIAL_CHARS:
-        user_str = user_str.replace(char, f'\\{char}')
-    print(f'Sanitised user string: {user_str}')
+        if not char is "\\":
+            user_str = user_str.replace(char, f'\\{char}')
+    
     return user_str
 
 

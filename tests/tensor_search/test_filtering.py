@@ -19,9 +19,9 @@ class TestFiltering(unittest.TestCase):
                 f"({enums.TensorField.chunks}.an_int:[0 TO 30] AND {enums.TensorField.chunks}.an_int:2) AND {enums.TensorField.chunks}.abc:(some text)"
             ),
             (   # fields with spaces
-                "(spaced\ int):[0 TO 30]",
+                r'spaced\ int:[0 TO 30]',
                 ["spaced int"],
-                f"({enums.TensorField.chunks}.spaced\ int):[0 TO 30])"
+                rf'{enums.TensorField.chunks}.spaced\ int:[0 TO 30]'
             ),
             (   # field in string not in properties
                 "field_not_in_properties:random AND normal_field:3",
@@ -35,10 +35,12 @@ class TestFiltering(unittest.TestCase):
             ),
             (
                 None,
+                ["random_field_1", "random_field_2"],
                 ""
             ),
             (
                 "",
+                ["random_field_1", "random_field_2"],
                 ""
             )
         ]
@@ -53,7 +55,7 @@ class TestFiltering(unittest.TestCase):
             (["an_int", "abc"],
              f"{enums.TensorField.chunks}.{enums.TensorField.field_name}:(abc) OR {enums.TensorField.chunks}.{enums.TensorField.field_name}:(an_int)"),
             (["an_int"],
-             f"{enums.TensorField.chunks}.{enums.TensorField.field_name}:(an_int)")
+             f"{enums.TensorField.chunks}.{enums.TensorField.field_name}:(an_int)"),
             ([], "")
         ]
         for given, expected in expected_mappings:
@@ -66,8 +68,8 @@ class TestFiltering(unittest.TestCase):
             {
                 "filter_string": "abc:(some text)",
                 "simple_properties": ["abc"],
-                "searchable_attributes": ["abc"],
-                "expected": f"{enums.TensorField.chunks}.{enums.TensorField.field_name}:abc AND ({enums.TensorField.chunks}.abc:(some text))"
+                "searchable_attributes": ["bleh"],
+                "expected": f"({enums.TensorField.chunks}.{enums.TensorField.field_name}:(bleh)) AND ({enums.TensorField.chunks}.abc:(some text))"
             },
             # special character in searchable attribute
             # escaped space in filter string
@@ -76,15 +78,17 @@ class TestFiltering(unittest.TestCase):
             assert case["expected"] == filtering.build_tensor_search_filter(
                 filter_string=case["filter_string"],
                 simple_properties=case["simple_properties"],
-                searchable_attributes=case["searchable_attributes"]
+                searchable_attribs=case["searchable_attributes"]
             )
     
     def test_sanitise_lucene_special_chars(self):
         expected_mappings = [
-            ("some text", "some text"),
-            ("some text!", "some text\!"),
-            ("some text?", "some text\?"),
-            ("some text&&", "some text\&&"),
+            ("plain text", "plain text"),
+            ("exclamation!", "exclamation\\!"),
+            ("some text?", "some text\\?"),
+            ("some text&&", "some text\\&&"),
+            ("some text\\", "some text\\\\"),
+            ("everything ||&?\\ combined", "everything \\||&\\?\\\\ combined"),
             ("some text&", "some text&")        # no change, & is not a special char
         ]
         for given, expected in expected_mappings:
