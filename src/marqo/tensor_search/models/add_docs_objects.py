@@ -24,6 +24,7 @@ class AddDocsBodyParams(BaseModel):
         extra = "forbid" # Raise error on unknown fields
 
     nonTensorFields: List = Field(default_factory=list)
+    tensorFields: List = Field(default_factory=list)
     useExistingTensors: bool = False
     imageDownloadHeaders: dict = Field(default_factory=dict)
     modelAuth: Optional[ModelAuth] = None
@@ -62,13 +63,14 @@ class AddDocsParams(BaseModel):
     auto_refresh: bool
     device: Optional[str]
     non_tensor_fields: List = Field(default_factory=list)
+    tensor_fields: List = Field(default_factory=list)
     image_download_thread_count: int = 20
     image_download_headers: dict = Field(default_factory=dict)
     use_existing_tensors: bool = False
     mappings: Optional[dict] = None
     model_auth: Optional[ModelAuth] = None
 
-    def __init__(self, **data: dict):
+    def __init__(self, **data: Any):
         # Ensure `None` and passing nothing are treated the same for device
         if "device" not in data or data["device"] is None:
             data["device"] = get_best_available_device()

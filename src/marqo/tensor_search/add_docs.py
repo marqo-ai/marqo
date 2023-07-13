@@ -8,10 +8,12 @@ from typing import List, Optional, Tuple
 import PIL
 from marqo.s2_inference import clip_utils
 from marqo.tensor_search.telemetry import RequestMetricsStore, RequestMetrics
+import marqo.errors as errors
 
 
-def threaded_download_images(allocated_docs: List[dict], image_repo: dict,
-                             non_tensor_fields: Tuple, image_download_headers: dict, metric_obj: Optional[RequestMetrics] = None) -> None:
+def threaded_download_images(allocated_docs: List[dict], image_repo: dict, tensor_fields: Optional[Tuple],
+                             non_tensor_fields: Optional[Tuple], image_download_headers: dict,
+                             metric_obj: Optional[RequestMetrics] = None) -> None:
     """A thread calls this function to download images for its allocated documents
 
     This should be called only if treat URLs as images is True.
@@ -20,8 +22,10 @@ def threaded_download_images(allocated_docs: List[dict], image_repo: dict,
         allocated_docs: docs with images to be downloaded by this thread,
         image_repo: dictionary that will be mutated by this thread. It will add PIL images
             as values and the URLs as keys
+        tensor_fields: A tuple of tensor_fields. Images will be downloaded for these fields only. Cannot be provided
+            at the same time as `non_tensor_fields`.
         non_tensor_fields: A tuple of non_tensor_fields. No images will be downloaded for
-            these fields
+            these fields. Cannot be provided at the same time as `tensor_fields`.
         image_download_headers: A dict of headers for image download. Can be used
             to authenticate image downloads
     Side Effects:
@@ -36,6 +40,10 @@ def threaded_download_images(allocated_docs: List[dict], image_repo: dict,
     Returns:
         None
     """
+
+    if tensor_fields and non_tensor_fields:
+        raise errors.InternalError("Exactly one of tensor_fields or non_tensor_fields must be provided. Found both.")
+
     # Generate pseudo-unique ID for thread metrics.
     _id = hash("".join([d.get("_id", str(random.getrandbits(64))) for d in allocated_docs])) % 1000
     _id = f"image_download.{_id}"
@@ -44,10 +52,16 @@ def threaded_download_images(allocated_docs: List[dict], image_repo: dict,
         metric_obj = RequestMetricsStore.for_request()
         RequestMetricsStore.set_in_request(metrics=metric_obj)
 
+    def is_non_tensor_field(f: str) -> bool:
+        if tensor_fields:
+            return f not in tensor_fields
+        else:
+            return f in non_tensor_fields
+
     with metric_obj.time(f"{_id}.thread_time"):
         for doc in allocated_docs:
             for field in list(doc):
-                if field in non_tensor_fields:
+                if is_non_tensor_field(field):
                     continue
                 if isinstance(doc[field], str) and clip_utils._is_image(doc[field]):
                     if doc[field] in image_repo:
@@ -77,13 +91,16 @@ def threaded_download_images(allocated_docs: List[dict], image_repo: dict,
                                 continue
 
 
-def download_images(docs: List[dict], thread_count: int, non_tensor_fields: Tuple, image_download_headers: dict) -> dict:
+def download_images(docs: List[dict], thread_count: int, tensor_fields: Optional[Tuple],
+                    non_tensor_fields: Optional[Tuple], image_download_headers: dict) -> dict:
     """Concurrently downloads images from each doc, storing them into the image_repo dict
     Args:
         docs: docs with images to be downloaded. These will be allocated to each thread
         thread_count: number of threads to spin up
+        tensor_fields: A tuple of tensor_fields. Images will be downloaded for these fields only. Cannot be provided
+            at the same time as `non_tensor_fields`.
         non_tensor_fields: A tuple of non_tensor_fields. No images will be downloaded for
-            these fields
+            these fields. Cannot be provided at the same time as `tensor_fields`.
         image_download_headers: A dict of image download headers for authentication.
     This should be called only if treat URLs as images is True
 
@@ -97,7 +114,9 @@ def download_images(docs: List[dict], thread_count: int, non_tensor_fields: Tupl
 
     m = [RequestMetrics() for i in range(thread_count)]
     thread_allocated_docs = [copied[i: i + docs_per_thread] for i in range(len(copied))[::docs_per_thread]]
-    threads = [threading.Thread(target=threaded_download_images, args=(allocation, image_repo, non_tensor_fields, image_download_headers, m[i]))
+    threads = [threading.Thread(target=threaded_download_images, args=(allocation, image_repo,
+                                                                       tensor_fields, non_tensor_fields,
+                                                                       image_download_headers, m[i]))
                for i, allocation in enumerate(thread_allocated_docs)]
 
     for th in threads:

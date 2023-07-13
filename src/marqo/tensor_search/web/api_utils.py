@@ -161,19 +161,30 @@ def add_docs_params_orchestrator(index_name: str, body: Union[AddDocsBodyParams,
 
         mappings = body.mappings
         non_tensor_fields = body.nonTensorFields
+        tensor_fields = body.tensorFields
         use_existing_tensors = body.useExistingTensors
         model_auth = body.modelAuth
         image_download_headers = body.imageDownloadHeaders
 
+        if non_tensor_fields and tensor_fields:
+            raise BadRequestError('Cannot provide nonTensorFields when tensorFields is defined.')
+
+        return AddDocsParams(
+            index_name=index_name, docs=docs, auto_refresh=auto_refresh,
+            device=device, non_tensor_fields=non_tensor_fields, tensor_fields=tensor_fields,
+            use_existing_tensors=use_existing_tensors, image_download_headers=image_download_headers,
+            mappings=mappings, model_auth=model_auth
+        )
+
     elif isinstance(body, list) and all(isinstance(item, dict) for item in body):
         docs = body
 
+        return AddDocsParams(
+            index_name=index_name, docs=docs, auto_refresh=auto_refresh,
+            device=device, non_tensor_fields=non_tensor_fields,
+            use_existing_tensors=use_existing_tensors, image_download_headers=image_download_headers,
+            mappings=mappings, model_auth=model_auth
+        )
+
     else:
         raise InternalError(f"Unexpected request body type `{type(body).__name__} for `/documents` API. ")
-
-    return AddDocsParams(
-        index_name=index_name, docs=docs, auto_refresh=auto_refresh,
-        device=device, non_tensor_fields=non_tensor_fields,
-        use_existing_tensors=use_existing_tensors, image_download_headers=image_download_headers,
-        mappings=mappings, model_auth=model_auth
-    )
