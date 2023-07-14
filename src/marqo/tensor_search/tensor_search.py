@@ -264,8 +264,9 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
     """
     # ADD DOCS TIMER-LOGGER (3)
 
-    if add_docs_params.tensor_fields and add_docs_params.non_tensor_fields:
-        raise errors.InternalError("Exactly one of tensor_fields or non_tensor_fields must be provided. Found both.")
+    if add_docs_params.tensor_fields and add_docs_params.non_tensor_fields \
+            or not (add_docs_params.tensor_fields or add_docs_params.non_tensor_fields):
+        raise errors.InternalError("Exactly one of tensor_fields or non_tensor_fields must be provided.")
 
     RequestMetricsStore.for_request().start("add_documents.processing_before_opensearch")
     start_time_3 = timer()
