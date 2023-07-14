@@ -9,6 +9,7 @@ from typing import (
 from marqo.marqo_logging import logger
 import copy
 from marqo.tensor_search.enums import EnvVars
+import re
 
 def build_tensor_search_filter(
         filter_string: str, simple_properties: dict,
@@ -113,17 +114,41 @@ def contextualise_user_filter(filter_string: Optional[str], simple_properties: t
             # it must be followed by a colon, otherwise it is a substring of another field name
             # edge case example: "field_a_excess_chars:a, escaped_field_name=field_a"
             if filter_string.startswith(escaped_field_name + ":"):
-                # add the chunk prefix ONLY to the start of the field name
+                # add the chunk prefix ONCE to the start of the field name
                 contextualised_filter = f'{enums.TensorField.chunks}.{contextualised_filter}'
             
             # next we check every occurence of field name NOT at the start of the filter string
             # note: we do this even if it was also at the start
-            # case 1: field name is after a space
-            # e.g.: "field_a:foo AND field_b:bar, escaped_field_name=field_b"
-            contextualised_filter = contextualised_filter.replace(
-                f' {escaped_field_name}:', f' {enums.TensorField.chunks}.{escaped_field_name}:')
+            possible_chars_before_field_name = {" ", "("}
+            i = 0
+            while i < len(contextualised_filter):
+                # find every occurence of the field name in the filter string
+                if contextualised_filter[i:i+len(escaped_field_name)] == escaped_field_name:
+                    # check if it is preceded by a space or an opening parenthesis
+                    # also check that the preceding char is NOT escaped
+                    if \
+                    (i > 0 and contextualised_filter[i-1] in possible_chars_before_field_name) and \
+                    (i == 1 or contextualised_filter[i-2] != "\\"): 
+                        # if so, add the chunk prefix the start of the field name
+                        contextualised_filter = contextualised_filter[:i] + f"{enums.TensorField.chunks}." + contextualised_filter[i:]
+                        # skip checking the newly inserted part
+                        i += len("chunk_prefix_")  
+                i += 1
 
-            # case 2: field name is directly after an opening parenthesis
-            contextualised_filter = contextualised_filter.replace(
-                f'({escaped_field_name}:', f'({enums.TensorField.chunks}.{escaped_field_name}:')
     return contextualised_filter
+
+"""
+def add_chunks_prefix_to_filter_string(filter_string: str):
+    # Search for the field pattern
+    # Field names in Lucene can contain any character, but only alphanumeric characters or underscore are recommended
+    # To include spaces or special characters in the field name, you need to escape them with a backslash
+    # The pattern below will match both normal field names and ones with escaped characters
+    pattern = r'(?<=[\s\(])([a-zA-Z0-9_\\]+\s*:|\[[a-zA-Z0-9_\\]+\s*TO\s*[a-zA-Z0-9_\\]+\])'
+    # This pattern will not handle unescaped special characters, if you want to include those, the regex will become significantly more complex
+
+    # Add chunks prefix to the matched fields
+    chunks_prefix = enums.TensorField.chunks + "."
+    modified_filter = re.sub(pattern, lambda m: chunks_prefix + m.group(0), filter_string)
+
+    return modified_filter
+"""
