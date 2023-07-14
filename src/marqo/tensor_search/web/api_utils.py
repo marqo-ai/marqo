@@ -5,6 +5,10 @@ from marqo.tensor_search import enums
 from typing import Optional
 from marqo.tensor_search.utils import construct_authorized_url
 from marqo.tensor_search.models.add_docs_objects import ModelAuth
+from marqo.tensor_search.models.add_docs_objects import AddDocsParams, AddDocsBodyParams
+from marqo.errors import BadRequestError
+from typing import Union, List, Optional, Dict
+from fastapi import Request
 
 
 def upconstruct_authorized_url(opensearch_url: str) -> str:
@@ -48,7 +52,7 @@ def translate_api_device(device: Optional[str]) -> Optional[str]:
             lowered_device.startswith(acceptable),
             lowered_device.replace(acceptable, ""),
             acceptable
-         )
+        )
         for acceptable in acceptable_devices]
 
     try:
@@ -129,3 +133,47 @@ def decode_mappings(mappings: Optional[str] = None) -> dict:
             return as_dict
         except json.JSONDecodeError as e:
             raise InvalidArgError(f"Error parsing mappings. Message: {e}")
+
+
+def add_docs_params_orchestrator(index_name: str, body: Union[AddDocsBodyParams, List[Dict]],
+                                device: str, auto_refresh: bool = True, non_tensor_fields: Optional[List[str]] = [],
+                                mappings: Optional[dict] = dict(), model_auth: Optional[ModelAuth] = None,
+                                image_download_headers: Optional[dict] = dict(),
+                                use_existing_tensors: Optional[bool] = False, query_parameters: Optional[Dict] = dict()) -> AddDocsParams:
+    """An orchestrator for the add_documents API to support both old and new versions of the API.
+    All the arguments are decoded and validated in the API function. This function is only responsible for orchestrating.
+
+    Returns:
+        AddDocsParams: An AddDocsParams object for internal use
+    """
+
+    if isinstance(body, AddDocsBodyParams):
+        docs = body.documents
+
+        # Check for query parameters that are not supported in the new API
+        deprecated_fields = ["non_tensor_fields", "use_existing_tensors", "image_download_headers", "model_auth", "mappings"]
+        if any(field in query_parameters for field in deprecated_fields):
+            raise BadRequestError("Marqo is not accepting any of the following parameters in the query string: "
+                                  "`non_tensor_fields`, `use_existing_tensors`, `image_download_headers`, `model_auth`, `mappings`. "
+                                  "Please move these parameters to the request body as "
+                                  "`nonTensorFields`,` useExistingTensors`, `imageDownloadHeaders`, `modelAuth`, `mappings`. and try again. "
+                                  "Please check `https://docs.marqo.ai/latest/API-Reference/documents/` for the correct APIs.")
+
+        mappings = body.mappings
+        non_tensor_fields = body.nonTensorFields
+        use_existing_tensors = body.useExistingTensors
+        model_auth = body.modelAuth
+        image_download_headers = body.imageDownloadHeaders
+
+    elif isinstance(body, list) and all(isinstance(item, dict) for item in body):
+        docs = body
+
+    else:
+        raise InternalError(f"Unexpected request body type `{type(body).__name__} for `/documents` API. ")
+
+    return AddDocsParams(
+        index_name=index_name, docs=docs, auto_refresh=auto_refresh,
+        device=device, non_tensor_fields=non_tensor_fields,
+        use_existing_tensors=use_existing_tensors, image_download_headers=image_download_headers,
+        mappings=mappings, model_auth=model_auth
+    )
