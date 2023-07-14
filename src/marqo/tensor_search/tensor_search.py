@@ -50,13 +50,13 @@ from marqo.tensor_search.enums import (
     EnvVars
 )
 from marqo.tensor_search.enums import IndexSettingsField as NsField
-from marqo.tensor_search import utils, backend, validation, configs, add_docs
+from marqo.tensor_search import utils, backend, validation, configs, add_docs, filtering
 from marqo.tensor_search.formatting import _clean_doc
 from marqo.tensor_search.index_meta_cache import get_cache, get_index_info
 from marqo.tensor_search import index_meta_cache
 from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQueryEntity, ScoreModifier
 from marqo.tensor_search.models.search import Qidx, JHash, SearchContext, VectorisedJobs, VectorisedJobPointer
-from marqo.tensor_search.models.index_info import IndexInfo
+from marqo.tensor_search.models.index_info import IndexInfo, get_model_properties_from_index_defaults
 from marqo.tensor_search.models.external_apis.abstract_classes import ExternalAuth
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.tensor_search.utils import add_timing
@@ -79,6 +79,47 @@ from dataclasses import replace
 from marqo.tensor_search.tensor_search_logging import get_logger
 
 logger = get_logger(__name__)
+
+
+def _get_dimension_from_model_properties(model_properties: dict):
+    """
+    Args:
+        model_properties: dict containing model properties
+    """
+    try:
+        return model_properties["dimensions"]
+    except KeyError:
+        raise errors.InvalidArgError(
+            "The given model properties must contain a 'dimensions' key"
+        )
+
+
+def add_knn_field(ix_settings: dict):
+    """
+    This adds the OpenSearch knn field to the index's mappings
+
+    Args:
+        ix_settings: the index settings
+    """
+    model_prop = get_model_properties_from_index_defaults(
+        index_defaults=(
+            ix_settings["mappings"]["_meta"]
+            ["index_settings"][NsField.index_defaults]),
+        model_name=(
+            ix_settings["mappings"]["_meta"]
+            ["index_settings"][NsField.index_defaults][NsField.model])
+    )
+    
+    ix_settings_with_knn = ix_settings.copy()
+    ix_settings_with_knn["mappings"]["properties"][TensorField.chunks]["properties"][TensorField.marqo_knn_field] = {
+        "type": "knn_vector",
+        "dimension": _get_dimension_from_model_properties(model_prop),
+        "method": (
+            ix_settings["mappings"]["_meta"]
+            ["index_settings"][NsField.index_defaults][NsField.ann_parameters]
+        )
+    }
+    return ix_settings_with_knn
 
 
 def create_vector_index(
@@ -145,14 +186,18 @@ def create_vector_index(
     if max_marqo_fields is not None:
         max_os_fields = _marqo_field_limit_to_os_limit(int(max_marqo_fields))
         vector_index_settings["settings"]["mapping"] = {"total_fields": {"limit": int(max_os_fields)}}
+
     model_name = the_index_settings[NsField.index_defaults][NsField.model]
     vector_index_settings["mappings"]["_meta"][NsField.index_settings] = the_index_settings
     vector_index_settings["mappings"]["_meta"]["model"] = model_name
 
-    response = HttpRequests(config).put(path=index_name, body=vector_index_settings)
+    vector_index_settings_with_knn = add_knn_field(ix_settings=vector_index_settings)
+
+    logger.debug(f"Creating index {index_name} with settings: {vector_index_settings_with_knn}")
+    response = HttpRequests(config).put(path=index_name, body=vector_index_settings_with_knn)
 
     get_cache()[index_name] = IndexInfo(
-        model_name=model_name, properties=vector_index_settings["mappings"]["properties"].copy(),
+        model_name=model_name, properties=vector_index_settings_with_knn["mappings"]["properties"].copy(),
         index_settings=the_index_settings
     )
     return response
@@ -171,13 +216,13 @@ def _marqo_field_limit_to_os_limit(marqo_index_field_limit: int) -> int:
     """Translates a Marqo Index Field limit (that a Marqo user will set)
     into the equivalent limit for Marqo-OS
 
-    Each Marqo field generates 3 Marqo-OS fields:
+    Each Marqo field generates 2 Marqo-OS fields:
         - One for its content
-        - One for its vector
         - One for filtering
 
-    There are also 3 fields that will be generated on a Marqo index, in most
+    There are also 4 fields that will be generated on a Marqo index, in most
     cases:
+        - one for __vector_marqo_knn_field
         - one for the chunks field
         - one for chunk's __field_content
         - one for chunk's __field_name
@@ -185,7 +230,7 @@ def _marqo_field_limit_to_os_limit(marqo_index_field_limit: int) -> int:
     Returns:
         The corresponding Marqo-OS limit
     """
-    return (marqo_index_field_limit * 3) + 3
+    return (marqo_index_field_limit * 2) + 4
 
 
 def _autofill_index_settings(index_settings: dict):
@@ -478,7 +523,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                     with RequestMetricsStore.for_request().time(f"add_documents.create_vectors"):
                         vector_chunks = s2_inference.vectorise(
                             model_name=index_info.model_name,
-                            model_properties=_get_model_properties(index_info), content=content_chunks,
+                            model_properties=index_info.get_model_properties(), content=content_chunks,
                             device=add_docs_params.device, normalize_embeddings=normalize_embeddings,
                             infer=infer_if_image, model_auth=add_docs_params.model_auth
                         )
@@ -510,7 +555,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                 for text_chunk, vector_chunk in zip(text_chunks, vector_chunks):
                     # We do not put in metadata yet at this stage.
                     chunks_to_append.append({
-                        utils.generate_vector_name(field): vector_chunk,
+                        TensorField.marqo_knn_field: vector_chunk,
                         TensorField.field_content: text_chunk,
                         TensorField.field_name: field
                     })
@@ -555,16 +600,16 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
         # the HttpRequest wrapper handles error logic
         update_mapping_response = backend.add_customer_field_properties(
             config=config, index_name=add_docs_params.index_name, customer_field_names=new_fields,
-            model_properties=_get_model_properties(index_info), multimodal_combination_fields=new_obj_fields)
+            model_properties=index_info.get_model_properties(), multimodal_combination_fields=new_obj_fields)
 
         # ADD DOCS TIMER-LOGGER (5)
         start_time_5 = timer()
         with RequestMetricsStore.for_request().time("add_documents.opensearch._bulk"):
+            serialised_body = utils.dicts_to_jsonl(bulk_parent_dicts)
             index_parent_response = HttpRequests(config).post(
-                path="_bulk", body=utils.dicts_to_jsonl(bulk_parent_dicts)
-            )
+                path="_bulk", body=serialised_body)
         RequestMetricsStore.for_request().add_time("add_documents.opensearch._bulk.internal", float(index_parent_response["took"]))
-
+        
         end_time_5 = timer()
         total_http_time = end_time_5 - start_time_5
         total_index_time = index_parent_response["took"] * 0.001
@@ -1044,17 +1089,16 @@ def _lexical_search(
 
     # SEARCH TIMER-LOGGER (pre-processing)
     RequestMetricsStore.for_request().start("search.lexical.processing_before_opensearch")
-    if searchable_attributes is not None and searchable_attributes:
+    if searchable_attributes is not None:
+        # Empty searchable attributes should produce empty results.
+        if len(searchable_attributes) == 0:
+            return {"hits": []}
+        
         fields_to_search = searchable_attributes
     else:
         fields_to_search = index_meta_cache.get_index_info(
             config=config, index_name=index_name
         ).get_true_text_properties()
-
-    # Validation for offset (pagination is single field)
-    if len(fields_to_search) != 1 and offset > 0:
-        raise errors.InvalidArgError(
-            f"Pagination (offset > 0) is only supported for single field searches! Your search currently has {len(fields_to_search)} fields: {fields_to_search}")
 
     # Parse text into required and optional terms.
     (required_terms, optional_blob) = utils.parse_lexical_query(text)
@@ -1088,6 +1132,7 @@ def _lexical_search(
         "size": result_count,
         "from": offset
     }
+
     if filter_string is not None:
         body["query"]["bool"]["filter"] = [{
             "query_string": {"query": filter_string}}]
@@ -1158,55 +1203,46 @@ def construct_vector_input_batches(query: Union[str, Dict], index_info: IndexInf
             return [k for k, _ in ordered_queries], []
 
 
-def get_vector_properties_to_search(searchable_attributes: Union[None, List[str]], index_info: IndexInfo, offset: int = 0) -> List[str]:
-    if searchable_attributes is None:
-        properties_to_search = index_info.get_vector_properties().keys()
-    else:
-        searchable_attributes_as_vectors = {
-            utils.generate_vector_name(field_name=attribute) for attribute in searchable_attributes
-        }
-        # discard searchable attributes that aren't found in the cache:
-        properties_to_search = list(searchable_attributes_as_vectors.intersection(
-            index_info.get_vector_properties().keys()
-        ))
-    
-    # Validation for offset (pagination is single field) if offset not provided, validation is not run.
-    if len(properties_to_search) != 1 and offset > 0:
-        human_readable_vector_properties = [v.replace(TensorField.vector_prefix, '') for v in
-                                            list(properties_to_search)]
-        raise errors.InvalidArgError(
-            f"Pagination (offset > 0) is only supported for single field searches!"
-            f" Your search currently has {len(properties_to_search)} vectorisable fields: {human_readable_vector_properties}"
-        )
-    return properties_to_search
-
-
 def construct_msearch_body_elements(searchableAttributes: List[str], offset: int, filter_string: str, index_info: IndexInfo, result_count: int, query_vector: List[float], attributes_to_retrieve: List[str], index_name: str, score_modifiers: Optional[ScoreModifier] = None) -> List[Dict[str, Any]]:
     """Constructs the body payload of a `/_msearch` request for a single bulk search query"""
-    contextualised_filter = utils.contextualise_filter(filter_string=filter_string, simple_properties=index_info.get_text_properties())
-    vector_properties_to_search = get_vector_properties_to_search(searchableAttributes, index_info, offset=offset)
+
+    # search filter has 2 components:
+    # 1. searchable_attributes filter: filters out results that are not part of the searchable attributes
+    # 2. filter_string: filters out results that do not match the filter string
+    filter_for_opensearch = filtering.build_tensor_search_filter(
+        filter_string=filter_string, simple_properties=index_info.get_text_properties(),
+        searchable_attribs=searchableAttributes
+    )
     body = []
 
-    for vector_field in vector_properties_to_search:
-        if score_modifiers is not None:
-            search_query = _create_score_modifiers_tensor_search_query(score_modifiers, result_count, offset, vector_field, query_vector)
-            if filter_string is not None:
-                search_query["query"]["function_score"]["query"]["nested"]["query"]["function_score"]["query"]\
-                    ["knn"][f"{TensorField.chunks}.{vector_field}"][
-                    "filter"] = {
-                    "query_string": {"query": f"{contextualised_filter}"}
+    if score_modifiers is not None:
+        search_query = _create_score_modifiers_tensor_search_query(
+            score_modifiers,
+            result_count,
+            offset,
+            TensorField.marqo_knn_field,
+            query_vector
+        )
+        if (filter_string is not None) or (searchableAttributes is not None):
+            (search_query["query"]["function_score"]
+                ["query"]["nested"]
+                ["query"]["function_score"]
+                ["query"]["knn"]
+                [f"{TensorField.chunks}.{TensorField.marqo_knn_field}"]["filter"]) = {
+                    "query_string": {"query": f"{filter_for_opensearch}"}
                 }
-        else:
-            search_query = _create_normal_tensor_search_query(result_count, offset, vector_field, query_vector)
-            if filter_string is not None:
-                search_query["query"]["nested"]["query"]["knn"][f"{TensorField.chunks}.{vector_field}"][
-                    "filter"] = {
-                    "query_string": {"query": f"{contextualised_filter}"}
+    else:
+        search_query = _create_normal_tensor_search_query(result_count, offset, TensorField.marqo_knn_field, query_vector)
+        if (filter_string is not None) or (searchableAttributes is not None):
+            (search_query["query"]["nested"]
+                ["query"]["knn"]
+                [f"{TensorField.chunks}.{TensorField.marqo_knn_field}"]["filter"]) = {
+                    "query_string": {"query": f"{filter_for_opensearch}"}
                 }
 
-        if attributes_to_retrieve is not None:
-            search_query["_source"] = {"include": attributes_to_retrieve} if len(attributes_to_retrieve) > 0 else False
-        body += [{"index": index_name}, search_query]
+    if attributes_to_retrieve is not None:
+        search_query["_source"] = {"include": attributes_to_retrieve} if len(attributes_to_retrieve) > 0 else False
+    body += [{"index": index_name}, search_query]
 
     return body
 
@@ -1216,9 +1252,10 @@ def bulk_msearch(config: Config, body: List[Dict]) -> List[Dict]:
     start_search_http_time = timer()
     try:
         with RequestMetricsStore.for_request().time("search.opensearch._msearch"):
-            response = HttpRequests(config).get(path=F"_msearch", body=utils.dicts_to_jsonl(body))
+            serialised_search_body = utils.dicts_to_jsonl(body)
+            response = HttpRequests(config).get(path=F"_msearch", body=serialised_search_body)
         RequestMetricsStore.for_request().add_time("search.opensearch._msearch.internal", float(response["took"])) # internal, not round trip time
-
+        
         end_search_http_time = timer()
         total_search_http_time = end_search_http_time - start_search_http_time
         total_os_process_time = response["took"] * 0.001
@@ -1303,7 +1340,7 @@ def assign_query_to_vector_job(
         content_type = 'text' if i == 0 else 'image'
         vector_job = VectorisedJobs(
             model_name=index_info.model_name,
-            model_properties=_get_model_properties(index_info),
+            model_properties=index_info.get_model_properties(),
             content=grouped_content,
             device=device,
             normalize_embeddings=index_info.index_settings['index_defaults']['normalize_embeddings'],
@@ -1649,7 +1686,6 @@ def _vector_text_search(
         qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, device)
     vectorised_text = list(qidx_to_vectors.values())[0]
 
-    contextualised_filter = utils.contextualise_filter(filter_string=filter_string, simple_properties=index_info.get_text_properties())
     body = construct_msearch_body_elements(
         searchable_attributes, offset, filter_string, index_info, result_count, vectorised_text, attributes_to_retrieve, index_name, score_modifiers
     )
@@ -1746,8 +1782,10 @@ def boost_score(docs: dict, boosters: dict, searchable_attributes) -> dict:
             if field_name in boosters.keys():
                 booster = boosters[field_name]
                 if len(booster) == 2:
+                    # weight and bias are given
                     chunk['_score'] = chunk['_score'] * booster[0] + booster[1]
                 else:
+                    # only weight is given
                     chunk['_score'] = chunk['_score'] * booster[0]
                 boosted_fields.add(field_name)
     return to_be_boosted
@@ -1825,23 +1863,6 @@ def _select_model_from_media_type(media_type: Union[MediaType, str]) -> Union[Ml
     else:
         raise ValueError("_select_model_from_media_type(): "
                          "Received unknown media type: {}".format(media_type))
-
-
-def _get_model_properties(index_info):
-    index_defaults = index_info.get_index_settings()["index_defaults"]
-    try:
-        model_properties = index_defaults[NsField.model_properties]
-    except KeyError:
-        try:
-            model_properties = s2_inference.get_model_properties_from_registry(index_info.model_name)
-        except s2_inference_errors.UnknownModelError:
-            raise s2_inference_errors.UnknownModelError(
-                f"Could not find model properties for model={index_info.model_name}. "
-                f"Please check that the model name is correct. "
-                f"Please provide model_properties if the model is a custom model and is not supported by default")
-
-    return model_properties
-
 
 def get_loaded_models() -> dict:
     available_models = s2_inference.get_available_models()
@@ -1983,7 +2004,7 @@ def vectorise_multimodal_combination_field(
             with RequestMetricsStore.for_request().time(f"create_vectors"):
                 text_vectors = s2_inference.vectorise(
                     model_name=index_info.model_name,
-                    model_properties=_get_model_properties(index_info), content=text_content_to_vectorise,
+                    model_properties=index_info.get_model_properties(), content=text_content_to_vectorise,
                     device=device, normalize_embeddings=normalize_embeddings,
                     infer=infer_if_image, model_auth=model_auth
                 )
@@ -1992,7 +2013,7 @@ def vectorise_multimodal_combination_field(
             with RequestMetricsStore.for_request().time(f"create_vectors"):
                 image_vectors = s2_inference.vectorise(
                     model_name=index_info.model_name,
-                    model_properties=_get_model_properties(index_info), content=image_content_to_vectorise,
+                    model_properties=index_info.get_model_properties(), content=image_content_to_vectorise,
                     device=device, normalize_embeddings=normalize_embeddings,
                     infer=infer_if_image, model_auth=model_auth
                 )
@@ -2028,11 +2049,12 @@ def vectorise_multimodal_combination_field(
     vector_chunk = vector_chunk.tolist()
 
     combo_chunk = dict({
-        utils.generate_vector_name(field): vector_chunk,
+        TensorField.marqo_knn_field: vector_chunk,
         TensorField.field_content: json.dumps(multimodal_object),
         TensorField.field_name: field,
     })
     return combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add, new_fields_from_multimodal_combination
+
 
 def _create_normal_tensor_search_query(result_count, offset, vector_field, vectorised_text) -> dict:
     search_query = {

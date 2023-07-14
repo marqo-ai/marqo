@@ -23,7 +23,7 @@ def _clean_doc(doc: dict, doc_id=None, include_vectors: bool = False) -> dict:
     if include_vectors:
         copied[TensorField.tensor_facets] = [
             {ch[TensorField.field_name]: ch[TensorField.field_content],
-             TensorField.embedding: ch[utils.generate_vector_name(ch[TensorField.field_name])]
+             TensorField.embedding: ch[TensorField.marqo_knn_field]
             } for ch in copied[TensorField.chunks]
         ]
     if TensorField.chunks in copied:

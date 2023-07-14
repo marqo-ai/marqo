@@ -4,11 +4,11 @@ import sys
 from tests.utils.transition import add_docs_caller
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from unittest import mock
-from marqo.s2_inference.s2_inference import vectorise
+from marqo.s2_inference.s2_inference import vectorise, get_model_properties_from_registry
 import numpy as np
 from marqo.tensor_search import utils
 import typing
-from marqo.tensor_search.enums import TensorField, SearchMethod, EnvVars, IndexSettingsField
+from marqo.tensor_search.enums import TensorField, SearchMethod, EnvVars, IndexSettingsField, MlModel
 from marqo.errors import (
     MarqoApiError, MarqoError, IndexNotFoundError, InvalidArgError,
     InvalidFieldNameError, IllegalRequestedDocCount, BadRequestError, InternalError
@@ -601,7 +601,10 @@ class TestVectorSearch(MarqoTestCase):
         """calling search with a specified device overrides MARQO_BEST_AVAILABLE_DEVICE"""
 
         mock_vectorise = mock.MagicMock()
-        mock_vectorise.return_value = [[0, 0, 0, 0]]
+
+        # Get vector dimension of the default BERT model
+        DEFAULT_MODEL_DIMENSION = get_model_properties_from_registry(MlModel.bert)["dimensions"]
+        mock_vectorise.return_value = [[0 for i in range(DEFAULT_MODEL_DIMENSION)]]
 
         @mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
         def run():
@@ -908,104 +911,8 @@ class TestVectorSearch(MarqoTestCase):
 
                 assert run()
 
-    def test_pagination_single_field(self):
-        vocab_source = "https://www.mit.edu/~ecprice/wordlist.10000"
-
-        vocab = requests.get(vocab_source).text.splitlines()
-        num_docs = 2000
-        
-        add_docs_caller(
-            config=self.config, index_name=self.index_name_1,
-            docs=[{"Title": "a " + (" ".join(random.choices(population=vocab, k=25))),
-                    "_id": str(i)
-                    }
-                  for i in range(num_docs)], auto_refresh=False
-        )
-        tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
-
-        for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
-            for doc_count in [2000]:
-                # Query full results
-                full_search_results = tensor_search.search(
-                                        search_method=search_method,
-                                        config=self.config,
-                                        index_name=self.index_name_1,
-                                        text='a', 
-                                        result_count=doc_count)
-
-                for page_size in [5, 10, 100, 1000, 2000]:
-                    paginated_search_results = {"hits": []}
-
-                    for page_num in range(math.ceil(num_docs / page_size)):
-                        lim = page_size
-                        off = page_num * page_size
-                        page_res = tensor_search.search(
-                                        search_method=search_method,
-                                        config=self.config,
-                                        index_name=self.index_name_1,
-                                        text='a', 
-                                        result_count=lim, offset=off)
-                        
-                        paginated_search_results["hits"].extend(page_res["hits"])
-
-                    # Compare paginated to full results (length only for now)
-                    assert len(full_search_results["hits"]) == len(paginated_search_results["hits"])
-
-                    # TODO: re-add this assert when KNN incosistency bug is fixed
-                    # assert full_search_results["hits"] == paginated_search_results["hits"]
-                    
-    def test_pagination_break_limitations(self):
-        # Negative offset
-        for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
-            for lim in [1, 10, 1000]:
-                for off in [-1, -10, -1000]:
-                    try:
-                        tensor_search.search(text=" ",
-                                            index_name=self.index_name_1, 
-                                            config=self.config, 
-                                            result_count=lim,
-                                            offset=off,
-                                            search_method=search_method)
-                        raise AssertionError
-                    except IllegalRequestedDocCount:
-                        pass
-        
-        # Negative limit
-        for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
-            for lim in [0, -1, -10, -1000]:
-                for off in [1, 10, 1000]:
-                    try:
-                        tensor_search.search(text=" ",
-                                            index_name=self.index_name_1, 
-                                            config=self.config, 
-                                            result_count=lim,
-                                            offset=off,
-                                            search_method=search_method)
-                        raise AssertionError
-                    except IllegalRequestedDocCount:
-                        pass
-
-        # Going over 10,000 for offset + limit
-        mock_environ = {EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: "10000"}
-        @mock.patch.dict(os.environ, {**os.environ, **mock_environ})
-        def run():
-            for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
-                try:
-                    tensor_search.search(search_method=search_method,
-                                        config=self.config, index_name=self.index_name_1, text=' ', 
-                                        result_count=10000,
-                                        offset=1)
-                    raise AssertionError
-                except IllegalRequestedDocCount:
-                    pass
-            
-            return True
-
-        assert run()
-
-    def test_pagination_multi_field_error(self):
-        # Try pagination with 0, 2, and 3 fields
-        # To be removed when multi-field pagination is added.
+    def test_empty_searchable_attributes(self):
+        # Result should be empty whether paginated or not.
         docs = [
             {
                 "field_a": 0,
@@ -1026,38 +933,11 @@ class TestVectorSearch(MarqoTestCase):
 
         tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
 
-        for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
-            try:
-                tensor_search.search(text=" ",
-                                    index_name=self.index_name_1, 
-                                    config=self.config, 
-                                    offset=1,
-                                    searchable_attributes=["field_a", "field_b"],
-                                    search_method=search_method)
-                raise AssertionError
-            except InvalidArgError:
-                pass
-        
-            try:
-                tensor_search.search(text=" ",
-                                    index_name=self.index_name_1, 
-                                    config=self.config, 
-                                    offset=1,
-                                    search_method=search_method)
-                raise AssertionError
-            except InvalidArgError:
-                pass
-            
-            try:
-                tensor_search.search(text=" ",
-                                    index_name=self.index_name_1, 
-                                    config=self.config, 
-                                    offset=1,
-                                    searchable_attributes=[],
-                                    search_method=search_method)
-                raise AssertionError
-            except InvalidArgError:
-                pass
+        res = tensor_search.search(
+            config=self.config, index_name=self.index_name_1, text="some text",
+            searchable_attributes=[], search_method="TENSOR"
+        )
+        assert res["hits"] == []
     
     def test_image_search_highlights(self):
         """does the URL get returned as the highlight? (it should - because no rerankers are being used)"""
@@ -1233,7 +1113,7 @@ class TestVectorSearch(MarqoTestCase):
                 query_dict = search_dicts[1]
 
                 query_vec = query_dict['query']['nested']['query']['knn'][
-                    f"{TensorField.chunks}.{utils.generate_vector_name('loc a')}"]['vector']
+                    f"{TensorField.chunks}.{TensorField.marqo_knn_field}"]['vector']
                 return query_vec
             # manually calculate weights:
             weighted_vectors =[]

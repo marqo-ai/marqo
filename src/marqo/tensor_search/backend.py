@@ -91,14 +91,7 @@ def add_customer_field_properties(config: Config, index_name: str,
         "properties": {
             enums.TensorField.chunks: {
                 "type": "nested",
-                "properties": {
-                    validation.validate_vector_name(
-                        utils.generate_vector_name(field_name[0])): {
-                        "type": "knn_vector",
-                        "dimension": model_properties["dimensions"],
-                        "method": existing_info.get_ann_parameters()
-                    } for field_name in knn_field_names
-                }
+                "properties": {}
             }
         }
     }
