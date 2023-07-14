@@ -150,9 +150,8 @@ for patch_method in patch_methods:
    
     response = client.create_index(index_name, settings_dict=settings)
     
-    # index the documents on the GPU using multiple processes
-    response = client.index(index_name).add_documents(documents, device='cuda', 
-                                server_batch_size=50, processes=2)
+    # index the documents on the GPU 
+    response = client.index(index_name).add_documents(documents, device='cuda', client_batch_size=50)
 ```
 
 If no GPU is available, set device='cpu'. 

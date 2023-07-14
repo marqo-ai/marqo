@@ -34,6 +34,9 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         raise
     except:
+        print('Creating index')
+        mq.create_index(DOC_INDEX_NAME)
+
         print('Indexing documents')
         mq.index(DOC_INDEX_NAME).add_documents(MARQO_DOCUMENTS)
         print('Done')
