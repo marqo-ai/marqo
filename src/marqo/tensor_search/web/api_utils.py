@@ -166,8 +166,14 @@ def add_docs_params_orchestrator(index_name: str, body: Union[AddDocsBodyParams,
         model_auth = body.modelAuth
         image_download_headers = body.imageDownloadHeaders
 
-        if non_tensor_fields and tensor_fields:
-            raise BadRequestError('Cannot provide nonTensorFields when tensorFields is defined.')
+        if tensor_fields and non_tensor_fields:
+            raise BadRequestError('Cannot provide nonTensorFields when tensorFields is defined. '
+                                  'nonTensorFields has been deprecated and will be removed in Marqo 2.0.0. '
+                                  'Its use is discouraged.')
+
+        if not tensor_fields and not non_tensor_fields:
+            raise BadRequestError('You must include the tensorFields parameter. '
+                                  'Use tensorFields=[] to index for lexical-only search.')
 
         return AddDocsParams(
             index_name=index_name, docs=docs, auto_refresh=auto_refresh,
