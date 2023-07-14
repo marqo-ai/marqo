@@ -38,7 +38,6 @@ class TestAddDocuments(MarqoTestCase):
 
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
 
-
     def tearDown(self) -> None:
         self.index_name_1 = "my-test-index-1"
         self.index_name_2 = "my-test-index-2"
@@ -733,6 +732,18 @@ class TestAddDocuments(MarqoTestCase):
         assert "Title" not in resp[enums.TensorField.tensor_facets][0]
         assert "Description" in resp[enums.TensorField.tensor_facets][0]
 
+    def test_add_document_with_tensor_fields(self):
+        docs_ = [{"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}]
+        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+            index_name=self.index_name_1, docs=docs_, auto_refresh=True, tensor_fields=['Title'], non_tensor_fields=None, device="cpu"
+        ))
+        resp = tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="789", show_vectors=True)
+
+        assert len(resp[enums.TensorField.tensor_facets]) == 1
+        assert enums.TensorField.embedding in resp[enums.TensorField.tensor_facets][0]
+        assert "Title" in resp[enums.TensorField.tensor_facets][0]
+        assert "Description" not in resp[enums.TensorField.tensor_facets][0]
+
     def test_doc_too_large(self):
         max_size = 400000
         mock_environ = {enums.EnvVars.MARQO_MAX_DOC_BYTES: str(max_size)}
@@ -1141,3 +1152,53 @@ class TestAddDocuments(MarqoTestCase):
             assert len(expected_repo_structure) == len(image_repo)
             for k in expected_repo_structure:
                 assert isinstance(image_repo[k], expected_repo_structure[k])
+
+    def test_params_validation_tensors_and_nontensors(self):
+        with pytest.raises(InternalError):
+            AddDocsParams(
+                docs=[],
+                index_name="my_index",
+                auto_refresh=True,
+                tensor_fields=["field1"],
+                non_tensor_fields=["field2"]
+            )
+
+        with pytest.raises(InternalError):
+            AddDocsParams(
+                docs=[],
+                index_name="my_index",
+                auto_refresh=True,
+                tensor_fields=["field1"],
+                # non_tensor_fields defaults to []
+            )
+
+    def test_params_validation_no_tensors_no_nontensors(self):
+        with pytest.raises(InternalError):
+            AddDocsParams(
+                docs=[],
+                index_name="my_index",
+                auto_refresh=True,
+                tensor_fields=None,
+                non_tensor_fields=None
+            )
+
+    def test_params_validation_default(self):
+        params = AddDocsParams(
+            docs=[],
+            index_name="my_index",
+            auto_refresh=True
+        )
+
+        assert params.tensor_fields is None
+        assert params.non_tensor_fields == []
+
+    def test_params_validation_non_tensor_fields_only(self):
+        params = AddDocsParams(
+            docs=[],
+            index_name="my_index",
+            auto_refresh=True,
+            non_tensor_fields=["field1", "field2"]
+        )
+
+        assert params.tensor_fields is None
+        assert params.non_tensor_fields == ["field1", "field2"]
