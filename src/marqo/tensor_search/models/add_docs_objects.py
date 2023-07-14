@@ -62,8 +62,8 @@ class AddDocsParams(BaseModel):
     index_name: str
     auto_refresh: bool
     device: Optional[str]
-    non_tensor_fields: Optional[List] = Field(default_factory=None)
-    tensor_fields: Optional[List] = Field(default_factory=list)
+    non_tensor_fields: Optional[List] = Field(default_factory=list)
+    tensor_fields: Optional[List] = Field(default_factory=None)
     image_download_thread_count: int = 20
     image_download_headers: dict = Field(default_factory=dict)
     use_existing_tensors: bool = False
