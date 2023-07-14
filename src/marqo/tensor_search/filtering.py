@@ -132,7 +132,7 @@ def contextualise_user_filter(filter_string: Optional[str], simple_properties: t
                         # if so, add the chunk prefix the start of the field name
                         contextualised_filter = contextualised_filter[:i] + f"{enums.TensorField.chunks}." + contextualised_filter[i:]
                         # skip checking the newly inserted part
-                        i += len("chunk_prefix_")  
+                        i += len(f"{enums.TensorField.chunks}.")  
                 i += 1
 
     return contextualised_filter
