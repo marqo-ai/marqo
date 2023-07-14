@@ -41,9 +41,6 @@ def threaded_download_images(allocated_docs: List[dict], image_repo: dict, tenso
         None
     """
 
-    if tensor_fields and non_tensor_fields or not (tensor_fields or non_tensor_fields):
-        raise errors.InternalError("Exactly one of tensor_fields or non_tensor_fields must be provided.")
-
     # Generate pseudo-unique ID for thread metrics.
     _id = hash("".join([d.get("_id", str(random.getrandbits(64))) for d in allocated_docs])) % 1000
     _id = f"image_download.{_id}"
@@ -53,7 +50,7 @@ def threaded_download_images(allocated_docs: List[dict], image_repo: dict, tenso
         RequestMetricsStore.set_in_request(metrics=metric_obj)
 
     def is_non_tensor_field(f: str) -> bool:
-        if tensor_fields:
+        if tensor_fields is not None:
             return f not in tensor_fields
         else:
             return f in non_tensor_fields

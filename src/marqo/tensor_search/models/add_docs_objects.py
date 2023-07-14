@@ -7,7 +7,7 @@ from typing import List
 from marqo.tensor_search.utils import read_env_vars_and_defaults
 from marqo.tensor_search.enums import EnvVars
 from marqo.errors import InternalError
-from pydantic import BaseModel
+from pydantic import BaseModel, root_validator
 from marqo.tensor_search.utils import get_best_available_device
 from typing import List, Dict
 
@@ -62,13 +62,23 @@ class AddDocsParams(BaseModel):
     index_name: str
     auto_refresh: bool
     device: Optional[str]
-    non_tensor_fields: List = Field(default_factory=list)
-    tensor_fields: List = Field(default_factory=list)
+    non_tensor_fields: Optional[List] = Field(default_factory=None)
+    tensor_fields: Optional[List] = Field(default_factory=list)
     image_download_thread_count: int = 20
     image_download_headers: dict = Field(default_factory=dict)
     use_existing_tensors: bool = False
     mappings: Optional[dict] = None
     model_auth: Optional[ModelAuth] = None
+
+    @root_validator
+    def validate_fields(cls, values):
+        field1 = values.get('tensor_fields')
+        field2 = values.get('non_tensor_fields')
+
+        if (field1 is None and field2 is None) or (field1 is not None and field2 is not None):
+            raise InternalError("Exactly one of tensor_fields or non_tensor_fields must be provided.")
+
+        return values
 
     def __init__(self, **data: Any):
         # Ensure `None` and passing nothing are treated the same for device

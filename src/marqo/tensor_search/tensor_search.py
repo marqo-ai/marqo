@@ -264,10 +264,6 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
     """
     # ADD DOCS TIMER-LOGGER (3)
 
-    if add_docs_params.tensor_fields and add_docs_params.non_tensor_fields \
-            or not (add_docs_params.tensor_fields or add_docs_params.non_tensor_fields):
-        raise errors.InternalError("Exactly one of tensor_fields or non_tensor_fields must be provided.")
-
     RequestMetricsStore.for_request().start("add_documents.processing_before_opensearch")
     start_time_3 = timer()
 
@@ -311,8 +307,10 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
             )
         ):
             image_repo = add_docs.download_images(docs=add_docs_params.docs, thread_count=20,
-                                                  tensor_fields=tuple(add_docs_params.tensor_fields),
-                                                  non_tensor_fields=tuple(add_docs_params.non_tensor_fields),
+                                                  tensor_fields=tuple(add_docs_params.tensor_fields)
+                                                  if add_docs_params.tensor_fields is not None else None,
+                                                  non_tensor_fields=tuple(add_docs_params.non_tensor_fields)
+                                                  if add_docs_params.non_tensor_fields is not None else None,
                                                   image_download_headers=add_docs_params.image_download_headers)
 
     if add_docs_params.use_existing_tensors:
@@ -376,7 +374,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
             chunk_values_for_filtering[key] = value
 
         def is_non_tensor_field(field: str) -> bool:
-            if add_docs_params.tensor_fields:
+            if add_docs_params.tensor_fields is not None:
                 return field not in add_docs_params.tensor_fields
             else:
                 return field in add_docs_params.non_tensor_fields
@@ -544,7 +542,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                         # TODO: we may want to use chunks_to_append here to make it uniform with use_existing_tensors and normal vectorisation
                         chunks.append({**combo_chunk, **chunk_values_for_filtering})
                         continue
-            
+
             # Add chunks_to_append along with doc metadata to total chunks
             for chunk in chunks_to_append:
                 chunks.append({**chunk, **chunk_values_for_filtering})
@@ -1180,7 +1178,7 @@ def get_vector_properties_to_search(searchable_attributes: Union[None, List[str]
         properties_to_search = list(searchable_attributes_as_vectors.intersection(
             index_info.get_vector_properties().keys()
         ))
-    
+
     # Validation for offset (pagination is single field) if offset not provided, validation is not run.
     if len(properties_to_search) != 1 and offset > 0:
         human_readable_vector_properties = [v.replace(TensorField.vector_prefix, '') for v in
@@ -1355,7 +1353,7 @@ def create_vector_jobs(queries: List[BulkSearchQueryEntity], config: Config, dev
         # split images from text:
         to_be_vectorised: Tuple[List[str], List[str]] = construct_vector_input_batches(q.q, index_info)
         qidx_to_job[i] = assign_query_to_vector_job(q, jobs, to_be_vectorised, index_info, device)
-    
+
     return qidx_to_job, jobs
 
 
@@ -1535,7 +1533,7 @@ def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity
 
     if not device:
         raise errors.InternalError("_bulk_vector_text_search cannot be called without `device`!")
-    
+
     with RequestMetricsStore.for_request().time("bulk_search.vector.processing_before_opensearch",
         lambda t : logger.debug(f"bulk search (tensor) pre-processing: took {t:.3f}ms")
     ):
@@ -1558,7 +1556,7 @@ def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity
         if not aggregate_body:
             # Must return empty response, per search query
             return create_empty_query_response(queries)
-    
+
     ## 5. POST aggregate  to /_msearch
     responses = bulk_msearch(config, aggregate_body)
 
@@ -1600,7 +1598,7 @@ def create_bulk_search_response(queries: List[BulkSearchQueryEntity], query_to_b
 def _vector_text_search(
         config: Config, index_name: str, query: Union[str, dict], result_count: int = 5, offset: int = 0,
         searchable_attributes: Iterable[str] = None, verbose=0, filter_string: str = None, device: str = None,
-        attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None, 
+        attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None,
         image_download_headers: Optional[Dict] = None, context: Optional[Dict] = None,
         score_modifiers: Optional[ScoreModifier] = None, model_auth: Optional[ModelAuth] = None):
     """
