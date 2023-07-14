@@ -11,7 +11,7 @@ from unittest.mock import patch, MagicMock
 
 
 class TestFiltering(unittest.TestCase):
-    def test_contextualise_user_filter(self):
+    def test_add_chunks_prefix_to_filter_string_fields(self):
         expected_mappings = [
             (   # multiple fields with no spaces
                 "(an_int:[0 TO 30] AND an_int:2) AND abc:(some text)",
@@ -63,7 +63,6 @@ class TestFiltering(unittest.TestCase):
                 ["field_a", "another_field_a"],
                 f"{enums.TensorField.chunks}.field_a:a AND {enums.TensorField.chunks}.another_field_a:b"
             ),
-            # we may need to make out own tokenizer to fix this edge case.
             (   # field is not at start and is ending substring of another field with space or parenthesis before it
                 "random:random OR field_a:a AND another\\ field_a:b",
                 ["field_a", "another field_a"],
@@ -100,6 +99,12 @@ class TestFiltering(unittest.TestCase):
                 ["field_a"],
                 f"{enums.TensorField.chunks}.field_a:field_a"
             ),
+            (
+                # nested parenthesis
+                "(field_a:(inner_a AND inner_b) OR field_b:outer_b) AND field_c:c", 
+                ["field_a", "field_b", "field_c"], 
+                f"({enums.TensorField.chunks}.field_a:(inner_a AND inner_b) OR {enums.TensorField.chunks}.field_b:outer_b) AND {enums.TensorField.chunks}.field_c:c"
+            ),
             (   # None filter string
                 None,
                 ["random_field_1", "random_field_2"],
@@ -109,14 +114,24 @@ class TestFiltering(unittest.TestCase):
                 "",
                 ["random_field_1", "random_field_2"],
                 ""
+            ),
+            (   # empty properties
+                "random_field_1:random AND random_field_2:random",
+                [],
+                "random_field_1:random AND random_field_2:random"
+            ),
+            (   # empty both
+                "",
+                [],
+                ""
             )
         ]
         for given_filter_string, given_simple_properties, expected in expected_mappings:
-            contextualised_user_filter = filtering.contextualise_user_filter(
+            prefixed_filter_string = filtering.add_chunks_prefix_to_filter_string_fields(
                 filter_string=given_filter_string,
                 simple_properties=given_simple_properties,
             )
-            assert expected == contextualised_user_filter
+            assert expected == prefixed_filter_string
 
     def test_build_searchable_attributes_filter(self):
         expected_mappings = [
@@ -249,7 +264,7 @@ class TestFiltering(unittest.TestCase):
                 "filter_string": "abc:(some text)",     # chunks prefix will NOT be added
                 "simple_properties": None,
                 "searchable_attributes": ["def"],
-                "expected": f"({enums.TensorField.chunks}.{enums.TensorField.field_name}:(def)) AND (abc:(some text))"
+                "expected": errors.InternalError
             },
             { # empty all
                 "filter_string": "",
@@ -259,12 +274,16 @@ class TestFiltering(unittest.TestCase):
             }
         )
         for case in test_cases:
-            tensor_search_filter = filtering.build_tensor_search_filter(
-                filter_string=case["filter_string"],
-                simple_properties=case["simple_properties"],
-                searchable_attribs=case["searchable_attributes"]
-            )
-            assert case["expected"] == tensor_search_filter
+            try:
+                tensor_search_filter = filtering.build_tensor_search_filter(
+                    filter_string=case["filter_string"],
+                    simple_properties=case["simple_properties"],
+                    searchable_attribs=case["searchable_attributes"]
+                )
+                assert case["expected"] == tensor_search_filter
+            except case["expected"]:
+                # expected will be a specific error, if the case should fail
+                pass
 
     def test_sanitise_lucene_special_chars(self):
         expected_mappings = [
@@ -280,69 +299,3 @@ class TestFiltering(unittest.TestCase):
             assert expected == filtering.sanitise_lucene_special_chars(
                 given
             )
-"""
-    def test_add_chunks_prefix_to_filter_string(self):
-        # No more simple_properties, should add prefix to every field it finds
-        expected_mappings = [
-            (   # multiple fields with no spaces
-                "(an_int:[0 TO 30] AND an_int:2) AND abc:(some text)",
-                f"({enums.TensorField.chunks}.an_int:[0 TO 30] AND {enums.TensorField.chunks}.an_int:2) AND {enums.TensorField.chunks}.abc:(some text)"
-            ),
-            (   # fields with spaces
-                "spaced\\ int:[0 TO 30]",
-                f"{enums.TensorField.chunks}.spaced\\ int:[0 TO 30]"
-            ),
-            (   # fields with special chars
-                "field\\&&\\||withspecialchars:(random \\+value)",
-                f"{enums.TensorField.chunks}.field\\&&\\||withspecialchars:(random \\+value)"
-            ),
-            (   # field name at start
-                "field_field_field:foo",
-                f"{enums.TensorField.chunks}.field_field_field:foo"
-            ),
-            (   # field name at start and has : in it
-                "field\\:a:a",
-                f"{enums.TensorField.chunks}.field\\:a:a"
-            ),
-            (   # field is at start and is ending substring of another field
-                "field_a:a AND another_field_a:b",
-                f"{enums.TensorField.chunks}.field_a:a AND {enums.TensorField.chunks}.another_field_a:b"
-            ),
-            # we may need to make out own tokenizer to fix this edge case.
-            (   # field is not at start and is ending substring of another field with space or parenthesis before it
-                "random:random OR field_a:a AND another\\ field_a:b",
-                f"{enums.TensorField.chunks}.random:random OR {enums.TensorField.chunks}.field_a:a AND {enums.TensorField.chunks}.another\\ field_a:b"
-            ),
-            (   # field name in the middle and has : in it
-                "random:random OR field\\:a:a",
-                f"{enums.TensorField.chunks}.random:random OR {enums.TensorField.chunks}.field\\:a:a"
-            ),
-            (   # field appears multiple times in filter string
-                "field_a:a AND field_b:b OR (field_a:c OR field_a:d)",
-                f"{enums.TensorField.chunks}.field_a:a AND {enums.TensorField.chunks}.field_b:b OR ({enums.TensorField.chunks}.field_a:c OR {enums.TensorField.chunks}.field_a:d)"
-            ),
-            (   # field is substring of another field
-                "field_a:a AND field_a_another:b",
-                f"{enums.TensorField.chunks}.field_a:a AND {enums.TensorField.chunks}.field_a_another:b"
-            ),
-            (   # content has field name in it
-                "field_a:field_a",
-                ["field_a"],
-                f"{enums.TensorField.chunks}.field_a:field_a"
-            ),
-            (   # None filter string
-                None,
-                ""
-            ),
-            (   # empty filter string
-                "",
-                ""
-            )
-        ]
-        TEST_LIM = 3
-        for given_filter_string, expected in expected_mappings[:TEST_LIM]:
-            contextualised_user_filter = filtering.add_chunks_prefix_to_filter_string(
-                filter_string=given_filter_string,
-            )
-            assert expected == contextualised_user_filter
-"""
