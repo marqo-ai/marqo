@@ -94,10 +94,15 @@ class TestFiltering(unittest.TestCase):
                 ["field_b"],
                 f"field_a:a AND ({enums.TensorField.chunks}.field_b:b OR field_c:c)"
             ),
-            (   # content has field name in it
+            (   # content has field name with space before it in it
                 "field_a:field_a",
                 ["field_a"],
                 f"{enums.TensorField.chunks}.field_a:field_a"
+            ),
+            (   # content has field name with space before it in it
+                "field_a:(field_a field_a)",
+                ["field_a"],
+                f"{enums.TensorField.chunks}.field_a:(field_a field_a)"
             ),
             (
                 # nested parenthesis

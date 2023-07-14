@@ -109,13 +109,15 @@ def add_chunks_prefix_to_filter_string_fields(filter_string: Optional[str], simp
     for field in simple_properties:
         escaped_field_name = sanitise_lucene_special_chars(field)
         if escaped_field_name in filter_string:
+            # The field name MUST be followed by a colon.
+            escaped_field_name_with_colon = f'{escaped_field_name}:'
             # we want to replace the field name that directly corresponds to the simple property,
             # not any other field names that contain the simple property as a substring.
 
             # case 0: field name is at the start of the filter string
             # it must be followed by a colon, otherwise it is a substring of another field name
             # edge case example: "field_a_excess_chars:a, escaped_field_name=field_a"
-            if filter_string.startswith(escaped_field_name + ":"):
+            if filter_string.startswith(escaped_field_name_with_colon):
                 # add the chunk prefix ONCE to the start of the field name
                 prefixed_filter = f'{enums.TensorField.chunks}.{prefixed_filter}'
             
@@ -125,7 +127,7 @@ def add_chunks_prefix_to_filter_string_fields(filter_string: Optional[str], simp
             i = 0
             while i < len(prefixed_filter):
                 # find every occurence of the field name in the filter string
-                if prefixed_filter[i:i+len(escaped_field_name)] == escaped_field_name:
+                if prefixed_filter[i:i+len(escaped_field_name_with_colon)] == escaped_field_name_with_colon:
                     # check if it is preceded by a space or an opening parenthesis
                     # also check that the preceding char is NOT escaped
                     if \
