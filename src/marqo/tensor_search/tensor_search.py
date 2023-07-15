@@ -94,7 +94,7 @@ def _get_dimension_from_model_properties(model_properties: dict):
         )
 
 
-def add_knn_field(ix_settings: dict):
+def _add_knn_field(ix_settings: dict):
     """
     This adds the OpenSearch knn field to the index's mappings
 
@@ -191,7 +191,7 @@ def create_vector_index(
     vector_index_settings["mappings"]["_meta"][NsField.index_settings] = the_index_settings
     vector_index_settings["mappings"]["_meta"]["model"] = model_name
 
-    vector_index_settings_with_knn = add_knn_field(ix_settings=vector_index_settings)
+    vector_index_settings_with_knn = _add_knn_field(ix_settings=vector_index_settings)
 
     logger.debug(f"Creating index {index_name} with settings: {vector_index_settings_with_knn}")
     response = HttpRequests(config).put(path=index_name, body=vector_index_settings_with_knn)
@@ -600,7 +600,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
         # the HttpRequest wrapper handles error logic
         update_mapping_response = backend.add_customer_field_properties(
             config=config, index_name=add_docs_params.index_name, customer_field_names=new_fields,
-            model_properties=index_info.get_model_properties(), multimodal_combination_fields=new_obj_fields)
+            multimodal_combination_fields=new_obj_fields)
 
         # ADD DOCS TIMER-LOGGER (5)
         start_time_5 = timer()

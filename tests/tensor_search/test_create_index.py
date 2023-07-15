@@ -631,7 +631,6 @@ class TestCreateIndex(MarqoTestCase):
             tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings=bad_settings)
             raise AssertionError
         except errors.InvalidArgError as e:
-            print(e)
             pass
     
     def test_custom_model_with_no_dimensions_fails(self):
@@ -653,7 +652,6 @@ class TestCreateIndex(MarqoTestCase):
             tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings=bad_settings)
             raise AssertionError
         except errors.InvalidArgError as e:
-            print(e)
             pass
     
     def test_custom_model_with_dimensions_wrong_type_fails(self):
@@ -676,7 +674,6 @@ class TestCreateIndex(MarqoTestCase):
             raise AssertionError
         # TODO: This 500 is fine as user sees their mistake, but we should change it to a 400 later.
         except errors.MarqoWebError as e:
-            print(e)
             pass
     
     def test_custom_model_with_bad_properties_fails_add_docs(self):
@@ -709,7 +706,6 @@ class TestCreateIndex(MarqoTestCase):
             )
             raise AssertionError
         except errors.MarqoWebError as e:
-            print(e)
             pass
     
     def _fill_in_test_model_data(self, test_model_data):
@@ -812,7 +808,25 @@ class TestCreateIndex(MarqoTestCase):
             # create raw index settings object
             index_settings_no_knn = self._fill_in_test_model_data(model_data)
             # add knn field
-            index_settings_with_knn = tensor_search.add_knn_field(index_settings_no_knn)
+            index_settings_with_knn = tensor_search._add_knn_field(index_settings_no_knn)
             # check that knn field was added
             assert index_settings_with_knn["mappings"]["properties"][TensorField.chunks]["properties"][TensorField.marqo_knn_field] \
                 == expected_knn_properties
+    
+    def test_add_knn_field_failures(self):
+        test_cases = (
+            # custom model with no model properties
+            ({"model": "my-custom-model"}, 
+             errors.InvalidArgError),
+            # custom model with model properties but no dimensions
+            ({"model": "my-custom-model", "model_properties": {"url": "https://www.random.com", "type": "open_clip"}},
+             errors.InvalidArgError),
+        )
+
+        for model_data, error_type in test_cases:
+            try:
+                index_settings_no_knn = self._fill_in_test_model_data(model_data)
+                tensor_search._add_knn_field(index_settings_no_knn)
+                raise AssertionError
+            except error_type:
+                pass

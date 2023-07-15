@@ -62,7 +62,7 @@ def get_index_info(config: Config, index_name: str) -> IndexInfo:
 
 def add_customer_field_properties(config: Config, index_name: str,
                                   customer_field_names: Iterable[Tuple[str, enums.OpenSearchDataType]],
-                                  model_properties: dict, multimodal_combination_fields: Dict[str, Iterable[Tuple[str, enums.OpenSearchDataType]]]):
+                                  multimodal_combination_fields: Dict[str, Iterable[Tuple[str, enums.OpenSearchDataType]]]):
     """Adds new customer fields to index mapping.
 
     Pushes the updated mapping to OpenSearch, and updates the local cache.
@@ -79,13 +79,6 @@ def add_customer_field_properties(config: Config, index_name: str,
         HTTP Response
     """
     existing_info = get_cached_index_info(config=config, index_name=index_name)
-
-    # check if there is multimodal fie;ds and convert the fields name to a list with the same
-    # format of customer_field_names
-    knn_field_names = copy.deepcopy(customer_field_names)
-    if len(multimodal_combination_fields) > 0:
-        multimodal_customer_field_names = set([(field_name, "_") for field_name in list(multimodal_combination_fields)])
-        knn_field_names = knn_field_names.union(multimodal_customer_field_names)
 
     body = {
         "properties": {
@@ -138,7 +131,6 @@ def add_customer_field_properties(config: Config, index_name: str,
         new_index_properties[validation.validate_field_name(new_prop)] = {
             "type": type_to_set
         }
-
 
     for multimodal_field, child_fields in multimodal_combination_fields.items():
         # update the new multimodal_field if it's not in it
