@@ -10,7 +10,7 @@ from marqo.s2_inference import errors as s2_inference_errors
 
 # For use outside of this module
 def get_model_properties_from_index_defaults(index_defaults: Dict, model_name: str):
-    """ Gets model_properties from index defaults if available
+    """ Gets model_properties from index defaults if available. Otherwise, it attempts to get it from the model registry.
     """
     try:
         model_properties = index_defaults[NsField.model_properties]
@@ -57,15 +57,16 @@ class IndexInfo(NamedTuple):
         This returns more than just pure text fields. For example: ints
         bool fields.
 
+        
+        NOTE: get_text_properties will flatten the object properties
+        Example: left-text_properties   right-true_text_properties
+        {'Description': {'type': 'text'},                                                         {'Description': {'type': 'text'},
+         'Genre': {'type': 'text'},                                                                'Genre': {'type': 'text'},
+         'Title': {'type': 'text'},                                                                'Title': {'type': 'text'},
+         'my_combination_field': {'properties': {'lexical_field': {'type': 'text'}, ----->         'my_combination_field.lexical_field': {'type': 'text'},
+                                                 'my_image': {'type': 'text'},                     'my_combination_field.my_image': {'type': 'text'},
+                                                 'some_text': {'type': 'text'}}}}                   'my_combination_field.some_text': {'type': 'text'}}
         """
-        # get_text_properties will flatten the object properties
-        # Example: left-text_properties   right-true_text_properties
-        # {'Description': {'type': 'text'},                                                         {'Description': {'type': 'text'},
-        #  'Genre': {'type': 'text'},                                                                'Genre': {'type': 'text'},
-        #  'Title': {'type': 'text'},                                                                'Title': {'type': 'text'},
-        #  'my_combination_field': {'properties': {'lexical_field': {'type': 'text'}, ----->         'my_combination_field.lexical_field': {'type': 'text'},
-        #                                          'my_image': {'type': 'text'},                     'my_combination_field.my_image': {'type': 'text'},
-        #                                          'some_text': {'type': 'text'}}}}                   'my_combination_field.some_text': {'type': 'text'}}
 
         text_props_dict = {}
         for text_field, text_props in self.properties.items():
