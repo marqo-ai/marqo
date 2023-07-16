@@ -2577,7 +2577,7 @@ class TestS3ModelAuthlLoadForHFModelVariants(MarqoTestCase):
             mock_s3_client.generate_presigned_url.return_value = "https://some_non_existent_model.pt"
 
             with unittest.mock.patch('marqo.s2_inference.s2_inference.vectorise',
-                                     side_effect=fake_vectorise) as mock_vectorise:
+                                     side_effect=fake_vectorise_384) as mock_vectorise:
                         tensor_search.bulk_search(
                             query=bulk_search_query,
                             marqo_config=self.config,

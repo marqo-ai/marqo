@@ -9,7 +9,7 @@ from marqo.errors import MarqoApiError, MarqoError, IndexNotFoundError
 from marqo.tensor_search import tensor_search, configs, backend
 from marqo.tensor_search.utils import read_env_vars_and_defaults
 from tests.marqo_test import MarqoTestCase
-from marqo.tensor_search.enums import IndexSettingsField as NsField
+from marqo.tensor_search.enums import IndexSettingsField as NsField, TensorField
 from unittest import mock
 from marqo.tensor_search.models.settings_object import settings_schema
 from marqo import errors
@@ -185,7 +185,7 @@ class TestCreateIndex(MarqoTestCase):
             url=self.endpoint + "/" + self.index_name_1 + "/_mapping",
             verify=False
         ).json()
-        params = mappings[self.index_name_1]['mappings']['properties']['__chunks']['properties']['__vector_Title']['method']
+        params = mappings[self.index_name_1]['mappings']['properties']['__chunks']['properties'][TensorField.marqo_knn_field]['method']
         assert params['engine'] == 'lucene'
         assert params['space_type'] == 'cosinesimil'
         assert params['parameters'] == {'ef_construction': 128, 'm': 16}
@@ -223,7 +223,7 @@ class TestCreateIndex(MarqoTestCase):
             url=self.endpoint + "/" + self.index_name_1 + "/_mapping",
             verify=False
         ).json()
-        params = mappings[self.index_name_1]['mappings']['properties']['__chunks']['properties']['__vector_Title']['method']
+        params = mappings[self.index_name_1]['mappings']['properties']['__chunks']['properties'][TensorField.marqo_knn_field]['method']
         assert params['engine'] == 'lucene'
         assert params['space_type'] == 'l2'
         assert params['parameters'] == {'ef_construction': 133, 'm': 17}
@@ -616,3 +616,217 @@ class TestCreateIndex(MarqoTestCase):
             "number_of_replicas": 1
         }
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings=good_settings)
+
+    def test_custom_model_with_no_model_properties_fails(self):
+        try:
+            tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+        except IndexNotFoundError:
+            pass
+        bad_settings = {
+            "index_defaults": {
+                "model": "my-custom-model",
+            },
+        }
+        try:
+            tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings=bad_settings)
+            raise AssertionError
+        except errors.InvalidArgError as e:
+            pass
+    
+    def test_custom_model_with_no_dimensions_fails(self):
+        try:
+            tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+        except IndexNotFoundError:
+            pass
+        bad_settings = {
+            "index_defaults": {
+                "model": "my-custom-model",
+                "model_properties": {
+                    "url": "https://www.random.com",
+                    "type": "open_clip"
+                    # no dimensions here
+                }
+            },
+        }
+        try:
+            tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings=bad_settings)
+            raise AssertionError
+        except errors.InvalidArgError as e:
+            pass
+    
+    def test_custom_model_with_dimensions_wrong_type_fails(self):
+        try:
+            tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+        except IndexNotFoundError:
+            pass
+        bad_settings = {
+            "index_defaults": {
+                "model": "my-custom-model",
+                "model_properties": {
+                    "url": "https://www.random.com",
+                    "type": "open_clip",
+                    "dimensions": "BAD DATATYPE!! should be int."
+                }
+            },
+        }
+        try:
+            tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings=bad_settings)
+            raise AssertionError
+        # TODO: This 500 is fine as user sees their mistake, but we should change it to a 400 later.
+        except errors.MarqoWebError as e:
+            pass
+    
+    def test_custom_model_with_bad_properties_fails_add_docs(self):
+        try:
+            tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+        except IndexNotFoundError:
+            pass
+        bad_settings = {
+            "index_defaults": {
+                "model": "my-custom-model",
+                "model_properties": {
+                    "url": "https://www.random.com",
+                    "type": "open_clip",
+                    "dimensions": 123  # random number, should be 512
+                }
+            },
+        }
+        
+        # creating index should work fine
+        # but when you add docs, it fails (when trying to load the model)
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings=bad_settings)
+        docs = [
+            {"f1": "water is healthy", "f5": True},
+            {"f2": 49, "f3": 400.4, "f4": "alien message", "_id": "rkjn"}
+        ]
+        try:
+            tensor_search.add_documents(
+                add_docs_params=AddDocsParams(index_name=self.index_name_1, docs=docs, auto_refresh=True, device="cpu"),
+                config=self.config
+            )
+            raise AssertionError
+        except errors.MarqoWebError as e:
+            pass
+    
+    def _fill_in_test_model_data(self, test_model_data):
+        """
+        Helper function to fill in test model data with index defaults
+        Returns index settings object with no knn field
+        """
+        return {
+            'settings': {
+                'index': {
+                    'knn': True, 
+                    'knn.algo_param.ef_search': 100, 
+                    'refresh_interval': '1s', 
+                    'store.hybrid.mmap.extensions': ['nvd', 'dvd', 'tim', 'tip', 'dim', 'kdd', 'kdi', 'cfs', 'doc', 'vec', 'vex']
+                }, 
+                'number_of_shards': 5, 
+                'number_of_replicas': 1
+            }, 
+            'mappings': {
+                '_meta': {
+                    'media_type': 'text', 
+                    'index_settings': {
+                        'index_defaults': {
+                            'treat_urls_and_pointers_as_images': False, 
+                            **test_model_data,  # has model and possibly model_properties
+                            'normalize_embeddings': True, 
+                            'text_preprocessing': {
+                                'split_length': 2, 
+                                'split_overlap': 0, 
+                                'split_method': 'sentence'
+                            }, 
+                            'image_preprocessing': {'patch_method': None}, 
+                            'ann_parameters': {
+                                'name': 'hnsw', 
+                                'space_type': 'cosinesimil', 
+                                'engine': 'lucene', 
+                                'parameters': {'ef_construction': 128, 'm': 16}
+                            }
+                        }, 
+                        'number_of_shards': 5, 
+                        'number_of_replicas': 1
+                    }, 
+                    'model': 'hf/all_datasets_v4_MiniLM-L6'
+                }, 
+                'dynamic_templates': [{
+                    'strings': {
+                        'match_mapping_type': 'string', 
+                        'mapping': {'type': 'text'}
+                    }
+                }], 
+                'properties': {
+                    '__chunks': {
+                        'type': 'nested', 
+                        'properties': {
+                            '__field_name': {'type': 'keyword'}, 
+                            '__field_content': {'type': 'text'}
+                        }
+                    }
+                }
+            }
+        }
+
+    def test_add_knn_field(self):
+        """
+        Tests helper function to add OpenSearch KNN Field to index mappings
+        """
+        test_cases = (
+            # format: (model_data, expected_knn_properties)
+            # model in registry
+            (
+                {"model": "hf/all_datasets_v4_MiniLM-L6"}, 
+                {
+                    'type': 'knn_vector', 
+                    'dimension': 384, 
+                    'method': {
+                        'name': 'hnsw', 
+                        'space_type': 'cosinesimil', 
+                        'engine': 'lucene', 
+                        'parameters': {'ef_construction': 128, 'm': 16}
+                    }
+                }
+            ),
+            # custom model
+            (
+                {"model": "my-custom-model", "model_properties": {"url": "https://www.random.com", "type": "open_clip", "dimensions": 512}},
+                {
+                    'type': 'knn_vector', 
+                    'dimension': 512,   # dimension should match custom model properties
+                    'method': {
+                        'name': 'hnsw', 
+                        'space_type': 'cosinesimil', 
+                        'engine': 'lucene', 
+                        'parameters': {'ef_construction': 128, 'm': 16}
+                    }
+                }
+            )
+        )
+
+        for model_data, expected_knn_properties in test_cases:
+            # create raw index settings object
+            index_settings_no_knn = self._fill_in_test_model_data(model_data)
+            # add knn field
+            index_settings_with_knn = tensor_search._add_knn_field(index_settings_no_knn)
+            # check that knn field was added
+            assert index_settings_with_knn["mappings"]["properties"][TensorField.chunks]["properties"][TensorField.marqo_knn_field] \
+                == expected_knn_properties
+    
+    def test_add_knn_field_failures(self):
+        test_cases = (
+            # custom model with no model properties
+            ({"model": "my-custom-model"}, 
+             errors.InvalidArgError),
+            # custom model with model properties but no dimensions
+            ({"model": "my-custom-model", "model_properties": {"url": "https://www.random.com", "type": "open_clip"}},
+             errors.InvalidArgError),
+        )
+
+        for model_data, error_type in test_cases:
+            try:
+                index_settings_no_knn = self._fill_in_test_model_data(model_data)
+                tensor_search._add_knn_field(index_settings_no_knn)
+                raise AssertionError
+            except error_type:
+                pass
