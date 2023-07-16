@@ -23,8 +23,8 @@ class AddDocsBodyParams(BaseModel):
         allow_mutation = False
         extra = "forbid" # Raise error on unknown fields
 
-    nonTensorFields: List = Field(default_factory=list)
-    tensorFields: List = Field(default_factory=list)
+    nonTensorFields: List = None
+    tensorFields: List = None
     useExistingTensors: bool = False
     imageDownloadHeaders: dict = Field(default_factory=dict)
     modelAuth: Optional[ModelAuth] = None
@@ -75,8 +75,10 @@ class AddDocsParams(BaseModel):
         field1 = values.get('tensor_fields')
         field2 = values.get('non_tensor_fields')
 
-        if (field1 is None and field2 is None) or (field1 is not None and field2 is not None):
-            raise InternalError("Exactly one of tensor_fields or non_tensor_fields must be provided.")
+        if field1 is not None and field2 is not None:
+            raise InternalError("Only one of `tensor_fields` or `non_tensor_fields` can be provided.")
+        if field1 is None and field2 is None:
+            raise InternalError("Exactly one of `tensor_fields` or `non_tensor_fields` must be provided.")
 
         return values
 
