@@ -6,6 +6,7 @@ from marqo.tensor_search import add_docs
 from marqo.s2_inference.s2_inference import vectorise
 from marqo.s2_inference.clip_utils import load_image_from_path
 from marqo.tensor_search import tensor_search, index_meta_cache, backend
+from marqo.tensor_search.enums import TensorField
 from marqo.errors import IndexNotFoundError, InvalidArgError, BadRequestError
 
 
@@ -366,7 +367,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
                 if ch["__field_name"] == vector_field:
                     found_vector_field = True
                     assert ch['__field_content'] == use_existing_tensor_doc[vector_field]
-                    assert isinstance(ch[f"__vector_{vector_field}"], list)
+                assert isinstance(ch[TensorField.marqo_knn_field], list)
             assert found_vector_field
 
     def test_use_existing_tensors_check_meta_data_mappings(self):
@@ -410,8 +411,8 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
             assert index_info.properties[text_field]['type'] == 'text'
             assert index_info.properties['__chunks']['properties'][text_field]['type'] == 'keyword'
 
-        for vector_field in ["title 1", "my new field", "modded field"]:
-            assert index_info.properties['__chunks']['properties'][f"__vector_{vector_field}"]['type'] == 'knn_vector'
+        # Only 1 tensor field
+        assert index_info.properties['__chunks']['properties'][TensorField.marqo_knn_field]['type'] == 'knn_vector'
 
         for field_name, os_type in [('fl', "float"), ('new_bool', "boolean")]:
             assert index_info.properties[field_name]['type'] == os_type
@@ -505,7 +506,8 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
                     if ch["__field_name"] == vector_field:
                         found_vector_field = True
                         assert ch['__field_content'] == use_existing_tensor_doc[vector_field]
-                        assert isinstance(ch[f"__vector_{vector_field}"], list)
+                    # Only 1 tensor field
+                    assert isinstance(ch[TensorField.marqo_knn_field], list)
                 assert found_vector_field
 
             expected_text_chunks = {

@@ -36,16 +36,6 @@ class TestUtils(unittest.TestCase):
             url_base="https://localhost:9200", username="", password=""
         )
 
-    def test_contextualise_filter(self):
-        expected_mappings = [
-            ("(an_int:[0 TO 30] and an_int:2) AND abc:(some text)",
-             f"({enums.TensorField.chunks}.an_int:[0 TO 30] and {enums.TensorField.chunks}.an_int:2) AND {enums.TensorField.chunks}.abc:(some text)")
-        ]
-        for given, expected in expected_mappings:
-            assert expected == utils.contextualise_filter(
-                given, simple_properties=["an_int", "abc"]
-            )
-
     def test_check_device_is_available(self):
         mock_cuda_is_available = mock.MagicMock()
         mock_cuda_device_count = mock.MagicMock()

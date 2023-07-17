@@ -5,7 +5,7 @@ import json
 from timeit import default_timer as timer
 import torch
 from marqo import errors
-from marqo.tensor_search import enums, configs
+from marqo.tensor_search import enums, configs, constants
 from typing import (
     List, Optional, Union, Callable, Iterable, Sequence, Dict, Tuple
 )
@@ -88,32 +88,6 @@ def construct_authorized_url(url_base: str, username: str, password: str) -> str
         raise errors.MarqoError(f"Could not parse url: {url_base}")
     http_part, domain_part = url_split
     return f"{http_part}{http_sep}{username}:{password}@{domain_part}"
-
-
-def contextualise_filter(filter_string: Optional[str], simple_properties: typing.Iterable) -> str:
-    """adds the chunk prefix to the start of properties found in simple string
-
-    This allows for filtering within chunks.
-
-    Args:
-        filter_string:
-        simple_properties: simple properties of an index (such as text or floats
-            and bools)
-
-    Returns:
-        a string where the properties are referenced as children of a chunk.
-    """
-    if filter_string is None:
-        return ''
-    contextualised_filter = filter_string
-    for field in simple_properties:
-        if ' ' in field:
-            field_with_escaped_space = field.replace(' ', r'\ ') # monitor this: fixed the invalid escape sequence (Deprecation warning).
-            contextualised_filter = contextualised_filter.replace(f'{field_with_escaped_space}:', f'{enums.TensorField.chunks}.{field_with_escaped_space}:')
-        else:
-            contextualised_filter = contextualised_filter.replace(f'{field}:', f'{enums.TensorField.chunks}.{field}:')
-    return contextualised_filter
-
 
 def check_device_is_available(device: str) -> bool:
     """Checks if a device is available on the machine
