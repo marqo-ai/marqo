@@ -57,7 +57,7 @@ class IndexInfo(NamedTuple):
         This returns more than just pure text fields. For example: ints
         bool fields.
 
-        
+
         NOTE: get_text_properties will flatten the object properties
         Example: left-text_properties   right-true_text_properties
         {'Description': {'type': 'text'},                                                         {'Description': {'type': 'text'},
