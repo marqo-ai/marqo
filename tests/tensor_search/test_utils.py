@@ -372,3 +372,29 @@ class TestUtils(unittest.TestCase):
             raise AssertionError
         except ValueError as e:
             assert "must be greater than 0" in str(e)
+
+    def test_is_tensor_field_field_in_tensor_fields(self):
+        tensor_fields = ['field1', 'field2', 'field3']
+        result = utils.is_tensor_field('field1', tensor_fields=tensor_fields)
+        self.assertTrue(result)
+
+    def test_is_tensor_field_field_not_in_non_tensor_fields(self):
+        non_tensor_fields = ['field4', 'field5', 'field6']
+        result = utils.is_tensor_field('field1', non_tensor_fields=non_tensor_fields)
+        self.assertTrue(result)
+
+    def test_is_tensor_field_missing_both_fields(self):
+        with self.assertRaises(errors.InternalError):
+            utils.is_tensor_field('field1')
+
+    def test_is_tensor_field_providing_both_fields(self):
+        tensor_fields = ['field1', 'field2', 'field3']
+        non_tensor_fields = ['field4', 'field5', 'field6']
+        with self.assertRaises(errors.InternalError):
+            utils.is_tensor_field('field1', tensor_fields=tensor_fields, non_tensor_fields=non_tensor_fields)
+
+    def test_is_tensor_field_providing_one_empty(self):
+        tensor_fields = ['field1', 'field2', 'field3']
+        non_tensor_fields = []
+        with self.assertRaises(errors.InternalError):
+            utils.is_tensor_field('field1', tensor_fields=tensor_fields, non_tensor_fields=non_tensor_fields)
