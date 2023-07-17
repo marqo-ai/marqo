@@ -9,6 +9,7 @@ import PIL
 from marqo.s2_inference import clip_utils
 from marqo.tensor_search.telemetry import RequestMetricsStore, RequestMetrics
 import marqo.errors as errors
+from marqo.tensor_search import utils
 
 
 def threaded_download_images(allocated_docs: List[dict], image_repo: dict, tensor_fields: Optional[Tuple],
@@ -57,16 +58,10 @@ def threaded_download_images(allocated_docs: List[dict], image_repo: dict, tenso
         metric_obj = RequestMetricsStore.for_request()
         RequestMetricsStore.set_in_request(metrics=metric_obj)
 
-    def is_non_tensor_field(f: str) -> bool:
-        if tensor_fields is not None:
-            return f not in tensor_fields
-        else:
-            return f in non_tensor_fields
-
     with metric_obj.time(f"{_id}.thread_time"):
         for doc in allocated_docs:
             for field in list(doc):
-                if is_non_tensor_field(field):
+                if not utils.is_tensor_field(field, list(tensor_fields), list(non_tensor_fields)):
                     continue
                 if isinstance(doc[field], str) and clip_utils._is_image(doc[field]):
                     if doc[field] in image_repo:

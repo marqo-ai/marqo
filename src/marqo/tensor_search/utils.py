@@ -259,7 +259,7 @@ def parse_lexical_query(text: str) -> Tuple[List[str], str]:
             if i > 0 and text[i-1] == '\\':
                 # Read quote literally. Backslash should be ignored (both blob and required)
                 pass
-            
+
             # Check if CLOSING QUOTE
             # Closing " must have space on the right (or is last character) while opening exists.
             elif (opening_quote_idx is not None) and (i == len(text) - 1 or text[i+1] == " "):
@@ -361,3 +361,17 @@ def get_best_available_device() -> str:
                            f"Invalid device: {device}. Must be either 'cpu' or start with 'cuda'.")
     return device
 
+
+def is_tensor_field(field: str,
+                    tensor_fields: Optional[list] = None,
+                    non_tensor_fields: Optional[list] = None
+                    ) -> bool:
+    """Determine whether a field is a tensor field or not."""
+    if tensor_fields is not None and non_tensor_fields is not None or \
+            tensor_fields is None and non_tensor_fields is None:
+        raise errors.InternalError("Must provide exactly one of tensor_fields or non_tensor_fields.")
+
+    if tensor_fields is not None:
+        return field in tensor_fields
+    else:
+        return field not in non_tensor_fields
