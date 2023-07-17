@@ -1041,7 +1041,7 @@ class TestAddDocuments(MarqoTestCase):
                 allocated_docs=[
                     {"Title": "frog", "Desc": "blah"}, {"Title": "Dog", "Loc": "https://google.com/my_dog.png"}],
                 image_repo=image_repo,
-                non_tensor_fields=(),
+                non_tensor_fields=[],
                 tensor_fields=None,
                 image_download_headers={}
             )
@@ -1062,7 +1062,7 @@ class TestAddDocuments(MarqoTestCase):
         add_docs.threaded_download_images(
             allocated_docs=[test_doc],
             image_repo=image_repo,
-            non_tensor_fields=(),
+            non_tensor_fields=[],
             tensor_fields=None,
             image_download_headers={}
         )
@@ -1104,7 +1104,7 @@ class TestAddDocuments(MarqoTestCase):
             add_docs.threaded_download_images(
                 allocated_docs=docs,
                 image_repo=image_repo,
-                non_tensor_fields=('nt_1', 'nt_2'),
+                non_tensor_fields=['nt_1', 'nt_2'],
                 tensor_fields=None,
                 image_download_headers={}
             )

@@ -307,9 +307,9 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
             )
         ):
             image_repo = add_docs.download_images(docs=add_docs_params.docs, thread_count=20,
-                                                  tensor_fields=tuple(add_docs_params.tensor_fields)
+                                                  tensor_fields=add_docs_params.tensor_fields
                                                   if add_docs_params.tensor_fields is not None else None,
-                                                  non_tensor_fields=tuple(add_docs_params.non_tensor_fields)
+                                                  non_tensor_fields=add_docs_params.non_tensor_fields
                                                   if add_docs_params.non_tensor_fields is not None else None,
                                                   image_download_headers=add_docs_params.image_download_headers)
 

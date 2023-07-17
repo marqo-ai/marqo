@@ -12,8 +12,8 @@ import marqo.errors as errors
 from marqo.tensor_search import utils
 
 
-def threaded_download_images(allocated_docs: List[dict], image_repo: dict, tensor_fields: Optional[Tuple],
-                             non_tensor_fields: Optional[Tuple], image_download_headers: dict,
+def threaded_download_images(allocated_docs: List[dict], image_repo: dict, tensor_fields: Optional[List[str]],
+                             non_tensor_fields: Optional[List[str]], image_download_headers: dict,
                              metric_obj: Optional[RequestMetrics] = None) -> None:
     """A thread calls this function to download images for its allocated documents
 
@@ -61,7 +61,7 @@ def threaded_download_images(allocated_docs: List[dict], image_repo: dict, tenso
     with metric_obj.time(f"{_id}.thread_time"):
         for doc in allocated_docs:
             for field in list(doc):
-                if not utils.is_tensor_field(field, list(tensor_fields), list(non_tensor_fields)):
+                if not utils.is_tensor_field(field, tensor_fields, non_tensor_fields):
                     continue
                 if isinstance(doc[field], str) and clip_utils._is_image(doc[field]):
                     if doc[field] in image_repo:
@@ -91,8 +91,8 @@ def threaded_download_images(allocated_docs: List[dict], image_repo: dict, tenso
                                 continue
 
 
-def download_images(docs: List[dict], thread_count: int, tensor_fields: Optional[Tuple],
-                    non_tensor_fields: Optional[Tuple], image_download_headers: dict) -> dict:
+def download_images(docs: List[dict], thread_count: int, tensor_fields: Optional[List[str]],
+                    non_tensor_fields: Optional[List[str]], image_download_headers: dict) -> dict:
     """Concurrently downloads images from each doc, storing them into the image_repo dict
     Args:
         docs: docs with images to be downloaded. These will be allocated to each thread
