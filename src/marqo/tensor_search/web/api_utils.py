@@ -172,7 +172,7 @@ def add_docs_params_orchestrator(index_name: str, body: Union[AddDocsBodyParams,
                                   'Its use is discouraged.')
 
         if tensor_fields is None and non_tensor_fields is None:
-            raise BadRequestError('You must include the `tensorFields` parameter. '
+            raise BadRequestError('Required parameter `tensorFields` is missing from the request body. '
                                   'Use `tensorFields=[]` to index for lexical-only search.')
 
         return AddDocsParams(
