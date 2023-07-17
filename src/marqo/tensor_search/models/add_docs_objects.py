@@ -7,7 +7,7 @@ from typing import List
 from marqo.tensor_search.utils import read_env_vars_and_defaults
 from marqo.tensor_search.enums import EnvVars
 from marqo.errors import InternalError
-from pydantic import BaseModel
+from pydantic import BaseModel, root_validator
 from marqo.tensor_search.utils import get_best_available_device
 from typing import List, Dict
 
@@ -23,7 +23,8 @@ class AddDocsBodyParams(BaseModel):
         allow_mutation = False
         extra = "forbid" # Raise error on unknown fields
 
-    nonTensorFields: List = Field(default_factory=list)
+    nonTensorFields: List = None
+    tensorFields: List = None
     useExistingTensors: bool = False
     imageDownloadHeaders: dict = Field(default_factory=dict)
     modelAuth: Optional[ModelAuth] = None
@@ -61,14 +62,27 @@ class AddDocsParams(BaseModel):
     index_name: str
     auto_refresh: bool
     device: Optional[str]
-    non_tensor_fields: List = Field(default_factory=list)
+    non_tensor_fields: Optional[List] = Field(default_factory=list)
+    tensor_fields: Optional[List] = Field(default_factory=None)
     image_download_thread_count: int = 20
     image_download_headers: dict = Field(default_factory=dict)
     use_existing_tensors: bool = False
     mappings: Optional[dict] = None
     model_auth: Optional[ModelAuth] = None
 
-    def __init__(self, **data: dict):
+    @root_validator
+    def validate_fields(cls, values):
+        field1 = values.get('tensor_fields')
+        field2 = values.get('non_tensor_fields')
+
+        if field1 is not None and field2 is not None:
+            raise InternalError("Only one of `tensor_fields` or `non_tensor_fields` can be provided.")
+        if field1 is None and field2 is None:
+            raise InternalError("Exactly one of `tensor_fields` or `non_tensor_fields` must be provided.")
+
+        return values
+
+    def __init__(self, **data: Any):
         # Ensure `None` and passing nothing are treated the same for device
         if "device" not in data or data["device"] is None:
             data["device"] = get_best_available_device()

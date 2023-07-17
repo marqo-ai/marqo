@@ -161,19 +161,36 @@ def add_docs_params_orchestrator(index_name: str, body: Union[AddDocsBodyParams,
 
         mappings = body.mappings
         non_tensor_fields = body.nonTensorFields
+        tensor_fields = body.tensorFields
         use_existing_tensors = body.useExistingTensors
         model_auth = body.modelAuth
         image_download_headers = body.imageDownloadHeaders
 
+        if tensor_fields is not None and non_tensor_fields is not None:
+            raise BadRequestError('Cannot provide `nonTensorFields` when `tensorFields` is defined. '
+                                  '`nonTensorField`s has been deprecated and will be removed in Marqo 2.0.0. '
+                                  'Its use is discouraged.')
+
+        if tensor_fields is None and non_tensor_fields is None:
+            raise BadRequestError('Required parameter `tensorFields` is missing from the request body. '
+                                  'Use `tensorFields=[]` to index for lexical-only search.')
+
+        return AddDocsParams(
+            index_name=index_name, docs=docs, auto_refresh=auto_refresh,
+            device=device, non_tensor_fields=non_tensor_fields, tensor_fields=tensor_fields,
+            use_existing_tensors=use_existing_tensors, image_download_headers=image_download_headers,
+            mappings=mappings, model_auth=model_auth
+        )
+
     elif isinstance(body, list) and all(isinstance(item, dict) for item in body):
         docs = body
 
+        return AddDocsParams(
+            index_name=index_name, docs=docs, auto_refresh=auto_refresh,
+            device=device, non_tensor_fields=non_tensor_fields,
+            use_existing_tensors=use_existing_tensors, image_download_headers=image_download_headers,
+            mappings=mappings, model_auth=model_auth
+        )
+
     else:
         raise InternalError(f"Unexpected request body type `{type(body).__name__} for `/documents` API. ")
-
-    return AddDocsParams(
-        index_name=index_name, docs=docs, auto_refresh=auto_refresh,
-        device=device, non_tensor_fields=non_tensor_fields,
-        use_existing_tensors=use_existing_tensors, image_download_headers=image_download_headers,
-        mappings=mappings, model_auth=model_auth
-    )
