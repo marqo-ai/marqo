@@ -17,6 +17,10 @@ def build_tensor_search_filter(
     """Builds a Lucene-DSL filter string for OpenSearch, that combines the user's filter string
     with searchable_attributes
 
+    args:
+        filter_string: user input string to filter results on. special chars must be escaped.
+        simple_properties: dict containing the index's fields as keys. will be used to add chunks prefix to fields in filter string.
+        searchable_attribs: user input list of attributes to search on. will be turned into a filter string.
     """
     if searchable_attribs is not None:
         copied_searchable_attribs = copy.deepcopy(searchable_attribs)
