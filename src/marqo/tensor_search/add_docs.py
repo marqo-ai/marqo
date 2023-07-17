@@ -39,7 +39,15 @@ def threaded_download_images(allocated_docs: List[dict], image_repo: dict, tenso
         }
     Returns:
         None
+    Raises:
+        - InternalError if both or neither of tensor_fields and non_tensor_fields are provided. This validation should
+        take place at API level and such invalid arguments are not expected to reach this function.
+
     """
+
+    if tensor_fields is not None and non_tensor_fields is not None \
+            or tensor_fields is None and non_tensor_fields is None:
+        raise errors.InternalError("Must provide exactly one of tensor_fields or non_tensor_fields")
 
     # Generate pseudo-unique ID for thread metrics.
     _id = hash("".join([d.get("_id", str(random.getrandbits(64))) for d in allocated_docs])) % 1000
@@ -103,7 +111,15 @@ def download_images(docs: List[dict], thread_count: int, tensor_fields: Optional
 
     Returns:
          An image repo: a dict <image pointer>:<image data>
+
+    Raises:
+        - InternalError if both or neither of tensor_fields and non_tensor_fields are provided. This validation should
+        take place at API level and such invalid arguments are not expected to reach this function.
     """
+
+    if tensor_fields is not None and non_tensor_fields is not None \
+            or tensor_fields is None and non_tensor_fields is None:
+        raise errors.InternalError("Must provide exactly one of tensor_fields or non_tensor_fields")
 
     docs_per_thread = math.ceil(len(docs)/thread_count)
     copied = copy.deepcopy(docs)
