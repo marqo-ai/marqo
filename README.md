@@ -103,7 +103,7 @@ import marqo
 
 mq = marqo.Client(url='http://localhost:8882')
 
-mq.create_index(index_name="my-first-index")
+mq.create_index("my-first-index", model="hf/all_datasets_v4_MiniLM-L6")
 
 mq.index("my-first-index").add_documents([
     {
@@ -125,7 +125,7 @@ results = mq.index("my-first-index").search(
 ```
 
 - `mq` is the client that wraps the `marqo` API.
-- `create_index()` creates a new index with default settings.
+`create_index()` creates a new index with default settings. We optionally specify the model to be `hf/all_datasets_v4_MiniLM-L6` which also the default model. Have a play around with different models to figure out which best fits your use case! Most models are tradeoff between speed and accuracy. See [here](https://docs.marqo.ai/0.1.0/Models-Reference/dense_retrieval/) for the full list of models. 
 - `add_documents()` takes a list of documents, represented as python dicts for indexing.
 - You can optionally set a document's ID with the special `_id` field. Otherwise, Marqo will generate one.
 
