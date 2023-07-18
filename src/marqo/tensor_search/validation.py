@@ -479,7 +479,7 @@ def validate_multimodal_combination(field_content, is_non_tensor_field, field_ma
             f"The multimodal_combination_field `{field_content}` is an empty dictionary. "
             f"This is not a valid format of field content."
             f"If you aim to use multimodal_combination, it must contain at least 1 field. "
-            f"please check `https://docs.marqo.ai/0.0.15/Advanced-Usage/document_fields/#multimodal-combination-object` for more info.")
+            f"please check `https://docs.marqo.ai/0.1.0/Advanced-Usage/document_fields/#multimodal-combination-object` for more info.")
 
     for key, value in field_content.items():
         if not ((type(key) in constants.ALLOWED_MULTIMODAL_FIELD_TYPES) and (
@@ -492,16 +492,16 @@ def validate_multimodal_combination(field_content, is_non_tensor_field, field_ma
         if not key in field_mapping["weights"]:
             raise InvalidArgError(
                 f"Multimodal-combination field content `{key}:{value}` \n  "
-                f"is not in the multimodal_field mappings weights `{field_mapping['weights']}`. Each sub_field requires a weights."
-                f"Please add the `{key}` to the mappings."
-                f"please check `https://docs.marqo.ai/0.0.15/Advanced-Usage/document_fields/#multimodal-combination-object` for more info.")
+                f"is not in the multimodal_field mappings weights `{field_mapping['weights']}`. Each sub_field requires a weight."
+                f"Please add `{key}` to the mappings."
+                f"Please check `https://docs.marqo.ai/0.1.0/Advanced-Usage/document_fields/#multimodal-combination-object` for more info.")
 
     if is_non_tensor_field:
         raise InvalidArgError(
             f"Field content `{field_content}` \n  "
             f"of type `{type(field_content).__name__}` is the content for a multimodal_combination."
-            f"It CANNOT be a `non_tensor_field`. Remove this field from `non_tensor_field` or"
-            f"add them as normal fields to fix this problem."
+            f"It must be a tensor field. Add this field to `tensor_field` or"
+            f"add it as a normal field to fix this problem."
         )
     return True
 
