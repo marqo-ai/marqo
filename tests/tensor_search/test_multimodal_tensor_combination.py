@@ -508,7 +508,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             validate_dict(field, {"test_void": "test", "test_2": "test_test"}, is_non_tensor_field=False, mappings=test_mappings)
             raise AssertionError
         except InvalidArgError as e:
-            assert "Each sub_field requires a weights" in e.message
+            assert "Each sub_field requires a weight" in e.message
 
         # length of fields
         try:
