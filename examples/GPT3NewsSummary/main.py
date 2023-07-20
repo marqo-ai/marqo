@@ -38,7 +38,7 @@ if __name__ == '__main__':
         mq.create_index(DOC_INDEX_NAME)
 
         print('Indexing documents')
-        mq.index(DOC_INDEX_NAME).add_documents(MARQO_DOCUMENTS)
+        mq.index(DOC_INDEX_NAME).add_documents(MARQO_DOCUMENTS, tensor_fields= ["Title", "Description"])
         print('Done')
 
 
