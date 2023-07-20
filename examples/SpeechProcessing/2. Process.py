@@ -4,7 +4,7 @@ import torch
 from dotenv import load_dotenv
 import time
 from SpeechSearch.transcriber import AudioTranscriber
-from SpeechSearch.indexer import index_transciptions
+from SpeechSearch.indexer import index_transcriptions
 
 load_dotenv()
 
@@ -71,11 +71,11 @@ def main():
         )
 
         indx_start = time.perf_counter()
-        index_transciptions(
+        index_transcriptions(
             annotated_transcriptions,
             index_name,
             mq,
-            ["samplerate", "start", "end", "speaker", "file"],
+            ["transcription"],
             marqo_device,
         )
         indx_end = time.perf_counter()

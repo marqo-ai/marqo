@@ -78,7 +78,8 @@ def build_index():
                 # We set auto_refresh to False which is optimal for indexing
                 # a lot of documents.
                 mq.index(index_name=INDEX_NAME).add_documents(
-                    documents=[to_post], device=DEVICE, auto_refresh=False
+                    documents=[to_post], device=DEVICE, auto_refresh=False,
+                    tensor_fields=["language", "text", "labels"]
                 )
     t1 = datetime.datetime.now()
     print(f"finished indexing. Started at {t0}. Finished at {t1}. Took {t1 - t0}")

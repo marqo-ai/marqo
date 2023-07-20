@@ -89,7 +89,7 @@ client.create_index(index_name, model='onnx/all_datasets_v4_MiniLM-L6')
 
 device = 'cpu'
 
-responses = client.index(index_name).add_documents(data, device=device, client_batch_size=20)
+responses = client.index(index_name).add_documents(data, device=device, client_batch_size=20, tensor_fields=['title', 'content'])
 
 # optionally take a look at the responses
 #pprint.print(responses)
