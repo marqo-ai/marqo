@@ -75,7 +75,7 @@ if __name__ == "__main__":
     #############################################################
 
     # index the documents
-    indexing = mq.index(index_name).add_documents(documents, non_tensor_fields=['filename'])
+    indexing = mq.index(index_name).add_documents(documents, tensor_fields=["cleaned_text"])
 
     #############################################################
     #       4. Search the data                                          
