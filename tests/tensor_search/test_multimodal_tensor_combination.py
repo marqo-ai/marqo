@@ -508,7 +508,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             validate_dict(field, {"test_void": "test", "test_2": "test_test"}, is_non_tensor_field=False, mappings=test_mappings)
             raise AssertionError
         except InvalidArgError as e:
-            assert "Each sub_field requires a weights" in e.message
+            assert "Each sub_field requires a weight" in e.message
 
         # length of fields
         try:
@@ -522,7 +522,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             validate_dict(field, valid_dict, is_non_tensor_field=True, mappings=test_mappings)
             raise AssertionError
         except InvalidArgError as e:
-            assert "It CANNOT be a `non_tensor_field`" in e.message
+            assert "must be a tensor field" in e.message
 
     def test_batched_vectorise_call(self):
         tensor_search.create_vector_index(
