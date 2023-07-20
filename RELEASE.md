@@ -4,13 +4,13 @@
 
 - New parameter `tensor_fields` will replace `non_tensor_fields` in the `add_documents` endpoint. Only fields in `tensor_fields` will have embeddings generated, thereby offering more granular control as to which fields to vectorise. The `non_tensor_fields` parameter is deprecated and will be removed in a future release. Calls to `add_documents` with neither of these parameters specified will now fail [#538](https://github.com/marqo-ai/marqo/pull/538).
 
-- Single KNN Vector Optimisation. Only one OpenSearch KNN vector field will be created per index, instead of one per field. This will result in a single HNSW graph, thus increasing search speed by eliminating the need to load multiple graphs in and out of memory. Note that indexed documents will now have a different OpenSearch document structure, so documents indexed with previous Marqo versions cannot be searched with this version, and vice versa [#530](https://github.com/marqo-ai/marqo/pull/530).
+- Single KNN Vector Optimisation. Only one OpenSearch KNN vector field will be created per index, instead of one per field. This results in faster and more stable searches across multiple tensor fields. Note that indexed documents will now have a different OpenSearch document structure, so documents indexed with previous Marqo versions cannot be searched with this version, and vice versa [#530](https://github.com/marqo-ai/marqo/pull/530).
 
-- Moved `add documents` query parameters `non_tensor_fields`, `use_existing_tensors`, `image_download_headers`, `model_auth`, and `mappings` to the request body, and support for these parameters in the query string is deprecated. Backwards compatibility is supported at the moment, but will be removed in a later release [#535](https://github.com/marqo-ai/marqo/pull/535).
+- The `add documents` endpoint's request body is now an object, with the list of documents under the `documents` key. The query parameters `use_existing_tensors`, `image_download_headers`, `model_auth`, and `mappings` have also been moved to the body as optional keys, and support for these parameters in the query string is deprecated. Backwards compatibility is supported at the moment, but will be removed in a later release. This change results in better shorter URLs as well as better readability, since these parameters are no longer URL-encoded [#535](https://github.com/marqo-ai/marqo/pull/535).
 
-- Better validation for index creation with custom models. When creating an index with a `model` not in the registry, Marqo will check if `model_properties` is specified with a proper `dimension`, and raise an error if not. This is now done at index creation time, rather than at add documents or search time [#530](https://github.com/marqo-ai/marqo/pull/530).
+- Better validation for index creation with custom models. When creating an index with a `model` not in the registry, Marqo will check if `model_properties` is specified with a proper `dimension`, and raise an error if not. See [here] (https://docs.marqo.ai/1.0.0/Models-Reference/bring_your_own_model) for a guide on using custom models. This validation is now done at index creation time, rather than at add documents or search time [#530](https://github.com/marqo-ai/marqo/pull/530).
 
-- Stricter `filter_string` syntax for `search`. The `filter_string` parameter must have special Lucene characters escaped with a backslash (`\`) to filter as expected. This will affect filtering on field names or content that contain special characters. See [here] (https://lucene.apache.org/core/2_9_4/queryparsersyntax.html) for more information on special characters [#530] (https://github.com/marqo-ai/marqo/pull/530).
+- Stricter `filter_string` syntax for `search`. The `filter_string` parameter must have special Lucene characters escaped with a backslash (`\`) to filter as expected. This will affect filtering on field names or content that contain special characters. See [here] (https://lucene.apache.org/core/2_9_4/queryparsersyntax.html) for more information on special characters and see [here](https://docs.marqo.ai/1.0.0/query_dsl) for a guide on using Marqo filter strings [#530] (https://github.com/marqo-ai/marqo/pull/530).
 
 - Removed server-side batching (`batch_size` parameter) for `add_documents` endpoint. Instead, client batching is encouraged (use `client_batch_size` instead of `server_batch_size` in the python client) [#527] (https://github.com/marqo-ai/marqo/pull/527).
 
@@ -24,6 +24,7 @@
 
 ## Contributor shout-outs
 - Thank you to our 3.2k stargazers!
+- We've finally come to our first major release, Marqo 1.0.0! Thanks to all our users and contributors, new and old, for your feedback and support to help us reach this huge milestone. We're excited to continue building Marqo with you. Happy searching!
 
 
 # Release 0.1.0
