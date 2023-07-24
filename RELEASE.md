@@ -2,11 +2,11 @@
 
 ## Breaking Changes
 
-- New parameter `tensor_fields` will replace `non_tensor_fields` in the `add_documents` endpoint. Only fields in `tensor_fields` will have embeddings generated, thereby offering more granular control as to which fields to vectorise. The `non_tensor_fields` parameter is deprecated and will be removed in a future release. Calls to `add_documents` with neither of these parameters specified will now fail [#538](https://github.com/marqo-ai/marqo/pull/538).
+- New parameter `tensor_fields` will replace `non_tensor_fields` in the `add_documents` endpoint. Only fields in `tensor_fields` will have embeddings generated, thereby offering more granular control as to which fields to vectorise. See [here](https://docs.marqo.ai/1.0.0/API-Reference/documents/#add-or-replace-documents) for the full list of `add_documents` parameters and their usage. The `non_tensor_fields` parameter is deprecated and will be removed in a future release. Calls to `add_documents` with neither of these parameters specified will now fail [#538](https://github.com/marqo-ai/marqo/pull/538).
 
-- Single KNN Vector Optimisation. Only one OpenSearch KNN vector field will be created per index, instead of one per field. This results in faster and more stable searches across multiple tensor fields. Note that indexed documents will now have a different OpenSearch document structure, so documents indexed with previous Marqo versions cannot be searched with this version, and vice versa [#530](https://github.com/marqo-ai/marqo/pull/530).
+- Single KNN Vector Optimisation. This results in faster and more stable searches across multiple tensor fields. Note that indexed documents will now have a different internal document structure, so documents indexed with previous Marqo versions cannot be searched with this version, and vice versa [#530](https://github.com/marqo-ai/marqo/pull/530).
 
-- The `add documents` endpoint's request body is now an object, with the list of documents under the `documents` key. The query parameters `use_existing_tensors`, `image_download_headers`, `model_auth`, and `mappings` have also been moved to the body as optional keys, and support for these parameters in the query string is deprecated. Backwards compatibility is supported at the moment, but will be removed in a later release. This change results in better shorter URLs as well as better readability, since these parameters are no longer URL-encoded [#535](https://github.com/marqo-ai/marqo/pull/535).
+- The `add documents` endpoint's request body is now an object, with the list of documents under the `documents` key. The query parameters `use_existing_tensors`, `image_download_headers`, `model_auth`, and `mappings` have also been moved to the body as optional keys, and support for these parameters in the query string is deprecated. See [here](https://docs.marqo.ai/1.0.0/API-Reference/documents/#add-or-replace-documents) for new `add_documents` API usage. Backwards compatibility is supported at the moment, but will be removed in a later release. This change results in better shorter URLs as well as better readability, since these parameters are no longer URL-encoded [#535](https://github.com/marqo-ai/marqo/pull/535).
 
 - Better validation for index creation with custom models. When creating an index with a `model` not in the registry, Marqo will check if `model_properties` is specified with a proper `dimension`, and raise an error if not. See [here] (https://docs.marqo.ai/1.0.0/Models-Reference/bring_your_own_model) for a guide on using custom models. This validation is now done at index creation time, rather than at add documents or search time [#530](https://github.com/marqo-ai/marqo/pull/530).
 
@@ -15,7 +15,7 @@
 - Removed server-side batching (`batch_size` parameter) for `add_documents` endpoint. Instead, client batching is encouraged (use `client_batch_size` instead of `server_batch_size` in the python client) [#527] (https://github.com/marqo-ai/marqo/pull/527).
 
 ## New Features
-- Multi-field pagination. The `offset` parameter in `search` can now be used to paginate through results spanning multiple `searchable_attributes`. This works for both `TENSOR` and `LEXICAL` search [#530](https://github.com/marqo-ai/marqo/pull/530).
+- Multi-field pagination. The `offset` parameter in `search` can now be used to paginate through results spanning multiple `searchable_attributes`. This works for both `TENSOR` and `LEXICAL` search. See [here](https://docs.marqo.ai/1.0.0/API-Reference/search/#search-result-pagination) for a guide on pagination [#530](https://github.com/marqo-ai/marqo/pull/530).
 - Optimised default index configuration [#540] (https://github.com/marqo-ai/marqo/pull/540).
 
 ## Bug Fixes & Minor Changes
