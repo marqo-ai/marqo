@@ -151,7 +151,7 @@ for patch_method in patch_methods:
     response = client.create_index(index_name, settings_dict=settings)
     
     # index the documents on the GPU 
-    response = client.index(index_name).add_documents(documents, device='cuda', client_batch_size=50)
+    response = client.index(index_name).add_documents(documents, tensor_fields =["image_location"], device='cuda', client_batch_size=50)
 ```
 
 If no GPU is available, set device='cpu'. 
