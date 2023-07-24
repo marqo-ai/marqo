@@ -102,10 +102,16 @@ def load_image_from_path(image_path: str, image_download_headers: dict, timeout=
             if metrics_obj is not None:
                 metrics_obj.start(f"image_download.{image_path}")
 
-            resp = requests.get(image_path, stream=True, timeout=timeout, headers=image_download_headers)
+            with requests.get(image_path, stream=True, timeout=timeout, headers=image_download_headers) as resp:
+                if not resp.ok:
+                    raise UnidentifiedImageError(
+                        f"image url `{image_path}` returned {resp.status_code}. Reason: {resp.reason}")
+
+                img = Image.open(resp.raw)
 
             if metrics_obj is not None:
                 metrics_obj.stop(f"image_download.{image_path}")
+
         except (requests.exceptions.ConnectTimeout, requests.exceptions.ConnectionError,
                 requests.exceptions.RequestException
                 ) as e:
@@ -113,9 +119,6 @@ def load_image_from_path(image_path: str, image_download_headers: dict, timeout=
                 f"image url `{image_path}` is unreachable, perhaps due to timeout. "
                 f"Timeout threshold is set to {timeout} seconds."
                 f"\nConnection error type: `{e.__class__.__name__}`")
-        if not resp.ok:
-            raise UnidentifiedImageError(f"image url `{image_path}` returned {resp.status_code}. Reason: {resp.reason}")
-        img = Image.open(resp.raw)
     else:
         raise UnidentifiedImageError(f"input str of `{image_path}` is not a local file or a valid url")
 
