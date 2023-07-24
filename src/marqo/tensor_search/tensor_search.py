@@ -1807,7 +1807,55 @@ def sort_chunks(docs: dict) -> List:
     return sorted(as_list, key=lambda x: x["chunks"][0]["_score"], reverse=True)
 
 
+def check_index_health(config: Config, index_name: str) -> dict:
+    """Checks the health of a specific index
+    Args:
+        config: Config
+        index_name: str
+    Returns:
+        dict
+    """
+    TIMEOUT = 3
+    statuses = {
+        "green": 0,
+        "yellow": 1,
+        "red": 2
+    }
+
+    marqo_status = "green"
+    marqo_os_health_check = None
+    try:
+        timeout_config = copy.deepcopy(config)
+        timeout_config.timeout = TIMEOUT
+        marqo_os_health_check = HttpRequests(timeout_config).get(
+            path=f"_cluster/health/{index_name}"
+        )
+    except errors.BackendCommunicationError:
+        marqo_os_status = "red"
+
+    if marqo_os_health_check is not None:
+        if "status" in marqo_os_health_check:
+            marqo_os_status = marqo_os_health_check['status']
+        else:
+            marqo_os_status = "red"
+    else:
+        marqo_os_status = "red"
+
+    marqo_status = marqo_status if statuses[marqo_status] >= statuses[marqo_os_status] else marqo_os_status
+
+    return {
+        "status": marqo_status,
+        "backend": {
+            "status": marqo_os_status
+        }
+    }
+
+
 def check_health(config: Config):
+    """Check the health of the Marqo-os backend.
+    Deprecated in Marqo 1.0.0 and will be removed in future versions.
+    Please check_index_health.
+    """
     TIMEOUT = 3
     statuses = {
         "green": 0,
@@ -1842,6 +1890,7 @@ def check_health(config: Config):
             "status": marqo_os_status
         }
     }
+
 
 def delete_index(config: Config, index_name):
     res = HttpRequests(config).delete(path=index_name)
