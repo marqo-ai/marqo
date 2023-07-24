@@ -353,11 +353,14 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                     f"images for {batch_size} docs using {add_docs_params.image_download_thread_count} threads"
                 )
             ):
+                if add_docs_params.tensor_fields and '_id' in add_docs_params.tensor_fields:
+                    raise errors.BadRequestError(message="`_id` field cannot be a tensor field.")
+
                 image_repo = exit_stack.enter_context(
                     add_docs.download_images(docs=add_docs_params.docs, thread_count=20,
                                              tensor_fields=add_docs_params.tensor_fields
                                              if add_docs_params.tensor_fields is not None else None,
-                                             non_tensor_fields=add_docs_params.non_tensor_fields
+                                             non_tensor_fields=add_docs_params.non_tensor_fields.extend('_id')
                                              if add_docs_params.non_tensor_fields is not None else None,
                                              image_download_headers=add_docs_params.image_download_headers)
                 )
