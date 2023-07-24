@@ -80,4 +80,4 @@ for patch_method in patch_methods:
     response = client.create_index(index_name, settings_dict=settings)
 
 
-    response = client.index(index_name).add_documents(documents, device='cuda', client_batch_size=batch_size)
+    response = client.index(index_name).add_documents(documents, device='cuda', tensor_fields=["image_location"], client_batch_size=batch_size)

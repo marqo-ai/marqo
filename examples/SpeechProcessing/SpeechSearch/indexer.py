@@ -3,11 +3,11 @@ import marqo
 from typing import List, Dict, Any
 
 
-def index_transciptions(
+def index_transcriptions(
     annotated_transcriptions: List[Dict[str, Any]],
     index: str,
     mq: marqo.Client,
-    non_tensor_fields: List[str] = [],
+    tensor_fields: List[str] = [],
     device: str = "cpu",
     batch_size: int = 32,
 ) -> Dict[str, str]:
@@ -22,7 +22,7 @@ def index_transciptions(
 
     response = mq.index(index).add_documents(
         annotated_transcriptions,
-        non_tensor_fields=non_tensor_fields,
+        tensor_fields=tensor_fields,
         device=device,
         client_batch_size=batch_size
     )
