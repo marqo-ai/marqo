@@ -1147,16 +1147,16 @@ class TestAddDocuments(MarqoTestCase):
              }),
         ]
         for docs, expected_repo_structure in examples:
-            image_repo = add_docs.download_images(
+            with add_docs.download_images(
                 docs=docs,
                 thread_count=20,
                 non_tensor_fields=('nt_1', 'nt_2'),
                 image_download_headers={},
                 tensor_fields=None
-            )
-            assert len(expected_repo_structure) == len(image_repo)
-            for k in expected_repo_structure:
-                assert isinstance(image_repo[k], expected_repo_structure[k])
+            ) as image_repo:
+                assert len(expected_repo_structure) == len(image_repo)
+                for k in expected_repo_structure:
+                    assert isinstance(image_repo[k], expected_repo_structure[k])
 
     def test_params_validation_tensors_and_nontensors(self):
         with pytest.raises(InternalError):
