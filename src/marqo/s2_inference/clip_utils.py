@@ -81,7 +81,8 @@ def format_and_load_CLIP_images(images: List[Union[str, ndarray, ImageType]], im
     return results
 
 
-def load_image_from_path(image_path: str, image_download_headers: dict, timeout=3, metrics_obj: Optional[RequestMetrics] = None) -> ImageType:
+def load_image_from_path(image_path: str, image_download_headers: dict, timeout=3,
+                         metrics_obj: Optional[RequestMetrics] = None, session: requests.session() = None) -> ImageType:
     """Loads an image into PIL from a string path that is either local or a url
 
     Args:
@@ -102,15 +103,24 @@ def load_image_from_path(image_path: str, image_download_headers: dict, timeout=
             if metrics_obj is not None:
                 metrics_obj.start(f"image_download.{image_path}")
 
-            with requests.get(image_path, stream=True, timeout=timeout, headers=image_download_headers) as resp:
-                if not resp.ok:
-                    raise UnidentifiedImageError(
-                        f"image url `{image_path}` returned {resp.status_code}. Reason: {resp.reason}")
+            pooling = True
+            if not session:
+                pooling = False
+                session = requests.sessions.Session()
 
-                img = Image.open(resp.raw)
+            try:
+                with session.get(image_path, stream=True, timeout=timeout, headers=image_download_headers) as resp:
+                    if not resp.ok:
+                        raise UnidentifiedImageError(
+                            f"image url `{image_path}` returned {resp.status_code}. Reason: {resp.reason}")
 
-            if metrics_obj is not None:
-                metrics_obj.stop(f"image_download.{image_path}")
+                    img = Image.open(resp.raw)
+
+                if metrics_obj is not None:
+                    metrics_obj.stop(f"image_download.{image_path}")
+            finally:
+                if not pooling:
+                    session.close()
 
         except (requests.exceptions.ConnectTimeout, requests.exceptions.ConnectionError,
                 requests.exceptions.RequestException
