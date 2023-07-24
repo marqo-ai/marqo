@@ -61,9 +61,7 @@ if __name__ == "__main__":
     
     # https://marqo.pages.dev/0.0.21/API-Reference/documents/
     device = 'cpu' # change to 'cuda' if GPU is available 
-    non_tensor_fields = ['_id', 'price', 'blip_large_caption', 'aesthetic_score']
-
-    res = client.index(index_name).add_documents(documents, client_batch_size=64, non_tensor_fields=non_tensor_fields, device=device)
+    res = client.index(index_name).add_documents(documents, client_batch_size=64, tensor_fields=["s3_http"], device=device)
 
     print("Finished indexing data...")
 
@@ -209,10 +207,10 @@ if __name__ == "__main__":
 
     
     # index the document             
-    res = client.index(index_name_context).add_documents([document1], device=device, mappings=mappings1)
+    res = client.index(index_name_context).add_documents([document1], tensor_fields=["multimodal"], device=device, mappings=mappings1)
 
     # index the other using a different mappings
-    res = client.index(index_name_context).add_documents([document2], device=device, mappings=mappings2)
+    res = client.index(index_name_context).add_documents([document2], tensor_fields=["multimodal"], device=device, mappings=mappings2)
 
     # retrieve the embedding to use as a context for search
     indexed_documents = client.index(index_name_context).get_documents([document1['_id'], document2['_id']] , expose_facets=True)
@@ -265,9 +263,6 @@ if __name__ == "__main__":
                             'blip_large_caption':doc['blip_large_caption'],
                             's3_http':doc['s3_http'],
                             }
-        
-    # the fields we do not want to embed
-    non_tensor_fields = ['_id', 'price', 'blip_large_caption', 'aesthetic_score', 's3_http']
 
     # define how we want to combine the fields
     mappings = {"multimodal": 
@@ -280,7 +275,7 @@ if __name__ == "__main__":
                     }
 
     # now index
-    res = client.index(index_name_mm_objects).add_documents(documents, client_batch_size=64, non_tensor_fields=non_tensor_fields, device=device, mappings=mappings)    
+    res = client.index(index_name_mm_objects).add_documents(documents, client_batch_size=64, tensor_fields=["multimodal"], device=device, mappings=mappings)    
 
     # now search
     query = "red shawl"

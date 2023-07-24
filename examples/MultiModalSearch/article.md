@@ -333,9 +333,8 @@ Now we can [add images](https://marqo.pages.dev/0.0.21/API-Reference/documents/)
 
 ```python
 device = 'cpu' # use 'cuda' if a GPU is available
-non_tensor_fields = ['_id', 'price', 'blip_large_caption', 'aesthetic_score']
 
-res = client.index(index_name).add_documents(documents, client_batch_size=64, non_tensor_fields=non_tensor_fields, device=device)
+res = client.index(index_name).add_documents(documents, client_batch_size=64, tensor_fields=["s3_http"], device=device)
 ```
 
 ###  3.6 Searching
@@ -495,10 +494,10 @@ mappings2 = {"multimodal":
                             }}}
 
 # index the document             
-res = client.index(index_name_context).add_documents([document1], device=device, mappings=mappings1)
+res = client.index(index_name_context).add_documents([document1], tensor_fields=["multimodal"], device=device, mappings=mappings1)
     
 # index the other using a different mappings
-res = client.index(index_name_context).add_documents([document2], device=device, mappings=mappings2)
+res = client.index(index_name_context).add_documents([document2], tensor_fields=["multimodal"], device=device, mappings=mappings2)
 ```
 
 To get the vectors to use as context vectors at search time - we need to [retrieve the calculated vectors](https://marqo.pages.dev/0.0.21/API-Reference/documents/). We can then [create a context object](https://marqo.pages.dev/0.0.21/API-Reference/search/#context) that is used at search time.
@@ -580,7 +579,7 @@ mappings = {"multimodal":
                 }
     
 # now index
-res = client.index(index_name_mm_objects).add_documents(documents, client_batch_size=64, non_tensor_fields=non_tensor_fields, device=device, mappings=mappings)
+res = client.index(index_name_mm_objects).add_documents(documents, client_batch_size=64, tensor_fields=["multimodal"], device=device, mappings=mappings)
 ```
 
 Finally we can search in the same way as before. 
