@@ -143,6 +143,7 @@ def convert_to_marqo_web_error_and_raise(response: requests.Response, err: reque
     except JSONDecodeError:
         raise_catchall_http_as_marqo_error(response=response, err=err)
     if response.status_code == 429:
+        # TODO, raise a different marqo error here.
         raise TooManyRequestsError(
             message="Marqo-OS received too many requests! "
                     "Please try reducing the frequency of add_documents and update_documents calls.")

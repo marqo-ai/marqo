@@ -61,6 +61,7 @@ from marqo.tensor_search.models.external_apis.abstract_classes import ExternalAu
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.tensor_search.utils import add_timing
 from marqo.tensor_search import delete_docs
+from marqo.tensor_search import constants
 from marqo.s2_inference.processing import text as text_processor
 from marqo.s2_inference.processing import image as image_processor
 from marqo.s2_inference.clip_utils import _is_image
@@ -1826,6 +1827,7 @@ def check_health(config: Config):
     except errors.BackendCommunicationError:
         marqo_os_status = "red"
 
+    # Check marqo-os health endpoint
     if marqo_os_health_check is not None:
         if "status" in marqo_os_health_check:
             marqo_os_status = marqo_os_health_check['status']
@@ -1834,6 +1836,17 @@ def check_health(config: Config):
     else:
         marqo_os_status = "red"
 
+    # Check if disk space is below watermark
+    # Query opensearch for disk space
+    filesystem_stats = HttpRequests(config).get(path="_cluster/stats")["nodes"]["fs"]
+    current_percent_disk_remaining = filesystem_stats["available_in_bytes"] / filesystem_stats["total_in_bytes"]
+    minimum_percent_disk_remaining = 1 - constants.OPENSEARCH_DISK_BREACH_WATERMARK
+
+    if current_percent_disk_remaining < minimum_percent_disk_remaining:
+        # if disk space is below watermark, return red
+        marqo_os_status = "red"
+
+    # if marqo os returns anything worse than green, return it
     marqo_status = marqo_status if statuses[marqo_status] >= statuses[marqo_os_status] else marqo_os_status
 
     return {

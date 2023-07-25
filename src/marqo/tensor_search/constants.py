@@ -27,3 +27,6 @@ LUCENE_SPECIAL_CHARS = {
 NON_OFFICIAL_LUCENE_SPECIAL_CHARS = {
     ' '
 }
+
+# If the OpenSearch cluster is this percent full, health should return red
+OPENSEARCH_DISK_BREACH_WATERMARK = .85
