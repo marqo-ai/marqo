@@ -1,10 +1,7 @@
-import pprint
-
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.errors import IndexNotFoundError, MarqoError
 from marqo.tensor_search import tensor_search, constants, index_meta_cache
 from tests.marqo_test import MarqoTestCase
-from marqo._httprequests import HttpRequests
 
 
 class TestGetStats(MarqoTestCase):
