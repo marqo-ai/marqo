@@ -72,6 +72,13 @@ class TestHealthCheck(MarqoTestCase):
                 return True
             assert run()
 
+    def test_index_health_check_path(self):
+        tensor_search.create_vector_index(index_name=self.index_name, config=self.config)
+        with mock.patch("marqo._httprequests.HttpRequests.get") as mock_get:
+            tensor_search.check_index_health(index_name=self.index_name, config=self.config)
+            args, kwargs = mock_get.call_args
+            self.assertIn(f"_cluster/health/{self.index_name}", kwargs['path'])
+
     def test_index_health_check_unknown_backend_response(self):
         mock__get = mock.MagicMock()
         mock__get.return_value = dict()
