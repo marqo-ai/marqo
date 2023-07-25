@@ -20,7 +20,9 @@ class TestGetStats(MarqoTestCase):
         except IndexNotFoundError as s:
             pass
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
-        assert tensor_search.get_stats(config=self.config, index_name=self.index_name_1)["numberOfDocuments"] == 0
+        index_stats = tensor_search.get_stats(config=self.config, index_name=self.index_name_1)
+        assert index_stats["numberOfDocuments"] == 0
+        assert len(index_stats["size"]) != 0
 
     def test_get_stats_non_empty(self):
         try:
@@ -35,4 +37,6 @@ class TestGetStats(MarqoTestCase):
                 auto_refresh=True, device="cpu"
             )
         )
-        assert tensor_search.get_stats(config=self.config, index_name=self.index_name_1)["numberOfDocuments"] == 3
+        index_stats = tensor_search.get_stats(config=self.config, index_name=self.index_name_1)
+        assert index_stats["numberOfDocuments"] == 3
+        assert len(index_stats["size"]) != 0

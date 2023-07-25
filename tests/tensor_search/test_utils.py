@@ -398,3 +398,22 @@ class TestUtils(unittest.TestCase):
         non_tensor_fields = []
         with self.assertRaises(errors.InternalError):
             utils.is_tensor_field('field1', tensor_fields=tensor_fields, non_tensor_fields=non_tensor_fields)
+
+    def test_convert_bytes_to_human_readable_format(self):
+        size_in_bytes = 1000  # 1000 B
+        assert utils.convert_bytes_to_human_readable_format(size_in_bytes) == "1000.00 B"
+
+        size_in_bytes = 16121  # 15.74 KB
+        assert utils.convert_bytes_to_human_readable_format(size_in_bytes) == "15.74 KB"
+
+        size_in_bytes = 9874321  # 9.42 MB
+        assert utils.convert_bytes_to_human_readable_format(size_in_bytes) == "9.42 MB"
+
+        size_in_bytes = 10000000000  # 9.31 GB
+        assert utils.convert_bytes_to_human_readable_format(size_in_bytes) == "9.31 GB"
+
+        size_in_bytes = 712893712304234  # 648.37 TB
+        assert utils.convert_bytes_to_human_readable_format(size_in_bytes) == "648.37 TB"
+
+        size_in_bytes = 6212893712323224  # 5.52 PB
+        assert utils.convert_bytes_to_human_readable_format(size_in_bytes) == "5.52 PB"

@@ -269,11 +269,17 @@ def _autofill_index_settings(index_settings: dict):
 
 def get_stats(config: Config, index_name: str):
     doc_count = HttpRequests(config).post(path=F"{index_name}/_count")["count"]
-    index_info = HttpRequests(config).get(path=F"_cat/indices/{index_name}?format=json")
-    size = index_info[0]["store.size"]
+    index_stats = HttpRequests(config).get(path=F"{index_name}/_stats")["indices"]
+    size_in_bytes = None
+    try:
+        size_in_bytes = index_stats[index_name]["total"]["store"]["size_in_bytes"]
+    except AttributeError:
+        raise errors.IndexNotFoundError(message="Tried to get a non-existent index: {}".format(index_name))
+
+    formatted_size = utils.convert_bytes_to_human_readable_format(size_in_bytes)
     return {
         "numberOfDocuments": doc_count,
-        "size": size
+        "size": formatted_size
     }
 
 
