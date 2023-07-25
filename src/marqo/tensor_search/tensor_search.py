@@ -267,9 +267,24 @@ def _autofill_index_settings(index_settings: dict):
 
 
 def get_stats(config: Config, index_name: str):
-    doc_count = HttpRequests(config).post(path=F"{index_name}/_count")["count"]
+    """Returns the number of documents and vectors in the index.
+
+    The _count API counts top-level documents.
+    The _stats API includes the count of nested documents, which is __chunks in Marqo.
+
+    Difference between the two gives the numberOfVectors."""
+
+    try:
+        doc_count = HttpRequests(config).post(path=F"{index_name}/_count")["count"]
+        nested_doc_count = HttpRequests(config).get(path=F"{index_name}/_stats/docs")["indices"][index_name]["primaries"][
+            "docs"]["count"]
+    except KeyError as e:
+        return errors.InternalError(f"Marqo encountered an unexpected response from Marqo-os when calling `get_stats(index=)`. "
+                                   f"The expected fields do not exist in the response. Original error message = {e}")
+
     return {
-        "numberOfDocuments": doc_count
+        "numberOfDocuments": doc_count,
+        "numberOfVectors": nested_doc_count - doc_count
     }
 
 
