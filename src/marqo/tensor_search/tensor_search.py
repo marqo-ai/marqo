@@ -1808,7 +1808,7 @@ def sort_chunks(docs: dict) -> List:
 
 
 def check_index_health(config: Config, index_name: str) -> dict:
-    """Checks the health of a specific index
+    """Checks the health of an index
     Args:
         config: Config
         index_name: str
@@ -1854,7 +1854,7 @@ def check_index_health(config: Config, index_name: str) -> dict:
 def check_health(config: Config):
     """Check the health of the Marqo-os backend.
     Deprecated in Marqo 1.0.0 and will be removed in future versions.
-    Please check_index_health.
+    Please use check_index_health instead.
     """
     TIMEOUT = 3
     statuses = {
