@@ -48,10 +48,11 @@ class ApiTests(MarqoTestCase):
     def test_add_or_replace_documents_non_tensor_fields_query_param(self):
         with mock.patch('marqo.tensor_search.tensor_search.add_documents') as mock_add_documents:
             response = self.client.post(
-                "/indexes/index1/documents?device=cpu&non_tensor_fields=['text']",
+                "/indexes/index1/documents?device=cpu&non_tensor_fields=text&non_tensor_fields=title",
                 json=[
                     {
                         "id": "1",
+                        "title": "My doc",
                         "text": "This is a test document",
                     }
                 ]
