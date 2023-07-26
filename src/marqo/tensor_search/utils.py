@@ -351,7 +351,7 @@ def is_tensor_field(field: str,
         return field not in non_tensor_fields
 
 
-def calculate_health_status(marqo_os_health_check_response: Optional[str]) -> dict:
+def calculate_health_status(marqo_os_health_check_response: Optional[Dict]) -> dict:
     """Calculate the health status of Marqo based on the response API from Marqo-os ."""
     statuses = {
         "green" : 0,
@@ -371,10 +371,5 @@ def calculate_health_status(marqo_os_health_check_response: Optional[str]) -> di
 
     marqo_status = marqo_status if statuses[marqo_status] >= statuses[marqo_os_status] else marqo_os_status
 
-    return {
-        "status": marqo_status,
-        "backend": {
-            "status": marqo_os_status
-        }
-    }
+    return marqo_status, marqo_os_status
 
