@@ -174,7 +174,7 @@ def add_or_replace_documents(
         index_name: str,
         refresh: bool = True,
         marqo_config: config.Config = Depends(generate_config),
-        non_tensor_fields: Optional[List[str]] = Query(default=[]),
+        non_tensor_fields: Optional[List[str]] = Query(default=None),
         device: str = Depends(api_validation.validate_device),
         use_existing_tensors: Optional[bool] = False,
         image_download_headers: Optional[dict] = Depends(
@@ -286,7 +286,6 @@ def get_cpu_info():
 @app.get("/device/cuda")
 def get_cuda_info():
     return tensor_search.get_cuda_info()
-
 
 # try these curl commands:
 
