@@ -621,3 +621,27 @@ def validate_delete_docs_request(delete_request: MqDeleteDocsRequest, max_delete
 
     return delete_request
 
+
+def validate_nonnegative_number(input_string: str, field_description: str = "Input"):
+    """Validates that a string is a non-negative number
+
+    Args:
+        input_string: the string to validate
+
+    Returns:
+        input_string converted to a float, if it is a non-negative number
+
+    Raises:
+        InternalError if the string is not a non-negative number,
+        with a message dependent on field_description
+    """
+    try:
+        output_number = float(input_string)
+    except ValueError:
+        raise InternalError(f"`{field_description} must be a valid number! It is currently: {input_string}.`")
+    if output_number < 0:
+        raise InternalError(f"{field_description} cannot be a negative number! It is currently: `{input_string}`.")
+    return output_number
+
+
+

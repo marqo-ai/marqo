@@ -28,5 +28,7 @@ NON_OFFICIAL_LUCENE_SPECIAL_CHARS = {
     ' '
 }
 
-# If the OpenSearch cluster is this percent full, health should return red
-OPENSEARCH_DISK_BREACH_WATERMARK = .85
+# Order is important here: transient, persistent, then defaults.
+OPENSEARCH_CLUSTER_SETTINGS_TYPES = ["transient", "persistent", "defaults"]
+
+BYTE_SUFFIXES = ['b', 'kb', 'mb', 'gb', 'tb', 'pb', 'eb', 'zb', 'yb']
