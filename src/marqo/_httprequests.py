@@ -140,6 +140,8 @@ def convert_to_marqo_web_error_and_raise(response: requests.Response, err: reque
     """
     try:
         response_dict = response.json()
+        print("DEBUG: OpenSearch error response: ")
+        pprint.pprint(response_dict)
     except JSONDecodeError:
         raise_catchall_http_as_marqo_error(response=response, err=err)
     if response.status_code == 429:
