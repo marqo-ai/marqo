@@ -1,5 +1,8 @@
 import copy
+import io
 import itertools
+import os
+
 import PIL
 import requests.exceptions
 from marqo.s2_inference import clip_utils, types
@@ -79,6 +82,24 @@ class TestEncoding(unittest.TestCase):
                 return True
 
             run()
+
+    def test_load_image_from_path_closes_response(self):
+        good_url = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
+
+        mock_resp = mock.MagicMock()
+        mock_resp.ok = True
+
+        with mock.patch('requests.get', return_value=mock_resp) as mock_get:
+            with mock.patch('PIL.Image.open') as mock_open:
+                mock_open.side_effect = Exception()
+
+                with pytest.raises(Exception):
+                    clip_utils.load_image_from_path(good_url, {})
+
+                mock_get.assert_called_once()
+                mock_open.assert_called_once()
+                mock_resp.__exit__.assert_called_once()
+
 
 class TestDownloadFromRepo(unittest.TestCase):
 
