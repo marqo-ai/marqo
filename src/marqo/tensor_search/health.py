@@ -6,6 +6,7 @@ from marqo import errors
 from marqo._httprequests import HttpRequests
 from marqo.tensor_search.enums import HealthStatuses
 
+
 def generate_heath_check_response(config: Config, index_name: Optional[str] = None) -> dict:
     """Generate the health check response for check_heath(), check_index_health() APIs in tensor_search"""
     marqo_status = get_marqo_status()
