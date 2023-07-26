@@ -7,6 +7,7 @@ from marqo._httprequests import HttpRequests
 
 
 def generate_heath_check_response(config: Config, index_name: Optional[str] = None) -> dict:
+    """Generate the health check response for check_heath(), check_index_health() APIs in tensor_search"""
     marqo_status = get_marqo_status()
     marqo_os_status = get_marqo_os_status(config, index_name=index_name)
     marqo_status, marqo_os_status = aggregate_status(marqo_status, marqo_os_status)
