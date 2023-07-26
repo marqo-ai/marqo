@@ -215,3 +215,8 @@ class ConfigurationError(InternalError):
     code = "server_configuration_error"
     status_code = HTTPStatus.INTERNAL_SERVER_ERROR
 
+
+class DiskWatermarkBreachError(InternalError):
+    """Error when OpenSearch disk watermark is breached"""
+    code = "disk_watermark_breach_error"
+    status_code = HTTPStatus.INSUFFICIENT_STORAGE

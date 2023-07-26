@@ -15,7 +15,8 @@ from marqo.errors import (
     IndexAlreadyExistsError,
     InvalidIndexNameError,
     HardwareCompatabilityError,
-    IndexMaxFieldsError, TooManyRequestsError
+    IndexMaxFieldsError, TooManyRequestsError,
+    DiskWatermarkBreachError
 )
 from urllib3.exceptions import InsecureRequestWarning
 import warnings
@@ -144,11 +145,6 @@ def convert_to_marqo_web_error_and_raise(response: requests.Response, err: reque
         pprint.pprint(response_dict)
     except JSONDecodeError:
         raise_catchall_http_as_marqo_error(response=response, err=err)
-    if response.status_code == 429:
-        # TODO, raise a different marqo error here.
-        raise TooManyRequestsError(
-            message="Marqo-OS received too many requests! "
-                    "Please try reducing the frequency of add_documents and update_documents calls.")
 
     try:
         open_search_error_type = response_dict["error"]["type"]
@@ -172,9 +168,21 @@ def convert_to_marqo_web_error_and_raise(response: requests.Response, err: reque
             if "limit of total fields" in reason and "exceeded" in reason:
                 raise IndexMaxFieldsError(message="Exceeded maximum number of "
                                                   "allowed fields for this index.")
+        elif open_search_error_type == "cluster_block_exception":
+            # TODO: change the open search error type depending on experiment results
+            raise DiskWatermarkBreachError(message="OpenSearch cluster indexing has been blocked, most likely due to breach \
+                                           of the `flood_stage` disk watermark. For more information, please refer \
+                                           to your cluster settings: `cluster.routing.allocation.disk.watermark` at \
+                                           https://opensearch.org/docs/2.7/api-reference/cluster-api/cluster-settings/")
     except KeyError:
         pass
 
+    # for throttling
+    if response.status_code == 429:
+        raise TooManyRequestsError(
+            message="Marqo-OS received too many requests! "
+                    "Please try reducing the frequency of add_documents and update_documents calls.")
+    
     try:
         if response_dict["found"] is False:
             raise DocumentNotFoundError(
