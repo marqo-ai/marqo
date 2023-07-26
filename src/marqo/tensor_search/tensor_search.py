@@ -653,7 +653,6 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
             serialised_body = utils.dicts_to_jsonl(bulk_parent_dicts)
             index_parent_response = HttpRequests(config).post(
                 path="_bulk", body=serialised_body)
-            print(serialised_body)
         RequestMetricsStore.for_request().add_time("add_documents.opensearch._bulk.internal",
                                                    float(index_parent_response["took"]))
 

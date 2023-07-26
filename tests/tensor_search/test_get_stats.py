@@ -133,7 +133,6 @@ class TestGetStats(MarqoTestCase):
                     **test_case["add_docs_kwargs"],
                 )
             )
-            print(test_case)
             assert tensor_search.get_stats(config=self.config, index_name=self.index_name_1)["numberOfDocuments"] \
                    == test_case["expected_number_of_documents"]
             assert tensor_search.get_stats(config=self.config, index_name=self.index_name_1)["numberOfVectors"] \
