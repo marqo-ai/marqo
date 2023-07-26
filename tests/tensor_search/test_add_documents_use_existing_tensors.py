@@ -459,7 +459,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
         mock_vectorise.side_effect = pass_through_vectorise
         mock_close = unittest.mock.MagicMock()
         @unittest.mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
-        @unittest.mock.patch("PIL.Image.Image.close", mock_close)
+        @unittest.mock.patch("PIL.Image.Image.close", mock_close)  # disable .close so we can access images in this test
         def run():
             use_existing_tensor_doc = {
                 "txt_to_be_the_same": "some text to leave unchanged. I repeat, unchanged",
