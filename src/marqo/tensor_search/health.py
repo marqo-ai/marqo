@@ -40,7 +40,8 @@ def get_marqo_os_status(config: Config, index_name: Optional[str] = None) -> str
         marqo_os_health_check_response = None
 
     if marqo_os_health_check_response is not None:
-        if "status" in marqo_os_health_check_response:
+        if "status" in marqo_os_health_check_response and marqo_os_health_check_response['status'] \
+                in list(HealthStatuses):
             marqo_os_status = HealthStatuses[marqo_os_health_check_response['status']]
         else:
             marqo_os_status = HealthStatuses.red
