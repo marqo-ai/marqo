@@ -66,6 +66,7 @@ from marqo.s2_inference.processing import image as image_processor
 from marqo.s2_inference.clip_utils import _is_image
 from marqo.s2_inference.reranking import rerank
 from marqo.s2_inference import s2_inference
+from marqo.tensor_search.health import generate_heath_check_response
 import torch.cuda
 import psutil
 # We depend on _httprequests.py for now, but this may be replaced in the future, as
@@ -1815,53 +1816,15 @@ def check_index_health(config: Config, index_name: str) -> dict:
     Returns:
         dict
     """
-    TIMEOUT = 3
-    marqo_os_health_check_response = None
-
-    try:
-        timeout_config = copy.deepcopy(config)
-        timeout_config.timeout = TIMEOUT
-        marqo_os_health_check_response = HttpRequests(timeout_config).get(
-            path=f"_cluster/health/{index_name}"
-        )
-    except errors.BackendCommunicationError:
-        marqo_os_health_check_response = None
-
-    marqo_status, marqo_os_status = utils.calculate_health_status(marqo_os_health_check_response)
-
-    return {
-        "status": marqo_status,
-        "backend": {
-            "status": marqo_os_status
-        }
-    }
+    return generate_heath_check_response(config, index_name=index_name)
 
 
-def check_health(config: Config):
+def check_health(config: Config) -> dict:
     """Check the health of the Marqo-os backend.
     Deprecated in Marqo 1.0.0 and will be removed in future versions.
     Please use check_index_health instead.
     """
-    TIMEOUT = 3
-    marqo_os_health_check_response = None
-
-    try:
-        timeout_config = copy.deepcopy(config)
-        timeout_config.timeout = TIMEOUT
-        marqo_os_health_check_response = HttpRequests(timeout_config).get(
-            path="_cluster/health"
-        )
-    except errors.BackendCommunicationError:
-        marqo_os_health_check_response = None
-
-    marqo_status, marqo_os_status = utils.calculate_health_status(marqo_os_health_check_response)
-
-    return {
-        "status": marqo_status,
-        "backend": {
-            "status": marqo_os_status
-        }
-    }
+    return generate_heath_check_response(config)
 
 
 def delete_index(config: Config, index_name):

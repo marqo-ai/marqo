@@ -4,7 +4,7 @@ import unittest
 from marqo.tensor_search import tensor_search
 from tests.marqo_test import MarqoTestCase
 from marqo.errors import IndexNotFoundError
-from marqo.tensor_search.utils import calculate_health_status
+from marqo.tensor_search.health import aggregate_status
 
 
 class TestHealthCheck(MarqoTestCase):
@@ -97,28 +97,16 @@ class TestHealthCheck(MarqoTestCase):
         assert run()
 
 
-class TestCalculateStatus(unittest.TestCase):
+class TestAggregateStatus(unittest.TestCase):
     def test_status_green(self):
-        response = {'status': 'green'}
-        result = calculate_health_status(response)
+        result = aggregate_status(marqo_status="green", marqo_os_status="green")
         self.assertEqual(result, ('green', 'green'))
 
     def test_status_yellow(self):
-        response = {'status': 'yellow'}
-        result = calculate_health_status(response)
+        result = aggregate_status(marqo_status="green", marqo_os_status="yellow")
         self.assertEqual(result, ('yellow', 'yellow'))
 
     def test_status_red(self):
-        response = {'status': 'red'}
-        result = calculate_health_status(response)
-        self.assertEqual(result, ('red', 'red'))
-
-    def test_no_status_in_response(self):
-        response = {'something_else': 'random'}
-        result = calculate_health_status(response)
-        self.assertEqual(result, ('red', 'red'))
-
-    def test_no_response(self):
-        result = calculate_health_status(None)
+        result = aggregate_status(marqo_status="green", marqo_os_status="red")
         self.assertEqual(result, ('red', 'red'))
 
