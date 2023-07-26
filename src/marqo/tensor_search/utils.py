@@ -2,6 +2,7 @@ import os
 import typing
 import functools
 import json
+import math
 from timeit import default_timer as timer
 import torch
 from marqo import errors
@@ -349,3 +350,9 @@ def is_tensor_field(field: str,
         return field in tensor_fields
     else:
         return field not in non_tensor_fields
+
+
+def convert_bytes_to_human_readable_format(size_in_bytes: int) -> str:
+    size_factor = math.floor(math.log(size_in_bytes) / math.log(constants.NUM_BYTES_IN_KB))
+    processed_size = size_in_bytes / math.pow(constants.NUM_BYTES_IN_KB, size_factor)
+    return f"{processed_size:.2f} {constants.SUPPORTED_SIZES_FOR_STATS[size_factor]}"
