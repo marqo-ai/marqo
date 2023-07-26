@@ -1816,32 +1816,18 @@ def check_index_health(config: Config, index_name: str) -> dict:
         dict
     """
     TIMEOUT = 3
-    statuses = {
-        "green": 0,
-        "yellow": 1,
-        "red": 2
-    }
+    marqo_os_health_check_response = None
 
-    marqo_status = "green"
-    marqo_os_health_check = None
     try:
         timeout_config = copy.deepcopy(config)
         timeout_config.timeout = TIMEOUT
-        marqo_os_health_check = HttpRequests(timeout_config).get(
+        marqo_os_health_check_response = HttpRequests(timeout_config).get(
             path=f"_cluster/health/{index_name}"
         )
     except errors.BackendCommunicationError:
-        marqo_os_status = "red"
+        marqo_os_health_check_response = None
 
-    if marqo_os_health_check is not None:
-        if "status" in marqo_os_health_check:
-            marqo_os_status = marqo_os_health_check['status']
-        else:
-            marqo_os_status = "red"
-    else:
-        marqo_os_status = "red"
-
-    marqo_status = marqo_status if statuses[marqo_status] >= statuses[marqo_os_status] else marqo_os_status
+    marqo_status, marqo_os_status = utils.calculate_health_status(marqo_os_health_check_response)
 
     return {
         "status": marqo_status,
@@ -1857,32 +1843,18 @@ def check_health(config: Config):
     Please use check_index_health instead.
     """
     TIMEOUT = 3
-    statuses = {
-        "green": 0,
-        "yellow": 1,
-        "red": 2
-    }
+    marqo_os_health_check_response = None
 
-    marqo_status = "green"
-    marqo_os_health_check = None
     try:
         timeout_config = copy.deepcopy(config)
         timeout_config.timeout = TIMEOUT
-        marqo_os_health_check = HttpRequests(timeout_config).get(
+        marqo_os_health_check_response = HttpRequests(timeout_config).get(
             path="_cluster/health"
         )
     except errors.BackendCommunicationError:
-        marqo_os_status = "red"
+        marqo_os_health_check_response = None
 
-    if marqo_os_health_check is not None:
-        if "status" in marqo_os_health_check:
-            marqo_os_status = marqo_os_health_check['status']
-        else:
-            marqo_os_status = "red"
-    else:
-        marqo_os_status = "red"
-
-    marqo_status = marqo_status if statuses[marqo_status] >= statuses[marqo_os_status] else marqo_os_status
+    marqo_status, marqo_os_status = utils.calculate_health_status(marqo_os_health_check_response)
 
     return {
         "status": marqo_status,
