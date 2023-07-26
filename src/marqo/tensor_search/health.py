@@ -4,7 +4,7 @@ import copy
 from marqo.config import Config
 from marqo import errors
 from marqo._httprequests import HttpRequests
-
+from marqo.tensor_search.enums import HealthStatuses
 
 def generate_heath_check_response(config: Config, index_name: Optional[str] = None) -> dict:
     """Generate the health check response for check_heath(), check_index_health() APIs in tensor_search"""
@@ -22,7 +22,7 @@ def generate_heath_check_response(config: Config, index_name: Optional[str] = No
 
 def get_marqo_status() -> str:
     """Check the Marqo instance status."""
-    return "green"
+    return HealthStatuses.green
 
 
 def get_marqo_os_status(config: Config, index_name: Optional[str] = None) -> str:
@@ -40,23 +40,16 @@ def get_marqo_os_status(config: Config, index_name: Optional[str] = None) -> str
 
     if marqo_os_health_check_response is not None:
         if "status" in marqo_os_health_check_response:
-            marqo_os_status = marqo_os_health_check_response['status']
+            marqo_os_status = HealthStatuses[marqo_os_health_check_response['status']]
         else:
-            marqo_os_status = "red"
+            marqo_os_status = HealthStatuses.red
     else:
-        marqo_os_status = "red"
+        marqo_os_status = HealthStatuses.red
 
     return marqo_os_status
 
 
 def aggregate_status(marqo_status: str, marqo_os_status: str) -> Tuple[str, str]:
     """Aggregate the Marqo instance and Marqo-os backend status."""
-
-    statuses = {
-        "green": 0,
-        "yellow": 1,
-        "red": 2,
-    }
-
-    marqo_status = marqo_status if statuses[marqo_status] >= statuses[marqo_os_status] else marqo_os_status
+    marqo_status = max(marqo_status, marqo_os_status)
     return marqo_status, marqo_os_status
