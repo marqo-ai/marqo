@@ -189,7 +189,9 @@ def add_docs_params_orchestrator(index_name: str, body: Union[AddDocsBodyParams,
             raise BadRequestError('Required parameter `tensorFields` is missing from the request body. '
                                   'This endpoint now requires `tensorFields` in request body. Providing '
                                   'a list of documents as body has been deprecated and will not be '
-                                  'supported in Marqo 2.0.0')
+                                  'supported in Marqo 2.0.0. See '
+                                  'https://docs.marqo.ai/1.0.0/API-Reference/documents/#add-or-replace-documents '
+                                  'for usage of this endpoint.')
 
         return AddDocsParams(
             index_name=index_name, docs=docs, auto_refresh=auto_refresh,
