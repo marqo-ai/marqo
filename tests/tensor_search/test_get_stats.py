@@ -1,8 +1,10 @@
+from unittest.mock import MagicMock, patch
+
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
+from marqo import errors
 from marqo.errors import IndexNotFoundError, MarqoError
 from marqo.tensor_search import tensor_search, constants, index_meta_cache
 from tests.marqo_test import MarqoTestCase
-from marqo._httprequests import HttpRequests
 
 
 class TestGetStats(MarqoTestCase):
@@ -182,6 +184,59 @@ class TestGetStats(MarqoTestCase):
                == test_case["expected_number_of_documents"]
         assert tensor_search.get_stats(config=self.config, index_name=self.index_name_1)["numberOfVectors"] \
                == test_case["expected_number_of_vectors"]
+
+    def test_key_error(self):
+        with patch("marqo.tensor_search.tensor_search.HttpRequests.get") as mock_get:
+            mock_get.return_value = {"aggregations": {"nested_chunks": {"chunk_count": {"not_value": 200}}}}
+
+            tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1,)
+            with self.assertRaises(errors.InternalError) as e:
+                res = tensor_search.get_stats(self.config, self.index_name_1)
+
+            self.assertIn("The expected fields do not exist in the response", str(e.exception))
+
+    def test_type_error(self):
+        with patch("marqo.tensor_search.tensor_search.HttpRequests.get") as mock_get:
+            mock_get.return_value = None
+
+            tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1,)
+            with self.assertRaises(errors.InternalError) as e:
+                res = tensor_search.get_stats(self.config, self.index_name_1)
+
+            self.assertIn("The expected fields do not exist in the response", str(e.exception))
+
+    def test_IndexNotFoundError_error(self):
+        with patch("marqo.tensor_search.tensor_search.HttpRequests.get") as mock_get:
+            mock_get.side_effect = errors.IndexNotFoundError("IndexNotFoundError")
+
+            tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1,)
+            with self.assertRaises(errors.IndexNotFoundError) as e:
+                res = tensor_search.get_stats(self.config, self.index_name_1)
+
+            self.assertIn("IndexNotFoundError", str(e.exception))
+
+    def test_InvalidIndexNameError_error(self):
+        with patch("marqo.tensor_search.tensor_search.HttpRequests.get") as mock_get:
+            mock_get.side_effect = errors.InvalidIndexNameError("InvalidIndexNameError")
+
+            tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1,)
+            with self.assertRaises(errors.InvalidIndexNameError) as e:
+                res = tensor_search.get_stats(self.config, self.index_name_1)
+
+            self.assertIn("InvalidIndexNameError", str(e.exception))
+
+    def test_generic_MarqoWebError_error(self):
+        # Generic MarqoWebError should be caught and raised as InternalError
+        with patch("marqo.tensor_search.tensor_search.HttpRequests.get") as mock_get:
+            mock_get.side_effect = errors.MarqoWebError("test-test")
+
+            tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1,)
+            with self.assertRaises(errors.InternalError) as e:
+                res = tensor_search.get_stats(self.config, self.index_name_1)
+
+            self.assertIn("Marqo encountered an error while communicating with Marqo-os during execution of", str(e.exception))
+
+
 
 
 

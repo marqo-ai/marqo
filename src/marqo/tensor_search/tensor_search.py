@@ -299,9 +299,18 @@ def get_stats(config: Config, index_name: str):
         vector_count = HttpRequests(config).get(path=f"{index_name}/_search", body=body) \
             ["aggregations"]["nested_chunks"]["chunk_count"]["value"]
     except (KeyError, TypeError) as e:
-        return errors.InternalError(
-            f"Marqo encountered an unexpected response from Marqo-os when calling `get_stats(index=)`. "
-            f"The expected fields do not exist in the response. Original error message = {e}")
+        error_message = (f"Marqo received an unexpected response from Marqo-os during execution of `get_stats()` APIs. "
+                         f"The expected fields do not exist in the response. Original error message = {e}")
+        logger.error(error_message)
+        raise errors.InternalError(error_message)
+    except (errors.IndexNotFoundError, errors.InvalidIndexNameError):
+        raise
+    except errors.MarqoWebError as e:
+        error_message = (
+            f"Marqo encountered an error while communicating with Marqo-os during execution of `get_stats()` APIs. "
+            f"Original error message: {e.message}")
+        logger.error(error_message)
+        raise errors.InternalError(error_message)
 
     return {
         "numberOfDocuments": doc_count,
