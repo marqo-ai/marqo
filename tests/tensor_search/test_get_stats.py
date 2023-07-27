@@ -38,7 +38,7 @@ class TestGetStats(MarqoTestCase):
         )
         assert tensor_search.get_stats(config=self.config, index_name=self.index_name_1)["numberOfDocuments"] == 3
 
-    def test_get_stats_number_of_vectors(self):
+    def test_get_stats_number_of_vectors_unified(self):
 
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1,
                                           index_settings={'index_defaults': {"model": "random/small"}})
@@ -67,7 +67,7 @@ class TestGetStats(MarqoTestCase):
         assert tensor_search.get_stats(config=self.config, index_name=self.index_name_1)["numberOfVectors"] \
                == expected_number_of_vectors
 
-    def test_get_stats_number_of_vectors(self):
+    def test_get_stats_number_of_vectors_separated(self):
         testing_list = [
             {
                 "expected_number_of_vectors": 2,
