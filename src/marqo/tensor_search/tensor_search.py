@@ -267,13 +267,7 @@ def _autofill_index_settings(index_settings: dict):
 
 
 def get_stats(config: Config, index_name: str):
-    """Returns the number of documents and vectors in the index.
-
-    The _count API counts top-level documents.
-    For numberOfVectors, we count the number of `__chunks.__field_name` fields because it is a key_word field, which
-    is known to be fast.
-
-    Difference between the two gives the numberOfVectors."""
+    """Returns the number of documents and vectors in the index."""
 
     body = {
         "size": 0,
@@ -285,6 +279,7 @@ def get_stats(config: Config, index_name: str):
                 "aggs": {
                     "marqo_vector_count": {
                         "value_count": {
+                            # This is a key_word field, so it is fast in value_count
                             "field": "__chunks.__field_name"
                         }
                     }
@@ -298,18 +293,14 @@ def get_stats(config: Config, index_name: str):
         vector_count = HttpRequests(config).get(path=f"{index_name}/_search", body=body) \
             ["aggregations"]["nested_chunks"]["marqo_vector_count"]["value"]
     except (KeyError, TypeError) as e:
-        error_message = (f"Marqo received an unexpected response from Marqo-os during execution of `get_stats()` APIs. "
-                         f"The expected fields do not exist in the response. Original error message = {e}")
-        logger.error(error_message)
-        raise errors.InternalError(error_message)
-    except (errors.IndexNotFoundError, errors.InvalidIndexNameError):
-        raise
+        raise errors.InternalError(f"Marqo received an unexpected response from Marqo-OS. "
+                                   f"The expected fields do not exist in the response. Original error message = {e}")
     except errors.MarqoWebError as e:
-        error_message = (
-            f"Marqo encountered an error while communicating with Marqo-os during execution of `get_stats()` APIs. "
-            f"Original error message: {e.message}")
-        logger.error(error_message)
-        raise errors.InternalError(error_message)
+        if isinstance(e, (errors.IndexNotFoundError, errors.InvalidIndexNameError)):
+            raise e
+        else:
+            raise errors.InternalError(f"Marqo encountered an error while communicating with Marqo-OS. "
+                                       f"Original error message: {e.message}")
 
     return {
         "numberOfDocuments": doc_count,

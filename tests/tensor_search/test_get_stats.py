@@ -39,7 +39,8 @@ class TestGetStats(MarqoTestCase):
         assert tensor_search.get_stats(config=self.config, index_name=self.index_name_1)["numberOfDocuments"] == 3
 
     def test_get_stats_number_of_vectors_unified(self):
-
+        """Tests the 'get_stats' function by checking if it correctly returns the
+           number of vectors and documents for all the documents indexed at once."""
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1,
                                           index_settings={'index_defaults': {"model": "random/small"}})
         expected_number_of_vectors = 7
@@ -62,12 +63,14 @@ class TestGetStats(MarqoTestCase):
             )
         )
 
-        assert tensor_search.get_stats(config=self.config, index_name=self.index_name_1)["numberOfDocuments"] \
-               == expected_number_of_documents
-        assert tensor_search.get_stats(config=self.config, index_name=self.index_name_1)["numberOfVectors"] \
-               == expected_number_of_vectors
+        res = tensor_search.get_stats(config=self.config, index_name=self.index_name_1)
+
+        assert res["numberOfDocuments"] == expected_number_of_documents
+        assert res["numberOfVectors"] == expected_number_of_vectors
 
     def test_get_stats_number_of_vectors_separated(self):
+        """Tests the 'get_stats' function by checking if it correctly returns the
+           number of vectors and documents for documents indexed one by one ."""
         testing_list = [
             {
                 "expected_number_of_vectors": 2,
@@ -135,10 +138,11 @@ class TestGetStats(MarqoTestCase):
                     **test_case["add_docs_kwargs"],
                 )
             )
-            assert tensor_search.get_stats(config=self.config, index_name=self.index_name_1)["numberOfDocuments"] \
-                   == test_case["expected_number_of_documents"]
-            assert tensor_search.get_stats(config=self.config, index_name=self.index_name_1)["numberOfVectors"] \
-                   == test_case["expected_number_of_vectors"]
+
+            res = tensor_search.get_stats(config=self.config, index_name=self.index_name_1)
+
+            assert res["numberOfDocuments"] == test_case["expected_number_of_documents"]
+            assert res["numberOfVectors"] == test_case["expected_number_of_vectors"]
 
     def test_long_text_splitting_vectors_count(self):
 
@@ -180,10 +184,10 @@ class TestGetStats(MarqoTestCase):
             )
         )
 
-        assert tensor_search.get_stats(config=self.config, index_name=self.index_name_1)["numberOfDocuments"] \
-               == test_case["expected_number_of_documents"]
-        assert tensor_search.get_stats(config=self.config, index_name=self.index_name_1)["numberOfVectors"] \
-               == test_case["expected_number_of_vectors"]
+        res = tensor_search.get_stats(config=self.config, index_name=self.index_name_1)
+
+        assert res["numberOfDocuments"] == test_case["expected_number_of_documents"]
+        assert res["numberOfVectors"] == test_case["expected_number_of_vectors"]
 
     def test_key_error(self):
         with patch("marqo.tensor_search.tensor_search.HttpRequests.get") as mock_get:
@@ -213,8 +217,6 @@ class TestGetStats(MarqoTestCase):
             with self.assertRaises(errors.IndexNotFoundError) as e:
                 res = tensor_search.get_stats(self.config, self.index_name_1)
 
-            self.assertIn("IndexNotFoundError", str(e.exception))
-
     def test_InvalidIndexNameError_error(self):
         with patch("marqo.tensor_search.tensor_search.HttpRequests.get") as mock_get:
             mock_get.side_effect = errors.InvalidIndexNameError("InvalidIndexNameError")
@@ -222,8 +224,6 @@ class TestGetStats(MarqoTestCase):
             tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1,)
             with self.assertRaises(errors.InvalidIndexNameError) as e:
                 res = tensor_search.get_stats(self.config, self.index_name_1)
-
-            self.assertIn("InvalidIndexNameError", str(e.exception))
 
     def test_generic_MarqoWebError_error(self):
         # Generic MarqoWebError should be caught and raised as InternalError
@@ -234,4 +234,4 @@ class TestGetStats(MarqoTestCase):
             with self.assertRaises(errors.InternalError) as e:
                 res = tensor_search.get_stats(self.config, self.index_name_1)
 
-            self.assertIn("Marqo encountered an error while communicating with Marqo-os during execution of", str(e.exception))
+            self.assertIn("Marqo encountered an error while communicating with Marqo-OS", str(e.exception))
