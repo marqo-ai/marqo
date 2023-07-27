@@ -270,9 +270,7 @@ def get_stats(config: Config, index_name: str):
     """Returns the number of documents and vectors in the index.
 
     The _count API counts top-level documents.
-    The _stats API includes the count of nested documents, which is __chunks in Marqo.
-
-    For numberOfVectors, we count the number of __chunks.__field_name because it is a key_word field, which
+    For numberOfVectors, we count the number of `__chunks.__field_name` fields because it is a key_word field, which
     is known to be fast.
 
     Difference between the two gives the numberOfVectors."""
