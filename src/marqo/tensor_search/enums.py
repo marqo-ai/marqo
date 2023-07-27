@@ -146,6 +146,17 @@ class ModelProperties:
 class InferenceParams:
     model_auth = "model_auth"
 # Perhaps create a ThrottleType to differentiate thread_count and data_size throttling mechanisms
+
+
+class HealthStatuses(str, Enum):
+    green = "green"
+    yellow = "yellow"
+    red = "red"
+
+    def __lt__(self, other):
+        # Define the custom comparison logic
+        status_order = [self.green, self.yellow, self.red]
+        return status_order.index(self) < status_order.index(other)
     
 
 

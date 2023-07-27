@@ -67,6 +67,7 @@ from marqo.s2_inference.processing import image as image_processor
 from marqo.s2_inference.clip_utils import _is_image
 from marqo.s2_inference.reranking import rerank
 from marqo.s2_inference import s2_inference
+from marqo.tensor_search.health import generate_heath_check_response
 import torch.cuda
 import psutil
 # We depend on _httprequests.py for now, but this may be replaced in the future, as
@@ -1814,41 +1815,24 @@ def sort_chunks(docs: dict) -> List:
     return sorted(as_list, key=lambda x: x["chunks"][0]["_score"], reverse=True)
 
 
-def check_health(config: Config):
-    TIMEOUT = 3
-    statuses = {
-        "green": 0,
-        "yellow": 1,
-        "red": 2
-    }
+def check_index_health(config: Config, index_name: str) -> dict:
+    """Checks the health of an index
+    Args:
+        config: Config
+        index_name: str
+    Returns:
+        dict
+    """
+    return generate_heath_check_response(config, index_name=index_name)
 
-    marqo_status = "green"
-    marqo_os_health_check = None
-    try:
-        timeout_config = copy.deepcopy(config)
-        timeout_config.timeout = TIMEOUT
-        marqo_os_health_check = HttpRequests(timeout_config).get(
-            path="_cluster/health"
-        )
-    except errors.BackendCommunicationError:
-        marqo_os_status = "red"
 
-    if marqo_os_health_check is not None:
-        if "status" in marqo_os_health_check:
-            marqo_os_status = marqo_os_health_check['status']
-        else:
-            marqo_os_status = "red"
-    else:
-        marqo_os_status = "red"
+def check_health(config: Config) -> dict:
+    """Check the health of the Marqo-os backend.
+    Deprecated in Marqo 1.0.0 and will be removed in future versions.
+    Please use check_index_health instead.
+    """
+    return generate_heath_check_response(config)
 
-    marqo_status = marqo_status if statuses[marqo_status] >= statuses[marqo_os_status] else marqo_os_status
-
-    return {
-        "status": marqo_status,
-        "backend": {
-            "status": marqo_os_status
-        }
-    }
 
 def delete_index(config: Config, index_name):
     res = HttpRequests(config).delete(path=index_name)
