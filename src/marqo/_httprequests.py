@@ -139,10 +139,9 @@ def convert_to_marqo_web_error_and_raise(response: requests.Response, err: reque
     Raises:
         MarqoWebError - some type of Marqo Web error
     """
+
     try:
         response_dict = response.json()
-        print("DEBUG: OpenSearch error response: ")
-        pprint.pprint(response_dict)
     except JSONDecodeError:
         raise_catchall_http_as_marqo_error(response=response, err=err)
 
@@ -169,7 +168,6 @@ def convert_to_marqo_web_error_and_raise(response: requests.Response, err: reque
                 raise IndexMaxFieldsError(message="Exceeded maximum number of "
                                                   "allowed fields for this index.")
         elif open_search_error_type == "cluster_block_exception":
-            # TODO: change the open search error type depending on experiment results
             raise DiskWatermarkBreachError(message="OpenSearch cluster indexing has been blocked, most likely due to breach \
                                            of the `flood_stage` disk watermark. For more information, please refer \
                                            to your cluster settings: `cluster.routing.allocation.disk.watermark` at \

@@ -4,20 +4,21 @@ from marqo._httprequests import HttpRequests
 from marqo.config import Config
 from marqo import errors
 from marqo.tensor_search.tensor_search_logging import get_logger
+import math
 
 logger = get_logger(__name__)
 
 
-def convert_watermark_to_bytes(watermark: str, total_in_bytes: str = None):
+def convert_watermark_to_bytes(watermark: str, total_in_bytes: int = None) -> int:
     """
     Converts a value to bytes.
     It could possible be:
     1. Bytes (eg 123.4gb) - do nothing
-    2. MB, GB, TB, etc, (eg 123.4gb) - divide by some power of 1024 to get bytes
+    2. MB, GB, TB, etc, (eg 123.4gb) - multiply by some power of 1024 to get bytes
     3. Ratio (e.g. 0.9) - multiply by total_in_bytes to get bytes
     4. Percentage (e.g. 90%) - convert to ratio then multiply by total_in_bytes to get bytes
 
-    Returns: watermark in bytes (float)
+    Returns: watermark in bytes (int)
     """
 
     # Initial validation
@@ -27,9 +28,9 @@ def convert_watermark_to_bytes(watermark: str, total_in_bytes: str = None):
     if watermark == "":
         raise errors.InternalError("OpenSearch disk watermark cannot be empty string.")
     
-    if total_in_bytes is not None:
-        total_in_bytes = validation.validate_nonnegative_number(total_in_bytes, "OpenSearch disk total size in bytes")
-    
+    if total_in_bytes is not None and total_in_bytes < 0:
+        raise errors.InternalError("OpenSearch cluster stats fs: total_in_bytes cannot be negative.")
+
     if watermark[-2:].lower() in constants.BYTE_SUFFIXES:
         # Watermark in KB/MB/GB/TB format
         # Bytes represent MIN disk space AVAILABLE
@@ -61,7 +62,8 @@ def convert_watermark_to_bytes(watermark: str, total_in_bytes: str = None):
     if total_in_bytes is None:
         raise errors.InternalError("total_in_bytes must be provided for ratio or percentage watermark.")
     
-    return total_in_bytes * ratio_watermark
+    # Round up to the next byte (more conservative approach)
+    return math.ceil(total_in_bytes * ratio_watermark)
 
 
 def check_opensearch_disk_watermark_breach(config: Config):
@@ -82,9 +84,8 @@ def check_opensearch_disk_watermark_breach(config: Config):
     for settings_type in constants.OPENSEARCH_CLUSTER_SETTINGS_TYPES:
         try:
             # Check for transient, persistent, then defaults settings
-            opensearch_disk_settings = HttpRequests(config).get(path="_cluster/settings?include_defaults=true")\
+            opensearch_disk_settings = HttpRequests(config).get(path="_cluster/settings?include_defaults=true&filter_path=**.disk*")\
                 [settings_type]["cluster"]["routing"]["allocation"]["disk"]
-            # TODO: Should we use flood stage? or high? or low?
             raw_flood_stage_watermark = opensearch_disk_settings["watermark"]["flood_stage"]
             logger.debug(f"Found disk flood stage watermark in {settings_type} settings: {raw_flood_stage_watermark}")
             break
@@ -92,12 +93,10 @@ def check_opensearch_disk_watermark_breach(config: Config):
             logger.debug(f"Flood stage watermark not found in {settings_type} settings.")
     
     if not raw_flood_stage_watermark:
-        raise errors.BackendCommunicationError("Could not find disk flood stage watermark in OpenSearch settings.")
-    
+        raise errors.InternalError("Could not find disk flood stage watermark in OpenSearch settings.")
     # Query opensearch for disk space
     filesystem_stats = HttpRequests(config).get(path="_cluster/stats")["nodes"]["fs"]
     minimum_available_disk_space = convert_watermark_to_bytes(watermark=raw_flood_stage_watermark, total_in_bytes=filesystem_stats["total_in_bytes"])
-
-    if filesystem_stats["available_in_bytes"] < minimum_available_disk_space:
+    if filesystem_stats["available_in_bytes"] <= minimum_available_disk_space:
         return "red"
     return "green"
