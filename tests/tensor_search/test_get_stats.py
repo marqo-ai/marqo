@@ -235,8 +235,3 @@ class TestGetStats(MarqoTestCase):
                 res = tensor_search.get_stats(self.config, self.index_name_1)
 
             self.assertIn("Marqo encountered an error while communicating with Marqo-os during execution of", str(e.exception))
-
-
-
-
-
