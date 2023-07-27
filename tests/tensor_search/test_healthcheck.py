@@ -281,7 +281,6 @@ class TestHealthCheck(MarqoTestCase):
                         raise e
                     assert isinstance(e, test_case["EXPECTED"])
 
-
     def test_health_check_unknown_backend_response(self):
         def run():
             health_check_status = tensor_search.check_health(self.config)
@@ -293,6 +292,30 @@ class TestHealthCheck(MarqoTestCase):
         with mock.patch("marqo._httprequests.HttpRequests.get", side_effect=mock_http_get):
             assert run()
     
+    def test_health_check_path(self):
+        mock_http_get = self.create_mock_http_get()
+        with mock.patch("marqo._httprequests.HttpRequests.get", side_effect=mock_http_get) as http_get_tracker:
+            tensor_search.check_health(self.config)
+
+            http_get_calls_list = http_get_tracker.call_args_list
+            health_call_found = False
+            settings_call_found = False
+            stats_call_found = False
+
+            # for health, settings, stats
+            assert len(http_get_calls_list) == 3
+            for args, kwargs in http_get_calls_list:
+                if f"_cluster/health" in kwargs['path']:
+                    health_call_found = True
+                if f"_cluster/settings" in kwargs['path']:
+                    settings_call_found = True
+                if f"_cluster/stats" in kwargs['path']:
+                    stats_call_found = True
+            
+            assert health_call_found
+            assert settings_call_found
+            assert stats_call_found
+
     def test_convert_watermark_to_bytes(self):
         test_cases = [
             # byte watermarks (total_in_bytes is ignored)
@@ -345,7 +368,6 @@ class TestHealthCheck(MarqoTestCase):
             except Exception as e:
                 assert isinstance(e, expected)
     
-
     def test_check_opensearch_disk_watermark_breach(self):
         # Note that percentages and ratios are USED SPACE CEILINGS (90%, 0.85, etc)
         # while bytes, kb, mb, gb, tb are MINIMUM AVAILABLE SPACE FLOORS (1gb [out of 10gb], 15kb [out of 100kb], etc])
@@ -796,12 +818,24 @@ class TestHealthCheck(MarqoTestCase):
             print(f"DEBUG mock_get: {http_get_tracker}, type is {type(http_get_tracker)}")
             tensor_search.check_index_health(index_name=self.index_name, config=self.config)
 
-            # Check that at least 1 call was made to the _cluster/health/index-name endpoint
-            health_endpoint_found = False
-            for args, kwargs in http_get_tracker.call_args_list:
+            http_get_calls_list = http_get_tracker.call_args_list
+            health_call_found = False
+            settings_call_found = False
+            stats_call_found = False
+
+            # for health, settings, stats
+            assert len(http_get_calls_list) == 3
+            for args, kwargs in http_get_calls_list:
                 if f"_cluster/health/{self.index_name}" in kwargs['path']:
-                    health_endpoint_found = True
-            assert health_endpoint_found
+                    health_call_found = True
+                if f"_cluster/settings" in kwargs['path']:
+                    settings_call_found = True
+                if f"_cluster/stats" in kwargs['path']:
+                    stats_call_found = True
+            
+            assert health_call_found
+            assert settings_call_found
+            assert stats_call_found
 
     def test_index_health_check_unknown_backend_response(self):
         # Ensure the index does not exist

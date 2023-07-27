@@ -168,10 +168,10 @@ def convert_to_marqo_web_error_and_raise(response: requests.Response, err: reque
                 raise IndexMaxFieldsError(message="Exceeded maximum number of "
                                                   "allowed fields for this index.")
         elif open_search_error_type == "cluster_block_exception":
-            raise DiskWatermarkBreachError(message="OpenSearch cluster indexing has been blocked, most likely due to breach \
-                                           of the `flood_stage` disk watermark. For more information, please refer \
-                                           to your cluster settings: `cluster.routing.allocation.disk.watermark` at \
-                                           https://opensearch.org/docs/2.7/api-reference/cluster-api/cluster-settings/")
+            raise DiskWatermarkBreachError(message="OpenSearch cluster indexing has been blocked, most likely due to breach "
+                                           "of the `flood_stage` disk watermark. Try freeing up disk space on your OpenSearch instances. "
+                                           "For more information, please refer to cluster settings: `cluster.routing.allocation.disk.watermark` at "
+                                           "https://opensearch.org/docs/2.7/api-reference/cluster-api/cluster-settings/")
     except KeyError:
         pass
 

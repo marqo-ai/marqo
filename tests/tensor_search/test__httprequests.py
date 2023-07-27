@@ -76,8 +76,8 @@ class Test_HttpRequests(MarqoTestCase):
                     )
                 )
                 raise AssertionError
-            except DiskWatermarkBreachError:
-                pass
+            except DiskWatermarkBreachError as e:
+                print(e.message)
             return True
         assert run()
         

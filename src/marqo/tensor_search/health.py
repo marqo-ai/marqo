@@ -84,11 +84,11 @@ def check_opensearch_disk_watermark_breach(config: Config):
 
     # Query opensearch for watermark
     raw_flood_stage_watermark = None
+    opensearch_settings = HttpRequests(config).get(path="_cluster/settings?include_defaults=true&filter_path=**.disk*")
     for settings_type in constants.OPENSEARCH_CLUSTER_SETTINGS_TYPES:
         try:
             # Check for transient, persistent, then defaults settings
-            opensearch_disk_settings = HttpRequests(config).get(path="_cluster/settings?include_defaults=true&filter_path=**.disk*")\
-                [settings_type]["cluster"]["routing"]["allocation"]["disk"]
+            opensearch_disk_settings = opensearch_settings[settings_type]["cluster"]["routing"]["allocation"]["disk"]
             raw_flood_stage_watermark = opensearch_disk_settings["watermark"]["flood_stage"]
             logger.debug(f"Found disk flood stage watermark in {settings_type} settings: {raw_flood_stage_watermark}")
             break
@@ -125,7 +125,14 @@ def get_marqo_status() -> Union[str, HealthStatuses]:
 
 
 def get_marqo_os_status(config: Config, index_name: Optional[str] = None) -> Union[str, HealthStatuses]:
-    """Check the Marqo-os backend status."""
+    """
+    Check the Marqo-os backend status.
+
+    3 OpenSearch calls are made in this check:
+    1. health: _cluster/health or _cluster/health/{index_name}
+    2. settings: _cluster/settings?include_defaults=true&filter_path=**.disk*
+    3. stats: _cluster/stats
+    """
     TIMEOUT = 3
     marqo_os_health_check_response = None
     path = f"_cluster/health/{index_name}" if index_name else "_cluster/health"
