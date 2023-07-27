@@ -1,4 +1,4 @@
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Union
 import copy
 
 from marqo.config import Config
@@ -11,22 +11,22 @@ def generate_heath_check_response(config: Config, index_name: Optional[str] = No
     """Generate the health check response for check_heath(), check_index_health() APIs in tensor_search"""
     marqo_status = get_marqo_status()
     marqo_os_status = get_marqo_os_status(config, index_name=index_name)
-    marqo_status, marqo_os_status = aggregate_status(marqo_status, marqo_os_status)
+    aggregated_marqo_status, marqo_os_status = aggregate_status(marqo_status, marqo_os_status)
 
     return {
-        "status": marqo_status,
+        "status": aggregated_marqo_status,
         "backend": {
             "status": marqo_os_status
         }
     }
 
 
-def get_marqo_status() -> str:
+def get_marqo_status() -> Union[str, HealthStatuses]:
     """Check the Marqo instance status."""
     return HealthStatuses.green
 
 
-def get_marqo_os_status(config: Config, index_name: Optional[str] = None) -> str:
+def get_marqo_os_status(config: Config, index_name: Optional[str] = None) -> Union[str, HealthStatuses]:
     """Check the Marqo-os backend status."""
     TIMEOUT = 3
     marqo_os_health_check_response = None
@@ -36,7 +36,7 @@ def get_marqo_os_status(config: Config, index_name: Optional[str] = None) -> str
         timeout_config = copy.deepcopy(config)
         timeout_config.timeout = TIMEOUT
         marqo_os_health_check_response = HttpRequests(timeout_config).get(path=path)
-    except errors.BackendCommunicationError:
+    except errors.InternalError:
         marqo_os_health_check_response = None
 
     if marqo_os_health_check_response is not None:
@@ -51,7 +51,7 @@ def get_marqo_os_status(config: Config, index_name: Optional[str] = None) -> str
     return marqo_os_status
 
 
-def aggregate_status(marqo_status: str, marqo_os_status: str) -> Tuple[str, str]:
+def aggregate_status(marqo_status: str, marqo_os_status: str) -> Tuple[Union[str,HealthStatuses], Union[str, HealthStatuses]]:
     """Aggregate the Marqo instance and Marqo-os backend status."""
-    marqo_status = max(marqo_status, marqo_os_status)
-    return marqo_status, marqo_os_status
+    aggregated_marqo_status = max(marqo_status, marqo_os_status)
+    return aggregated_marqo_status, marqo_os_status
