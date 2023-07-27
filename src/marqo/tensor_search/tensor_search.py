@@ -1826,7 +1826,6 @@ def check_health(config: Config):
     except errors.BackendCommunicationError:
         marqo_os_status = "red"
 
-    # Check marqo-os health endpoint
     if marqo_os_health_check is not None:
         if "status" in marqo_os_health_check:
             marqo_os_status = marqo_os_health_check['status']
