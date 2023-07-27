@@ -272,6 +272,9 @@ def get_stats(config: Config, index_name: str):
     The _count API counts top-level documents.
     The _stats API includes the count of nested documents, which is __chunks in Marqo.
 
+    For numberOfVectors, we count the number of __chunks.__field_name because it is a key_word field, which
+    is known to be fast.
+
     Difference between the two gives the numberOfVectors."""
 
     body = {
@@ -282,11 +285,9 @@ def get_stats(config: Config, index_name: str):
                     "path": "__chunks"
                 },
                 "aggs": {
-                    "chunk_count": {
+                    "marqo_vector_count": {
                         "value_count": {
-                            "script": {
-                                "source": "params._source['__chunks'] != null ? params._source['__chunks'].length : 0"
-                            }
+                            "field": "__chunks.__field_name"
                         }
                     }
                 }
@@ -297,7 +298,7 @@ def get_stats(config: Config, index_name: str):
     try:
         doc_count = HttpRequests(config).post(path=F"{index_name}/_count")["count"]
         vector_count = HttpRequests(config).get(path=f"{index_name}/_search", body=body) \
-            ["aggregations"]["nested_chunks"]["chunk_count"]["value"]
+            ["aggregations"]["nested_chunks"]["marqo_vector_count"]["value"]
     except (KeyError, TypeError) as e:
         error_message = (f"Marqo received an unexpected response from Marqo-os during execution of `get_stats()` APIs. "
                          f"The expected fields do not exist in the response. Original error message = {e}")
