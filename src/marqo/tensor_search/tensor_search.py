@@ -295,12 +295,11 @@ def get_stats(config: Config, index_name: str):
     except (KeyError, TypeError) as e:
         raise errors.InternalError(f"Marqo received an unexpected response from Marqo-OS. "
                                    f"The expected fields do not exist in the response. Original error message = {e}")
+    except (errors.IndexNotFoundError, errors.InvalidIndexNameError):
+        raise
     except errors.MarqoWebError as e:
-        if isinstance(e, (errors.IndexNotFoundError, errors.InvalidIndexNameError)):
-            raise e
-        else:
-            raise errors.InternalError(f"Marqo encountered an error while communicating with Marqo-OS. "
-                                       f"Original error message: {e.message}")
+        raise errors.InternalError(f"Marqo encountered an error while communicating with Marqo-OS. "
+                                   f"Original error message: {e.message}")
 
     return {
         "numberOfDocuments": doc_count,
