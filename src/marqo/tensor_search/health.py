@@ -51,7 +51,8 @@ def get_marqo_os_status(config: Config, index_name: Optional[str] = None) -> Uni
     return marqo_os_status
 
 
-def aggregate_status(marqo_status: Union[str, HealthStatuses], marqo_os_status: Union[str, HealthStatuses]) -> Tuple[Union[str,HealthStatuses], Union[str, HealthStatuses]]:
+def aggregate_status(marqo_status: Union[str, HealthStatuses], marqo_os_status: Union[str, HealthStatuses]) \
+        -> Tuple[Union[str,HealthStatuses], Union[str, HealthStatuses]]:
     """Aggregate the Marqo instance and Marqo-os backend status."""
     aggregated_marqo_status = max(marqo_status, marqo_os_status)
     return aggregated_marqo_status, marqo_os_status
