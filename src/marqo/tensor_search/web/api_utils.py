@@ -136,7 +136,7 @@ def decode_mappings(mappings: Optional[str] = None) -> dict:
 
 
 def add_docs_params_orchestrator(index_name: str, body: Union[AddDocsBodyParams, List[Dict]],
-                                device: str, auto_refresh: bool = True, non_tensor_fields: Optional[List[str]] = [],
+                                device: str, auto_refresh: bool = True, non_tensor_fields: Optional[List[str]] = None,
                                 mappings: Optional[dict] = dict(), model_auth: Optional[ModelAuth] = None,
                                 image_download_headers: Optional[dict] = dict(),
                                 use_existing_tensors: Optional[bool] = False, query_parameters: Optional[Dict] = dict()) -> AddDocsParams:
@@ -184,6 +184,14 @@ def add_docs_params_orchestrator(index_name: str, body: Union[AddDocsBodyParams,
 
     elif isinstance(body, list) and all(isinstance(item, dict) for item in body):
         docs = body
+
+        if non_tensor_fields is None:
+            raise BadRequestError('Required parameter `tensorFields` is missing from the request body. '
+                                  'This endpoint now requires `tensorFields` in request body. Providing '
+                                  'a list of documents as body has been deprecated and will not be '
+                                  'supported in Marqo 2.0.0. See '
+                                  'https://docs.marqo.ai/1.0.0/API-Reference/documents/#add-or-replace-documents '
+                                  'for usage of this endpoint.')
 
         return AddDocsParams(
             index_name=index_name, docs=docs, auto_refresh=auto_refresh,

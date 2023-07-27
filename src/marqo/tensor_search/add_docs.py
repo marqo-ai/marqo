@@ -1,11 +1,14 @@
 """Functions used to fulfill the add_documents endpoint"""
 import copy
+from contextlib import contextmanager
+
 import math
 import threading
 import random
 
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, ContextManager
 import PIL
+from PIL.ImageFile import ImageFile
 from marqo.s2_inference import clip_utils
 from marqo.tensor_search.telemetry import RequestMetricsStore, RequestMetrics
 import marqo.errors as errors
@@ -91,8 +94,9 @@ def threaded_download_images(allocated_docs: List[dict], image_repo: dict, tenso
                                 continue
 
 
+@contextmanager
 def download_images(docs: List[dict], thread_count: int, tensor_fields: Optional[List[str]],
-                    non_tensor_fields: Optional[List[str]], image_download_headers: dict) -> dict:
+                    non_tensor_fields: Optional[List[str]], image_download_headers: dict) -> ContextManager[dict]:
     """Concurrently downloads images from each doc, storing them into the image_repo dict
     Args:
         docs: docs with images to be downloaded. These will be allocated to each thread
@@ -120,24 +124,30 @@ def download_images(docs: List[dict], thread_count: int, tensor_fields: Optional
     copied = copy.deepcopy(docs)
     image_repo = dict()
 
-    m = [RequestMetrics() for i in range(thread_count)]
-    thread_allocated_docs = [copied[i: i + docs_per_thread] for i in range(len(copied))[::docs_per_thread]]
-    threads = [threading.Thread(target=threaded_download_images, args=(allocation, image_repo,
-                                                                       tensor_fields, non_tensor_fields,
-                                                                       image_download_headers, m[i]))
-               for i, allocation in enumerate(thread_allocated_docs)]
+    try:
+        m = [RequestMetrics() for i in range(thread_count)]
+        thread_allocated_docs = [copied[i: i + docs_per_thread] for i in range(len(copied))[::docs_per_thread]]
+        threads = [threading.Thread(target=threaded_download_images, args=(allocation, image_repo,
+                                                                           tensor_fields, non_tensor_fields,
+                                                                           image_download_headers, m[i]))
+                   for i, allocation in enumerate(thread_allocated_docs)]
 
-    for th in threads:
-        th.start()
+        for th in threads:
+            th.start()
 
-    for th in threads:
-        th.join()
+        for th in threads:
+            th.join()
 
-    # Fix up metric_obj to make it not mention thread-ids
-    metric_obj = RequestMetricsStore.for_request()
-    metric_obj = RequestMetrics.reduce_from_list([metric_obj] + m)
-    metric_obj.times = reduce_thread_metrics(metric_obj.times)
-    return image_repo
+        # Fix up metric_obj to make it not mention thread-ids
+        metric_obj = RequestMetricsStore.for_request()
+        metric_obj = RequestMetrics.reduce_from_list([metric_obj] + m)
+        metric_obj.times = reduce_thread_metrics(metric_obj.times)
+        yield image_repo
+    finally:
+        for p in image_repo.values():
+            if isinstance(p, ImageFile):
+                p.close()
+
 
 def reduce_thread_metrics(data):
     """Reduce the metrics from each thread, as if they were run in a single thread.

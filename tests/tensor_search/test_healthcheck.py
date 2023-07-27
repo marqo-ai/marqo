@@ -1,22 +1,21 @@
-import json
-import pprint
 from unittest import mock
+import unittest
 
-import requests
-from numpy.ma import copy
-
-from marqo.tensor_search.enums import IndexSettingsField
-from marqo.errors import MarqoApiError, MarqoError, IndexNotFoundError
 from marqo.tensor_search import tensor_search
-from marqo.tensor_search import configs
 from tests.marqo_test import MarqoTestCase
 from marqo.tensor_search.enums import IndexSettingsField as NsField
-from marqo import errors
 from marqo.tensor_search import health
-from unittest import mock
-
+from marqo.errors import IndexNotFoundError, InternalError
 
 class TestHealthCheck(MarqoTestCase):
+    def setUp(self) -> None:
+        self.index_name = "health-check-index"
+
+    def tearDown(self) -> None:
+        try:
+            tensor_search.delete_index(index_name=self.index_name, config=self.config)
+        except IndexNotFoundError as e:
+            pass
 
     def test_health_check(self):
         health_check_status = tensor_search.check_health(self.config)
@@ -59,15 +58,15 @@ class TestHealthCheck(MarqoTestCase):
             ("21B", 99999, 21),
             ("2.1B", 99999, 2.1),
             ("2.1 b", 99999, 2.1),
-            ("2.1garbage1b", 99999, errors.InternalError),
+            ("2.1garbage1b", 99999, InternalError),
             # kb/gb/mb/tb watermarks (total_in_bytes is ignored)
             ("0kb", 99999, 0),
             ("21kb", 99999, 21 * 1024),
             ("2.1MB", 99999, 2.1 * 1024 ** 2),
             ("21GB", 99999, 21 * 1024 ** 3),
             ("2.1 TB", 99999, 2.1 * 1024 ** 4),
-            ("2.1garbagePB", 99999, errors.InternalError),
-            ("2.1XB", 99999, errors.InternalError),
+            ("2.1garbagePB", 99999, InternalError),
+            ("2.1XB", 99999, InternalError),
 
             # percentage watermarks
             ("0%", 1000, 1000),
@@ -76,9 +75,9 @@ class TestHealthCheck(MarqoTestCase):
             ("100%", 1000, 0),
             ("40.%", 1000, 600),
             ("0.5%", 1000, 995),
-            ("1garbage2%", 1000, errors.InternalError),
-            ("-1%", 1000, errors.InternalError),
-            ("101%", 1000, errors.InternalError),
+            ("1garbage2%", 1000, InternalError),
+            ("-1%", 1000, InternalError),
+            ("101%", 1000, InternalError),
 
             # ratio watermarks
             ("0", 1000, 1000),
@@ -86,14 +85,14 @@ class TestHealthCheck(MarqoTestCase):
             ("1.00", 1000, 0),
             ("0.4", 1000, 600),
             (".005", 1000, 995),
-            ("0.1garbage2", 1000, errors.InternalError),
-            ("-.01", 1000, errors.InternalError),
-            ("1.01", 1000, errors.InternalError),
+            ("0.1garbage2", 1000, InternalError),
+            ("-.01", 1000, InternalError),
+            ("1.01", 1000, InternalError),
 
             # edge cases
-            ("", 99999, errors.InternalError),
-            (" ", 99999, errors.InternalError),
-            (None, 99999, errors.InternalError)
+            ("", 99999, InternalError),
+            (" ", 99999, InternalError),
+            (None, 99999, InternalError)
         ]
 
         for watermark, total_in_bytes, expected in test_cases:
@@ -250,7 +249,7 @@ class TestHealthCheck(MarqoTestCase):
                         "fs": {"total_in_bytes": 5000, "available_in_bytes": 2000}
                     }
                 },
-                "EXPECTED": errors.InternalError
+                "EXPECTED": InternalError
             },
 
             # Watermark in B format, not breached
@@ -510,7 +509,7 @@ class TestHealthCheck(MarqoTestCase):
                         "fs": {"total_in_bytes": -1000, "available_in_bytes": 1001}
                     }
                 },
-                "EXPECTED": errors.InternalError
+                "EXPECTED": InternalError
             }
         ]
 
@@ -530,3 +529,64 @@ class TestHealthCheck(MarqoTestCase):
                     if isinstance(e, AssertionError):
                         raise e
                     assert isinstance(e, test_case["EXPECTED"])
+
+    def test_index_health_check(self):
+        tensor_search.create_vector_index(index_name=self.index_name, config=self.config)
+        health_check_status = tensor_search.check_index_health(index_name=self.index_name, config=self.config)
+        assert 'backend' in health_check_status
+        assert 'status' in health_check_status['backend']
+        assert 'status' in health_check_status
+
+    def test_index_health_check_red_backend(self):
+        tensor_search.create_vector_index(index_name=self.index_name, config=self.config)
+        mock__get = mock.MagicMock()
+        statuses_to_check = ['red', 'yellow', 'green']
+
+        for status in statuses_to_check:
+            mock__get.return_value = {
+                'status': status
+            }
+            @mock.patch("marqo._httprequests.HttpRequests.get", mock__get)
+            def run():
+                health_check_status = tensor_search.check_index_health(index_name=self.index_name, config=self.config)
+                assert health_check_status['status'] == status
+                assert health_check_status['backend']['status'] == status
+                return True
+            assert run()
+
+    def test_index_health_check_path(self):
+        tensor_search.create_vector_index(index_name=self.index_name, config=self.config)
+        with mock.patch("marqo._httprequests.HttpRequests.get") as mock_get:
+            tensor_search.check_index_health(index_name=self.index_name, config=self.config)
+            args, kwargs = mock_get.call_args
+            self.assertIn(f"_cluster/health/{self.index_name}", kwargs['path'])
+
+    def test_index_health_check_unknown_backend_response(self):
+        mock__get = mock.MagicMock()
+        mock__get.return_value = dict()
+
+        # Ensure the index does not exist
+        with self.assertRaises(IndexNotFoundError):
+            tensor_search.delete_index(index_name=self.index_name, config=self.config)
+        @mock.patch("marqo._httprequests.HttpRequests.get", mock__get)
+        def run():
+            health_check_status = tensor_search.check_index_health(index_name=self.index_name, config=self.config)
+            assert health_check_status['status'] == 'red'
+            assert health_check_status['backend']['status'] == 'red'
+            return True
+        assert run()
+
+
+class TestAggregateStatus(unittest.TestCase):
+    def test_status_green(self):
+        result = health.aggregate_status(marqo_status="green", marqo_os_status="green")
+        self.assertEqual(result, ('green', 'green'))
+
+    def test_status_yellow(self):
+        result = health.aggregate_status(marqo_status="green", marqo_os_status="yellow")
+        self.assertEqual(result, ('yellow', 'yellow'))
+
+    def test_status_red(self):
+        result = health.aggregate_status(marqo_status="green", marqo_os_status="red")
+        self.assertEqual(result, ('red', 'red'))
+
