@@ -13,7 +13,7 @@ from marqo.tensor_search import validation
 logger = get_logger(__name__)
 
 
-def convert_watermark_to_bytes(watermark: str, total_in_bytes: int = None) -> int:
+def convert_watermark_to_bytes(watermark: str, total_in_bytes: int = None):
     """
     Converts a value to bytes.
     It could possible be:

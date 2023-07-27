@@ -1,5 +1,6 @@
 from unittest import mock
 import unittest
+import copy
 
 from marqo.tensor_search import tensor_search
 from tests.marqo_test import MarqoTestCase
@@ -17,6 +18,46 @@ class TestHealthCheck(MarqoTestCase):
         except IndexNotFoundError as e:
             pass
 
+    def create_mock_http_get(self, mock_health: dict = None, mock_settings: dict = None, mock_stats: dict = None):
+        """
+        Mocks calls to opensearch. Currently for health, we have 3: health, settings, and stats.
+        If a mock isn't provided, it will be set to the default from setUP.
+
+        Returns a function
+        """
+
+        def mock_http_get(path):
+            nonlocal mock_health, mock_settings, mock_stats
+            # mock settings should return GREEN, flood stage watermark NOT breached
+            # Inserting default mocks and also making deep copies so that the original mocks aren't modified each run
+            returned_mock_health = copy.deepcopy(mock_health) if mock_health is not None else {'status': 'green'}
+            returned_mock_settings = copy.deepcopy(mock_settings) if mock_settings is not None else {
+                "transient": {
+                    "cluster": {"routing": {"allocation": {"disk": {"watermark": {"flood_stage": "95%"}}}}}
+                },
+                "persistent": {},
+                "defaults": {}
+            }
+            returned_mock_stats = copy.deepcopy(mock_stats) if mock_stats is not None else {
+                "nodes": {
+                    "fs": {
+                        "total_in_bytes": 1000000000,
+                        "available_in_bytes": 500000000   # 50% of disk still
+                    },
+                }
+            }
+
+            if path.startswith("_cluster/health"):
+                return returned_mock_health
+            elif path.startswith("_cluster/settings"):
+                return returned_mock_settings
+            elif path.startswith("_cluster/stats"):
+                return returned_mock_stats
+            else:
+                raise Exception(f"Unexpected path: {path}")
+        
+        return mock_http_get
+    
     def test_health_check(self):
         health_check_status = tensor_search.check_health(self.config)
         assert 'backend' in health_check_status
@@ -24,31 +65,233 @@ class TestHealthCheck(MarqoTestCase):
         assert 'status' in health_check_status
 
     def test_health_check_red_backend(self):
-        mock__get = mock.MagicMock()
         statuses_to_check = ['red', 'yellow', 'green']
 
         for status in statuses_to_check:
-            mock__get.return_value = {
-                'status': status
-            }
-            @mock.patch("marqo._httprequests.HttpRequests.get", mock__get)
+            print(f"Starting test for status: {status}")
             def run():
                 health_check_status = tensor_search.check_health(self.config)
                 assert health_check_status['status'] == status
                 assert health_check_status['backend']['status'] == status
                 return True
-            assert run()
+            
+            mock_http_get = self.create_mock_http_get(mock_health={'status': status})
+            with mock.patch("marqo._httprequests.HttpRequests.get", side_effect=mock_http_get):
+                assert run()
+        
+
+    def test_health_check_with_disk_watermark_breach(self):
+        # Tests both health check and index health checks
+        test_cases = [
+            # Health green and disk watermark NOT breached
+            {
+                "HEALTH_OBJECT": {"status": "green"},
+                "SETTINGS_OBJECT": {
+                    "transient": {
+                        "cluster": {"routing": {"allocation": {"disk": {"watermark": {"flood_stage": "1kb"}}}}}
+                    },
+                    "persistent": {},
+                    "defaults": {}
+                },
+                "STATS_OBJECT": {
+                    "nodes": {
+                        "fs": {"total_in_bytes": 5000, "available_in_bytes": 1025}
+                    }
+                },
+                "EXPECTED": "green"
+            },
+            # Health green and disk watermark breached
+            {
+                "HEALTH_OBJECT": {"status": "green"},
+                "SETTINGS_OBJECT": {
+                    "transient": {
+                        "cluster": {"routing": {"allocation": {"disk": {"watermark": {"flood_stage": "1kb"}}}}}
+                    },
+                    "persistent": {},
+                    "defaults": {}
+                },
+                "STATS_OBJECT": {
+                    "nodes": {
+                        "fs": {"total_in_bytes": 5000, "available_in_bytes": 500}
+                    }
+                },
+                "EXPECTED": "red"
+            },
+            # Health yellow and disk watermark NOT breached
+            {
+                "HEALTH_OBJECT": {"status": "yellow"},
+                "SETTINGS_OBJECT": {
+                    "transient": {
+                        "cluster": {"routing": {"allocation": {"disk": {"watermark": {"flood_stage": "1kb"}}}}}
+                    },
+                    "persistent": {},
+                    "defaults": {}
+                },
+                "STATS_OBJECT": {
+                    "nodes": {
+                        "fs": {"total_in_bytes": 5000, "available_in_bytes": 1025}
+                    }
+                },
+                "EXPECTED": "yellow"
+            },
+            # Health yellow and disk watermark breached
+            {
+                "HEALTH_OBJECT": {"status": "yellow"},
+                "SETTINGS_OBJECT": {
+                    "transient": {
+                        "cluster": {"routing": {"allocation": {"disk": {"watermark": {"flood_stage": "1kb"}}}}}
+                    },
+                    "persistent": {},
+                    "defaults": {}
+                },
+                "STATS_OBJECT": {
+                    "nodes": {
+                        "fs": {"total_in_bytes": 5000, "available_in_bytes": 500}
+                    }
+                },
+                "EXPECTED": "red"
+            },
+            # Health red and disk watermark NOT breached
+            {
+                "HEALTH_OBJECT": {"status": "red"},
+                "SETTINGS_OBJECT": {
+                    "transient": {
+                        "cluster": {"routing": {"allocation": {"disk": {"watermark": {"flood_stage": "1kb"}}}}}
+                    },
+                    "persistent": {},
+                    "defaults": {}
+                },
+                "STATS_OBJECT": {
+                    "nodes": {
+                        "fs": {"total_in_bytes": 5000, "available_in_bytes": 1025}
+                    }
+                },
+                "EXPECTED": "red"
+            },
+            # Health red and disk watermark breached
+            {
+                "HEALTH_OBJECT": {"status": "red"},
+                "SETTINGS_OBJECT": {
+                    "transient": {
+                        "cluster": {"routing": {"allocation": {"disk": {"watermark": {"flood_stage": "1kb"}}}}}
+                    },
+                    "persistent": {},
+                    "defaults": {}
+                },
+                "STATS_OBJECT": {
+                    "nodes": {
+                        "fs": {"total_in_bytes": 5000, "available_in_bytes": 500}
+                    }
+                },
+                "EXPECTED": "red"
+            },
+            # GB watermark
+            {
+                "HEALTH_OBJECT": {"status": "green"},
+                "SETTINGS_OBJECT": {
+                    "transient": {
+                        "cluster": {"routing": {"allocation": {"disk": {"watermark": {"flood_stage": "1GB"}}}}}
+                    },
+                    "persistent": {},
+                    "defaults": {}
+                },
+                "STATS_OBJECT": {
+                    "nodes": {
+                        "fs": {"total_in_bytes": 1000000000, "available_in_bytes": 500}
+                    }
+                },
+                "EXPECTED": "red"
+            },
+            # Ratio watermark
+            {
+                "HEALTH_OBJECT": {"status": "green"},
+                "SETTINGS_OBJECT": {
+                    "transient": {
+                        "cluster": {"routing": {"allocation": {"disk": {"watermark": {"flood_stage": ".5"}}}}}
+                    },
+                    "persistent": {},
+                    "defaults": {}
+                },
+                "STATS_OBJECT": {
+                    "nodes": {
+                        "fs": {"total_in_bytes": 100, "available_in_bytes": 40}
+                    }
+                },
+                "EXPECTED": "red"
+            },
+            # Percentage watermark
+            {
+                "HEALTH_OBJECT": {"status": "green"},
+                "SETTINGS_OBJECT": {
+                    "transient": {
+                        "cluster": {"routing": {"allocation": {"disk": {"watermark": {"flood_stage": "50%"}}}}}
+                    },
+                    "persistent": {},
+                    "defaults": {}
+                },
+                "STATS_OBJECT": {
+                    "nodes": {
+                        "fs": {"total_in_bytes": 100, "available_in_bytes": 40}
+                    }
+                },
+                "EXPECTED": "red"
+            },
+            # Missing watermark
+            {
+                "HEALTH_OBJECT": {"status": "green"},
+                "SETTINGS_OBJECT": {
+                    "transient": {
+                        "cluster": {"routing": {"allocation": {"disk": {"watermark": {"RANDOM FIELD!!": "garbage"}}}}}
+                    },
+                    "persistent": {},
+                    "defaults": {}
+                },
+                "STATS_OBJECT": {
+                    "nodes": {
+                        "fs": {"total_in_bytes": 100, "available_in_bytes": 40}
+                    }
+                },
+                "EXPECTED": InternalError
+            },
+        ]
+
+        tensor_search.create_vector_index(index_name=self.index_name, config=self.config)
+        for test_case in test_cases:
+            print(f"Starting test case: {test_case}")
+            mock_http_get = self.create_mock_http_get(mock_health=test_case["HEALTH_OBJECT"], mock_settings=test_case["SETTINGS_OBJECT"], mock_stats=test_case["STATS_OBJECT"])
+            with mock.patch("marqo._httprequests.HttpRequests.get", side_effect=mock_http_get):
+                
+                # Test health check  
+                try:
+                    health_check_status = tensor_search.check_health(self.config)
+                    assert health_check_status['status'] == test_case["EXPECTED"]
+                    assert health_check_status['backend']['status'] == test_case["EXPECTED"]
+                except Exception as e:
+                    if isinstance(e, AssertionError):
+                        raise e
+                    assert isinstance(e, test_case["EXPECTED"])
+
+                # Test index health check
+                try:
+                    health_check_status = tensor_search.check_index_health(index_name=self.index_name, config=self.config)
+                    assert health_check_status['status'] == test_case["EXPECTED"]
+                    assert health_check_status['backend']['status'] == test_case["EXPECTED"]
+                except Exception as e:
+                    if isinstance(e, AssertionError):
+                        raise e
+                    assert isinstance(e, test_case["EXPECTED"])
+
 
     def test_health_check_unknown_backend_response(self):
-        mock__get = mock.MagicMock()
-        mock__get.return_value = dict()
-        @mock.patch("marqo._httprequests.HttpRequests.get", mock__get)
         def run():
             health_check_status = tensor_search.check_health(self.config)
             assert health_check_status['status'] == 'red'
             assert health_check_status['backend']['status'] == 'red'
             return True
-        assert run()
+
+        mock_http_get = self.create_mock_http_get(mock_health=dict())
+        with mock.patch("marqo._httprequests.HttpRequests.get", side_effect=mock_http_get):
+            assert run()
     
     def test_convert_watermark_to_bytes(self):
         test_cases = [
@@ -513,15 +756,9 @@ class TestHealthCheck(MarqoTestCase):
             }
         ]
 
-        for test_case in test_cases:
-            def mock_http_get(path):
-                if path == "_cluster/settings?include_defaults=true&filter_path=**.disk*":
-                    return test_case["SETTINGS_OBJECT"]
-                elif path == "_cluster/stats":
-                    return test_case["STATS_OBJECT"]
-                else:
-                    raise Exception(f"Unexpected path: {path}")
-            
+        for test_case in test_cases: 
+            print(f"Starting test case: {test_case}")     
+            mock_http_get = self.create_mock_http_get(mock_settings=test_case["SETTINGS_OBJECT"], mock_stats=test_case["STATS_OBJECT"])
             with mock.patch("marqo._httprequests.HttpRequests.get", side_effect=mock_http_get):
                 try:
                     assert health.check_opensearch_disk_watermark_breach(self.config) == test_case["EXPECTED"]
@@ -539,42 +776,46 @@ class TestHealthCheck(MarqoTestCase):
 
     def test_index_health_check_red_backend(self):
         tensor_search.create_vector_index(index_name=self.index_name, config=self.config)
-        mock__get = mock.MagicMock()
         statuses_to_check = ['red', 'yellow', 'green']
 
         for status in statuses_to_check:
-            mock__get.return_value = {
-                'status': status
-            }
-            @mock.patch("marqo._httprequests.HttpRequests.get", mock__get)
             def run():
                 health_check_status = tensor_search.check_index_health(index_name=self.index_name, config=self.config)
                 assert health_check_status['status'] == status
                 assert health_check_status['backend']['status'] == status
                 return True
-            assert run()
+            
+            mock_http_get = self.create_mock_http_get(mock_health={'status': status})
+            with mock.patch("marqo._httprequests.HttpRequests.get", side_effect=mock_http_get):
+                assert run()
 
     def test_index_health_check_path(self):
         tensor_search.create_vector_index(index_name=self.index_name, config=self.config)
-        with mock.patch("marqo._httprequests.HttpRequests.get") as mock_get:
+        mock_http_get = self.create_mock_http_get()
+        with mock.patch("marqo._httprequests.HttpRequests.get", side_effect=mock_http_get) as http_get_tracker:
+            print(f"DEBUG mock_get: {http_get_tracker}, type is {type(http_get_tracker)}")
             tensor_search.check_index_health(index_name=self.index_name, config=self.config)
-            args, kwargs = mock_get.call_args
-            self.assertIn(f"_cluster/health/{self.index_name}", kwargs['path'])
+
+            # Check that at least 1 call was made to the _cluster/health/index-name endpoint
+            health_endpoint_found = False
+            for args, kwargs in http_get_tracker.call_args_list:
+                if f"_cluster/health/{self.index_name}" in kwargs['path']:
+                    health_endpoint_found = True
+            assert health_endpoint_found
 
     def test_index_health_check_unknown_backend_response(self):
-        mock__get = mock.MagicMock()
-        mock__get.return_value = dict()
-
         # Ensure the index does not exist
         with self.assertRaises(IndexNotFoundError):
             tensor_search.delete_index(index_name=self.index_name, config=self.config)
-        @mock.patch("marqo._httprequests.HttpRequests.get", mock__get)
         def run():
             health_check_status = tensor_search.check_index_health(index_name=self.index_name, config=self.config)
             assert health_check_status['status'] == 'red'
             assert health_check_status['backend']['status'] == 'red'
             return True
-        assert run()
+        
+        mock_http_get = self.create_mock_http_get(mock_health=dict())
+        with mock.patch("marqo._httprequests.HttpRequests.get", side_effect=mock_http_get):
+            assert run()
 
 
 class TestAggregateStatus(unittest.TestCase):

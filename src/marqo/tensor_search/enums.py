@@ -153,10 +153,10 @@ class HealthStatuses(str, Enum):
     yellow = "yellow"
     red = "red"
 
-    def __lt__(self, other):
+    def __gt__(self, other):
         # Define the custom comparison logic
         status_order = [self.green, self.yellow, self.red]
-        return status_order.index(self) < status_order.index(other)
+        return status_order.index(self) > status_order.index(other)
     
 
 
