@@ -60,6 +60,7 @@ from marqo.tensor_search.models.search import Qidx, JHash, SearchContext, Vector
 from marqo.tensor_search.models.index_info import IndexInfo, get_model_properties_from_index_defaults
 from marqo.tensor_search.models.external_apis.abstract_classes import ExternalAuth
 from marqo.tensor_search.telemetry import RequestMetricsStore
+from marqo.tensor_search.health import generate_heath_check_response
 from marqo.tensor_search.utils import add_timing
 from marqo.tensor_search import delete_docs
 from marqo.s2_inference.processing import text as text_processor
