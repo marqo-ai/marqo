@@ -1,5 +1,7 @@
 import copy
 import os
+import re
+
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 import functools
 import json
@@ -8,7 +10,7 @@ import pprint
 from unittest import mock
 from unittest.mock import patch
 from marqo.tensor_search.enums import EnvVars
-from marqo.s2_inference import types
+from marqo.s2_inference import types, s2_inference
 import PIL
 import requests
 import pytest
@@ -19,8 +21,8 @@ from marqo.tensor_search import tensor_search, index_meta_cache, backend
 from tests.marqo_test import MarqoTestCase
 from marqo.tensor_search import add_docs
 
-class TestAddDocuments(MarqoTestCase):
 
+class TestAddDocuments(MarqoTestCase):
     def setUp(self) -> None:
         self.endpoint = self.authorized_url
         self.generic_header = {"Content-type": "application/json"}
@@ -540,6 +542,92 @@ class TestAddDocuments(MarqoTestCase):
                     assert res_dict["_id"] == expected_results[i][0]
                     assert expected_results[i][1] in res_dict
             tensor_search.delete_index(config=self.config, index_name=self.index_name_2)
+
+    def test_add_documents_id_image_url(self):
+        index_setting = {
+            IndexSettingsField.index_defaults: {
+                IndexSettingsField.model: "ViT-B/16",
+                IndexSettingsField.treat_urls_and_pointers_as_images: True
+            }
+        }
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_2,
+                                          index_settings=index_setting)
+        docs = [{
+            "_id": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+            "my_field": "wow"}
+        ]
+
+        with mock.patch('PIL.Image.open') as mock_image_open:
+            tensor_search.add_documents(config=self.config,
+                                        add_docs_params=AddDocsParams(
+                                            index_name=self.index_name_2, docs=docs, auto_refresh=True,
+                                            device="cpu", non_tensor_fields=['my_field']
+                                        ))
+
+            mock_image_open.assert_not_called()
+
+            tensor_search.add_documents(config=self.config,
+                                        add_docs_params=AddDocsParams(
+                                            index_name=self.index_name_2, docs=docs, auto_refresh=True,
+                                            device="cpu", tensor_fields=['my_field'], non_tensor_fields=None
+                                        ))
+
+            mock_image_open.assert_not_called()
+
+    def test_add_documents_id_in_tensor_field(self):
+        index_setting = {
+            IndexSettingsField.index_defaults: {
+                IndexSettingsField.model: "ViT-B/16",
+                IndexSettingsField.treat_urls_and_pointers_as_images: True
+            }
+        }
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_2,
+                                          index_settings=index_setting)
+        docs = [{
+            "_id": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+            "my_field": "wow"}
+        ]
+
+        with mock.patch('marqo.s2_inference.s2_inference.vectorise') as mock_vectorise:
+            with pytest.raises(BadRequestError, match=re.escape('`_id` field cannot be a tensor field.')):
+                tensor_search.add_documents(config=self.config,
+                                            add_docs_params=AddDocsParams(
+                                                index_name=self.index_name_2, docs=docs, auto_refresh=True,
+                                                device="cpu", tensor_fields=['my_field', '_id'], non_tensor_fields=None
+                                            ))
+            mock_vectorise.assert_not_called()
+
+    def test_add_documents_id_not_in_non_tensor_field(self):
+        index_setting = {
+            IndexSettingsField.index_defaults: {
+                IndexSettingsField.model: "ViT-B/16",
+                IndexSettingsField.treat_urls_and_pointers_as_images: False
+            }
+        }
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_2,
+                                          index_settings=index_setting)
+        docs = [{
+            "_id": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+            "my_field": "wow"}
+        ]
+
+        mock_vectorise = mock.MagicMock()
+        mock_vectorise.side_effect = s2_inference.vectorise
+
+        @mock.patch('marqo.s2_inference.s2_inference.vectorise', mock_vectorise)
+        def run():
+            tensor_search.add_documents(config=self.config,
+                                        add_docs_params=AddDocsParams(
+                                            index_name=self.index_name_2, docs=docs, auto_refresh=True,
+                                            device="cpu", non_tensor_fields=[]
+                                        ))
+            vectorised_content = [call_kwargs['content'] for call_args, call_kwargs
+                                  in mock_vectorise.call_args_list]
+            expected_content = [['wow']]
+            mock_vectorise.assert_called_once()
+            assert vectorised_content == expected_content
+
+        run()
 
     def test_add_documents_resilient_doc_validation(self):
         docs_results = [
@@ -1146,17 +1234,21 @@ class TestAddDocuments(MarqoTestCase):
                  good_url: types.ImageType
              }),
         ]
-        for docs, expected_repo_structure in examples:
-            image_repo = add_docs.download_images(
-                docs=docs,
-                thread_count=20,
-                non_tensor_fields=('nt_1', 'nt_2'),
-                image_download_headers={},
-                tensor_fields=None
-            )
-            assert len(expected_repo_structure) == len(image_repo)
-            for k in expected_repo_structure:
-                assert isinstance(image_repo[k], expected_repo_structure[k])
+        with mock.patch('PIL.Image.Image.close') as mock_close:
+            for docs, expected_repo_structure in examples:
+                with add_docs.download_images(
+                    docs=docs,
+                    thread_count=20,
+                    non_tensor_fields=('nt_1', 'nt_2'),
+                    image_download_headers={},
+                    tensor_fields=None
+                ) as image_repo:
+                    assert len(expected_repo_structure) == len(image_repo)
+                    for k in expected_repo_structure:
+                        assert isinstance(image_repo[k], expected_repo_structure[k])
+
+            # Context manager must have closed all valid images
+            assert mock_close.call_count == 2
 
     def test_params_validation_tensors_and_nontensors(self):
         with pytest.raises(InternalError):
