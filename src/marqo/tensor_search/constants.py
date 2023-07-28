@@ -27,3 +27,20 @@ LUCENE_SPECIAL_CHARS = {
 NON_OFFICIAL_LUCENE_SPECIAL_CHARS = {
     ' '
 }
+
+# Order is important here: transient, persistent, then defaults.
+OPENSEARCH_CLUSTER_SETTINGS_TYPES = ["transient", "persistent", "defaults"]
+
+# To convert from {key} to bytes, we multiply by 1024 ** {value}
+# eg. 10kb = 10 * (1024 ** 1) bytes, 5mb = 5 * (1024 ** 2) bytes
+BYTE_SUFFIX_EXPONENTS = {
+    'b': 0, 
+    'kb': 1, 
+    'mb': 2, 
+    'gb': 3, 
+    'tb': 4, 
+    'pb': 5, 
+    'eb': 6, 
+    'zb': 7, 
+    'yb': 8
+}

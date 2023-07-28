@@ -1868,7 +1868,6 @@ def check_health(config: Config) -> dict:
     """
     return generate_heath_check_response(config)
 
-
 def delete_index(config: Config, index_name):
     res = HttpRequests(config).delete(path=index_name)
     if index_name in get_cache():
