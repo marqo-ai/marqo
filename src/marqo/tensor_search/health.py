@@ -13,7 +13,7 @@ from marqo.tensor_search import validation
 logger = get_logger(__name__)
 
 
-def convert_watermark_to_bytes(watermark: str, total_in_bytes: int = None):
+def convert_watermark_to_bytes(watermark: str, total_in_bytes: int = None) -> int:
     """
     Converts a value to bytes.
     It could possible be:
@@ -35,12 +35,11 @@ def convert_watermark_to_bytes(watermark: str, total_in_bytes: int = None):
     if total_in_bytes is not None and total_in_bytes < 0:
         raise errors.InternalError("OpenSearch cluster stats fs: total_in_bytes cannot be negative.")
 
-    if watermark[-2:].lower() in constants.BYTE_SUFFIXES:
+    if watermark[-2:].lower() in constants.BYTE_SUFFIX_EXPONENTS:
         # Watermark in KB/MB/GB/TB format
         # Bytes represent MIN disk space AVAILABLE
-        # TODO: Do we use 1000 or 1024 for conversion?
         numeric_watermark = validation.validate_nonnegative_number(watermark[:-2], "OpenSearch disk watermark value")
-        multiplier = 1024 ** constants.BYTE_SUFFIXES.index(watermark[-2:].lower())
+        multiplier = 1024 ** constants.BYTE_SUFFIX_EXPONENTS[watermark[-2:].lower()]
         return numeric_watermark * multiplier
         
     elif watermark[-1].lower() == "b":
@@ -93,7 +92,7 @@ def check_opensearch_disk_watermark_breach(config: Config):
             logger.debug(f"Found disk flood stage watermark in {settings_type} settings: {raw_flood_stage_watermark}")
             break
         except KeyError:
-            logger.debug(f"Flood stage watermark not found in {settings_type} settings.")
+            pass
     
     if not raw_flood_stage_watermark:
         raise errors.InternalError("Could not find disk flood stage watermark in OpenSearch settings.")

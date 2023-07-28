@@ -627,10 +627,11 @@ def validate_nonnegative_number(input_string: str, field_description: str = "Inp
 
     Args:
         input_string: the string to validate
+        field_description: description of the value being validated, to be used in error messages
 
     Returns:
         input_string converted to a float, if it is a non-negative number
-
+        
     Raises:
         InternalError if the string is not a non-negative number,
         with a message dependent on field_description
