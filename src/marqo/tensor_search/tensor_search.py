@@ -60,6 +60,7 @@ from marqo.tensor_search.models.search import Qidx, JHash, SearchContext, Vector
 from marqo.tensor_search.models.index_info import IndexInfo, get_model_properties_from_index_defaults
 from marqo.tensor_search.models.external_apis.abstract_classes import ExternalAuth
 from marqo.tensor_search.telemetry import RequestMetricsStore
+from marqo.tensor_search.health import generate_heath_check_response
 from marqo.tensor_search.utils import add_timing
 from marqo.tensor_search import delete_docs
 from marqo.s2_inference.processing import text as text_processor
@@ -67,7 +68,6 @@ from marqo.s2_inference.processing import image as image_processor
 from marqo.s2_inference.clip_utils import _is_image
 from marqo.s2_inference.reranking import rerank
 from marqo.s2_inference import s2_inference
-from marqo.tensor_search.health import generate_heath_check_response
 import torch.cuda
 import psutil
 # We depend on _httprequests.py for now, but this may be replaced in the future, as
@@ -269,9 +269,43 @@ def _autofill_index_settings(index_settings: dict):
 
 
 def get_stats(config: Config, index_name: str):
-    doc_count = HttpRequests(config).post(path=F"{index_name}/_count")["count"]
+    """Returns the number of documents and vectors in the index."""
+
+    body = {
+        "size": 0,
+        "aggs": {
+            "nested_chunks": {
+                "nested": {
+                    "path": "__chunks"
+                },
+                "aggs": {
+                    "marqo_vector_count": {
+                        "value_count": {
+                            # This is a key_word field, so it is fast in value_count
+                            "field": "__chunks.__field_name"
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    try:
+        doc_count = HttpRequests(config).post(path=F"{index_name}/_count")["count"]
+        vector_count = HttpRequests(config).get(path=f"{index_name}/_search", body=body) \
+            ["aggregations"]["nested_chunks"]["marqo_vector_count"]["value"]
+    except (KeyError, TypeError) as e:
+        raise errors.InternalError(f"Marqo received an unexpected response from Marqo-OS. "
+                                   f"The expected fields do not exist in the response. Original error message = {e}")
+    except (errors.IndexNotFoundError, errors.InvalidIndexNameError):
+        raise
+    except errors.MarqoWebError as e:
+        raise errors.InternalError(f"Marqo encountered an error while communicating with Marqo-OS. "
+                                   f"Original error message: {e.message}")
+
     return {
-        "numberOfDocuments": doc_count
+        "numberOfDocuments": doc_count,
+        "numberOfVectors": vector_count,
     }
 
 
@@ -289,8 +323,9 @@ def _infer_opensearch_data_type(
         to_check = sample_field_content
 
     if isinstance(to_check, dict):
-        raise errors.MarqoError("Field content can't be an object. An object should not be passed into _infer_opensearch_data_type"
-                                     "to check.")
+        raise errors.MarqoError(
+            "Field content can't be an object. An object should not be passed into _infer_opensearch_data_type"
+            "to check.")
     elif isinstance(to_check, str):
         return OpenSearchDataType.text
     else:
@@ -1859,6 +1894,7 @@ def _select_model_from_media_type(media_type: Union[MediaType, str]) -> Union[Ml
     else:
         raise ValueError("_select_model_from_media_type(): "
                          "Received unknown media type: {}".format(media_type))
+
 
 def get_loaded_models() -> dict:
     available_models = s2_inference.get_available_models()
