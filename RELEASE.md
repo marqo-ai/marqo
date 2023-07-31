@@ -12,7 +12,7 @@ We move the health check under the index API to make it more intuitive to use. T
 
 - Improve image download validation and resource management (https://github.com/marqo-ai/marqo/pull/551). The image download in Marqo is more stable and resource-efficient now.
 
-- Return a more helpful error message for `tensorFields` (https://github.com/marqo-ai/marqo/pull/554/files).
+- Error out when adding documents without specifying `tensorFields` explicitly (https://github.com/marqo-ai/marqo/pull/554).
 
 ## Contributor shout-outs
 
