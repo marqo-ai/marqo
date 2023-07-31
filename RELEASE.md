@@ -2,21 +2,23 @@
 
 ## New features
 
-- New field `numberOfVectors` in the response of the `get_stats` endpoint (https://github.com/marqo-ai/marqo/pull/553). 
-This field indicates the number of vectors in an index so that users can monitor the status of their index. See [here](https://docs.marqo.ai/1.1.0/API-Reference/stats/) for detailed usage.
+- New field `numberOfVectors` in the `get_stats` response object (https://github.com/marqo-ai/marqo/pull/553). 
+This field counts all vectors from all documents in the given index. See [here](https://docs.marqo.ai/1.1.0/API-Reference/stats/) for detailed usage.
 
-- New health check endpoint `client.index("your-index").health()` (https://github.com/marqo-ai/marqo/pull/552). 
-We move the health check under the index API to make it more intuitive to use. The old health check endpoint `client.health()` is deprecated and will be removed in Marqo 2.0.0. See [here](https://docs.marqo.ai/1.0.0/API-Reference/health/) for detailed usage.
+- New per-index health check endpoint `client.index("your-index").health()` (https://github.com/marqo-ai/marqo/pull/552). 
+This replaces the old cluster-level health check endpoint, `client.health()`,
+which is deprecated and will be removed in Marqo 2.0.0. See [here](https://docs.marqo.ai/1.0.0/API-Reference/health/) for detailed usage.
 
 ## Bug fixes and minor changes
 
-- Improve image download validation and resource management (https://github.com/marqo-ai/marqo/pull/551). The image download in Marqo is more stable and resource-efficient now.
+- Improve image downloading validation and resource management (https://github.com/marqo-ai/marqo/pull/551). Image downloading in Marqo is more stable and resource-efficient now.
 
-- Error out when adding documents without specifying `tensorFields` explicitly (https://github.com/marqo-ai/marqo/pull/554).
+- Adding documents now error out when `tensorFields` is not specified explicitly (https://github.com/marqo-ai/marqo/pull/554). This prevents users accidentally creating unwanted tensor fields.
 
 ## Contributor shout-outs
 
-- Thank you for the heated discussion in our and [forum](https://community.marqo.ai/).
+- Thank you for the Vibrant discussion in our and [forum](https://community.marqo.ai/). 
+We love hearing your questions and about your use cases.
 
 
 # Release 1.0.0
