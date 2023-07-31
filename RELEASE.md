@@ -7,7 +7,7 @@ This field counts all vectors from all documents in a given index. See [here](ht
 
 - New per-index health check endpoint `GET /indexes/{index-name}/health` (https://github.com/marqo-ai/marqo/pull/552). 
 This replaces the cluster-level health check endpoint, `GET /health`,
-which is deprecated and will be removed in Marqo 2.0.0. See [here](https://docs.marqo.ai/1.0.0/API-Reference/health/) for detailed usage.
+which is deprecated and will be removed in Marqo 2.0.0. See [here](https://docs.marqo.ai/1.1.0/API-Reference/health/) for detailed usage.
 
 ## Bug fixes and minor changes
 
