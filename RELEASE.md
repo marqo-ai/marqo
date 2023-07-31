@@ -1,6 +1,7 @@
 # Release 1.1.0
 
 ## New features
+
 - New field `numberOfVectors` in the response of the `get_stats` endpoint (https://github.com/marqo-ai/marqo/pull/553). 
 This field indicates the number of vectors in an index so that users can monitor the status of their index. See [here](https://docs.marqo.ai/1.1.0/API-Reference/indexes/) for detailed usage.
 
@@ -8,6 +9,7 @@ This field indicates the number of vectors in an index so that users can monitor
 We move the health check under the index API to make it more intuitive to use. See [here](https://docs.marqo.ai/1.1.0/API-Reference/indexes/) for detailed usage.
 
 ## Bug fixes and minor changes
+
 - Improve image download validation and resource management (https://github.com/marqo-ai/marqo/pull/551). The image download in Marqo is more stable and resource-efficient now.
 
 - Return a more helpful error message for `tensorFields` (https://github.com/marqo-ai/marqo/pull/554/files).
