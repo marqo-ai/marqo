@@ -11,7 +11,7 @@ which is deprecated and will be removed in Marqo 2.0.0. See [here](https://docs.
 
 ## Bug fixes and minor changes
 
-- Improve image downloading validation and resource management (https://github.com/marqo-ai/marqo/pull/551). Image downloading in Marqo is more stable and resource-efficient now.
+- Improved image downloading validation and resource management (https://github.com/marqo-ai/marqo/pull/551). Image downloading in Marqo is more stable and resource-efficient now.
 
 - Adding documents now error out when `tensorFields` is not specified explicitly (https://github.com/marqo-ai/marqo/pull/554). This prevents users accidentally creating unwanted tensor fields.
 
