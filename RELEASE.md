@@ -3,17 +3,17 @@
 ## New features
 
 - New field `numberOfVectors` in the `get_stats` response object (https://github.com/marqo-ai/marqo/pull/553). 
-This field counts all vectors from all documents in the given index. See [here](https://docs.marqo.ai/1.1.0/API-Reference/stats/) for detailed usage.
+This field counts all vectors from all documents in a given index. See [here](https://docs.marqo.ai/1.1.0/API-Reference/stats/) for detailed usage.
 
-- New per-index health check endpoint `client.index("your-index").health()` (https://github.com/marqo-ai/marqo/pull/552). 
-This replaces the old cluster-level health check endpoint, `client.health()`,
+- New per-index health check endpoint `GET /indexes/{index-name}/health` (https://github.com/marqo-ai/marqo/pull/552). 
+This replaces the cluster-level health check endpoint, `GET /health`,
 which is deprecated and will be removed in Marqo 2.0.0. See [here](https://docs.marqo.ai/1.0.0/API-Reference/health/) for detailed usage.
 
 ## Bug fixes and minor changes
 
-- Improved image downloading validation and resource management (https://github.com/marqo-ai/marqo/pull/551). Image downloading in Marqo is more stable and resource-efficient now.
+- Improved image download validation and resource management (https://github.com/marqo-ai/marqo/pull/551). Image downloading in Marqo is more stable and resource-efficient now.
 
-- Adding documents now error out when `tensorFields` is not specified explicitly (https://github.com/marqo-ai/marqo/pull/554). This prevents users accidentally creating unwanted tensor fields.
+- Adding documents now returns an error when `tensorFields` is not specified explicitly (https://github.com/marqo-ai/marqo/pull/554). This prevents users accidentally creating unwanted tensor fields.
 
 ## Contributor shout-outs
 
