@@ -17,8 +17,7 @@ which is deprecated and will be removed in Marqo 2.0.0. See [here](https://docs.
 
 ## Contributor shout-outs
 
-- Thank you for the Vibrant discussion in our and [forum](https://community.marqo.ai/). 
-We love hearing your questions and about your use cases.
+- Thank you for the vibrant discussion in our [forum](https://community.marqo.ai/). We love hearing your questions and about your use cases.
 
 
 # Release 1.0.0
