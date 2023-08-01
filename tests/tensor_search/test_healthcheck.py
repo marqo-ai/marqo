@@ -7,6 +7,15 @@ from tests.marqo_test import MarqoTestCase
 from marqo.tensor_search.enums import IndexSettingsField as NsField
 from marqo.tensor_search import health
 from marqo.errors import IndexNotFoundError, InternalError
+from marqo.tensor_search.enums import HealthStatuses
+
+"""
+NOTE: The way the HealthStatuses is set up,
+HealthStatuses.green == "green"
+but str(HealthStatuses.green) == "HealthStatuses.green".
+
+Therefore, just compare the enum directly to the desired string.
+"""
 
 class TestHealthCheck(MarqoTestCase):
     def setUp(self) -> None:
@@ -62,13 +71,13 @@ class TestHealthCheck(MarqoTestCase):
         health_check_status = tensor_search.check_health(self.config)
         assert 'backend' in health_check_status
         assert 'status' in health_check_status['backend']
+        assert 'storage_is_available' in health_check_status['backend']
         assert 'status' in health_check_status
 
     def test_health_check_red_backend(self):
         statuses_to_check = ['red', 'yellow', 'green']
 
         for status in statuses_to_check:
-            print(f"Starting test for status: {status}")
             def run():
                 health_check_status = tensor_search.check_health(self.config)
                 assert health_check_status['status'] == status
@@ -82,6 +91,7 @@ class TestHealthCheck(MarqoTestCase):
 
     def test_health_check_with_disk_watermark_breach(self):
         # Tests both health check and index health checks
+        # Expected format: (health status, storage_is_available)
         test_cases = [
             # Health green and disk watermark NOT breached
             {
@@ -98,7 +108,7 @@ class TestHealthCheck(MarqoTestCase):
                         "fs": {"total_in_bytes": 5000, "available_in_bytes": 1025}
                     }
                 },
-                "EXPECTED": "green"
+                "EXPECTED": ("green", True)
             },
             # Health green and disk watermark breached
             {
@@ -115,7 +125,7 @@ class TestHealthCheck(MarqoTestCase):
                         "fs": {"total_in_bytes": 5000, "available_in_bytes": 500}
                     }
                 },
-                "EXPECTED": "red"
+                "EXPECTED": ("red", False)
             },
             # Health yellow and disk watermark NOT breached
             {
@@ -132,7 +142,7 @@ class TestHealthCheck(MarqoTestCase):
                         "fs": {"total_in_bytes": 5000, "available_in_bytes": 1025}
                     }
                 },
-                "EXPECTED": "yellow"
+                "EXPECTED": ("yellow", True)
             },
             # Health yellow and disk watermark breached
             {
@@ -149,7 +159,7 @@ class TestHealthCheck(MarqoTestCase):
                         "fs": {"total_in_bytes": 5000, "available_in_bytes": 500}
                     }
                 },
-                "EXPECTED": "red"
+                "EXPECTED": ("red", False)
             },
             # Health red and disk watermark NOT breached
             {
@@ -166,7 +176,7 @@ class TestHealthCheck(MarqoTestCase):
                         "fs": {"total_in_bytes": 5000, "available_in_bytes": 1025}
                     }
                 },
-                "EXPECTED": "red"
+                "EXPECTED": ("red", True)
             },
             # Health red and disk watermark breached
             {
@@ -183,7 +193,7 @@ class TestHealthCheck(MarqoTestCase):
                         "fs": {"total_in_bytes": 5000, "available_in_bytes": 500}
                     }
                 },
-                "EXPECTED": "red"
+                "EXPECTED": ("red", False)
             },
             # GB watermark
             {
@@ -200,7 +210,7 @@ class TestHealthCheck(MarqoTestCase):
                         "fs": {"total_in_bytes": 1000000000, "available_in_bytes": 500}
                     }
                 },
-                "EXPECTED": "red"
+                "EXPECTED": ("red", False)
             },
             # Ratio watermark
             {
@@ -217,7 +227,7 @@ class TestHealthCheck(MarqoTestCase):
                         "fs": {"total_in_bytes": 100, "available_in_bytes": 40}
                     }
                 },
-                "EXPECTED": "red"
+                "EXPECTED": ("red", False)
             },
             # Percentage watermark
             {
@@ -234,7 +244,7 @@ class TestHealthCheck(MarqoTestCase):
                         "fs": {"total_in_bytes": 100, "available_in_bytes": 40}
                     }
                 },
-                "EXPECTED": "red"
+                "EXPECTED": ("red", False)
             },
             # Missing watermark
             {
@@ -264,8 +274,9 @@ class TestHealthCheck(MarqoTestCase):
                 # Test health check  
                 try:
                     health_check_status = tensor_search.check_health(self.config)
-                    assert health_check_status['status'] == test_case["EXPECTED"]
-                    assert health_check_status['backend']['status'] == test_case["EXPECTED"]
+                    assert health_check_status['status'] == test_case["EXPECTED"][0]
+                    assert health_check_status['backend']['status'] == test_case["EXPECTED"][0]
+                    assert health_check_status['backend']['storage_is_available'] == test_case["EXPECTED"][1]
                 except Exception as e:
                     if isinstance(e, AssertionError):
                         raise e
@@ -274,8 +285,9 @@ class TestHealthCheck(MarqoTestCase):
                 # Test index health check
                 try:
                     health_check_status = tensor_search.check_index_health(index_name=self.index_name, config=self.config)
-                    assert health_check_status['status'] == test_case["EXPECTED"]
-                    assert health_check_status['backend']['status'] == test_case["EXPECTED"]
+                    assert health_check_status['status'] == test_case["EXPECTED"][0]
+                    assert health_check_status['backend']['status'] == test_case["EXPECTED"][0]
+                    assert health_check_status['backend']['storage_is_available'] == test_case["EXPECTED"][1]
                 except Exception as e:
                     if isinstance(e, AssertionError):
                         raise e
@@ -794,6 +806,7 @@ class TestHealthCheck(MarqoTestCase):
         health_check_status = tensor_search.check_index_health(index_name=self.index_name, config=self.config)
         assert 'backend' in health_check_status
         assert 'status' in health_check_status['backend']
+        assert 'storage_is_available' in health_check_status['backend']
         assert 'status' in health_check_status
 
     def test_index_health_check_red_backend(self):
@@ -854,14 +867,20 @@ class TestHealthCheck(MarqoTestCase):
 
 class TestAggregateStatus(unittest.TestCase):
     def test_status_green(self):
-        result = health.aggregate_status(marqo_status="green", marqo_os_status="green")
+        result = health.aggregate_status(marqo_status=HealthStatuses.green, marqo_os_status=HealthStatuses.green)
         self.assertEqual(result, ('green', 'green'))
 
     def test_status_yellow(self):
-        result = health.aggregate_status(marqo_status="green", marqo_os_status="yellow")
+        result = health.aggregate_status(marqo_status=HealthStatuses.green, marqo_os_status=HealthStatuses.yellow)
         self.assertEqual(result, ('yellow', 'yellow'))
 
     def test_status_red(self):
-        result = health.aggregate_status(marqo_status="green", marqo_os_status="red")
+        result = health.aggregate_status(marqo_status=HealthStatuses.green, marqo_os_status=HealthStatuses.red)
+        self.assertEqual(result, ('red', 'red'))
+    
+    # Case should theoretically never happen, but aggregate should still function properly.
+    # This tests the max() function in aggregate_status
+    def test_status_red_and_yellow(self):
+        result = health.aggregate_status(HealthStatuses.yellow, HealthStatuses.red)
         self.assertEqual(result, ('red', 'red'))
 
