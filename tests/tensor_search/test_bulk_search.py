@@ -1,8 +1,6 @@
 import copy
 import os
 import math
-import pprint
-
 import requests
 import random
 from unittest import mock
