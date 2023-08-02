@@ -1294,9 +1294,10 @@ class TestVectorSearch(MarqoTestCase):
 
         @mock.patch('marqo.tensor_search.tensor_search._create_dummy_query_for_zero_vector_search', mock_create_dummy_query)
         def run():
-            res = tensor_search.search(config=self.config, text = query, index_name=index_name, verbose=1)
-            mock_create_dummy_query.assert_called_once()
-            assert res["hits"] == []
+            for verbose in [0,1,2]:
+                res = tensor_search.search(config=self.config, text = query, index_name=index_name, verbose = verbose)
+                mock_create_dummy_query.assert_called_once()
+                assert res["hits"] == []
+                mock_create_dummy_query.reset_mock()
             return True
-
         assert run()
