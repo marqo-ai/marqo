@@ -125,7 +125,7 @@ class TestHealthCheck(MarqoTestCase):
                         "fs": {"total_in_bytes": 5000, "available_in_bytes": 500}
                     }
                 },
-                "EXPECTED": ("red", False)
+                "EXPECTED": ("yellow", False)
             },
             # Health yellow and disk watermark NOT breached
             {
@@ -159,7 +159,7 @@ class TestHealthCheck(MarqoTestCase):
                         "fs": {"total_in_bytes": 5000, "available_in_bytes": 500}
                     }
                 },
-                "EXPECTED": ("red", False)
+                "EXPECTED": ("yellow", False)
             },
             # Health red and disk watermark NOT breached
             {
@@ -210,7 +210,7 @@ class TestHealthCheck(MarqoTestCase):
                         "fs": {"total_in_bytes": 1000000000, "available_in_bytes": 500}
                     }
                 },
-                "EXPECTED": ("red", False)
+                "EXPECTED": ("yellow", False)
             },
             # Ratio watermark
             {
@@ -227,7 +227,7 @@ class TestHealthCheck(MarqoTestCase):
                         "fs": {"total_in_bytes": 100, "available_in_bytes": 40}
                     }
                 },
-                "EXPECTED": ("red", False)
+                "EXPECTED": ("yellow", False)
             },
             # Percentage watermark
             {
@@ -244,7 +244,7 @@ class TestHealthCheck(MarqoTestCase):
                         "fs": {"total_in_bytes": 100, "available_in_bytes": 40}
                     }
                 },
-                "EXPECTED": ("red", False)
+                "EXPECTED": ("yellow", False)
             },
             # Missing watermark
             {
@@ -560,7 +560,7 @@ class TestHealthCheck(MarqoTestCase):
                         "fs": {"total_in_bytes": 5000, "available_in_bytes": 2}
                     }
                 },
-                "EXPECTED": "red"   # exactly on the limit is means BREACHED
+                "EXPECTED": "yellow"   # exactly on the limit is means BREACHED
             },
 
             # Watermark in B format, breached
@@ -577,7 +577,7 @@ class TestHealthCheck(MarqoTestCase):
                         "fs": {"total_in_bytes": 5000, "available_in_bytes": 2}
                     }
                 },
-                "EXPECTED": "red"
+                "EXPECTED": "yellow"
             },
 
             # Watermark in GB format
@@ -594,7 +594,7 @@ class TestHealthCheck(MarqoTestCase):
                         "fs": {"total_in_bytes": 1024**3 * 5, "available_in_bytes": 20}
                     }
                 },
-                "EXPECTED": "red"
+                "EXPECTED": "yellow"
             },
 
             # Watermark in percent format
@@ -628,7 +628,7 @@ class TestHealthCheck(MarqoTestCase):
                         "fs": {"total_in_bytes": 5000, "available_in_bytes": 500}
                     }
                 },
-                "EXPECTED": "red"
+                "EXPECTED": "yellow"
             },
 
             # Watermark in percent format, breached
@@ -645,7 +645,7 @@ class TestHealthCheck(MarqoTestCase):
                         "fs": {"total_in_bytes": 5000, "available_in_bytes": 499}
                     }
                 },
-                "EXPECTED": "red"
+                "EXPECTED": "yellow"
             },
 
             # Watermark in ratio format
@@ -678,7 +678,7 @@ class TestHealthCheck(MarqoTestCase):
                         "fs": {"total_in_bytes": 5000, "available_in_bytes": 500}
                     }
                 },
-                "EXPECTED": "red"
+                "EXPECTED": "yellow"
             },
             # Watermark in ratio format, breached
             {
@@ -694,7 +694,7 @@ class TestHealthCheck(MarqoTestCase):
                         "fs": {"total_in_bytes": 5000, "available_in_bytes": 499}
                     }
                 },
-                "EXPECTED": "red"
+                "EXPECTED": "yellow"
             },
             # Realistic values: Percentage, not breached
             {
@@ -732,7 +732,7 @@ class TestHealthCheck(MarqoTestCase):
                         },
                     }
                 },
-                "EXPECTED": "red"
+                "EXPECTED": "yellow"
             },
             # Realistic values: GB, not breached
             {
@@ -747,11 +747,11 @@ class TestHealthCheck(MarqoTestCase):
                     "nodes": {
                         "fs": {
                             "total_in_bytes": 10394816512,
-                            "available_in_bytes": 492272384
+                            "available_in_bytes": 522272384
                         },
                     }
                 },
-                "EXPECTED": "red"
+                "EXPECTED": "green"
             },
             # Realistic values: GB, breached
             {
@@ -770,7 +770,7 @@ class TestHealthCheck(MarqoTestCase):
                         },
                     }
                 },
-                "EXPECTED": "red"
+                "EXPECTED": "yellow"
             },
             # Negative total_in_bytes
             {

@@ -78,7 +78,7 @@ def check_opensearch_disk_watermark_breach(config: Config):
     2. Check the current available disk space from the stats endpoint.
     3. Compare current avilable space to watermark value.
 
-    Returns: red if watermark is breached, green otherwise.
+    Returns: yellow if watermark is breached, green otherwise.
     """
 
     # Query opensearch for watermark
@@ -100,7 +100,7 @@ def check_opensearch_disk_watermark_breach(config: Config):
     filesystem_stats = HttpRequests(config).get(path="_cluster/stats")["nodes"]["fs"]
     minimum_available_disk_space = convert_watermark_to_bytes(watermark=raw_flood_stage_watermark, total_in_bytes=filesystem_stats["total_in_bytes"])
     if filesystem_stats["available_in_bytes"] <= minimum_available_disk_space:
-        return HealthStatuses.red
+        return HealthStatuses.yellow
     return HealthStatuses.green
 
 
@@ -154,14 +154,14 @@ def get_marqo_os_status(config: Config, index_name: Optional[str] = None) -> Tup
         marqo_os_status = HealthStatuses.red
 
     marqo_os_disk_watermark_breached = check_opensearch_disk_watermark_breach(config)
+    
     # Storage is available if disk watermark is not breached (green).
     if marqo_os_disk_watermark_breached == HealthStatuses.green:
         marqo_os_storage_is_available = True
     else:
         marqo_os_storage_is_available = False
-    # Returns red status if disk watermark is breached.
+    
     marqo_os_status = max(marqo_os_status, marqo_os_disk_watermark_breached)
-
     return marqo_os_status, marqo_os_storage_is_available
 
 

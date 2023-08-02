@@ -78,9 +78,9 @@ class Test_HttpRequests(MarqoTestCase):
                 )
                 raise AssertionError
             except DiskWatermarkBreachError as e:
-                # Disk breach is a 429 error
+                # Disk breach is a 400 error
                 assert e.code == "disk_watermark_breach_error"
-                assert e.status_code == HTTPStatus.TOO_MANY_REQUESTS
+                assert e.status_code == HTTPStatus.BAD_REQUEST
                 assert "Marqo storage is full" in e.message
 
             return True
