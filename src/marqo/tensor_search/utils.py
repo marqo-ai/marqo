@@ -375,6 +375,6 @@ def calculate_health_status(marqo_os_health_check_response: Optional[Dict]) -> d
 
 
 def check_is_zero_vector(vector: List[float]) -> bool:
-    """Check if a vector is all zero."""
+    """Check if a vector is all zero. We assume the input to this function is of valid type, List[Float]"""
     return all([x == 0 for x in vector])
 
