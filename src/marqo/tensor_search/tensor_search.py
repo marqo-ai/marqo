@@ -1321,7 +1321,6 @@ def bulk_msearch(config: Config, body: List[Dict]) -> List[Dict]:
     except KeyError as e:
         # KeyError indicates we have received a non-successful result
         try:
-            print(response)
             root_cause_reason = response["responses"][0]["error"]["root_cause"][0]["reason"]
             root_cause_type: Optional[str] = response["responses"][0]["error"]["root_cause"][0].get("type")
 
@@ -1624,8 +1623,6 @@ def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity
         with RequestMetricsStore.for_request().time(f"bulk_search.vector_inference_full_pipeline"):
             qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, device)
 
-        print(qidx_to_vectors)
-
         ## 4. Create msearch request bodies and combine to aggregate.
         query_to_body_parts: Dict[Qidx, List[Dict]] = dict()
         query_to_body_count: Dict[Qidx, int] = dict() # Keep track of count, so we can separate after msearch call.
@@ -1634,8 +1631,6 @@ def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity
             body = construct_msearch_body_elements(q.searchableAttributes, q.offset, q.filter, index_info, q.limit, qidx_to_vectors[qidx], q.attributesToRetrieve, q.index, q.scoreModifiers)
             query_to_body_parts[qidx] = body
             query_to_body_count[qidx] = len(body)
-
-
 
         # Combine all msearch request bodies into one request body.
         aggregate_body = functools.reduce(lambda x, y: x + y, query_to_body_parts.values())
