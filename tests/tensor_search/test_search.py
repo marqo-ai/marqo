@@ -18,6 +18,7 @@ import copy
 from tests.marqo_test import MarqoTestCase
 import requests
 import random
+from marqo.tensor_search.tensor_search import _create_dummy_query_for_zero_vector_search
 
 class TestVectorSearch(MarqoTestCase):
 
@@ -1259,3 +1260,43 @@ class TestVectorSearch(MarqoTestCase):
             highlight_field = list(hit['_highlights'].keys())[0]
             assert highlight_field in original_doc
             assert hit[highlight_field] == original_doc[highlight_field]
+
+    def test_zero_vectors_search(self):
+        """This is to test an edge case where the query is a 0-vector, 1 shard, 0 replicas"""
+        index_name = "zero_vectors_search_index"
+
+        try:
+            tensor_search.delete_index(config=self.config, index_name=index_name)
+        except IndexNotFoundError:
+            pass
+
+        index_settings= {
+            IndexSettingsField.index_defaults: {
+                "treat_urls_and_pointers_as_images": True,
+                "model": "random/small"
+        },
+            'number_of_shards': 1,
+            'number_of_replicas': 0,
+        }
+
+        tensor_search.create_vector_index(config=self.config, index_name=index_name, index_settings=index_settings)
+
+        add_docs_caller(
+            config=self.config, index_name=index_name, docs=[
+                {"abc": "Exact match hehehe", "other field": "baaadd"},
+                {"abc": "random text", "other field": "Close match hehehe"},
+            ], auto_refresh=True)
+
+        query = {"A rider riding a horse": 0}
+
+        mock_create_dummy_query = mock.MagicMock()
+        mock_create_dummy_query.side_effect = _create_dummy_query_for_zero_vector_search
+
+        @mock.patch('marqo.tensor_search.tensor_search._create_dummy_query_for_zero_vector_search', mock_create_dummy_query)
+        def run():
+            res = tensor_search.search(config=self.config, text = query, index_name=index_name, verbose=1)
+            mock_create_dummy_query.assert_called_once()
+            assert res["hits"] == []
+            return True
+
+        assert run()

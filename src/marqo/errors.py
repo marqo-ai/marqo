@@ -184,6 +184,10 @@ class ModelNotInCacheError(__InvalidRequestError):
     status_code = HTTPStatus.NOT_FOUND
 
 
+class ZeroVectorError(__InvalidRequestError):
+    code = "zero_vector_error"
+    status_code = HTTPStatus.BAD_REQUEST
+
 # ---MARQO INTERNAL ERROR---
 
 
