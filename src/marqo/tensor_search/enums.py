@@ -162,6 +162,3 @@ class HealthStatuses(str, Enum):
 
     def __lt__(self, other):
         return self._status_index() < other._status_index()
-
-
-

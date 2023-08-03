@@ -6,6 +6,7 @@ from marqo.tensor_search import tensor_search
 from marqo.errors import (
     IndexNotFoundError, TooManyRequestsError, DiskWatermarkBreachError
 )
+from http import HTTPStatus
 
 class Test_HttpRequests(MarqoTestCase):
 
@@ -77,7 +78,11 @@ class Test_HttpRequests(MarqoTestCase):
                 )
                 raise AssertionError
             except DiskWatermarkBreachError as e:
-                pass
+                # Disk breach is a 400 error
+                assert e.code == "disk_watermark_breach_error"
+                assert e.status_code == HTTPStatus.BAD_REQUEST
+                assert "Marqo storage is full" in e.message
+
             return True
         assert run()
         
