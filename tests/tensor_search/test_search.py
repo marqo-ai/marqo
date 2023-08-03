@@ -18,7 +18,8 @@ import copy
 from tests.marqo_test import MarqoTestCase
 import requests
 import random
-from marqo.tensor_search.tensor_search import _create_dummy_query_for_zero_vector_search
+from marqo.tensor_search.tensor_search import (_create_dummy_query_for_zero_vector_search,
+                                                _vector_text_search_query_verbose)
 
 class TestVectorSearch(MarqoTestCase):
 
@@ -1292,12 +1293,45 @@ class TestVectorSearch(MarqoTestCase):
         mock_create_dummy_query = mock.MagicMock()
         mock_create_dummy_query.side_effect = _create_dummy_query_for_zero_vector_search
 
+        mock_vector_text_search_verbose = mock.MagicMock()
+        mock_vector_text_search_verbose.side_effect = _vector_text_search_query_verbose
         @mock.patch('marqo.tensor_search.tensor_search._create_dummy_query_for_zero_vector_search', mock_create_dummy_query)
+        @mock.patch('marqo.tensor_search.tensor_search._vector_text_search_query_verbose', mock_vector_text_search_verbose)
         def run():
             for verbose in [0, 1, 2]:
                 res = tensor_search.search(config=self.config, text = query, index_name=index_name, verbose = verbose)
                 mock_create_dummy_query.assert_called_once()
                 assert res["hits"] == []
                 mock_create_dummy_query.reset_mock()
+                if verbose == 0:
+                    mock_vector_text_search_verbose.assert_not_called()
+                elif verbose > 0:
+                    args, kwargs = mock_vector_text_search_verbose.call_args
+                    assert kwargs["verbose"] == verbose
+                    assert kwargs["body"][0]["index"] == index_name
+                    assert kwargs["body"][1] == {"query": {"match_none": {}}}
+                mock_vector_text_search_verbose.reset_mock()
             return True
         assert run()
+
+    def test_vector_text_search_verbose(self):
+        mock_vector_text_search_verbose = mock.MagicMock()
+        mock_vector_text_search_verbose.side_effect = _vector_text_search_query_verbose
+        @mock.patch('marqo.tensor_search.tensor_search._vector_text_search_query_verbose', mock_vector_text_search_verbose)
+        def run():
+            for verbose in [0, 1, 2]:
+                search_res = tensor_search.search(config=self.config, text="random text",
+                                                  index_name=self.index_name_1, verbose=verbose)
+                if verbose == 0:
+                    mock_vector_text_search_verbose.assert_not_called()
+                elif verbose > 0:
+                    mock_vector_text_search_verbose.assert_called_once()
+                    args, kwargs = mock_vector_text_search_verbose.call_args
+                    assert kwargs["verbose"] == verbose
+                    assert kwargs["body"][0]["index"] == self.index_name_1
+                    assert "knn" in kwargs["body"][1]["query"]["nested"]["query"]
+                    mock_vector_text_search_verbose.reset_mock()
+                    print(kwargs)
+            return True
+        assert run()
+

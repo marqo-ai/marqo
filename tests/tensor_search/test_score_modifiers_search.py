@@ -8,8 +8,7 @@ from marqo.tensor_search.enums import TensorField, IndexSettingsField, SearchMet
 from tests.marqo_test import MarqoTestCase
 from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQueryEntity
 from pprint import pprint
-from marqo.tensor_search.tensor_search import _create_normal_tensor_search_query
-from pydantic.error_wrappers import ValidationError
+from marqo.tensor_search.tensor_search import _create_normal_tensor_search_query, _vector_text_search_query_verbose
 import os
 
 class TestScoreModifiersSearch(MarqoTestCase):
@@ -30,7 +29,6 @@ class TestScoreModifiersSearch(MarqoTestCase):
                     IndexSettingsField.normalize_embeddings: True
                 }
             })
-        pass
 
         self.test_valid_score_modifiers_list = [ScoreModifier(**x) for x in [
             {
@@ -1041,4 +1039,64 @@ class TestScoreModifiersBulkSearch(MarqoTestCase):
             mock_create_normal_tensor_search_query.assert_called()
 
             return True
+        assert run()
+
+    def test_vector_text_search_verbose(self):
+        mock_vector_text_search_verbose = mock.MagicMock()
+        mock_vector_text_search_verbose.side_effect = _vector_text_search_query_verbose
+        @mock.patch('marqo.tensor_search.tensor_search._vector_text_search_query_verbose', mock_vector_text_search_verbose)
+        def run():
+            for verbose in [0, 1, 2]:
+                search_res = tensor_search.search(config=self.config, text="random text",
+                                                  index_name=self.index_name_1, verbose=verbose)
+                if verbose == 0:
+                    mock_vector_text_search_verbose.assert_not_called()
+                elif verbose > 0:
+                    mock_vector_text_search_verbose.assert_called_once()
+                    args, kwargs = mock_vector_text_search_verbose.call_args
+                    assert kwargs["verbose"] == verbose
+                    assert kwargs["body"][0]["index"] == self.index_name_1
+                    assert "knn" in kwargs["body"][1]["query"]["nested"]["query"]
+                    mock_vector_text_search_verbose.reset_mock()
+                    print(kwargs)
+            return True
+        assert run()
+
+    def test_score_modifier_vector_text_search_verbose(self):
+        mock_vector_text_search_verbose = mock.MagicMock()
+        mock_vector_text_search_verbose.side_effect = _vector_text_search_query_verbose
+
+        @mock.patch('marqo.tensor_search.tensor_search._vector_text_search_query_verbose',
+                    mock_vector_text_search_verbose)
+        def run():
+            for verbose in [0, 1, 2]:
+                search_res = tensor_search.search(config=self.config, text="random text",
+                                                  index_name=self.index_name, verbose=verbose,
+                                                  score_modifiers=ScoreModifier(**{
+                                                      "multiply_score_by":
+                                                          [{"field_name": "multiply_1",
+                                                            "weight": 1, },
+                                                           {"field_name": "multiply_2", }
+                                                           ],
+                                                      "add_to_score": [
+                                                          {"field_name": "add_1",
+                                                           },
+                                                          {"field_name": "add_2",
+                                                           }
+                                                      ]
+                                                  }))
+
+                if verbose == 0:
+                    mock_vector_text_search_verbose.assert_not_called()
+                elif verbose > 0:
+                    mock_vector_text_search_verbose.assert_called_once()
+                    args, kwargs = mock_vector_text_search_verbose.call_args
+                    assert kwargs["verbose"] == verbose
+                    assert kwargs["body"][0]["index"] == self.index_name
+                    assert "knn" in \
+                           kwargs["body"][1]["query"]["function_score"]["query"]["nested"]["query"]["function_score"][
+                               "query"]
+                    mock_vector_text_search_verbose.reset_mock()
+            return True
+
         assert run()

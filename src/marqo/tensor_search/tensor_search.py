@@ -1252,7 +1252,10 @@ def construct_vector_input_batches(query: Union[str, Dict], index_info: IndexInf
             return [k for k, _ in ordered_queries], []
 
 
-def construct_msearch_body_elements(searchableAttributes: List[str], offset: int, filter_string: str, index_info: IndexInfo, result_count: int, query_vector: List[float], attributes_to_retrieve: List[str], index_name: str, score_modifiers: Optional[ScoreModifier] = None) -> List[Dict[str, Any]]:
+def construct_msearch_body_elements(searchableAttributes: List[str], offset: int, filter_string: str,
+                                    index_info: IndexInfo, result_count: int, query_vector: List[float],
+                                    attributes_to_retrieve: List[str], index_name: str,
+                                    score_modifiers: Optional[ScoreModifier] = None) -> List[Dict[str, Any]]:
     """Constructs the body payload of a `/_msearch` request for a single bulk search query"""
 
     # search filter has 2 components:
@@ -1744,22 +1747,7 @@ def _vector_text_search(
     )
 
     if verbose:
-        print("vector search body:")
-        if verbose == 1:
-            readable_body = copy.deepcopy(body)
-            for i, q in enumerate(readable_body):
-                if "index" in q:
-                    continue
-                try:
-                    for vec in list(q["query"]["nested"]["query"]["knn"].keys()):
-                        if "vector" in q["query"]["nested"]["query"]["knn"][vec]:
-                            readable_body[i]["query"]["nested"]["query"]["knn"][vec]["vector"] = \
-                                readable_body[i]["query"]["nested"]["query"]["knn"][vec]["vector"][:5]
-                except KeyError:
-                    pass
-            pprint.pprint(readable_body)
-        if verbose == 2:
-            pprint.pprint(body, compact=True)
+        _vector_text_search_query_verbose(verbose=verbose, body=body)
 
     total_preprocess_time = RequestMetricsStore.for_request().stop("search.vector.processing_before_opensearch")
     logger.debug(f"search (tensor) pre-processing: took {(total_preprocess_time):.3f}ms to vectorize and process query.")
@@ -2089,6 +2077,38 @@ def vectorise_multimodal_combination_field(
         TensorField.field_name: field,
     })
     return combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add, new_fields_from_multimodal_combination
+
+
+def _vector_text_search_query_verbose(verbose: int, body: List[Dict[str, Any]]) -> None:
+    """Handle the verbose flag for _vector_text_search queries"""
+    print("vector search body:")
+    if verbose == 1:
+        readable_body = copy.deepcopy(body)
+        for i, q in enumerate(readable_body):
+            if "index" in q:
+                continue
+            if "query" in q and "nested" in q.get("query"):
+                # A normal vector search
+                for vec in list(q["query"]["nested"]["query"]["knn"].keys()):
+                    if "vector" in q["query"]["nested"]["query"]["knn"][vec]:
+                        readable_body[i]["query"]["nested"]["query"]["knn"][vec]["vector"] = \
+                            readable_body[i]["query"]["nested"]["query"]["knn"][vec]["vector"][:5]
+            elif "query" in q and "function_score" in q.get("query"):
+                # A score modifier search
+                for vec in list(q["query"]["function_score"]["query"]["nested"]["query"]["function_score"]["query"]["knn"].keys()):
+                    if "vector" in q["query"]["function_score"]["query"]["nested"]["query"]["function_score"]["query"]["knn"][vec]:
+                        readable_body[i]["query"]["function_score"]["query"]["nested"]["query"]["function_score"]["query"]["knn"][vec]["vector"] = \
+                            readable_body[i]["query"]["function_score"]["query"]["nested"]["query"]["function_score"]["query"]["knn"][vec]["vector"][:5]
+            elif "query" in q and "match_none" in q.get("query"):
+                # A dummy search to replace a zero-vector
+                pass
+            else:
+                raise errors.InternalError(f"Marqo encountered an unexpected query format "
+                                           f"in `_vector_text_search` when setting `verbose=1`. "
+                                           f"The query is `{q}`")
+        pprint.pprint(readable_body)
+    if verbose == 2:
+        pprint.pprint(body, compact=True)
 
 
 def _create_normal_tensor_search_query(result_count, offset, vector_field, vectorised_text) -> dict:
