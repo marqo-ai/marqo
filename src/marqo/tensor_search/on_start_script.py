@@ -19,11 +19,11 @@ import torch
 def on_start(marqo_os_url: str):
         
     to_run_on_start = (
-                        PopulateCache(marqo_os_url),
                         DownloadStartText(),
                         CUDAAvailable(), 
                         SetBestAvailableDevice(),
-                        ModelsForCacheing(), 
+                        ModelsForCacheing(),
+                        PopulateCache(marqo_os_url),
                         InitializeRedis("localhost", 6379),    # TODO, have these variable
                         DownloadFinishText(),
                         MarqoWelcome(),
