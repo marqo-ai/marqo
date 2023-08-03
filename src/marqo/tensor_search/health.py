@@ -1,6 +1,6 @@
 import math
 import copy
-from typing import Optional, Tuple, Union
+from typing import Optional, Tuple
 
 from marqo import errors
 from marqo._httprequests import HttpRequests
@@ -16,8 +16,8 @@ logger = get_logger(__name__)
 def convert_watermark_to_bytes(watermark: str, total_in_bytes: int = None) -> int:
     """
     Converts a value to bytes.
-    It could possible be:
-    1. Bytes (eg 123.4gb) - do nothing
+    It could possibly be:
+    1. Bytes (eg 1234b) - do nothing
     2. MB, GB, TB, etc, (eg 123.4gb) - multiply by some power of 1024 to get bytes
     3. Ratio (e.g. 0.9) - multiply by total_in_bytes to get bytes
     4. Percentage (e.g. 90%) - convert to ratio then multiply by total_in_bytes to get bytes
@@ -78,7 +78,7 @@ def check_opensearch_disk_watermark_breach(config: Config):
     2. Check the current available disk space from the stats endpoint.
     3. Compare current avilable space to watermark value.
 
-    Returns: red if watermark is breached, green otherwise.
+    Returns: yellow if watermark is breached, green otherwise.
     """
 
     # Query opensearch for watermark
@@ -100,30 +100,31 @@ def check_opensearch_disk_watermark_breach(config: Config):
     filesystem_stats = HttpRequests(config).get(path="_cluster/stats")["nodes"]["fs"]
     minimum_available_disk_space = convert_watermark_to_bytes(watermark=raw_flood_stage_watermark, total_in_bytes=filesystem_stats["total_in_bytes"])
     if filesystem_stats["available_in_bytes"] <= minimum_available_disk_space:
-        return HealthStatuses.red
+        return HealthStatuses.yellow
     return HealthStatuses.green
 
 
 def generate_heath_check_response(config: Config, index_name: Optional[str] = None) -> dict:
     """Generate the health check response for check_heath(), check_index_health() APIs in tensor_search"""
     marqo_status = get_marqo_status()
-    marqo_os_status = get_marqo_os_status(config, index_name=index_name)
+    marqo_os_status, marqo_os_storage_is_available = get_marqo_os_status(config, index_name=index_name)
     aggregated_marqo_status, marqo_os_status = aggregate_status(marqo_status, marqo_os_status)
 
     return {
-        "status": aggregated_marqo_status,
+        "status": aggregated_marqo_status.value,
         "backend": {
-            "status": marqo_os_status
+            "status": marqo_os_status.value,
+            "storage_is_available": marqo_os_storage_is_available
         }
     }
 
 
-def get_marqo_status() -> Union[str, HealthStatuses]:
+def get_marqo_status() -> HealthStatuses:
     """Check the Marqo instance status."""
     return HealthStatuses.green
 
 
-def get_marqo_os_status(config: Config, index_name: Optional[str] = None) -> Union[str, HealthStatuses]:
+def get_marqo_os_status(config: Config, index_name: Optional[str] = None) -> Tuple[HealthStatuses, bool]:
     """
     Check the Marqo-os backend status.
 
@@ -152,14 +153,20 @@ def get_marqo_os_status(config: Config, index_name: Optional[str] = None) -> Uni
     else:
         marqo_os_status = HealthStatuses.red
 
-    # Returns red if disk watermark is breached.
-    marqo_os_status = max(marqo_os_status, check_opensearch_disk_watermark_breach(config))
+    marqo_os_disk_watermark_breached = check_opensearch_disk_watermark_breach(config)
+    
+    # Storage is available if disk watermark is not breached (green).
+    if marqo_os_disk_watermark_breached == HealthStatuses.green:
+        marqo_os_storage_is_available = True
+    else:
+        marqo_os_storage_is_available = False
+    
+    marqo_os_status = max(marqo_os_status, marqo_os_disk_watermark_breached)
+    return marqo_os_status, marqo_os_storage_is_available
 
-    return marqo_os_status
 
-
-def aggregate_status(marqo_status: Union[str, HealthStatuses], marqo_os_status: Union[str, HealthStatuses]) \
-        -> Tuple[Union[str,HealthStatuses], Union[str, HealthStatuses]]:
+def aggregate_status(marqo_status: HealthStatuses, marqo_os_status: HealthStatuses) \
+        -> Tuple[HealthStatuses, HealthStatuses]:
     """Aggregate the Marqo instance and Marqo-os backend status."""
     aggregated_marqo_status = max(marqo_status, marqo_os_status)
     return aggregated_marqo_status, marqo_os_status
