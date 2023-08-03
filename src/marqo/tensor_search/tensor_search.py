@@ -2105,7 +2105,7 @@ def _vector_text_search_query_verbose(verbose: int, body: List[Dict[str, Any]]) 
             else:
                 raise errors.InternalError(f"Marqo encountered an unexpected query format "
                                            f"in `_vector_text_search` when setting `verbose=1`. "
-                                           f"The query is `{q}`")
+                                           f"The unexpected query is `{q}`")
         pprint.pprint(readable_body)
     if verbose == 2:
         pprint.pprint(body, compact=True)
