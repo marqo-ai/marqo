@@ -1331,7 +1331,6 @@ class TestVectorSearch(MarqoTestCase):
                     assert kwargs["body"][0]["index"] == self.index_name_1
                     assert "knn" in kwargs["body"][1]["query"]["nested"]["query"]
                     mock_vector_text_search_verbose.reset_mock()
-                    print(kwargs)
             return True
         assert run()
 
