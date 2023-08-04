@@ -1686,7 +1686,7 @@ def _vector_text_search(
         image_download_headers: Optional[Dict] = None, context: Optional[Dict] = None,
         score_modifiers: Optional[ScoreModifier] = None, model_auth: Optional[ModelAuth] = None):
     """
-    
+
     Args:
         config:
         index_name:
@@ -2152,7 +2152,7 @@ def _create_normal_tensor_search_query(result_count, offset, vector_field, vecto
 
 
 def _create_score_modifiers_tensor_search_query(score_modifiers, result_count, offset, vector_field, vectorised_text) -> dict:
-    script_score = score_modifiers.to_painless_script()
+    script_score = score_modifiers.to_script_score()
     search_query = {
         "size": result_count,
         "from": offset,
@@ -2181,7 +2181,7 @@ def _create_score_modifiers_tensor_search_query(score_modifiers, result_count, o
                                     {
                                         "script_score": {
                                             "script": {
-                                                "source": script_score
+                                                **script_score
                                             }
                                         }
                                     }
