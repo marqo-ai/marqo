@@ -1,4 +1,4 @@
-__version__ = "1.1.0+cuda11.7.1"
+__version__ = "1.1.0+cuda11.6.1"
 
 
 def get_version() -> str:
