@@ -7,8 +7,10 @@ from marqo.tensor_search.models.api_models import ScoreModifier
 from marqo.tensor_search.enums import TensorField, IndexSettingsField, SearchMethod
 from tests.marqo_test import MarqoTestCase
 from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQueryEntity
-from pprint import pprint
-from marqo.tensor_search.tensor_search import _create_normal_tensor_search_query, _vector_text_search_query_verbose
+import pprint
+from marqo.tensor_search.tensor_search import (_create_normal_tensor_search_query, _vector_text_search_query_verbose,
+                                                _generate_vector_text_search_query_for_verbose_one)
+
 from pydantic.error_wrappers import ValidationError
 import os
 
@@ -1047,8 +1049,14 @@ class TestScoreModifiersBulkSearch(MarqoTestCase):
         mock_vector_text_search_verbose = mock.MagicMock()
         mock_vector_text_search_verbose.side_effect = _vector_text_search_query_verbose
 
-        @mock.patch('marqo.tensor_search.tensor_search._vector_text_search_query_verbose',
-                    mock_vector_text_search_verbose)
+        mock_pprint = mock.MagicMock()
+        mock_pprint.side_effect = pprint.pprint
+
+        mock_generate_verbose_one_body = mock.MagicMock()
+        mock_generate_verbose_one_body.side_effect = _generate_vector_text_search_query_for_verbose_one
+        @mock.patch('marqo.tensor_search.tensor_search._generate_vector_text_search_query_for_verbose_one', mock_generate_verbose_one_body)
+        @mock.patch('marqo.tensor_search.tensor_search._vector_text_search_query_verbose', mock_vector_text_search_verbose)
+        @mock.patch('marqo.tensor_search.tensor_search.pprint.pprint', mock_pprint)
         def run():
             for verbose in [0, 1, 2]:
                 search_res = tensor_search.search(config=self.config, text="random text",
@@ -1071,13 +1079,25 @@ class TestScoreModifiersBulkSearch(MarqoTestCase):
                     mock_vector_text_search_verbose.assert_not_called()
                 elif verbose > 0:
                     mock_vector_text_search_verbose.assert_called_once()
-                    args, kwargs = mock_vector_text_search_verbose.call_args
-                    assert kwargs["verbose"] == verbose
-                    assert kwargs["body"][0]["index"] == self.index_name
+                    _, verbose_kwargs = mock_vector_text_search_verbose.call_args
+                    assert verbose_kwargs["verbose"] == verbose
+                    assert verbose_kwargs["body"][0]["index"] == self.index_name
                     assert "knn" in \
-                           kwargs["body"][1]["query"]["function_score"]["query"]["nested"]["query"]["function_score"][
+                           verbose_kwargs["body"][1]["query"]["function_score"]["query"]["nested"]["query"]["function_score"][
                                "query"]
-                    mock_vector_text_search_verbose.reset_mock()
+
+                    assert mock_pprint.call_count == 2
+
+                    pprint_args, pprint_kwargs = mock_pprint.call_args_list[0]
+                    if verbose == 1:
+                        mock_generate_verbose_one_body.assert_called_once_with(verbose_kwargs["body"])
+                    elif verbose == 2:
+                        assert verbose_kwargs["body"] == pprint_args[0]
+                        assert pprint_kwargs["compact"] == True
+
+                mock_vector_text_search_verbose.reset_mock()
+                mock_pprint.reset_mock()
+
             return True
 
         assert run()

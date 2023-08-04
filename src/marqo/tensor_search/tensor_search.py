@@ -2078,37 +2078,46 @@ def vectorise_multimodal_combination_field(
     })
     return combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add, new_fields_from_multimodal_combination
 
+def _generate_vector_text_search_query_for_verbose_one(original_body:List[Dict[str, Any]]) -> None:
+    readable_body = copy.deepcopy(original_body)
+    for i, q in enumerate(readable_body):
+        if "index" in q:
+            continue
+        if "query" in q and "nested" in q.get("query"):
+            # A normal vector search
+            for vec in list(q["query"]["nested"]["query"]["knn"].keys()):
+                if "vector" in q["query"]["nested"]["query"]["knn"][vec]:
+                    readable_body[i]["query"]["nested"]["query"]["knn"][vec]["vector"] = \
+                        readable_body[i]["query"]["nested"]["query"]["knn"][vec]["vector"][:5]
+        elif "query" in q and "function_score" in q.get("query"):
+            # A score modifier search
+            for vec in list(
+                    q["query"]["function_score"]["query"]["nested"]["query"]["function_score"]["query"]["knn"].keys()):
+                if "vector" in \
+                        q["query"]["function_score"]["query"]["nested"]["query"]["function_score"]["query"]["knn"][vec]:
+                    readable_body[i]["query"]["function_score"]["query"]["nested"]["query"]["function_score"]["query"][
+                        "knn"][vec]["vector"] = \
+                        readable_body[i]["query"]["function_score"]["query"]["nested"]["query"]["function_score"][
+                            "query"]["knn"][vec]["vector"][:5]
+        elif "query" in q and "match_none" in q.get("query"):
+            # A dummy search to replace a zero-vector
+            pass
+        else:
+            raise errors.InternalError(f"Marqo encountered an unexpected query format "
+                                       f"in `_vector_text_search` when setting `verbose=1`. "
+                                       f"The unexpected query is `{q}`")
+    return readable_body
+
 
 def _vector_text_search_query_verbose(verbose: int, body: List[Dict[str, Any]]) -> None:
     """Handle the verbose flag for _vector_text_search queries"""
     print("vector search body:")
     if verbose == 1:
-        readable_body = copy.deepcopy(body)
-        for i, q in enumerate(readable_body):
-            if "index" in q:
-                continue
-            if "query" in q and "nested" in q.get("query"):
-                # A normal vector search
-                for vec in list(q["query"]["nested"]["query"]["knn"].keys()):
-                    if "vector" in q["query"]["nested"]["query"]["knn"][vec]:
-                        readable_body[i]["query"]["nested"]["query"]["knn"][vec]["vector"] = \
-                            readable_body[i]["query"]["nested"]["query"]["knn"][vec]["vector"][:5]
-            elif "query" in q and "function_score" in q.get("query"):
-                # A score modifier search
-                for vec in list(q["query"]["function_score"]["query"]["nested"]["query"]["function_score"]["query"]["knn"].keys()):
-                    if "vector" in q["query"]["function_score"]["query"]["nested"]["query"]["function_score"]["query"]["knn"][vec]:
-                        readable_body[i]["query"]["function_score"]["query"]["nested"]["query"]["function_score"]["query"]["knn"][vec]["vector"] = \
-                            readable_body[i]["query"]["function_score"]["query"]["nested"]["query"]["function_score"]["query"]["knn"][vec]["vector"][:5]
-            elif "query" in q and "match_none" in q.get("query"):
-                # A dummy search to replace a zero-vector
-                pass
-            else:
-                raise errors.InternalError(f"Marqo encountered an unexpected query format "
-                                           f"in `_vector_text_search` when setting `verbose=1`. "
-                                           f"The unexpected query is `{q}`")
-        pprint.pprint(readable_body)
-    if verbose == 2:
+        pprint.pprint(_generate_vector_text_search_query_for_verbose_one(body))
+    elif verbose == 2:
         pprint.pprint(body, compact=True)
+    else:
+        raise errors.InternalError(f"Marqo encountered an unexpected verbose flag = `{verbose}`")
 
 
 def _create_normal_tensor_search_query(result_count, offset, vector_field, vectorised_text) -> dict:
