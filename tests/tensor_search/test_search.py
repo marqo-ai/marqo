@@ -1,6 +1,6 @@
 import math
 import os
-import sys 
+import sys
 from tests.utils.transition import add_docs_caller
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from unittest import mock
@@ -18,6 +18,11 @@ import copy
 from tests.marqo_test import MarqoTestCase
 import requests
 import random
+from marqo.tensor_search.tensor_search import (_create_dummy_query_for_zero_vector_search,
+                                               _vector_text_search_query_verbose,
+                                               _generate_vector_text_search_query_for_verbose_one)
+import pprint
+
 
 class TestVectorSearch(MarqoTestCase):
 
@@ -126,16 +131,16 @@ class TestVectorSearch(MarqoTestCase):
     def test_vector_text_search_no_device(self):
         try:
             search_res = tensor_search._vector_text_search(
-                    config=self.config, index_name=self.index_name_1,
-                    result_count=5, query="some text...")
+                config=self.config, index_name=self.index_name_1,
+                result_count=5, query="some text...")
             raise AssertionError
         except InternalError:
             pass
 
     def test_vector_search_against_empty_index(self):
         search_res = tensor_search._vector_text_search(
-                config=self.config, index_name=self.index_name_1,
-                result_count=5, query="some text...", device="cpu")
+            config=self.config, index_name=self.index_name_1,
+            result_count=5, query="some text...", device="cpu")
         assert {'hits': []} == search_res
 
     def test_vector_search_against_non_existent_index(self):
@@ -194,7 +199,7 @@ class TestVectorSearch(MarqoTestCase):
     def test_tricky_search(self):
         """We ran into bugs with this doc"""
         add_docs_caller(
-            config=self.config, index_name=self.index_name_1, docs = [
+            config=self.config, index_name=self.index_name_1, docs=[
                 {
                     'text': 'In addition to NiS collection fire assay for a five element PGM suite, the samples will undergo research quality analyses for a wide range of elements, including the large ion. , the rare earth elements, high field strength elements, sulphur and selenium.hey include 55 elements of the periodic system: O, Si, Al, Ti, B, C, all the alkali and alkaline-earth metals, the halogens, and many of the rare elements.',
                     'combined': 'In addition to NiS collection fire assay for a five element PGM suite, the samples will undergo research quality analyses for a wide range of elements, including the large ion. , the rare earth elements, high field strength elements, sulphur and selenium.hey include 55 elements of the periodic system: O, Si, Al, Ti, B, C, all the alkali and alkaline-earth metals, the halogens, and many of the rare elements.'
@@ -363,7 +368,7 @@ class TestVectorSearch(MarqoTestCase):
             config=self.config, index_name=self.index_name_1, docs=[
                 {"abc": "some text", "other field": "baaadd", "_id": "5678", "my_string": "b"},
                 {"abc": "some text", "other field": "Close match hehehe", "_id": "1234", "an_int": 2},
-                {"abc": "some text", "_id": "1235",  "my_list": ["tag1", "tag2 some"]}
+                {"abc": "some text", "_id": "1235", "my_list": ["tag1", "tag2 some"]}
             ], auto_refresh=True, non_tensor_fields=["my_list"])
 
         res_exists = tensor_search.search(
@@ -400,7 +405,7 @@ class TestVectorSearch(MarqoTestCase):
             config=self.config, index_name=self.index_name_1, docs=[
                 {"abc": "some text", "other field": "baaadd", "_id": "5678", "my_string": "b"},
                 {"abc": "some text", "other field": "Close match hehehe", "_id": "1234", "an_int": 2},
-                {"abc": "some text", "_id": "1235",  "my_list": ["tag1", "tag2 some"]}
+                {"abc": "some text", "_id": "1235", "my_list": ["tag1", "tag2 some"]}
             ], auto_refresh=True, non_tensor_fields=["my_list"])
         base_search_args = {
             'index_name': self.index_name_1, "config": self.config, "text": "some",
@@ -575,7 +580,8 @@ class TestVectorSearch(MarqoTestCase):
         assert res_mult['hits'][1]['_id'] != res_mult['hits'][0]['_id']
 
         res_float = tensor_search.search(
-            config=self.config, index_name=self.index_name_1, text='', filter="(Floaty\ Field:[0 TO 1]) AND (abc:(some text))")
+            config=self.config, index_name=self.index_name_1, text='',
+            filter="(Floaty\ Field:[0 TO 1]) AND (abc:(some text))")
         get_res = tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id='344')
 
         assert len(res_float['hits']) == 1
@@ -668,7 +674,7 @@ class TestVectorSearch(MarqoTestCase):
                     "_id": "123456", "a_float": 0.61
                 },
                 {
-                    "_id": "other doc", "a_float": 0.66, "bfield": "some text too", "my_int":5,
+                    "_id": "other doc", "a_float": 0.66, "bfield": "some text too", "my_int": 5,
                     "fake_int": "234", "fake_float": "1.23", "gapped field_name": "gap"
                 }
             ], auto_refresh=True)
@@ -683,10 +689,10 @@ class TestVectorSearch(MarqoTestCase):
 
         pairs = [
             ("my_looLoo:1", None), ("", None), ("*:*", math.inf),
-             ("my_int:5", "other doc"), ("my_int:[1 TO 10]", "other doc"),
-             ("a_float:0.61", "123456"), ("field1:(other things)", "123456"),
-             ("fake_int:234", "other doc"), ("fake_float:1.23", "other doc"),
-             ("fake_float:[0 TO 2]", "other doc"), ("gapped\ field_name:gap", "other doc")
+            ("my_int:5", "other doc"), ("my_int:[1 TO 10]", "other doc"),
+            ("a_float:0.61", "123456"), ("field1:(other things)", "123456"),
+            ("fake_int:234", "other doc"), ("fake_float:1.23", "other doc"),
+            ("fake_float:[0 TO 2]", "other doc"), ("gapped\ field_name:gap", "other doc")
         ]
 
         for filter, expected in pairs:
@@ -831,8 +837,8 @@ class TestVectorSearch(MarqoTestCase):
 
     def test_attributes_to_retrieve_non_list(self):
         add_docs_caller(config=self.config, index_name=self.index_name_1,
-                                    docs=[{"cool field 111": "this is some content"}],
-                                    auto_refresh=True)
+                        docs=[{"cool field 111": "this is some content"}],
+                        auto_refresh=True)
         for method in ("TENSOR", "LEXICAL"):
             for bad_attr in ["jknjhc", "", dict(), 1234, 1.245]:
                 try:
@@ -863,21 +869,25 @@ class TestVectorSearch(MarqoTestCase):
                 @mock.patch.dict(os.environ, {**os.environ, **mock_environ})
                 def run():
                     half_search = tensor_search.search(search_method=search_method,
-                        config=self.config, index_name=self.index_name_1, text='a', result_count=max_doc//2)
-                    assert half_search['limit'] == max_doc//2
-                    assert len(half_search['hits']) == max_doc//2
+                                                       config=self.config, index_name=self.index_name_1, text='a',
+                                                       result_count=max_doc // 2)
+                    assert half_search['limit'] == max_doc // 2
+                    assert len(half_search['hits']) == max_doc // 2
                     limit_search = tensor_search.search(search_method=search_method,
-                        config=self.config, index_name=self.index_name_1, text='a', result_count=max_doc)
+                                                        config=self.config, index_name=self.index_name_1, text='a',
+                                                        result_count=max_doc)
                     assert limit_search['limit'] == max_doc
                     assert len(limit_search['hits']) == max_doc
                     try:
                         oversized_search = tensor_search.search(search_method=search_method,
-                            config=self.config, index_name=self.index_name_1, text='a', result_count=max_doc + 1)
+                                                                config=self.config, index_name=self.index_name_1,
+                                                                text='a', result_count=max_doc + 1)
                     except IllegalRequestedDocCount:
                         pass
                     try:
                         very_oversized_search = tensor_search.search(search_method=search_method,
-                            config=self.config, index_name=self.index_name_1, text='a', result_count=(max_doc + 1) * 2)
+                                                                     config=self.config, index_name=self.index_name_1,
+                                                                     text='a', result_count=(max_doc + 1) * 2)
                     except IllegalRequestedDocCount:
                         pass
                     return True
@@ -891,8 +901,10 @@ class TestVectorSearch(MarqoTestCase):
 
         tensor_search.add_documents(
             config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1,
-                docs=[{"Title": "a " + (" ".join(random.choices(population=vocab, k=25)))}
-                      for _ in range(700)], auto_refresh=False, device = "cpu")
+                                                              docs=[{"Title": "a " + (
+                                                                  " ".join(random.choices(population=vocab, k=25)))}
+                                                                    for _ in range(700)], auto_refresh=False,
+                                                              device="cpu")
         )
         tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
 
@@ -916,12 +928,12 @@ class TestVectorSearch(MarqoTestCase):
         docs = [
             {
                 "field_a": 0,
-                "field_b": 0, 
+                "field_b": 0,
                 "field_c": 0
             },
             {
                 "field_a": 1,
-                "field_b": 1, 
+                "field_b": 1,
                 "field_c": 1
             }
         ]
@@ -938,7 +950,7 @@ class TestVectorSearch(MarqoTestCase):
             searchable_attributes=[], search_method="TENSOR"
         )
         assert res["hits"] == []
-    
+
     def test_image_search_highlights(self):
         """does the URL get returned as the highlight? (it should - because no rerankers are being used)"""
         settings = {
@@ -991,7 +1003,7 @@ class TestVectorSearch(MarqoTestCase):
             ({"Dogs": -2.0, "Poodles": 2}, ['poodle_doc', 'irrelevant_doc', 'dog_doc']),
         ]
         for query, expected_ordering in queries_expected_ordering:
-            
+
             res = tensor_search.search(
                 text=query,
                 index_name=self.index_name_1,
@@ -1005,8 +1017,9 @@ class TestVectorSearch(MarqoTestCase):
 
     def test_multi_search_images(self):
         docs = [
-            {"loc a": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
-             "_id": 'realistic_hippo'},
+            {
+                "loc a": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+                "_id": 'realistic_hippo'},
             {"loc b": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png",
              "_id": 'artefact_hippo'}
         ]
@@ -1055,8 +1068,9 @@ class TestVectorSearch(MarqoTestCase):
         This checks our batching logic.
         """
         docs = [
-            {"loc a": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
-            "_id": 'realistic_hippo'},
+            {
+                "loc a": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+                "_id": 'realistic_hippo'},
             {"loc a": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png",
              "_id": 'artefact_hippo'}
         ]
@@ -1115,8 +1129,9 @@ class TestVectorSearch(MarqoTestCase):
                 query_vec = query_dict['query']['nested']['query']['knn'][
                     f"{TensorField.chunks}.{TensorField.marqo_knn_field}"]['vector']
                 return query_vec
+
             # manually calculate weights:
-            weighted_vectors =[]
+            weighted_vectors = []
             for q, weight in multi_query.items():
                 vec = vectorise(model_name="ViT-B/16", content=[q, ],
                                 image_download_headers=None, normalize_embeddings=True,
@@ -1131,7 +1146,6 @@ class TestVectorSearch(MarqoTestCase):
 
             combined_query = run()
             assert np.allclose(combined_query, manually_combined, atol=1e-6)
-
 
     def test_multi_search_images_edge_cases(self):
         docs = [
@@ -1228,9 +1242,9 @@ class TestVectorSearch(MarqoTestCase):
         )
         doc_dict = {
             'realistic_hippo': {"loc": hippo_image,
-             "_id": 'realistic_hippo'},
+                                "_id": 'realistic_hippo'},
             'artefact_hippo': {"field_a": "Some text about a weird forest",
-             "_id": 'artefact_hippo'}
+                               "_id": 'artefact_hippo'}
         }
         docs = list(doc_dict.values())
         image_index_config = {
@@ -1259,3 +1273,104 @@ class TestVectorSearch(MarqoTestCase):
             highlight_field = list(hit['_highlights'].keys())[0]
             assert highlight_field in original_doc
             assert hit[highlight_field] == original_doc[highlight_field]
+
+    def test_zero_vectors_search(self):
+        """This is to test an edge case where the query is a 0-vector, 1 shard, 0 replicas"""
+        index_name = "zero_vectors_search_index"
+
+        try:
+            tensor_search.delete_index(config=self.config, index_name=index_name)
+        except IndexNotFoundError:
+            pass
+
+        index_settings = {
+            IndexSettingsField.index_defaults: {
+                "treat_urls_and_pointers_as_images": True,
+                "model": "random/small"
+            },
+            'number_of_shards': 1,
+            'number_of_replicas': 0,
+        }
+
+        tensor_search.create_vector_index(config=self.config, index_name=index_name, index_settings=index_settings)
+
+        add_docs_caller(
+            config=self.config, index_name=index_name, docs=[
+                {"abc": "Exact match hehehe", "other field": "baaadd"},
+                {"abc": "random text", "other field": "Close match hehehe"},
+            ], auto_refresh=True)
+
+        query = {"A rider riding a horse": 0}
+
+        mock_create_dummy_query = mock.MagicMock()
+        mock_create_dummy_query.side_effect = _create_dummy_query_for_zero_vector_search
+
+        mock_vector_text_search_verbose = mock.MagicMock()
+        mock_vector_text_search_verbose.side_effect = _vector_text_search_query_verbose
+
+        @mock.patch('marqo.tensor_search.tensor_search._create_dummy_query_for_zero_vector_search',
+                    mock_create_dummy_query)
+        @mock.patch('marqo.tensor_search.tensor_search._vector_text_search_query_verbose',
+                    mock_vector_text_search_verbose)
+        def run():
+            for verbose in [0, 1, 2]:
+                res = tensor_search.search(config=self.config, text=query, index_name=index_name, verbose=verbose)
+                mock_create_dummy_query.assert_called_once()
+                assert res["hits"] == []
+                mock_create_dummy_query.reset_mock()
+                if verbose == 0:
+                    mock_vector_text_search_verbose.assert_not_called()
+                elif verbose > 0:
+                    args, kwargs = mock_vector_text_search_verbose.call_args
+                    assert kwargs["verbose"] == verbose
+                    assert kwargs["body"][0]["index"] == index_name
+                    assert kwargs["body"][1] == {"query": {"match_none": {}}}
+                mock_vector_text_search_verbose.reset_mock()
+            return True
+
+        assert run()
+
+    def test_vector_text_search_verbose(self):
+        mock_vector_text_search_verbose = mock.MagicMock()
+        mock_vector_text_search_verbose.side_effect = _vector_text_search_query_verbose
+
+        mock_pprint = mock.MagicMock()
+        mock_pprint.side_effect = pprint.pprint
+
+        mock_generate_verbose_one_body = mock.MagicMock()
+        mock_generate_verbose_one_body.side_effect = _generate_vector_text_search_query_for_verbose_one
+
+        @mock.patch('marqo.tensor_search.tensor_search._generate_vector_text_search_query_for_verbose_one',
+                    mock_generate_verbose_one_body)
+        @mock.patch('marqo.tensor_search.tensor_search._vector_text_search_query_verbose',
+                    mock_vector_text_search_verbose)
+        @mock.patch('marqo.tensor_search.tensor_search.pprint.pprint', mock_pprint)
+        def run():
+            for verbose in [0, 1, 2]:
+                search_res = tensor_search.search(config=self.config, text="random text",
+                                                  index_name=self.index_name_1, verbose=verbose)
+                if verbose == 0:
+                    mock_vector_text_search_verbose.assert_not_called()
+                    mock_pprint.assert_not_called()
+                elif verbose > 0:
+                    mock_vector_text_search_verbose.assert_called_once()
+                    _, verbose_kwargs = mock_vector_text_search_verbose.call_args
+                    assert verbose_kwargs["verbose"] == verbose
+                    assert verbose_kwargs["body"][0]["index"] == self.index_name_1
+                    assert "knn" in verbose_kwargs["body"][1]["query"]["nested"]["query"]
+
+                    # Called twice because of there is a result verbose after the search
+                    assert mock_pprint.call_count == 2
+
+                    pprint_args, pprint_kwargs = mock_pprint.call_args_list[0]
+                    if verbose == 1:
+                        mock_generate_verbose_one_body.assert_called_once_with(verbose_kwargs["body"])
+                    elif verbose == 2:
+                        assert verbose_kwargs["body"] == pprint_args[0]
+                        assert pprint_kwargs["compact"] == True
+
+                mock_vector_text_search_verbose.reset_mock()
+                mock_pprint.reset_mock()
+            return True
+
+        assert run()

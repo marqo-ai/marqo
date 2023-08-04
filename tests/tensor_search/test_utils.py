@@ -398,3 +398,31 @@ class TestUtils(unittest.TestCase):
         non_tensor_fields = []
         with self.assertRaises(errors.InternalError):
             utils.is_tensor_field('field1', tensor_fields=tensor_fields, non_tensor_fields=non_tensor_fields)
+
+    def test_check_is_zero_vector_empty_vector(self):
+        vector = []
+        self.assertTrue(utils.check_is_zero_vector(vector))
+
+    def test_check_is_zero_vector_zero_vector(self):
+        vector = [0, 0, 0, 0]
+        self.assertTrue(utils.check_is_zero_vector(vector))
+
+    def test_check_is_zero_vector_non_zero_vector(self):
+        vector = [1, 2, 3, 4]
+        self.assertFalse(utils.check_is_zero_vector(vector))
+
+    def test_check_is_zero_vector_mixed_vector(self):
+        vector = [0, 1, 0, 2]
+        self.assertFalse(utils.check_is_zero_vector(vector))
+
+    def test_check_is_zero_vector_large_vector(self):
+        vector = [0] * 1000
+        self.assertTrue(utils.check_is_zero_vector(vector))
+
+    def test_check_is_zero_vector_float_vector(self):
+        vector = [0.0, 0.0, 0.0]
+        self.assertTrue(utils.check_is_zero_vector(vector))
+
+    def test_check_is_zero_vector_negative_vector(self):
+        vector = [-1, -2, -3]
+        self.assertFalse(utils.check_is_zero_vector(vector))

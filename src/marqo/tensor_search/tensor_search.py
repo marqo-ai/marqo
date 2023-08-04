@@ -860,7 +860,7 @@ def refresh_index(config: Config, index_name: str):
 
 
 @add_timing
-def bulk_search(query: BulkSearchQuery, marqo_config: config.Config, verbose: bool = True, device: str = None):
+def bulk_search(query: BulkSearchQuery, marqo_config: config.Config, verbose: int = 0, device: str = None):
     """Performs a set of search operations in parallel.
 
     Args:
@@ -1252,45 +1252,53 @@ def construct_vector_input_batches(query: Union[str, Dict], index_info: IndexInf
             return [k for k, _ in ordered_queries], []
 
 
-def construct_msearch_body_elements(searchableAttributes: List[str], offset: int, filter_string: str, index_info: IndexInfo, result_count: int, query_vector: List[float], attributes_to_retrieve: List[str], index_name: str, score_modifiers: Optional[ScoreModifier] = None) -> List[Dict[str, Any]]:
+def construct_msearch_body_elements(searchableAttributes: List[str], offset: int, filter_string: str,
+                                    index_info: IndexInfo, result_count: int, query_vector: List[float],
+                                    attributes_to_retrieve: List[str], index_name: str,
+                                    score_modifiers: Optional[ScoreModifier] = None) -> List[Dict[str, Any]]:
     """Constructs the body payload of a `/_msearch` request for a single bulk search query"""
 
     # search filter has 2 components:
     # 1. searchable_attributes filter: filters out results that are not part of the searchable attributes
     # 2. filter_string: filters out results that do not match the filter string
-    filter_for_opensearch = filtering.build_tensor_search_filter(
-        filter_string=filter_string, simple_properties=index_info.get_text_properties(),
-        searchable_attribs=searchableAttributes
-    )
+
     body = []
 
-    if score_modifiers is not None:
-        search_query = _create_score_modifiers_tensor_search_query(
-            score_modifiers,
-            result_count,
-            offset,
-            TensorField.marqo_knn_field,
-            query_vector
+    if not utils.check_is_zero_vector(query_vector):
+        filter_for_opensearch = filtering.build_tensor_search_filter(
+            filter_string=filter_string, simple_properties=index_info.get_text_properties(),
+            searchable_attribs=searchableAttributes
         )
-        if (filter_string is not None) or (searchableAttributes is not None):
-            (search_query["query"]["function_score"]
-                ["query"]["nested"]
-                ["query"]["function_score"]
-                ["query"]["knn"]
-                [f"{TensorField.chunks}.{TensorField.marqo_knn_field}"]["filter"]) = {
-                    "query_string": {"query": f"{filter_for_opensearch}"}
-                }
-    else:
-        search_query = _create_normal_tensor_search_query(result_count, offset, TensorField.marqo_knn_field, query_vector)
-        if (filter_string is not None) or (searchableAttributes is not None):
-            (search_query["query"]["nested"]
-                ["query"]["knn"]
-                [f"{TensorField.chunks}.{TensorField.marqo_knn_field}"]["filter"]) = {
-                    "query_string": {"query": f"{filter_for_opensearch}"}
-                }
+        if score_modifiers is not None:
+            search_query = _create_score_modifiers_tensor_search_query(
+                score_modifiers,
+                result_count,
+                offset,
+                TensorField.marqo_knn_field,
+                query_vector
+            )
+            if (filter_string is not None) or (searchableAttributes is not None):
+                (search_query["query"]["function_score"]
+                    ["query"]["nested"]
+                    ["query"]["function_score"]
+                    ["query"]["knn"]
+                    [f"{TensorField.chunks}.{TensorField.marqo_knn_field}"]["filter"]) = {
+                        "query_string": {"query": f"{filter_for_opensearch}"}
+                    }
+        else:
+            search_query = _create_normal_tensor_search_query(result_count, offset, TensorField.marqo_knn_field, query_vector)
+            if (filter_string is not None) or (searchableAttributes is not None):
+                (search_query["query"]["nested"]
+                    ["query"]["knn"]
+                    [f"{TensorField.chunks}.{TensorField.marqo_knn_field}"]["filter"]) = {
+                        "query_string": {"query": f"{filter_for_opensearch}"}
+                    }
 
-    if attributes_to_retrieve is not None:
-        search_query["_source"] = {"include": attributes_to_retrieve} if len(attributes_to_retrieve) > 0 else False
+        if attributes_to_retrieve is not None:
+            search_query["_source"] = {"include": attributes_to_retrieve} if len(attributes_to_retrieve) > 0 else False
+    else:
+        search_query = _create_dummy_query_for_zero_vector_search()
+
     body += [{"index": index_name}, search_query]
 
     return body
@@ -1624,7 +1632,6 @@ def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity
         for qidx, q in enumerate(queries):
             index_info = get_index_info(config=config, index_name=q.index)
             body = construct_msearch_body_elements(q.searchableAttributes, q.offset, q.filter, index_info, q.limit, qidx_to_vectors[qidx], q.attributesToRetrieve, q.index, q.scoreModifiers)
-
             query_to_body_parts[qidx] = body
             query_to_body_count[qidx] = len(body)
 
@@ -1740,23 +1747,7 @@ def _vector_text_search(
     )
 
     if verbose:
-        print("vector search body:")
-        if verbose == 1:
-            readable_body = copy.deepcopy(body)
-            for i, q in enumerate(readable_body):
-                if "index" in q:
-                    continue
-                for vec in list(q["query"]["nested"]["query"]["knn"].keys()):
-                    readable_body[i]["query"]["nested"]["query"]["knn"][vec]["vector"] = \
-                        readable_body[i]["query"]["nested"]["query"]["knn"][vec]["vector"][:5]
-            pprint.pprint(readable_body)
-        if verbose == 2:
-            pprint.pprint(body, compact=True)
-
-    if not body:
-        # empty body means that there are no vector fields associated with the index.
-        # This probably means the index is emtpy
-        return {"hits": []}
+        _vector_text_search_query_verbose(verbose=verbose, body=body)
 
     total_preprocess_time = RequestMetricsStore.for_request().stop("search.vector.processing_before_opensearch")
     logger.debug(f"search (tensor) pre-processing: took {(total_preprocess_time):.3f}ms to vectorize and process query.")
@@ -2087,6 +2078,48 @@ def vectorise_multimodal_combination_field(
     })
     return combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add, new_fields_from_multimodal_combination
 
+def _generate_vector_text_search_query_for_verbose_one(original_body:List[Dict[str, Any]]) -> None:
+    """Generate a simplified version of the query body for verbose=1 mode. """
+    readable_body = copy.deepcopy(original_body)
+    for i, q in enumerate(readable_body):
+        if "index" in q:
+            continue
+        if "query" in q and "nested" in q.get("query"):
+            # A normal vector search
+            for vec in list(q["query"]["nested"]["query"]["knn"].keys()):
+                if "vector" in q["query"]["nested"]["query"]["knn"][vec]:
+                    readable_body[i]["query"]["nested"]["query"]["knn"][vec]["vector"] = \
+                        readable_body[i]["query"]["nested"]["query"]["knn"][vec]["vector"][:5]
+        elif "query" in q and "function_score" in q.get("query"):
+            # A score modifier search
+            for vec in list(
+                    q["query"]["function_score"]["query"]["nested"]["query"]["function_score"]["query"]["knn"].keys()):
+                if "vector" in \
+                        q["query"]["function_score"]["query"]["nested"]["query"]["function_score"]["query"]["knn"][vec]:
+                    readable_body[i]["query"]["function_score"]["query"]["nested"]["query"]["function_score"]["query"][
+                        "knn"][vec]["vector"] = \
+                        readable_body[i]["query"]["function_score"]["query"]["nested"]["query"]["function_score"][
+                            "query"]["knn"][vec]["vector"][:5]
+        elif "query" in q and "match_none" in q.get("query"):
+            # A dummy search to replace a zero-vector
+            pass
+        else:
+            raise errors.InternalError(f"Marqo encountered an unexpected query format "
+                                       f"in `_vector_text_search` when setting `verbose=1`. "
+                                       f"The unexpected query is `{q}`")
+    return readable_body
+
+
+def _vector_text_search_query_verbose(verbose: int, body: List[Dict[str, Any]]) -> None:
+    """Handle the verbose flag for _vector_text_search queries"""
+    print("vector search body:")
+    if verbose == 1:
+        pprint.pprint(_generate_vector_text_search_query_for_verbose_one(body))
+    elif verbose == 2:
+        pprint.pprint(body, compact=True)
+    else:
+        raise errors.InternalError(f"Marqo encountered an unexpected verbose flag = `{verbose}`")
+
 
 def _create_normal_tensor_search_query(result_count, offset, vector_field, vectorised_text) -> dict:
     search_query = {
@@ -2163,6 +2196,16 @@ def _create_score_modifiers_tensor_search_query(score_modifiers, result_count, o
         },
         "_source": {
             "exclude": ["__chunks.__vector_*"]
+        }
+    }
+    return search_query
+
+
+def _create_dummy_query_for_zero_vector_search() -> dict:
+    """A dummy search query that returns no results. Used when the query vector is all zeros."""
+    search_query = {
+        "query": {
+            "match_none": {}
         }
     }
     return search_query
