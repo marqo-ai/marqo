@@ -1,4 +1,4 @@
-ARG CUDA_VERSION=11.6.1
+ARG CUDA_VERSION=11.6.2
 FROM nvidia/cuda:${CUDA_VERSION}-cudnn8-runtime-ubuntu20.04 as cuda_image
 FROM ubuntu:20.04
 VOLUME /var/lib/docker
