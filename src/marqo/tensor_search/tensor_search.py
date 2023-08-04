@@ -2079,6 +2079,7 @@ def vectorise_multimodal_combination_field(
     return combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add, new_fields_from_multimodal_combination
 
 def _generate_vector_text_search_query_for_verbose_one(original_body:List[Dict[str, Any]]) -> None:
+    """Generate a simplified version of the query body for verbose=1 mode. """
     readable_body = copy.deepcopy(original_body)
     for i, q in enumerate(readable_body):
         if "index" in q:
