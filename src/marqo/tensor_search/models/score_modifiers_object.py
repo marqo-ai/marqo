@@ -94,19 +94,17 @@ class ScoreModifier(BaseModel):
                                                  enumerate(self.multiply_score_by)])))
         else:
             mult, mult_params = [], []
-
         if self.add_to_score is not None:
             add, add_params = map(list, zip(*([x.to_painless_script_and_params(i, "add_to_score") for i, x
                                                in enumerate(self.add_to_score)])))
         else:
             add, add_params = [], []
-
         source_script = "\n".join(
             ["double additive = 0;"] + \
             mult + add + ["return Math.max(0.0, (_score + additive));"]
         )
 
-        params_script = {k: v for d in mult_params + add_params for k, v in d.items()}
+        params = {k: v for d in mult_params + add_params for k, v in d.items()}
+        script_score = {"source": f"""{source_script}""", "params": params}
 
-        script_score = {"source": f"""{source_script}""", "params": params_script}
         return script_score
