@@ -1,7 +1,7 @@
 import copy
 from unittest import mock
 from tests.utils.transition import add_docs_caller
-from marqo.errors import IndexNotFoundError, InvalidArgError
+from marqo.errors import IndexNotFoundError, InvalidArgError, BackendCommunicationError
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.models.api_models import ScoreModifier
 from marqo.tensor_search.enums import TensorField, IndexSettingsField, SearchMethod
@@ -10,6 +10,7 @@ from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQue
 import pprint
 from marqo.tensor_search.tensor_search import (_create_normal_tensor_search_query, _vector_text_search_query_verbose,
                                                 _generate_vector_text_search_query_for_verbose_one)
+import numpy as np
 
 from pydantic.error_wrappers import ValidationError
 import os
@@ -1097,7 +1098,62 @@ class TestScoreModifiersBulkSearch(MarqoTestCase):
 
                 mock_vector_text_search_verbose.reset_mock()
                 mock_pprint.reset_mock()
-
             return True
-
         assert run()
+
+    def test_score_modifier_with_changing_weights(self):
+        """To test there is no compiling error when changing weights of score modifier and changing field names,
+        but fixed number of fields."""
+        try:
+            tensor_search.delete_index(self.config, self.index_name)
+        except IndexNotFoundError:
+            pass
+
+        index_settings = {
+            "index_defaults": {
+                # use a small model to speed up the test
+                "model": "random/small"
+            }
+        }
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name, index_settings=index_settings)
+
+        # By default, Opensearch only allow 75 recompiling in 5 minutes.
+        for _ in range(300):
+            res = tensor_search.search(config=self.config, text="random text", score_modifiers=ScoreModifier(**{
+                "multiply_score_by": [{"field_name": f"multiply_{np.random.randint(1, 100)}", "weight": np.random.rand()},
+                                      {"field_name": f"multiply_{np.random.randint(1, 100)}", "weight": np.random.rand()}],
+                "add_to_score": [{"field_name": f"add_{np.random.randint(1, 100)}", "weight": np.random.rand()},
+                                 {"field_name": f"add_{np.random.randint(1, 100)}", "weight": np.random.rand()}]
+            }), index_name=self.index_name)
+
+    def test_too_many_dynamic_script_compilation_error(self):
+        """To test the dynamic script compilation errors in Opensearch.
+        The error is expected to be raised when there are too many dynamic script compilation in a short time."""
+        try:
+            tensor_search.delete_index(self.config, self.index_name)
+        except IndexNotFoundError:
+            pass
+
+        index_settings = {
+            "index_defaults": {
+                # use a small model to speed up the test
+                "model": "random/small"
+            }
+        }
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name, index_settings=index_settings)
+
+        # By default, Opensearch only allow 75 recompiling in 5 minutes.
+        multiply_score_by_list = []
+        for i in range(150):
+            multiply_score_by_list.append({"field_name": f"multiply_{i}", "weight": np.random.rand()})
+
+            try:
+                res = tensor_search.search(config=self.config, text="random text", score_modifiers=ScoreModifier(**{
+                    "multiply_score_by": multiply_score_by_list,
+                }), index_name=self.index_name)
+                if i >= 100:
+                    assert False, "Should raise BackendCommunicationError"
+            except BackendCommunicationError as e:
+                assert "Too many dynamic script compilations" in str(e.message)
+                break
+
