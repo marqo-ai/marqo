@@ -1156,4 +1156,3 @@ class TestScoreModifiersBulkSearch(MarqoTestCase):
             except BackendCommunicationError as e:
                 assert "Too many dynamic script compilations" in str(e.message)
                 break
-
