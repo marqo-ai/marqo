@@ -94,7 +94,7 @@ class ScoreModifier(BaseModel):
     def to_script_score(self) -> dict:
         """Convert this ScoreModifier to a dictionary to modify the score.
         returns:
-            A dictionary that can be used as a script_score in an Elasticsearch query.
+            A dictionary that can be used as a script_score in an OpenSearch query.
                 source: the painless script
                 params: the field name and fields used in the painless script
         """
