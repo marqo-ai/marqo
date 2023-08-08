@@ -11,6 +11,7 @@ import pprint
 from marqo.tensor_search.tensor_search import (_create_normal_tensor_search_query, _vector_text_search_query_verbose,
                                                 _generate_vector_text_search_query_for_verbose_one,
                                                _create_score_modifiers_tensor_search_query)
+from marqo.tensor_search.models.score_modifiers_object import ScoreModifierOperator
 import numpy as np
 
 from pydantic.error_wrappers import ValidationError
@@ -1145,14 +1146,14 @@ class TestScoreModifiersBulkSearch(MarqoTestCase):
 
         # By default, Opensearch only allow 75 recompiling in 5 minutes.
         multiply_score_by_list = []
-        for i in range(150):
+        for i in range(300):
             multiply_score_by_list.append({"field_name": f"multiply_{i}", "weight": np.random.rand()})
 
             try:
                 res = tensor_search.search(config=self.config, text="random text", score_modifiers=ScoreModifier(**{
                     "multiply_score_by": multiply_score_by_list,
                 }), index_name=self.index_name)
-                if i >= 100:
+                if i >= 250:
                     assert False, "Should raise BackendCommunicationError"
             except BackendCommunicationError as e:
                 assert "Too many dynamic script compilations" in str(e.message)
@@ -1189,3 +1190,102 @@ class TestScoreModifiersBulkSearch(MarqoTestCase):
 
         assert run()
 
+    def test_multiply_score_by_operator(self):
+        op = ScoreModifierOperator(field_name="test", weight=2.0)
+        script, weights, fields = op.to_painless_script_and_params(1, "multiply_score_by")
+
+        self.assertIn("multiplier_field_1", script)
+        self.assertEqual(weights, {"multiplier_weight_1": 2.0})
+        self.assertEqual(fields, {"multiplier_field_1": "__chunks.test"})
+
+    def test_add_to_score_operator(self):
+        op = ScoreModifierOperator(field_name="test", weight=2.0)
+        script, weights, fields = op.to_painless_script_and_params(1, "add_to_score")
+
+        self.assertIn("add_field_1", script)
+        self.assertEqual(weights, {"add_weight_1": 2.0})
+        self.assertEqual(fields, {"add_field_1": "__chunks.test"})
+
+    def test_invalid_operation(self):
+        op = ScoreModifierOperator(field_name="test", weight=2.0)
+
+        with self.assertRaises(ValueError) as context:
+            op.to_painless_script_and_params(1, "invalid_operation")
+        self.assertIn("operation must be either 'multiply_score_by' or 'add_to_score'", str(context.exception))
+
+    def test_field_name_validation(self):
+        with self.assertRaises(InvalidArgError) as context:
+            ScoreModifierOperator(field_name="_id", weight=2.0)
+        self.assertIn("_id is not allowed as a field_name", str(context.exception))
+
+    def test_multiply_score_by_script_score(self):
+        modifier = ScoreModifier(multiply_score_by=[ScoreModifierOperator(field_name="test1", weight=2.0)])
+        result = modifier.to_script_score()
+
+        self.assertIn("multiplier_field_0", result["source"])
+        self.assertIn("multiplier_weight_0", result["params"])
+        self.assertEqual(result["params"]["multiplier_weight_0"], 2.0)
+        self.assertEqual(result["params"]["multiplier_field_0"], "__chunks.test1")
+
+    def test_add_to_score_script_score(self):
+        modifier = ScoreModifier(add_to_score=[ScoreModifierOperator(field_name="test2", weight=3.0)])
+        result = modifier.to_script_score()
+
+        self.assertIn("add_field_0", result["source"])
+        self.assertIn("add_weight_0", result["params"])
+        self.assertEqual(result["params"]["add_weight_0"], 3.0)
+        self.assertEqual(result["params"]["add_field_0"], "__chunks.test2")
+
+    def test_both_operations_script_score(self):
+        modifier = ScoreModifier(
+            multiply_score_by=[ScoreModifierOperator(field_name="test1", weight=2.0)],
+            add_to_score=[ScoreModifierOperator(field_name="test2", weight=3.0)]
+        )
+        result = modifier.to_script_score()
+
+        self.assertIn("multiplier_field_0", result["source"])
+        self.assertIn("add_field_0", result["source"])
+        self.assertIn("multiplier_weight_0", result["params"])
+        self.assertIn("add_weight_0", result["params"])
+        self.assertEqual(result["params"]["multiplier_weight_0"], 2.0)
+        self.assertEqual(result["params"]["add_weight_0"], 3.0)
+        self.assertEqual(result["params"]["multiplier_field_0"], "__chunks.test1")
+        self.assertEqual(result["params"]["add_field_0"], "__chunks.test2")
+
+    def test_multiple_multiply_score_by_script_score(self):
+        modifier = ScoreModifier(
+            multiply_score_by=[
+                ScoreModifierOperator(field_name="test1", weight=2.0),
+                ScoreModifierOperator(field_name="test2", weight=3.0)
+            ]
+        )
+        result = modifier.to_script_score()
+
+        self.assertIn("multiplier_field_0", result["source"])
+        self.assertIn("multiplier_field_1", result["source"])
+        self.assertEqual(result["params"]["multiplier_weight_0"], 2.0)
+        self.assertEqual(result["params"]["multiplier_weight_1"], 3.0)
+
+    def test_multiple_add_to_score_script_score(self):
+        modifier = ScoreModifier(
+            add_to_score=[
+                ScoreModifierOperator(field_name="test1", weight=2.0),
+                ScoreModifierOperator(field_name="test2", weight=3.0)
+            ]
+        )
+        result = modifier.to_script_score()
+
+        self.assertIn("add_field_0", result["source"])
+        self.assertIn("add_field_1", result["source"])
+        self.assertEqual(result["params"]["add_weight_0"], 2.0)
+        self.assertEqual(result["params"]["add_weight_1"], 3.0)
+
+    def test_zero_weight_multiply_score_by_script_score(self):
+        modifier = ScoreModifier(multiply_score_by=[ScoreModifierOperator(field_name="test1", weight=0.0)])
+        result = modifier.to_script_score()
+        self.assertEqual(result["params"]["multiplier_weight_0"], 0.0)
+
+    def test_negative_weight_add_to_score_script_score(self):
+        modifier = ScoreModifier(add_to_score=[ScoreModifierOperator(field_name="test2", weight=-3.0)])
+        result = modifier.to_script_score()
+        self.assertEqual(result["params"]["add_weight_0"], -3.0)
