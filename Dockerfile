@@ -6,7 +6,8 @@ ARG TARGETPLATFORM
 # this is required for onnx to find cuda
 COPY --from=cuda_image /usr/local/cuda/ /usr/local/cuda/
 WORKDIR /app
-RUN apt-get update && \
+RUN set -x && \
+    apt-get update && \
     apt-get install ca-certificates curl  gnupg lsof lsb-release jq -y && \
     apt-get install apt-transport-https ca-certificates curl gnupg2 software-properties-common -y && \
     apt-get update && \
@@ -28,7 +29,8 @@ COPY requirements.txt requirements.txt
 RUN pip3 install --no-cache-dir -r requirements.txt
 
 COPY scripts scripts
-RUN bash scripts/install_onnx_gpu_for_amd.sh && \
+RUN set -x && \
+    bash scripts/install_onnx_gpu_for_amd.sh && \
     bash scripts/install_torch_amd.sh && \
     # redis installation for throttling
     bash scripts/install_redis.sh && \
