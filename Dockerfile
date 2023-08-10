@@ -1,6 +1,6 @@
 ARG CUDA_VERSION=11.4.3
 FROM nvidia/cuda:${CUDA_VERSION}-cudnn8-runtime-ubuntu20.04 as cuda_image
-FROM ubuntu:20.04
+FROM ubuntu:20.04 as base_image
 VOLUME /var/lib/docker
 ARG TARGETPLATFORM
 # this is required for onnx to find cuda
@@ -37,6 +37,9 @@ RUN echo "echo never > /sys/kernel/mm/transparent_hugepage/enabled" >> /etc/rc.l
 RUN echo "save ''" | tee -a /etc/redis/redis.conf
 COPY dind_setup dind_setup
 RUN bash dind_setup/setup_dind.sh
+
+# Group the previous infrequently-changing steps into a single layer
+FROM base_image
 COPY . /app
 ENV PYTHONPATH "${PYTHONPATH}:/app"
 RUN chmod +x ./run_marqo.sh
