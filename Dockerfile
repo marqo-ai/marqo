@@ -29,8 +29,8 @@ ARG TARGETPLATFORM
 COPY requirements.txt requirements.txt
 RUN pip3 install --no-cache-dir -r requirements.txt
 
-# COPY scripts scripts
-# RUN set -x && \
+COPY scripts scripts
+RUN set -x && \
 #     bash scripts/install_onnx_gpu_for_amd.sh && \
 #     bash scripts/install_torch_amd.sh && \
 #     # redis installation for throttling
@@ -38,8 +38,8 @@ RUN pip3 install --no-cache-dir -r requirements.txt
 #     # redis config lines
 #     echo "echo never > /sys/kernel/mm/transparent_hugepage/enabled" >> /etc/rc.local && \
 #     echo "save ''" | tee -a /etc/redis/redis.conf && \
-#     # set up Docker-in-Docker
-#     bash scripts/dind_setup/setup_dind.sh
+    # set up Docker-in-Docker
+    bash scripts/dind_setup/setup_dind.sh
 
 # Separate the previous steps
 FROM base_image
