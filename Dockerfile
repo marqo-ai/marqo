@@ -1,7 +1,7 @@
 # ARG CUDA_VERSION=11.4.3
 # FROM nvidia/cuda:${CUDA_VERSION}-cudnn8-runtime-ubuntu20.04 as cuda_image
 # FROM ubuntu:20.04 as base_image
-FROM marqoai:marqo-base:1 as base_image
+FROM marqoai/marqo-base:1 as base_image
 VOLUME /var/lib/docker
 ARG TARGETPLATFORM
 # # this is required for onnx to find cuda
