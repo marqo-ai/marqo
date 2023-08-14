@@ -2,14 +2,14 @@
 
 ## New features
 
-- Storage status in health check endpoint ([#555](https://github.com/marqo-ai/marqo/pull/555) & [#559](https://github.com/marqo-ai/marqo/pull/559)). The `GET /indexes/{index-name}/health` endpoint's `backend` object will now return the boolean `storage_is_available`, to indicate if there is remaining storage space. If space is not available, health status will now return `yellow`. See [here](https://marqo.pages.dev/1.2.0/API-Reference/health/) for detailed usage.
+- Storage status in health check endpoint (https://github.com/marqo-ai/marqo/pull/555 & https://github.com/marqo-ai/marqo/pull/559). The `GET /indexes/{index-name}/health` endpoint's `backend` object will now return the boolean `storage_is_available`, to indicate if there is remaining storage space. If space is not available, health status will now return `yellow`. See [here](https://marqo.pages.dev/1.2.0/API-Reference/health/) for detailed usage.
 
-- Score Modifiers search optimization ([#566] (https://github.com/marqo-ai/marqo/pull/566)). This optimization reduces latency for searches with the `score_modifiers` parameter when field names or weights are changed. See [here](https://marqo.pages.dev/1.2.0/API-Reference/search/#score-modifiers) for detailed usage.
+- Score Modifiers search optimization (https://github.com/marqo-ai/marqo/pull/566). This optimization reduces latency for searches with the `score_modifiers` parameter when field names or weights are changed. See [here](https://marqo.pages.dev/1.2.0/API-Reference/search/#score-modifiers) for detailed usage.
 
 ## Bug fixes and minor changes
 
-- Improved error message for full storage ([#555](https://github.com/marqo-ai/marqo/pull/555) & [#559](https://github.com/marqo-ai/marqo/pull/559)). When storage is full, Marqo will return `400 Bad Request` instead of `429 Too Many Requests`.
-- Fixed backend error when searching with a zero vector ([#562](https://github.com/marqo-ai/marqo/pull/562))
+- Improved error message for full storage (https://github.com/marqo-ai/marqo/pull/555 & https://github.com/marqo-ai/marqo/pull/559). When storage is full, Marqo will return `400 Bad Request` instead of `429 Too Many Requests`.
+- Searching with a zero vector now returns an empty list instead of an internal error (https://github.com/marqo-ai/marqo/pull/562).
 
 ## Contributor shout-outs
 
