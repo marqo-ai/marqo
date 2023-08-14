@@ -27,7 +27,7 @@ Marqo is more than a vector database, it's an end-to-end vector search engine. V
 **🤖 State of the art embeddings**
 - Use the latest machine learning models from PyTorch, Huggingface, OpenAI and more. 
 - Start with a pre-configured model or bring your own.
-- Built in ONNX support and conversion for faster inference and higher throughput.
+- Built-in ONNX support and conversion for faster inference and higher throughput.
 - CPU and GPU support.
 
 **⚡ Performance**
