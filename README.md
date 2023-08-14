@@ -106,7 +106,7 @@ import marqo
 
 mq = marqo.Client(url='http://localhost:8882')
 
-mq.create_index(index_name="my-first-index")
+mq.create_index("my-first-index")
 
 mq.index("my-first-index").add_documents([
     {
@@ -118,7 +118,8 @@ mq.index("my-first-index").add_documents([
         "Description": "The EMU is a spacesuit that provides environmental protection, "
                        "mobility, life support, and communications for astronauts",
         "_id": "article_591"
-    }]
+    }],
+    tensor_fields=["Title", "Description"]
 )
 
 results = mq.index("my-first-index").search(
@@ -128,7 +129,7 @@ results = mq.index("my-first-index").search(
 ```
 
 - `mq` is the client that wraps the `marqo` API.
-- `create_index()` creates a new index with default settings.
+- `create_index()` creates a new index with default settings. You have the option to specify what model to use. For example, `mq.create_index("my-first-index", model="hf/all_datasets_v4_MiniLM-L6")` will create an index with the default text model `hf/all_datasets_v4_MiniLM-L6`. Experimentation with different models is often required to achieve the best retrieval for your specific use case. Different models also offer a tradeoff between inference speed and relevancy. See [here](https://docs.marqo.ai/1.0.0/Models-Reference/dense_retrieval/) for the full list of models.
 - `add_documents()` takes a list of documents, represented as python dicts for indexing.
 - You can optionally set a document's ID with the special `_id` field. Otherwise, Marqo will generate one.
 
@@ -237,7 +238,9 @@ response = mq.index("my-multimodal-index").add_documents([{
     "My Image": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
     "Description": "The hippopotamus, also called the common hippopotamus or river hippopotamus, is a large semiaquatic mammal native to sub-Saharan Africa",
     "_id": "hippo-facts"
-}])
+}], tensor_fields=["My Image", "Description"])
+
+```
 
 ```
 
@@ -297,7 +300,8 @@ mq.index("my-weighted-query-index").add_documents(
             "is an extinct carnivorous marsupial."
             "The last known of its species died in 1936.",
         },
-    ]
+    ],
+    tensor_fields=["Title", "Description"]
 )
 
 # initially we ask for a type of communications device which is popular in the 21st century
@@ -384,6 +388,9 @@ mq.index("my-first-multimodal-index").add_documents(
             },
         }
     },
+    # We specify which fields to create vectors for. 
+    # Note that captioned_image is treated as a single field.
+    tensor_fields=["Title", "captioned_image"]
 )
 
 # Search this index with a simple text query

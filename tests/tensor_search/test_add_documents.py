@@ -1,5 +1,7 @@
 import copy
 import os
+import re
+
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 import functools
 import json
@@ -8,7 +10,7 @@ import pprint
 from unittest import mock
 from unittest.mock import patch
 from marqo.tensor_search.enums import EnvVars
-from marqo.s2_inference import types
+from marqo.s2_inference import types, s2_inference
 import PIL
 import requests
 import pytest
@@ -19,8 +21,8 @@ from marqo.tensor_search import tensor_search, index_meta_cache, backend
 from tests.marqo_test import MarqoTestCase
 from marqo.tensor_search import add_docs
 
-class TestAddDocuments(MarqoTestCase):
 
+class TestAddDocuments(MarqoTestCase):
     def setUp(self) -> None:
         self.endpoint = self.authorized_url
         self.generic_header = {"Content-type": "application/json"}
@@ -37,7 +39,6 @@ class TestAddDocuments(MarqoTestCase):
         self.device_patcher.start()
 
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
-
 
     def tearDown(self) -> None:
         self.index_name_1 = "my-test-index-1"
@@ -234,8 +235,8 @@ class TestAddDocuments(MarqoTestCase):
             verify=False
         )
 
-        assert "__vector_abc" in cluster_ix_info.json()[self.index_name_1]["mappings"]["properties"][TensorField.chunks]["properties"]
-        assert "dimension" in cluster_ix_info.json()[self.index_name_1]["mappings"]["properties"][TensorField.chunks]["properties"]["__vector_abc"]
+        assert TensorField.marqo_knn_field in cluster_ix_info.json()[self.index_name_1]["mappings"]["properties"][TensorField.chunks]["properties"]
+        assert "dimension" in cluster_ix_info.json()[self.index_name_1]["mappings"]["properties"][TensorField.chunks]["properties"][TensorField.marqo_knn_field]
         add_doc_res = tensor_search.add_documents(
             config=self.config, add_docs_params=AddDocsParams(
                 index_name=self.index_name_1, docs=[{"abc": "1234", "The title book 1": "hahehehe"}], auto_refresh=True, device="cpu"
@@ -245,12 +246,14 @@ class TestAddDocuments(MarqoTestCase):
             url=f"{self.endpoint}/{self.index_name_1}",
             verify=False
         )
-        assert "__vector_abc" in \
+        assert "__vector_abc" not in \
                cluster_ix_info_2.json()[self.index_name_1]["mappings"]["properties"][TensorField.chunks]["properties"]
-        assert "__vector_The title book 1" in \
+        assert "__vector_The title book 1" not in \
                cluster_ix_info_2.json()[self.index_name_1]["mappings"]["properties"][TensorField.chunks]["properties"]
+        assert TensorField.marqo_knn_field in \
+                cluster_ix_info_2.json()[self.index_name_1]["mappings"]["properties"][TensorField.chunks]["properties"]
         assert "dimension" in \
-               cluster_ix_info_2.json()[self.index_name_1]["mappings"]["properties"][TensorField.chunks]["properties"]["__vector_The title book 1"]
+               cluster_ix_info_2.json()[self.index_name_1]["mappings"]["properties"][TensorField.chunks]["properties"][TensorField.marqo_knn_field]
 
     def test_add_new_fields_on_the_fly_index_cache_syncs(self):
         index_info = requests.get(
@@ -266,8 +269,8 @@ class TestAddDocuments(MarqoTestCase):
             url=f"{self.endpoint}/{self.index_name_1}",
             verify=False
         )
-        assert index_meta_cache.get_cache()[self.index_name_1].properties[TensorField.chunks]["properties"]["__vector_abc"] \
-               == index_info_2.json()[self.index_name_1]["mappings"]["properties"][TensorField.chunks]["properties"]["__vector_abc"]
+        assert index_meta_cache.get_cache()[self.index_name_1].properties[TensorField.chunks]["properties"][TensorField.marqo_knn_field] \
+               == index_info_2.json()[self.index_name_1]["mappings"]["properties"][TensorField.chunks]["properties"][TensorField.marqo_knn_field]
         add_doc_res_2 = tensor_search.add_documents(
             config=self.config, add_docs_params=AddDocsParams(
                 index_name=self.index_name_1, docs=[{"cool field": "yep yep", "haha": "heheh"}], auto_refresh=True, device="cpu"
@@ -296,8 +299,11 @@ class TestAddDocuments(MarqoTestCase):
                == {k: v for k, v in
                    cluster_ix_info.json()[self.index_name_1]["mappings"]["properties"][TensorField.chunks]["properties"].items()
                    if k.startswith("__vector_")}
-        assert "__vector_cool v field" in index_meta_cache.get_cache()[self.index_name_1].get_vector_properties()
-        assert "__vector_haha ee" in index_meta_cache.get_cache()[self.index_name_1].get_vector_properties()
+        
+        # Only 1 vector field should be created
+        assert TensorField.marqo_knn_field in index_meta_cache.get_cache()[self.index_name_1].get_vector_properties()
+        assert "__vector_cool v field" not in index_meta_cache.get_cache()[self.index_name_1].get_vector_properties()
+        assert "__vector_haha ee" not in index_meta_cache.get_cache()[self.index_name_1].get_vector_properties()
 
     def test_add_docs_response_format(self):
         add_res = tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
@@ -537,6 +543,92 @@ class TestAddDocuments(MarqoTestCase):
                     assert expected_results[i][1] in res_dict
             tensor_search.delete_index(config=self.config, index_name=self.index_name_2)
 
+    def test_add_documents_id_image_url(self):
+        index_setting = {
+            IndexSettingsField.index_defaults: {
+                IndexSettingsField.model: "ViT-B/16",
+                IndexSettingsField.treat_urls_and_pointers_as_images: True
+            }
+        }
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_2,
+                                          index_settings=index_setting)
+        docs = [{
+            "_id": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+            "my_field": "wow"}
+        ]
+
+        with mock.patch('PIL.Image.open') as mock_image_open:
+            tensor_search.add_documents(config=self.config,
+                                        add_docs_params=AddDocsParams(
+                                            index_name=self.index_name_2, docs=docs, auto_refresh=True,
+                                            device="cpu", non_tensor_fields=['my_field']
+                                        ))
+
+            mock_image_open.assert_not_called()
+
+            tensor_search.add_documents(config=self.config,
+                                        add_docs_params=AddDocsParams(
+                                            index_name=self.index_name_2, docs=docs, auto_refresh=True,
+                                            device="cpu", tensor_fields=['my_field'], non_tensor_fields=None
+                                        ))
+
+            mock_image_open.assert_not_called()
+
+    def test_add_documents_id_in_tensor_field(self):
+        index_setting = {
+            IndexSettingsField.index_defaults: {
+                IndexSettingsField.model: "ViT-B/16",
+                IndexSettingsField.treat_urls_and_pointers_as_images: True
+            }
+        }
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_2,
+                                          index_settings=index_setting)
+        docs = [{
+            "_id": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+            "my_field": "wow"}
+        ]
+
+        with mock.patch('marqo.s2_inference.s2_inference.vectorise') as mock_vectorise:
+            with pytest.raises(BadRequestError, match=re.escape('`_id` field cannot be a tensor field.')):
+                tensor_search.add_documents(config=self.config,
+                                            add_docs_params=AddDocsParams(
+                                                index_name=self.index_name_2, docs=docs, auto_refresh=True,
+                                                device="cpu", tensor_fields=['my_field', '_id'], non_tensor_fields=None
+                                            ))
+            mock_vectorise.assert_not_called()
+
+    def test_add_documents_id_not_in_non_tensor_field(self):
+        index_setting = {
+            IndexSettingsField.index_defaults: {
+                IndexSettingsField.model: "ViT-B/16",
+                IndexSettingsField.treat_urls_and_pointers_as_images: False
+            }
+        }
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_2,
+                                          index_settings=index_setting)
+        docs = [{
+            "_id": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+            "my_field": "wow"}
+        ]
+
+        mock_vectorise = mock.MagicMock()
+        mock_vectorise.side_effect = s2_inference.vectorise
+
+        @mock.patch('marqo.s2_inference.s2_inference.vectorise', mock_vectorise)
+        def run():
+            tensor_search.add_documents(config=self.config,
+                                        add_docs_params=AddDocsParams(
+                                            index_name=self.index_name_2, docs=docs, auto_refresh=True,
+                                            device="cpu", non_tensor_fields=[]
+                                        ))
+            vectorised_content = [call_kwargs['content'] for call_args, call_kwargs
+                                  in mock_vectorise.call_args_list]
+            expected_content = [['wow']]
+            mock_vectorise.assert_called_once()
+            assert vectorised_content == expected_content
+
+        run()
+
     def test_add_documents_resilient_doc_validation(self):
         docs_results = [
             # handle empty dicts
@@ -733,6 +825,18 @@ class TestAddDocuments(MarqoTestCase):
         assert "Title" not in resp[enums.TensorField.tensor_facets][0]
         assert "Description" in resp[enums.TensorField.tensor_facets][0]
 
+    def test_add_document_with_tensor_fields(self):
+        docs_ = [{"_id": "789", "Title": "Story of Alice Appleseed", "Description": "Alice grew up in Houston, Texas."}]
+        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+            index_name=self.index_name_1, docs=docs_, auto_refresh=True, tensor_fields=['Title'], non_tensor_fields=None, device="cpu"
+        ))
+        resp = tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="789", show_vectors=True)
+
+        assert len(resp[enums.TensorField.tensor_facets]) == 1
+        assert enums.TensorField.embedding in resp[enums.TensorField.tensor_facets][0]
+        assert "Title" in resp[enums.TensorField.tensor_facets][0]
+        assert "Description" not in resp[enums.TensorField.tensor_facets][0]
+
     def test_doc_too_large(self):
         max_size = 400000
         mock_environ = {enums.EnvVars.MARQO_MAX_DOC_BYTES: str(max_size)}
@@ -825,7 +929,7 @@ class TestAddDocuments(MarqoTestCase):
         #     check if the chunk represents the tensorsied "mydata2" field
         assert myfield2_chunk['__field_name'] == 'myfield2'
         assert myfield2_chunk['__field_content'] == 'mydata2'
-        assert isinstance(myfield2_chunk['__vector_myfield2'], list)
+        assert isinstance(myfield2_chunk[TensorField.marqo_knn_field], list)
         #      Check if all filter fields are  there (inc. the non tensorised my_list):
         assert myfield2_chunk['my_list'] == ['data1', 'mydata']
         assert myfield2_chunk['myfield2'] == 'mydata2'
@@ -836,7 +940,7 @@ class TestAddDocuments(MarqoTestCase):
         assert index_info.properties['myfield2']['type'] == 'text'
         assert index_info.properties['__chunks']['properties']['my_list']['type'] == 'keyword'
         assert index_info.properties['__chunks']['properties']['myfield2']['type'] == 'keyword'
-        assert index_info.properties['__chunks']['properties']['__vector_myfield2']['type'] == 'knn_vector'
+        assert index_info.properties['__chunks']['properties'][TensorField.marqo_knn_field]['type'] == 'knn_vector'
 
 
     def test_no_tensor_field_replace(self):
@@ -1030,7 +1134,8 @@ class TestAddDocuments(MarqoTestCase):
                 allocated_docs=[
                     {"Title": "frog", "Desc": "blah"}, {"Title": "Dog", "Loc": "https://google.com/my_dog.png"}],
                 image_repo=image_repo,
-                non_tensor_fields=(),
+                non_tensor_fields=[],
+                tensor_fields=None,
                 image_download_headers={}
             )
             assert list(image_repo.keys()) == ['https://google.com/my_dog.png']
@@ -1050,7 +1155,8 @@ class TestAddDocuments(MarqoTestCase):
         add_docs.threaded_download_images(
             allocated_docs=[test_doc],
             image_repo=image_repo,
-            non_tensor_fields=(),
+            non_tensor_fields=[],
+            tensor_fields=None,
             image_download_headers={}
         )
         assert len(image_repo) == 2
@@ -1091,7 +1197,8 @@ class TestAddDocuments(MarqoTestCase):
             add_docs.threaded_download_images(
                 allocated_docs=docs,
                 image_repo=image_repo,
-                non_tensor_fields=('nt_1', 'nt_2'),
+                non_tensor_fields=['nt_1', 'nt_2'],
+                tensor_fields=None,
                 image_download_headers={}
             )
             assert len(expected_repo_structure) == len(image_repo)
@@ -1127,13 +1234,68 @@ class TestAddDocuments(MarqoTestCase):
                  good_url: types.ImageType
              }),
         ]
-        for docs, expected_repo_structure in examples:
-            image_repo = add_docs.download_images(
-                docs=docs,
-                thread_count=20,
-                non_tensor_fields=('nt_1', 'nt_2'),
-                image_download_headers={}
+        with mock.patch('PIL.Image.Image.close') as mock_close:
+            for docs, expected_repo_structure in examples:
+                with add_docs.download_images(
+                    docs=docs,
+                    thread_count=20,
+                    non_tensor_fields=('nt_1', 'nt_2'),
+                    image_download_headers={},
+                    tensor_fields=None
+                ) as image_repo:
+                    assert len(expected_repo_structure) == len(image_repo)
+                    for k in expected_repo_structure:
+                        assert isinstance(image_repo[k], expected_repo_structure[k])
+
+            # Context manager must have closed all valid images
+            assert mock_close.call_count == 2
+
+    def test_params_validation_tensors_and_nontensors(self):
+        with pytest.raises(InternalError):
+            AddDocsParams(
+                docs=[],
+                index_name="my_index",
+                auto_refresh=True,
+                tensor_fields=["field1"],
+                non_tensor_fields=["field2"]
             )
-            assert len(expected_repo_structure) == len(image_repo)
-            for k in expected_repo_structure:
-                assert isinstance(image_repo[k], expected_repo_structure[k])
+
+        with pytest.raises(InternalError):
+            AddDocsParams(
+                docs=[],
+                index_name="my_index",
+                auto_refresh=True,
+                tensor_fields=["field1"],
+                # non_tensor_fields defaults to []
+            )
+
+    def test_params_validation_no_tensors_no_nontensors(self):
+        with pytest.raises(InternalError):
+            AddDocsParams(
+                docs=[],
+                index_name="my_index",
+                auto_refresh=True,
+                tensor_fields=None,
+                non_tensor_fields=None
+            )
+
+    def test_params_validation_default(self):
+        params = AddDocsParams(
+            docs=[],
+            index_name="my_index",
+            auto_refresh=True
+        )
+
+        assert params.tensor_fields is None
+        assert params.non_tensor_fields == []
+
+    def test_params_validation_non_tensor_fields_only(self):
+        params = AddDocsParams(
+            docs=[],
+            index_name="my_index",
+            auto_refresh=True,
+            non_tensor_fields=["field1", "field2"]
+        )
+
+        assert params.tensor_fields is None
+        assert params.non_tensor_fields == ["field1", "field2"]

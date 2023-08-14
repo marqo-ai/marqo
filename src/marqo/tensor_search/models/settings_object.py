@@ -221,7 +221,7 @@ settings_schema = {
                 }
             }
         },
-        NsFields.number_of_shards: 5,
-        NsFields.number_of_replicas: 1
+        NsFields.number_of_shards: 3,
+        NsFields.number_of_replicas: 0
     }]
 }

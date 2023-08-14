@@ -1,3 +1,54 @@
+# Release 1.1.0
+
+## New features
+
+- New field `numberOfVectors` in the `get_stats` response object (https://github.com/marqo-ai/marqo/pull/553). 
+This field counts all vectors from all documents in a given index. See [here](https://docs.marqo.ai/1.1.0/API-Reference/stats/) for detailed usage.
+
+- New per-index health check endpoint `GET /indexes/{index-name}/health` (https://github.com/marqo-ai/marqo/pull/552). 
+This replaces the cluster-level health check endpoint, `GET /health`,
+which is deprecated and will be removed in Marqo 2.0.0. See [here](https://docs.marqo.ai/1.1.0/API-Reference/health/) for detailed usage.
+
+## Bug fixes and minor changes
+
+- Improved image download validation and resource management (https://github.com/marqo-ai/marqo/pull/551). Image downloading in Marqo is more stable and resource-efficient now.
+
+- Adding documents now returns an error when `tensorFields` is not specified explicitly (https://github.com/marqo-ai/marqo/pull/554). This prevents users accidentally creating unwanted tensor fields.
+
+## Contributor shout-outs
+
+- Thank you for the vibrant discussion in our [forum](https://community.marqo.ai/). We love hearing your questions and about your use cases.
+
+
+# Release 1.0.0
+
+## Breaking Changes
+
+- New parameter `tensor_fields` will replace `non_tensor_fields` in the `add_documents` endpoint (https://github.com/marqo-ai/marqo/pull/538). Only fields in `tensor_fields` will have embeddings generated, offering more granular control over which fields are vectorised. See [here](https://docs.marqo.ai/1.0.0/API-Reference/documents/#add-or-replace-documents) for the full list of `add_documents` parameters and their usage. The `non_tensor_fields` parameter is deprecated and will be removed in a future release. Calls to `add_documents` with neither of these parameters specified will now fail.
+
+- Multiple tensor field optimisation ([#530](https://github.com/marqo-ai/marqo/pull/530)). This optimisation results in faster and more stable searches across multiple tensor fields. Please note that indexed documents will now have a different internal document structure, so documents indexed with previous Marqo versions cannot be searched with this version, and vice versa.
+
+- The `add_documents` endpoint's request body is now an object, with the list of documents under the `documents` key ([#535](https://github.com/marqo-ai/marqo/pull/535)). The query parameters `use_existing_tensors`, `image_download_headers`, `model_auth`, and `mappings` have been moved to the body as optional keys, and support for these parameters in the query string is deprecated. This change results in shorter URLs and better readability, as values for these parameters no longer need to be URL-encoded. See [here](https://docs.marqo.ai/1.0.0/API-Reference/documents/#add-or-replace-documents) for the new `add_documents` API usage. Backwards compatibility is supported at the moment but will be removed in a future release.
+
+- Better validation for index creation with custom models (https://github.com/marqo-ai/marqo/pull/530). When creating an index with a `model` not in the registry, Marqo will check if `model_properties` is specified with a proper `dimension`, and raise an error if not. See [here](https://docs.marqo.ai/1.0.0/Models-Reference/bring_your_own_model) for a guide on using custom models. This validation is now done at index creation time, rather than at add documents or search time.
+
+- Stricter `filter_string` syntax for `search` ([#530](https://github.com/marqo-ai/marqo/pull/530)). The `filter_string` parameter must have special Lucene characters escaped with a backslash (`\`) to filter as expected. This will affect filtering on field names or content that contains special characters. See [here](https://lucene.apache.org/core/2_9_4/queryparsersyntax.html) for more information on special characters and see [here](https://docs.marqo.ai/1.0.0/query_dsl) for a guide on using Marqo filter strings.
+
+- Removed server-side batching (`batch_size` parameter) for the `add_documents` endpoint ([#527](https://github.com/marqo-ai/marqo/pull/527)). Instead, client-side batching is encouraged (use `client_batch_size` instead of `server_batch_size` in the python client).
+
+## New Features
+- Multi-field pagination ([#530](https://github.com/marqo-ai/marqo/pull/530)). The `offset` parameter in `search` can now be used to paginate through results spanning multiple `searchable_attributes`. This works for both `TENSOR` and `LEXICAL` search. See [here](https://docs.marqo.ai/1.0.0/API-Reference/search/#search-result-pagination) for a guide on pagination.
+- Optimised default index configuration (https://github.com/marqo-ai/marqo/pull/540).
+
+## Bug Fixes & Minor Changes
+- Removed or updated all references to outdated features in the examples and the README (https://github.com/marqo-ai/marqo/pull/529).
+- Enhanced bulk search test stability (https://github.com/marqo-ai/marqo/pull/544).
+
+## Contributor shout-outs
+- Thank you to our 3.2k stargazers!
+- We've finally come to our first major release, Marqo 1.0.0! Thanks to all our users and contributors, new and old, for your feedback and support to help us reach this huge milestone. We're excited to continue building Marqo with you. Happy searching!
+
+
 # Release 0.1.0
 
 ## New features

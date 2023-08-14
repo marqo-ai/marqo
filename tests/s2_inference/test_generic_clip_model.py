@@ -369,25 +369,6 @@ class TestGenericModelSupport(MarqoTestCase):
         vectorise(model_name, content, model_properties, device="cpu")
 
 
-    def test_validate_model_properties_unknown_model_error(self):
-        """_validate_model_properties should throw an error if model is not in registry,
-            and if model_properties have not been given in index
-        """
-        model_name = "test-model"
-        tensor_search.create_vector_index(
-            index_name=self.index_name_1, config=self.config,
-            index_settings={
-                "index_defaults": {
-                    'model': model_name,
-                }
-            }
-        )
-
-        model_properties = None
-
-        self.assertRaises(UnknownModelError, _validate_model_properties, model_name, model_properties)
-
-
     def test_vectorise_generic_openai_clip_encode_image_results(self):
 
         epsilon = 1e-7

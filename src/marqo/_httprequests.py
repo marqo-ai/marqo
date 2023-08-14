@@ -15,7 +15,8 @@ from marqo.errors import (
     IndexAlreadyExistsError,
     InvalidIndexNameError,
     HardwareCompatabilityError,
-    IndexMaxFieldsError, TooManyRequestsError
+    IndexMaxFieldsError, TooManyRequestsError,
+    DiskWatermarkBreachError
 )
 from urllib3.exceptions import InsecureRequestWarning
 import warnings
@@ -138,14 +139,11 @@ def convert_to_marqo_web_error_and_raise(response: requests.Response, err: reque
     Raises:
         MarqoWebError - some type of Marqo Web error
     """
+
     try:
         response_dict = response.json()
     except JSONDecodeError:
         raise_catchall_http_as_marqo_error(response=response, err=err)
-    if response.status_code == 429:
-        raise TooManyRequestsError(
-            message="Marqo-OS received too many requests! "
-                    "Please try reducing the frequency of add_documents and update_documents calls.")
 
     try:
         open_search_error_type = response_dict["error"]["type"]
@@ -169,9 +167,18 @@ def convert_to_marqo_web_error_and_raise(response: requests.Response, err: reque
             if "limit of total fields" in reason and "exceeded" in reason:
                 raise IndexMaxFieldsError(message="Exceeded maximum number of "
                                                   "allowed fields for this index.")
+        elif open_search_error_type == "cluster_block_exception":
+            raise DiskWatermarkBreachError(message="Your Marqo storage is full. "
+                                           "Please delete documents before attempting to add any new documents.")
     except KeyError:
         pass
 
+    # for throttling
+    if response.status_code == 429:
+        raise TooManyRequestsError(
+            message="Marqo-OS received too many requests! "
+                    "Please try reducing the frequency of add_documents and update_documents calls.")
+    
     try:
         if response_dict["found"] is False:
             raise DocumentNotFoundError(

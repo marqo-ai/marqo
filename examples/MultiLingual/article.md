@@ -75,7 +75,8 @@ mq.index(index_name='my-multilingual-index').add_documents(
                     'text': sub_doc,
                     'celex_id': doc['celex_id'],
                     'labels': str(doc['labels'])
-                }]
+                }],
+    tensor_fields=["language", "text", "labels"]
 )
 ```
 Here we set the device argument as `"cuda"`. This tells Marqo to use the GPU it finds on the machine to index the document. 

@@ -5,7 +5,7 @@ import json
 from timeit import default_timer as timer
 import torch
 from marqo import errors
-from marqo.tensor_search import enums, configs
+from marqo.tensor_search import enums, configs, constants
 from typing import (
     List, Optional, Union, Callable, Iterable, Sequence, Dict, Tuple
 )
@@ -88,32 +88,6 @@ def construct_authorized_url(url_base: str, username: str, password: str) -> str
         raise errors.MarqoError(f"Could not parse url: {url_base}")
     http_part, domain_part = url_split
     return f"{http_part}{http_sep}{username}:{password}@{domain_part}"
-
-
-def contextualise_filter(filter_string: Optional[str], simple_properties: typing.Iterable) -> str:
-    """adds the chunk prefix to the start of properties found in simple string
-
-    This allows for filtering within chunks.
-
-    Args:
-        filter_string:
-        simple_properties: simple properties of an index (such as text or floats
-            and bools)
-
-    Returns:
-        a string where the properties are referenced as children of a chunk.
-    """
-    if filter_string is None:
-        return ''
-    contextualised_filter = filter_string
-    for field in simple_properties:
-        if ' ' in field:
-            field_with_escaped_space = field.replace(' ', r'\ ') # monitor this: fixed the invalid escape sequence (Deprecation warning).
-            contextualised_filter = contextualised_filter.replace(f'{field_with_escaped_space}:', f'{enums.TensorField.chunks}.{field_with_escaped_space}:')
-        else:
-            contextualised_filter = contextualised_filter.replace(f'{field}:', f'{enums.TensorField.chunks}.{field}:')
-    return contextualised_filter
-
 
 def check_device_is_available(device: str) -> bool:
     """Checks if a device is available on the machine
@@ -259,7 +233,7 @@ def parse_lexical_query(text: str) -> Tuple[List[str], str]:
             if i > 0 and text[i-1] == '\\':
                 # Read quote literally. Backslash should be ignored (both blob and required)
                 pass
-            
+
             # Check if CLOSING QUOTE
             # Closing " must have space on the right (or is last character) while opening exists.
             elif (opening_quote_idx is not None) and (i == len(text) - 1 or text[i+1] == " "):
@@ -360,4 +334,47 @@ def get_best_available_device() -> str:
         raise errors.InternalError(f"Marqo encountered an error when loading device from environment variable `MARQO_BEST_AVAILABLE_DEVICE`. "
                            f"Invalid device: {device}. Must be either 'cpu' or start with 'cuda'.")
     return device
+
+
+def is_tensor_field(field: str,
+                    tensor_fields: Optional[List[str]] = None,
+                    non_tensor_fields: Optional[List[str]] = None
+                    ) -> bool:
+    """Determine whether a field is a tensor field or not for add_documents calls."""
+    if tensor_fields is not None and non_tensor_fields is not None or \
+            tensor_fields is None and non_tensor_fields is None:
+        raise errors.InternalError("Must provide exactly one of tensor_fields or non_tensor_fields.")
+
+    if tensor_fields is not None:
+        return field in tensor_fields
+    else:
+        return field not in non_tensor_fields
+
+
+def calculate_health_status(marqo_os_health_check_response: Optional[Dict]) -> dict:
+    """Calculate the health status of Marqo based on the response API from Marqo-os ."""
+    statuses = {
+        "green" : 0,
+        "yellow": 1,
+        "red": 2,
+    }
+
+    marqo_status = "green"
+
+    if marqo_os_health_check_response is not None:
+        if "status" in marqo_os_health_check_response:
+            marqo_os_status = marqo_os_health_check_response['status']
+        else:
+            marqo_os_status = "red"
+    else:
+        marqo_os_status = "red"
+
+    marqo_status = marqo_status if statuses[marqo_status] >= statuses[marqo_os_status] else marqo_os_status
+
+    return marqo_status, marqo_os_status
+
+
+def check_is_zero_vector(vector: List[float]) -> bool:
+    """Check if a vector is all zero. We assume the input to this function is of valid type, List[Float]"""
+    return all([x == 0 for x in vector])
 

@@ -508,7 +508,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             validate_dict(field, {"test_void": "test", "test_2": "test_test"}, is_non_tensor_field=False, mappings=test_mappings)
             raise AssertionError
         except InvalidArgError as e:
-            assert "Each sub_field requires a weights" in e.message
+            assert "Each sub_field requires a weight" in e.message
 
         # length of fields
         try:
@@ -522,7 +522,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             validate_dict(field, valid_dict, is_non_tensor_field=True, mappings=test_mappings)
             raise AssertionError
         except InvalidArgError as e:
-            assert "It CANNOT be a `non_tensor_field`" in e.message
+            assert "must be a tensor field" in e.message
 
     def test_batched_vectorise_call(self):
         tensor_search.create_vector_index(
@@ -1032,7 +1032,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         # check if the chunk represents the tensorsied "multimodal_combination" field
         assert multi_combo_chunk['__field_name'] == 'my_combination_field'
         assert multi_combo_chunk['__field_content'] == json.dumps(test_doc['my_combination_field'])
-        assert isinstance(multi_combo_chunk['__vector_my_combination_field'], list)
+        assert isinstance(multi_combo_chunk[TensorField.marqo_knn_field], list)
         # Check if all filter fields are  there (inc. the non tensorised my_list):
         assert multi_combo_chunk['my_combination_field'] == test_doc["my_combination_field"]
 
@@ -1042,7 +1042,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         assert index_info.properties['my_combination_field']['properties']['text']["type"] == 'text'
         assert index_info.properties['__chunks']['properties']['my_combination_field']['properties']['text']["type"]   == 'keyword'
         assert index_info.properties['__chunks']['properties']['my_combination_field']['properties']['image']["type"] == 'keyword'
-        assert index_info.properties['__chunks']['properties']['__vector_my_combination_field']['type']  == 'knn_vector'
+        assert index_info.properties['__chunks']['properties'][TensorField.marqo_knn_field]['type']  == 'knn_vector'
 
     def test_multimodal_child_fields_order(self):
         tensor_search.create_vector_index(

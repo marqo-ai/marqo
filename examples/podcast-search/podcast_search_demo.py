@@ -47,7 +47,7 @@ format of podcast_data -
 index_name = "marqo-podcast-search-demo"
 mq = marqo.Client(url='http://localhost:8882')  # Connection to Marqo Docker Container
 mq.create_index(index_name)
-mq.index(index_name).add_documents(podcast_data)
+mq.index(index_name).add_documents(podcast_data, tensor_fields=['name', 'description', 'transcript'])
 stats = mq.index(index_name).get_stats()  # get the stats for the index
 print(f"{stats['numberOfDocuments']} documents added to index: {index_name}")
 

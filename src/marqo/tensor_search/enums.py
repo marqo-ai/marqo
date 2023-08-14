@@ -29,6 +29,7 @@ class TensorField:
     chunk_ids = "__chunk_ids"
     # the prefix will have the customer's field name appended to the end of it
     vector_prefix = "__vector_"
+    marqo_knn_field = "__vector_marqo_knn_field"
     chunks = "__chunks"
     output_highlights = "_highlights"
     output_score = "_score"
@@ -145,7 +146,19 @@ class ModelProperties:
 class InferenceParams:
     model_auth = "model_auth"
 # Perhaps create a ThrottleType to differentiate thread_count and data_size throttling mechanisms
-    
 
 
+class HealthStatuses(str, Enum):
+    green = "green"
+    yellow = "yellow"
+    red = "red"
 
+    def _status_index(self):
+        status_order = [self.green, self.yellow, self.red]
+        return status_order.index(self)
+
+    def __gt__(self, other):
+        return self._status_index() > other._status_index()
+
+    def __lt__(self, other):
+        return self._status_index() < other._status_index()
