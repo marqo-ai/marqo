@@ -6,7 +6,7 @@ VOLUME /var/lib/docker
 ARG TARGETPLATFORM
 # # this is required for onnx to find cuda
 # COPY --from=cuda_image /usr/local/cuda/ /usr/local/cuda/
-# WORKDIR /app
+WORKDIR /app
 # RUN set -x && \
 #     apt-get update && \
 #     apt-get install ca-certificates curl  gnupg lsof lsb-release jq -y && \
