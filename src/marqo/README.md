@@ -133,12 +133,18 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs/ | sh;
 
 6. Set up redis (follow instructions in Option A)
 
-7. Install marqo dependencies,
+7. If you are using an M2 Mac specifically, then edit `requirements.txt`. Find the `onnx` and `protobuf` entries, and remove their versions. Then, move onnx to be above protobuf. These two lines should end up looking like this: 
+```
+onnx
+protobuf
+```
+
+9. Install marqo dependencies. 
 ```
 pip install -r requirements.txt
 ```
 
-8. Change into the tensor search directory,
+9. Change into the tensor search directory,
 ```
 CWD=$(pwd)
 cd src/marqo/tensor_search/
