@@ -133,7 +133,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs/ | sh;
 
 6. Set up redis (follow instructions in Option A)
 
-7. Install marqo dependencies. If you are using an M2 Mac specifically, then install use the requirements specified in [this gist](https://gist.github.com/pandu-k/f3cdf319b7abaa1d0e5c5e038e16377c#file-pip_requirements_for_m2_devs-txt) (this installs `onnx` and `protobuf` for M2 Macs properly). If you use this gist to install dependencies make sure you don't accidentally commit the gist. 
+7. Install marqo dependencies. If you are using an M2 Mac specifically, then install the requirements specified in [this gist](https://gist.github.com/pandu-k/f3cdf319b7abaa1d0e5c5e038e16377c#file-pip_requirements_for_m2_devs-txt) (this installs `onnx` and `protobuf` for M2 Macs properly). If you use this gist to install dependencies make sure you don't accidentally commit the gist. 
  
 ```
 pip install -r requirements.txt
