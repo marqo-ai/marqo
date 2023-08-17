@@ -1,7 +1,7 @@
 # ARG CUDA_VERSION=11.4.3
 # FROM nvidia/cuda:${CUDA_VERSION}-cudnn8-runtime-ubuntu20.04 as cuda_image
 # FROM ubuntu:20.04 as base_image
-FROM marqoai/marqo-base:test as base_image
+FROM marqoai/marqo-base:test
 VOLUME /var/lib/docker
 ARG TARGETPLATFORM
 # # this is required for onnx to find cuda
@@ -41,8 +41,6 @@ RUN set -x && \
     # set up Docker-in-Docker
     bash scripts/dind_setup/setup_dind.sh
 
-# Separate the previous steps
-FROM base_image
 COPY . /app
 ENV PYTHONPATH "${PYTHONPATH}:/app"
 RUN chmod +x ./run_marqo.sh
