@@ -23,7 +23,7 @@ git clone https://github.com/marqo-ai/marqo.git
 # this requirements file is from the marqo-base repo:
 pip install -r requirements.txt
 ```
-4. Install marqo dependencies (from this respo)
+4. Install marqo dependencies (from this repo)
 ```
 cd marqo
 pip install -r requirements.txt
@@ -143,7 +143,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs/ | sh;
 # this requirements file is from the marqo-base repo:
 pip install -r requirements.txt
 ```
-8. Install marqo dependencies (from this respo)
+8. Install marqo dependencies (from this repo)
 ```
 cd marqo
 pip install -r requirements.txt
