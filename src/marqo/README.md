@@ -133,7 +133,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs/ | sh;
 
 6. Set up redis (follow instructions in Option A)
 
-7. If you are using an M2 Mac specifically, then edit `requirements.txt`. Find the `onnx` and `protobuf` entries, and remove their versions. Then, move onnx to be above protobuf. These two lines should end up looking like this: 
+7. If you are using an M2 Mac specifically, then install use the requirements specified in [this gist](https://gist.github.com/pandu-k/f3cdf319b7abaa1d0e5c5e038e16377c#file-pip_requirements_for_m2_devs-txt). `requirements.txt`. Find the `onnx` and `protobuf` entries, and remove their versions. Then, move onnx to be above protobuf. These two lines should end up looking like this: 
 ```
 onnx
 protobuf
