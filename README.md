@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-<b><a href="https://marqo.ai">Website</a> | <a href="https://docs.marqo.ai">Documentation</a> | <a href="https://demo.marqo.ai">Demos</a>  | <a href="https://join.slack.com/t/marqo-community/shared_invite/zt-1d737l76e-u~b3Rvey2IN2nGM4wyr44w">Slack Community</a> | <a href="https://q78175g1wwa.typeform.com/to/d0PEuRPC">Marqo Cloud</a>
+<b><a href="https://marqo.ai">Website</a> | <a href="https://docs.marqo.ai">Documentation</a> | <a href="https://demo.marqo.ai">Demos</a> | <a href="https://community.marqo.ai">Discourse</a>  | <a href="https://join.slack.com/t/marqo-community/shared_invite/zt-1d737l76e-u~b3Rvey2IN2nGM4wyr44w">Slack Community</a> | <a href="https://www.marqo.ai/cloud">Marqo Cloud</a>
 </b>
 </p>
 
@@ -12,62 +12,65 @@
 <a href="https://pypi.org/project/marqo/"><img src="https://img.shields.io/pypi/v/marqo?label=PyPI"></a>
 <a href="https://github.com/marqo-ai/marqo/actions/workflows/unit_test_CI.yml"><img src="https://img.shields.io/github/actions/workflow/status/marqo-ai/marqo/unit_test_CI.yml?branch=mainline"></a>
 <a align="center" href="https://join.slack.com/t/marqo-community/shared_invite/zt-1d737l76e-u~b3Rvey2IN2nGM4wyr44w"><img src="https://img.shields.io/badge/Slack-blueviolet?logo=slack&amp;logoColor=white"></a>
-</p>
 
 <p align="center">
-Marqo is an end-to-end, multimodal vector search engine. With Marqo, users can store and query unstructured data such as text, images, and code through a single easy-to-use API. Input preprocessing, machine learning inference, and storage are all included out of the box and can be easily scaled.
+Marqo is more than a vector database, it's an end-to-end vector search engine. Vector generation, storage and retrieval are handled out of the box through a single API. No need to bring your own embeddings.
 </p> <br>
     
 <p align="center">
-    <a href="https://demo.marqo.ai/?q=smiling+with+glasses&index=boredapes"><img src="assets/stripes.gif"></a>
+    <a href="https://demo.marqo.ai/?q=smiling+with+glasses&index=boredapes"><img src="assets/00_marqo_diagram_MAIN-COMP-1080-1920-01.gif"></a>
 </p>
- 
-
-
-
-
 
 
 ## ✨ Core Features
+
+**🤖 State of the art embeddings**
+- Use the latest machine learning models from PyTorch, Huggingface, OpenAI and more. 
+- Start with a pre-configured model or bring your own.
+- Built-in ONNX support and conversion for faster inference and higher throughput.
+- CPU and GPU support.
+
 **⚡ Performance**
 - Embeddings stored in in-memory HNSW indexes, achieving cutting edge search speeds.
 - Scale to hundred-million document indexes with horizontal index sharding.
 - Async and non-blocking data upload and search.
 
-**🤖 Machine Learning**
-- Use the latest machine learning models from PyTorch, Huggingface, OpenAI and more. 
-- Start with a pre-configured model or bring your own.
-- Built in ONNX support and conversion for faster inference and higher throughput.
-- CPU and GPU support.
-
-**☁️ Cloud-native**
-- Fast deployment using Docker.
-- Run Marqo high availability.
-
-**🌌 End-to-end**
-- Build search and analytics on multiple unstructured data types such as text, image, code, video.
+**🌌 Documents-in-documents-out**
+- Vector generation, storage, and retieval are provided out of the box.
+- Build search, entity resolution, and data exploration application with using your text and images.
+- Build complex semantic queries by combining weighted search terms.
 - Filter search results using Marqo’s query DSL.
 - Store unstructured data and semi-structured metadata together in documents, using a range of supported datatypes like bools, ints and keywords.
 
 **🍱 Managed cloud**
-- Scale Marqo at the click of a button.
-- High availability, accelerated inference.
-- Marqo cloud ☁️ is in pre-release. If you’re interested, [apply here](https://q78175g1wwa.typeform.com/to/d0PEuRPC).
+- Low latency optimised deployment of Marqo.
+- Scale inference at the click of a button.
+- High availability.
+- 24/7 support.
+- Access control.
+- Learn more [here](https://www.marqo.ai/cloud).
 
-<p align="center">
-    <a href="https://q78175g1wwa.typeform.com/to/d0PEuRPC"><img src="assets/join-the-cloud-beta.png" width="90%" height="20%"/></a>
-</p>
+## Integrations
+
+Marqo is integrated into popular AI and data processing frameworks, with more on the way.
+
+**🛹 [Griptape](https://github.com/griptape-ai/griptape)**
+
+Griptape enables safe and reliable deployment of LLM-based agents for enterprise applications, the MarqoVectorStoreDriver gives these agents access to scalable search with your own data. This integration lets you leverage open source or custom fine-tuned models through Marqo to deliver relevant results to your LLMs.
+
+**🦜🔗 [Langchain](https://github.com/langchain-ai/langchain)**
+
+This integration lets you leverage open source or custom fine tuned models through Marqo for LangChain applications with a vector search component. The Marqo vector store implementation can plug into existing chains such as the Retrieval QA and Conversational Retrieval QA.
 
 ## Learn more about Marqo
                                                                                                                                                        
 | | |
 | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 📗 [Quick start](#Getting-started)| Build your first application with Marqo in under 5 minutes. |
-| 🔍 [ What is tensor search?](https://medium.com/@jesse_894/introducing-marqo-build-cloud-native-tensor-search-applications-in-minutes-9cb9a05a1736) | A beginner's guide to the fundamentals of Marqo and tensor search. |
-| 🖼 [Marqo for image data](https://medium.com/@wanli19940222/how-to-implement-text-to-image-search-on-marqo-in-5-lines-of-code-448f75bed1da) | Building text-to-image search in Marqo in 5 lines of code. |
-| 📚 [Marqo for text](https://medium.com/@pandu_95301/how-i-used-marqo-to-create-a-multilingual-legal-database-in-5-key-lines-of-code-42ba49fd0caa) | Building a multilingual database in Marqo. |
-| 🔮 [Integrating Marqo with GPT](https://medium.com/creator-fund/building-search-engines-that-think-like-humans-e019e6fb6389) | Making GPT a subject matter expert by using Marqo as a knowledge base. |
-| 🎨 [ Marqo for Creative AI](https://medium.com/@jesse_894/combining-stable-diffusion-with-semantic-search-generating-and-categorising-100k-hot-dogs-afeeddea9d81) | Combining stable diffusion with semantic search to generate and categorise 100k images of hotdogs. |
+| 🖼 [Marqo for image data](https://www.marqo.ai/blog/context-is-all-you-need-multimodal-vector-search-with-personalization) | Building advanced image search with Marqo. |
+| 📚 [Marqo for text](https://www.marqo.ai/blog/how-i-used-marqo-to-create-a-multilingual-legal-databse-in-5-key-lines-of-code) | Building a multilingual database in Marqo. |
+| 🔮 [Integrating Marqo with GPT](https://www.marqo.ai/blog/from-iron-manual-to-ironman-augmenting-gpt-with-marqo-for-fast-editable-memory-to-enable-context-aware-question-answering) | Making GPT a subject matter expert by using Marqo as a knowledge base. |
+| 🎨 [ Marqo for Creative AI](https://www.marqo.ai/blog/combining-stable-diffusion-with-semantic-search-generating-and-categorising-100k-hot-dogs) | Combining stable diffusion with semantic search to generate and categorise 100k images of hotdogs. |
 | 🔊 [Marqo and Speech Data](https://www.marqo.ai/blog/speech-processing) | Add diarisation and transcription to preprocess audio for Q&A with Marqo and ChatGPT. |
 | 🦾 [Features](#-Core-Features) | Marqo's core features. |
 
@@ -495,8 +498,8 @@ Marqo is a community project with the goal of making tensor search accessible to
 
 ## Support
 
+- Ask questions and share your creations with the community on our [Discourse forum](https://community.marqo.ai).
 - Join our [Slack community](https://join.slack.com/t/marqo-community/shared_invite/zt-1d737l76e-u~b3Rvey2IN2nGM4wyr44w) and chat with other community members about ideas.
-- Marqo community meetings (coming soon!).
 
 ### Stargazers
 
@@ -505,14 +508,3 @@ Marqo is a community project with the goal of making tensor search accessible to
 ### Forkers
 
 [![Forkers repo roster for @marqo-ai/marqo](https://reporoster.com/forks/marqo-ai/marqo)](https://github.com/marqo-ai/marqo/network/members).
-
-## Translations
-
-This readme is available in the following translations:
-
-- [English](README.md)🇬🇧
-- [Français](README-translated/README-French.md)🇫🇷
-- [中文 Chinese](README-translated/README-Chinese.md)🇨🇳
-- [Polski](README-translated/README-Polish.md)🇵🇱
-- [Українська](README-translated/README-Ukrainian.md)🇺🇦
-
