@@ -139,7 +139,7 @@ onnx
 protobuf
 ```
 
-9. Install marqo dependencies. 
+8. Install marqo dependencies. 
 ```
 pip install -r requirements.txt
 ```
@@ -149,7 +149,8 @@ pip install -r requirements.txt
 CWD=$(pwd)
 cd src/marqo/tensor_search/
 ```
-9. Run Marqo,
+
+10. Run Marqo,
 ```
 export OPENSEARCH_URL="https://localhost:9200" && 
     export PYTHONPATH="${PYTHONPATH}:${CWD}/src" &&
