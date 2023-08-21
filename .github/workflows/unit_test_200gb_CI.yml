@@ -69,27 +69,21 @@ jobs:
           pip install -r marqo-base/requirements.txt
           pip install -r marqo/requirements.txt
           pip install tox==3.26
-          pip install flake8
-  
-      - name: Checkout marqo-api-tests repo
-        uses: actions/checkout@v3
-        with:
-          repository: marqo-ai/marqo-api-tests
-          
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-          
-      - name: Set up Environment
+      
+      - name: start Marqo-os
         run: |
-          # Set up conf file
-          echo 'export MARQO_API_TESTS_ROOT="${{ github.workspace }}"' >> conf
+          export LOCAL_OPENSEARCH_URL="https://localhost:9200"
+          docker run --name marqo-os -d -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" marqoai/marqo-os:0.0.3 || exit
+          
+          # wait for marqo-os to start:
+          timeout 10m bash -c 'until [[ $(curl -v --silent --insecure $LOCAL_OPENSEARCH_URL 2>&1 | grep Unauthorized) ]]; do sleep 0.1; done;' || \
+            (echo "Marqo-os did not start in time" && exit 1)
           
       - name: Run Unit Tests
         run: |
-          export MQ_API_TEST_BRANCH=$(echo "${GITHUB_REF}" | cut -d'/' -f3-)
-          # feed the pip-installed dependencies to tox: 
-          tox --develop -e py3-local_os_unit_tests_w_requirements --deps $(pip freeze | tr '\n' ',')
-          # tox -e py3-local_os_unit_tests_w_requirements
+          export LOCAL_OPENSEARCH_URL="https://localhost:9200"
+          export PYTHONPATH="./tests:.:./temp/marqo/src:./src"
+          pytest tests/
   
   Stop-Runner:
     name: Stop self-hosted EC2 runner
