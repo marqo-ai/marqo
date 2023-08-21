@@ -35,66 +35,51 @@ jobs:
     name: Run Marqo Test Suite
     needs: Start-Runner # required to start the main job when the runner is ready
     runs-on: ${{ needs.start-runner.outputs.label }} # run the job on the newly created runner
-
-    environment: marqo-test-suite
-
+                
+    environment: marqo-test-suite 
+    
     steps:
-
+       
       - name: Checkout marqo repo
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
+          path: marqo
 
       - name: Set up Python 3.8
         uses: actions/setup-python@v3
         with:
           python-version: "3.8"
           cache: "pip"
-
-      - name: Install Dependencies
-        run: |
-          #pip install -r requirements.txt
-          pip install tox==3.26
-          pip install flake8
-
-      # TODO: Figure out how to make linting work on self-hosted runner
-      # usual error: $HOME not set
-      #- name: Get Changed Directories
-      #  id: changed-dir
-      #  uses: tj-actions/changed-files@v29.0.1
-      #  with:
-      #    dir_names: true
-      #  run:  |
-      #    export HOME=$pwd
-
-      #- name: Lint Changed Directories with flake8
-      #  run: |
-      #    for dir in ${{ steps.changed-dir.outputs.all_changed_files }}; do
-      #      echo "$dir was changed"
-            # stop the build if there are Python syntax errors or undefined names
-      #      flake8 $dir --count --select=E9,F63,F7,F82 --show-source --statistics --filename *.py
-            # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-      #      flake8 $dir --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics --filename *.py
-      #    done
-
-      - name: Checkout marqo-api-tests repo
+          
+      - name: Checkout marqo-base for requirements
         uses: actions/checkout@v3
         with:
-          repository: marqo-ai/marqo-api-tests
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-
-      - name: Set up Environment
+          repository: marqo-ai/marqo-base
+          path: marqo-base
+          
+      - name: Install dependencies
         run: |
-          # Set up conf file
-          echo 'export MARQO_API_TESTS_ROOT="${{ github.workspace }}"' >> conf
-
-      - name: Run Unit Tests
+          pip install -r marqo-base/requirements.txt
+          # override base requirements with marqo requirements, if needed: 
+          pip install -r marqo/requirements.txt
+          pip install pytest==7.4.0
+      
+      - name: start Marqo-os
         run: |
-          export MQ_API_TEST_BRANCH=$(echo "${GITHUB_REF}" | cut -d'/' -f3-)
-          tox -e py3-local_os_unit_tests_w_requirements -- --largemodel
-
+          export LOCAL_OPENSEARCH_URL="https://localhost:9200"
+          docker run --name marqo-os -d -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" marqoai/marqo-os:0.0.3 || exit
+          
+          # wait for marqo-os to start:
+          timeout 10m bash -c 'until [[ $(curl -v --silent --insecure $LOCAL_OPENSEARCH_URL 2>&1 | grep Unauthorized) ]]; do sleep 0.1; done;' || \
+            (echo "Marqo-os did not start in time" && exit 1)
+          
+      - name: Run Large Model Unit Tests
+        run: |
+          export LOCAL_OPENSEARCH_URL="https://localhost:9200"
+          export PYTHONPATH="./marqo/tests:./marqo/src:./marqo"
+          pytest marqo/tests --largemodel
+          
   Stop-Runner:
     name: Stop self-hosted EC2 runner
     needs:
