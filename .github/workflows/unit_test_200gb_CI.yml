@@ -57,31 +57,17 @@ jobs:
           python-version: "3.8"
           cache: "pip"
           
-      - name: Install Dependencies
+      - name: Checkout marqo-base for requirements
+        uses: actions/checkout@v3
+        with:
+          repository: marqo-ai/marqo-base
+          
+      - name: Install dependencies
         run: |
-          #pip install -r requirements.txt
+          pip install -r marqo-base/requirements.txt
+          pip install -r marqo/requirements.txt
           pip install tox==3.26
           pip install flake8
-      
-      # TODO: Figure out how to make linting work on self-hosted runner
-      # usual error: $HOME not set
-      #- name: Get Changed Directories
-      #  id: changed-dir
-      #  uses: tj-actions/changed-files@v29.0.1
-      #  with:
-      #    dir_names: true
-      #  run:  |
-      #    export HOME=$pwd
-      
-      #- name: Lint Changed Directories with flake8
-      #  run: |
-      #    for dir in ${{ steps.changed-dir.outputs.all_changed_files }}; do
-      #      echo "$dir was changed"
-            # stop the build if there are Python syntax errors or undefined names
-      #      flake8 $dir --count --select=E9,F63,F7,F82 --show-source --statistics --filename *.py
-            # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-      #      flake8 $dir --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics --filename *.py
-      #    done
   
       - name: Checkout marqo-api-tests repo
         uses: actions/checkout@v3
