@@ -50,6 +50,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
+          path: marqo
 
       - name: Set up Python 3.8
         uses: actions/setup-python@v3
@@ -61,6 +62,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           repository: marqo-ai/marqo-base
+          path: marqo-base
           
       - name: Install dependencies
         run: |
