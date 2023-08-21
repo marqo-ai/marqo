@@ -83,7 +83,7 @@ jobs:
       - name: Run Unit Tests
         run: |
           export LOCAL_OPENSEARCH_URL="https://localhost:9200"
-          export PYTHONPATH="./tests:.:./temp/marqo/src:./src"
+          export PYTHONPATH="./marqo/tests:./marqo/src:./marqo"
           pytest marqo/tests
   
   Stop-Runner:
