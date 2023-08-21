@@ -42,7 +42,7 @@ also push it to the latest tag (add `-t marqoai/marqo:latest`).
 [github release](https://docs.github.com/en/repositories/releasing-projects-on-github/managing-releases-in-a-repository) 
 (with a short summary of changes) that links to the changes in `RELEASE.md`.
 - For releases that change the API, update py-marqo to make those changes accessible. 
-- To release a change to py-marqo, bump py-marqo's version (major.minor.patch, see below for more details), run all the tests, build the package and push to it PyPi. py-marqo's verson is independent from Marqo.  
+- To release a change to py-marqo, bump py-marqo's version (major.minor.patch, see below for more details), run all the tests, build the package and push it to PyPi. py-marqo's version is independent from Marqo.  
 
 - Then, use the following format for releasing changes:
   - . # Release x.y.z 
