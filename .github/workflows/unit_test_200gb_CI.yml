@@ -69,6 +69,7 @@ jobs:
           pip install -r marqo-base/requirements.txt
           pip install -r marqo/requirements.txt
           pip install tox==3.26
+          pip install pytest==7.4.0
       
       - name: start Marqo-os
         run: |
