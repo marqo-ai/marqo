@@ -87,6 +87,7 @@ jobs:
       - name: Run Unit Tests
         run: |
           export MQ_API_TEST_BRANCH=$(echo "${GITHUB_REF}" | cut -d'/' -f3-)
+          # feed the pip-installed dependencies to tox: 
           tox --develop -e py3-local_os_unit_tests_w_requirements --deps $(pip freeze | tr '\n' ',')
           # tox -e py3-local_os_unit_tests_w_requirements
   
