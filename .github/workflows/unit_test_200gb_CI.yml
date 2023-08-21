@@ -84,7 +84,7 @@ jobs:
         run: |
           export LOCAL_OPENSEARCH_URL="https://localhost:9200"
           export PYTHONPATH="./tests:.:./temp/marqo/src:./src"
-          pytest tests/
+          pytest marqo/tests
   
   Stop-Runner:
     name: Stop self-hosted EC2 runner
