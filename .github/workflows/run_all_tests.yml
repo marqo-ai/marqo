@@ -84,3 +84,27 @@ jobs:
     if: needs.should-tests-run.outputs.decision == 'true'
     uses: ./.github/workflows/unit_test_200gb_CI.yml
     secrets: inherit
+    
+  summary:
+    name: Test Summary
+    needs: [should-tests-run, run-arm64-tests, run-cuda-dind-tests, run-dind-os-tests, run-largemodel-unit-tests, run-local-os-tests, run-unit-tests]
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check test results
+      run: |
+        # If tests weren't intended to run, consider this a success
+        if [[ "${{ needs.should-tests-run.outputs.decision }}" != "true" ]]; then
+          echo "Tests were skipped. No further checks required."
+          exit 0
+        fi
+
+        # Else, check if all tests succeeded or were skipped
+        for job in run-arm64-tests run-cuda-dind-tests run-dind-os-tests run-largemodel-unit-tests run-local-os-tests run-unit-tests; do
+          if [[ "${{ needs[job].result }}" != "success" && "${{ needs[job].result }}" != "skipped" ]]; then
+            echo "Job $job did not succeed."
+            exit 1
+          fi
+        done
+        
+        echo "All tests either passed or were skipped."
+        
