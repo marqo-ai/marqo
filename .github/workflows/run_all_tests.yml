@@ -1,0 +1,42 @@
+# Runs all Marqo tests. The goal is a single workflow that,
+# if all jobs pass, is sufficient to merge, provided an
+# accepted PR review.
+
+name: Run all Marqo tests
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  run-arm64-tests:
+    name: Run arm64 API test job
+    uses: ./.github/workflows/arm64_local_os_CI.yml
+    secrets: inherit
+
+  run-cuda-dind-tests:
+    name: Run CUDA Docker-in-Docker API test job
+    uses: ./.github/workflows/cuda_dind_os_CI.yml
+    secrets: inherit
+
+  run-dind-os-tests:
+    name: Run Docker-in-Docker API test job
+    uses: ./.github/workflows/dind_os_CI.yml
+    secrets: inherit
+
+  run-largemodel-unit-tests:
+    name: Run Large Model Unit test job
+    uses: ./.github/workflows/largemodel_unit_test_CI.yml
+    secrets: inherit
+
+  run-local-os-tests:
+    name: Run Local Marqo-OS API test job
+    uses: ./.github/workflows/local_os_CI.yml
+    secrets: inherit
+
+  run-unit-tests:
+    name: Run Unit test job
+    uses: ./.github/workflows/unit_test_200gb_CI.yml
+    secrets: inherit

@@ -2,6 +2,7 @@ name: unit_test_200gb_CI
 # runs unit tests on AMD64 machine
 
 on:
+  workflow_call:
   workflow_dispatch:
   push:
     branches:

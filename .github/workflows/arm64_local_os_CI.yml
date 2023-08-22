@@ -1,6 +1,7 @@
 name: arm64_local_os_CI
 # runs Integration Tests on Local OS on an ARM64 Machine
 on:
+  workflow_call:
   workflow_dispatch:
     inputs:
       image_to_test:
