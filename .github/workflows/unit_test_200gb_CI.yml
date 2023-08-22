@@ -12,8 +12,6 @@ on:
   pull_request:
     branches:
       - mainline
-    paths-ignore:
-      - '**.md'
 
 permissions:
   contents: read
