@@ -1,7 +1,10 @@
-# Runs all Marqo tests. The goal is a single workflow that,
-# if all jobs pass, is sufficient to merge, provided an
-# accepted PR review.
-# This runs if a PR is approved and can also be manually run.
+# Runs all Marqo tests.
+#  - The goal is a single workflow that, if all jobs pass, is sufficient to
+#    merge.
+#  - This can be run manually. It is automatically triggered if a PR is
+#    approved.
+#  - The automatic trigger on PR approvals is skipped if only markdown files
+#    have changed.
 
 name: Run all Marqo tests
 
@@ -17,7 +20,7 @@ permissions:
 
 jobs:
   should-tests-run:
-    name: Determine whether tests should be run
+    name: Determine whether tests should run
     runs-on: ubuntu-latest
     outputs:
       decision: ${{ steps.decision.outputs.result }}
@@ -25,7 +28,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v2
 
-      - name: Filter files
+      - name: Check if only markdown files have changed
         id: filter
         uses: dorny/paths-filter@v2
         with:
@@ -34,7 +37,7 @@ jobs:
               - '**'
               - '!*.md'
 
-      - name: Decide to run tests
+      - name: Decide whether to run tests
         id: decision
         run: |
           if [[ "${{ github.event_name }}" == "pull_request_review" && \
