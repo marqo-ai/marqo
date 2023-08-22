@@ -1,0 +1,83 @@
+# Runs all Marqo tests. The goal is a single workflow that,
+# if all jobs pass, is sufficient to merge, provided an
+# accepted PR review.
+# This runs if a PR is approved and can also be manually run.
+
+name: Run all Marqo tests
+
+on:
+  pull_request_review:
+    types: [submitted]
+    branches:
+      - mainline
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  should-tests-run:
+    name: Determine whether tests should be run
+    runs-on: ubuntu-latest
+    outputs:
+      decision: ${{ steps.decision.outputs.result }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Filter files
+        id: filter
+        uses: dorny/paths-filter@v2
+        with:
+          filters: |
+            proceed:
+              - '**'
+              - '!*.md'
+
+      - name: Decide to run tests
+        id: decision
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request_review" && \
+                "${{ github.event.review.state }}" == "approved" && \
+                "${{ steps.filter.outputs.proceed }}" == "true" ]] \
+              || [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "::set-output name=result::true"
+          else
+            echo "::set-output name=result::false"
+          fi
+
+  run-arm64-tests:
+    needs: should-tests-run
+    if: needs.should-tests-run.outputs.decision == 'true'
+    uses: ./.github/workflows/arm64_local_os_CI.yml
+    secrets: inherit
+
+  run-cuda-dind-tests:
+    needs: should-tests-run
+    if: needs.should-tests-run.outputs.decision == 'true'
+    uses: ./.github/workflows/cuda_dind_os_CI.yml
+    secrets: inherit
+
+  run-dind-os-tests:
+    needs: should-tests-run
+    if: needs.should-tests-run.outputs.decision == 'true'
+    uses: ./.github/workflows/dind_os_CI.yml
+    secrets: inherit
+
+  run-largemodel-unit-tests:
+    needs: should-tests-run
+    if: needs.should-tests-run.outputs.decision == 'true'
+    uses: ./.github/workflows/largemodel_unit_test_CI.yml
+    secrets: inherit
+
+  run-local-os-tests:
+    needs: should-tests-run
+    if: needs.should-tests-run.outputs.decision == 'true'
+    uses: ./.github/workflows/local_os_CI.yml
+    secrets: inherit
+
+  run-unit-tests:
+    needs: should-tests-run
+    if: needs.should-tests-run.outputs.decision == 'true'
+    uses: ./.github/workflows/unit_test_200gb_CI.yml
+    secrets: inherit
