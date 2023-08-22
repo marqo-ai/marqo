@@ -2,10 +2,16 @@ name: unit_test_200gb_CI
 # runs unit tests on AMD64 machine
 
 on:
+  workflow_call:
   workflow_dispatch:
   push:
     branches:
       mainline
+    paths-ignore:
+      - '**.md'
+  pull_request:
+    branches:
+      - mainline
     paths-ignore:
       - '**.md'
 
@@ -38,7 +44,7 @@ jobs:
           security-group-id: ${{ secrets.AMD_SECURITY_GROUP_ID }}
 
   Test-Marqo:
-    name: Run Marqo Test Suite
+    name: Run Unit Tests
     needs: Start-Runner # required to start the main job when the runner is ready
     runs-on: ${{ needs.start-runner.outputs.label }} # run the job on the newly created runner
     environment: marqo-test-suite
