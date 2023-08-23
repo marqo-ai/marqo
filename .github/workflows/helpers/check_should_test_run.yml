@@ -1,6 +1,7 @@
 # This is a helper workflow that determines whether the caller test workflow should run
 # The decision is in this workflow's should_test_run value
-
+# - Changes to only .md files don't trigger runs, unless manually requested via workflow_dispatch
+# - Runs are triggerd on the following events: approving PRs, pushes, PR synchronises
 name: Check if test should run
 
 on:
@@ -43,7 +44,9 @@ jobs:
       - name: Decide whether to run tests
         id: decision
         run: |
-          if   [[ "${{ inputs.github_event_name }}" == "push" && \
+          if   [[ "${{ inputs.github_event_name }}" == "pull_request" && \
+                  "${{ steps.filter.outputs.proceed }}" == "true" ]] \
+            || [[ "${{ inputs.github_event_name }}" == "push" && \
                   "${{ steps.filter.outputs.proceed }}" == "true" ]] \
             || [[ "${{ inputs.github_event_name }}" == "pull_request_review" && \
                  "${{ inputs.github_event_review_state }}" == "approved" && \
