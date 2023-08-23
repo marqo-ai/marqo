@@ -19,7 +19,13 @@ permissions:
   contents: read
 
 jobs:
+  Should-Test-Proceed:
+    uses: ./.github/workflows/helpers/check_should_test_run.yml
+    secrets: inherit
+  
   Start-Runner:
+    needs: Should-Test-Proceed
+    if: needs.Should-Test-Proceed.outputs.decision == 'true'
     name: Start self-hosted EC2 runner
     runs-on: ubuntu-latest
     outputs:
