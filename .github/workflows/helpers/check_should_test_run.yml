@@ -2,6 +2,7 @@
 # The decision is in this workflow's should_test_run value
 # - Changes to only .md files don't trigger runs, unless manually requested via workflow_dispatch
 # - Runs are triggerd on the following events: approving PRs, pushes, PR synchronises
+
 name: Check if test should run
 
 on:
