@@ -1,5 +1,6 @@
 # This is a helper workflow that determines whether the caller test workflow should run
-# The decision is in this workflow's should_test_run value
+# The decision is in this workflow's 'output.decision' value. This value is either 'true', if the 
+# test should proceed or 'false'.
 # - Changes to only .md files don't trigger runs, unless manually requested via workflow_dispatch
 # - Runs are triggerd on the following events: approving PRs, pushes, PR synchronises
 
@@ -15,8 +16,8 @@ on:
         required: true
         type: string
     outputs:
-      should_test_run:
-        description: "Output from reusable workflow"
+      decision:
+        description: "Either 'true', if the test should proceed or 'false'."
         value: ${{ steps.decision.outputs.result }}
 
 permissions:
