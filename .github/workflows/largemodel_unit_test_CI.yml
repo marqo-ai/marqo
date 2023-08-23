@@ -1,7 +1,9 @@
 name: largemodel_unit_test_CI
 # runs unit tests on CUDA machine with large model tests.
 
-on: workflow_dispatch
+on:
+  workflow_call:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -32,7 +34,7 @@ jobs:
           security-group-id: ${{ secrets.CUDA_SECURITY_GROUP_ID }}
 
   Test-Marqo:
-    name: Run Marqo Test Suite
+    name: Run Large Model Unit Tests
     needs: Start-Runner # required to start the main job when the runner is ready
     runs-on: ${{ needs.start-runner.outputs.label }} # run the job on the newly created runner
     environment: marqo-test-suite
