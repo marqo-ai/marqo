@@ -46,6 +46,7 @@ jobs:
       - name: Decide whether to run tests
         id: decision
         run: |
+          RESULT="false" 
           if   [[ "${{ inputs.github_event_name }}" == "pull_request" && \
                   "${{ steps.filter.outputs.proceed }}" == "true" ]] \
             || [[ "${{ inputs.github_event_name }}" == "push" && \
@@ -54,7 +55,9 @@ jobs:
                  "${{ inputs.github_event_review_state }}" == "approved" && \
                  "${{ steps.filter.outputs.proceed }}" == "true" ]] \
             || [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-              echo "::set-output name=result::true"
-          else
-              echo "::set-output name=result::false"
+              RESULT="true"
           fi
+          
+          echo "Decision to proceed with test: $RESULT"
+          echo "::set-output name=result::$RESULT"
+
