@@ -88,6 +88,7 @@ jobs:
   summary:
     name: Test Summary
     needs: [should-tests-run, run-arm64-tests, run-cuda-dind-tests, run-dind-os-tests, run-largemodel-unit-tests, run-local-os-tests, run-unit-tests]
+    if: ${{ always() }}
     runs-on: ubuntu-latest
     steps:
     - name: Check test results
