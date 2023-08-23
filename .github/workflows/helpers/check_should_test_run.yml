@@ -1,0 +1,56 @@
+# This is a helper workflow that determines whether the caller test workflow should run
+# The decision is in this workflow's should_test_run value
+
+name: Check if test should run
+
+on:
+  workflow_call:
+    inputs:
+      github_event_name:
+        required: true
+        type: string
+      github_event_review_state:
+        required: true
+        type: string
+    outputs:
+      should_test_run:
+        description: "Output from reusable workflow"
+        value: ${{ steps.decision.outputs.result }}
+
+permissions:
+  contents: read
+  
+jobs:
+  should-tests-run:
+    name: Determine whether tests should run
+    runs-on: ubuntu-latest
+    outputs:
+      decision: ${{ steps.decision.outputs.result }}
+    steps:
+      - name: Checkout repository
+        # should automatically check out the caller workflow's branch
+        uses: actions/checkout@v2
+
+      - name: Check if only markdown files have changed
+        id: filter
+        uses: dorny/paths-filter@v2
+        with:
+          filters: |
+            proceed:
+              - '**'
+              - '!*.md'
+
+      - name: Decide whether to run tests
+        id: decision
+        run: |
+          if   [[ "${{ inputs.github_event_name }}" == "push" && \
+                  "${{ steps.filter.outputs.proceed }}" == "true" ]] \
+            || [[ "${{ inputs.github_event_name }}" == "pull_request_review" && \
+                 "${{ inputs.github_event_review_state }}" == "approved" && \
+                 "${{ steps.filter.outputs.proceed }}" == "true" ]] \
+            || [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+              echo "::set-output name=result::true"
+          else
+              echo "::set-output name=result::false"
+
+          fi
