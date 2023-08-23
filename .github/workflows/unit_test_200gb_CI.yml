@@ -21,6 +21,9 @@ permissions:
 jobs:
   Should-Test-Proceed:
     uses: ./.github/workflows/helpers/check_should_test_run.yml
+    with:
+      github_event_name: "${{ github.event_name }}"
+      github_event_review_state: "${{ github.event.review.state }}"
     secrets: inherit
   
   Start-Runner:
