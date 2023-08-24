@@ -134,4 +134,4 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Check job conditions
-        run: ./.github/workflows/scripts/check_test_result.sh ${{ needs.Should-Test-Proceed.outputs.decision }} ${{ needs.Start-Runner.result }} ${{ needs.Test-Marqo.result }} ${{ needs.Stop-Runner.result }}
+        run: bash ./.github/workflows/scripts/check_test_result.sh ${{ needs.Should-Test-Proceed.outputs.decision }} ${{ needs.Start-Runner.result }} ${{ needs.Test-Marqo.result }} ${{ needs.Stop-Runner.result }}
