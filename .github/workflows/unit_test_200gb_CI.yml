@@ -14,6 +14,10 @@ on:
       - mainline
     paths-ignore:
       - '**.md'
+  pull_request_review:
+    types: [submitted]
+    branches:
+      - mainline
 
 permissions:
   contents: read
