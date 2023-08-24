@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-<b><a href="https://marqo.ai">Website</a> | <a href="https://docs.marqo.ai">Documentation</a> | <a href="https://demo.marqo.ai">Demos</a> | <a href="https://community.marqo.ai">Discourse</a>  | <a href="https://join.slack.com/t/marqo-community/shared_invite/zt-1d737l76e-u~b3Rvey2IN2nGM4wyr44w">Slack Community</a> | <a href="https://www.marqo.ai/cloud">Marqo Cloud</a>
+<b><a href="https://www.marqo.ai">Website</a> | <a href="https://docs.marqo.ai">Documentation</a> | <a href="https://demo.marqo.ai">Demos</a> | <a href="https://community.marqo.ai">Discourse</a>  | <a href="https://join.slack.com/t/marqo-community/shared_invite/zt-1d737l76e-u~b3Rvey2IN2nGM4wyr44w">Slack Community</a> | <a href="https://www.marqo.ai/cloud">Marqo Cloud</a>
 </b>
 </p>
 
@@ -36,7 +36,7 @@ Marqo is more than a vector database, it's an end-to-end vector search engine. V
 - Async and non-blocking data upload and search.
 
 **🌌 Documents-in-documents-out**
-- Vector generation, storage, and retieval are provided out of the box.
+- Vector generation, storage, and retrieval are provided out of the box.
 - Build search, entity resolution, and data exploration application with using your text and images.
 - Build complex semantic queries by combining weighted search terms.
 - Filter search results using Marqo’s query DSL.
