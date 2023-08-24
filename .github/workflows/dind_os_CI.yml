@@ -13,15 +13,28 @@ on:
           Otherwise, the specified docker image is tested. For example "marqoai/marqo:test"
   push:
     branches:
-      mainline
+      - mainline
     paths-ignore:
       - '**.md'
+  pull_request_review:
+    types: [submitted]
+    branches:
+      - mainline
 
 permissions:
   contents: read
 
 jobs:
+  Should-Test-Proceed:
+    uses: ./.github/workflows/check_should_test_run.yml
+    with:
+      github_event_name: "${{ github.event_name }}"
+      github_event_review_state: "${{ github.event.review.state }}"
+    secrets: inherit
+
   Start-Runner:
+    needs: Should-Test-Proceed
+    if: needs.Should-Test-Proceed.outputs.decision == 'true'
     name: Start self-hosted EC2 runner
     runs-on: ubuntu-latest
     outputs:
@@ -114,3 +127,15 @@ jobs:
           github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
           label: ${{ needs.start-runner.outputs.label }}
           ec2-instance-id: ${{ needs.start-runner.outputs.ec2-instance-id }}
+
+  Summary:
+    name: Docker-in-Docker API Tests Result
+    runs-on: ubuntu-latest
+    needs: [ Should-Test-Proceed, Start-Runner, Test-Marqo, Stop-Runner ]
+    if: always()
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Check job conditions
+        run: bash ./.github/workflows/scripts/check_test_result.sh ${{ needs.Should-Test-Proceed.outputs.decision }} ${{ needs.Start-Runner.result }} ${{ needs.Test-Marqo.result }} ${{ needs.Stop-Runner.result }}
