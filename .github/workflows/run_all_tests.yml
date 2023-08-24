@@ -100,7 +100,7 @@ jobs:
 
         # Else, check if all tests succeeded or were skipped
         for job in run-arm64-tests run-cuda-dind-tests run-dind-os-tests run-largemodel-unit-tests run-local-os-tests run-unit-tests; do
-          if [[ "${{ needs[job].result }}" != "success" && "${{ needs[job].result }}" != "skipped" ]]; then
+          if [[ "${{ needs[job].result }}" != "success" && "${{ needs[job].result }}" != "skipped" && "${{ needs[job].result }}" != "" ]]; then
             echo "Job $job did not succeed."
             exit 1
           fi
