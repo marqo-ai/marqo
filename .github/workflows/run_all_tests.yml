@@ -84,3 +84,51 @@ jobs:
     if: needs.should-tests-run.outputs.decision == 'true'
     uses: ./.github/workflows/unit_test_200gb_CI.yml
     secrets: inherit
+
+  summary:
+    if: ${{ always() }}
+    name: Test Summary
+    needs: [should-tests-run, run-arm64-tests, run-cuda-dind-tests, run-dind-os-tests, run-largemodel-unit-tests, run-local-os-tests, run-unit-tests]
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check test results
+      run: |
+        # If tests weren't intended to run, consider this a success
+        if [[ "${{ needs.should-tests-run.outputs.decision }}" != "true" ]]; then
+          echo "Tests were skipped. No further checks required."
+          exit 0
+        fi
+  
+        if [[ "${{ needs.run-arm64-tests.result }}" != "success" && "${{ needs.run-arm64-tests.result }}" != "skipped" ]]; then
+          echo "Job run-arm64-tests did not succeed."
+          exit 1
+        fi
+        
+        if [[ "${{ needs.run-cuda-dind-tests.result }}" != "success" && "${{ needs.run-cuda-dind-tests.result }}" != "skipped" ]]; then
+          echo "Job run-cuda-dind-tests did not succeed."
+          exit 1
+        fi
+  
+        if [[ "${{ needs.run-dind-os-tests.result }}" != "success" && "${{ needs.run-dind-os-tests.result }}" != "skipped" ]]; then
+          echo "Job run-dind-os-tests did not succeed."
+          exit 1
+        fi
+  
+        if [[ "${{ needs.run-largemodel-unit-tests.result }}" != "success" && "${{ needs.run-largemodel-unit-tests.result }}" != "skipped" ]]; then
+          echo "Job run-largemodel-unit-tests did not succeed."
+          exit 1
+        fi
+  
+        if [[ "${{ needs.run-local-os-tests.result }}" != "success" && "${{ needs.run-local-os-tests.result }}" != "skipped" ]]; then
+          echo "Job run-local-os-tests did not succeed."
+          exit 1
+        fi
+  
+        if [[ "${{ needs.run-unit-tests.result }}" != "success" && "${{ needs.run-unit-tests.result }}" != "skipped" ]]; then
+          echo "Job run-unit-tests did not succeed."
+          exit 1
+        fi
+  
+        echo "All tests either passed or were skipped."
+  
+          
