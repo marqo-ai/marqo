@@ -23,7 +23,7 @@ def on_start(marqo_os_url: str):
                         DownloadStartText(),
                         CUDAAvailable(), 
                         SetBestAvailableDevice(),
-                        ModelsForCacheing(), 
+                        ModelsForCacheing(),
                         InitializeRedis("localhost", 6379),    # TODO, have these variable
                         DownloadFinishText(),
                         MarqoWelcome(),
@@ -240,7 +240,7 @@ class DownloadFinishText:
         print('\n')
         print("###########################################################")
         print("###########################################################")
-        print("###### !!COMPLETED SUCCESFULLY!!!          ################")
+        print("###### !!COMPLETED SUCCESSFULLY!!!         ################")
         print("###########################################################")
         print("###########################################################")
         print('\n')
