@@ -2,6 +2,7 @@
 # If you are running this on your local machine you will need to install additional
 # requirements specified here: https://github.com/marqo-ai/marqo-base/blob/main/requirements.txt
 requests==2.28.1
+anyio==3.7.1
 fastapi==0.86.0
 uvicorn[standard]
 fastapi-utils==0.2.1
