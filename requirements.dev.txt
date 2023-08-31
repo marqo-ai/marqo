@@ -1,5 +1,6 @@
 # tensor search:
 requests==2.28.1
+anyio==3.7.1
 fastapi==0.86.0
 uvicorn[standard]
 fastapi-utils==0.2.1
