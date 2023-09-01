@@ -2,22 +2,23 @@
 
 ## New features
 
-- Dockerfile optimisation (https://github.com/marqo-ai/marqo/pull/569/files). A pre-built Marqo base image results in reduced image layers and increased build speed.
-- New E5 models added to model registry (https://github.com/marqo-ai/marqo/pull/568). E5 V2 and Multilingual E5 models are now available for use. See all available models [here] (https://marqo.pages.dev/1.2.0/Models-Reference/dense_retrieval/).
+- New E5 models added to model registry (https://github.com/marqo-ai/marqo/pull/568). E5 V2 and Multilingual E5 models are now available for use. The new E5 V2 models outperform their E5 counterparts in the BEIR benchmark, as seen [here](https://github.com/microsoft/unilm/tree/master/e5#english-pre-trained-models). See all available models [here](https://marqo.pages.dev/1.2.0/Models-Reference/dense_retrieval/).
+- Dockerfile optimisation (https://github.com/marqo-ai/marqo/pull/569). A pre-built Marqo base image results in reduced image layers and increased build speed, meaning faster docker pulls and an overall better development experience.
+
 
 ## Bug fixes and minor changes
 
-- Improved testing pipeline (https://github.com/marqo-ai/marqo/pull/582 & https://github.com/marqo-ai/marqo/pull/586). Tests now trigger on pull request updates. This results in safer and easier merges to mainline.
 - Major README overhaul (https://github.com/marqo-ai/marqo/pull/573). The README has been revamped with up-to-date examples and easier to follow instructions.
 - New security policy (https://github.com/marqo-ai/marqo/pull/574).
-- Updated requirements file. Now the `requirements.dev.txt` should be used to install requirements for development environments (https://github.com/marqo-ai/marqo/pull/569). Pins for `protobuf` & `onnx` have been removed while a pin for `anyio` has been added (https://github.com/marqo-ai/marqo/pull/581, & https://github.com/marqo-ai/marqo/pull/589).
-- General grammar and spelling fixes (https://github.com/marqo-ai/marqo/pull/577, https://github.com/marqo-ai/marqo/pull/578, https://github.com/marqo-ai/marqo/pull/587/files, & https://github.com/marqo-ai/marqo/pull/580)
+- Improved testing pipeline (https://github.com/marqo-ai/marqo/pull/582 & https://github.com/marqo-ai/marqo/pull/586). Tests now trigger on pull request updates. This results in safer and easier merges to mainline.
+- Updated requirements files. Now the `requirements.dev.txt` should be used to install requirements for development environments (https://github.com/marqo-ai/marqo/pull/569). Version pins for `protobuf` & `onnx` have been removed while a version pin for `anyio` has been added (https://github.com/marqo-ai/marqo/pull/581, & https://github.com/marqo-ai/marqo/pull/589).
+- General grammar and spelling fixes (https://github.com/marqo-ai/marqo/pull/577, https://github.com/marqo-ai/marqo/pull/578, https://github.com/marqo-ai/marqo/pull/587, & https://github.com/marqo-ai/marqo/pull/580)
 
 ## Contributor shout-outs
 
 - A huge thank you to all our 3.5k stargazers!
 - Shoutout to @vladdoster for all the useful spelling and grammar edits!
-- Thanks everyone for keeping our [forum](https://community.marqo.ai/) alive and bustling. Don't hesitate to keep posting your insights, questions, and feedback!
+- Thanks everyone for keeping our [forum](https://community.marqo.ai/) bustling. Don't hesitate to keep posting your insights, questions, and feedback!
 
 
 # Release 1.2.0
