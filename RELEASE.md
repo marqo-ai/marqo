@@ -12,7 +12,7 @@
 - New security policy (https://github.com/marqo-ai/marqo/pull/574).
 - Improved testing pipeline (https://github.com/marqo-ai/marqo/pull/582 & https://github.com/marqo-ai/marqo/pull/586). Tests now trigger on pull request updates. This results in safer and easier merges to mainline.
 - Updated requirements files. Now the `requirements.dev.txt` should be used to install requirements for development environments (https://github.com/marqo-ai/marqo/pull/569). Version pins for `protobuf` & `onnx` have been removed while a version pin for `anyio` has been added (https://github.com/marqo-ai/marqo/pull/581, & https://github.com/marqo-ai/marqo/pull/589).
-- General grammar and spelling fixes (https://github.com/marqo-ai/marqo/pull/577, https://github.com/marqo-ai/marqo/pull/578, https://github.com/marqo-ai/marqo/pull/587, & https://github.com/marqo-ai/marqo/pull/580)
+- General readability improvements (https://github.com/marqo-ai/marqo/pull/577, https://github.com/marqo-ai/marqo/pull/578, https://github.com/marqo-ai/marqo/pull/587, & https://github.com/marqo-ai/marqo/pull/580)
 
 ## Contributor shout-outs
 
