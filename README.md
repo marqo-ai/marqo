@@ -11,7 +11,7 @@
 <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg"></a>
 <a href="https://pypi.org/project/marqo/"><img src="https://img.shields.io/pypi/v/marqo?label=PyPI"></a>
 <a href="https://github.com/marqo-ai/marqo/actions/workflows/unit_test_CI.yml"><img src="https://img.shields.io/github/actions/workflow/status/marqo-ai/marqo/unit_test_CI.yml?branch=mainline"></a>
-<a align="center" href="https://join.slack.com/t/marqo-community/shared_invite/zt-1d737l76e-u~b3Rvey2IN2nGM4wyr44w"><img src="https://img.shields.io/badge/Slack-blueviolet?logo=slack&amp;logoColor=white"></a>
+<a align="center" href="https://join.slack.com/t/marqo-community/shared_invite/zt-22hhps0bo-cB9mZKQIw2x3KCkYpAu9AA"><img src="https://img.shields.io/badge/Slack-blueviolet?logo=slack&amp;logoColor=white"></a>
 
 <p align="center">
 Marqo is more than a vector database, it's an end-to-end vector search engine. Vector generation, storage and retrieval are handled out of the box through a single API. No need to bring your own embeddings.
