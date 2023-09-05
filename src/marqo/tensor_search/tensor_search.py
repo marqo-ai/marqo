@@ -360,8 +360,14 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
     except errors.IndexNotFoundError:
         raise errors.IndexNotFoundError(f"Cannot add documents to non-existent index {add_docs_params.index_name}")
 
-    if len(add_docs_params.docs) == 0:
+    doc_count = len(add_docs_params.docs)
+
+    if doc_count == 0:
         raise errors.BadRequestError(message="Received empty add documents request")
+    elif doc_count > utils.read_env_vars_and_defaults(EnvVars.MARQO_MAX_ADD_DOCS_COUNT):
+        raise errors.BadRequestError(message=f"Number of docs in add documents request ({doc_count}) exceeds limit of {utils.read_env_vars_and_defaults(EnvVars.MARQO_MAX_ADD_DOCS_COUNT)}. "
+                                     f"This limit can be increased by setting the environment variable `{EnvVars.MARQO_MAX_ADD_DOCS_COUNT}`."
+                                     f"If using the Python client, use `client_batch_size`. See https://marqo.pages.dev/1.3.0/API-Reference/documents/#body for more details.")
 
     if add_docs_params.mappings is not None:
         validate_mappings = validation.validate_mappings(add_docs_params.mappings)
@@ -377,7 +383,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
 
     unsuccessful_docs = []
     total_vectorise_time = 0
-    batch_size = len(add_docs_params.docs)
+    
     image_repo = {}
 
     with ExitStack() as exit_stack:
@@ -386,7 +392,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                 "image_download.full_time",
                 lambda t: logger.debug(
                     f"add_documents image download: took {t:.3f}ms to concurrently download "
-                    f"images for {batch_size} docs using {add_docs_params.image_download_thread_count} threads"
+                    f"images for {doc_count} docs using {add_docs_params.image_download_thread_count} threads"
                 )
             ):
                 if add_docs_params.tensor_fields and '_id' in add_docs_params.tensor_fields:
@@ -405,7 +411,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
             doc_ids = []
 
             # Iterate through the list in reverse, only latest doc with dupe id gets added.
-            for i in range(len(add_docs_params.docs)-1, -1, -1):
+            for i in range(doc_count-1, -1, -1):
                 if ("_id" in add_docs_params.docs[i]) and (add_docs_params.docs[i]["_id"] not in doc_ids):
                     doc_ids.append(add_docs_params.docs[i]["_id"])
             existing_docs = _get_documents_for_upsert(
@@ -639,11 +645,11 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                 bulk_parent_dicts.append(copied)
 
         total_preproc_time = 0.001 * RequestMetricsStore.for_request().stop("add_documents.processing_before_opensearch")
-        logger.debug(f"      add_documents pre-processing: took {(total_preproc_time):.3f}s total for {batch_size} docs, "
-                    f"for an average of {(total_preproc_time / batch_size):.3f}s per doc.")
+        logger.debug(f"      add_documents pre-processing: took {(total_preproc_time):.3f}s total for {doc_count} docs, "
+                    f"for an average of {(total_preproc_time / doc_count):.3f}s per doc.")
 
-        logger.debug(f"          add_documents vectorise: took {(total_vectorise_time):.3f}s for {batch_size} docs, "
-                    f"for an average of {(total_vectorise_time / batch_size):.3f}s per doc.")
+        logger.debug(f"          add_documents vectorise: took {(total_vectorise_time):.3f}s for {doc_count} docs, "
+                    f"for an average of {(total_vectorise_time / doc_count):.3f}s per doc.")
 
         if bulk_parent_dicts:
             # the HttpRequest wrapper handles error logic
@@ -663,12 +669,12 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
             total_http_time = end_time_5 - start_time_5
             total_index_time = index_parent_response["took"] * 0.001
             logger.debug(
-                f"      add_documents roundtrip: took {(total_http_time):.3f}s to send {batch_size} docs (roundtrip) to Marqo-os, "
-                f"for an average of {(total_http_time / batch_size):.3f}s per doc.")
+                f"      add_documents roundtrip: took {(total_http_time):.3f}s to send {doc_count} docs (roundtrip) to Marqo-os, "
+                f"for an average of {(total_http_time / doc_count):.3f}s per doc.")
 
             logger.debug(
-                f"          add_documents Marqo-os index: took {(total_index_time):.3f}s for Marqo-os to index {batch_size} docs, "
-                f"for an average of {(total_index_time / batch_size):.3f}s per doc.")
+                f"          add_documents Marqo-os index: took {(total_index_time):.3f}s for Marqo-os to index {doc_count} docs, "
+                f"for an average of {(total_index_time / doc_count):.3f}s per doc.")
         else:
             index_parent_response = None
 
