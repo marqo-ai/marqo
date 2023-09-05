@@ -1058,7 +1058,7 @@ class TestBulkSearch(MarqoTestCase):
         self._delete_test_indices()
         settings = {"index_defaults": {"treat_urls_and_pointers_as_images": True, "model": "ViT-B/32"}}
         tensor_search.create_vector_index(index_name=self.index_name_1, index_settings=settings, config=self.config)
-        hippo_img = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
+        hippo_img = 'https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png'
         add_docs_caller(
             config=self.config, index_name=self.index_name_1, docs=[
                 {"img": hippo_img, "abc": "some text", "other field": "baaadd", "_id": "5678", "my_string": "b"},
@@ -1707,8 +1707,8 @@ class TestBulkSearch(MarqoTestCase):
         tensor_search.create_vector_index(
             index_name=self.index_name_1, index_settings=settings, config=self.config
         )
-        url_1 = "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png"
-        url_2 = "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png"
+        url_1 = "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png"
+        url_2 = "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_statue.png"
         docs = [
             {"_id": "123",
              "image_field": url_1,
@@ -1771,9 +1771,9 @@ class TestBulkSearch(MarqoTestCase):
 
     def test_multi_search_images(self):
         docs = [
-            {"loc a": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+            {"loc a": "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png",
              "_id": 'realistic_hippo'},
-            {"loc b": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png",
+            {"loc b": "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_statue.png",
              "_id": 'artefact_hippo'}
         ]
         image_index_config = {
@@ -1793,13 +1793,13 @@ class TestBulkSearch(MarqoTestCase):
             ({"Nature photography": 2.0, "Artefact": -2}, ['realistic_hippo', 'artefact_hippo']),
             ({"Nature photography": -1.0, "Artefact": 1.0}, ['artefact_hippo', 'realistic_hippo']),
             ({"Nature photography": -1.5, "Artefact": 1.0, "hippo": 1.0}, ['artefact_hippo', 'realistic_hippo']),
-            ({"https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png": -1.0,
+            ({"https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_statue.png": -1.0,
               "blah": 1.0}, ['realistic_hippo', 'artefact_hippo']),
-            ({"https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png": 2.0,
-              "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png": -1.0},
+            ({"https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_statue.png": 2.0,
+              "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png": -1.0},
              ['artefact_hippo', 'realistic_hippo']),
-            ({"https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png": 2.0,
-              "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png": -1.0,
+            ({"https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_statue.png": 2.0,
+              "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png": -1.0,
               "artefact": 1.0, "photo realistic": -1,
               },
              ['artefact_hippo', 'realistic_hippo']),
@@ -1821,7 +1821,7 @@ class TestBulkSearch(MarqoTestCase):
 
     def test_multi_search_images_edge_cases(self):
         docs = [
-            {"loc": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+            {"loc": "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png",
              "_id": 'realistic_hippo'},
             {"field_a": "Some text about a weird forest",
              "_id": 'artefact_hippo'}
@@ -1857,7 +1857,7 @@ class TestBulkSearch(MarqoTestCase):
 
     def test_multi_search_images_ok_edge_cases(self):
         docs = [
-            {"loc": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+            {"loc": "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png",
              "_id": 'realistic_hippo'},
             {"field_a": "Some text about a weird forest",
              "_id": 'artefact_hippo'}
@@ -1892,7 +1892,7 @@ class TestBulkSearch(MarqoTestCase):
         The code paths for image and search have diverged quite a bit
         """
         hippo_image = (
-            'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
+            'https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png'
         )
         doc_dict = {
             'realistic_hippo': {"loc": hippo_image,
@@ -1976,9 +1976,9 @@ class TestBulkSearch(MarqoTestCase):
         """
         docs = [
             {
-                "loc a": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+                "loc a": "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png",
                 "_id": 'realistic_hippo'},
-            {"loc a": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png",
+            {"loc a": "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_statue.png",
              "_id": 'artefact_hippo'}
         ]
         image_index_config = {
@@ -1996,19 +1996,19 @@ class TestBulkSearch(MarqoTestCase):
         )
         multi_queries = [
             {
-                "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png": 2.0,
-                "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png": -1.0,
+                "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_statue.png": 2.0,
+                "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png": -1.0,
                 "artefact": 5.0, "photo realistic": -1,
             },
             {
                 "artefact": 5.0,
-                "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png": 2.0,
+                "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_statue.png": 2.0,
                 "photo realistic": -1,
-                "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png": -1.0
+                "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png": -1.0
             },
             {
-                "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png": 3,
-                "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png": -1.0,
+                "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_statue.png": 3,
+                "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png": -1.0,
             },
             {
                 "hello": 3, "some thing": -1.0,
@@ -2064,9 +2064,9 @@ class TestBulkSearch(MarqoTestCase):
         """
         docs = [
             {
-                "loc a": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+                "loc a": "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png",
                 "_id": 'realistic_hippo'},
-            {"loc a": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png",
+            {"loc a": "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_statue.png",
              "_id": 'artefact_hippo'}
         ]
         image_index_config = {
@@ -2084,19 +2084,19 @@ class TestBulkSearch(MarqoTestCase):
         )
         multi_queries = [
             {
-                "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png": 2.0,
-                "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png": -1.0,
+                "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_statue.png": 2.0,
+                "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png": -1.0,
                 "artefact": 5.0, "photo realistic": -1,
             },
             {
                 "artefact": 5.0,
-                "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png": 2.0,
+                "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_statue.png": 2.0,
                 "photo realistic": -1,
-                "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png": -1.0
+                "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png": -1.0
             },
             {
-                "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png": 3,
-                "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png": -1.0,
+                "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_statue.png": 3,
+                "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png": -1.0,
             },
             {
                 "hello": 3, "some thing": -1.0,
@@ -2155,10 +2155,10 @@ class TestBulkSearch(MarqoTestCase):
         """ Ensure multimodal vectors generated by bulk search are correct (only 1 query in bulk search)
         """
         docs = [
-            {"loc a": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+            {"loc a": "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png",
              "_id": 'realistic_hippo'},
 
-            {"loc a": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png",
+            {"loc a": "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_statue.png",
              "_id": 'artefact_hippo'}
         ]
         image_index_config = {
@@ -2183,7 +2183,7 @@ class TestBulkSearch(MarqoTestCase):
                 "photo realistic": -1,
             },
             {
-                "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png": 0.0,
+                "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_statue.png": 0.0,
                 "photo realistic": 0.0,
             },
             {

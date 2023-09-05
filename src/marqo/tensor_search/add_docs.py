@@ -39,7 +39,7 @@ def threaded_download_images(allocated_docs: List[dict], image_repo: dict, tenso
         For example:
         {
             'https://google.com/my_dog.png': UnidentifiedImageError, # error because such an image doesn't exist
-            'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png': <PIL image>
+            'https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png': <PIL image>
         }
     Returns:
         None

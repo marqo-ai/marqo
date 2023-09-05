@@ -23,7 +23,7 @@ class TestImageDownloadHeaders(MarqoTestCase):
         super(TestImageDownloadHeaders, cls).setUpClass()
         cls.generic_header = {"Content-type": "application/json"}
         cls.index_name_1 = "my-test-index-1"
-        cls.real_img_url = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
+        cls.real_img_url = 'https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png'
 
     def setUp(self) -> None:
         self.endpoint = self.authorized_url

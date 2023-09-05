@@ -157,7 +157,7 @@ class TestRerankingWithModels(unittest.TestCase):
         # not all results have the searchable filed to rerank over
         results_lexical = {'hits': 
                     [{'attributes': 'yello head. pruple shirt. black sweater.',
-                        'location': 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png',
+                        'location': 'https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_statue.png',
                         'other': 'some other text',
                         # this one has no id
                         '_score': 1.4017934,
@@ -172,7 +172,7 @@ class TestRerankingWithModels(unittest.TestCase):
                         },
                         # this one has less fields
                         {'attributes': 'face is bowlcut. body is blue . background is grey. head is tan',
-                        'location': 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png',
+                        'location': 'https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png',
                         '_id': 'QmTVYuULK1Qbzh21Y3hzeTFny5AGUSUGAXoGjLqNB2b1at',
                         '_score': 0.2876821,
                         '_highlights': [],
@@ -213,7 +213,7 @@ class TestRerankingWithModels(unittest.TestCase):
         # not all results have the searchable filed to rerank over
         results_lexical = {'hits': 
                     [{'attributes': 'yello head. pruple shirt. black sweater.',
-                        'location': 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png',
+                        'location': 'https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_statue.png',
                         'other': 'some other text',
                         # this one has no id
                         '_score': 1.4017934,
@@ -228,7 +228,7 @@ class TestRerankingWithModels(unittest.TestCase):
                         },
                         # this one has less fields
                         {'attributes': 'face is bowlcut. body is blue . background is grey. head is tan',
-                        'location': 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png',
+                        'location': 'https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png',
                         '_id': 'QmTVYuULK1Qbzh21Y3hzeTFny5AGUSUGAXoGjLqNB2b1at',
                         '_score': 0.2876821,
                         '_highlights': [],
@@ -251,7 +251,7 @@ class TestRerankingWithModels(unittest.TestCase):
         # not all results have the searchable filed to rerank over
         results_lexical = {'hits': 
                     [{'attributes': 'yello head. pruple shirt. black sweater.',
-                        'location': 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png',
+                        'location': 'https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_statue.png',
                         'other': 'some other text',
                         # this one has no id
                         '_score': 1.4017934,
@@ -266,7 +266,7 @@ class TestRerankingWithModels(unittest.TestCase):
                         },
                         # this one has less fields
                         {'attributes': 'face is bowlcut. body is blue . background is grey. head is tan',
-                        'location': 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png',
+                        'location': 'https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png',
                         '_id': 'QmTVYuULK1Qbzh21Y3hzeTFny5AGUSUGAXoGjLqNB2b1at',
                         '_score': 0.2876821,
                         '_highlights': {"location":[0,0,20,30]},
@@ -308,7 +308,7 @@ class TestRerankingWithModels(unittest.TestCase):
         # all results have the searchable field to rerank over
         results_lexical = {'hits': 
                     [{'attributes': 'yello head. pruple shirt. black sweater.',
-                        'location': 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png',
+                        'location': 'https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_statue.png',
                         'other': 'some other text',
                         # this one has no id
                         '_score': 1.4017934,
@@ -317,14 +317,14 @@ class TestRerankingWithModels(unittest.TestCase):
                         {'attributes': 'face is viking. body is white turtleneck. background is pearl',
                         # missing locations
                         'other': 'some more text',
-                        'location': 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png',
+                        'location': 'https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_statue.png',
                         '_id': 'QmRR6PBkgCdhiSYBM3AY3EWhn4ZbeR2X8Ygpy2veLkcPC5',
                         '_score': 0.2876821,
                         '_highlights': [],
                         },
                         # this one has less fields
                         {'attributes': 'face is bowlcut. body is blue . background is grey. head is tan',
-                        'location': 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png',
+                        'location': 'https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png',
                         '_id': 'QmTVYuULK1Qbzh21Y3hzeTFny5AGUSUGAXoGjLqNB2b1at',
                         '_score': 0.2876821,
                         '_highlights': [],
@@ -365,7 +365,7 @@ class TestRerankingWithModels(unittest.TestCase):
 
         results_lexical = {'hits': 
                     [{'attributes': 'yello head. pruple shirt. black sweater.',
-                        'location': 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png',
+                        'location': 'https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_statue.png',
                         'other': 'some other text',
                         # this one has no id
                         '_score': 1.4017934,
@@ -374,14 +374,14 @@ class TestRerankingWithModels(unittest.TestCase):
                         {'attributes': 'face is viking. body is white turtleneck. background is pearl',
                         # missing locations
                         'other': 'some more text',
-                        'location': 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png',
+                        'location': 'https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_statue.png',
                         '_id': 'QmRR6PBkgCdhiSYBM3AY3EWhn4ZbeR2X8Ygpy2veLkcPC5',
                         '_score': 0.2876821,
                         '_highlights': [],
                         },
                         # this one has less fields
                         {'attributes': 'face is bowlcut. body is blue . background is grey. head is tan',
-                        'location': 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png',
+                        'location': 'https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png',
                         '_id': 'QmTVYuULK1Qbzh21Y3hzeTFny5AGUSUGAXoGjLqNB2b1at',
                         '_score': 0.2876821,
                         '_highlights': [],
