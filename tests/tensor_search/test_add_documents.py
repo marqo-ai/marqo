@@ -489,6 +489,45 @@ class TestAddDocuments(MarqoTestCase):
         except BadRequestError:
             pass
 
+    def test_add_documents_below_max_doc_count(self):
+        max_doc_count = 64
+        mock_environ = {enums.EnvVars.MARQO_MAX_ADD_DOCS_COUNT: str(max_doc_count)}
+
+        @mock.patch.dict(os.environ, {**os.environ, **mock_environ})
+        def run():
+            # No error when below or equal to limit
+            for actual_doc_count in (63, 64):
+                tensor_search.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=self.index_name_1, 
+                        docs=[{"some": "doc"} for _ in range(actual_doc_count)],
+                    auto_refresh=True, device="cpu")
+                )
+            return True
+        
+        assert run()
+
+    def test_add_documents_exceeded_max_doc_count(self):
+        max_doc_count = 64
+        mock_environ = {enums.EnvVars.MARQO_MAX_ADD_DOCS_COUNT: str(max_doc_count)}
+
+        @mock.patch.dict(os.environ, {**os.environ, **mock_environ})
+        def run():
+            try:
+                actual_doc_count = 65
+                tensor_search.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=self.index_name_1, 
+                        docs=[{"some": "doc"} for _ in range(actual_doc_count)],
+                    auto_refresh=True, device="cpu")
+                )
+                raise AssertionError
+            except BadRequestError as e:
+                assert f"exceeds limit of {max_doc_count}" in e.message
+                return True
+        
+        assert run()
+
     def test_resilient_add_images(self):
         image_index_configs = [
             # NO CHUNKING

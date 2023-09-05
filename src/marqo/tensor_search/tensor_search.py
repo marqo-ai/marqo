@@ -364,7 +364,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
 
     if doc_count == 0:
         raise errors.BadRequestError(message="Received empty add documents request")
-    elif doc_count > utils.read_env_vars_and_defaults(EnvVars.MARQO_MAX_ADD_DOCS_COUNT):
+    elif doc_count > utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_ADD_DOCS_COUNT):
         raise errors.BadRequestError(message=f"Number of docs in add documents request ({doc_count}) exceeds limit of {utils.read_env_vars_and_defaults(EnvVars.MARQO_MAX_ADD_DOCS_COUNT)}. "
                                      f"This limit can be increased by setting the environment variable `{EnvVars.MARQO_MAX_ADD_DOCS_COUNT}`."
                                      f"If using the Python client, use `client_batch_size`. See https://marqo.pages.dev/1.3.0/API-Reference/documents/#body for more details.")
