@@ -466,11 +466,11 @@ class TestBulkSearch(MarqoTestCase):
     def test_multimodal_tensor_combination_zero_weight(self):
         documents = [{
                 "text_field": "A rider is riding a horse jumping over the barrier.",
-                # "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+                # "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
             },{
                 "combo_text_image": {
                     "text_field" : "A rider is riding a horse jumping over the barrier.",
-                    "image_field" : "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+                    "image_field" : "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
                 },
         }]
         try:
