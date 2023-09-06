@@ -18,6 +18,7 @@ from marqo.tensor_search.models.search import SearchContext
 from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest
 from marqo.tensor_search.models.settings_object import settings_schema
 from marqo.tensor_search.models.mappings_object import mappings_schema, multimodal_combination_schema
+import numpy as np
 
 
 def validate_query(q: Union[dict, str], search_method: Union[str, SearchMethod]):

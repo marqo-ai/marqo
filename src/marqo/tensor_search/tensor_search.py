@@ -360,15 +360,6 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
     except errors.IndexNotFoundError:
         raise errors.IndexNotFoundError(f"Cannot add documents to non-existent index {add_docs_params.index_name}")
 
-    doc_count = len(add_docs_params.docs)
-
-    if doc_count == 0:
-        raise errors.BadRequestError(message="Received empty add documents request")
-    elif doc_count > utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_ADD_DOCS_COUNT):
-        raise errors.BadRequestError(message=f"Number of docs in add documents request ({doc_count}) exceeds limit of {utils.read_env_vars_and_defaults(EnvVars.MARQO_MAX_ADD_DOCS_COUNT)}. "
-                                     f"This limit can be increased by setting the environment variable `{EnvVars.MARQO_MAX_ADD_DOCS_COUNT}`."
-                                     f"If using the Python client, use `client_batch_size`. See https://marqo.pages.dev/1.3.0/API-Reference/documents/#body for more details.")
-
     if add_docs_params.mappings is not None:
         validate_mappings = validation.validate_mappings(add_docs_params.mappings)
 
@@ -385,7 +376,8 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
     total_vectorise_time = 0
     
     image_repo = {}
-
+    doc_count = len(add_docs_params.docs)
+    
     with ExitStack() as exit_stack:
         if index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]:
             with RequestMetricsStore.for_request().time(

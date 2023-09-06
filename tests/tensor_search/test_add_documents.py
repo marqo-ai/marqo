@@ -490,41 +490,74 @@ class TestAddDocuments(MarqoTestCase):
             pass
 
     def test_add_documents_below_max_doc_count(self):
-        max_doc_count = 64
-        mock_environ = {enums.EnvVars.MARQO_MAX_ADD_DOCS_COUNT: str(max_doc_count)}
+        """
+        Ensures that there is no error when adding documents equal to or less than
+        the max doc count limit
+        """
+        test_cases = [
+            # (max_doc_count, actual_doc_count)
+            # default max (= 64)
+            (64, 64),
+            (64, 63),
+            (64, 1),
 
-        @mock.patch.dict(os.environ, {**os.environ, **mock_environ})
-        def run():
-            # No error when below or equal to limit
-            for actual_doc_count in (63, 64):
+            # non-default max (!= 64)
+            (200, 200),
+            (200, 199),
+            (200, 1)
+        ]
+
+        for case in test_cases:
+            max_doc_count = case[0]
+            mock_environ = {enums.EnvVars.MARQO_MAX_ADD_DOCS_COUNT: str(max_doc_count)}
+
+            @mock.patch.dict(os.environ, {**os.environ, **mock_environ})
+            def run():
                 tensor_search.add_documents(
                     config=self.config, add_docs_params=AddDocsParams(
                         index_name=self.index_name_1, 
-                        docs=[{"some": "doc"} for _ in range(actual_doc_count)],
+                        # actual doc count is case[1]
+                        docs=[{"some": "doc"} for _ in range(case[1])],
                     auto_refresh=True, device="cpu")
                 )
-            return True
-        
-        assert run()
+                return True
+            
+            assert run()
 
     def test_add_documents_exceeded_max_doc_count(self):
-        max_doc_count = 64
-        mock_environ = {enums.EnvVars.MARQO_MAX_ADD_DOCS_COUNT: str(max_doc_count)}
+        """
+        Ensures that there is a bad request error when adding documents greater than
+        the max doc count limit
+        """
+        test_cases = [
+            # (max_doc_count, actual_doc_count)
+            # default max (= 64)
+            (64, 65),
+            (64, 200),
 
-        @mock.patch.dict(os.environ, {**os.environ, **mock_environ})
-        def run():
-            try:
-                actual_doc_count = 65
-                tensor_search.add_documents(
-                    config=self.config, add_docs_params=AddDocsParams(
-                        index_name=self.index_name_1, 
-                        docs=[{"some": "doc"} for _ in range(actual_doc_count)],
-                    auto_refresh=True, device="cpu")
-                )
-                raise AssertionError
-            except BadRequestError as e:
-                assert f"exceeds limit of {max_doc_count}" in e.message
-                return True
+            # non-default max (!= 64)
+            (200, 201),
+            (200, 300)
+        ]
+
+        for case in test_cases:
+            max_doc_count = case[0]
+            mock_environ = {enums.EnvVars.MARQO_MAX_ADD_DOCS_COUNT: str(max_doc_count)}
+
+            @mock.patch.dict(os.environ, {**os.environ, **mock_environ})
+            def run():
+                try:
+                    tensor_search.add_documents(
+                        config=self.config, add_docs_params=AddDocsParams(
+                            index_name=self.index_name_1, 
+                            # actual doc count is case[1]
+                            docs=[{"some": "doc"} for _ in range(case[1])],
+                        auto_refresh=True, device="cpu")
+                    )
+                    raise AssertionError
+                except BadRequestError as e:
+                    assert f"exceeds limit of {max_doc_count}" in e.message
+                    return True
         
         assert run()
 
