@@ -1373,9 +1373,9 @@ class TestScoreModifierSearchScore(MarqoTestCase):
                 multiply_indices = np.random.choice(50, number_of_fields, replace=False)
                 add_indices = np.random.choice(50, number_of_fields, replace=False)
 
-                for i, j in zip(add_indices, multiply_indices):
+                for i, j in zip(multiply_indices, add_indices):
                     score_modifiers["multiply_score_by"].append({"field_name": f"multiply_{i}", "weight": np.random.rand()})
-                    score_modifiers["add_to_score"].append({"field_name": f"add_{i}", "weight": np.random.rand()})
+                    score_modifiers["add_to_score"].append({"field_name": f"add_{j}", "weight": np.random.rand()})
 
                 res = tensor_search.search(config=self.config, index_name=self.index_name, text=self.query,
                                            score_modifiers=ScoreModifier(**score_modifiers))["hits"]
