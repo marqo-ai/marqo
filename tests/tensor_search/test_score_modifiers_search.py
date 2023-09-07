@@ -1314,7 +1314,7 @@ class TestScoreModifiersBulkSearch(MarqoTestCase):
 
 class TestScoreModifierSearchScore(MarqoTestCase):
     """This test ensures that scoreModifier modifies the score as expected.
-    As this test requires more complication setup, we put it in a separate class."""
+    As this test requires different setups, we put it in a separate class."""
 
     def setUp(self):
         self.index_name = "test_score_modifier_search_score"
@@ -1359,8 +1359,8 @@ class TestScoreModifierSearchScore(MarqoTestCase):
         self.device_patcher.stop()
 
     def test_score_modifiers_search_score(self):
-        """ We select  10, 15, 20, 25 random multiply fields and add fields to verify the score modifiers."""
-
+        """We select  10, 15, 20, 25 random multiply fields and add fields to verify the score modifiers.
+        Number of fields should change too much to avoid excessive compilation error in Opensearch."""
         for number_of_fields in [10, 15, 20, 25]:
             number_of_tests = 20
             for _ in range(number_of_tests):
