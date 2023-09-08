@@ -621,7 +621,7 @@ class TestModelAuthOpenCLIP(MarqoTestCase):
                     auto_refresh=True, device="cpu",
                     docs=[{
                         'my_combination_field': {
-                            'my_image': f"https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+                            'my_image': f"https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png",
                             'some_text': f"my text {i}"}} for i in range(20)],
                     mappings={
                         "my_combination_field": {
@@ -2201,7 +2201,7 @@ class TestS3ModelAuthlLoadForHFModelVariants(MarqoTestCase):
                     auto_refresh=True, device="cpu",
                     docs=[{
                         'my_combination_field': {
-                            'my_image': f"https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+                            'my_image': f"https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png",
                             'some_text': f"my text {i}"}} for i in range(20)],
                     mappings={
                         "my_combination_field": {
