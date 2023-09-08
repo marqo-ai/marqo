@@ -55,7 +55,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             "Title": "Horse rider",
             "combo_text_image": {
                 "text": "A rider is riding a horse jumping over the barrier.",
-                "image": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg"
+                "image": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg"
             },
             "_id": "0"
         })
@@ -66,7 +66,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                 {
                     "Title": "Horse rider",
                     "text_field": "A rider is riding a horse jumping over the barrier.",
-                    "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+                    "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
                     "_id": "1"
                 },
             ],
@@ -123,18 +123,18 @@ class TestMultimodalTensorCombination(MarqoTestCase):
 
         score_1 = get_score({
             "text_field": "A rider is riding a horse jumping over the barrier.",
-            # "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+            # "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
         })
 
         score_2 = get_score({
             # "text_field": "A rider is riding a horse jumping over the barrier.",
-            "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+            "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
         })
 
         score_3 = get_score({
             "combo_text_image": {
                 "text_field" : "A rider is riding a horse jumping over the barrier.",
-                "image_field" : "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+                "image_field" : "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
         },
         })
 
@@ -156,24 +156,24 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                 "combo_text_image": {
                     "text_field_1": "A rider is riding a horse jumping over the barrier.",
                     "text_field_2": "What is the best to wear on the moon?",
-                    "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
-                    "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+                    "image_field_1": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
+                    "image_field_2": "https://marqo-assets.s3.amazonaws.com/tests/images/image2.jpg",
                     },
                     "_id":"c1"
                 },
                 {
                 "combo_text_image": {
                     "text_field_1": "A rider is riding a horse jumping over the barrier.",
-                    "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+                    "image_field_1": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
                     "text_field_2": "What is the best to wear on the moon?",
-                    "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+                    "image_field_2": "https://marqo-assets.s3.amazonaws.com/tests/images/image2.jpg",
                     },
                     "_id": "c2"
                 },
                 {
                 "combo_text_image": {
-                    "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
-                    "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+                    "image_field_1": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
+                    "image_field_2": "https://marqo-assets.s3.amazonaws.com/tests/images/image2.jpg",
                     "text_field_1": "A rider is riding a horse jumping over the barrier.",
                     "text_field_2": "What is the best to wear on the moon?",
                     },
@@ -181,10 +181,10 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                 },
                 {
                 "combo_text_image": {
-                    "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+                    "image_field_1": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
                     "text_field_1": "A rider is riding a horse jumping over the barrier.",
                     "text_field_2": "What is the best to wear on the moon?",
-                    "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+                    "image_field_2": "https://marqo-assets.s3.amazonaws.com/tests/images/image2.jpg",
                     },
                     "_id": "c4"
                 },
@@ -197,11 +197,11 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                     "_id": "2"
                 },
                 {
-                    "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+                    "image_field_1": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
                     "_id": "3"
                 },
                 {
-                    "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+                    "image_field_2": "https://marqo-assets.s3.amazonaws.com/tests/images/image2.jpg",
                     "_id": "4"
                 }],
             auto_refresh=True, 
@@ -278,13 +278,13 @@ class TestMultimodalTensorCombination(MarqoTestCase):
 
         score_1 = get_score({
             "text_field": "A rider is riding a horse jumping over the barrier.",
-            # "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+            # "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
         })
 
         score_3 = get_score({
             "combo_text_image": {
             "text_field" : "A rider is riding a horse jumping over the barrier.",
-            "image_field" : "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+            "image_field" : "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
                 },
         })
 
@@ -318,19 +318,19 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                     {
                         "combo_text_image": {
                             "text_field": "A rider is riding a horse jumping over the barrier.",
-                            "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+                            "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
                         },
                         "_id": "123",
                     },
                     {
                         "combo_text_image": {
                             "text_field" : "test-text-two.",
-                            "image_field":"https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+                            "image_field":"https://marqo-assets.s3.amazonaws.com/tests/images/image2.jpg",
                         },
                         "_id": "234",
                     },
                     {  # a normal doc
-                        "combo_text_image_test": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+                        "combo_text_image_test": "https://marqo-assets.s3.amazonaws.com/tests/images/image2.jpg",
                         "_id": "534",
                     }],
                 mappings = {
@@ -346,7 +346,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             assert real_fied_0 == "combo_text_image"
             assert field_content_0 ==    {
                         "text_field": "A rider is riding a horse jumping over the barrier.",
-                        "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+                        "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
                     }
 
             # second multimodal=doc
@@ -355,7 +355,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             assert real_fied_1 == "combo_text_image"
             assert field_content_1 =={
                         "text_field" : "test-text-two.",
-                        "image_field":"https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+                        "image_field":"https://marqo-assets.s3.amazonaws.com/tests/images/image2.jpg",
                     }
             # ensure we only call multimodal-combination twice
             assert len(mock_multimodal_combination.call_args_list) == 2
@@ -405,7 +405,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                 {
                     "combo_text_image": {
                         "text_field": "A rider is riding a horse jumping over the barrier.",
-                        "image_field": {"image_url" : "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+                        "image_field": {"image_url" : "https://marqo-assets.s3.amazonaws.com/tests/images/image2.jpg",
                        },
                     },
                     "_id": "123",
@@ -425,7 +425,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             {
                 "combo_text_image": {
                     "text_field" : "A rider is riding a horse jumping over the barrier.",
-                    934343 : "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+                    934343 : "https://marqo-assets.s3.amazonaws.com/tests/images/image2.jpg",
 
                 },
                 "_id": "123",
@@ -554,11 +554,11 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                             "text_2":"A rider is riding a horse jumping over the barrier_2.",
                             "text_3":"A rider is riding a horse jumping over the barrier_3.",
                             "text_4":"A rider is riding a horse jumping over the barrier_4.",
-                            "image_0" :  "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image0.jpg",
-                            "image_1" : "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
-                            "image_2" : "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
-                            "image_3" : "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image3.jpg",
-                            "image_4" : "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg",
+                            "image_0" :  "https://marqo-assets.s3.amazonaws.com/tests/images/image0.jpg",
+                            "image_1" : "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
+                            "image_2" : "https://marqo-assets.s3.amazonaws.com/tests/images/image2.jpg",
+                            "image_3" : "https://marqo-assets.s3.amazonaws.com/tests/images/image3.jpg",
+                            "image_4" : "https://marqo-assets.s3.amazonaws.com/tests/images/image4.jpg",
                         },
                         "_id": "111",
                     }],
@@ -613,11 +613,11 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                             "text_2":"A rider is riding a horse jumping over the barrier_2.",
                             "text_3":"A rider is riding a horse jumping over the barrier_3.",
                             "text_4":"A rider is riding a horse jumping over the barrier_4.",
-                            "image_0" :  "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image0.jpg",
-                            "image_1" : "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
-                            "image_2" : "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
-                            "image_3" : "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image3.jpg",
-                            "image_4" : "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg",
+                            "image_0" :  "https://marqo-assets.s3.amazonaws.com/tests/images/image0.jpg",
+                            "image_1" : "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
+                            "image_2" : "https://marqo-assets.s3.amazonaws.com/tests/images/image2.jpg",
+                            "image_3" : "https://marqo-assets.s3.amazonaws.com/tests/images/image3.jpg",
+                            "image_4" : "https://marqo-assets.s3.amazonaws.com/tests/images/image4.jpg",
                         },
                         "_id": "111",
                     }],
@@ -634,7 +634,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             assert len(mock_vectorise.call_args_list) == 1
 
             text_content = [f"A rider is riding a horse jumping over the barrier_{i}." for i in range(5)]
-            text_content = text_content  + [f"https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image{i}.jpg" for i in range(5)]
+            text_content = text_content  + [f"https://marqo-assets.s3.amazonaws.com/tests/images/image{i}.jpg" for i in range(5)]
 
             real_text_content = [call_kwargs['content'] for call_args, call_kwargs
                                  in mock_vectorise.call_args_list][0]
@@ -673,11 +673,11 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                         "text_2": "A rider is riding a horse jumping over the barrier_2.",
                         "text_3": "A rider is riding a horse jumping over the barrier_3.",
                         "text_4": "A rider is riding a horse jumping over the barrier_4.",
-                        "image_0": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image0.jpg",
-                        "image_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
-                        "image_2": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
-                        "image_3": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image3.jpg",
-                        "image_4": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg",
+                        "image_0": "https://marqo-assets.s3.amazonaws.com/tests/images/image0.jpg",
+                        "image_1": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
+                        "image_2": "https://marqo-assets.s3.amazonaws.com/tests/images/image2.jpg",
+                        "image_3": "https://marqo-assets.s3.amazonaws.com/tests/images/image3.jpg",
+                        "image_4": "https://marqo-assets.s3.amazonaws.com/tests/images/image4.jpg",
                     },
                     "_id": "111",
                 }],
@@ -709,7 +709,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                  "_id": "article_591",
                  "Genre": "Science",
                  "my_combination_field": {
-                     "my_image": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg",
+                     "my_image": "https://marqo-assets.s3.amazonaws.com/tests/images/image4.jpg",
                      "some_text": "hello there",
                      "lexical_field": "search me please",}}
                 ],
@@ -734,7 +734,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                     "_id": "article_592",
                     "Genre": "text",
                     "my_combination_field": {
-                        "my_image_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg",
+                        "my_image_1": "https://marqo-assets.s3.amazonaws.com/tests/images/image4.jpg",
                         "some_text_1": "hello there",
                         "lexical_field_1": "no no no",
                         "additional_field_1" : "test_search here"}}],
@@ -785,7 +785,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                  "_id": "article_592",
                  "Genre": "text",
                  "my_combination_field": {
-                     "my_image_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg",
+                     "my_image_1": "https://marqo-assets.s3.amazonaws.com/tests/images/image4.jpg",
                      "some_text_1": "hello there",
                      "lexical_field_1": "no no no",
                      "additional_field_1" : "test_search here"}}
@@ -821,19 +821,19 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                     {"Title": "Extravehicular Mobility Unit (EMU)",
                      "_id": "0",
                      "my_combination_field": {
-                         "my_image": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg",
+                         "my_image": "https://marqo-assets.s3.amazonaws.com/tests/images/image4.jpg",
                          "some_text": "hello there",
                          "filter_field": "test_this_0", }},
                     {"Title": "Extravehicular Mobility Unit (EMU)",
                      "_id": "1",
                      "my_combination_field": {
-                         "my_image": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg",
+                         "my_image": "https://marqo-assets.s3.amazonaws.com/tests/images/image4.jpg",
                          "some_text": "hello there",
                          "filter_field": "test_this_1", }},
                     {"Title": "Extravehicular Mobility Unit (EMU)",
                      "_id": "2",
                      "my_combination_field": {
-                         "my_image": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg",
+                         "my_image": "https://marqo-assets.s3.amazonaws.com/tests/images/image4.jpg",
                          "some_text": "hello there",
                          "filter_field": "test_this_2", }}],
                 mappings={
@@ -877,20 +877,20 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                     {"Title": "Extravehicular Mobility Unit (EMU)",
                      "_id": "0",
                      "my_combination_field": {
-                         "my_image": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg",
+                         "my_image": "https://marqo-assets.s3.amazonaws.com/tests/images/image4.jpg",
                          "some_text": "hello there",
                          "filter_field": "test_this_0", }},
                     {"Title": "what is this",
                      "_id": "1",
                      "my_combination_field": {
-                         "my_image": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg",
+                         "my_image": "https://marqo-assets.s3.amazonaws.com/tests/images/image4.jpg",
                          "some_text": "hello there",
                          "filter_field": "test_this_1", }},
 
                     {"Title": "have a test",
                      "_id": "2",
                      "my_combination_field": {
-                         "my_image": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg",
+                         "my_image": "https://marqo-assets.s3.amazonaws.com/tests/images/image4.jpg",
                          "some_text": "hello there",
                          "filter_field": "test_this_2"}}],
                 mappings={
@@ -938,7 +938,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                  "_id": "article_591",
                  "Genre": "Science",
                  "my_combination_field_0": {
-                     "my_image": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg",
+                     "my_image": "https://marqo-assets.s3.amazonaws.com/tests/images/image4.jpg",
                      "some_text": "hello there",
                      "lexical_field": "search me please"}}],
             mappings={
@@ -959,7 +959,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                  "_id": "article_592",
                  "Genre": "text",
                  "my_combination_field_1": {
-                     "my_image": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg",
+                     "my_image": "https://marqo-assets.s3.amazonaws.com/tests/images/image4.jpg",
                      "some_text": "marqo is good",
                      "lexical_field": "no no no",
                      "additional_field": "i can hear you"}}
@@ -989,7 +989,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
     def test_multimodal_combination_open_search_chunks(self):
         test_doc ={
                  "my_combination_field": {
-                     "image": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg",
+                     "image": "https://marqo-assets.s3.amazonaws.com/tests/images/image4.jpg",
                      "text": "marqo is good" },
                    "_id": "123",
                    }
@@ -1058,24 +1058,24 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                 "combo_text_image": {
                     "text_field_1": "A rider is riding a horse jumping over the barrier.",
                     "text_field_2": "What is the best to wear on the moon?",
-                    "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
-                    "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+                    "image_field_1": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
+                    "image_field_2": "https://marqo-assets.s3.amazonaws.com/tests/images/image2.jpg",
                 },
             }
 
         doc_1 = {
                 "combo_text_image": {
-                    "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+                    "image_field_1": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
                     "text_field_1": "A rider is riding a horse jumping over the barrier.",
                     "text_field_2": "What is the best to wear on the moon?",
-                    "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+                    "image_field_2": "https://marqo-assets.s3.amazonaws.com/tests/images/image2.jpg",
                 },
             }
 
         doc_2 = {
                 "combo_text_image": {
-                    "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
-                    "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+                    "image_field_2": "https://marqo-assets.s3.amazonaws.com/tests/images/image2.jpg",
+                    "image_field_1": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
                     "text_field_1": "A rider is riding a horse jumping over the barrier.",
                     "text_field_2": "What is the best to wear on the moon?",
                 },
@@ -1084,8 +1084,8 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         doc_3 = {
                 "combo_text_image": {
                     "text_field_1": "A rider is riding a horse jumping over the barrier.",
-                    "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
-                    "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+                    "image_field_2": "https://marqo-assets.s3.amazonaws.com/tests/images/image2.jpg",
+                    "image_field_1": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
                     "text_field_2": "What is the best to wear on the moon?",
                 },
             }
@@ -1126,26 +1126,26 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             "combo_text_image": {
                 "text_field_1": "A rider is riding a horse jumping over the barrier.",
                 "text_field_2": "What is the best to wear on the moon?",
-                "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
-                "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+                "image_field_1": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
+                "image_field_2": "https://marqo-assets.s3.amazonaws.com/tests/images/image2.jpg",
             },
         }
 
         doc_1 = {
             "_id": "d1",
             "combo_text_image": {
-                "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+                "image_field_1": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
                 "text_field_1": "A rider is riding a horse jumping over the barrier.",
                 "text_field_2": "What is the best to wear on the moon?",
-                "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+                "image_field_2": "https://marqo-assets.s3.amazonaws.com/tests/images/image2.jpg",
             },
         }
 
         doc_2 = {
             "_id": "d2",
             "combo_text_image": {
-                "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
-                "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+                "image_field_2": "https://marqo-assets.s3.amazonaws.com/tests/images/image2.jpg",
+                "image_field_1": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
                 "text_field_1": "A rider is riding a horse jumping over the barrier.",
                 "text_field_2": "What is the best to wear on the moon?",
             },
@@ -1155,8 +1155,8 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             "_id": "d3",
             "combo_text_image": {
                 "text_field_1": "A rider is riding a horse jumping over the barrier.",
-                "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
-                "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+                "image_field_2": "https://marqo-assets.s3.amazonaws.com/tests/images/image2.jpg",
+                "image_field_1": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
                 "text_field_2": "What is the best to wear on the moon?",
             },
         }

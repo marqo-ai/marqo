@@ -584,15 +584,15 @@ class TestAddDocuments(MarqoTestCase):
             tensor_search.create_vector_index(
                 config=self.config, index_name=self.index_name_2, index_settings=image_index_config)
             docs_results = [
-                ([{"_id": "123", "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png"},
-                 {"_id": "789", "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png"},
+                ([{"_id": "123", "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png"},
+                 {"_id": "789", "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_statue.png"},
                  {"_id": "456", "image_field": "https://www.marqo.ai/this/image/doesnt/exist.png"}],
                  [("123", "result"), ("789", "result"), ("456", "error")]
                  ),
                 ([{"_id": "123",
-                   "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png"},
+                   "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png"},
                   {"_id": "789",
-                   "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png"},
+                   "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_statue.png"},
                   {"_id": "456", "image_field": "https://www.marqo.ai/this/image/doesnt/exist.png"},
                   {"_id": "111", "image_field": "https://www.marqo.ai/this/image/doesnt/exist2.png"}],
                  [("123", "result"), ("789", "result"), ("456", "error"), ("111", "error")]
@@ -625,7 +625,7 @@ class TestAddDocuments(MarqoTestCase):
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_2,
                                           index_settings=index_setting)
         docs = [{
-            "_id": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+            "_id": "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png",
             "my_field": "wow"}
         ]
 
@@ -656,7 +656,7 @@ class TestAddDocuments(MarqoTestCase):
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_2,
                                           index_settings=index_setting)
         docs = [{
-            "_id": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+            "_id": "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png",
             "my_field": "wow"}
         ]
 
@@ -679,7 +679,7 @@ class TestAddDocuments(MarqoTestCase):
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_2,
                                           index_settings=index_setting)
         docs = [{
-            "_id": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+            "_id": "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png",
             "my_field": "wow"}
         ]
 
@@ -844,9 +844,9 @@ class TestAddDocuments(MarqoTestCase):
             docs_results = [
                 # invalid images
                 ([{"_id": "123",
-                  "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png"},
+                  "image_field_1": "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png"},
                  {"_id": "789",
-                  "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png"},
+                  "image_field_2": "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_statue.png"},
                  {"_id": "456", "image_field_3": "https://www.marqo.ai/this/image/doesnt/exist.png"}],
                  ({"image_field_1", "image_field_2"}, {"image_field_3"})
                  ),
@@ -1066,7 +1066,7 @@ class TestAddDocuments(MarqoTestCase):
         assert 'myfield2' in doc_w_facets
 
     def test_various_image_count(self):
-        hippo_url = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
+        hippo_url = 'https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png'
 
         def _check_get_docs(doc_count, some_field_value):
             approx_half = math.floor(doc_count/2)
@@ -1134,7 +1134,7 @@ class TestAddDocuments(MarqoTestCase):
             assert _check_get_docs(doc_count=c, some_field_value='blah2')
 
     def test_images_non_tensor_fields_count(self):
-        hippo_url = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
+        hippo_url = 'https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png'
 
         def _check_get_docs(doc_count, some_field_value):
             approx_half = math.floor(doc_count/2)
@@ -1218,7 +1218,7 @@ class TestAddDocuments(MarqoTestCase):
 
     def test_image_download(self):
         image_repo = dict()
-        good_url ='https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
+        good_url ='https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png'
         test_doc = {
             'field_1': 'https://google.com/my_dog.png',  # error because such an image doesn't exist
             'field_2': good_url
@@ -1237,7 +1237,7 @@ class TestAddDocuments(MarqoTestCase):
 
     def test_threaded_download_images_non_tensor_field(self):
         """Tests add_docs.threaded_download_images(). URLs in non_tensor_fields should not be downloaded """
-        good_url ='https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
+        good_url ='https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png'
         bad_url = 'https://google.com/my_dog.png'
         examples = [
             ([{
@@ -1279,7 +1279,7 @@ class TestAddDocuments(MarqoTestCase):
 
     def test_download_images_non_tensor_field(self):
         """tests add_docs.download_images(). URLs in non_tensor_fields should not be downloaded """
-        good_url ='https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
+        good_url ='https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png'
         bad_url = 'https://google.com/my_dog.png'
         examples = [
             ([{

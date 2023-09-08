@@ -432,8 +432,8 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
         }
         tensor_search.create_vector_index(
             index_name=self.index_name_2, index_settings=index_settings, config=self.config)
-        hippo_img = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
-        artefact_hippo_img = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png'
+        hippo_img = 'https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png'
+        artefact_hippo_img = 'https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_statue.png'
         tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
             index_name=self.index_name_2, docs=[
             {
