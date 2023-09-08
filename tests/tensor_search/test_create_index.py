@@ -575,10 +575,10 @@ class TestCreateIndex(MarqoTestCase):
 
     def test_create_index_protected_name_bulk(self):
         """Tests that validation prevents the user from creating an index called 'bulk' """
-        # an index that contains "bulk" is allowed: 
+        # an index that contains the "bulk" substring is allowed: 
         tensor_search.create_vector_index(config=self.config, index_name='some-bulk')
         tensor_search.create_vector_index(config=self.config, index_name='bulkabc')
-        # but not just "bulk"
+        # but an index name that exaclty matches "bulk" is not:
         try:
             tensor_search.create_vector_index(config=self.config, index_name='bulk')
             raise AssertionError
