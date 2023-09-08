@@ -34,7 +34,7 @@ jobs:
         with:
           filters: |
             proceed:
-                - '!**/*.md'
+              - '!**/*.md'
 
       - name: Decide whether to run tests
         id: decision
