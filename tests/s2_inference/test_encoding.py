@@ -323,9 +323,9 @@ class TestOpenClipModelEncoding(unittest.TestCase):
 
         device = 'cpu'
         eps = 1e-9
-        images = ["https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image0.jpg",
-                  "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
-                  "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg"]
+        images = ["https://marqo-assets.s3.amazonaws.com/tests/images/image0.jpg",
+                  "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
+                  "https://marqo-assets.s3.amazonaws.com/tests/images/image2.jpg"]
 
         for name in names:
 
@@ -439,7 +439,7 @@ class TestOpenClipModelEncoding(unittest.TestCase):
     @patch("torch.cuda.amp.autocast")
     def test_autocast_called_when_cuda(self, mock_autocast):
         names = self.open_clip_test_model
-        contents = ['this is a test sentence. so is this.', "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image0.jpg"]
+        contents = ['this is a test sentence. so is this.', "https://marqo-assets.s3.amazonaws.com/tests/images/image0.jpg"]
         for model_name in names:
             for content in contents:
                 vectorise(model_name=model_name, content=content, device="cpu")
