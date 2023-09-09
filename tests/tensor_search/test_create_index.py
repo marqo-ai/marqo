@@ -584,9 +584,9 @@ class TestCreateIndex(MarqoTestCase):
             raise AssertionError
         except errors.InvalidIndexNameError:
             pass
-        # ensure the index was not accidentally created despite error:
+        # ensure the index was not accidentally created despite the error:
         assert {'index_name': 'bulk'} not in tensor_search.get_indexes()['results']
-        # but an index name with bulk as a substring should appear as expected:
+        # but an index name with 'bulk' as a substring should appear as expected:
         assert {'index_name': 'some-bulk'} in tensor_search.get_indexes()['results']
         
         # cleanup: 
