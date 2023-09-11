@@ -26,7 +26,7 @@ function wait_for_process () {
           echo "Process $process_name is not running yet. Retrying in 1 seconds"
           echo "Retry $retries of a maximum of $max_retries retries"
         fi
-        echo "Waiting for Marqo-OS to start..."
+        echo "Preparing to start Marqo-OS..."
         ((retries=retries+1))
         if ((retries >= n_restarts_before_sigkill)); then
             if [ "$MARQO_LOG_LEVEL" = "debug" ]; then
