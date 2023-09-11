@@ -33,7 +33,11 @@ function wait_for_process () {
             fi
             ps axf | grep docker | grep -v grep | awk '{print "kill -9 " $1}' | sh; rm /var/run/docker.pid; dockerd &
         else
-            dockerd &
+            if [ "$MARQO_LOG_LEVEL" = "debug" ]; then
+              dockerd &
+            else
+              dockerd > /dev/null &
+            fi
         fi
         sleep 3
         if ((retries >= max_retries)); then
@@ -62,7 +66,7 @@ if [[ ! $OPENSEARCH_URL ]]; then
 
   /usr/bin/supervisord -n >> /dev/null 2>&1 &
 
-  dockerd &
+  dockerd > /dev/null &
 
   if [ "$MARQO_LOG_LEVEL" = "debug" ]; then
     echo "Called dockerd command. Waiting for dockerd to start."
