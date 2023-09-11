@@ -11,8 +11,9 @@ import requests
 from unittest.mock import patch
 from marqo import errors
 from marqo.tensor_search import enums
-from tests.utils.transition import add_docs_caller
+from tests.utils.transition import add_docs_caller, add_docs_batched
 import os
+
 
 class TestDeleteDocuments(MarqoTestCase):
     """module that has tests at the tensor_search level"""
@@ -419,11 +420,12 @@ class TestDeleteDocumentsEndpoint(MarqoTestCase):
             tensor_search.create_vector_index(
                 index_name=self.index_name_1, index_settings={"index_defaults": {"model": 'random'}}, config=self.config)
             # over the limit:
-            add_docs_caller(
-                config=self.config, index_name=self.index_name_1, docs=[
-                    {"_id": x, 'Bad field': "blh "} for x in doc_ids
-                ],
-                auto_refresh=True)
+            docs=[{"_id": x, 'Bad field': "blh "} for x in doc_ids]
+            
+            add_docs_batched(
+                config=self.config, index_name=self.index_name_1,
+                docs=docs, auto_refresh=False, device="cpu"
+            )
             try:
                 tensor_search.delete_documents(config=self.config, index_name=self.index_name_1, doc_ids=doc_ids, auto_refresh=True)
                 raise AssertionError
