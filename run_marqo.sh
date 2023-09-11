@@ -31,12 +31,12 @@ function wait_for_process () {
             if [ "$MARQO_LOG_LEVEL" = "debug" ]; then
               echo "sending SIGKILL to dockerd and restarting "
             fi
-            ps axf | grep docker | grep -v grep | awk '{print "kill -9 " $1}' | sh; rm /var/run/docker.pid; dockerd &
+            ps axf | grep docker | grep -v grep | awk '{print "kill -9 " $1}' | sh; rm /var/run/docker.pid; dockerd > /dev/null 2>&1 &
         else
             if [ "$MARQO_LOG_LEVEL" = "debug" ]; then
               dockerd &
             else
-              dockerd > /dev/null &
+              dockerd > /dev/null 2>&1 &
             fi
         fi
         sleep 3
@@ -66,7 +66,7 @@ if [[ ! $OPENSEARCH_URL ]]; then
 
   /usr/bin/supervisord -n >> /dev/null 2>&1 &
 
-  dockerd > /dev/null &
+  dockerd > /dev/null 2>&1 &
 
   if [ "$MARQO_LOG_LEVEL" = "debug" ]; then
     echo "Called dockerd command. Waiting for dockerd to start."
@@ -79,7 +79,9 @@ if [[ ! $OPENSEARCH_URL ]]; then
           echo "$process is not running after max time"
           exit 1
       else
-          echo "$process is running"
+          if [ "$MARQO_LOG_LEVEL" = "debug" ]; then
+            echo "$process is running"
+          fi
       fi
   done
   OPENSEARCH_URL="https://localhost:9200"
@@ -98,7 +100,7 @@ if [[ ! $OPENSEARCH_URL ]]; then
       if [ "$MARQO_LOG_LEVEL" = "debug" ]; then
         docker run --name marqo-os -id -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" marqoai/marqo-os:0.0.3 &
       else
-        docker run --name marqo-os -id -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" marqoai/marqo-os:0.0.3  > /dev/null &
+        docker run --name marqo-os -id -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" marqoai/marqo-os:0.0.3  > /dev/null 2>&1 &
       fi
       docker start marqo-os &
       until [[ $(curl -v --silent --insecure $OPENSEARCH_URL 2>&1 | grep Unauthorized) ]]; do
