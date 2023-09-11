@@ -539,13 +539,10 @@ class TestCreateIndex(MarqoTestCase):
 
         assert run()
 
-    def test_field_Limit_none_env_var(self):
-        """When the limit env var is undefined: we need to manually test it,
+    def test_field_limit_none_env_var(self):
+        """When the max index fields env var is undefined: we need to manually test it,
         as the testing environment may have this env var defined."""
-        mock_read_env_vars = mock.MagicMock()
-        mock_read_env_vars.return_value = None
 
-        @mock.patch("marqo.tensor_search.utils.read_env_vars_and_defaults", mock_read_env_vars)
         def run():
             docs = [
                 {"f1": "fgrrvb", "f2": 1234, "f3": 1.4, "f4": "hello hello", "f5": False},
@@ -564,7 +561,16 @@ class TestCreateIndex(MarqoTestCase):
             )
             assert not res_1['errors']
             return True
-        assert run()
+        
+        def mock_read_env_vars_and_defaults(var):
+            # Read env vars should return None for MARQO_MAX_INDEX_FIELDS
+            if var == EnvVars.MARQO_MAX_INDEX_FIELDS:
+                return None
+            else:
+                return read_env_vars_and_defaults(var)
+        
+        with mock.patch("marqo.tensor_search.utils.read_env_vars_and_defaults", side_effect=mock_read_env_vars_and_defaults):
+            assert run()
 
     def test_create_index_protected_name(self):
         try:

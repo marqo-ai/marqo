@@ -1325,7 +1325,7 @@ class TestAddDocuments(MarqoTestCase):
     def test_params_validation_tensors_and_nontensors(self):
         with pytest.raises(InternalError):
             AddDocsParams(
-                docs=[],
+                docs=[{"dummy": "doc"}],
                 index_name="my_index",
                 auto_refresh=True,
                 tensor_fields=["field1"],
@@ -1334,7 +1334,7 @@ class TestAddDocuments(MarqoTestCase):
 
         with pytest.raises(InternalError):
             AddDocsParams(
-                docs=[],
+                docs=[{"dummy": "doc"}],
                 index_name="my_index",
                 auto_refresh=True,
                 tensor_fields=["field1"],
@@ -1344,7 +1344,7 @@ class TestAddDocuments(MarqoTestCase):
     def test_params_validation_no_tensors_no_nontensors(self):
         with pytest.raises(InternalError):
             AddDocsParams(
-                docs=[],
+                docs=[{"dummy": "doc"}],
                 index_name="my_index",
                 auto_refresh=True,
                 tensor_fields=None,
@@ -1353,7 +1353,7 @@ class TestAddDocuments(MarqoTestCase):
 
     def test_params_validation_default(self):
         params = AddDocsParams(
-            docs=[],
+            docs=[{"dummy": "doc"}],
             index_name="my_index",
             auto_refresh=True
         )
@@ -1363,7 +1363,7 @@ class TestAddDocuments(MarqoTestCase):
 
     def test_params_validation_non_tensor_fields_only(self):
         params = AddDocsParams(
-            docs=[],
+            docs=[{"dummy": "doc"}],
             index_name="my_index",
             auto_refresh=True,
             non_tensor_fields=["field1", "field2"]

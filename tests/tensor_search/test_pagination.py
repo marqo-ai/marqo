@@ -1,7 +1,7 @@
 import math
 import os
 import sys 
-from tests.utils.transition import add_docs_caller
+from tests.utils.transition import add_docs_caller, add_docs_batched
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from unittest import mock
 from marqo.s2_inference.s2_inference import vectorise, get_model_properties_from_registry
@@ -65,12 +65,12 @@ class TestPagination(MarqoTestCase):
         tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings={"index_defaults": {"model": "random"}})
 
-        add_docs_caller(
+        add_docs_batched(
             config=self.config, index_name=self.index_name_1,
             docs=[{"Title": "a " + (" ".join(random.choices(population=vocab, k=10))),
                     "_id": str(i)
                     } for i in range(num_docs)
-            ], auto_refresh=False
+            ], auto_refresh=False, device="cpu"
         )
         tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
 
@@ -116,14 +116,14 @@ class TestPagination(MarqoTestCase):
         tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings={"index_defaults": {"model": "random"}})
 
-        add_docs_caller(
+        add_docs_batched(
             config=self.config, index_name=self.index_name_1,
             docs=[{"field_1": "a " + (" ".join(random.choices(population=vocab, k=5))),
                    "field_2": "a " + (" ".join(random.choices(population=vocab, k=5))),
                    "field_3": "a " + (" ".join(random.choices(population=vocab, k=5))),
                     "_id": str(i)
                     } for i in range(num_docs)
-            ], auto_refresh=False
+            ], auto_refresh=False, device="cpu"
         )
         tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
 
