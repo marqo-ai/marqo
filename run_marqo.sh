@@ -103,10 +103,13 @@ if [[ ! $OPENSEARCH_URL ]]; then
       else
         docker run --name marqo-os -id -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" marqoai/marqo-os:0.0.3  > /dev/null 2>&1 &
       fi
-      docker start marqo-os &
+      if [ "$MARQO_LOG_LEVEL" = "debug" ]; then
+        docker start marqo-os > /dev/null 2>&1 &
+      fi
       until [[ $(curl -v --silent --insecure $OPENSEARCH_URL 2>&1 | grep Unauthorized) ]]; do
         sleep 0.1;
       done;
+      echo "Marqo-OS started successfully."
   fi
 fi
 
@@ -115,6 +118,7 @@ export OPENSEARCH_IS_INTERNAL
 
 # Start up redis
 if [ "$MARQO_ENABLE_THROTTLING" != "FALSE" ]; then
+    echo "Starting Marqo throttling..."
     redis-server /etc/redis/redis.conf
     if [ "$MARQO_LOG_LEVEL" = "debug" ]; then
       echo "Called redis-server command"
@@ -139,7 +143,7 @@ if [ "$MARQO_ENABLE_THROTTLING" != "FALSE" ]; then
         
     done
     # redis server is now running
-    echo "Marqo throttling successfully started"
+    echo "Marqo throttling successfully started."
 
 else
     # skip starting Redis
