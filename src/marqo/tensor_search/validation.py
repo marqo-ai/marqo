@@ -1,10 +1,8 @@
 from enum import Enum
 import jsonschema
 import json
-import typing
 from typing import Any, Container, Dict, Iterable, List, Optional, Tuple, Type, Sequence, Union
 
-from marqo.config import Config
 from marqo.tensor_search import constants
 from marqo.tensor_search import enums, utils
 from marqo.errors import (
@@ -18,7 +16,6 @@ from marqo.tensor_search.models.search import SearchContext
 from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest
 from marqo.tensor_search.models.settings_object import settings_schema
 from marqo.tensor_search.models.mappings_object import mappings_schema, multimodal_combination_schema
-import numpy as np
 
 
 def validate_query(q: Union[dict, str], search_method: Union[str, SearchMethod]):

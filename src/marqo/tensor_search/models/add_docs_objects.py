@@ -117,7 +117,6 @@ class AddDocsParams(BaseModel):
         """
         
         docs = validate_add_docs_count(docs)
-        # TODO: insert future docs validation here
 
         return docs
     
