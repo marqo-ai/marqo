@@ -172,7 +172,7 @@ def add_or_replace_documents(
         request: Request,
         body: typing.Union[AddDocsBodyParams, List[Dict]],
         index_name: str,
-        refresh: bool = True,
+        refresh: bool = False,
         marqo_config: config.Config = Depends(generate_config),
         non_tensor_fields: Optional[List[str]] = Query(default=None),
         device: str = Depends(api_validation.validate_device),
