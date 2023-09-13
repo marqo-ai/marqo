@@ -93,7 +93,7 @@ docker run --name marqo -it --privileged -p 8882:8882 --add-host host.docker.int
 
 ```
 
-Note: If your `marqo` container keeps getting killed, this is most likely due to too little memory being allotted to Docker. Increasing this limit (try 8GB) in your Docker settings may fix the problem.
+Note: If your `marqo` container keeps getting killed, this is most likely due to a lack of memory being allocated to Docker. Increasing the memory limit for Docker to at least 6GB (8GB recommended) in your Docker settings may fix the problem.
 
 3. Install the Marqo client:
 
