@@ -116,6 +116,34 @@ class ApiTestsAddDocs(MarqoTestCase):
             # Assert that add documents is called with the correct default arguments
             assert kwargs["add_docs_params"].auto_refresh == False
             assert kwargs["add_docs_params"].use_existing_tensors == False
+    
+    def test_add_or_replace_documents_auto_refresh_true(self):
+        """
+        Ensures that calling add documents with some parameters set to non-default values
+        (refresh, use_existing_tensors) works as expected.
+        """
+        with mock.patch('marqo.tensor_search.tensor_search.add_documents') as mock_add_documents:
+            response = self.client.post(
+                "/indexes/index1/documents?device=cpu&refresh=true",
+                json={
+                    "documents": [
+                        {
+                            "id": "1",
+                            "text": "This is a test document",
+                        }
+                    ],
+                    "useExistingTensors": True,
+                    "tensorFields": ['text']
+                },
+            )
+
+            self.assertEqual(response.status_code, 200)
+            mock_add_documents.assert_called_once()
+            args, kwargs = mock_add_documents.call_args
+
+            # Assert that add documents is called with the correct new arguments
+            assert kwargs["add_docs_params"].auto_refresh == True
+            assert kwargs["add_docs_params"].use_existing_tensors == True
 
 
 class ApiTestsDeleteDocs(MarqoTestCase):
@@ -147,3 +175,22 @@ class ApiTestsDeleteDocs(MarqoTestCase):
 
             # Assert that delete_documents is called with the correct default arguments
             assert kwargs["auto_refresh"] == False
+    
+    def test_delete_docs_auto_refresh_true(self):
+        """
+        Ensures that API calls to delete documents with parameters set (auto_refresh=True)
+        reflect those in calls to tensor_search.delete_documents
+        """
+
+        with mock.patch('marqo.tensor_search.tensor_search.delete_documents') as mock_delete_documents:
+            response = self.client.post(
+                "/indexes/index1/documents/delete-batch?refresh=true",
+                json=['0', '1', '2']
+            )
+            
+            self.assertEqual(response.status_code, 200)
+            mock_delete_documents.assert_called_once()
+            args, kwargs = mock_delete_documents.call_args
+
+            # Assert that delete_documents is called with the correct new arguments
+            assert kwargs["auto_refresh"] == True

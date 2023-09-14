@@ -238,7 +238,7 @@ def delete_index(index_name: str, marqo_config: config.Config = Depends(generate
 @app.post("/indexes/{index_name}/documents/delete-batch")
 def delete_docs(index_name: str, documentIds: List[str], refresh: bool = False,
                       marqo_config: config.Config = Depends(generate_config)):
-    
+
     return tensor_search.delete_documents(
         index_name=index_name, config=marqo_config, doc_ids=documentIds,
         auto_refresh=refresh
