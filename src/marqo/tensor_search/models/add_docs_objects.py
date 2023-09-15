@@ -41,7 +41,11 @@ class AddDocsParamsConfig:
 
 
 class AddDocsBodyParams(BaseModel):
-    """The parameters of the body parameters of tensor_search_add_documents() function"""
+    """
+    Representation of the body parameters of the API add_or_replace_documents() function.
+    This will be processed by add_docs_params_orchestrator (along with other query parameters)
+    into an AddDocsParams object to be given to tensor_search.add_documents()
+    """
     class Config:
         arbitrary_types_allowed = True
         allow_mutation = False

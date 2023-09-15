@@ -136,7 +136,7 @@ def decode_mappings(mappings: Optional[str] = None) -> dict:
 
 
 def add_docs_params_orchestrator(index_name: str, body: Union[AddDocsBodyParams, List[Dict]],
-                                device: str, auto_refresh: bool = True, non_tensor_fields: Optional[List[str]] = None,
+                                device: str, auto_refresh: bool = False, non_tensor_fields: Optional[List[str]] = None,
                                 mappings: Optional[dict] = dict(), model_auth: Optional[ModelAuth] = None,
                                 image_download_headers: Optional[dict] = dict(),
                                 use_existing_tensors: Optional[bool] = False, query_parameters: Optional[Dict] = dict()) -> AddDocsParams:
