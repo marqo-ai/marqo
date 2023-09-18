@@ -1,7 +1,7 @@
 import math
 import os
 import sys
-from tests.utils.transition import add_docs_caller
+from tests.utils.transition import add_docs_caller, add_docs_batched
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from unittest import mock
 from marqo.s2_inference.s2_inference import vectorise, get_model_properties_from_registry
@@ -856,10 +856,10 @@ class TestVectorSearch(MarqoTestCase):
 
         vocab = requests.get(vocab_source).text.splitlines()
 
-        add_docs_caller(
+        add_docs_batched(
             config=self.config, index_name=self.index_name_1,
             docs=[{"Title": "a " + (" ".join(random.choices(population=vocab, k=25)))}
-                  for _ in range(2000)], auto_refresh=False
+                  for _ in range(2000)], auto_refresh=False, device="cpu"
         )
         tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
         for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
@@ -899,12 +899,10 @@ class TestVectorSearch(MarqoTestCase):
 
         vocab = requests.get(vocab_source).text.splitlines()
 
-        tensor_search.add_documents(
-            config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1,
-                                                              docs=[{"Title": "a " + (
-                                                                  " ".join(random.choices(population=vocab, k=25)))}
-                                                                    for _ in range(700)], auto_refresh=False,
-                                                              device="cpu")
+        add_docs_batched(
+            config=self.config, index_name=self.index_name_1,
+            docs=[{"Title": "a " + (" ".join(random.choices(population=vocab, k=25)))}
+            for _ in range(700)], auto_refresh=False, device="cpu"
         )
         tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
 

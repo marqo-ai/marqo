@@ -1,10 +1,8 @@
 from enum import Enum
 import jsonschema
 import json
-import typing
 from typing import Any, Container, Dict, Iterable, List, Optional, Tuple, Type, Sequence, Union
 
-from marqo.config import Config
 from marqo.tensor_search import constants
 from marqo.tensor_search import enums, utils
 from marqo.errors import (

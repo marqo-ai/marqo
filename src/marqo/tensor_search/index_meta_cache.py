@@ -61,7 +61,7 @@ def get_cache() -> Dict[str, IndexInfo]:
 
 
 def refresh_index_info_on_interval(config: Config, index_name: str, interval_seconds: int) -> None:
-    """Refreshes an index's index_info if inteval_seconds have elapsed since the last time it was refreshed
+    """Refreshes an index's index_info if interval_seconds have elapsed since the last time it was refreshed
 
     Non-thread safe, so there is a chance two threads both refresh index_info at the same time.
     """

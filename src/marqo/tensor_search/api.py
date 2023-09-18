@@ -189,7 +189,7 @@ def add_or_replace_documents(
         request: Request,
         body: typing.Union[AddDocsBodyParams, List[Dict]],
         index_name: str,
-        refresh: bool = True,
+        refresh: bool = False,
         marqo_config: config.Config = Depends(generate_config),
         non_tensor_fields: Optional[List[str]] = Query(default=None),
         device: str = Depends(api_validation.validate_device),
@@ -252,10 +252,10 @@ def delete_index(index_name: str, marqo_config: config.Config = Depends(generate
         config=marqo_config, index_name=index_name
     )
 
-
 @app.post("/indexes/{index_name}/documents/delete-batch")
-def delete_docs(index_name: str, documentIds: List[str], refresh: bool = True,
+def delete_docs(index_name: str, documentIds: List[str], refresh: bool = False,
                       marqo_config: config.Config = Depends(generate_config)):
+
     return tensor_search.delete_documents(
         index_name=index_name, config=marqo_config, doc_ids=documentIds,
         auto_refresh=refresh
