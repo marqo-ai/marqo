@@ -21,7 +21,7 @@ function wait_for_process () {
     local n_restarts_before_sigkill=3
     local process_name="$1"
     local retries=0
-    while ! [[ $(docker ps -a | grep CONTAINER) ]] >/dev/null 2>&1 && ((retries < max_retries)); do
+    while ! [[ $(docker ps -a | grep CONTAINER) ]] > /dev/null 2>&1 && ((retries < max_retries)); do
         if [ "$MARQO_LOG_LEVEL" = "debug" ]; then
           echo "Process $process_name is not running yet. Retrying in 1 seconds"
           echo "Retry $retries of a maximum of $max_retries retries"
@@ -98,13 +98,9 @@ if [[ ! $OPENSEARCH_URL ]]; then
       echo "Marqo-OS is running"
   else
       echo "Marqo-OS not found; starting Marqo-OS..."
+      docker run --name marqo-os -d -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" marqoai/marqo-os:0.0.3 &
       if [ "$MARQO_LOG_LEVEL" = "debug" ]; then
-        docker run --name marqo-os -id -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" marqoai/marqo-os:0.0.3 &
-      else
-        docker run --name marqo-os -id -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" marqoai/marqo-os:0.0.3  > /dev/null 2>&1 &
-      fi
-      if [ "$MARQO_LOG_LEVEL" = "debug" ]; then
-        docker start marqo-os > /dev/null 2>&1 &
+        docker start marqo-os
       fi
       until [[ $(curl -v --silent --insecure $OPENSEARCH_URL 2>&1 | grep Unauthorized) ]]; do
         sleep 0.1;
