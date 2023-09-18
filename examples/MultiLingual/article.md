@@ -68,7 +68,7 @@ One small adjustment we'll make is to split up text of very long documents (of o
 At the end of each loop, we call the `add_documents()` function to insert the document:
 ```python
 mq.index(index_name='my-multilingual-index').add_documents(
-    device='cuda', auto_refresh=False,
+    device='cuda', 
     documents=[{
                     "_id": doc_id,
                     "language": lang,
@@ -83,7 +83,7 @@ Here we set the device argument as `"cuda"`. This tells Marqo to use the GPU it 
 If you don't have a GPU, remove this argument or set it to `"cpu"`. We encourage using a GPU as it will make the `add_documents` 
 process significantly faster (our testing showed a 6–12x speed up). 
 
-We also set the `auto_refresh` argument to `False`. When indexing large volumes of data we encourage you to set this to False, as it optimises the `add_documents` process. 
+We do not set the `auto_refresh` argument, so it defaults to `False`. When indexing large volumes of data we encourage you to keep this `False`, as it optimises the `add_documents` process. 
 
 And that's the indexing process! Run the script to fill up the Marqo index with documents. It took us around 45 minutes 
 with an AWS _ml.g4dn.2xlarge_ machine. 
