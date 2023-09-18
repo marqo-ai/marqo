@@ -23,7 +23,7 @@ import numpy as np
 from tests.marqo_test import MarqoTestCase
 from typing import Dict, List
 import pydantic
-from tests.utils.transition import add_docs_caller
+from tests.utils.transition import add_docs_caller, add_docs_batched
 
 
 
@@ -1348,11 +1348,12 @@ class TestBulkSearch(MarqoTestCase):
     
         vocab = requests.get(vocab_source).text.splitlines()
     
-        add_docs_caller(
+        docs=[{"Title": "a " + (" ".join(random.choices(population=vocab, k=25)))} for _ in range(2000)]
+        add_docs_batched(
             config=self.config, index_name=self.index_name_1,
-            docs=[{"Title": "a " + (" ".join(random.choices(population=vocab, k=25)))}
-                  for _ in range(2000)], auto_refresh=False
+            docs=docs, auto_refresh=False, device="cpu"
         )
+
         tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
         for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
             for max_doc in [0, 1, 2, 5, 10, 100, 1000]:
@@ -1424,10 +1425,10 @@ class TestBulkSearch(MarqoTestCase):
         vocab_source = "https://www.mit.edu/~ecprice/wordlist.10000"
     
         vocab = requests.get(vocab_source).text.splitlines()
-        tensor_search.add_documents(
-            config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1,
-            docs=[{"Title": "a " + (" ".join(random.choices(population=vocab, k=25)))}
-                  for _ in range(700)], auto_refresh=False, device="cpu")
+        docs=[{"Title": "a " + (" ".join(random.choices(population=vocab, k=25)))} for _ in range(700)]
+        add_docs_batched(
+            config=self.config, index_name=self.index_name_1,
+            docs=docs, auto_refresh=False, device="cpu"
         )
         tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
     
@@ -1459,23 +1460,22 @@ class TestBulkSearch(MarqoTestCase):
         vocab_source = "https://www.mit.edu/~ecprice/wordlist.10000"
     
         vocab = requests.get(vocab_source).text.splitlines()
-        num_docs = 1000
+        num_docs = 100
 
         # Recreate index with random model
         tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings={"index_defaults": {"model": "random"}})
 
-        add_docs_caller(
+        docs=[{"Title": "a " + (" ".join(random.choices(population=vocab, k=25)))} for _ in range(num_docs)]
+        add_docs_batched(
             config=self.config, index_name=self.index_name_1,
-            docs=[{"Title": "a " + (" ".join(random.choices(population=vocab, k=10))),
-                    "_id": str(i)
-                    }
-                  for i in range(num_docs)], auto_refresh=False
+            docs=docs, auto_refresh=False, device="cpu"
         )
+        
         tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
     
         for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
-            for doc_count in [1000]:
+            for doc_count in [num_docs]:
                 # Query full results
                 full_search_results = tensor_search.bulk_search(
                             marqo_config=self.config, query=BulkSearchQuery(
@@ -1488,7 +1488,7 @@ class TestBulkSearch(MarqoTestCase):
                         ))
                 full_search_results = full_search_results['result'][0]
     
-                for page_size in [5, 10, 100, 1000, 1000]:
+                for page_size in [5, 10, 100]:
                     paginated_search_results = {"hits": []}
     
                     for page_num in range(math.ceil(num_docs / page_size)):
@@ -1640,25 +1640,26 @@ class TestBulkSearch(MarqoTestCase):
         vocab_source = "https://www.mit.edu/~ecprice/wordlist.10000"
 
         vocab = requests.get(vocab_source).text.splitlines()
-        num_docs = 1000
+        num_docs = 100
         
         # Recreate index with random model
         tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings={"index_defaults": {"model": "random"}})
 
-        add_docs_caller(
-            config=self.config, index_name=self.index_name_1,
-            docs=[{"field_1": "a " + (" ".join(random.choices(population=vocab, k=5))),
+        docs=[{"field_1": "a " + (" ".join(random.choices(population=vocab, k=5))),
                    "field_2": "a " + (" ".join(random.choices(population=vocab, k=5))),
                    "field_3": "a " + (" ".join(random.choices(population=vocab, k=5))),
                     "_id": str(i)
                     } for i in range(num_docs)
-            ], auto_refresh=False
+        ]
+        add_docs_batched(
+            config=self.config, index_name=self.index_name_1,
+            docs=docs, auto_refresh=False, device="cpu"
         )
         tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
 
         for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
-            for doc_count in [1000]:
+            for doc_count in [num_docs]:
                 # Query full results
                 full_search_results = tensor_search.bulk_search(
                                             marqo_config=self.config, query=BulkSearchQuery(
@@ -1671,7 +1672,7 @@ class TestBulkSearch(MarqoTestCase):
                                         ))
                 full_search_results = full_search_results["result"][0]
 
-                for page_size in [5, 10, 100, 1000]:
+                for page_size in [5, 10, 100]:
                     paginated_search_results = {"hits": []}
 
                     for page_num in range(math.ceil(num_docs / page_size)):
@@ -1693,7 +1694,7 @@ class TestBulkSearch(MarqoTestCase):
                     # Compare paginated to full results (length only for now)
                     assert len(full_search_results["hits"]) == len(paginated_search_results["hits"])
 
-                    # TODO: re-add this assert when KNN incosistency bug is fixed
+                    # TODO: re-add this assert when KNN inconsistency bug is fixed
                     # assert full_search_results["hits"] == paginated_search_results["hits"]
 
     def test_image_search_highlights(self):

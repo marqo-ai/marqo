@@ -489,6 +489,78 @@ class TestAddDocuments(MarqoTestCase):
         except BadRequestError:
             pass
 
+    def test_add_documents_below_max_doc_count(self):
+        """
+        Ensures that there is no error when adding documents equal to or less than
+        the max doc count limit
+        """
+        test_cases = [
+            # (max_doc_count, actual_doc_count)
+            # default max (= 64)
+            (64, 64),
+            (64, 63),
+            (64, 1),
+
+            # non-default max (!= 64)
+            (200, 200),
+            (200, 199),
+            (200, 1)
+        ]
+
+        for case in test_cases:
+            max_doc_count = case[0]
+            mock_environ = {enums.EnvVars.MARQO_MAX_ADD_DOCS_COUNT: str(max_doc_count)}
+
+            @mock.patch.dict(os.environ, {**os.environ, **mock_environ})
+            def run():
+                tensor_search.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=self.index_name_1, 
+                        # actual doc count is case[1]
+                        docs=[{"some": "doc"} for _ in range(case[1])],
+                    auto_refresh=True, device="cpu")
+                )
+                return True
+            
+            assert run()
+
+    def test_add_documents_exceeded_max_doc_count(self):
+        """
+        Ensures that there is a bad request error when adding documents greater than
+        the max doc count limit
+        """
+        test_cases = [
+            # (max_doc_count, actual_doc_count)
+            # default max (= 64)
+            (64, 65),
+            (64, 200),
+
+            # non-default max (!= 64)
+            (200, 201),
+            (200, 300)
+        ]
+
+        for case in test_cases:
+            max_doc_count = case[0]
+            mock_environ = {enums.EnvVars.MARQO_MAX_ADD_DOCS_COUNT: str(max_doc_count)}
+
+            @mock.patch.dict(os.environ, {**os.environ, **mock_environ})
+            def run():
+                try:
+                    tensor_search.add_documents(
+                        config=self.config, add_docs_params=AddDocsParams(
+                            index_name=self.index_name_1, 
+                            # actual doc count is case[1]
+                            docs=[{"some": "doc"} for _ in range(case[1])],
+                        auto_refresh=True, device="cpu")
+                    )
+                    raise AssertionError
+                except BadRequestError as e:
+                    assert f"exceeds limit of {max_doc_count}" in e.message
+                    return True
+        
+        assert run()
+
     def test_resilient_add_images(self):
         image_index_configs = [
             # NO CHUNKING
@@ -1253,7 +1325,7 @@ class TestAddDocuments(MarqoTestCase):
     def test_params_validation_tensors_and_nontensors(self):
         with pytest.raises(InternalError):
             AddDocsParams(
-                docs=[],
+                docs=[{"dummy": "doc"}],
                 index_name="my_index",
                 auto_refresh=True,
                 tensor_fields=["field1"],
@@ -1262,7 +1334,7 @@ class TestAddDocuments(MarqoTestCase):
 
         with pytest.raises(InternalError):
             AddDocsParams(
-                docs=[],
+                docs=[{"dummy": "doc"}],
                 index_name="my_index",
                 auto_refresh=True,
                 tensor_fields=["field1"],
@@ -1272,7 +1344,7 @@ class TestAddDocuments(MarqoTestCase):
     def test_params_validation_no_tensors_no_nontensors(self):
         with pytest.raises(InternalError):
             AddDocsParams(
-                docs=[],
+                docs=[{"dummy": "doc"}],
                 index_name="my_index",
                 auto_refresh=True,
                 tensor_fields=None,
@@ -1281,7 +1353,7 @@ class TestAddDocuments(MarqoTestCase):
 
     def test_params_validation_default(self):
         params = AddDocsParams(
-            docs=[],
+            docs=[{"dummy": "doc"}],
             index_name="my_index",
             auto_refresh=True
         )
@@ -1291,7 +1363,7 @@ class TestAddDocuments(MarqoTestCase):
 
     def test_params_validation_non_tensor_fields_only(self):
         params = AddDocsParams(
-            docs=[],
+            docs=[{"dummy": "doc"}],
             index_name="my_index",
             auto_refresh=True,
             non_tensor_fields=["field1", "field2"]

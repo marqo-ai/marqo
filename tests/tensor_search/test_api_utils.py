@@ -113,6 +113,31 @@ class TestAddDocsParamsOrchestrator(unittest.TestCase):
         assert result.docs == [{"test": "doc"}]
         assert result.image_download_headers == {"header1": "value1"}
 
+    def test_add_docs_params_orchestrator_defaults(self):
+        """
+        Ensures that certain defaults are correct when not specified upon calls to 
+        add_docs_params_orchestrator (like use_existing_tensors, auto_refresh, etc)
+        """
+        
+        # Set up the bare minimum arguments for the function
+        index_name = "test-index"
+        body = AddDocsBodyParams(documents=[{"test": "doc"}],
+                                    nonTensorFields=["field1"],
+                                    imageDownloadHeaders={"header1": "value1"},
+                                    modelAuth=ModelAuth(s3=S3Auth(aws_secret_access_key="test", aws_access_key_id="test")),
+                                    mappings={"map1": "value1"})
+        device = "test-device"
+
+        # Call the function with the arguments
+        result = add_docs_params_orchestrator(index_name, body, device)
+
+        # Assert that the defaults are correct
+        assert isinstance(result, AddDocsParams)
+        assert result.use_existing_tensors == False
+        assert result.auto_refresh == False
+        
+
+
     def test_add_docs_params_orchestrator_deprecated_query_parameters(self):
         # Set up the arguments for the function
         index_name = "test-index"
