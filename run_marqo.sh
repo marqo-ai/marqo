@@ -21,7 +21,7 @@ function wait_for_process () {
     local n_restarts_before_sigkill=3
     local process_name="$1"
     local retries=0
-    while ! [[ $(docker ps -a | grep CONTAINER) ]] >/dev/null 2>&1 && ((retries < max_retries)); do
+    while ! [[ $(docker ps -a | grep CONTAINER) ]] > /dev/null 2>&1 && ((retries < max_retries)); do
         if [ "$MARQO_LOG_LEVEL" = "debug" ]; then
           echo "Process $process_name is not running yet. Retrying in 1 seconds"
           echo "Retry $retries of a maximum of $max_retries retries"
