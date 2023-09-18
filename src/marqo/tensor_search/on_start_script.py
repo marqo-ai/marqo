@@ -8,7 +8,6 @@ from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search import backend, index_meta_cache, utils
 from marqo import config
 from marqo.tensor_search.web import api_utils
-from marqo._httprequests import HttpRequests
 from marqo import errors
 from marqo.tensor_search.throttling.redis_throttle import throttle
 from marqo.connections import redis_driver
