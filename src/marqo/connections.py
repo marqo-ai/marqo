@@ -59,7 +59,7 @@ class RedisDriver:
             self.faulty = False
 
             t1 = time.time()
-            logger.debug(f"Took {((t1-t0)*1000):.3f}ms to connected to redis...")
+            logger.debug(f"Took {((t1-t0)*1000):.3f}ms to connect to redis...")
             logger.info(f"Took {((t1-t0)*1000):.3f}ms to connect to Marqo throttling and load scripts.")
 
         except Exception as e:
