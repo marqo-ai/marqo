@@ -72,7 +72,7 @@ class CUDAAvailable:
 
     """checks the status of cuda
     """
-    logger = get_logger('CUDA device summary')
+    logger = get_logger('DeviceSummary')
 
     def __init__(self):
         
