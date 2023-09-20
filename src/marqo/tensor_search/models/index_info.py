@@ -1,5 +1,5 @@
 import pprint
-from typing import NamedTuple, Any, Dict
+from typing import NamedTuple, Any, Dict, Optional
 from marqo.tensor_search import enums
 from marqo.tensor_search.enums import IndexSettingsField as NsField
 from marqo.tensor_search import configs
@@ -33,8 +33,8 @@ class IndexInfo(NamedTuple):
     index_settings: settings for the index
     """
     model_name: str
-    properties: dict
     index_settings: dict
+    properties: Optional[dict] = None
 
     def get_index_settings(self) -> dict:
         return self.index_settings.copy()

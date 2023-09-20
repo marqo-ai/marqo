@@ -2,6 +2,7 @@ import json
 import os
 from marqo.tensor_search import enums
 from marqo.tensor_search.tensor_search_logging import get_logger
+import subprocess
 import time
 from marqo.tensor_search.enums import EnvVars
 # we need to import backend before index_meta_cache to prevent circular import error:
@@ -23,7 +24,7 @@ def on_start(marqo_os_url: str):
                         DownloadStartText(),
                         CUDAAvailable(), 
                         SetBestAvailableDevice(),
-                        ModelsForCacheing(),
+                        ModelsForCacheing(), 
                         InitializeRedis("localhost", 6379),    # TODO, have these variable
                         DownloadFinishText(),
                         MarqoWelcome(),
@@ -42,31 +43,17 @@ class PopulateCache:
         pass
 
     def run(self):
-        c = config.Config(api_utils.upconstruct_authorized_url(
-            opensearch_url=self.marqo_os_url
-        ))
-        try:
-            index_meta_cache.populate_cache(c)
-        except errors.BackendCommunicationError as e:
-            raise errors.BackendCommunicationError(
-                message="Can't connect to Marqo-os backend. \n"  
-                        "    Possible causes: \n"
-                        "        - If this is an arm64 machine, ensure you are using an external Marqo-os instance \n"
-                        "        - If you are using an external Marqo-os instance, check if it is running: "
-                        "`curl <YOUR MARQO-OS URL>` \n"
-                        "        - Ensure that the OPENSEARCH_URL environment variable defined "
-                        "in the `docker run marqo` command points to Marqo-os\n",
-                link="https://github.com/marqo-ai/marqo/tree/mainline/src/marqo"
-                     "#c-build-and-run-the-marqo-as-a-docker-container-connecting-"
-                     "to-marqo-os-which-is-running-on-the-host"
-            ) from e
-        # the following lines turns off auto create index
-        # connection = HttpRequests(c)
-        # connection.put(
-        #     path="_cluster/settings",
-        #     body={
-        #         "persistent": {"action.auto_create_index": "false"}
-        #     })
+        vespa_config_endpoint = os.getenv("VESPA_CONFIG_URL", "http://localhost:19071")
+        set_up_command = f"vespa config set target {vespa_config_endpoint}"
+        status_check_command = f"vespa status --wait 3"
+        subprocess.run(set_up_command, shell=True, check=True)
+
+        result = subprocess.run(status_check_command, shell=True, check=True, text=True, capture_output=True).stdout
+
+        if "ready" in result:
+            print("Vespa is ready to accept requests")
+        else:
+            errors.BackendCommunicationError(f"Unable to connect to Vespa through endpoint {vespa_config_endpoint}")
 
 
 class CUDAAvailable:
@@ -240,7 +227,7 @@ class DownloadFinishText:
         print('\n')
         print("###########################################################")
         print("###########################################################")
-        print("###### !!COMPLETED SUCCESSFULLY!!!         ################")
+        print("###### !!COMPLETED SUCCESFULLY!!!          ################")
         print("###########################################################")
         print("###########################################################")
         print('\n')

@@ -409,6 +409,10 @@ def validate_index_name(name: str) -> str:
         raise InvalidIndexNameError(
             f"Index name `{name}` starts with a protected prefix. "
             f"Please chose a different name for your index.")
+    if "-" in name:
+        raise InvalidIndexNameError(
+            f"Index name `{name}` contains a hyphen which is not supported in Vespa"
+            f"Please chose a different name for your index.")
     return name
 
 

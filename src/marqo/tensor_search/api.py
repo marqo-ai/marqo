@@ -8,11 +8,12 @@ import pydantic
 from fastapi import FastAPI, Query
 from fastapi import Request, Depends
 from fastapi.responses import JSONResponse
+from vespa.application import Vespa
 
 from marqo import config
 from marqo import version
 from marqo.errors import InvalidArgError, MarqoWebError, MarqoError, BadRequestError
-from marqo.tensor_search import tensor_search
+from marqo.vespa.tensor_search import tensor_search
 from marqo.tensor_search.backend import get_index_info
 from marqo.tensor_search.enums import RequestType
 from marqo.tensor_search.models.add_docs_objects import (AddDocsParams, ModelAuth,
@@ -48,12 +49,13 @@ def replace_host_localhosts(OPENSEARCH_IS_INTERNAL: str, OS_URL: str):
                 return replaced_str
     return OS_URL
 
+
 if __name__ in ["__main__", "api"]:
-    OPENSEARCH_URL = replace_host_localhosts(
-        os.environ.get("OPENSEARCH_IS_INTERNAL", None),
-        os.environ["OPENSEARCH_URL"]
+    VESPA_CONFIG_URL = replace_host_localhosts(
+        os.environ.get("VESPA_CONFIG_URL", None),
+        os.environ["VESPA_CONFIG_URL"]
     )
-    on_start(OPENSEARCH_URL)
+    on_start(VESPA_CONFIG_URL)
 
 app = FastAPI(
     title="Marqo",
@@ -61,11 +63,13 @@ app = FastAPI(
 )
 app.add_middleware(TelemetryMiddleware)
 
+VESPA_URL = 'http://localhost'
+VESPA_URL = os.environ.get("VESPA_URL", VESPA_URL)
+vespa = Vespa(url=VESPA_URL, port=8080)
+
 
 def generate_config() -> config.Config:
-    return config.Config(api_utils.upconstruct_authorized_url(
-        opensearch_url=OPENSEARCH_URL
-    ))
+    return config.Config()
 
 
 @app.exception_handler(MarqoWebError)
@@ -106,6 +110,7 @@ async def validation_exception_handler(request: Request, exc: pydantic.Validatio
     }
     return JSONResponse(content=body, status_code=InvalidArgError.status_code)
 
+
 @app.exception_handler(MarqoError)
 def marqo_internal_exception_handler(request, exc: MarqoError):
     """MarqoErrors are treated as internal errors"""
@@ -129,25 +134,25 @@ def root():
 
 
 @app.post("/indexes/{index_name}")
-def create_index(index_name: str, settings: Dict = None, marqo_config: config.Config = Depends(generate_config)):
-    index_settings = dict() if settings is None else settings
+def create_index(index_name: str, settings_dict: Dict, marqo_config: config.Config = Depends(generate_config)):
     return tensor_search.create_vector_index(
-        config=marqo_config, index_name=index_name, index_settings=index_settings
+        marqo_config, index_name=index_name, index_settings=settings_dict
     )
 
 
 @app.post("/indexes/bulk/search")
 @throttle(RequestType.SEARCH)
 @add_timing
-def bulk_search(query: BulkSearchQuery, device: str = Depends(api_validation.validate_device), marqo_config: config.Config = Depends(generate_config)):
+def bulk_search(query: BulkSearchQuery, device: str = Depends(api_validation.validate_device),
+                marqo_config: config.Config = Depends(generate_config)):
     with RequestMetricsStore.for_request().time(f"POST /indexes/bulk/search"):
         return tensor_search.bulk_search(query, marqo_config, device=device)
+
 
 @app.post("/indexes/{index_name}/search")
 @throttle(RequestType.SEARCH)
 def search(search_query: SearchQuery, index_name: str, device: str = Depends(api_validation.validate_device),
            marqo_config: config.Config = Depends(generate_config)):
-    
     with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/search"):
         return tensor_search.search(
             config=marqo_config, text=search_query.q,
@@ -155,15 +160,14 @@ def search(search_query: SearchQuery, index_name: str, device: str = Depends(api
             searchable_attributes=search_query.searchableAttributes,
             search_method=search_query.searchMethod,
             result_count=search_query.limit, offset=search_query.offset,
-            reranker=search_query.reRanker, 
+            reranker=search_query.reRanker,
             filter=search_query.filter, device=device,
             attributes_to_retrieve=search_query.attributesToRetrieve, boost=search_query.boost,
             image_download_headers=search_query.image_download_headers,
             context=search_query.context,
             score_modifiers=search_query.scoreModifiers,
-            model_auth=search_query.modelAuth
+            model_auth=search_query.modelAuth,
         )
-
 
 
 @app.post("/indexes/{index_name}/documents")
@@ -184,7 +188,6 @@ def add_or_replace_documents(
             api_utils.decode_query_string_model_auth
         ),
         mappings: Optional[dict] = Depends(api_utils.decode_mappings)):
-
     """add_documents endpoint (replace existing docs with the same id)"""
     add_docs_params = api_utils.add_docs_params_orchestrator(index_name=index_name, body=body,
                                                              device=device, auto_refresh=refresh,
@@ -200,11 +203,10 @@ def add_or_replace_documents(
         )
 
 
-
 @app.get("/indexes/{index_name}/documents/{document_id}")
 def get_document_by_id(index_name: str, document_id: str,
-                             marqo_config: config.Config = Depends(generate_config),
-                             expose_facets: bool = False):
+                       marqo_config: config.Config = Depends(generate_config),
+                       expose_facets: bool = False):
     return tensor_search.get_document_by_id(
         config=marqo_config, index_name=index_name, document_id=document_id,
         show_vectors=expose_facets
@@ -238,7 +240,7 @@ def delete_index(index_name: str, marqo_config: config.Config = Depends(generate
 
 @app.post("/indexes/{index_name}/documents/delete-batch")
 def delete_docs(index_name: str, documentIds: List[str], refresh: bool = True,
-                      marqo_config: config.Config = Depends(generate_config)):
+                marqo_config: config.Config = Depends(generate_config)):
     return tensor_search.delete_documents(
         index_name=index_name, config=marqo_config, doc_ids=documentIds,
         auto_refresh=refresh
@@ -269,7 +271,7 @@ def get_indexes(marqo_config: config.Config = Depends(generate_config)):
 
 @app.get("/indexes/{index_name}/settings")
 def get_settings(index_name: str, marqo_config: config.Config = Depends(generate_config)):
-    index_info = get_index_info(config=marqo_config, index_name=index_name)
+    index_info = get_index_info(config=marqo_config, index_name=index_name, vespa_client=vespa)
     return index_info.index_settings
 
 
@@ -279,8 +281,8 @@ def get_loaded_models():
 
 
 @app.delete("/models")
-def eject_model(model_name:str, model_device:str):
-    return tensor_search.eject_model(model_name = model_name, device = model_device)
+def eject_model(model_name: str, model_device: str):
+    return tensor_search.eject_model(model_name=model_name, device=model_device)
 
 
 @app.get("/device/cpu")
@@ -291,6 +293,12 @@ def get_cpu_info():
 @app.get("/device/cuda")
 def get_cuda_info():
     return tensor_search.get_cuda_info()
+
+
+import uvicorn
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="localhost", port=8882)
 
 # try these curl commands:
 
@@ -309,7 +317,6 @@ curl -XPOST  'http://localhost:8882/indexes/my-irst-ix/documents?refresh=true&de
     }
 ]'
 """
-
 
 # SEARCH DOCS
 """

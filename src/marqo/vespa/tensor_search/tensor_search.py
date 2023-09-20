@@ -31,12 +31,21 @@ Notes on search behaviour with caching and searchable attributes:
 
 """
 import copy
+import os
 import json
 from collections import defaultdict
 from contextlib import ExitStack
+from itertools import chain
 from timeit import default_timer as timer
 import functools
 import pprint
+import typing
+import shutil
+
+from vespa.io import VespaQueryResponse
+
+from marqo.errors import InvalidArgError
+import re
 import typing
 from marqo.tensor_search.models.private_models import ModelAuth
 import uuid
@@ -79,6 +88,8 @@ from marqo.s2_inference import errors as s2_inference_errors
 import threading
 from dataclasses import replace
 from marqo.tensor_search.tensor_search_logging import get_logger
+from vespa.application import Vespa
+from marqo.vespa.tensor_search.deployment import MarqoVespa
 
 logger = get_logger(__name__)
 
@@ -124,9 +135,274 @@ def _add_knn_field(ix_settings: dict):
     return ix_settings_with_knn
 
 
-def create_vector_index(
-        config: Config, index_name: str, media_type: Union[str, MediaType] = MediaType.default,
-        refresh_interval: str = "1s", index_settings=None):
+def _generate_index_schema(index_name: str, ix_settings: Dict) -> str:
+    model_properties = get_model_properties_from_index_defaults(ix_settings[NsField.index_defaults],
+                                                                ix_settings[NsField.index_defaults][NsField.model])
+    dimension = _get_dimension_from_model_properties(model_properties)
+
+    fields_script = ""
+    document_structure = ix_settings["documents_structure"]
+
+    for field in document_structure:
+        field_name = field["field_name"]
+        field_type = field["type"]
+        indexing_options = " | ".join(field["indexing_options"])
+        if "index_options" in field and "bm25" in field["index_options"]:
+            index_option = "index: enable-bm25"
+        else:
+            index_option = ""
+
+        if "attribute_options" in field and "fast-search" in field["attribute_options"]:
+            attribute_option = "attribute: fast-search\nmatch: exact"
+        else:
+            attribute_option = ""
+
+        fields_script += f"""
+        field {field_name} type {field_type} {{
+            indexing: {indexing_options}
+            {index_option}
+            {attribute_option}
+        }}
+        """
+
+    base_schema = f"""
+schema {index_name} {{
+    document {index_name} {{
+        {fields_script}
+        field marqo_chunks type array<string> {{
+            indexing: attribute
+        }} 
+        field marqo_embeddings type tensor<float>(p{{}},x[{dimension}]) {{
+            indexing: attribute | index
+            attribute {{
+                distance-metric: prenormalized-angular
+            }}
+            index {{
+                hnsw {{
+                    max-links-per-node: 16
+                    neighbors-to-explore-at-insert: 512
+                }}
+            }}
+        }} 
+    }}
+    {_generate_document_summaries(document_structure, dimension)}
+    {_generate_fieldsets(document_structure)}
+    {_generate_rank_profiles(document_structure, dimension)}
+}}
+"""
+
+    logger.debug(base_schema)
+
+    return base_schema
+
+
+def _generate_document_summaries(document_structure: dict, dimension: int) -> str:
+    # all_non_vector = [f['field_name'] for f in document_structure] + ["marqo_chunks"]
+    # all = all_non_vector + ["marqo_embeddings"]
+    all_non_vector = '\n'.join([
+                                   f"summary {f['field_name']} type {f['type']} {{}}"
+                                   for f in document_structure if 'attribute' in f['indexing_options']
+                               ] + [
+                                   "summary marqo_chunks type array<string> {}"
+                               ])
+
+    return f"""
+     document-summary all-non-vector-summary {{
+        {all_non_vector}
+    }}
+    document-summary all-summary {{
+        {all_non_vector}
+        summary marqo_embeddings type tensor<float>(p{{}},x[{dimension}]) {{}}
+    }}
+"""
+
+
+def _field_is_pointer(field: dict) -> bool:
+    return "pointer" in field and field["pointer"]
+
+
+def _generate_fieldsets(document_structure: dict) -> str:
+    str_fields = [f['field_name'] for f in document_structure if f["type"] in ["string", "array<string>"]
+                  and not _field_is_pointer(f)
+                  and 'index_options' in f and 'bm25' in f['index_options']]
+    return f"""
+    fieldset default {{
+           fields: {','.join(str_fields)}
+    }}
+"""
+
+
+def _generate_rank_profiles(document_structure: dict, dimension: int) -> str:
+    num_fields = [f['field_name'] for f in document_structure if f["type"] in ["int", "float"]]
+    str_fields = [f['field_name'] for f in document_structure if f["type"] == "string"
+                  and not _field_is_pointer(f)
+                  and 'index_options' in f and 'bm25' in f['index_options']]
+
+    inputs = [[
+        f"query(rank_weight_mult_{f}): 0.0",
+        f"query(rank_weight_add_{f}): 0.0"
+    ] for f in num_fields]
+    # flatten
+    inputs = '\n'.join(list(chain.from_iterable(inputs)))
+
+    functions = [[
+        f"function rank_mult_{f}() {{expression: if (attribute({f}) > 0, "
+        f"if (query(rank_weight_mult_{f}) > 0, query(rank_weight_mult_{f}) * "
+        f"attribute({f}), 1), 1)}}",
+
+        f"function rank_add_{f}() {{expression: if (attribute({f}) > 0, "
+        f"if (query(rank_weight_add_{f}) > 0, query(rank_weight_add_{f}) * "
+        f"attribute({f}), 0), 0)}}"
+    ] for f in num_fields]
+    # flatten
+    functions = '\n'.join(list(chain.from_iterable(functions)))
+
+    mult_exp = '*'.join([f"rank_mult_{f}" for f in num_fields]) if len(num_fields) > 0 else "1"
+    add_exp = "+".join([f"rank_add_{f}" for f in num_fields]) if len(num_fields) > 0 else "0"
+
+    modifiers_profile = f"""
+    rank-profile modifiers inherits default {{
+        inputs {{
+            {inputs}
+        }}
+        {functions}
+        function modify(score) {{
+            expression: {mult_exp} * score + {add_exp}
+        }}
+    }}
+"""
+    bm25_exp = "+".join([f'bm25({f})' for f in str_fields])
+
+    return f"""
+    {modifiers_profile}
+    rank-profile bm25 inherits default {{
+        first-phase {{
+            expression: {bm25_exp}
+        }}
+    }}
+    rank-profile bm25_modifiers inherits modifiers {{
+        first-phase {{
+            expression: {bm25_exp}
+        }}
+    }}
+    rank-profile embedding_similarity inherits default {{
+        inputs {{
+            query(query_embedding) tensor<float>(x[{dimension}])
+        }}
+        first-phase {{
+            expression: closeness(field, marqo_embeddings)
+        }}
+        match-features: closest(marqo_embeddings)
+    }}
+    rank-profile embedding_similarity_modifiers inherits modifiers {{
+        inputs {{
+            query(query_embedding) tensor<float>(x[{dimension}])
+        }}
+        first-phase {{
+            expression: modify((closeness(field, marqo_embeddings)))
+        }}
+        match-features: closest(marqo_embeddings)
+    }}
+    rank-profile hybrid inherits default {{
+        inputs {{
+            query(query_embedding) tensor<float>(x[{dimension}])
+        }}
+        first-phase {{
+            expression: {bm25_exp} + closeness(field, marqo_embeddings)
+        }}
+    }}
+    rank-profile hybrid_modifiers inherits modifiers {{
+        inputs {{
+            query(query_embedding) tensor<float>(x[{dimension}])
+        }}
+        first-phase {{
+            expression: modify({bm25_exp} + closeness(field, marqo_embeddings))
+        }}
+    }}
+    """
+
+
+def _write_schema_to_path(schema_string: Dict, filename: str) -> str:
+    with open(filename, 'w') as file:
+        file.write(schema_string)
+    return filename
+
+
+def _extract_schema_name(schema_content: str) -> str:
+    # Regular expression pattern to match the schema name
+    schema_name_pattern = r"schema\s+(\w+)\s*{"
+    # Find the schema name using regular expression
+    match = re.search(schema_name_pattern, schema_content)
+    return match.group(1)
+
+
+def _add_new_schema_to_service_xml(service_xml_content: str, new_schema_name: str) -> None:
+    # Find the position where the new line should be inserted
+    insertion_point = service_xml_content.find('<documents>') + len('<documents>')
+
+    # Construct the new line with the provided schema name
+    new_line = f'\n      <document type=\'{new_schema_name}\' mode="index"/>'
+
+    # Only insert new line if it doesn't already exist
+    if new_line not in service_xml_content:
+        # Insert the new line into the service.xml content
+        modified_service_xml_content = (
+                service_xml_content[:insertion_point] +
+                new_line +
+                service_xml_content[insertion_point:]
+        )
+    else:
+        modified_service_xml_content = service_xml_content
+    return modified_service_xml_content
+
+
+def _wrap_new_schemas_in_application_package(service_file: str, hosts_file: str, existing_schemas: List[str],
+                                             index_schema: str) -> str:
+    """
+    Args:
+        service_file: Existing service files
+        existing_schemas: Existing schemas
+        index_schema: New schema to be added for the new index
+    Returns:
+        Path to the directory of the application package, which contains the service files and schemas
+    """
+    # Create a directory for the temporary application package
+    temp_dir = './marqo_vespa_cache/temp_application'
+    if os.path.exists(temp_dir):
+        shutil.rmtree(temp_dir)
+    os.makedirs(temp_dir, exist_ok=True)
+    os.makedirs(os.path.join(temp_dir, 'schemas'), exist_ok=True)
+
+    # Write existing schema strings to the temp directory and create filenames
+    schema_filenames = []
+    for schema_content in existing_schemas:
+        schema_name = _extract_schema_name(schema_content)
+
+        schema_filename = os.path.join(temp_dir, 'schemas', f"{schema_name}.sd")
+        schema_filenames.append(schema_filename)
+        with open(schema_filename, 'w') as target_schema_file:
+            target_schema_file.write(schema_content)
+
+    # Write index schema to the temp directory
+    target_index_schema_path = os.path.join(temp_dir, 'schemas', f'{_extract_schema_name(index_schema)}.sd')
+    with open(target_index_schema_path, 'w') as index_schema_file:
+        index_schema_file.write(index_schema)
+
+    # Write hosts file to the temp directory
+    if hosts_file:
+        target_hosts_path = os.path.join(temp_dir, 'hosts.xml')
+        with open(target_hosts_path, 'w') as target_hosts_file:
+            target_hosts_file.write(hosts_file)
+
+    # Write service files to the temp directory
+    target_service_path = os.path.join(temp_dir, 'services.xml')
+    with open(target_service_path, 'w') as target_service_file:
+        modified_service_file = _add_new_schema_to_service_xml(service_file, _extract_schema_name(index_schema))
+        target_service_file.write(modified_service_file)
+    return temp_dir
+
+
+def create_vector_index(config: Config, index_name: str, index_settings=None):
     """
     Args:
         media_type: 'text'|'image'
@@ -140,68 +416,29 @@ def create_vector_index(
     else:
         the_index_settings = configs.get_default_index_settings()
 
-    validation.validate_settings_object(settings_object=the_index_settings)
-
-    vector_index_settings = {
-        "settings": {
-            "index": {
-                "knn": True,
-                "knn.algo_param.ef_search": 100,
-                "refresh_interval": refresh_interval,
-                "store.hybrid.mmap.extensions": ["nvd", "dvd", "tim", "tip", "dim", "kdd", "kdi", "cfs", "doc", "vec",
-                                                 "vex"]
-            },
-            "number_of_shards": the_index_settings[NsField.number_of_shards],
-            "number_of_replicas": the_index_settings[NsField.number_of_replicas],
-        },
-        "mappings": {
-            "_meta": {
-                "media_type": media_type,
-            },
-            "dynamic_templates": [
-                {
-                    "strings": {
-                        "match_mapping_type": "string",
-                        "mapping": {
-                            "type": "text"
-                        }
-                    }
-                }
-            ],
-            "properties": {
-                TensorField.chunks: {
-                    "type": "nested",
-                    "properties": {
-                        TensorField.field_name: {
-                            "type": "keyword"
-                        },
-                        TensorField.field_content: {
-                            "type": "text"
-                        },
-                    }
-                }
-            }
-        }
-    }
-    max_marqo_fields = utils.read_env_vars_and_defaults(EnvVars.MARQO_MAX_INDEX_FIELDS)
-
-    if max_marqo_fields is not None:
-        max_os_fields = _marqo_field_limit_to_os_limit(int(max_marqo_fields))
-        vector_index_settings["settings"]["mapping"] = {"total_fields": {"limit": int(max_os_fields)}}
-
     model_name = the_index_settings[NsField.index_defaults][NsField.model]
-    vector_index_settings["mappings"]["_meta"][NsField.index_settings] = the_index_settings
-    vector_index_settings["mappings"]["_meta"]["model"] = model_name
 
-    vector_index_settings_with_knn = _add_knn_field(ix_settings=vector_index_settings)
+    index_schema = _generate_index_schema(index_name, the_index_settings)
 
-    logger.debug(f"Creating index {index_name} with settings: {vector_index_settings_with_knn}")
-    response = HttpRequests(config).put(path=index_name, body=vector_index_settings_with_knn)
+    vespa_instance = MarqoVespa(config, index_name)
+    service_file = vespa_instance.get_service_file()
+    hosts_file = vespa_instance.get_hosts_file()
+    existing_schemas = vespa_instance.get_existing_schemas()
+
+    wrapped_file_path = _wrap_new_schemas_in_application_package(
+        service_file=service_file, hosts_file=hosts_file, existing_schemas=existing_schemas, index_schema=index_schema)
+
+    vespa_index_info = {
+        "model_name": model_name,
+        "index_settings": the_index_settings,
+    }
 
     get_cache()[index_name] = IndexInfo(
-        model_name=model_name, properties=vector_index_settings_with_knn["mappings"]["properties"].copy(),
-        index_settings=the_index_settings
-    )
+        **vespa_index_info)
+
+    response = vespa_instance.deploy(wrapped_file_path)
+    vespa_instance.feed_index_settings(vespa_index_info)
+
     return response
 
 
@@ -366,14 +603,11 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
     if add_docs_params.mappings is not None:
         validate_mappings = validation.validate_mappings(add_docs_params.mappings)
 
-    existing_fields = set(index_info.properties.keys())
-    new_fields = set()
-
     # A dict to store the multimodal_fields and their (child_fields, opensearch_type)
     # dict = {parent_field_1 : set((child_field_1, type), ),
     #      =  parent_field_2 : set((child_field_1, type), )}
     # Check backend to see the differences between multimodal_fields and new_fields
-    new_obj_fields = dict()
+    # new_obj_fields = dict()
 
     unsuccessful_docs = []
     total_vectorise_time = 0
@@ -383,11 +617,11 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
     with ExitStack() as exit_stack:
         if index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]:
             with RequestMetricsStore.for_request().time(
-                "image_download.full_time",
-                lambda t: logger.debug(
-                    f"add_documents image download: took {t:.3f}ms to concurrently download "
-                    f"images for {batch_size} docs using {add_docs_params.image_download_thread_count} threads"
-                )
+                    "image_download.full_time",
+                    lambda t: logger.debug(
+                        f"add_documents image download: took {t:.3f}ms to concurrently download "
+                        f"images for {batch_size} docs using {add_docs_params.image_download_thread_count} threads"
+                    )
             ):
                 if add_docs_params.tensor_fields and '_id' in add_docs_params.tensor_fields:
                     raise errors.BadRequestError(message="`_id` field cannot be a tensor field.")
@@ -402,18 +636,19 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                 )
 
         if add_docs_params.use_existing_tensors:
-            doc_ids = []
-
-            # Iterate through the list in reverse, only latest doc with dupe id gets added.
-            for i in range(len(add_docs_params.docs)-1, -1, -1):
-                if ("_id" in add_docs_params.docs[i]) and (add_docs_params.docs[i]["_id"] not in doc_ids):
-                    doc_ids.append(add_docs_params.docs[i]["_id"])
-            existing_docs = _get_documents_for_upsert(
-                config=config, index_name=add_docs_params.index_name, document_ids=doc_ids)
+            raise errors.MarqoWebError('use_existing_tensors is not currently supported with Vespa')
+            # doc_ids = []
+            #
+            # # Iterate through the list in reverse, only latest doc with dupe id gets added.
+            # for i in range(len(add_docs_params.docs) - 1, -1, -1):
+            #     if ("_id" in add_docs_params.docs[i]) and (add_docs_params.docs[i]["_id"] not in doc_ids):
+            #         doc_ids.append(add_docs_params.docs[i]["_id"])
+            # existing_docs = _get_documents_for_upsert(
+            #     config=config, index_name=add_docs_params.index_name, document_ids=doc_ids)
 
         for i, doc in enumerate(add_docs_params.docs):
 
-            indexing_instructions = {'index': {"_index": add_docs_params.index_name}}
+            # indexing_instructions = {'index': {"_index": add_docs_params.index_name}}
             copied = copy.deepcopy(doc)
 
             document_is_valid = True
@@ -437,38 +672,46 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                 )
                 continue
 
-            indexing_instructions["index"]["_id"] = doc_id
-            if add_docs_params.use_existing_tensors:
-                matching_doc = [doc for doc in existing_docs["docs"] if doc["_id"] == doc_id]
-                # Should only have 1 result, as only 1 id matches
-                if len(matching_doc) == 1:
-                    existing_doc = matching_doc[0]
-                # When a request isn't sent to get matching docs, because the added docs don't
-                # have IDs:
-                elif len(matching_doc) == 0:
-                    existing_doc = {"found": False}
-                else:
-                    raise errors.InternalError(message= f"Upsert: found {len(matching_doc)} matching docs for {doc_id} when only 1 or 0 should have been found.")
+            # indexing_instructions["index"]["_id"] = doc_id
+
+            # if add_docs_params.use_existing_tensors:
+            #     matching_doc = [doc for doc in existing_docs["docs"] if doc["_id"] == doc_id]
+            #     # Should only have 1 result, as only 1 id matches
+            #     if len(matching_doc) == 1:
+            #         existing_doc = matching_doc[0]
+            #     # When a request isn't sent to get matching docs, because the added docs don't
+            #     # have IDs:
+            #     elif len(matching_doc) == 0:
+            #         existing_doc = {"found": False}
+            #     else:
+            #         raise errors.InternalError(
+            #             message=f"Upsert: found {len(matching_doc)} matching docs for {doc_id} when only 1 or 0 should have been found.")
 
             # Metadata can be calculated here at the doc level.
             # Only add chunk values which are string, boolean, numeric or dictionary.
             # Dictionary keys will be store in a list.
-            chunk_values_for_filtering = {}
-            for key, value in copied.items():
-                if not (isinstance(value, str) or isinstance(value, float)
-                        or isinstance(value, bool) or isinstance(value, int)
-                        or isinstance(value, list) or isinstance(value, dict)):
-                    continue
-                chunk_values_for_filtering[key] = value
+            # chunk_values_for_filtering = {}
+            # for key, value in copied.items():
+            #     if not (isinstance(value, str) or isinstance(value, float)
+            #             or isinstance(value, bool) or isinstance(value, int)
+            #             or isinstance(value, list) or isinstance(value, dict)):
+            #         continue
+            #     chunk_values_for_filtering[key] = value
 
             chunks = []
+            embeddings = []
+            fields_to_add = {}
+            fields_to_remove = []
 
             for field in copied:
+                if '::' in field:
+                    raise InvalidArgError(f'Illegal field name {field}. Field names cannot contain "::"')
 
                 try:
                     field_content = validation.validate_field_content(
                         field_content=copied[field],
-                        is_non_tensor_field=not utils.is_tensor_field(field, add_docs_params.tensor_fields, add_docs_params.non_tensor_fields)
+                        is_non_tensor_field=not utils.is_tensor_field(field, add_docs_params.tensor_fields,
+                                                                      add_docs_params.non_tensor_fields)
                     )
                     if isinstance(field_content, dict):
                         field_content = validation.validate_dict(
@@ -484,8 +727,8 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                     )
                     break
 
-                if (field not in existing_fields) and (not isinstance(field_content, dict)):
-                    new_fields_from_doc.add((field, _infer_opensearch_data_type(copied[field])))
+                # if (field not in existing_fields) and (not isinstance(field_content, dict)):
+                #     new_fields_from_doc.add((field, _infer_opensearch_data_type(copied[field])))
 
                 # Don't process text/image fields when explicitly told not to.
                 if not utils.is_tensor_field(field, add_docs_params.tensor_fields, add_docs_params.non_tensor_fields):
@@ -493,14 +736,16 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
 
                 # chunks generated by processing this field for this doc:
                 chunks_to_append = []
+                embeddings_to_append = []
                 # Check if content of this field changed. If no, skip all chunking and vectorisation
-                if (add_docs_params.use_existing_tensors
-                        and existing_doc["found"]
-                        and (field in existing_doc["_source"]) and (existing_doc["_source"][field] == field_content)):
-                    chunks_to_append = _get_chunks_for_field(field_name=field, doc_id=doc_id, doc=existing_doc)
+                # if (add_docs_params.use_existing_tensors
+                #         and existing_doc["found"]
+                #         and (field in existing_doc["_source"]) and (existing_doc["_source"][field] == field_content)):
+                #     chunks_to_append = _get_chunks_for_field(field_name=field, doc_id=doc_id, doc=existing_doc)
 
                 # Chunk and vectorise, since content changed.
-                elif isinstance(field_content, (str, Image.Image)):
+                # elif isinstance(field_content, (str, Image.Image)):
+                if isinstance(field_content, (str, Image.Image)):
 
                     # TODO: better/consistent handling of a no-op for processing (but still vectorize)
 
@@ -520,7 +765,8 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                         split_overlap = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][
                             NsField.split_overlap]
                         content_chunks = text_processor.split_text(field_content, split_by=split_by,
-                                                                   split_length=split_length, split_overlap=split_overlap)
+                                                                   split_length=split_length,
+                                                                   split_overlap=split_overlap)
                         text_chunks = content_chunks
                     else:
                         # TODO put the logic for getting field parameters into a function and add per field options
@@ -603,65 +849,92 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
 
                     for text_chunk, vector_chunk in zip(text_chunks, vector_chunks):
                         # We do not put in metadata yet at this stage.
-                        chunks_to_append.append({
-                            TensorField.marqo_knn_field: vector_chunk,
-                            TensorField.field_content: text_chunk,
-                            TensorField.field_name: field
-                        })
+                        # chunks_to_append.append({
+                        #     TensorField.marqo_knn_field: vector_chunk,
+                        #     TensorField.field_content: text_chunk,
+                        #     TensorField.field_name: field
+                        # })
+                        # chunks_to_append.append(f'{field}::{text_chunk}')
+                        chunks_to_append.append(text_chunk)
+                        embeddings_to_append.append(vector_chunk)
 
                 elif isinstance(field_content, dict):
                     if add_docs_params.mappings[field]["type"] == "multimodal_combination":
                         (combo_chunk, combo_document_is_valid,
                          unsuccessful_doc_to_append, combo_vectorise_time_to_add,
                          new_fields_from_multimodal_combination) = vectorise_multimodal_combination_field(
-                                field, field_content, copied, i, doc_id, add_docs_params.device, index_info,
-                                image_repo, add_docs_params.mappings[field], model_auth=add_docs_params.model_auth)
+                            field, field_content, copied, i, doc_id, add_docs_params.device, index_info,
+                            image_repo, add_docs_params.mappings[field], model_auth=add_docs_params.model_auth)
                         total_vectorise_time = total_vectorise_time + combo_vectorise_time_to_add
                         if combo_document_is_valid is False:
                             unsuccessful_docs.append(unsuccessful_doc_to_append)
                             break
                         else:
-                            if field not in new_obj_fields:
-                                new_obj_fields[field] = set()
-                            new_obj_fields[field] = new_obj_fields[field].union(new_fields_from_multimodal_combination)
-                            # TODO: we may want to use chunks_to_append here to make it uniform with use_existing_tensors and normal vectorisation
-                            chunks.append({**combo_chunk, **chunk_values_for_filtering})
-                            continue
+                            # chunks_to_append.append(f'{field}::{combo_chunk[TensorField.field_content]}')
+                            chunks_to_append.append(combo_chunk[TensorField.field_content])
+                            embeddings_to_append.append(combo_chunk[TensorField.marqo_knn_field])
+                            fields_to_remove.append(field)
+                            for subfield in field_content:
+                                if subfield in copied:
+                                    err = errors.InvalidArgError(f"Field {subfield} already exists in document.")
+                                    unsuccessful_docs.append(
+                                        (i, {'_id': doc_id, 'error': err.message, 'status': int(err.status_code),
+                                             'code': err.code})
+                                    )
+                                    document_is_valid = False
+                                    break
+
+                                fields_to_add[subfield] = field_content[subfield]
 
                 # Add chunks_to_append along with doc metadata to total chunks
-                for chunk in chunks_to_append:
-                    chunks.append({**chunk, **chunk_values_for_filtering})
+                # for chunk in chunks_to_append:
+                #     chunks.append({**chunk, **chunk_values_for_filtering})
+                # chunks.extend(chunks_to_append)
+                # embeddings.extend(embeddings_to_append)
+                fields_to_add[f"marqo_chunks_{field}"] = chunks_to_append
+                fields_to_add[f"marqo_embeddings_{field}"] = {f"{i}": embeddings_to_append[i] for i in
+                                                              range(len(embeddings_to_append))}
 
             if document_is_valid:
-                new_fields = new_fields.union(new_fields_from_doc)
-                copied[TensorField.chunks] = chunks
-                bulk_parent_dicts.append(indexing_instructions)
-                bulk_parent_dicts.append(copied)
+                # remove multimodal fields
+                copied = {k: v for k, v in copied.items() if k not in fields_to_remove}
+                # add new fields from multimodal fields
+                copied.update(fields_to_add)
+                # copied["marqo_chunks"] = chunks
+                # copied["marqo_embeddings"] = {f"{i}": embeddings[i] for i in range(len(embeddings))}
+                vespa_doc = {"fields": copied, "id": doc_id}
+                bulk_parent_dicts.append(vespa_doc)
 
-        total_preproc_time = 0.001 * RequestMetricsStore.for_request().stop("add_documents.processing_before_opensearch")
-        logger.debug(f"      add_documents pre-processing: took {(total_preproc_time):.3f}s total for {batch_size} docs, "
-                    f"for an average of {(total_preproc_time / batch_size):.3f}s per doc.")
+        total_preproc_time = 0.001 * RequestMetricsStore.for_request().stop(
+            "add_documents.processing_before_opensearch")
+        logger.debug(
+            f"      add_documents pre-processing: took {(total_preproc_time):.3f}s total for {batch_size} docs, "
+            f"for an average of {(total_preproc_time / batch_size):.3f}s per doc.")
 
         logger.debug(f"          add_documents vectorise: took {(total_vectorise_time):.3f}s for {batch_size} docs, "
-                    f"for an average of {(total_vectorise_time / batch_size):.3f}s per doc.")
+                     f"for an average of {(total_vectorise_time / batch_size):.3f}s per doc.")
 
         if bulk_parent_dicts:
             # the HttpRequest wrapper handles error logic
-            update_mapping_response = backend.add_customer_field_properties(
-                config=config, index_name=add_docs_params.index_name, customer_field_names=new_fields,
-                multimodal_combination_fields=new_obj_fields)
+            # update_mapping_response = backend.add_customer_field_properties(
+            #     config=config, index_name=add_docs_params.index_name, customer_field_names=new_fields,
+            #     multimodal_combination_fields=new_obj_fields)
 
             # ADD DOCS TIMER-LOGGER (5)
             start_time_5 = timer()
-            with RequestMetricsStore.for_request().time("add_documents.opensearch._bulk"):
-                serialised_body = utils.dicts_to_jsonl(bulk_parent_dicts)
-                index_parent_response = HttpRequests(config).post(
-                    path="_bulk", body=serialised_body)
-            RequestMetricsStore.for_request().add_time("add_documents.opensearch._bulk.internal", float(index_parent_response["took"]))
+            with RequestMetricsStore.for_request().time("add_documents.vespa._bulk"):
+                # serialised_body = utils.dicts_to_jsonl(bulk_parent_dicts)
+                # index_parent_response = HttpRequests(config).post(
+                #     path="_bulk", body=serialised_body)
+                index_response = config.vespa_feed_client.feed_batch(bulk_parent_dicts, add_docs_params.index_name)
+
+            # RequestMetricsStore.for_request().add_time("add_documents.opensearch._bulk.internal",
+            #                                            float(index_parent_response["took"]))
 
             end_time_5 = timer()
             total_http_time = end_time_5 - start_time_5
-            total_index_time = index_parent_response["took"] * 0.001
+            # total_index_time = index_parent_response["took"] * 0.001
+            total_index_time = -1
             logger.debug(
                 f"      add_documents roundtrip: took {(total_http_time):.3f}s to send {batch_size} docs (roundtrip) to Marqo-os, "
                 f"for an average of {(total_http_time / batch_size):.3f}s per doc.")
@@ -670,31 +943,30 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                 f"          add_documents Marqo-os index: took {(total_index_time):.3f}s for Marqo-os to index {batch_size} docs, "
                 f"for an average of {(total_index_time / batch_size):.3f}s per doc.")
         else:
-            index_parent_response = None
+            index_response = None
 
         with RequestMetricsStore.for_request().time("add_documents.postprocess"):
-            if add_docs_params.auto_refresh:
-                HttpRequests(config).post(path=F"{add_docs_params.index_name}/_refresh")
+            # if add_docs_params.auto_refresh:
+            #     HttpRequests(config).post(path=F"{add_docs_params.index_name}/_refresh")
 
             t1 = timer()
 
             def translate_add_doc_response(response: Optional[dict], time_diff: float) -> dict:
                 """translates OpenSearch response dict into Marqo dict"""
-                item_fields_to_remove = ['_index', '_primary_term', '_seq_no', '_shards', '_version']
+                # item_fields_to_remove = ['_index', '_primary_term', '_seq_no', '_shards', '_version']
                 result_dict = {}
                 new_items = []
 
                 if response is not None:
-                    copied_res = copy.deepcopy(response)
-
-                    result_dict['errors'] = copied_res['errors']
-                    actioned = "index"
-
-                    for item in copied_res["items"]:
-                        for to_remove in item_fields_to_remove:
-                            if to_remove in item[actioned]:
-                                del item[actioned][to_remove]
-                        new_items.append(item[actioned])
+                    result_dict['errors'] = any(item.status_code != 200 for item in response)
+                    new_items.extend([
+                        {
+                            '_id': item.json['id'].split('::')[1],
+                            'result': 'created',
+                            'status': item.status_code
+                        } for item in response if item.status_code == 200])
+                    new_items.extend([
+                        item.json for item in response if item.status_code != 200])
 
                 if unsuccessful_docs:
                     result_dict['errors'] = True
@@ -707,7 +979,8 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                 result_dict["items"] = new_items
                 return result_dict
 
-            return translate_add_doc_response(response=index_parent_response, time_diff=t1 - t0)
+            # return translate_add_doc_response(response=index_parent_response, time_diff=t1 - t0)
+            return translate_add_doc_response(response=index_response, time_diff=t1 - t0)
 
 
 def get_document_by_id(
@@ -894,12 +1167,14 @@ def bulk_search(query: BulkSearchQuery, marqo_config: config.Config, verbose: in
     else:
         selected_device = device
 
-    tensor_queries: Dict[int, BulkSearchQueryEntity] = dict(filter(lambda e: e[1].searchMethod == SearchMethod.TENSOR, enumerate(query.queries)))
-    lexical_queries: Dict[int, BulkSearchQueryEntity] = dict(filter(lambda e: e[1].searchMethod == SearchMethod.LEXICAL, enumerate(query.queries)))
+    tensor_queries: Dict[int, BulkSearchQueryEntity] = dict(
+        filter(lambda e: e[1].searchMethod == SearchMethod.TENSOR, enumerate(query.queries)))
+    lexical_queries: Dict[int, BulkSearchQueryEntity] = dict(
+        filter(lambda e: e[1].searchMethod == SearchMethod.LEXICAL, enumerate(query.queries)))
 
     tensor_search_results = dict(zip(tensor_queries.keys(), _bulk_vector_text_search(
-            marqo_config, list(tensor_queries.values()), device=selected_device,
-        )))
+        marqo_config, list(tensor_queries.values()), device=selected_device,
+    )))
 
     # TODO: combine lexical + tensor queries into /_msearch
     lexical_search_results = dict(zip(lexical_queries.keys(), [_lexical_search(
@@ -935,15 +1210,18 @@ def bulk_search(query: BulkSearchQuery, marqo_config: config.Config, verbose: in
     }
 
 
-def rerank_query(query: BulkSearchQueryEntity, result: Dict[str, Any], reranker: Union[str, Dict], device: str, num_highlights: int):
+def rerank_query(query: BulkSearchQueryEntity, result: Dict[str, Any], reranker: Union[str, Dict], device: str,
+                 num_highlights: int):
     if query.searchableAttributes is None:
-        raise errors.InvalidArgError(f"searchable_attributes cannot be None when re-ranking. Specify which fields to search and rerank over.")
+        raise errors.InvalidArgError(
+            f"searchable_attributes cannot be None when re-ranking. Specify which fields to search and rerank over.")
     try:
         start_rerank_time = timer()
         rerank.rerank_search_results(search_result=result, query=query.q,
                                      model_name=reranker, device=device,
                                      searchable_attributes=query.searchableAttributes, num_highlights=num_highlights)
-        logger.debug(f"search ({query.searchMethod.lower()}) reranking using {reranker}: took {(timer() - start_rerank_time):.3f}s to rerank results.")
+        logger.debug(
+            f"search ({query.searchMethod.lower()}) reranking using {reranker}: took {(timer() - start_rerank_time):.3f}s to rerank results.")
     except Exception as e:
         raise errors.BadRequestError(f"reranking failure due to {str(e)}")
 
@@ -1010,7 +1288,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
     if offset < 0:
         raise errors.IllegalRequestedDocCount("search result offset cannot be less than 0!")
 
-        # validate query
+    # validate query
     validation.validate_query(q=text, search_method=search_method)
 
     # Validate result_count + offset <= int(max_docs_limit)
@@ -1064,10 +1342,10 @@ def search(config: Config, index_name: str, text: Union[str, dict],
             model_auth=model_auth
         )
     elif search_method.upper() == SearchMethod.LEXICAL:
-        search_result = _lexical_search(
+        search_result = _vespa_lexical_search(
             config=config, index_name=index_name, text=text, result_count=result_count, offset=offset,
             searchable_attributes=searchable_attributes, verbose=verbose,
-            filter_string=filter, attributes_to_retrieve=attributes_to_retrieve
+            filter_string=filter, attributes_to_retrieve=attributes_to_retrieve, score_modifiers=score_modifiers,
         )
     else:
         raise errors.InvalidArgError(f"Search called with unknown search method: {search_method}")
@@ -1107,10 +1385,70 @@ def search(config: Config, index_name: str, text: Union[str, dict],
     return search_result
 
 
+def _vespa_lexical_search(
+        config: Config, index_name: str, text: str, result_count: int = 3, offset: int = 0,
+        searchable_attributes: Sequence[str] = None, verbose: int = 0, filter_string: str = None,
+        attributes_to_retrieve: Optional[List[str]] = None, expose_facets: bool = False,
+        score_modifiers: Optional[ScoreModifier] = None):
+    if not isinstance(text, str):
+        raise errors.InvalidArgError(
+            f"Query arg must be of type str! text arg is of type {type(text)}. "
+            f"Query arg: {text}")
+
+    # SEARCH TIMER-LOGGER (pre-processing)
+    RequestMetricsStore.for_request().start("search.lexical.processing_before_opensearch")
+    if searchable_attributes is not None:
+        # Empty searchable attributes should produce empty results.
+        if len(searchable_attributes) == 0:
+            return {"hits": []}
+
+    select_atts = ','.join(attributes_to_retrieve) if attributes_to_retrieve else '*'
+    filter_term = 'and ({grammar:"weakAnd", ranked:false}userInput(@uf))' if filter_string else ''
+    if searchable_attributes is not None:
+        query_term = 'weakAnd(' + ','.join(
+            [f'({{grammar:"tokenize", defaultIndex:"{f}"}}userInput(@uq))' for f in searchable_attributes]
+        ) + ')'
+    else:
+        query_term = '({grammar:"tokenize"}userInput(@uq))'
+
+    if score_modifiers:
+        score_modifiers_query = construct_vespa_score_modifiers(score_modifiers)
+    else:
+        score_modifiers_query = {}
+
+    body = {
+        'yql': f'select {select_atts} from {index_name} where {query_term} {filter_term}',
+        'model.restrict': index_name,
+        'hits': result_count,
+        'ranking': 'bm25_modifiers' if score_modifiers else 'bm25',
+        'uq': text,
+        'uf': filter_string if filter_string else '',
+        **score_modifiers_query
+    }
+
+    total_preprocess_time = RequestMetricsStore.for_request().stop("search.lexical.processing_before_opensearch")
+    logger.debug(f"search (lexical) pre-processing: took {(total_preprocess_time):.3f}ms to process query.")
+    logger.debug(f'Query: {body}')
+
+    start_search_http_time = timer()
+    with RequestMetricsStore.for_request().time("search.vespa._search"):
+        responses = config.vespa_query_client.query(body)
+
+    end_search_http_time = timer()
+    total_search_http_time = end_search_http_time - start_search_http_time
+
+    logger.debug(
+        f"search (lexical) roundtrip: took {(total_search_http_time):.3f}s to send search query (roundtrip) to Vespa")
+
+    res = _create_vespa_search_response(responses)
+
+    return res
+
+
 def _lexical_search(
         config: Config, index_name: str, text: str, result_count: int = 3, offset: int = 0,
         searchable_attributes: Sequence[str] = None, verbose: int = 0, filter_string: str = None,
-        attributes_to_retrieve: Optional[List[str]] = None, expose_facets: bool = False):
+        attributes_to_retrieve: Optional[List[str]] = None, expose_facets: bool = False, ):
     """
 
     Args:
@@ -1199,7 +1537,8 @@ def _lexical_search(
     start_search_http_time = timer()
     with RequestMetricsStore.for_request().time("search.opensearch._search"):
         search_res = HttpRequests(config).get(path=f"{index_name}/_search", body=body)
-    RequestMetricsStore.for_request().add_time("search.opensearch._search.internal", search_res["took"] * 0.001) # internal, not round trip time
+    RequestMetricsStore.for_request().add_time("search.opensearch._search.internal",
+                                               search_res["took"] * 0.001)  # internal, not round trip time
 
     end_search_http_time = timer()
     total_search_http_time = end_search_http_time - start_search_http_time
@@ -1252,6 +1591,72 @@ def construct_vector_input_batches(query: Union[str, Dict], index_info: IndexInf
             return [k for k, _ in ordered_queries], []
 
 
+def construct_vespa_vector_query(searchable_attributes: List[str], offset: int, filter_string: str,
+                                 index_info: IndexInfo, result_count: int, query: str, query_vector: List[float],
+                                 attributes_to_retrieve: List[str], index_name: str,
+                                 score_modifiers: Optional[ScoreModifier] = None, hybrid: bool = False,
+                                 exact_knn: bool = False, k=None) -> Dict[str, Any]:
+    if searchable_attributes:
+        raise errors.MarqoWebError('searchable_attributes is not currently supported with Vespa tensor search')
+
+    if k is None:
+        k = result_count
+
+    select_atts = ','.join(attributes_to_retrieve) if attributes_to_retrieve else '*'
+    # filter_term = 'and ({grammar:"weakAnd", ranked:false}userInput(@uf))' if filter_string else ''
+    filter_term = f'and {filter_string}' if filter_string else ''
+    lexical_query_term = 'and ({grammar:"tokenize"}userInput(@uq))' if hybrid else ''
+
+    if score_modifiers:
+        score_modifiers_query = construct_vespa_score_modifiers(score_modifiers)
+    else:
+        score_modifiers_query = {}
+
+    if hybrid:
+        ranking = "hybrid_modifiers" if score_modifiers else "hybrid"
+    else:
+        ranking = "embedding_similarity_modifiers" if score_modifiers else "embedding_similarity"
+
+    query = {
+        "yql": f"select {select_atts} from {index_name} where "
+               f"({{targetHits: {k}, approximate:{str(not exact_knn).lower()}}}nearestNeighbor(marqo_embeddings_title, query_embedding)) or "
+               f"({{targetHits: {k}, approximate:{str(not exact_knn).lower()}}}nearestNeighbor(marqo_embeddings_content, query_embedding))"
+               f"{lexical_query_term} {filter_term}",
+        "model.restrict": index_name,
+        "hits": result_count,
+        "input.query(query_embedding)": query_vector,
+        "ranking": ranking,
+        "presentation.summary": "all-non-vector-summary",
+        # "uf": filter_string if filter_string else "",
+        "uf": "available_ia_codes:u-prints",
+        "uq": query if hybrid else "",
+        **score_modifiers_query
+    }
+
+    return query
+
+
+def construct_vespa_score_modifiers(score_modifiers: Optional[ScoreModifier]) -> Dict[str, float]:
+    output = {}
+
+    for operation, values in score_modifiers.dict().items():
+        if values is None:
+            continue
+
+        for value in values:
+            field_name = value["field_name"]
+            weight = value["weight"]
+
+            if operation == "multiply_score_by":
+                key = f"input.query(rank_weight_mult_{field_name})"
+            elif operation == "add_to_score":
+                key = f"input.query(rank_weight_add_{field_name})"
+
+            output[key] = weight
+
+    return output
+
+
 def construct_msearch_body_elements(searchableAttributes: List[str], offset: int, filter_string: str,
                                     index_info: IndexInfo, result_count: int, query_vector: List[float],
                                     attributes_to_retrieve: List[str], index_name: str,
@@ -1279,20 +1684,21 @@ def construct_msearch_body_elements(searchableAttributes: List[str], offset: int
             )
             if (filter_string is not None) or (searchableAttributes is not None):
                 (search_query["query"]["function_score"]
-                    ["query"]["nested"]
-                    ["query"]["function_score"]
-                    ["query"]["knn"]
-                    [f"{TensorField.chunks}.{TensorField.marqo_knn_field}"]["filter"]) = {
-                        "query_string": {"query": f"{filter_for_opensearch}"}
-                    }
+                ["query"]["nested"]
+                ["query"]["function_score"]
+                ["query"]["knn"]
+                [f"{TensorField.chunks}.{TensorField.marqo_knn_field}"]["filter"]) = {
+                    "query_string": {"query": f"{filter_for_opensearch}"}
+                }
         else:
-            search_query = _create_normal_tensor_search_query(result_count, offset, TensorField.marqo_knn_field, query_vector)
+            search_query = _create_normal_tensor_search_query(result_count, offset, TensorField.marqo_knn_field,
+                                                              query_vector)
             if (filter_string is not None) or (searchableAttributes is not None):
                 (search_query["query"]["nested"]
-                    ["query"]["knn"]
-                    [f"{TensorField.chunks}.{TensorField.marqo_knn_field}"]["filter"]) = {
-                        "query_string": {"query": f"{filter_for_opensearch}"}
-                    }
+                ["query"]["knn"]
+                [f"{TensorField.chunks}.{TensorField.marqo_knn_field}"]["filter"]) = {
+                    "query_string": {"query": f"{filter_for_opensearch}"}
+                }
 
         if attributes_to_retrieve is not None:
             search_query["_source"] = {"include": attributes_to_retrieve} if len(attributes_to_retrieve) > 0 else False
@@ -1311,13 +1717,15 @@ def bulk_msearch(config: Config, body: List[Dict]) -> List[Dict]:
         with RequestMetricsStore.for_request().time("search.opensearch._msearch"):
             serialised_search_body = utils.dicts_to_jsonl(body)
             response = HttpRequests(config).get(path=F"_msearch", body=serialised_search_body)
-        RequestMetricsStore.for_request().add_time("search.opensearch._msearch.internal", float(response["took"])) # internal, not round trip time
+        RequestMetricsStore.for_request().add_time("search.opensearch._msearch.internal",
+                                                   float(response["took"]))  # internal, not round trip time
 
         end_search_http_time = timer()
         total_search_http_time = end_search_http_time - start_search_http_time
         total_os_process_time = response["took"] * 0.001
         num_responses = len(response["responses"])
-        logger.debug(f"search (tensor) roundtrip: took {total_search_http_time:.3f}s to send {num_responses} search queries (roundtrip) to Marqo-os.")
+        logger.debug(
+            f"search (tensor) roundtrip: took {total_search_http_time:.3f}s to send {num_responses} search queries (roundtrip) to Marqo-os.")
 
         responses = [r['hits']['hits'] for r in response["responses"]]
 
@@ -1328,17 +1736,20 @@ def bulk_msearch(config: Config, body: List[Dict]) -> List[Dict]:
             root_cause_type: Optional[str] = response["responses"][0]["error"]["root_cause"][0].get("type")
 
             if "index.max_result_window" in root_cause_reason:
-                raise errors.IllegalRequestedDocCount("Marqo-OS rejected the response due to too many requested results. Try reducing the query's limit parameter") from e
+                raise errors.IllegalRequestedDocCount(
+                    "Marqo-OS rejected the response due to too many requested results. Try reducing the query's limit parameter") from e
             elif 'parse_exception' in root_cause_reason:
                 raise errors.InvalidArgError("Syntax error, could not parse filter string") from e
-            elif  root_cause_type == 'query_shard_exception' and root_cause_reason.startswith("Failed to parse query"):
+            elif root_cause_type == 'query_shard_exception' and root_cause_reason.startswith("Failed to parse query"):
                 raise errors.InvalidArgError("Syntax error, could not parse filter string") from e
             raise errors.BackendCommunicationError(f"Error communicating with Marqo-OS backend:\n{response}")
         except (KeyError, IndexError):
             raise e
 
-    logger.debug(f"  search (tensor) Marqo-os processing time: took {total_os_process_time:.3f}s for Marqo-os to execute the search.")
+    logger.debug(
+        f"  search (tensor) Marqo-os processing time: took {total_os_process_time:.3f}s for Marqo-os to execute the search.")
     return responses
+
 
 def gather_documents_from_response(resp: List[List[Dict[str, Any]]]) -> Dict[str, Any]:
     """
@@ -1419,7 +1830,8 @@ def assign_query_to_vector_job(
     return ptrs
 
 
-def create_vector_jobs(queries: List[BulkSearchQueryEntity], config: Config, device: str) -> Tuple[Dict[Qidx, List[VectorisedJobPointer]], Dict[JHash, VectorisedJobs]]:
+def create_vector_jobs(queries: List[BulkSearchQueryEntity], config: Config, device: str) -> Tuple[
+    Dict[Qidx, List[VectorisedJobPointer]], Dict[JHash, VectorisedJobs]]:
     """
         For each query:
             - Find what needs to be vectorised
@@ -1509,7 +1921,8 @@ def get_query_vectors_from_jobs(
                     possible_jobs=qidx_to_job[qidx],
                     jobs=jobs,
                     job_to_vectors=job_to_vectors,
-                    treat_urls_as_images=index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images],
+                    treat_urls_as_images=index_info.index_settings[NsField.index_defaults][
+                        NsField.treat_urls_and_pointers_as_images],
                     content=content),
                  weight,
                  content
@@ -1540,8 +1953,9 @@ def get_query_vectors_from_jobs(
             result[qidx] = get_content_vector(
                 possible_jobs=qidx_to_job.get(qidx, []),
                 jobs=jobs,
-                job_to_vectors= job_to_vectors,
-                treat_urls_as_images=index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images],
+                job_to_vectors=job_to_vectors,
+                treat_urls_as_images=index_info.index_settings[NsField.index_defaults][
+                    NsField.treat_urls_and_pointers_as_images],
                 content=q.q
             )
     return result
@@ -1581,11 +1995,14 @@ def create_empty_query_response(queries: List[BulkSearchQueryEntity]) -> List[Di
         )
     )
 
-def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity], device: Union[Device, str]) -> Dict[Qidx, List[float]]:
+
+def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity], device: Union[Device, str]) -> Dict[
+    Qidx, List[float]]:
     """Run the query vectorisation process"""
     # 1. Pre-process inputs ready for s2_inference.vectorise
     # we can still use qidx_to_job. But the jobs structure may need to be different
-    vector_jobs_tuple: Tuple[Dict[Qidx, List[VectorisedJobPointer]], Dict[JHash, VectorisedJobs]] = create_vector_jobs(queries, config, device)
+    vector_jobs_tuple: Tuple[Dict[Qidx, List[VectorisedJobPointer]], Dict[JHash, VectorisedJobs]] = create_vector_jobs(
+        queries, config, device)
 
     qidx_to_jobs, jobs = vector_jobs_tuple
 
@@ -1599,6 +2016,7 @@ def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity],
         queries, qidx_to_jobs, job_ptr_to_vectors, config, jobs
     )
     return qidx_to_vectors
+
 
 def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity], device: str = None) -> List[Dict]:
     """Resolve a batch of search queries in parallel.
@@ -1620,18 +2038,21 @@ def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity
         raise errors.InternalError("_bulk_vector_text_search cannot be called without `device`!")
 
     with RequestMetricsStore.for_request().time("bulk_search.vector.processing_before_opensearch",
-        lambda t : logger.debug(f"bulk search (tensor) pre-processing: took {t:.3f}ms")
-    ):
+                                                lambda t: logger.debug(
+                                                    f"bulk search (tensor) pre-processing: took {t:.3f}ms")
+                                                ):
 
         with RequestMetricsStore.for_request().time(f"bulk_search.vector_inference_full_pipeline"):
             qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, device)
 
         ## 4. Create msearch request bodies and combine to aggregate.
         query_to_body_parts: Dict[Qidx, List[Dict]] = dict()
-        query_to_body_count: Dict[Qidx, int] = dict() # Keep track of count, so we can separate after msearch call.
+        query_to_body_count: Dict[Qidx, int] = dict()  # Keep track of count, so we can separate after msearch call.
         for qidx, q in enumerate(queries):
             index_info = get_index_info(config=config, index_name=q.index)
-            body = construct_msearch_body_elements(q.searchableAttributes, q.offset, q.filter, index_info, q.limit, qidx_to_vectors[qidx], q.attributesToRetrieve, q.index, q.scoreModifiers)
+            body = construct_msearch_body_elements(q.searchableAttributes, q.offset, q.filter, index_info, q.limit,
+                                                   qidx_to_vectors[qidx], q.attributesToRetrieve, q.index,
+                                                   q.scoreModifiers)
             query_to_body_parts[qidx] = body
             query_to_body_count[qidx] = len(body)
 
@@ -1645,13 +2066,15 @@ def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity
     responses = bulk_msearch(config, aggregate_body)
 
     with RequestMetricsStore.for_request().time("bulk_search.vector.postprocess",
-        lambda t : logger.debug(f"bulk search (tensor) post-processing: took {t:.3f}ms")
-    ):
+                                                lambda t: logger.debug(
+                                                    f"bulk search (tensor) post-processing: took {t:.3f}ms")
+                                                ):
         # 6. Get documents back to each query, perform "gather" operation
         return create_bulk_search_response(queries, query_to_body_count, responses)
 
 
-def create_bulk_search_response(queries: List[BulkSearchQueryEntity], query_to_body_count: Dict[Qidx, int], responses) -> List[Dict]:
+def create_bulk_search_response(queries: List[BulkSearchQueryEntity], query_to_body_count: Dict[Qidx, int],
+                                responses) -> List[Dict]:
     """
         Create Marqo search responses by extracting the appropriate elements from the batched /_msearch response. Also handles:
             - Boosting score (optional)
@@ -1679,6 +2102,7 @@ def create_bulk_search_response(queries: List[BulkSearchQueryEntity], query_to_b
 
     return results
 
+
 def _vector_text_search(
         config: Config, index_name: str, query: Union[str, dict], result_count: int = 5, offset: int = 0,
         searchable_attributes: Iterable[str] = None, verbose=0, filter_string: str = None, device: str = None,
@@ -1686,7 +2110,7 @@ def _vector_text_search(
         image_download_headers: Optional[Dict] = None, context: Optional[Dict] = None,
         score_modifiers: Optional[ScoreModifier] = None, model_auth: Optional[ModelAuth] = None):
     """
-    
+
     Args:
         config:
         index_name:
@@ -1736,47 +2160,123 @@ def _vector_text_search(
         raise errors.IndexNotFoundError(message="Tried to search a non-existent index: {}".format(index_name))
 
     queries = [BulkSearchQueryEntity(
-        q=query, searchableAttributes=searchable_attributes,searchMethod=SearchMethod.TENSOR, limit=result_count, offset=offset, showHighlights=False, filter=filter_string, attributesToRetrieve=attributes_to_retrieve, boost=boost, image_download_headers=image_download_headers, context=context, scoreModifiers=score_modifiers, index=index_name, modelAuth=model_auth
+        q=query, searchableAttributes=searchable_attributes, searchMethod=SearchMethod.TENSOR, limit=result_count,
+        offset=offset, showHighlights=False, filter=filter_string, attributesToRetrieve=attributes_to_retrieve,
+        boost=boost, image_download_headers=image_download_headers, context=context, scoreModifiers=score_modifiers,
+        index=index_name, modelAuth=model_auth
     )]
     with RequestMetricsStore.for_request().time(f"search.vector_inference_full_pipeline"):
         qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, device)
     vectorised_text = list(qidx_to_vectors.values())[0]
 
-    body = construct_msearch_body_elements(
-        searchable_attributes, offset, filter_string, index_info, result_count, vectorised_text, attributes_to_retrieve, index_name, score_modifiers
+    # !!!!!!! Build Vespa search body here
+    # body = construct_msearch_body_elements(
+    #     searchable_attributes, offset, filter_string, index_info, result_count, vectorised_text, attributes_to_retrieve,
+    #     index_name, score_modifiers
+    # )
+    hybrid = False
+    exact_knn = False
+    ann_k = result_count
+
+    if searchable_attributes and '::hybrid' in searchable_attributes:
+        hybrid = True
+        searchable_attributes.remove('::hybrid')
+
+    if searchable_attributes and '::exact_knn' in searchable_attributes:
+        exact_knn = True
+        searchable_attributes.remove('::exact_knn')
+
+    def find_k(lst):
+        for item in lst:
+            if re.search(r'::k:\d+', item):
+                return item
+        return None
+
+    if searchable_attributes:
+        k = find_k(searchable_attributes)
+        if k:
+            ann_k = int(k.split(':')[-1])
+            searchable_attributes.remove(k)
+
+    body = construct_vespa_vector_query(
+        searchable_attributes, offset, filter_string, index_info, result_count, query, vectorised_text,
+        attributes_to_retrieve,
+        index_name, score_modifiers, hybrid=hybrid, exact_knn=exact_knn, k=ann_k
     )
 
-    if verbose:
-        _vector_text_search_query_verbose(verbose=verbose, body=body)
+    logger.debug(body)
+
+    # if verbose:
+    #     _vector_text_search_query_verbose(verbose=verbose, body=body)
 
     total_preprocess_time = RequestMetricsStore.for_request().stop("search.vector.processing_before_opensearch")
-    logger.debug(f"search (tensor) pre-processing: took {(total_preprocess_time):.3f}ms to vectorize and process query.")
+    logger.debug(
+        f"search (tensor) pre-processing: took {(total_preprocess_time):.3f}ms to vectorize and process query.")
 
+    # !!!!!!! Do Vespa search here
     # SEARCH TIMER-LOGGER (roundtrip)
-    responses = bulk_msearch(config, body)
+    # responses = bulk_msearch(config, body)
+    responses = config.vespa_query_client.query(body)
 
     # SEARCH TIMER-LOGGER (post-processing)
     RequestMetricsStore.for_request().start("search.vector.postprocess")
-    gathered_docs = gather_documents_from_response(responses)
+    # !!!!!!! Process search results here
+    # gathered_docs = gather_documents_from_response(responses)
 
     if boost is not None:
-        gathered_docs = boost_score(gathered_docs, boost, searchable_attributes)
+        raise errors.MarqoWebError('Boosting is not currently supported with Vespa')
+        # gathered_docs = boost_score(gathered_docs, boost, searchable_attributes)
 
-    completely_sorted = sort_chunks(gathered_docs)
+    # completely_sorted = sort_chunks(gathered_docs)
 
-    if verbose:
-        print("Chunk vector search, sorted result:")
-        if verbose == 1:
-            pprint.pprint(utils.truncate_dict_vectors(completely_sorted))
-        elif verbose == 2:
-            pprint.pprint(completely_sorted)
+    # if verbose:
+    #     print("Chunk vector search, sorted result:")
+    #     if verbose == 1:
+    #         pprint.pprint(utils.truncate_dict_vectors(completely_sorted))
+    #     elif verbose == 2:
+    #         pprint.pprint(completely_sorted)
 
-    res = _format_ordered_docs_simple(ordered_docs_w_chunks=completely_sorted, result_count=result_count)
+    res = _create_vespa_search_response(responses)
+    # res = _format_ordered_docs_simple(ordered_docs_w_chunks=completely_sorted, result_count=result_count)
 
     total_postprocess_time = RequestMetricsStore.for_request().stop("search.vector.postprocess")
     logger.debug(
-        f"search (tensor) post-processing: took {(total_postprocess_time):.3f}ms to sort and format {len(completely_sorted)} results from Marqo-os.")
+        f"search (tensor) post-processing: took {(total_postprocess_time):.3f}ms to sort and format {len(res)} results from Marqo-os.")
     return res
+
+
+def _create_vespa_search_response(responses: VespaQueryResponse) -> dict:
+    """
+    Convert a VespaQueryResponse to a Marqo search response
+    """
+    fields_to_skip = ['matchfeatures', 'sddocname', 'marqo_chunks', 'marqo_embeddings', 'marqo_embeddings_title',
+                      'marqo_embeddings_content']
+    hits = []
+    for doc in responses.hits:
+        hit = {k: v for k, v in doc['fields'].items() if k not in fields_to_skip}
+        hit['_id'] = doc['id']
+        hit['_score'] = doc['relevance']
+        hit['_highlights'] = _create_vespa_highlights(doc)
+        hits.append(hit)
+
+    return {'hits': hits}
+
+
+def _create_vespa_highlights(doc: Dict[str, Any]) -> Dict[str, str]:
+    # no marqo_chunks returned when doc has no tensor fields, or empty tensor field
+    if 'marqo_chunks' not in doc['fields'] or 'matchfeatures' not in doc['fields']:
+        return {}
+
+    closest_chunck_split = doc['fields']['marqo_chunks'][
+        int(
+            next(iter(
+                doc['fields']['matchfeatures']['closest(marqo_embeddings_title)']['cells']
+            ))
+        )
+    ].split('::', 1)
+
+    return {closest_chunck_split[0]: closest_chunck_split[1]}
+
 
 def _format_ordered_docs_simple(ordered_docs_w_chunks: List[dict], result_count: int) -> dict:
     """Only one highlight is returned
@@ -1800,6 +2300,7 @@ def _format_ordered_docs_simple(ordered_docs_w_chunks: List[dict], result_count:
         simple_results.append(cleaned)
     return {"hits": simple_results[:result_count]}
 
+
 def boost_score(docs: dict, boosters: dict, searchable_attributes) -> dict:
     """ re-weighs the scores of individual fields
         Args:
@@ -1811,10 +2312,10 @@ def boost_score(docs: dict, boosters: dict, searchable_attributes) -> dict:
     if searchable_attributes and boosters:
         if not set(boosters).issubset(set(searchable_attributes)):
             raise errors.InvalidArgError(
-        "Boost fieldnames must be a subset of searchable attributes. "
-        f"\nSearchable attributes: {searchable_attributes}"
-        f"\nBoost: {boosters}"
-        )
+                "Boost fieldnames must be a subset of searchable attributes. "
+                f"\nSearchable attributes: {searchable_attributes}"
+                f"\nBoost: {boosters}"
+            )
 
     for doc_id in list(to_be_boosted.keys()):
         for chunk in to_be_boosted[doc_id]["chunks"]:
@@ -1859,11 +2360,13 @@ def check_health(config: Config) -> dict:
     """
     return generate_heath_check_response(config)
 
+
 def delete_index(config: Config, index_name):
-    res = HttpRequests(config).delete(path=index_name)
-    if index_name in get_cache():
-        del get_cache()[index_name]
-    return res
+    raise errors.MarqoWebError('use_existing_tensors is not currently supported with Vespa')
+    # res = HttpRequests(config).delete(path=index_name)
+    # if index_name in get_cache():
+    #     del get_cache()[index_name]
+    # return res
 
 
 def get_indexes(config: Config):
@@ -1930,7 +2433,7 @@ def get_cuda_info() -> dict:
 
 def vectorise_multimodal_combination_field(
         field: str, multimodal_object: Dict[str, dict], doc: dict, doc_index: int,
-        doc_id:str, device:str, index_info, image_repo, field_map:dict,
+        doc_id: str, device: str, index_info, image_repo, field_map: dict,
         model_auth: Optional[ModelAuth] = None
 ):
     '''
@@ -1986,8 +2489,9 @@ def vectorise_multimodal_combination_field(
     if infer_if_image is False:
         text_field_names = list(multimodal_object.keys())
         text_content_to_vectorise = list(multimodal_object.values())
-        new_fields_from_multimodal_combination =set([(sub_field_name, _infer_opensearch_data_type(sub_content)) for sub_field_name
-        , sub_content in multimodal_object.items()])
+        new_fields_from_multimodal_combination = set(
+            [(sub_field_name, _infer_opensearch_data_type(sub_content)) for sub_field_name
+            , sub_content in multimodal_object.items()])
     else:
         for sub_field_name, sub_content in multimodal_object.items():
             if isinstance(sub_content, str) and not _is_image(sub_content):
@@ -1996,7 +2500,7 @@ def vectorise_multimodal_combination_field(
             else:
                 try:
                     if isinstance(sub_content, str) and index_info.index_settings[NsField.index_defaults][
-                            NsField.treat_urls_and_pointers_as_images]:
+                        NsField.treat_urls_and_pointers_as_images]:
                         if not isinstance(image_repo[sub_content], Exception):
                             image_data = image_repo[sub_content]
                         else:
@@ -2054,7 +2558,7 @@ def vectorise_multimodal_combination_field(
         image_err = errors.InvalidArgError(message=f'Could not process given image: {multimodal_object_copy}')
         unsuccessful_doc_to_append = \
             (doc_index, {'_id': doc_id, 'error': image_err.message, 'status': int(image_err.status_code),
-                 'code': image_err.code})
+                         'code': image_err.code})
 
         return combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add, new_fields_from_multimodal_combination
 
@@ -2062,9 +2566,12 @@ def vectorise_multimodal_combination_field(
     vectors_list = text_vectors + image_vectors
 
     if not len(sub_field_name_list) == len(vectors_list):
-        raise errors.BatchInferenceSizeError(message=f"Batch inference size does not match content for multimodal field {field}")
+        raise errors.BatchInferenceSizeError(
+            message=f"Batch inference size does not match content for multimodal field {field}")
 
-    vector_chunk = np.squeeze(np.mean([np.array(vector) * field_map["weights"][sub_field_name] for sub_field_name, vector in zip(sub_field_name_list, vectors_list)], axis=0))
+    vector_chunk = np.squeeze(np.mean(
+        [np.array(vector) * field_map["weights"][sub_field_name] for sub_field_name, vector in
+         zip(sub_field_name_list, vectors_list)], axis=0))
 
     if normalize_embeddings is True:
         vector_chunk = vector_chunk / np.linalg.norm(vector_chunk)
@@ -2078,7 +2585,8 @@ def vectorise_multimodal_combination_field(
     })
     return combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add, new_fields_from_multimodal_combination
 
-def _generate_vector_text_search_query_for_verbose_one(original_body:List[Dict[str, Any]]) -> None:
+
+def _generate_vector_text_search_query_for_verbose_one(original_body: List[Dict[str, Any]]) -> None:
     """Generate a simplified version of the query body for verbose=1 mode. """
     readable_body = copy.deepcopy(original_body)
     for i, q in enumerate(readable_body):
@@ -2151,7 +2659,8 @@ def _create_normal_tensor_search_query(result_count, offset, vector_field, vecto
     return search_query
 
 
-def _create_score_modifiers_tensor_search_query(score_modifiers, result_count, offset, vector_field, vectorised_text) -> dict:
+def _create_score_modifiers_tensor_search_query(score_modifiers, result_count, offset, vector_field,
+                                                vectorised_text) -> dict:
     script_score = score_modifiers.to_painless_script()
     search_query = {
         "size": result_count,
