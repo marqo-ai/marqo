@@ -122,6 +122,7 @@ class RequestType:
 
 class MappingsObjectType:
     multimodal_combination = "multimodal_combination"
+    custom_vector = "custom_vector"
 
 
 class SearchDb:

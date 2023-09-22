@@ -7,7 +7,7 @@ INDEX_NAME_PREFIXES_TO_IGNORE = {
     'security-auditlog-', '.kibana', '.opendistro'
 }
 
-MARQO_OBJECT_TYPES = {MappingsObjectType.multimodal_combination}
+MARQO_OBJECT_TYPES = {MappingsObjectType.multimodal_combination, MappingsObjectType.custom_vector}
 
 ILLEGAL_CUSTOMER_FIELD_NAME_CHARS = {'.', '/', '\n'}
 

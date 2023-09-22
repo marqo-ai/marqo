@@ -48,7 +48,7 @@ import marqo.config as config
 from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest
 from marqo.tensor_search.enums import (
     Device, MediaType, MlModel, TensorField, SearchMethod, OpenSearchDataType,
-    EnvVars
+    EnvVars, MappingsObjectType
 )
 from marqo.tensor_search.enums import IndexSettingsField as NsField
 from marqo.tensor_search import utils, backend, validation, configs, add_docs, filtering
@@ -596,7 +596,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                     if (len(vector_chunks) != len(text_chunks)):
                         raise RuntimeError(
                             f"the input content after preprocessing and its vectorized counterparts must be the same length."
-                            f"recevied text_chunks={len(text_chunks)} and vector_chunks={len(vector_chunks)}. "
+                            f"received text_chunks={len(text_chunks)} and vector_chunks={len(vector_chunks)}. "
                             f"check the preprocessing functions and try again. ")
 
                     for text_chunk, vector_chunk in zip(text_chunks, vector_chunks):
@@ -608,7 +608,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                         })
 
                 elif isinstance(field_content, dict):
-                    if add_docs_params.mappings[field]["type"] == "multimodal_combination":
+                    if add_docs_params.mappings[field]["type"] == MappingsObjectType.multimodal_combination:
                         (combo_chunk, combo_document_is_valid,
                          unsuccessful_doc_to_append, combo_vectorise_time_to_add,
                          new_fields_from_multimodal_combination) = vectorise_multimodal_combination_field(
@@ -625,6 +625,12 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                             # TODO: we may want to use chunks_to_append here to make it uniform with use_existing_tensors and normal vectorisation
                             chunks.append({**combo_chunk, **chunk_values_for_filtering})
                             continue
+                    
+                    elif add_docs_params.mappings[field]["type"] == MappingsObjectType.custom_vector:
+                        # Code here for custom vector.
+                        # No chunking. No vectorisation.
+                        # It still gets put into chunks_to_append though. By itself
+                        pass
 
                 # Add chunks_to_append along with doc metadata to total chunks
                 for chunk in chunks_to_append:

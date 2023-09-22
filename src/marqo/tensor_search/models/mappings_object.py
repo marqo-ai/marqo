@@ -46,3 +46,6 @@ multimodal_combination_schema = {
 }
 
 
+custom_vector_schema = {
+    # ???
+}
