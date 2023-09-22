@@ -1008,8 +1008,9 @@ def search(config: Config, index_name: str, text: Union[str, dict],
     if offset < 0:
         raise errors.IllegalRequestedDocCount("search result offset cannot be less than 0!")
 
-        # validate query
-    validation.validate_query(q=text, search_method=search_method)
+    # validate query (if it exists)
+    if text is not None:
+        validation.validate_query(q=text, search_method=search_method)
 
     # Validate result_count + offset <= int(max_docs_limit)
     max_docs_limit = utils.read_env_vars_and_defaults(EnvVars.MARQO_MAX_RETRIEVABLE_DOCS)
@@ -1513,7 +1514,7 @@ def get_query_vectors_from_jobs(
                  content
                 ) for content, weight in ordered_queries
             ]
-            # TODO how doe we ensure order?
+            # TODO how do we ensure order?
             weighted_vectors = [np.asarray(vec) * weight for vec, weight, content in vectorised_ordered_queries]
 
             context_tensors = q.get_context_tensor()

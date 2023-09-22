@@ -176,11 +176,11 @@ def validate_field_content(field_content: Any, is_non_tensor_field: bool) -> Any
             f"Allowed content types: {[ty.__name__ for ty in constants.ALLOWED_CUSTOMER_FIELD_TYPES]}"
         )
 
-def validate_context(context: Optional[SearchContext], search_method: SearchMethod, query: Union[str, Dict[str, Any]]): 
+def validate_context(context: Optional[SearchContext], search_method: SearchMethod, query: Union[None, str, Dict[str, Any]]): 
     """Validate the SearchContext.
 
     'validate_context' ensures that if the context is provided for a tensor search
-    operation, the query must be a dictionary (not a str). 'context' 
+    operation, the query must be a dictionary (not a str) or None. 'context' 
     structure is validated internally.
     
     """
