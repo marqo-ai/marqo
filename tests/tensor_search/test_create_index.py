@@ -579,6 +579,28 @@ class TestCreateIndex(MarqoTestCase):
         except errors.InvalidIndexNameError:
             pass
 
+    def test_create_index_protected_name_bulk(self):
+        """Tests that validation prevents the user from creating an index called 'bulk' """
+        # an index that contains the "bulk" substring is allowed: 
+        tensor_search.create_vector_index(config=self.config, index_name='some-bulk')
+        tensor_search.create_vector_index(config=self.config, index_name='bulkabc')
+        # but an index name that exaclty matches "bulk" is not:
+        try:
+            tensor_search.create_vector_index(config=self.config, index_name='bulk')
+            raise AssertionError
+        except errors.InvalidIndexNameError:
+            pass
+        # ensure the index was not accidentally created despite the error:
+        assert {'index_name': 'bulk'} not in tensor_search.get_indexes(config=self.config)['results']
+        
+        # but an index names with 'bulk' as a substring should appear as expected:
+        assert {'index_name': 'some-bulk'} in tensor_search.get_indexes(config=self.config)['results']
+        assert {'index_name': 'bulkabc'} in tensor_search.get_indexes(config=self.config)['results'] 
+        
+        # cleanup: 
+        tensor_search.delete_index(config=self.config, index_name='some-bulk')
+        tensor_search.delete_index(config=self.config, index_name='bulkabc')
+
     def test_index_validation_bad(self):
         bad_settings = {
             "index_defaults": {

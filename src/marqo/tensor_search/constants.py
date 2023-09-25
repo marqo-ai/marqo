@@ -1,7 +1,7 @@
 from marqo.tensor_search.enums import MappingsObjectType
 
 INDEX_NAMES_TO_IGNORE = {
-    '.opendistro_security',
+    '.opendistro_security', 'bulk'
 }
 INDEX_NAME_PREFIXES_TO_IGNORE = {
     'security-auditlog-', '.kibana', '.opendistro'
