@@ -183,3 +183,20 @@ def reduce_thread_metrics(data):
             else:
                 result[new_key] = value
     return result
+
+
+def create_chunk_metadata(raw_document: dict):
+    """
+    Creates a chunk metadata dictionary for a given document.
+    This metadata will be put in each OpenSearch child document (chunk) to be used for filtering.
+
+    We will only add values which are string, boolean, int, float, list or dictionary.
+    """
+
+    metadata = {}
+    metadata_field_types = {str, bool, int, float, list, dict}
+    for key, value in raw_document.items():
+        if type(value) in metadata_field_types:
+            metadata[key] = value
+
+    return metadata

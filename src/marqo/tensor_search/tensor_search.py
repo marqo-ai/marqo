@@ -378,6 +378,10 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
     image_repo = {}
     doc_count = len(add_docs_params.docs)
     
+    # Retrieve model dimensions from index info
+    # TODO: Confirm, will this make things too slow? They shouldn't because of the cache.
+    index_model_dimensions = get_index_info(config=config, index_name=add_docs_params.index_name).get_model_properties()["dimensions"]
+    
     with ExitStack() as exit_stack:
         if index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]:
             with RequestMetricsStore.for_request().time(
@@ -449,20 +453,11 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                     raise errors.InternalError(message= f"Upsert: found {len(matching_doc)} matching docs for {doc_id} when only 1 or 0 should have been found.")
 
             # Metadata can be calculated here at the doc level.
-            # Only add chunk values which are string, boolean, numeric or dictionary.
-            # Dictionary keys will be store in a list.
-            chunk_values_for_filtering = {}
-            for key, value in copied.items():
-                if not (isinstance(value, str) or isinstance(value, float)
-                        or isinstance(value, bool) or isinstance(value, int)
-                        or isinstance(value, list) or isinstance(value, dict)):
-                    continue
-                chunk_values_for_filtering[key] = value
-
+            # Create the chunk metadata from the doc itself.
+            chunk_values_for_filtering = add_docs.create_chunk_metadata(raw_document=copied)
             chunks = []
-
+            
             for field in copied:
-
                 try:
                     field_content = validation.validate_field_content(
                         field_content=copied[field],
@@ -473,7 +468,8 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                             field=field, field_content=field_content,
                             is_non_tensor_field=not utils.is_tensor_field(field, add_docs_params.tensor_fields,
                                                                           add_docs_params.non_tensor_fields),
-                            mappings=add_docs_params.mappings)
+                            mappings=add_docs_params.mappings,
+                            index_model_dimensions=index_model_dimensions)
                 except errors.InvalidArgError as err:
                     document_is_valid = False
                     unsuccessful_docs.append(
@@ -627,10 +623,21 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                             continue
                     
                     elif add_docs_params.mappings[field]["type"] == MappingsObjectType.custom_vector:
-                        # Code here for custom vector.
-                        # No chunking. No vectorisation.
-                        # It still gets put into chunks_to_append though. By itself
-                        pass
+                        # No real vectorisation or chunking will happen for custom vector fields.
+
+                        # Add timing tracking
+                        # Validation
+                        # Creating parent doc
+                        # Adding chunks_for_filtering
+
+                        # Adding chunk (Only 1 chunk gets added for a custom vector field).
+                        chunks_to_append.append({
+                            TensorField.marqo_knn_field: field_content["vector"],
+                            TensorField.field_content: field_content["content"],
+                            TensorField.field_name: field
+                        })
+
+                        # Updating index_info
 
                 # Add chunks_to_append along with doc metadata to total chunks
                 for chunk in chunks_to_append:
@@ -640,6 +647,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                 new_fields = new_fields.union(new_fields_from_doc)
                 copied[TensorField.chunks] = chunks
                 bulk_parent_dicts.append(indexing_instructions)
+                # TODO: Change this so that content becomes the value for custom vector field
                 bulk_parent_dicts.append(copied)
 
         total_preproc_time = 0.001 * RequestMetricsStore.for_request().stop("add_documents.processing_before_opensearch")
