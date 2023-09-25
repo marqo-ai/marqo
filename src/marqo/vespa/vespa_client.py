@@ -1,10 +1,12 @@
 import asyncio
 import concurrent
+from json import JSONDecodeError
 from typing import Dict, Any, List
 
 import httpx
 
 import marqo.vespa.concurrency as conc
+from marqo.vespa.exceptions import VespaStatusError, VespaError
 from marqo.vespa.models import *
 from marqo.vespa.models.feed_response import BatchFeedResponse
 
@@ -133,13 +135,16 @@ class VespaClient:
 
         async with semaphore:
             end_point = f"{self.document_url}/document/v1/{schema}/{schema}/docid/{doc_id}"
-            resp = await async_client.post(end_point, json=data, timeout=timeout)
+            try:
+                resp = await async_client.post(end_point, json=data, timeout=timeout)
+            except httpx.HTTPError as e:
+                raise VespaError(e) from e
 
         try:
             # This will cover 200 and document-specific errors. Other unexpected errors will be raised.
             return FeedResponse(**resp.json(), status=resp.status_code)
-        except:
-            resp.raise_for_status()
+        except JSONDecodeError:
+            self._raise_for_status(resp)
 
     def feed_batch_sync(self, batch: List[Dict[str, Any]], schema: str) -> List[FeedResponse]:
         """
@@ -153,6 +158,12 @@ class VespaClient:
             List of FeedResponse objects
         """
         pass
+
+    def _raise_for_status(self, resp):
+        try:
+            resp.raise_for_status()
+        except httpx.HTTPStatusError as e:
+            raise VespaStatusError(e) from e
 
 
 if __name__ == '__main__':
