@@ -14,7 +14,7 @@ from marqo.s2_inference.types import *
 from marqo.s2_inference.logger import get_logger
 import onnxruntime as ort
 from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize
-import marqo.s2_inference.model_registry as model_registry
+from marqo_commons.model_registry.onnx_clip_properties import _get_onnx_clip_properties
 from zipfile import ZipFile
 from huggingface_hub.utils import RevisionNotFoundError,RepositoryNotFoundError, EntryNotFoundError, LocalEntryNotFoundError
 from marqo.s2_inference.errors import ModelDownloadError
@@ -70,7 +70,7 @@ class CLIP_ONNX(object):
             "CPUExecutionProvider"]
         self.visual_session = None
         self.textual_session = None
-        self.model_info = model_registry._get_onnx_clip_properties()[self.model_name]
+        self.model_info = _get_onnx_clip_properties()[self.model_name]
 
         self.visual_type = np.float16 if self.onnx_type == "onnx16" else np.float32
         self.textual_type = np.int64 if self.source == "open_clip" else np.int32
