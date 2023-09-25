@@ -1,5 +1,7 @@
 import asyncio
 import concurrent
+import time
+from concurrent.futures import ThreadPoolExecutor
 from json import JSONDecodeError
 from typing import Dict, Any, List
 
@@ -8,7 +10,7 @@ import httpx
 import marqo.vespa.concurrency as conc
 from marqo.vespa.exceptions import VespaStatusError, VespaError
 from marqo.vespa.models import *
-from marqo.vespa.models.feed_response import BatchFeedResponse
+from marqo.vespa.models.feed_response import FeedBatchResponse
 
 
 class VespaClient:
@@ -82,7 +84,7 @@ class VespaClient:
                    batch: List[VespaDocument],
                    schema: str,
                    concurrency: int = 100,
-                   timeout: int = 60) -> List[FeedResponse]:
+                   timeout: int = 60) -> FeedBatchResponse:
         """
         Feed a batch of documents to Vespa concurrently.
 
@@ -105,7 +107,7 @@ class VespaClient:
 
     async def _feed_batch_async(self, batch: List[VespaDocument],
                                 schema: str,
-                                connections: int, timeout: int) -> BatchFeedResponse:
+                                connections: int, timeout: int) -> FeedBatchResponse:
         async with httpx.AsyncClient(limits=httpx.Limits(max_keepalive_connections=connections,
                                                          max_connections=connections)) as async_client:
             semaphore = asyncio.Semaphore(connections)
@@ -125,7 +127,7 @@ class VespaClient:
             if result.status != "200":
                 errors = True
 
-        return BatchFeedResponse(responses=responses, errors=errors)
+        return FeedBatchResponse(responses=responses, errors=errors)
 
     async def _feed_document_async(self, semaphore: asyncio.Semaphore, async_client: httpx.AsyncClient,
                                    document: VespaDocument, schema: str,
@@ -146,7 +148,7 @@ class VespaClient:
         except JSONDecodeError:
             self._raise_for_status(resp)
 
-    def feed_batch_sync(self, batch: List[Dict[str, Any]], schema: str) -> List[FeedResponse]:
+    def feed_batch_sync(self, batch: List[VespaDocument], schema: str) -> FeedBatchResponse:
         """
         Feed a batch of documents to Vespa sequentially.
 
@@ -157,7 +159,45 @@ class VespaClient:
         Returns:
             List of FeedResponse objects
         """
-        pass
+        with httpx.Client(limits=httpx.Limits(max_keepalive_connections=10, max_connections=10)) as sync_client:
+            responses = [
+                self._feed_document_sync(sync_client, document, schema, timeout=60)
+                for document in batch
+            ]
+
+        errors = False
+        for response in responses:
+            if response.status != "200":
+                errors = True
+
+        return FeedBatchResponse(responses=responses, errors=errors)
+
+    def feed_batch_multithreaded(self, batch: List[VespaDocument], schema: str,
+                                 max_threads: int = 100) -> FeedBatchResponse:
+        with httpx.Client(
+                limits=httpx.Limits(max_keepalive_connections=max_threads, max_connections=max_threads)) as sync_client:
+            with ThreadPoolExecutor(max_workers=max_threads) as executor:
+                responses = list(executor.map(
+                    lambda document: self._feed_document_sync(sync_client, document, schema, timeout=60), batch
+                ))
+
+        errors = False
+        for response in responses:
+            if response.status != "200":
+                errors = True
+
+        return FeedBatchResponse(responses=responses, errors=errors)
+
+    def _feed_document_sync(self, sync_client: httpx.Client, document: VespaDocument, schema: str,
+                            timeout: int) -> FeedResponse:
+        doc_id = document.id
+        data = {'fields': document.fields}
+
+        end_point = f"{self.document_url}/document/v1/{schema}/{schema}/docid/{doc_id}"
+
+        resp = sync_client.post(end_point, json=data, timeout=timeout)
+
+        return FeedResponse(**resp.json(), status=resp.status_code)
 
     def _raise_for_status(self, resp):
         try:
@@ -170,13 +210,23 @@ if __name__ == '__main__':
     client = VespaClient('', 'http://a90106143149745d1a731f29fa145882-2096005137.us-east-1.elb.amazonaws.com:8080',
                          'http://a90106143149745d1a731f29fa145882-2096005137.us-east-1.elb.amazonaws.com:8080')
 
-    # r = client.query(
-    #     yql='select * from marqo_settings where true',
-    #     hits=100
-    # )
-    r = client.feed_batch([
-        VespaDocument(id='test1', fields={}),
-        VespaDocument(id='test2', fields={'random': 'test'}),
-    ], schema='marqo_settings')
+    count = 10000
 
-    pass
+    start = time.time()
+    r = client.feed_batch_multithreaded([
+                                            VespaDocument(id='test1', fields={}),
+                                            # VespaDocument(id='test2', fields={'random': 'test'}),
+                                        ] * count, schema='marqo_settings')
+    end = time.time()
+
+    print(f'Multithreaded time: {end - start} seconds')
+    print(f'Errors: {r.errors}')
+
+    r = client.feed_batch([
+                              VespaDocument(id='test1', fields={}),
+                              # VespaDocument(id='test2', fields={'random': 'test'}),
+                          ] * count, schema='marqo_settings')
+    end = time.time()
+
+    print(f'Async time: {end - start} seconds')
+    print(f'Errors: {r.errors}')

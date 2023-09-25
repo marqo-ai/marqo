@@ -10,6 +10,6 @@ class FeedResponse(BaseModel):
     message: Optional[str]
 
 
-class BatchFeedResponse(BaseModel):
+class FeedBatchResponse(BaseModel):
     responses: List[FeedResponse]
     errors: bool
