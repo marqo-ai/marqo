@@ -1,0 +1,46 @@
+# Copyright Yahoo. Licensed under the terms of the Apache 2.0 license. See LICENSE in the project root.
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: vespa-content
+spec:
+  replicas: {{content.replicas}}
+  selector:
+    matchLabels:
+      app: vespa-content
+      name: vespa-internal
+  serviceName: vespa-internal
+  template:
+    metadata:
+      labels:
+        app: vespa-content
+        name: vespa-internal
+    spec:
+      containers:
+      - name: vespa-content
+        image: vespaengine/vespa
+        args: ["services"]
+        imagePullPolicy: Always
+        envFrom:
+        - configMapRef:
+            name: vespa-config
+        securityContext:
+          privileged: true
+          runAsUser: 0
+        volumeMounts:
+        - name: vespa-var-content
+          mountPath: /opt/vespa/var
+        resources:
+          requests:
+            memory: {{content.memory}}
+          limits:
+            memory: {{content.memory}}
+  volumeClaimTemplates:
+  - metadata:
+      name: vespa-var-content
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: {{content.storage}}

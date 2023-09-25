@@ -1,0 +1,20 @@
+{
+  "name": "vectordb-test-vespa-cluster",
+  "region": "us-east-2",
+  "instanceType": "c6a.xlarge",
+  "nodeCount": 7,
+  "content": {
+    "replicas": 3,
+    "memory": "6G"
+  },
+  "feed": {
+    "replicas": 1,
+    "memory": "4G",
+    "cpu": 2
+  },
+  "query": {
+    "replicas": 1,
+    "memory": "4G",
+    "cpu": 2
+  }
+}
