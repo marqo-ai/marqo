@@ -1,17 +1,19 @@
 import asyncio
-import concurrent
+import random
 import time
 from concurrent.futures import ThreadPoolExecutor
 from json import JSONDecodeError
-import random
 from typing import Dict, Any, List
 
 import httpx
 
+import marqo.logging
 import marqo.vespa.concurrency as conc
 from marqo.vespa.exceptions import VespaStatusError, VespaError
 from marqo.vespa.models import *
 from marqo.vespa.models.feed_response import FeedBatchResponse
+
+logger = marqo.logging.get_logger(__name__)
 
 
 class VespaClient:
@@ -74,6 +76,8 @@ class VespaClient:
             **kwargs
         }
         query = {key: value for key, value in query.items() if value}
+
+        logger.debug(f'Query: {query}')
 
         resp = self.http_client.post(f'{self.query_url}/search/', data=query)
 
@@ -227,7 +231,7 @@ if __name__ == '__main__':
     client = VespaClient('', 'http://a90106143149745d1a731f29fa145882-2096005137.us-east-1.elb.amazonaws.com:8080',
                          'http://a90106143149745d1a731f29fa145882-2096005137.us-east-1.elb.amazonaws.com:8080')
 
-    count = 2000
+    count = 100
     concurrency = 10
 
     random_vectors = [
@@ -245,17 +249,17 @@ if __name__ == '__main__':
         # VespaDocument(id='test2', fields={'random': 'test'}),
         for i in range(count)
     ]
-
-    start = time.time()
-    r = client.feed_batch_multithreaded(
-        batch,
-        schema='simplewiki',
-        max_threads=concurrency
-    )
-    end = time.time()
-
-    print(f'Multithreaded time: {end - start} seconds')
-    print(f'Errors: {r.errors}')
+    #
+    # start = time.time()
+    # r = client.feed_batch_multithreaded(
+    #     batch,
+    #     schema='simplewiki',
+    #     max_threads=concurrency
+    # )
+    # end = time.time()
+    #
+    # print(f'Multithreaded time: {end - start} seconds')
+    # print(f'Errors: {r.errors}')
 
     start = time.time()
     r = client.feed_batch(
