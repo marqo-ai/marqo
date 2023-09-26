@@ -28,7 +28,7 @@ class VespaClient:
         """
         self.config_url = config_url.strip('/')
         self.document_url = document_url.strip('/')
-        self.query_url = query_url
+        self.query_url = query_url.strip('/')
         self.http_client = httpx.Client(
             limits=httpx.Limits(max_keepalive_connections=pool_size, max_connections=pool_size)
         )

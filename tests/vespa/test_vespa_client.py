@@ -3,6 +3,7 @@ from unittest.mock import patch
 import vespa.application as pyvespa
 
 from marqo.vespa import concurrency
+from marqo.vespa.exceptions import VespaError
 from marqo.vespa.models import VespaDocument
 from marqo.vespa.models.feed_response import FeedBatchResponse
 from marqo.vespa.vespa_client import VespaClient
@@ -24,7 +25,6 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
 
         batch_response = func(batch, self.TEST_SCHEMA)
 
-        self.assertIsInstance(batch_response, FeedBatchResponse)
         self.assertEqual(batch_response.errors, False)
 
         statuses = [response.status for response in batch_response.responses]
@@ -49,6 +49,37 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
         documents = []
 
         self._base_test_feed_batch_successful(self.client.feed_batch, documents)
+
+    def test_feed_batch_invalidDoc_successful(self):
+        documents = [
+            VespaDocument(id="doc1", fields={"title": "Title 1", "contents": "Content 1"}),
+            VespaDocument(id="doc2", fields={"invalid_field": "Title 2"}),
+        ]
+
+        batch_response = self.client.feed_batch(documents, self.TEST_SCHEMA)
+
+        self.assertEqual(batch_response.errors, True)
+
+        statuses = [response.status for response in batch_response.responses]
+        pathIds = [response.pathId.split("/")[-1] for response in batch_response.responses]
+        ids = [response.id.split("::")[-1] for response in batch_response.responses if response.status == "200"]
+        messages = [response.message for response in batch_response.responses]
+
+        self.assertEqual(statuses, ["200", "400"])
+        self.assertEqual(pathIds, ["doc1", "doc2"])
+        self.assertEqual(ids, ["doc1"])
+        self.assertIsNone(messages[0])
+        self.assertIsNotNone(messages[1])
+
+    def test_feed_batch_invalidFeedUrl_fails(self):
+        feed_client = VespaClient("http://localhost:8080", "http://localhost:8000", "http://localhost:8080")
+        documents = [
+            VespaDocument(id="doc1", fields={"title": "Title 1", "contents": "Content 1"}),
+            VespaDocument(id="doc2", fields={"title": "Title 2"}),
+        ]
+
+        with self.assertRaises(VespaError):
+            feed_client.feed_batch(documents, self.TEST_SCHEMA)
 
     @patch.object(concurrency, "_run_coroutine_in_thread", wraps=concurrency._run_coroutine_in_thread)
     async def test_feed_batch_existingEventLoop_successful(self, mock_executor):
@@ -140,3 +171,4 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
         )
 
         self.assertEqual(len(result.root.children), 0)
+
