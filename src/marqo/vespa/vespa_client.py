@@ -79,9 +79,12 @@ class VespaClient:
 
         logger.debug(f'Query: {query}')
 
-        resp = self.http_client.post(f'{self.query_url}/search/', data=query)
+        try:
+            resp = self.http_client.post(f'{self.query_url}/search/', data=query)
+        except httpx.HTTPError as e:
+            raise VespaError(e) from e
 
-        resp.raise_for_status()
+        self._raise_for_status(resp)
 
         return QueryResult(**resp.json())
 

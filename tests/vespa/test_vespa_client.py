@@ -5,7 +5,6 @@ import vespa.application as pyvespa
 from marqo.vespa import concurrency
 from marqo.vespa.exceptions import VespaError
 from marqo.vespa.models import VespaDocument
-from marqo.vespa.models.feed_response import FeedBatchResponse
 from marqo.vespa.vespa_client import VespaClient
 from tests.marqo_test import AsyncMarqoTestCase
 
@@ -172,3 +171,10 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
 
         self.assertEqual(len(result.root.children), 0)
 
+    def test_query_invalidQueryUrl_fails(self):
+        query_client = VespaClient("http://localhost:8080", "http://localhost:8080", "http://localhost:8000")
+
+        with self.assertRaises(VespaError):
+            query_client.query(
+                yql="select * from sources * where title contains 'Title 1';"
+            )
