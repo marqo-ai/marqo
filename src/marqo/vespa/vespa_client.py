@@ -104,11 +104,14 @@ class VespaClient:
         Returns:
             List of FeedResponse objects
         """
-        responses = conc.run_coroutine(
+        if not batch:
+            return FeedBatchResponse(responses=[], errors=False)
+
+        batch_response = conc.run_coroutine(
             self._feed_batch_async(batch, schema, concurrency, timeout)
         )
 
-        return responses
+        return batch_response
 
     def feed_batch_sync(self, batch: List[VespaDocument], schema: str) -> FeedBatchResponse:
         """

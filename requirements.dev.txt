@@ -41,3 +41,6 @@ idna==2.8
 six==1.14.0
 typing-extensions==4.5.0
 urllib3==1.25.8
+
+# test requirements
+pyvespa==0.37.1
