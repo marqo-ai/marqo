@@ -1,9 +1,12 @@
 import asyncio
-import random
-import time
+import io
+import os
+import tarfile
+import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from json import JSONDecodeError
 from typing import Dict, Any, List
+from urllib.parse import urlparse
 
 import httpx
 
@@ -39,16 +42,27 @@ class VespaClient:
         """
         self.http_client.close()
 
-    def deploy_application(self, application_zip: str):
+    def deploy_application(self, application: str):
         """
         Deploy a Vespa application.
         Args:
-            application_zip: Path to the Vespa application zip file
+            application: Path to the Vespa application root directory
         """
-        pass
+        endpoint = f'{self.config_url}/application/v2/tenant/default/prepareandactivate'
 
-    def download_application(self):
-        pass
+        gzip_stream = self._gzip_compress(application)
+
+        response = httpx.post(
+            endpoint,
+            headers={'Content-Type': 'application/x-gzip'},
+            data=gzip_stream.read()
+        )
+
+        self._raise_for_status(response)
+
+    def download_application(self) -> str:
+        session_id = self._create_deploy_session()
+        return self._download_application(session_id)
 
     def query(self, yql: str, hits: int = 10, ranking: str = None, model_restrict: str = None,
               query_features: Dict[str, Any] = None, **kwargs) -> QueryResult:
@@ -137,7 +151,7 @@ class VespaClient:
 
         errors = False
         for response in responses:
-            if response.status != "200":
+            if response.status != '200':
                 errors = True
 
         return FeedBatchResponse(responses=responses, errors=errors)
@@ -167,10 +181,81 @@ class VespaClient:
 
         errors = False
         for response in responses:
-            if response.status != "200":
+            if response.status != '200':
                 errors = True
 
         return FeedBatchResponse(responses=responses, errors=errors)
+
+    def _gzip_compress(self, directory: str) -> io.BytesIO:
+        """
+        Gzip all files in the given directory and return an in-memory byte buffer.
+        """
+        byte_stream = io.BytesIO()
+        with tarfile.open(fileobj=byte_stream, mode='w:gz') as tar:
+            for root, dirs, files in os.walk(directory):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    arcname = os.path.relpath(file_path, directory)  # archive name should be relative
+                    tar.add(file_path, arcname=arcname)
+
+        byte_stream.seek(0)
+        return byte_stream
+
+    def _create_deploy_session(self) -> int:
+        endpoint = f'{self.config_url}/application/v2/tenant/default/session?from=' \
+                   f'{self.config_url}/application/v2/tenant/default/application/default/environment' \
+                   f'/default/region/default/instance/default'
+
+        response = httpx.post(endpoint)
+
+        self._raise_for_status(response)
+
+        return response.json()['session-id']
+
+    def _download_application(self, session_id: int) -> str:
+        endpoint = f'{self.config_url}/application/v2/tenant/default/session/{session_id}/content/?recursive=true'
+
+        with httpx.Client() as httpx_client:
+            response = httpx_client.get(endpoint)
+
+            self._raise_for_status(response)
+
+            urls = response.json()
+
+            logger.debug(f'URLs: {urls}')
+
+            def is_file(url: str) -> bool:
+                last_component = urlparse(url).path.split('/')[-1]
+                return '.' in last_component
+
+            temp_dir = tempfile.mkdtemp()
+
+            logger.debug(f'Downloading application to {temp_dir}')
+
+            for url in urls:
+                if not is_file(url):
+                    continue  # Skip directories
+
+                # Parse the URL
+                parsed = urlparse(url)
+                path_parts = parsed.path.split('/')
+
+                # Find the index for 'content' and use it as root
+                content_index = path_parts.index('content')
+                rel_path = os.path.join(*path_parts[content_index + 1:])
+                abs_path = os.path.join(temp_dir, rel_path)
+
+                # Ensure directory exists before downloading
+                os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+
+                response = httpx_client.get(url)
+                self._raise_for_status(response)
+
+                # Save the downloaded content
+                with open(abs_path, 'wb') as f:
+                    f.write(response.content)
+
+        return temp_dir
 
     async def _feed_batch_async(self, batch: List[VespaDocument],
                                 schema: str,
@@ -191,7 +276,7 @@ class VespaClient:
         for task in tasks:
             result = task.result()
             responses.append(task.result())
-            if result.status != "200":
+            if result.status != '200':
                 errors = True
 
         return FeedBatchResponse(responses=responses, errors=errors)
@@ -203,7 +288,7 @@ class VespaClient:
         data = {'fields': document.fields}
 
         async with semaphore:
-            end_point = f"{self.document_url}/document/v1/{schema}/{schema}/docid/{doc_id}"
+            end_point = f'{self.document_url}/document/v1/{schema}/{schema}/docid/{doc_id}'
             try:
                 resp = await async_client.post(end_point, json=data, timeout=timeout)
             except httpx.HTTPError as e:
@@ -220,7 +305,7 @@ class VespaClient:
         doc_id = document.id
         data = {'fields': document.fields}
 
-        end_point = f"{self.document_url}/document/v1/{schema}/{schema}/docid/{doc_id}"
+        end_point = f'{self.document_url}/document/v1/{schema}/{schema}/docid/{doc_id}'
 
         resp = sync_client.post(end_point, json=data, timeout=timeout)
 
