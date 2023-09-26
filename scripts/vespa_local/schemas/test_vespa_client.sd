@@ -22,4 +22,10 @@ schema test_vespa_client {
         fields: title, contents
     }
 
+    rank-profile bm25 inherits default {
+        first-phase {
+            expression: bm25(title) + bm25(contents)
+        }
+    }
+
 }

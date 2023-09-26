@@ -1,19 +1,10 @@
-from typing import List
+from typing import List, Dict, Any
 
 from pydantic import BaseModel
 
 
 class RootFields(BaseModel):
     totalCount: int
-
-
-class ChildFields(BaseModel):
-    sddocname: str = None
-    documentid: str = None
-
-    class Config:
-        # Let pydantic add all document fields
-        extra = "allow"
 
 
 class Coverage(BaseModel):
@@ -29,7 +20,7 @@ class Child(BaseModel):
     id: str
     relevance: float
     source: str = None
-    fields: ChildFields
+    fields: Dict[str, Any]
 
 
 class Root(BaseModel):
@@ -37,7 +28,7 @@ class Root(BaseModel):
     relevance: float
     fields: RootFields
     coverage: Coverage
-    children: List[Child]
+    children: List[Child] = []
 
 
 class QueryResult(BaseModel):

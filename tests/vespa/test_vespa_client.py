@@ -19,7 +19,7 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
 
         self.pyvespa_client.delete_all_docs(self.TEST_CLUSTER, self.TEST_SCHEMA)
 
-    def base_test_feed_batch_successful(self, func, batch):
+    def _base_test_feed_batch_successful(self, func, batch):
         batch_ids = [doc.id for doc in batch]
 
         batch_response = func(batch, self.TEST_SCHEMA)
@@ -43,12 +43,12 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
             VespaDocument(id="doc2", fields={"title": "Title 2"}),
         ]
 
-        self.base_test_feed_batch_successful(self.client.feed_batch, documents)
+        self._base_test_feed_batch_successful(self.client.feed_batch, documents)
 
     def test_feed_batch_emptyBatch_successful(self):
         documents = []
 
-        self.base_test_feed_batch_successful(self.client.feed_batch, documents)
+        self._base_test_feed_batch_successful(self.client.feed_batch, documents)
 
     @patch.object(concurrency, "_run_coroutine_in_thread", wraps=concurrency._run_coroutine_in_thread)
     async def test_feed_batch_existingEventLoop_successful(self, mock_executor):
@@ -84,12 +84,12 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
             VespaDocument(id="doc2", fields={"title": "Title 2"}),
         ]
 
-        self.base_test_feed_batch_successful(self.client.feed_batch_sync, documents)
+        self._base_test_feed_batch_successful(self.client.feed_batch_sync, documents)
 
     def test_feed_batch_sync_emptyBatch_successful(self):
         documents = []
 
-        self.base_test_feed_batch_successful(self.client.feed_batch_sync, documents)
+        self._base_test_feed_batch_successful(self.client.feed_batch_sync, documents)
 
     def test_feed_batch_multithreaded_successful(self):
         documents = [
@@ -97,9 +97,46 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
             VespaDocument(id="doc2", fields={"title": "Title 2"}),
         ]
 
-        self.base_test_feed_batch_successful(self.client.feed_batch_multithreaded, documents)
+        self._base_test_feed_batch_successful(self.client.feed_batch_multithreaded, documents)
 
     def test_feed_batch_multithreaded_emptyBatch_successful(self):
         documents = []
 
-        self.base_test_feed_batch_successful(self.client.feed_batch_multithreaded, documents)
+        self._base_test_feed_batch_successful(self.client.feed_batch_multithreaded, documents)
+
+    def test_query_found_successful(self):
+        documents = [
+            {"id": "doc1", "fields": {"title": "Title 1", "contents": "Content 1"}},
+            {"id": "doc2", "fields": {"title": "Title 1", "contents": "Content 1.1"}},
+            {"id": "doc3", "fields": {"title": "Title 2"}}
+        ]
+        self.pyvespa_client.feed_batch(documents, self.TEST_SCHEMA)
+
+        result = self.client.query(
+            yql="select * from sources * where title contains 'Title 1';",
+            ranking="bm25",
+            model_restrict=self.TEST_SCHEMA
+        )
+
+        self.assertEqual(len(result.root.children), 2)
+
+        titles = set([child.fields["title"] for child in result.root.children])
+        contents = set([child.fields["contents"] for child in result.root.children])
+
+        self.assertEqual(titles, {"Title 1"})
+        self.assertEqual(contents, {"Content 1", "Content 1.1"})
+
+    def test_query_notFound_successful(self):
+        documents = [
+            {"id": "doc1", "fields": {"title": "Title 1", "contents": "Content 1"}},
+            {"id": "doc2", "fields": {"title": "Title 2"}}
+        ]
+        self.pyvespa_client.feed_batch(documents, self.TEST_SCHEMA)
+
+        result = self.client.query(
+            yql="select * from sources * where title contains 'Title 3';",
+            ranking="bm25",
+            model_restrict=self.TEST_SCHEMA
+        )
+
+        self.assertEqual(len(result.root.children), 0)
