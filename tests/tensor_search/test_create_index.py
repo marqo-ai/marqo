@@ -11,7 +11,7 @@ from marqo.tensor_search.utils import read_env_vars_and_defaults
 from tests.marqo_test import MarqoTestCase
 from marqo.tensor_search.enums import IndexSettingsField as NsField, TensorField
 from unittest import mock
-from marqo.tensor_search.models.settings_object import settings_schema
+from marqo_commons.shared_utils.errors import InvalidSettingsArgError
 from marqo import errors
 from marqo.errors import InvalidArgError
 
@@ -98,7 +98,7 @@ class TestCreateIndex(MarqoTestCase):
                 except IndexNotFoundError as s:
                     pass
                 
-                with self.assertRaises(errors.InvalidArgError):
+                with self.assertRaises(InvalidSettingsArgError):
                     print(f"index settings={idx_defaults}")
                     tensor_search.create_vector_index(
                         config=self.config,
@@ -335,8 +335,7 @@ class TestCreateIndex(MarqoTestCase):
 
     def test_set_number_of_replicas(self):
         intended_replicas_count = 4
-        from marqo.tensor_search.models.settings_object import settings_schema
-        with patch.dict(settings_schema["properties"][NsField.number_of_replicas], maximum=10):
+        with patch.dict(os.environ, {EnvVars.MARQO_MAX_NUMBER_OF_REPLICAS: "10"}):
             res_0 = tensor_search.create_vector_index(
                 index_name=self.index_name_1, config=self.config,
                 index_settings={
@@ -358,9 +357,8 @@ class TestCreateIndex(MarqoTestCase):
         maximum_number_of_replicas = 5
         large_intended_replicas_count = 10
         small_intended_replicas_count = 3
-        from marqo.tensor_search.models.settings_object import settings_schema
 
-        with patch.dict(settings_schema["properties"][NsField.number_of_replicas], maximum=maximum_number_of_replicas):
+        with patch.dict(os.environ, {EnvVars.MARQO_MAX_NUMBER_OF_REPLICAS: str(maximum_number_of_replicas)}):
             # a large value exceeding limits should not work
             try:
                 res_0 = tensor_search.create_vector_index(
@@ -374,7 +372,7 @@ class TestCreateIndex(MarqoTestCase):
                     }
                 )
                 raise AssertionError
-            except InvalidArgError as e:
+            except InvalidSettingsArgError as e:
                 pass
 
             try:
@@ -441,7 +439,7 @@ class TestCreateIndex(MarqoTestCase):
                 }
             )
             raise AssertionError
-        except InvalidArgError as e:
+        except InvalidSettingsArgError as e:
             pass
 
         # a small value should work
@@ -622,7 +620,7 @@ class TestCreateIndex(MarqoTestCase):
         try:
             tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings=bad_settings)
             raise AssertionError
-        except errors.InvalidArgError as e:
+        except InvalidSettingsArgError as e:
             pass
 
     def test_index_validation_good(self):

@@ -52,6 +52,7 @@ from marqo.tensor_search.enums import (
 )
 from marqo.tensor_search.enums import IndexSettingsField as NsField
 from marqo.tensor_search import utils, backend, validation, configs, add_docs, filtering
+from marqo_commons.settings_validation.settings_validation import validate_index_settings
 from marqo.tensor_search.formatting import _clean_doc
 from marqo.tensor_search.index_meta_cache import get_cache, get_index_info
 from marqo.tensor_search import index_meta_cache
@@ -61,7 +62,7 @@ from marqo.tensor_search.models.index_info import IndexInfo, get_model_propertie
 from marqo.tensor_search.models.external_apis.abstract_classes import ExternalAuth
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.tensor_search.health import generate_heath_check_response
-from marqo.tensor_search.utils import add_timing
+from marqo.tensor_search.utils import add_timing, read_env_vars_and_defaults_ints
 from marqo.tensor_search import delete_docs
 from marqo.s2_inference.processing import text as text_processor
 from marqo.s2_inference.processing import image as image_processor
@@ -140,7 +141,11 @@ def create_vector_index(
     else:
         the_index_settings = configs.get_default_index_settings()
 
-    validation.validate_settings_object(settings_object=the_index_settings)
+    validate_index_settings(
+        settings_to_validate=the_index_settings,
+        MAX_EF_CONSTRUCTION_VALUE=read_env_vars_and_defaults_ints(EnvVars.MARQO_EF_CONSTRUCTION_MAX_VALUE),
+        MAX_NUMBER_OF_REPLICAS=read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_NUMBER_OF_REPLICAS),
+    )
 
     vector_index_settings = {
         "settings": {

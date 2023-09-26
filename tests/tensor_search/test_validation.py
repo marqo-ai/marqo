@@ -5,6 +5,8 @@ from marqo.tensor_search import enums
 import unittest
 from unittest import mock
 from unittest.mock import patch
+
+from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifier
 from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest
 from marqo.tensor_search.models.search import SearchContext
@@ -13,6 +15,11 @@ from marqo.errors import (
     InvalidDocumentIdError, InvalidArgError, DocTooLargeError,
     InvalidIndexNameError
 )
+from marqo_commons.shared_utils.errors import InvalidSettingsArgError
+from marqo_commons.settings_validation.settings_validation import validate_index_settings
+
+from marqo.tensor_search.utils import read_env_vars_and_defaults_ints
+
 
 class TestValidation(unittest.TestCase):
 
@@ -442,12 +449,22 @@ class TestValidateIndexSettings(unittest.TestCase):
             }
         ]
         for settings in good_settings:
-            assert settings == validation.validate_settings_object(settings)
+            assert settings == validate_index_settings(settings,
+                                                       MAX_EF_CONSTRUCTION_VALUE=read_env_vars_and_defaults_ints(
+                                                           EnvVars.MARQO_EF_CONSTRUCTION_MAX_VALUE),
+                                                       MAX_NUMBER_OF_REPLICAS=read_env_vars_and_defaults_ints(
+                                                           EnvVars.MARQO_MAX_NUMBER_OF_REPLICAS),
+                                                       )
 
     def test_validate_index_settings_model_properties(self):
         good_settings = self.get_good_index_settings()
         good_settings['index_defaults']['model_properties'] = dict()
-        assert good_settings == validation.validate_settings_object(good_settings)
+        assert good_settings == validate_index_settings(good_settings,
+                                                        MAX_EF_CONSTRUCTION_VALUE=read_env_vars_and_defaults_ints(
+                                                            EnvVars.MARQO_EF_CONSTRUCTION_MAX_VALUE),
+                                                        MAX_NUMBER_OF_REPLICAS=read_env_vars_and_defaults_ints(
+                                                            EnvVars.MARQO_MAX_NUMBER_OF_REPLICAS),
+                                                        )
 
     def test_validate_index_settings_bad(self):
         bad_settings = [{
@@ -486,72 +503,137 @@ class TestValidateIndexSettings(unittest.TestCase):
         ]
         for bad_setting in bad_settings:
             try:
-                validation.validate_settings_object(bad_setting)
+                validate_index_settings(bad_setting,
+                                        MAX_EF_CONSTRUCTION_VALUE=read_env_vars_and_defaults_ints(
+                                            EnvVars.MARQO_EF_CONSTRUCTION_MAX_VALUE),
+                                        MAX_NUMBER_OF_REPLICAS=read_env_vars_and_defaults_ints(
+                                            EnvVars.MARQO_MAX_NUMBER_OF_REPLICAS),
+                                        )
                 raise AssertionError
-            except InvalidArgError as e:
+            except InvalidSettingsArgError as e:
                 pass
 
     def test_validate_index_settings_missing_text_preprocessing(self):
         settings = self.get_good_index_settings()
         # base good settings should be OK
-        assert settings == validation.validate_settings_object(settings)
+        assert settings == validate_index_settings(settings,
+                                                   MAX_EF_CONSTRUCTION_VALUE=read_env_vars_and_defaults_ints(
+                                                       EnvVars.MARQO_EF_CONSTRUCTION_MAX_VALUE),
+                                                   MAX_NUMBER_OF_REPLICAS=read_env_vars_and_defaults_ints(
+                                                       EnvVars.MARQO_MAX_NUMBER_OF_REPLICAS),
+                                                   )
         del settings['index_defaults']['text_preprocessing']
         try:
-            validation.validate_settings_object(settings)
+            validate_index_settings(settings,
+                                    MAX_EF_CONSTRUCTION_VALUE=read_env_vars_and_defaults_ints(
+                                        EnvVars.MARQO_EF_CONSTRUCTION_MAX_VALUE),
+                                    MAX_NUMBER_OF_REPLICAS=read_env_vars_and_defaults_ints(
+                                        EnvVars.MARQO_MAX_NUMBER_OF_REPLICAS),
+                                    )
             raise AssertionError
-        except InvalidArgError:
+        except InvalidSettingsArgError:
             pass
 
     def test_validate_index_settings_missing_model(self):
         settings = self.get_good_index_settings()
         # base good settings should be OK
-        assert settings == validation.validate_settings_object(settings)
+        assert settings == validate_index_settings(settings,
+                                                   MAX_EF_CONSTRUCTION_VALUE=read_env_vars_and_defaults_ints(
+                                                       EnvVars.MARQO_EF_CONSTRUCTION_MAX_VALUE),
+                                                   MAX_NUMBER_OF_REPLICAS=read_env_vars_and_defaults_ints(
+                                                       EnvVars.MARQO_MAX_NUMBER_OF_REPLICAS),
+                                                   )
         del settings['index_defaults']['model']
         try:
-            validation.validate_settings_object(settings)
+            validate_index_settings(settings,
+                                    MAX_EF_CONSTRUCTION_VALUE=read_env_vars_and_defaults_ints(
+                                        EnvVars.MARQO_EF_CONSTRUCTION_MAX_VALUE),
+                                    MAX_NUMBER_OF_REPLICAS=read_env_vars_and_defaults_ints(
+                                        EnvVars.MARQO_MAX_NUMBER_OF_REPLICAS),
+                                    )
             raise AssertionError
-        except InvalidArgError:
+        except InvalidSettingsArgError:
             pass
 
     def test_validate_index_settings_missing_index_defaults(self):
         settings = self.get_good_index_settings()
         # base good settings should be OK
-        assert settings == validation.validate_settings_object(settings)
+        assert settings == validate_index_settings(settings,
+                                                   MAX_EF_CONSTRUCTION_VALUE=read_env_vars_and_defaults_ints(
+                                                       EnvVars.MARQO_EF_CONSTRUCTION_MAX_VALUE),
+                                                   MAX_NUMBER_OF_REPLICAS=read_env_vars_and_defaults_ints(
+                                                       EnvVars.MARQO_MAX_NUMBER_OF_REPLICAS),
+                                                   )
         del settings['index_defaults']
         try:
-            validation.validate_settings_object(settings)
+            validate_index_settings(settings,
+                                    MAX_EF_CONSTRUCTION_VALUE=read_env_vars_and_defaults_ints(
+                                        EnvVars.MARQO_EF_CONSTRUCTION_MAX_VALUE),
+                                    MAX_NUMBER_OF_REPLICAS=read_env_vars_and_defaults_ints(
+                                        EnvVars.MARQO_MAX_NUMBER_OF_REPLICAS),
+                                    )
             raise AssertionError
-        except InvalidArgError:
+        except InvalidSettingsArgError:
             pass
 
     def test_validate_index_settings_bad_number_shards(self):
         settings = self.get_good_index_settings()
         # base good settings should be OK
-        assert settings == validation.validate_settings_object(settings)
+        assert settings == validate_index_settings(settings,
+                                                   MAX_EF_CONSTRUCTION_VALUE=read_env_vars_and_defaults_ints(
+                                                       EnvVars.MARQO_EF_CONSTRUCTION_MAX_VALUE),
+                                                   MAX_NUMBER_OF_REPLICAS=read_env_vars_and_defaults_ints(
+                                                       EnvVars.MARQO_MAX_NUMBER_OF_REPLICAS),
+                                                   )
         settings['number_of_shards'] = -1
         try:
-            validation.validate_settings_object(settings)
+            validate_index_settings(settings,
+                                    MAX_EF_CONSTRUCTION_VALUE=read_env_vars_and_defaults_ints(
+                                        EnvVars.MARQO_EF_CONSTRUCTION_MAX_VALUE),
+                                    MAX_NUMBER_OF_REPLICAS=read_env_vars_and_defaults_ints(
+                                        EnvVars.MARQO_MAX_NUMBER_OF_REPLICAS),
+                                    )
             raise AssertionError
-        except InvalidArgError as e:
+        except InvalidSettingsArgError as e:
             pass
 
     def test_validate_index_settings_bad_number_replicas(self):
         settings = self.get_good_index_settings()
         # base good settings should be OK
-        assert settings == validation.validate_settings_object(settings)
+        assert settings == validate_index_settings(settings,
+                                                   MAX_EF_CONSTRUCTION_VALUE=read_env_vars_and_defaults_ints(
+                                                       EnvVars.MARQO_EF_CONSTRUCTION_MAX_VALUE),
+                                                   MAX_NUMBER_OF_REPLICAS=read_env_vars_and_defaults_ints(
+                                                       EnvVars.MARQO_MAX_NUMBER_OF_REPLICAS),
+                                                   )
         settings['number_of_replicas'] = -1
         try:
-            validation.validate_settings_object(settings)
+            validate_index_settings(settings,
+                                    MAX_EF_CONSTRUCTION_VALUE=read_env_vars_and_defaults_ints(
+                                        EnvVars.MARQO_EF_CONSTRUCTION_MAX_VALUE),
+                                    MAX_NUMBER_OF_REPLICAS=read_env_vars_and_defaults_ints(
+                                        EnvVars.MARQO_MAX_NUMBER_OF_REPLICAS),
+                                    )
             raise AssertionError
-        except InvalidArgError as e:
+        except InvalidSettingsArgError as e:
             pass
 
     def test_validate_index_settings_img_preprocessing(self):
         settings = self.get_good_index_settings()
         # base good settings should be OK
-        assert settings == validation.validate_settings_object(settings)
+        assert settings == validate_index_settings(settings,
+                                                   MAX_EF_CONSTRUCTION_VALUE=read_env_vars_and_defaults_ints(
+                                                       EnvVars.MARQO_EF_CONSTRUCTION_MAX_VALUE),
+                                                   MAX_NUMBER_OF_REPLICAS=read_env_vars_and_defaults_ints(
+                                                       EnvVars.MARQO_MAX_NUMBER_OF_REPLICAS),
+                                                   )
         settings['index_defaults']['image_preprocessing']["path_method"] = "frcnn"
-        assert settings == validation.validate_settings_object(settings)
+        assert settings == validate_index_settings(settings,
+                                                   MAX_EF_CONSTRUCTION_VALUE=read_env_vars_and_defaults_ints(
+                                                       EnvVars.MARQO_EF_CONSTRUCTION_MAX_VALUE),
+                                                   MAX_NUMBER_OF_REPLICAS=read_env_vars_and_defaults_ints(
+                                                       EnvVars.MARQO_MAX_NUMBER_OF_REPLICAS),
+                                                   )
 
     def test_validate_index_settings_misplaced_fields(self):
         bad_settings = [
@@ -643,9 +725,14 @@ class TestValidateIndexSettings(unittest.TestCase):
         ]
         for bad_set in bad_settings:
             try:
-                validation.validate_settings_object(bad_set)
+                validate_index_settings(bad_set,
+                                        MAX_EF_CONSTRUCTION_VALUE=read_env_vars_and_defaults_ints(
+                                            EnvVars.MARQO_EF_CONSTRUCTION_MAX_VALUE),
+                                        MAX_NUMBER_OF_REPLICAS=read_env_vars_and_defaults_ints(
+                                            EnvVars.MARQO_MAX_NUMBER_OF_REPLICAS),
+                                        )
                 raise AssertionError
-            except InvalidArgError as e:
+            except InvalidSettingsArgError as e:
                 pass
 
     def test_validate_mappings(self):
