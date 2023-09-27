@@ -112,7 +112,7 @@ if [[ ! $OPENSEARCH_URL ]]; then
       echo "Marqo-OS started successfully."
   fi
 else
-    echo "Found Marqo-OS URL. Skipping internal Marqo-OS configuration"
+    echo "Found Marqo-OS URL. Skipping internal Marqo-OS configuration."
 fi
 
 export OPENSEARCH_URL
