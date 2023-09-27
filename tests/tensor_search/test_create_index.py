@@ -11,7 +11,6 @@ from marqo.tensor_search.utils import read_env_vars_and_defaults
 from tests.marqo_test import MarqoTestCase
 from marqo.tensor_search.enums import IndexSettingsField as NsField, TensorField
 from unittest import mock
-from marqo_commons.shared_utils.errors import InvalidSettingsArgError
 from marqo import errors
 from marqo.errors import InvalidArgError
 
@@ -98,7 +97,7 @@ class TestCreateIndex(MarqoTestCase):
                 except IndexNotFoundError as s:
                     pass
                 
-                with self.assertRaises(InvalidSettingsArgError):
+                with self.assertRaises(InvalidArgError):
                     print(f"index settings={idx_defaults}")
                     tensor_search.create_vector_index(
                         config=self.config,
@@ -372,7 +371,8 @@ class TestCreateIndex(MarqoTestCase):
                     }
                 )
                 raise AssertionError
-            except InvalidSettingsArgError as e:
+            except InvalidArgError as e:
+                print(e.message)
                 pass
 
             try:
@@ -439,7 +439,7 @@ class TestCreateIndex(MarqoTestCase):
                 }
             )
             raise AssertionError
-        except InvalidSettingsArgError as e:
+        except InvalidArgError as e:
             pass
 
         # a small value should work
@@ -620,7 +620,7 @@ class TestCreateIndex(MarqoTestCase):
         try:
             tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings=bad_settings)
             raise AssertionError
-        except InvalidSettingsArgError as e:
+        except InvalidArgError as e:
             pass
 
     def test_index_validation_good(self):

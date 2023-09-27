@@ -14,7 +14,6 @@ from marqo.s2_inference.types import *
 from marqo.s2_inference.logger import get_logger
 import onnxruntime as ort
 from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize
-from marqo_commons.model_registry.onnx_clip_properties import _get_onnx_clip_properties
 from zipfile import ZipFile
 from huggingface_hub.utils import RevisionNotFoundError,RepositoryNotFoundError, EntryNotFoundError, LocalEntryNotFoundError
 from marqo.s2_inference.errors import ModelDownloadError
@@ -60,6 +59,7 @@ class CLIP_ONNX(object):
     def __init__(self, model_name: str ="onnx32/openai/ViT-L/14", device: str = None, embedding_dim: int = None,
                  truncate: bool = True,
                  load=True, **kwargs):
+        from marqo.s2_inference.s2_inference import get_model_properties_from_registry
         self.model_name = model_name
         self.onnx_type, self.source, self.clip_model = self.model_name.split("/", 2)
         if not device:
@@ -70,7 +70,7 @@ class CLIP_ONNX(object):
             "CPUExecutionProvider"]
         self.visual_session = None
         self.textual_session = None
-        self.model_info = _get_onnx_clip_properties()[self.model_name]
+        self.model_info = get_model_properties_from_registry(self.model_name)
 
         self.visual_type = np.float16 if self.onnx_type == "onnx16" else np.float32
         self.textual_type = np.int64 if self.source == "open_clip" else np.int32

@@ -2,12 +2,14 @@
 The functions defined here would have endpoints, later on.
 """
 import numpy as np
+from marqo_commons.model_registry.model_registry import get_model_properties_dict
+
 from marqo.errors import ModelCacheManagementError, InvalidArgError, ConfigurationError, InternalError
 from marqo.s2_inference.errors import (
     VectoriseError, InvalidModelPropertiesError, ModelLoadError,
     UnknownModelError, ModelNotInCacheError, ModelDownloadError, S2InferenceError)
 from PIL import UnidentifiedImageError
-from marqo.s2_inference.model_registry import load_model_properties
+from marqo.s2_inference.model_loaders import load_model_properties
 from marqo.s2_inference.configs import get_default_normalization, get_default_seq_length
 from marqo.s2_inference.types import *
 from marqo.s2_inference.logger import get_logger
@@ -28,7 +30,8 @@ logger = get_logger(__name__)
 available_models = dict()
 # A lock to protect the model loading process
 lock = threading.Lock()
-MODEL_PROPERTIES = load_model_properties()
+MODEL_PROPERTIES = get_model_properties_dict()
+MODEL_LOADERS = load_model_properties()
 
 
 def vectorise(model_name: str, content: Union[str, List[str]], model_properties: dict = None,
@@ -369,11 +372,11 @@ def get_model_properties_from_registry(model_name: str) -> dict:
         dict: a dictionary describing properties of the model.
     """
 
-    if model_name not in MODEL_PROPERTIES['models']:
+    if model_name not in MODEL_PROPERTIES:
         raise UnknownModelError(f"Could not find model properties in model registry for model={model_name}. "
                                 f"Model is not supported by default.")
 
-    return MODEL_PROPERTIES['models'][model_name]
+    return MODEL_PROPERTIES[model_name]
 
 
 def _check_output_type(output: List[List[float]]) -> bool:
@@ -505,10 +508,10 @@ def _get_model_loader(model_name: str, model_properties: dict) -> Any:
 
     model_type = model_properties['type']
 
-    if model_type not in MODEL_PROPERTIES['loaders']:
+    if model_type not in MODEL_LOADERS:
         raise KeyError(f"model_name={model_name} for model_type={model_type} not in allowed model types")
 
-    return MODEL_PROPERTIES['loaders'][model_type]
+    return MODEL_LOADERS[model_type]
 
 
 def get_available_models():

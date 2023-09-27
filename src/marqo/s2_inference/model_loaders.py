@@ -5,7 +5,6 @@ from marqo.s2_inference.random_utils import Random
 from marqo.s2_inference.clip_utils import CLIP, OPEN_CLIP, MULTILINGUAL_CLIP, FP16_CLIP, get_multilingual_clip_properties
 from marqo.s2_inference.types import Any, Dict, List, Optional, Union, FloatTensor
 from marqo.s2_inference.onnx_clip_utils import CLIP_ONNX
-from marqo_commons.model_registry.model_registry import get_model_properties_dict
 
 # we need to keep track of the embed dim and model load functions/classes
 # we can use this as a registry
@@ -23,12 +22,8 @@ def _get_model_load_mappings() -> Dict:
             'hf':HF_MODEL}
 
 def load_model_properties() -> Dict:
-
     all_properties = dict()
-    all_properties['models'] = get_model_properties_dict()
-
-    all_properties['loaders'] = dict()
     for key,val in _get_model_load_mappings().items():
-        all_properties['loaders'][key] = val
+        all_properties[key] = val
 
     return all_properties

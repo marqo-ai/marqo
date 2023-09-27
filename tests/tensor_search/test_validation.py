@@ -15,8 +15,8 @@ from marqo.errors import (
     InvalidDocumentIdError, InvalidArgError, DocTooLargeError,
     InvalidIndexNameError
 )
-from marqo_commons.shared_utils.errors import InvalidSettingsArgError
 from marqo_commons.settings_validation.settings_validation import validate_index_settings
+from marqo_commons.shared_utils.errors import InvalidSettingsArgError
 
 from marqo.tensor_search.utils import read_env_vars_and_defaults_ints
 

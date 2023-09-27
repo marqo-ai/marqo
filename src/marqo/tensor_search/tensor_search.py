@@ -38,6 +38,8 @@ from timeit import default_timer as timer
 import functools
 import pprint
 import typing
+
+from marqo.errors import InvalidArgError
 from marqo.tensor_search.models.private_models import ModelAuth
 import uuid
 from typing import List, Optional, Union, Iterable, Sequence, Dict, Any, Tuple
@@ -78,6 +80,7 @@ from marqo.config import Config
 from marqo import errors
 from marqo.s2_inference import errors as s2_inference_errors
 import threading
+from marqo_commons.shared_utils.errors import InvalidSettingsArgError
 from dataclasses import replace
 from marqo.tensor_search.tensor_search_logging import get_logger
 
@@ -141,11 +144,14 @@ def create_vector_index(
     else:
         the_index_settings = configs.get_default_index_settings()
 
-    validate_index_settings(
-        settings_to_validate=the_index_settings,
-        MAX_EF_CONSTRUCTION_VALUE=read_env_vars_and_defaults_ints(EnvVars.MARQO_EF_CONSTRUCTION_MAX_VALUE),
-        MAX_NUMBER_OF_REPLICAS=read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_NUMBER_OF_REPLICAS),
-    )
+    try:
+        validate_index_settings(
+            settings_to_validate=the_index_settings,
+            MAX_EF_CONSTRUCTION_VALUE=read_env_vars_and_defaults_ints(EnvVars.MARQO_EF_CONSTRUCTION_MAX_VALUE),
+            MAX_NUMBER_OF_REPLICAS=read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_NUMBER_OF_REPLICAS),
+        )
+    except InvalidSettingsArgError as e:
+        raise InvalidArgError(e)
 
     vector_index_settings = {
         "settings": {
