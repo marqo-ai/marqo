@@ -111,7 +111,7 @@ class VespaClient:
     def feed_batch(self,
                    batch: List[VespaDocument],
                    schema: str,
-                   concurrency: int = 100,
+                   concurrency: int = 10,
                    timeout: int = 60) -> FeedBatchResponse:
         """
         Feed a batch of documents to Vespa concurrently.
@@ -163,7 +163,7 @@ class VespaClient:
         return FeedBatchResponse(responses=responses, errors=errors)
 
     def feed_batch_multithreaded(self, batch: List[VespaDocument], schema: str,
-                                 max_threads: int = 100) -> FeedBatchResponse:
+                                 max_threads: int = 10) -> FeedBatchResponse:
         """
         Feed a batch of documents to Vespa concurrently using a thread pool.
 
