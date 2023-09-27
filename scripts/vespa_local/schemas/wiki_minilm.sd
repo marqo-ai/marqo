@@ -1,0 +1,124 @@
+schema wiki_minilm {
+
+    document wiki_minilm {
+
+        field id type string {
+            indexing: summary | attribute
+        }
+
+        field title type string {
+            indexing: summary | attribute | index
+            index: enable-bm25
+        }
+
+        field contents type string {
+            indexing: summary | attribute | index
+            index: enable-bm25
+        }
+
+        field age type int {
+            indexing: summary | attribute
+        }
+
+        field marqo_chunks type array<string> {
+            indexing: attribute
+        }
+
+        field marqo_embeddings type tensor<float>(p{},x[384]) {
+            indexing: attribute | index
+            attribute {
+                distance-metric: prenormalized-angular
+            }
+            index {
+                hnsw {
+                    max-links-per-node: 24
+                    neighbors-to-explore-at-insert: 200
+                }
+            }
+        }
+    }
+
+    document-summary all-non-vector-summary {
+        summary title type string {}
+        summary contents type string {}
+        summary age type int {}
+        summary marqo_chunks type array<string> {}
+    }
+
+    document-summary all-summary {
+        summary title type string {}
+        summary contents type string {}
+        summary age type int {}
+        summary marqo_chunks type array<string> {}
+        summary marqo_embeddings type tensor<float>(p{},x[384]) {}
+    }
+
+    fieldset default {
+        fields: title, contents
+    }
+    rank-profile modifiers inherits default {
+        inputs {
+            query(rank_weight_mult_age): 0.0
+            query(rank_weight_add_age): 0.0
+        }
+        function rank_mult_age() {
+            expression: if (attribute(age) > 0, if (query(rank_weight_mult_age) > 0, query(rank_weight_mult_age) * attribute(age), 1), 1)
+        }
+        function rank_add_age() {
+            expression: if (attribute(age) > 0, if (query(rank_weight_add_age) > 0, query(rank_weight_add_age) * attribute(age), 0), 0)
+        }
+        function modify(score) {
+            expression: rank_mult_age * score + rank_add_age
+        }
+    }
+    rank-profile bm25 inherits default {
+        first-phase {
+            expression: bm25(title) + bm25(contents)
+        }
+    }
+    rank-profile bm25_modifiers inherits modifiers {
+        first-phase {
+            expression: modify(bm25(title) + bm25(contents))
+        }
+    }
+    rank-profile nativeRank inherits default {
+        first-phase {
+            expression: nativeRank(title, contents)
+        }
+    }
+    rank-profile embedding_similarity inherits default {
+        inputs {
+            query(query_embedding) tensor<float>(x[384])
+        }
+        first-phase {
+            expression: closeness(field, marqo_embeddings)
+        }
+        match-features: closest(marqo_embeddings)
+    }
+    rank-profile embedding_similarity_modifiers inherits modifiers {
+        inputs {
+            query(query_embedding) tensor<float>(x[384])
+        }
+        first-phase {
+            expression: modify((closeness(field, marqo_embeddings)))
+        }
+        match-features: closest(marqo_embeddings)
+    }
+    rank-profile hybrid inherits default {
+        inputs {
+            query(query_embedding) tensor<float>(x[384])
+        }
+        first-phase {
+            expression: bm25(title) + bm25(contents) + closeness(field, marqo_embeddings)
+        }
+    }
+    rank-profile hybrid_modifiers inherits modifiers {
+        inputs {
+            query(query_embedding) tensor<float>(x[384])
+        }
+        first-phase {
+            expression: modify(bm25(title) + bm25(contents) + closeness(field, marqo_embeddings))
+        }
+    }
+
+}

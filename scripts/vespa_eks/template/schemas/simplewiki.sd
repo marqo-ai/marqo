@@ -1,0 +1,110 @@
+
+schema simplewiki {
+    document simplewiki {
+        
+        field docId type string {
+            indexing: attribute | summary
+        }
+
+        field url type string {
+            indexing: attribute | summary
+        }
+
+        field domain type string {
+            indexing: attribute | summary
+        }
+
+        field title type string {
+            indexing: index | attribute | summary
+            index: enable-bm25
+        }
+        
+        field content type string {
+            indexing: index | attribute | summary
+            index: enable-bm25
+        }
+        
+        field docDate type string {
+            indexing: attribute | summary
+        }
+
+        field marqo_chunks_title type array<string> {
+            indexing: attribute
+        }
+
+        field marqo_embeddings_title type tensor<float>(p{},x[384]) {
+            indexing: attribute | index
+            attribute {
+                distance-metric: prenormalized-angular
+            }
+            index {
+                hnsw {
+                    max-links-per-node: 16
+                    neighbors-to-explore-at-insert: 512
+                }
+            }
+        }
+
+        field marqo_chunks_content type array<string> {
+            indexing: attribute
+        }
+
+        field marqo_embeddings_content type tensor<float>(p{},x[384]) {
+            indexing: attribute | index
+            attribute {
+                distance-metric: prenormalized-angular
+            }
+            index {
+                hnsw {
+                    max-links-per-node: 16
+                    neighbors-to-explore-at-insert: 512
+                }
+            }
+        }
+    }
+    
+     document-summary all-non-vector-summary {
+        summary docId type string {}
+        summary url type string {}
+        summary domain type string {}
+        summary title type string {}
+        summary content type string {}
+        summary docDate type string {}
+        summary marqo_chunks_title type array<string> {}
+        summary marqo_chunks_content type array<string> {}
+    }
+    document-summary all-summary {
+        summary docId type string {}
+        summary url type string {}
+        summary domain type string {}
+        summary title type string {}
+        summary content type string {}
+        summary docDate type string {}
+        summary marqo_chunks_title type array<string> {}
+        summary marqo_chunks_content type array<string> {}
+        summary marqo_embeddings_title type tensor<float>(p{},x[384]) {}
+        summary marqo_embeddings_content type tensor<float>(p{},x[384]) {}
+    }
+
+    
+    fieldset default {
+           fields: title, content
+    }
+
+    rank-profile bm25 inherits default {
+        first-phase {
+            expression: bm25(title) + bm25(content)
+        }
+    }
+
+    rank-profile embedding_similarity inherits default {
+        inputs {
+            query(query_embedding) tensor<float>(x[384])
+        }
+        first-phase {
+            expression: max(closeness(field, marqo_embeddings_title), closeness(field, marqo_embeddings_content))
+        }
+        match-features: closest(marqo_embeddings_title)
+    }
+
+}
