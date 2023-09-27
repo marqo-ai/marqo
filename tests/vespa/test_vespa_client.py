@@ -200,11 +200,11 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
         original_post = httpx.post
 
         def modified_post(*args, **kwargs):
-            resp = original_post(*args, **kwargs)
+            resp = original_post(*args[1:], **kwargs)
             resp.status_code = 500
             return resp
 
-        with patch.object(httpx, "post", new=modified_post):
+        with patch.object(httpx.Client, "post", new=modified_post):
             with self.assertRaises(VespaError):
                 self.client.download_application()
 

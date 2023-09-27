@@ -63,11 +63,24 @@ class VespaClient:
         """
         Download the Vespa application.
 
+        Application download happens in two steps:
+        1. Create a session
+        2. Download the application using the session ID
+
+        The session created in step 1 is local to the config node that created it and subsequent requests will return a
+        404 error if the request is routed to a different config node. This method attempts to ensure the same config
+        node is used for all requests by using the same httpx client for all requests. However, this is not guaranteed.
+
+        The likelihood of getting a 404 error is further reduced if config cluster uses a load balancer with sticky
+        sessions. Since we are using a single httpx client, cookie-based sticky sessions will work with this
+        implementation.
+
         Returns:
             Path to the downloaded application
         """
-        session_id = self._create_deploy_session()
-        return self._download_application(session_id)
+        with httpx.Client() as httpx_client:
+            session_id = self._create_deploy_session(httpx_client)
+            return self._download_application(session_id, httpx_client)
 
     def query(self, yql: str, hits: int = 10, ranking: str = None, model_restrict: str = None,
               query_features: Dict[str, Any] = None, **kwargs) -> QueryResult:
@@ -206,59 +219,58 @@ class VespaClient:
         byte_stream.seek(0)
         return byte_stream
 
-    def _create_deploy_session(self) -> int:
+    def _create_deploy_session(self, httpx_client: httpx.Client) -> int:
         endpoint = f'{self.config_url}/application/v2/tenant/default/session?from=' \
                    f'{self.config_url}/application/v2/tenant/default/application/default/environment' \
                    f'/default/region/default/instance/default'
 
-        response = httpx.post(endpoint)
+        response = httpx_client.post(endpoint)
 
         self._raise_for_status(response)
 
         return response.json()['session-id']
 
-    def _download_application(self, session_id: int) -> str:
+    def _download_application(self, session_id: int, httpx_client: httpx.Client) -> str:
         endpoint = f'{self.config_url}/application/v2/tenant/default/session/{session_id}/content/?recursive=true'
 
-        with httpx.Client() as httpx_client:
-            response = httpx_client.get(endpoint)
+        response = httpx_client.get(endpoint)
 
+        self._raise_for_status(response)
+
+        urls = response.json()
+
+        logger.debug(f'URLs: {urls}')
+
+        def is_file(url: str) -> bool:
+            last_component = urlparse(url).path.split('/')[-1]
+            return '.' in last_component
+
+        temp_dir = tempfile.mkdtemp()
+
+        logger.debug(f'Downloading application to {temp_dir}')
+
+        for url in urls:
+            if not is_file(url):
+                continue  # Skip directories
+
+            # Parse the URL
+            parsed = urlparse(url)
+            path_parts = parsed.path.split('/')
+
+            # Find the index for 'content' and use it as root
+            content_index = path_parts.index('content')
+            rel_path = os.path.join(*path_parts[content_index + 1:])
+            abs_path = os.path.join(temp_dir, rel_path)
+
+            # Ensure directory exists before downloading
+            os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+
+            response = httpx_client.get(url)
             self._raise_for_status(response)
 
-            urls = response.json()
-
-            logger.debug(f'URLs: {urls}')
-
-            def is_file(url: str) -> bool:
-                last_component = urlparse(url).path.split('/')[-1]
-                return '.' in last_component
-
-            temp_dir = tempfile.mkdtemp()
-
-            logger.debug(f'Downloading application to {temp_dir}')
-
-            for url in urls:
-                if not is_file(url):
-                    continue  # Skip directories
-
-                # Parse the URL
-                parsed = urlparse(url)
-                path_parts = parsed.path.split('/')
-
-                # Find the index for 'content' and use it as root
-                content_index = path_parts.index('content')
-                rel_path = os.path.join(*path_parts[content_index + 1:])
-                abs_path = os.path.join(temp_dir, rel_path)
-
-                # Ensure directory exists before downloading
-                os.makedirs(os.path.dirname(abs_path), exist_ok=True)
-
-                response = httpx_client.get(url)
-                self._raise_for_status(response)
-
-                # Save the downloaded content
-                with open(abs_path, 'wb') as f:
-                    f.write(response.content)
+            # Save the downloaded content
+            with open(abs_path, 'wb') as f:
+                f.write(response.content)
 
         return temp_dir
 
