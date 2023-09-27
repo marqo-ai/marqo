@@ -1,5 +1,7 @@
+import os
 from unittest.mock import patch
 
+import httpx
 import vespa.application as pyvespa
 
 from marqo.vespa import concurrency
@@ -14,7 +16,7 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
     TEST_CLUSTER = "content_default"
 
     def setUp(self):
-        self.client = VespaClient("http://localhost:8080", "http://localhost:8080", "http://localhost:8080")
+        self.client = VespaClient("http://localhost:19071", "http://localhost:8080", "http://localhost:8080")
         self.pyvespa_client = pyvespa.Vespa(url="http://localhost", port=8080)
 
         self.pyvespa_client.delete_all_docs(self.TEST_CLUSTER, self.TEST_SCHEMA)
@@ -178,3 +180,77 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
             query_client.query(
                 yql="select * from sources * where title contains 'Title 1';"
             )
+
+    @patch.object(httpx, "get", wraps=httpx.get)
+    @patch.object(httpx, "post", wraps=httpx.post)
+    def test_download_application_successful(self, mock_post, mock_get):
+        app = self.client.download_application()
+
+        self.assertTrue(os.path.exists(app), "Application root does not exist")
+        self.assertTrue(os.path.isfile(os.path.join(app, "services.xml")),
+                        "services.xml does not exist or is not a file")
+        self.assertTrue(os.path.isdir(os.path.join(app, "schemas")), "schemas does not exist or is not a directory")
+        self.assertTrue(os.path.isfile(os.path.join(app, "schemas", "test_vespa_client.sd")),
+                        "test_vespa_client.sd does not exist or is not a file")
+
+    def test_download_application_createSessionError_fails(self):
+        """
+        Test that download_application fails when session creation fails
+        """
+        original_post = httpx.post
+
+        def modified_post(*args, **kwargs):
+            resp = original_post(*args, **kwargs)
+            resp.status_code = 500
+            return resp
+
+        with patch.object(httpx, "post", new=modified_post):
+            with self.assertRaises(VespaError):
+                self.client.download_application()
+
+    def test_download_application_downloadError_fails(self):
+        original_get = httpx.get
+
+        def modified_get(*args, **kwargs):
+            resp = original_get(*args[1:], **kwargs)  # 1:0 to skip self argument
+            resp.status_code = 500
+            return resp
+
+        with patch.object(httpx.Client, "get", new=modified_get):
+            with self.assertRaises(VespaError):
+                self.client.download_application()
+
+    def test_deploy_application_successful(self):
+        """
+        Test that deploy_application works. To ensure we're not changing our local Vespa, we download the current
+        application and deploy it. This means this test fails if donwload_application fails, even though we're not
+        testing that here.
+        """
+
+        def get_vespa_app_generation() -> int:
+            """
+            Get the current Vespa application generation
+            """
+            resp = httpx.get("http://localhost:19071/application/v2/tenant/default/application/default")
+            return resp.json()["generation"]
+
+        app = self.client.download_application()
+
+        with patch.object(httpx, "post", wraps=httpx.post) as mock_post:
+            generation_before = get_vespa_app_generation()
+
+            self.client.deploy_application(app)
+
+            generation_after = get_vespa_app_generation()
+
+            self.assertTrue(generation_after > generation_before)  # note generation can increase by more than 1
+            mock_post.assert_called_once()
+            self.assertTrue('prepareandactivate' in mock_post.call_args[0][0])
+
+    def test_deploy_application_invalidAppPath_fails(self):
+        with self.assertRaises(VespaError):
+            self.client.deploy_application("/invalid/path")
+
+    def test_deploy_application_invalidApp_fails(self):
+        with self.assertRaises(VespaError):
+            self.client.deploy_application(os.path.abspath(os.path.curdir))

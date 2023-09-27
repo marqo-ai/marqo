@@ -61,6 +61,12 @@ class VespaClient:
         self._raise_for_status(response)
 
     def download_application(self) -> str:
+        """
+        Download the Vespa application.
+
+        Returns:
+            Path to the downloaded application
+        """
         session_id = self._create_deploy_session()
         return self._download_application(session_id)
 
