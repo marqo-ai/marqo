@@ -13,8 +13,7 @@ import httpx
 import marqo.logging
 import marqo.vespa.concurrency as conc
 from marqo.vespa.exceptions import VespaStatusError, VespaError
-from marqo.vespa.models import *
-from marqo.vespa.models.feed_response import FeedBatchResponse
+from marqo.vespa.models import VespaDocument, QueryResult, FeedResponse, FeedBatchResponse
 
 logger = marqo.logging.get_logger(__name__)
 
