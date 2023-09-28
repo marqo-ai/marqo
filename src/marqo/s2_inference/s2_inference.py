@@ -9,7 +9,7 @@ from marqo.s2_inference.errors import (
     VectoriseError, InvalidModelPropertiesError, ModelLoadError,
     UnknownModelError, ModelNotInCacheError, ModelDownloadError, S2InferenceError)
 from PIL import UnidentifiedImageError
-from marqo.s2_inference.model_loaders import load_model_properties
+from marqo.s2_inference.model_loaders import get_model_loaders
 from marqo.s2_inference.configs import get_default_normalization, get_default_seq_length
 from marqo.s2_inference.types import *
 from marqo.s2_inference.logger import get_logger
@@ -31,7 +31,7 @@ available_models = dict()
 # A lock to protect the model loading process
 lock = threading.Lock()
 MODEL_PROPERTIES = get_model_properties_dict()
-MODEL_LOADERS = load_model_properties()
+MODEL_LOADERS = get_model_loaders()
 
 
 def vectorise(model_name: str, content: Union[str, List[str]], model_properties: dict = None,

@@ -21,9 +21,9 @@ def _get_model_load_mappings() -> Dict:
             'random':Random,
             'hf':HF_MODEL}
 
-def load_model_properties() -> Dict:
-    all_properties = dict()
+def get_model_loaders() -> Dict:
+    loaders = dict()
     for key,val in _get_model_load_mappings().items():
-        all_properties[key] = val
+        loaders[key] = val
 
-    return all_properties
+    return loaders

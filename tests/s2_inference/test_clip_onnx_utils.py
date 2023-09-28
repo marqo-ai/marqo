@@ -7,7 +7,6 @@ import unittest
 from unittest import mock
 import requests
 # NOTE: circular reference between model_registry & onnx_clip_utils
-import marqo.s2_inference.model_loaders as model_registry
 from marqo.s2_inference.onnx_clip_utils import CLIP_ONNX
 from marqo.tensor_search.enums import ModelProperties
 from marqo.tensor_search.models.private_models import ModelLocation, ModelAuth

@@ -145,6 +145,9 @@ def create_vector_index(
         the_index_settings = configs.get_default_index_settings()
 
     try:
+        """Validates the index settings using validate_index_settings function from marqo-commons.
+        validate_index_settings on error raises InvalidSettingsArgError from marqo-commons.
+        To propagate native error catches InvalidSettingsArgError and raises InvalidArgError from marqo."""
         validate_index_settings(
             settings_to_validate=the_index_settings,
             MAX_EF_CONSTRUCTION_VALUE=read_env_vars_and_defaults_ints(EnvVars.MARQO_EF_CONSTRUCTION_MAX_VALUE),
