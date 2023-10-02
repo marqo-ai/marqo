@@ -1165,6 +1165,90 @@ class TestValidateIndexSettings(unittest.TestCase):
 
         for valid_custom_score_fields in valid_custom_score_fields_list:
             ScoreModifier(**valid_custom_score_fields)
+    
+    def test_validate_dict(self):
+        test_mappings = {"my_combo_field":{"type":"multimodal_combination", "weights":{
+            "test_1":0.5, "test_2":0.5
+        }}}
+        field = "my_combo_field"
+        valid_dict = {"test_1": "test", "test_2": "test_test"}
+
+        # valid_dict
+        validation.validate_dict(field, valid_dict, is_non_tensor_field=False, mappings=test_mappings)
+
+        # invalid str:str format
+        # str:list
+        try:
+            validation.validate_dict(field, {"test_1": ["my","test"], "test_2": "test_test"}, is_non_tensor_field=False, mappings=test_mappings)
+            raise AssertionError
+        except InvalidArgError as e:
+            assert "is not of valid content type" in e.message
+        # str:tuple
+        try:
+            validation.validate_dict(field, {"test_1": ("my","test"), "test_2": "test_test"}, is_non_tensor_field=False,
+                          mappings=test_mappings)
+            raise AssertionError
+        except InvalidArgError as e:
+            assert "is not of valid content type" in e.message
+
+        # str:dict
+        try:
+            validation.validate_dict(field, {"test_1": {"my":"test"}, "test_2": "test_test"}, is_non_tensor_field=False,
+                          mappings=test_mappings)
+            raise AssertionError
+        except InvalidArgError as e:
+            assert "is not of valid content type" in e.message
+
+        # str:int
+        try:
+            validation.validate_dict(field, {"test_1": 53213, "test_2": "test_test"}, is_non_tensor_field=False,
+                          mappings=test_mappings)
+            raise AssertionError
+        except InvalidArgError as e:
+            assert "is not of valid content type" in e.message
+
+        # str:None
+        try:
+            validation.validate_dict(field, {"test_1": None, "test_2": "test_test"}, is_non_tensor_field=False,
+                          mappings=test_mappings)
+            raise AssertionError
+        except InvalidArgError as e:
+            assert "is not of valid content type" in e.message
+
+        # mapping is None
+        try:
+            validation.validate_dict(field, valid_dict, is_non_tensor_field=False, mappings=None)
+            raise AssertionError
+        except InvalidArgError as e:
+            assert "the parameter `mappings`" in e.message
+
+        # field not in mappings
+        try:
+            validation.validate_dict('void_field', valid_dict, is_non_tensor_field=False, mappings=test_mappings)
+            raise AssertionError
+        except InvalidArgError as e:
+            assert "not in the add_document parameter mappings" in e.message
+
+        # sub_fields not in mappings["weight"]
+        try:
+            validation.validate_dict(field, {"test_void": "test", "test_2": "test_test"}, is_non_tensor_field=False, mappings=test_mappings)
+            raise AssertionError
+        except InvalidArgError as e:
+            assert "Each sub_field requires a weight" in e.message
+
+        # length of fields
+        try:
+            validation.validate_dict(field, {}, is_non_tensor_field=False, mappings=test_mappings)
+            raise AssertionError
+        except InvalidArgError as e:
+            assert "it must contain at least 1 field" in e.message
+
+        # nontensor_field
+        try:
+            validation.validate_dict(field, valid_dict, is_non_tensor_field=True, mappings=test_mappings)
+            raise AssertionError
+        except InvalidArgError as e:
+            assert "must be a tensor field" in e.message
 
 
 class TestValidateDeleteDocsRequest(unittest.TestCase):

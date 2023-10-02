@@ -431,7 +431,7 @@ def validate_settings_object(settings_object):
         )
 
 
-def validate_dict(field: str, field_content: Dict, is_non_tensor_field: bool, mappings: Dict, index_model_dimensions: int):
+def validate_dict(field: str, field_content: Dict, is_non_tensor_field: bool, mappings: Dict, index_model_dimensions: int = None):
     '''
 
     Args:
@@ -525,6 +525,10 @@ def validate_custom_vector(field_content: dict, is_non_tensor_field: bool, index
         True if the validation passes
     '''
 
+    if index_model_dimensions is None:
+        raise InternalError(
+            f"Index model dimensions should never be None."
+        )
     # Validate only 2 fields exist in custom_vector_field
     if len(field_content) != 2:
         raise InvalidArgError(
