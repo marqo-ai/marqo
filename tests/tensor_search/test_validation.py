@@ -829,7 +829,7 @@ class TestValidateIndexSettings(unittest.TestCase):
             },
         ]
         for d in mappings:
-            assert d == validation.validate_multimodal_combination_object(d)
+            assert d == validation.validate_multimodal_combination_mappings_object(d)
 
     def test_validate_multimodal_combination_object_invalid(self):
         mappings = [
@@ -885,7 +885,7 @@ class TestValidateIndexSettings(unittest.TestCase):
         ]
         for mapping in mappings:
             try:
-                validation.validate_multimodal_combination_object(mapping)
+                validation.validate_multimodal_combination_mappings_object(mapping)
                 raise AssertionError
             except InvalidArgError as e:
                 pass

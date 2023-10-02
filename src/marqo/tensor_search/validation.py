@@ -15,7 +15,11 @@ from marqo.tensor_search.models.search import SearchContext
 
 from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest
 from marqo.tensor_search.models.settings_object import settings_schema
-from marqo.tensor_search.models.mappings_object import mappings_schema, multimodal_combination_schema
+from marqo.tensor_search.models.mappings_object import (
+    mappings_schema, 
+    multimodal_combination_mappings_schema,
+    custom_vector_mappings_schema
+)
 
 
 def validate_query(q: Union[dict, str], search_method: Union[str, SearchMethod]):
@@ -468,6 +472,7 @@ def validate_dict(field: str, field_content: Dict, is_non_tensor_field: bool, ma
 def validate_multimodal_combination(field_content, is_non_tensor_field, field_mapping):
     '''
 
+    Validates the field content if it is a multimodal combination field (dict)
     Args:
         field_content: the field content
         is_non_tensor_field: whether this is a non-tensor-field
@@ -481,7 +486,7 @@ def validate_multimodal_combination(field_content, is_non_tensor_field, field_ma
             f"The multimodal_combination field `{field_content}` is an empty dictionary. "
             f"This is not a valid format of field content."
             f"If you aim to use multimodal_combination, it must contain at least 1 field. "
-            f"please check `https://docs.marqo.ai/0.1.0/Advanced-Usage/document_fields/#multimodal-combination-object` for more info.")
+            f"please check `https://docs.marqo.ai/1.4.0/Advanced-Usage/document_fields/#multimodal-combination-object` for more info.")
 
     for key, value in field_content.items():
         if not ((type(key) in constants.ALLOWED_MULTIMODAL_FIELD_TYPES) and (
@@ -496,7 +501,7 @@ def validate_multimodal_combination(field_content, is_non_tensor_field, field_ma
                 f"Multimodal-combination field content `{key}:{value}` \n  "
                 f"is not in the multimodal_field mappings weights `{field_mapping['weights']}`. Each sub_field requires a weight."
                 f"Please add `{key}` to the mappings."
-                f"Please check `https://docs.marqo.ai/0.1.0/Advanced-Usage/document_fields/#multimodal-combination-object` for more info.")
+                f"Please check `https://docs.marqo.ai/1.4.0/Advanced-Usage/document_fields/#multimodal-combination-object` for more info.")
 
     if is_non_tensor_field:
         raise InvalidArgError(
@@ -510,6 +515,7 @@ def validate_multimodal_combination(field_content, is_non_tensor_field, field_ma
 
 def validate_custom_vector(field_content: dict, is_non_tensor_field: bool, index_model_dimensions: int):
     '''
+    Validates the field content if it is a custom vector field (dict)
     Args:
         field_content: the field content
         is_non_tensor_field: whether this is a non-tensor-field
@@ -583,12 +589,16 @@ def validate_mappings_object(mappings_object: Dict):
         The given mappings object if validation has passed
 
     Raises an InvalidArgError if the settings object is badly formatted
+    TODO: KEEP THIS ONE! Delete the other one.
     """
     try:
         jsonschema.validate(instance=mappings_object, schema=mappings_schema)
         for field_name, config in mappings_object.items():
+            validate_field_name(field_name)
             if config["type"] == enums.MappingsObjectType.multimodal_combination:
-                validate_multimodal_combination_object(config)
+                validate_multimodal_combination_mappings_object(config)
+            elif config["type"] == enums.MappingsObjectType.custom_vector:
+                validate_custom_vector_mappings_object(config)
         return mappings_object
     except jsonschema.ValidationError as e:
         raise InvalidArgError(
@@ -597,28 +607,10 @@ def validate_mappings_object(mappings_object: Dict):
         )
 
 
-def validate_multimodal_combination_object(multimodal_mappings: Dict):
-    """Validates the multimodal mappings object
-
-    Args:
-        multimodal_mappings:
-
-    Returns:
-        The original object, if it passes validation
-    Raises InvalidArgError if the object is badly formatted
-    """
-    try:
-        jsonschema.validate(instance=multimodal_mappings, schema=multimodal_combination_schema)
-        return multimodal_mappings
-    except jsonschema.ValidationError as e:
-        raise InvalidArgError(
-            f"Error validating multimodal combination object. Reason: \n{str(e)}"
-            f"\nRead about the mappings object here: https://docs.marqo.ai/0.0.15/API-Reference/mappings/"
-        )
-
-
 def validate_mappings(mappings: Dict):
     '''
+    TODO: REMOVE THIS IF TESTS PASS
+    No custom vector here
     Args:
         mappings:  a dictionary to help handle object content field
     Returns:
@@ -637,7 +629,72 @@ def validate_mappings(mappings: Dict):
     return True
 
 
+def validate_multimodal_combination_mappings_object(mappings_object: Dict):
+    """Validates the multimodal mappings object
+
+    Args:
+        mappings_object:
+
+    Returns:
+        The original object, if it passes validation
+    Raises InvalidArgError if the object is badly formatted
+    """
+    try:
+        jsonschema.validate(instance=mappings_object, schema=multimodal_combination_mappings_schema)
+    except jsonschema.ValidationError as e:
+        raise InvalidArgError(
+            f"Error validating multimodal combination mappings object. Reason: \n{str(e)}"
+            f"\nRead about the mappings object here: https://docs.marqo.ai/1.4.0/API-Reference/mappings/"
+        )
+    
+    # TODO: Move this validation into schema in mappings_object
+    for child_field, weight in mappings_object["weights"].items():
+        # TODO: We may need to validate field name of child field.
+        if type(child_field) not in constants.ALLOWED_MULTIMODAL_FIELD_TYPES:
+            raise InvalidArgError(
+                f"The multimodal_combination mapping `{mappings_object}` has an invalid child_field `{child_field}` of type `{type(child_field).__name__}`."
+                f"In multimodal_combination fields, it must be a string."
+                f"Please check `https://docs.marqo.ai/1.4.0/Advanced-Usage/document_fields/#multimodal-combination-object` for more info."
+            )
+
+        if not isinstance(weight, (float, int)):
+            raise InvalidArgError(
+                f"The multimodal_combination mapping `{mappings_object}` has an invalid weight `{weight}` of type `{type(weight).__name__}`."
+                f"In multimodal_combination fields, weight must be an int or float."
+                f"Please check `https://docs.marqo.ai/1.4.0/Advanced-Usage/document_fields/#multimodal-combination-object` for more info."
+            )
+        
+    return mappings_object
+
+
+def validate_custom_vector_mappings_object(mappings_object: Dict):
+    """Validates the multimodal mappings object
+
+    Args:
+        mappings_object:
+
+    Returns:
+        The original object, if it passes validation
+    Raises InvalidArgError if the object is badly formatted
+
+    Example custom vector mappings must look exactly like this:
+    "my_custom_vector_field": {
+        "type": "custom_vector"
+    }
+    """
+    try:
+        jsonschema.validate(instance=mappings_object, schema=custom_vector_mappings_schema)
+    except jsonschema.ValidationError as e:
+        raise InvalidArgError(
+            f"Error validating custom vector mappings object. Reason: \n{str(e)}"
+            f"\nRead about the mappings object here: https://docs.marqo.ai/1.4.0/API-Reference/mappings/"
+        )
+
+    return mappings_object
+
+
 def validate_multimodal_combination_mapping(field_mapping: Dict):
+    # TODO: REMOVE THIS IF TESTS PASS
     if "weights" not in field_mapping:
         raise InvalidArgError(
             f"The multimodal_combination mapping `{field_mapping}` does not contain `weights`"

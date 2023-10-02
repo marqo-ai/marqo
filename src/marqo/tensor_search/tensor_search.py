@@ -360,8 +360,9 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
     except errors.IndexNotFoundError:
         raise errors.IndexNotFoundError(f"Cannot add documents to non-existent index {add_docs_params.index_name}")
 
-    if add_docs_params.mappings is not None:
-        validate_mappings = validation.validate_mappings(add_docs_params.mappings)
+    # TODO: Remove this first (if tests pass)
+    # if add_docs_params.mappings is not None:
+    #    validate_mappings = validation.validate_mappings(add_docs_params.mappings)
 
     existing_fields = set(index_info.properties.keys())
     new_fields = set()
@@ -480,12 +481,12 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                 # 1. Determining how to add field to OpenSearch index
                 # 2. Determining chunk and vectorise behavior
                 # Multimodal fields not here because they will get added later (with nesting)
-                document_type = add_docs.determine_document_field_type(field, field_content, add_docs_params.mappings)
+                document_field_type = add_docs.determine_document_field_type(field, field_content, add_docs_params.mappings)
                 if field not in existing_fields:
-                    if document_type == DocumentFieldType.standard:
+                    if document_field_type == DocumentFieldType.standard:
                         # Normal field (str, int, float, bool, or list)
                         new_fields_from_doc.add((field, _infer_opensearch_data_type(field_content)))
-                    elif document_type == DocumentFieldType.custom_vector:
+                    elif document_field_type == DocumentFieldType.custom_vector:
                         # Custom vector field type in OpenSearch assimilates type of its content
                         new_fields_from_doc.add((field, _infer_opensearch_data_type(field_content["content"])))
 
@@ -502,6 +503,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                     chunks_to_append = _get_chunks_for_field(field_name=field, doc_id=doc_id, doc=existing_doc)
 
                 # Chunking and vectorising phase (only if content changed).
+                # Standard document field type
                 elif isinstance(field_content, (str, Image.Image)):
 
                     # TODO: better/consistent handling of a no-op for processing (but still vectorize)
@@ -611,47 +613,43 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                             TensorField.field_name: field
                         })
 
-                elif isinstance(field_content, dict):
-                    if document_type == DocumentFieldType.multimodal_combination:
-                        (combo_chunk, combo_document_is_valid,
-                         unsuccessful_doc_to_append, combo_vectorise_time_to_add,
-                         new_fields_from_multimodal_combination) = vectorise_multimodal_combination_field(
-                                field, field_content, copied, i, doc_id, add_docs_params.device, index_info,
-                                image_repo, add_docs_params.mappings[field], model_auth=add_docs_params.model_auth)
-                        total_vectorise_time = total_vectorise_time + combo_vectorise_time_to_add
-                        
-                        if combo_document_is_valid is False:
-                            unsuccessful_docs.append(unsuccessful_doc_to_append)
-                            break
-                        else:
-                            if field not in new_obj_fields:
-                                new_obj_fields[field] = set()
-                            new_obj_fields[field] = new_obj_fields[field].union(new_fields_from_multimodal_combination)
-                            # Multimodal combo chunk added to field chunks_to_append (no metadata yet)
-                            chunks_to_append.append(combo_chunk)
-                            continue
+                elif document_field_type == DocumentFieldType.multimodal_combination:
+                    (combo_chunk, combo_document_is_valid,
+                        unsuccessful_doc_to_append, combo_vectorise_time_to_add,
+                        new_fields_from_multimodal_combination) = vectorise_multimodal_combination_field(
+                            field, field_content, copied, i, doc_id, add_docs_params.device, index_info,
+                            image_repo, add_docs_params.mappings[field], model_auth=add_docs_params.model_auth)
+                    total_vectorise_time = total_vectorise_time + combo_vectorise_time_to_add
                     
-                    elif document_type == DocumentFieldType.custom_vector:
-                        # No real vectorisation or chunking will happen for custom vector fields.
+                    if combo_document_is_valid is False:
+                        unsuccessful_docs.append(unsuccessful_doc_to_append)
+                        break
+                    else:
+                        if field not in new_obj_fields:
+                            new_obj_fields[field] = set()
+                        new_obj_fields[field] = new_obj_fields[field].union(new_fields_from_multimodal_combination)
+                        # Multimodal combo chunk added to field chunks_to_append (no metadata yet)
+                        chunks_to_append.append(combo_chunk)
+                        continue
+                
+                elif document_field_type == DocumentFieldType.custom_vector:
+                    # No real vectorisation or chunking will happen for custom vector fields.
 
-                        # TODO: Add timing tracking
+                    # Adding chunk (Only 1 chunk gets added for a custom vector field).
+                    # No metadata yet.
+                    chunks_to_append.append({
+                        TensorField.marqo_knn_field: field_content["vector"],
+                        TensorField.field_content: field_content["content"],
+                        TensorField.field_name: field
+                    })
 
-                        # Adding chunk (Only 1 chunk gets added for a custom vector field).
-                        # No metadata yet.
-                        chunks_to_append.append({
-                            TensorField.marqo_knn_field: field_content["vector"],
-                            TensorField.field_content: field_content["content"],
-                            TensorField.field_name: field
-                        })
+                    # Update parent document (copied) to fit new format. Use content (text) to replace input dict
+                    copied[field] = field_content["content"]
 
-                        # Update parent document (copied) to fit new format.
-                        # TODO: Might need to update the key AFTER the loop. Because of runtime dict edit errors.
-                        copied[field] = field_content["content"]
+                    # No error handling, no vectorise, no chunking, dict validation happens before this.
 
-                        # No error handling, no vectorise, no chunking, dict validation happens before this.
-
-                        # TODO: Can this fail and add unsuccessful doc? idts, because all the validation happened beforehand.
-                        # Is there disallowed content or disallowed vector?
+                    # TODO: Can this fail and add unsuccessful doc? idts, because all the validation happened beforehand.
+                    # Is there disallowed content or disallowed vector?
 
                 # Add chunks_to_append along with doc metadata to total chunks
                 for chunk in chunks_to_append:
@@ -668,7 +666,6 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                 copied[TensorField.chunks] = doc_chunks
 
                 bulk_parent_dicts.append(indexing_instructions)
-                # TODO: Change this so that content becomes the value for custom vector field
                 bulk_parent_dicts.append(copied)
 
         total_preproc_time = 0.001 * RequestMetricsStore.for_request().stop("add_documents.processing_before_opensearch")
@@ -2080,7 +2077,7 @@ def vectorise_multimodal_combination_field(
             s2_inference_errors.ModelLoadError) as model_error:
         raise errors.BadRequestError(
             message=f'Problem vectorising query. Reason: {str(model_error)}',
-            link="https://marqo.pages.dev/latest/Models-Reference/dense_retrieval/"
+            link="https://marqo.pages.dev/1.4.0/Models-Reference/dense_retrieval/"
         )
     except s2_inference_errors.S2InferenceError:
         combo_document_is_valid = False

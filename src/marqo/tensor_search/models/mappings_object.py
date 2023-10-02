@@ -21,7 +21,7 @@ mappings_schema = {
     },
 }
 
-multimodal_combination_schema = {
+multimodal_combination_mappings_schema = {
   "$schema": "http://json-schema.org/draft-04/schema#",
   "type": "object",
   "properties": {
@@ -34,6 +34,8 @@ multimodal_combination_schema = {
       "patternProperties": {
         "^.*$": {
           "type": "number"
+          # TODO: add child_field in constants.ALLOWED_MULTIMODAL_FIELD_TYPES:
+          # TODO: add weights are float or int only
         },
       },
 
@@ -46,6 +48,15 @@ multimodal_combination_schema = {
 }
 
 
-custom_vector_schema = {
-    # ???
+custom_vector_mappings_schema = {
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "type": "object",
+  "properties": {
+    "type": {
+      "type": "string",
+      "enum": [MappingsObjectType.custom_vector]
+    }
+  },
+  "required": ["type"],
+  "additionalProperties": False
 }
