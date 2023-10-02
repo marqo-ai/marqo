@@ -593,7 +593,6 @@ def validate_mappings_object(mappings_object: Dict):
         The given mappings object if validation has passed
 
     Raises an InvalidArgError if the settings object is badly formatted
-    TODO: KEEP THIS ONE! Delete the other one.
     """
     try:
         jsonschema.validate(instance=mappings_object, schema=mappings_schema)
@@ -609,28 +608,6 @@ def validate_mappings_object(mappings_object: Dict):
             f"Error validating mappings object. Reason: \n{str(e)}"
             f"\nRead about the mappings object here: https://docs.marqo.ai/0.0.15/API-Reference/mappings/"
         )
-
-
-def validate_mappings(mappings: Dict):
-    '''
-    TODO: REMOVE THIS IF TESTS PASS
-    No custom vector here
-    Args:
-        mappings:  a dictionary to help handle object content field
-    Returns:
-    '''
-    for field, field_mapping in mappings.items():
-        validate_field_name(field)
-        if field_mapping["type"] not in constants.MARQO_OBJECT_TYPES:
-            raise InvalidArgError(
-                f"The type `{field_mapping['type']}` in mappings for filed `{field}` is not supported."
-                f"Please check the type of your mappings."
-                f"Supported mappings can be found in `https://docs.marqo.ai/0.0.15/API-Reference/mappings/`."
-            )
-        if field_mapping["type"] == "multimodal_combination":
-            validate_multimodal_combination_mapping(field_mapping)
-
-    return True
 
 
 def validate_multimodal_combination_mappings_object(mappings_object: Dict):
@@ -696,29 +673,6 @@ def validate_custom_vector_mappings_object(mappings_object: Dict):
 
     return mappings_object
 
-
-def validate_multimodal_combination_mapping(field_mapping: Dict):
-    # TODO: REMOVE THIS IF TESTS PASS
-    if "weights" not in field_mapping:
-        raise InvalidArgError(
-            f"The multimodal_combination mapping `{field_mapping}` does not contain `weights`"
-            f"Please check `https://docs.marqo.ai/0.0.15/Advanced-Usage/document_fields/#multimodal-combination-object` for more info."
-        )
-
-    for child_field, weight in field_mapping["weights"].items():
-        if type(child_field) not in constants.ALLOWED_MULTIMODAL_FIELD_TYPES:
-            raise InvalidArgError(
-                f"The multimodal_combination mapping `{field_mapping}` has an invalid child_field `{child_field}` of type `{type(child_field).__name__}`."
-                f"In multimodal_combination fields, it must be a string."
-                f"Please check `https://docs.marqo.ai/0.0.15/Advanced-Usage/document_fields/#multimodal-combination-object` for more info."
-            )
-
-        if not isinstance(weight, (float, int)):
-            raise InvalidArgError(
-                f"The multimodal_combination mapping `{field_mapping}` has an invalid weight `{weight}` of type `{type(weight).__name__}`."
-                f"In multimodal_combination fields, weight must be an int or float."
-                f"Please check `https://docs.marqo.ai/0.0.15/Advanced-Usage/document_fields/#multimodal-combination-object` for more info."
-            )
 
 def validate_delete_docs_request(delete_request: MqDeleteDocsRequest, max_delete_docs_count: int):
     """Validates a delete docs request from the user.

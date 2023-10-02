@@ -360,10 +360,6 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
     except errors.IndexNotFoundError:
         raise errors.IndexNotFoundError(f"Cannot add documents to non-existent index {add_docs_params.index_name}")
 
-    # TODO: Remove this first (if tests pass)
-    # if add_docs_params.mappings is not None:
-    #    validate_mappings = validation.validate_mappings(add_docs_params.mappings)
-
     existing_fields = set(index_info.properties.keys())
     new_fields = set()
 
@@ -454,7 +450,6 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                     raise errors.InternalError(message= f"Upsert: found {len(matching_doc)} matching docs for {doc_id} when only 1 or 0 should have been found.")
 
             doc_chunks = []
-            print(f"DEBUG: document {i} has the following fields: {copied.keys()}")
             for field in copied:
                 # Validation phase for field
                 try:
@@ -614,7 +609,6 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                         })
 
                 elif document_field_type == DocumentFieldType.multimodal_combination:
-                    print(f"DEBUG: Trying to add multimodal: {field}")
                     (combo_chunk, combo_document_is_valid,
                         unsuccessful_doc_to_append, combo_vectorise_time_to_add,
                         new_fields_from_multimodal_combination) = vectorise_multimodal_combination_field(
@@ -653,7 +647,6 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
 
                 # Executes regardless of document field type.
                 # Add field_chunks_to_append to total chunks
-                print(f"DEBUG: Appending all {len(field_chunks_to_append)} chunks for field {field}")
                 for chunk in field_chunks_to_append:
                     doc_chunks.append(chunk)
 
