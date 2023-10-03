@@ -372,7 +372,6 @@ class TestCreateIndex(MarqoTestCase):
                 )
                 raise AssertionError
             except InvalidArgError as e:
-                print(e.message)
                 pass
 
             try:
@@ -422,6 +421,92 @@ class TestCreateIndex(MarqoTestCase):
             )
             assert maximum_number_of_replicas == int(
                 resp.json()[self.index_name_1]['settings']['index']['number_of_replicas'])
+
+    def test_configurable_ef_construction_value(self):
+        maximum_ef_construction_value = 100
+        large_intended_ef_construction_value = 200
+        small_intended_ef_construction_value = 50
+
+        with patch.dict(os.environ, {EnvVars.MARQO_EF_CONSTRUCTION_MAX_VALUE: str(maximum_ef_construction_value)}):
+            # a large value exceeding limits should not work
+            try:
+                res_0 = tensor_search.create_vector_index(
+                    index_name=self.index_name_1, config=self.config,
+                    index_settings={
+                        "index_defaults": {
+                            "treat_urls_and_pointers_as_images": True,
+                            "model": "ViT-B/32",
+                            "ann_parameters": {
+                                "parameters": {
+                                    "ef_construction": large_intended_ef_construction_value
+                                }
+                            },
+                        },
+                    }
+                )
+                raise AssertionError
+            except InvalidArgError as e:
+                pass
+
+            try:
+                tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+            except IndexNotFoundError:
+                pass
+
+            # a small value should work
+            res_1 = tensor_search.create_vector_index(
+                index_name=self.index_name_1, config=self.config,
+                index_settings={
+                    "index_defaults": {
+                        "treat_urls_and_pointers_as_images": True,
+                        "model": "ViT-B/32",
+                        "ann_parameters": {
+                            "parameters": {
+                                "ef_construction": small_intended_ef_construction_value
+                            }
+                    },
+                }
+                }
+            )
+            resp = requests.get(
+                url=self.authorized_url + f"/{self.index_name_1}",
+                headers=self.generic_header,
+                verify=False
+            )
+            assert small_intended_ef_construction_value == int(
+                resp.json()[self.index_name_1]["mappings"]["_meta"]["index_settings"]
+                ["index_defaults"]["ann_parameters"]["parameters"]["ef_construction"]
+            )
+
+            try:
+                tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+            except IndexNotFoundError:
+                pass
+
+            # the same number should also work
+            res_1 = tensor_search.create_vector_index(
+                index_name=self.index_name_1, config=self.config,
+                index_settings={
+                    "index_defaults": {
+                        "treat_urls_and_pointers_as_images": True,
+                        "model": "ViT-B/32",
+                        "ann_parameters": {
+                            "parameters": {
+                                "ef_construction": maximum_ef_construction_value
+                            }
+                        },
+                    },
+                }
+            )
+            resp = requests.get(
+                url=self.authorized_url + f"/{self.index_name_1}",
+                headers=self.generic_header,
+                verify=False
+            )
+            assert maximum_ef_construction_value == int(
+                resp.json()[self.index_name_1]["mappings"]["_meta"]["index_settings"]
+                ["index_defaults"]["ann_parameters"]["parameters"]["ef_construction"]
+            )
 
     def test_default_max_number_of_replicas(self):
         large_intended_replicas_count = 2

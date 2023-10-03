@@ -9,21 +9,14 @@ from marqo.s2_inference.onnx_clip_utils import CLIP_ONNX
 # we need to keep track of the embed dim and model load functions/classes
 # we can use this as a registry
 
-def _get_model_load_mappings() -> Dict:
-    return {'clip':CLIP,
-            'open_clip': OPEN_CLIP,
-            'sbert':SBERT,
-            'test':TEST,
-            'sbert_onnx':SBERT_ONNX,
-            'clip_onnx': CLIP_ONNX,
-            "multilingual_clip" : MULTILINGUAL_CLIP,
-            "fp16_clip": FP16_CLIP,
-            'random':Random,
-            'hf':HF_MODEL}
-
 def get_model_loaders() -> Dict:
-    loaders = dict()
-    for key,val in _get_model_load_mappings().items():
-        loaders[key] = val
-
-    return loaders
+    return {'clip': CLIP,
+            'open_clip': OPEN_CLIP,
+            'sbert': SBERT,
+            'test': TEST,
+            'sbert_onnx': SBERT_ONNX,
+            'clip_onnx': CLIP_ONNX,
+            "multilingual_clip": MULTILINGUAL_CLIP,
+            "fp16_clip": FP16_CLIP,
+            'random': Random,
+            'hf': HF_MODEL}
