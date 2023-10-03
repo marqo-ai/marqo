@@ -1,4 +1,4 @@
-from marqo.core.models.marqo_index import MarqoIndex
+from marqo.core.models import MarqoIndex
 from marqo.vespa.vespa_client import VespaClient
 
 
