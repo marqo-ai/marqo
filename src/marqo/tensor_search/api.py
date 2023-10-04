@@ -1,8 +1,31 @@
 """The API entrypoint for Tensor Search"""
+
+import warnings
+from marqo.tensor_search.tensor_search_logging import get_logger
+import logging
+
+
+if get_logger(__name__).getEffectiveLevel() > logging.DEBUG:
+    # We need to suppress this warning before the dependency is imported
+    warnings.filterwarnings(
+        "ignore",
+        "Importing `GenerationMixin` from `src/transformers/generation_utils.py` "
+        "is deprecated and will be removed in Transformers v5. "
+        "Import as `from transformers import GenerationMixin` instead."
+    )
+    warnings.filterwarnings(
+        "ignore",
+        ".*Unverified HTTPS request is being made to host 'localhost'.*"
+    )
+    warnings.filterwarnings(
+        "ignore",
+        ".*Unverified HTTPS request is being made to host 'host.docker.internal'.*"
+    )
+
 import json
 import os
 import typing
-from typing import List, Dict, Optional, Union
+from typing import List, Dict, Optional
 
 import pydantic
 from fastapi import FastAPI, Query
