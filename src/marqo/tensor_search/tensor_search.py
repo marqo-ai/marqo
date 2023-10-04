@@ -357,6 +357,8 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
 
     try:
         index_info = backend.get_index_info(config=config, index_name=add_docs_params.index_name)
+        # Retrieve model dimensions from index info
+        index_model_dimensions = index_info.get_model_properties()["dimensions"]
     except errors.IndexNotFoundError:
         raise errors.IndexNotFoundError(f"Cannot add documents to non-existent index {add_docs_params.index_name}")
 
@@ -374,10 +376,6 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
     
     image_repo = {}
     doc_count = len(add_docs_params.docs)
-    
-    # Retrieve model dimensions from index info
-    # TODO: Confirm, will this make things too slow? They shouldn't because of the cache.
-    index_model_dimensions = get_index_info(config=config, index_name=add_docs_params.index_name).get_model_properties()["dimensions"]
     
     with ExitStack() as exit_stack:
         if index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]:
@@ -409,7 +407,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                     doc_ids.append(add_docs_params.docs[i]["_id"])
             existing_docs = _get_documents_for_upsert(
                 config=config, index_name=add_docs_params.index_name, document_ids=doc_ids)
-
+        
         for i, doc in enumerate(add_docs_params.docs):
 
             indexing_instructions = {'index': {"_index": add_docs_params.index_name}}
@@ -669,7 +667,6 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
 
         logger.debug(f"          add_documents vectorise: took {(total_vectorise_time):.3f}s for {doc_count} docs, "
                     f"for an average of {(total_vectorise_time / doc_count):.3f}s per doc.")
-
         if bulk_parent_dicts:
             # the HttpRequest wrapper handles error logic
             update_mapping_response = backend.add_customer_field_properties(

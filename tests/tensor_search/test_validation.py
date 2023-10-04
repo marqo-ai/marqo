@@ -705,6 +705,8 @@ class TestValidateIndexSettings(unittest.TestCase):
                     }
                 }
             },
+
+            # TODO: Add CUSTOM VECTOR and combination tests
         ]
         for d in mappings:
             assert d == validation.validate_mappings_object(d)
@@ -788,6 +790,7 @@ class TestValidateIndexSettings(unittest.TestCase):
                     }
                 },
             },
+            # TODO: Add CUSTOM VECTOR and combination tests
         ]
         for mapping in mappings:
             try:
@@ -796,7 +799,7 @@ class TestValidateIndexSettings(unittest.TestCase):
             except InvalidArgError as e:
                 pass
 
-    def test_validate_multimodal_combination_object(self):
+    def test_valid_multimodal_combination_mappings_object(self):
         mappings = [
             {
                 "type": "multimodal_combination",
@@ -831,7 +834,103 @@ class TestValidateIndexSettings(unittest.TestCase):
         for d in mappings:
             assert d == validation.validate_multimodal_combination_mappings_object(d)
 
-    def test_validate_multimodal_combination_object_invalid(self):
+    def test_invalid_multimodal_combination_mappings_object(self):
+        mappings = [
+            {
+                "my_combination_field": { # valid mappings dir, but not valid multimodal
+                    "type": "multimodal_combination",
+                    "weights": {
+                        "some_text": 0.5
+                    }
+                }
+            },
+            {
+                "type": "othertype",  # bad type
+                "weights": {
+                    "some_text": 0.5
+
+                }
+            },
+            {
+                "type": "multimodal_combination",
+                "non_weights": {  # unknown fieldname 'non_weights' config in multimodal_combination
+                    "some_text": 0.5
+                }
+            },
+            {
+                "type": "multimodal_combination",
+                # missing weights for multimodal_combination
+            },
+            {
+                "type": "multimodal_combination",
+                "weights": {"blah": "woo"}  # non-number weights
+            },
+            {
+                "type": "multimodal_combination",
+                "weights": {"blah": "1.3"}  # non-number weights
+            },
+            {
+                "type": "multimodal_combination",
+                "weights": {
+                    "some_text": -4.6,
+                    "other_text": 22
+                },
+                "extra_field": {"blah"}  # unknown field
+            },
+            {
+                "type": "multimodal_combination",
+                "weights": {
+                    "some_text": -4.6,
+                    "other_text": 22,
+                    "nontext": True  # non-number
+                },
+            }
+        ]
+        for mapping in mappings:
+            try:
+                validation.validate_multimodal_combination_mappings_object(mapping)
+                raise AssertionError
+            except InvalidArgError as e:
+                pass
+
+    def test_valid_custom_vector_mappings_object(self):
+        # TODO: CHANGE THIS TO CUSTOM VECTOR
+        mappings = [
+            {
+                "type": "multimodal_combination",
+                "weights": {
+                    "some_text": 0.5
+                }
+            },
+            {
+                "type": "multimodal_combination",
+                "weights": {
+                    "some_text": -2
+                }
+            },
+            {
+                "type": "multimodal_combination",
+                "weights": {
+                    "some_text": -4.6,
+                    "other_text": 22
+                }
+            },
+            {
+                "type": "multimodal_combination",
+                "weights": {}
+            },
+            {
+                "type": "multimodal_combination",
+                "weights": {
+                    "some_text": 0,
+                }
+            },
+        ]
+        for d in mappings:
+            assert d == validation.validate_multimodal_combination_mappings_object(d)
+
+    def test_invalid_custom_vector_mappings_object(self):
+        # TODO: CHANGE THIS TO CUSTOM VECTOR
         mappings = [
             {
                 "my_combination_field": { # valid mappings dir, but not valid multimodal

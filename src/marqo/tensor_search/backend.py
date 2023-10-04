@@ -109,9 +109,6 @@ def add_customer_field_properties(config: Config, index_name: str,
             } for sub_field in multimodal_combination_fields[field_name]
         },
     }
-        
-    # TODO: add custom_vector
-    # Opensearch mapping to look like chunks?
 
     mapping_res = HttpRequests(config).put(path=F"{index_name}/_mapping", body=json.dumps(body))
 
