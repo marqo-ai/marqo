@@ -6,7 +6,7 @@ from marqo.core.models.marqo_index import FieldType, FieldFeature, DistanceMetri
 from marqo.core.vespa_index import VespaIndex
 
 
-class TypesVespaIndex(VespaIndex):
+class TypedVespaIndex(VespaIndex):
     _TYPE_MAP = {
         FieldType.Text: 'string',
         FieldType.Bool: 'bool',
@@ -272,4 +272,4 @@ if __name__ == "__main__":
         ]
     )
 
-    print(TypesVespaIndex.generate_schema(marqo_index))
+    print(TypedVespaIndex.generate_schema(marqo_index))

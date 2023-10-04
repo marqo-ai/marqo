@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any
 
 from marqo.core.models import MarqoQuery, MarqoIndex
+from marqo.core.models.marqo_index import IndexType
 
 
 class VespaIndex(ABC):
@@ -24,3 +25,12 @@ class VespaIndex(ABC):
     @abstractmethod
     def to_vespa_query(cls, query: MarqoQuery) -> Dict[str, Any]:
         pass
+
+
+def for_marqo_index(marqo_index: MarqoIndex):
+    if marqo_index.type == IndexType.Typed:
+        from marqo.core.typed_vespa_index import TypedVespaIndex
+        return TypedVespaIndex
+    else:
+        from marqo.core.dynamic_vespa_index import DynamicVespaIndex
+        return DynamicVespaIndex
