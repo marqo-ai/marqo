@@ -108,6 +108,55 @@ class TestCustomVectorField(MarqoTestCase):
             else:
                 raise AssertionError(f"Unexpected chunk field name: {chunk['__field_name']}")
     
+    def test_add_documents_with_custom_vector_field_no_content(self):
+        """
+        Add a document with a custom vector field with no content:
+        Content should be autofilled with ""
+        mock HTTP call
+        In OpenSearch call, reformatted doc, chunks, and chunk metadata should be correct
+        """
+        mock_post = mock.MagicMock()
+        mock_post.return_value = {'took': 15, 'errors': False, 'items': [{'index': {'_index': 'my-test-index-1', '_id': '0', '_version': 1, 'result': 'created', '_shards': {'total': 1, 'successful': 1, 'failed': 0}, '_seq_no': 0, '_primary_term': 1, 'status': 201}}]}
+        
+        @mock.patch("marqo._httprequests.HttpRequests.post", mock_post)
+        def run():
+            tensor_search.add_documents(
+                config=self.config, add_docs_params=AddDocsParams(
+                    index_name=self.index_name_1,
+                    docs=[{
+                        "_id": "0",
+                        "my_custom_vector": {
+                            "vector": self.random_vector
+                        }
+                    }],
+                    auto_refresh=True, device="cpu", mappings=self.mappings
+                )
+            )
+            return True
+
+        assert run()
+
+        call_args = mock_post.call_args_list
+        assert len(call_args) == 2      # 2nd call is the refresh
+
+        post_args, post_kwargs = call_args[0]
+        request_body_lines = [json.loads(line) for line in post_kwargs["body"].splitlines() if line]
+        
+        # Confirm content is ""
+        # First line [0] is index command, Second line [1] is the document itself
+        assert request_body_lines[1]["my_custom_vector"] == ""
+        assert len(request_body_lines[1]["__chunks"]) == 1
+        for chunk in request_body_lines[1]["__chunks"]:
+            # Confirm chunk metadata are all correct
+            assert chunk["my_custom_vector"] == ""
+
+            # Confirm chunk data is correct
+            if chunk["__field_name"] == "my_custom_vector":
+                assert chunk["__field_content"] == ""
+                assert chunk["__vector_marqo_knn_field"] == self.random_vector
+            else:
+                raise AssertionError(f"Unexpected chunk field name: {chunk['__field_name']}")
+    
     def test_add_documents_with_custom_vector_field_backend_updated(self):
         """
         Add a document with a custom vector field:
