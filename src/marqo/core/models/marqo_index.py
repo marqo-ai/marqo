@@ -4,7 +4,7 @@ from typing import List, Optional, Dict
 from pydantic import BaseModel
 
 
-class FieldType(Enum, BaseModel):
+class FieldType(Enum):
     Text = 'text'
     Bool = 'bool'
     Int = 'int'
@@ -61,3 +61,13 @@ class MarqoIndex(BaseModel):
     hnsw_config: HnswConfig
     fields: List[Field]
     tensor_fields: List[TensorField]
+
+    @property
+    def lexical_fields(self) -> List[str]:
+        return [field.lexical_field_name for field in self.fields if
+                field.lexical_field_name is not None]
+
+    @property
+    def score_modifier_fields(self) -> List[str]:
+        return [field.name for field in self.fields if
+                FieldFeature.ScoreModifier in field.features]

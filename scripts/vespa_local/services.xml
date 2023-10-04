@@ -12,7 +12,7 @@
         <redundancy>2</redundancy>
         <documents>
             <document type="marqo_settings" mode="index"/>
-            <document type="wiki_minilm" mode="index"/>
+            <document type="my_index" mode="index"/>
             <document type="test_vespa_client" mode="index"/>
         </documents>
         <nodes>
