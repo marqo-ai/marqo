@@ -558,7 +558,6 @@ def validate_custom_vector(field_content: dict, is_non_tensor_field: bool, index
             "additionalProperties": False
         }
         jsonschema.validate(instance=field_content, schema=custom_vector_schema)
-    
     except jsonschema.ValidationError as e:
         raise InvalidArgError(
             f"Invalid custom_vector field format. Reason: \n{str(e)}"

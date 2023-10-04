@@ -339,11 +339,47 @@ class TestCustomVectorField(MarqoTestCase):
         """
         Add a document with a custom vector field with invalid content/embedding/format
         """
-        # Wrong vector length
-        # Wrong content type
-        # Wrong vector type inside list
-        # Nested dict inside custom vector
-        pass
+        test_cases = [
+            # Wrong vector length
+            {"content": "custom content is here!!", "vector": [1.0, 1.0, 1.0]},
+            # Wrong content type
+            {"content": 12345, "vector": self.random_vector},
+            # Wrong vector type inside list (even if correct length)
+            {"content": "custom content is here!!", "vector": self.random_vector[:-1] + ["NOT A FLOAT"]},
+            # Field that shouldn't be there
+            {"content": "custom content is here!!", "vector": self.random_vector, "extra_field": "blah"},
+            # No vector
+            {"content": "custom content is here!!"},
+            # Nested dict inside custom vector content
+            {
+                "content": {
+                    "content": "custom content is here!!",
+                    "vector": self.random_vector
+                }, 
+                "vector": self.random_vector
+            },
+        ]
+        
+        for case in test_cases:
+            res = tensor_search.add_documents(
+                config=self.config, add_docs_params=AddDocsParams(
+                    index_name=self.index_name_1,
+                    docs=[{
+                        "_id": "0",
+                        "my_custom_vector": case
+                    }],
+                    auto_refresh=True, device="cpu", mappings=self.mappings
+                )
+            )
+
+            assert res["errors"]
+            assert not json.loads(requests.get(url = f"{self.endpoint}/{self.index_name_1}/_doc/0", verify=False).text)["found"]
+            try:
+                tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="0")
+                raise AssertionError
+            except DocumentNotFoundError:
+                pass
+            
 
     def test_search_with_custom_vector_field(self):
         """
