@@ -4,6 +4,11 @@ from typing import List, Optional, Dict
 from pydantic import BaseModel
 
 
+class IndexType(Enum):
+    Typed = 'typed'
+    Dynamic = 'dynamic'
+
+
 class FieldType(Enum):
     Text = 'text'
     Bool = 'bool'
@@ -55,11 +60,12 @@ class HnswConfig(BaseModel):
 
 class MarqoIndex(BaseModel):
     name: str
+    type: IndexType
     model: str
     distance_metric: DistanceMetric
     vector_numeric_type: VectorNumericType
     hnsw_config: HnswConfig
-    fields: List[Field]
+    fields: Optional[List[Field]]
     tensor_fields: List[TensorField]
 
     @property

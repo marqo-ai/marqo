@@ -2,7 +2,7 @@ from typing import Dict, Any, List
 
 from marqo.core.models import MarqoQuery, MarqoIndex
 from marqo.core.models.marqo_index import FieldType, FieldFeature, DistanceMetric, VectorNumericType, HnswConfig, Field, \
-    TensorField
+    TensorField, IndexType
 from marqo.core.vespa_index import VespaIndex
 
 
@@ -40,6 +40,8 @@ class TypesVespaIndex(VespaIndex):
 
     @classmethod
     def generate_schema(cls, marqo_index: MarqoIndex) -> str:
+        cls._validate_index_type(marqo_index)
+
         schema = []
 
         schema.append(f'schema {marqo_index.name} {{')
@@ -245,11 +247,17 @@ class TypesVespaIndex(VespaIndex):
     @classmethod
     def _get_model_dimension(cls, model: str) -> int:
         return 512
+    @classmethod
+    def _validate_index_type(cls, marqo_index: MarqoIndex) -> None:
+        if marqo_index.type != IndexType.Typed:
+            raise ValueError(f'Vespa index type must be {IndexType.Typed.name}. '
+                             f'This module cannot handle index type {marqo_index.type.name}')
 
 
 if __name__ == "__main__":
     marqo_index = MarqoIndex(
         name='my_index', model='clip', distance_metric=DistanceMetric.PrenormalizedAnguar,
+        type=IndexType.Typed,
         vector_numeric_type=VectorNumericType.Float, hnsw_config=HnswConfig(ef_construction=100, m=16),
         fields=[
             Field(name='title', type=FieldType.Text, features=[FieldFeature.LexicalSearch]),
