@@ -11,7 +11,6 @@
     <content id="content_default" version="1.0">
         <redundancy>2</redundancy>
         <documents>
-            <document type="my_index" mode="index"/>
             <document type="test_vespa_client" mode="index"/>
         </documents>
         <nodes>
