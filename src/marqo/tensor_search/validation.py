@@ -461,10 +461,10 @@ def validate_dict(field: str, field_content: Dict, is_non_tensor_field: bool, ma
             f"please check `https://docs.marqo.ai/0.0.15/Advanced-Usage/document_fields/#multimodal-combination-object` for more info.")
 
     if mappings[field]["type"] == "multimodal_combination":
-        validate_multimodal_combination(field_content, is_non_tensor_field, mappings[field])
+        field_content = validate_multimodal_combination(field_content, is_non_tensor_field, mappings[field])
     
     if mappings[field]["type"] == "custom_vector":
-        validate_custom_vector(field_content, is_non_tensor_field, index_model_dimensions)
+        field_content = validate_custom_vector(field_content, is_non_tensor_field, index_model_dimensions)
 
     return field_content
 
@@ -479,7 +479,7 @@ def validate_multimodal_combination(field_content, is_non_tensor_field, field_ma
         field_mapping: the mapping to help validate this field content
 
     Returns:
-
+        The field content
     '''
     if len(field_content) < 1:
         raise InvalidArgError(
@@ -510,7 +510,7 @@ def validate_multimodal_combination(field_content, is_non_tensor_field, field_ma
             f"It must be a tensor field. Add this field to `tensor_fields` or"
             f"add it as a normal field to fix this problem."
         )
-    return True
+    return field_content
 
 
 def validate_custom_vector(field_content: dict, is_non_tensor_field: bool, index_model_dimensions: int):
@@ -522,69 +522,54 @@ def validate_custom_vector(field_content: dict, is_non_tensor_field: bool, index
         index_model_dimensions: the `dimensions` property of the index to be added to
 
     Returns:
-        True if the validation passes
+        field_content if the validation passes
+        "content" key will be added to the field_content as empty string if it is not provided.
     '''
-
     if index_model_dimensions is None:
         raise InternalError(
-            f"Index model dimensions should never be None."
+            f"Index model dimensions should not be `None`."
         )
-    # Validate only 2 fields exist in custom_vector_field
-    if len(field_content) != 2:
-        raise InvalidArgError(
-            f"Your custom_vector field: `{field_content}` must have exactly 2 keys: `content` and `vector`."
-            f"For info on how to use custom_vector, please see "
-            f"`https://docs.marqo.ai/1.4.0/Advanced-Usage/document_fields/#custom-vectors`.")
-
-    # Validate that the 2 fields are content and vector
-    if "content" not in field_content or "vector" not in field_content:
-        raise InvalidArgError(
-            f"Your custom_vector field: `{field_content}` must have exactly 2 keys: `content` and `vector`."
-            f"For info on how to use custom_vector, please see "
-            f"`https://docs.marqo.ai/1.4.0/Advanced-Usage/document_fields/#custom-vectors`.")
-
-    # Validate the content field: 
-    # 1. It must be in the list of allowed content types
-    if type(field_content["content"]) not in constants.ALLOWED_CUSTOM_VECTOR_CONTENT_TYPES:
-        raise InvalidArgError(
-            f"Your custom_vector field content: `{field_content['content']}` is of invalid type. "
-            f"It is {type(field_content['content'])}, but it must be one of {constants.ALLOWED_CUSTOM_VECTOR_CONTENT_TYPES}. "
-            f"For info on how to use custom_vector, please see "
-            f"`https://docs.marqo.ai/1.4.0/Advanced-Usage/document_fields/#custom-vectors`.")
-
-    # Validate the vector field:
-    # 1. It must be a list of floats
-    if type(field_content["vector"]) is not list:
-        raise InvalidArgError(
-            f"Your custom_vector field vector: `{field_content['vector']}` is of invalid type. "
-            f"It is {type(field_content['vector'])}, but it must be a list of floats. "
-            f"For info on how to use custom_vector, please see "
-            f"`https://docs.marqo.ai/1.4.0/Advanced-Usage/document_fields/#custom-vectors`.")
     
-    for vector_value in field_content["vector"]:
-        if type(vector_value) is not float:
-            raise InvalidArgError(
-                f"Your custom_vector field vector has item {vector_value} which is of "
-                f"type {type(vector_value)}, but vector must be a list of floats. "
-                f"For info on how to use custom_vector, please see "
-                f"`https://docs.marqo.ai/1.4.0/Advanced-Usage/document_fields/#custom-vectors`.")
-
-    # 2. It must be of length (index model dimensions)
-    if len(field_content["vector"]) != index_model_dimensions:
-        raise InvalidArgError(
-            f"Invalid length for custom_vector field vector ({len(field_content['vector'])}). "
-            f"Required length: {constants.INDEX_MODEL_DIMENSION}. "
-            f"For info on how to use custom_vector, please see "
-            f"`https://docs.marqo.ai/1.4.0/Advanced-Usage/document_fields/#custom-vectors`.")
-
     # Must be a tensor_field
     if is_non_tensor_field:
         raise InvalidArgError(
-            f"You are trying to create a custom_vector field with field content `{field_content}` \n  "
-            f"of type `{type(field_content).__name__}`."
-            f"This field must be a tensor field. Add this field to `tensor_fields` to fix this problem."
+            f"Cannot create custom_vector field (given field content: `{field_content}`) as a non-tensor field. "
+            f"Add this field to `tensor_fields` to fix this problem."
         )
-    return True
+    
+    try:
+        custom_vector_schema = {
+            "$schema": "http://json-schema.org/draft-04/schema#",
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": list(constants.ALLOWED_CUSTOM_VECTOR_CONTENT_TYPES)
+                },
+                "vector": {
+                    "type": "array",
+                    "minItems": index_model_dimensions,
+                    "maxItems": index_model_dimensions,
+                    "items": { 
+                        "type": "number"
+                    }
+                }
+            },
+            "required": ["vector"],     # content is optional.
+            "additionalProperties": False
+        }
+        jsonschema.validate(instance=field_content, schema=custom_vector_schema)
+    
+    except jsonschema.ValidationError as e:
+        raise InvalidArgError(
+            f"Invalid custom_vector field format. Reason: \n{str(e)}"
+            f"\nFor info on how to use custom_vector, please see: `https://docs.marqo.ai/1.4.0/Advanced-Usage/document_fields/#custom-vectors`"
+        )
+
+    # Fill in default content as empty string if not provided.
+    if "content" not in field_content:
+        field_content["content"] = ""
+    
+    return field_content
 
 
 def validate_mappings_object(mappings_object: Dict):

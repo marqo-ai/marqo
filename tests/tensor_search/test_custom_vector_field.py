@@ -282,7 +282,7 @@ class TestCustomVectorField(MarqoTestCase):
     def test_get_documents_with_custom_vector_field(self):
         """
         Add a document with a custom vector field:
-        2. Get the doc, both fetched content and embedding must be correct
+        Get the doc, both fetched content and embedding must be correct
         """
         pass
 
