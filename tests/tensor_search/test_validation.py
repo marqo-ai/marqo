@@ -1260,9 +1260,17 @@ class TestValidateIndexSettings(unittest.TestCase):
             ScoreModifier(**valid_custom_score_fields)
     
     def test_validate_dict(self):
-        test_mappings = {"my_combo_field":{"type":"multimodal_combination", "weights":{
-            "test_1":0.5, "test_2":0.5
-        }}}
+        test_mappings = {
+            "my_combo_field":{
+                "type":"multimodal_combination", 
+                "weights":{
+                    "test_1":0.5, "test_2":0.5
+                }
+            },
+            "my_custom_vector":{
+                "type":"custom_vector"
+            }
+        }
         field = "my_combo_field"
         valid_dict = {"test_1": "test", "test_2": "test_test"}
 
@@ -1342,6 +1350,56 @@ class TestValidateIndexSettings(unittest.TestCase):
             raise AssertionError
         except InvalidArgError as e:
             assert "must be a tensor field" in e.message
+        
+        # ============== custom vector validate_dict tests ==============
+        index_model_dimensions = 384
+        # custom vector, valid
+        obj = {"content": "custom content is here!!", "vector": [1.0 for _ in range(index_model_dimensions)]}
+        assert validation.validate_dict(field="my_custom_vector",
+                                    field_content=obj, 
+                                    is_non_tensor_field=False,
+                                    mappings=test_mappings,
+                                    index_model_dimensions=index_model_dimensions) == obj
+        
+        # custom vector, valid (no content). must be filled with empty string
+        obj = {"vector": [1.0 for _ in range(index_model_dimensions)]}
+        assert validation.validate_dict(field="my_custom_vector",
+                                    field_content=obj, 
+                                    is_non_tensor_field=False,
+                                    mappings=test_mappings,
+                                    index_model_dimensions=index_model_dimensions) \
+                == {"content": "", "vector": [1.0 for _ in range(index_model_dimensions)]}
+        
+        invalid_custom_vector_objects = [
+            # Wrong vector length
+            {"content": "custom content is here!!", "vector": [1.0, 1.0, 1.0]},
+            # Wrong content type
+            {"content": 12345, "vector": [1.0 for _ in range(index_model_dimensions)]},
+            # Wrong vector type inside list (even if correct length)
+            {"content": "custom content is here!!", "vector": [1.0 for _ in range(index_model_dimensions-1)] + ["NOT A FLOAT"]},
+            # Field that shouldn't be there
+            {"content": "custom content is here!!", "vector": [1.0 for _ in range(index_model_dimensions)], "extra_field": "blah"},
+            # No vector
+            {"content": "custom content is here!!"},
+            # Nested dict inside custom vector content
+            {
+                "content": {
+                    "content": "custom content is here!!",
+                    "vector": [1.0 for _ in range(index_model_dimensions)]
+                }, 
+                "vector": [1.0 for _ in range(index_model_dimensions)]
+            },
+        ]
+        for case in invalid_custom_vector_objects:
+            try:
+                validation.validate_dict(field="my_custom_vector",
+                                         field_content=case, 
+                                         is_non_tensor_field=False,
+                                         mappings=test_mappings,
+                                         index_model_dimensions=index_model_dimensions)
+                raise AssertionError(case)
+            except InvalidArgError:
+                pass
 
 
 class TestValidateDeleteDocsRequest(unittest.TestCase):

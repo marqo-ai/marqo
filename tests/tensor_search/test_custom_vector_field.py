@@ -43,7 +43,11 @@ class TestCustomVectorField(MarqoTestCase):
                     IndexSettingsField.normalize_embeddings: False
                 }
             })
-        self.random_vector = [1. for _ in range(512)]
+        
+        # Using arbitrary values so they're easy to eyeball
+        self.random_vector_1 = [1. for _ in range(512)]
+        self.random_vector_2 = [i for i in range(512)]
+        self.random_vector_3 = [1/(i+1) for i in range(512)]
         
         # Any tests that call add_document, search, bulk_search need this env var
         self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
@@ -74,7 +78,7 @@ class TestCustomVectorField(MarqoTestCase):
                         "_id": "0",
                         "my_custom_vector": {
                             "content": "custom content is here!!",
-                            "vector": self.random_vector
+                            "vector": self.random_vector_1
                         }
                     }],
                     auto_refresh=True, device="cpu", mappings=self.mappings
@@ -104,7 +108,7 @@ class TestCustomVectorField(MarqoTestCase):
             # Confirm chunk data is correct
             if chunk["__field_name"] == "my_custom_vector":
                 assert chunk["__field_content"] == "custom content is here!!"
-                assert chunk["__vector_marqo_knn_field"] == self.random_vector
+                assert chunk["__vector_marqo_knn_field"] == self.random_vector_1
             else:
                 raise AssertionError(f"Unexpected chunk field name: {chunk['__field_name']}")
     
@@ -126,7 +130,7 @@ class TestCustomVectorField(MarqoTestCase):
                     docs=[{
                         "_id": "0",
                         "my_custom_vector": {
-                            "vector": self.random_vector
+                            "vector": self.random_vector_1
                         }
                     }],
                     auto_refresh=True, device="cpu", mappings=self.mappings
@@ -153,7 +157,7 @@ class TestCustomVectorField(MarqoTestCase):
             # Confirm chunk data is correct
             if chunk["__field_name"] == "my_custom_vector":
                 assert chunk["__field_content"] == ""
-                assert chunk["__vector_marqo_knn_field"] == self.random_vector
+                assert chunk["__vector_marqo_knn_field"] == self.random_vector_1
             else:
                 raise AssertionError(f"Unexpected chunk field name: {chunk['__field_name']}")
     
@@ -169,7 +173,7 @@ class TestCustomVectorField(MarqoTestCase):
                     "_id": "0",
                     "my_custom_vector": {
                         "content": "custom content is here!!",
-                        "vector": self.random_vector
+                        "vector": self.random_vector_1
                     }
                 }],
                 auto_refresh=True, device="cpu", mappings=self.mappings
@@ -214,7 +218,7 @@ class TestCustomVectorField(MarqoTestCase):
                         "text_field": "blah",
                         "my_custom_vector": {
                             "content": "custom content is here!!",
-                            "vector": self.random_vector
+                            "vector": self.random_vector_1
                         },
                         "my_multimodal": {
                             "text": "multimodal text",
@@ -256,7 +260,7 @@ class TestCustomVectorField(MarqoTestCase):
             # Confirm chunk data is correct
             if chunk["__field_name"] == "my_custom_vector":
                 assert chunk["__field_content"] == "custom content is here!!"
-                assert chunk["__vector_marqo_knn_field"] == self.random_vector
+                assert chunk["__vector_marqo_knn_field"] == self.random_vector_1
             elif chunk["__field_name"] == "text_field":
                 assert chunk["__field_content"] == "blah"
             elif chunk["__field_name"] == "my_multimodal":
@@ -295,7 +299,7 @@ class TestCustomVectorField(MarqoTestCase):
                     "text_field": "blah",
                     "my_custom_vector": {
                         "content": "custom content is here!!",
-                        "vector": self.random_vector
+                        "vector": self.random_vector_1
                     },
                     "my_multimodal": {
                         "text": "multimodal text",
@@ -325,8 +329,72 @@ class TestCustomVectorField(MarqoTestCase):
     def test_add_documents_use_existing_tensors_with_custom_vector_field(self):
         """
         Add a document with a custom vector field and use existing tensors:
+        Will not actually use existing tensors, as custom vector pipeline
+        doesn't chunk or vectorise anyway.
         """
-        pass
+        # If we change the custom vector, doc should change
+        tensor_search.add_documents(
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1,
+                docs=[{
+                    "_id": "0",
+                    "my_custom_vector": {
+                        "content": "1 - custom content is here!!",
+                        "vector": self.random_vector_1
+                    }
+                }],
+                auto_refresh=True, device="cpu", mappings=self.mappings
+            )
+        )
+
+        get_doc_1 = tensor_search.get_document_by_id(
+            config=self.config, index_name=self.index_name_1,
+            document_id="0", show_vectors=True)
+        
+        tensor_search.add_documents(
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1,
+                docs=[{
+                    "_id": "0",
+                    "my_custom_vector": {
+                        "content": "2 - custom content is here!!",
+                        "vector": self.random_vector_2
+                    }
+                }],
+                auto_refresh=True, device="cpu", mappings=self.mappings,
+                use_existing_tensors=True
+            )
+        )
+
+        get_doc_2 = tensor_search.get_document_by_id(
+            config=self.config, index_name=self.index_name_1,
+            document_id="0", show_vectors=True)
+        assert get_doc_1["my_custom_vector"] == "1 - custom content is here!!"
+        assert get_doc_1[TensorField.tensor_facets][0][TensorField.embedding] == self.random_vector_1
+        assert get_doc_2["my_custom_vector"] == "2 - custom content is here!!"
+        assert get_doc_2[TensorField.tensor_facets][0][TensorField.embedding] == self.random_vector_2
+
+        # If we do not, it should remain the same, no errors
+        tensor_search.add_documents(
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1,
+                docs=[{
+                    "_id": "0",
+                    "my_custom_vector": {
+                        "content": "2 - custom content is here!!",
+                        "vector": self.random_vector_2
+                    }
+                }],
+                auto_refresh=True, device="cpu", mappings=self.mappings,
+                use_existing_tensors=True
+            )
+        )
+
+        get_doc_3 = tensor_search.get_document_by_id(
+            config=self.config, index_name=self.index_name_1,
+            document_id="0", show_vectors=True)
+        assert get_doc_2["my_custom_vector"] == "2 - custom content is here!!"
+        assert get_doc_2[TensorField.tensor_facets][0][TensorField.embedding] == self.random_vector_2
 
     def test_get_document_with_custom_vector_field(self):
         """
@@ -340,7 +408,7 @@ class TestCustomVectorField(MarqoTestCase):
                     "_id": "0",
                     "my_custom_vector": {
                         "content": "custom content is here!!",
-                        "vector": self.random_vector
+                        "vector": self.random_vector_1
                     }
                 }],
                 auto_refresh=True, device="cpu", mappings=self.mappings
@@ -359,7 +427,7 @@ class TestCustomVectorField(MarqoTestCase):
         # Check tensor facets and embedding are correct
         assert len(res[TensorField.tensor_facets]) == 1
         assert res[TensorField.tensor_facets][0]["my_custom_vector"] == "custom content is here!!"
-        assert res[TensorField.tensor_facets][0][TensorField.embedding] == self.random_vector
+        assert res[TensorField.tensor_facets][0][TensorField.embedding] == self.random_vector_1
 
     def test_get_documents_with_custom_vector_field(self):
         """
@@ -374,21 +442,21 @@ class TestCustomVectorField(MarqoTestCase):
                         "_id": "0",
                         "my_custom_vector": {
                             "content": "custom content is here!!",
-                            "vector": self.random_vector
+                            "vector": self.random_vector_1
                         }
                     },
                     {
                         "_id": "1",
                         "my_custom_vector": {
                             "content": "second custom vector",
-                            "vector": [2*i for i in self.random_vector]
+                            "vector": self.random_vector_2
                         }
                     },
                     {
                         "_id": "2",
                         "my_custom_vector": {
                             "content": "third custom vector",
-                            "vector": [3*i for i in self.random_vector]
+                            "vector": self.random_vector_3
                         }
                     },
                 ],
@@ -409,7 +477,7 @@ class TestCustomVectorField(MarqoTestCase):
         # Check tensor facets and embedding are correct
         assert len(res["results"][0][TensorField.tensor_facets]) == 1
         assert res["results"][0][TensorField.tensor_facets][0]["my_custom_vector"] == "custom content is here!!"
-        assert res["results"][0][TensorField.tensor_facets][0][TensorField.embedding] == self.random_vector
+        assert res["results"][0][TensorField.tensor_facets][0][TensorField.embedding] == self.random_vector_1
 
         # Check content is correct
         assert res["results"][1]["_id"] == "1"
@@ -417,7 +485,7 @@ class TestCustomVectorField(MarqoTestCase):
         # Check tensor facets and embedding are correct
         assert len(res["results"][1][TensorField.tensor_facets]) == 1
         assert res["results"][1][TensorField.tensor_facets][0]["my_custom_vector"] == "second custom vector"
-        assert res["results"][1][TensorField.tensor_facets][0][TensorField.embedding] == [2*i for i in self.random_vector]
+        assert res["results"][1][TensorField.tensor_facets][0][TensorField.embedding] == self.random_vector_2
 
         # Check content is correct
         assert res["results"][2]["_id"] == "2"
@@ -425,7 +493,7 @@ class TestCustomVectorField(MarqoTestCase):
         # Check tensor facets and embedding are correct
         assert len(res["results"][2][TensorField.tensor_facets]) == 1
         assert res["results"][2][TensorField.tensor_facets][0]["my_custom_vector"] == "third custom vector"
-        assert res["results"][2][TensorField.tensor_facets][0][TensorField.embedding] == [3*i for i in self.random_vector]
+        assert res["results"][2][TensorField.tensor_facets][0][TensorField.embedding] == self.random_vector_3
 
     
     def test_invalid_custom_vector_field_content(self):
@@ -436,20 +504,20 @@ class TestCustomVectorField(MarqoTestCase):
             # Wrong vector length
             {"content": "custom content is here!!", "vector": [1.0, 1.0, 1.0]},
             # Wrong content type
-            {"content": 12345, "vector": self.random_vector},
+            {"content": 12345, "vector": self.random_vector_1},
             # Wrong vector type inside list (even if correct length)
-            {"content": "custom content is here!!", "vector": self.random_vector[:-1] + ["NOT A FLOAT"]},
+            {"content": "custom content is here!!", "vector": self.random_vector_1[:-1] + ["NOT A FLOAT"]},
             # Field that shouldn't be there
-            {"content": "custom content is here!!", "vector": self.random_vector, "extra_field": "blah"},
+            {"content": "custom content is here!!", "vector": self.random_vector_1, "extra_field": "blah"},
             # No vector
             {"content": "custom content is here!!"},
             # Nested dict inside custom vector content
             {
                 "content": {
                     "content": "custom content is here!!",
-                    "vector": self.random_vector
+                    "vector": self.random_vector_1
                 }, 
-                "vector": self.random_vector
+                "vector": self.random_vector_1
             },
         ]
         
@@ -486,7 +554,13 @@ class TestCustomVectorField(MarqoTestCase):
                         "_id": "custom_vector_doc",
                         "my_custom_vector": {
                             "content": "custom content is here!!",
-                            "vector": self.random_vector    # size is 384
+                            "vector": self.random_vector_1    # size is 384
+                        }
+                    },
+                    {
+                        "_id": "empty_content_custom_vector_doc",
+                        "my_custom_vector": {
+                            "vector": self.random_vector_2    # size is 384
                         }
                     },
                     {
@@ -502,12 +576,22 @@ class TestCustomVectorField(MarqoTestCase):
         res = tensor_search.search(
             config=self.config, index_name=self.index_name_1, text={"dummy text": 0},
             search_method=SearchMethod.TENSOR,
-            context=SearchContext(**{"tensor": [{"vector": self.random_vector, "weight": 1}], })
+            context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], })
         )
+
         assert res["hits"][0]["_id"] == "custom_vector_doc"
         assert res["hits"][0]["_score"] == 1.0
         assert res["hits"][0]["_highlights"]["my_custom_vector"] == "custom content is here!!"
 
+        # Tensor search should work even if content is empty (highlight is empty string)
+        res = tensor_search.search(
+            config=self.config, index_name=self.index_name_1, text={"dummy text": 0},
+            search_method=SearchMethod.TENSOR,
+            context=SearchContext(**{"tensor": [{"vector": self.random_vector_2, "weight": 1}], })
+        )
+        assert res["hits"][0]["_id"] == "empty_content_custom_vector_doc"
+        assert res["hits"][0]["_score"] == 1.0
+        assert res["hits"][0]["_highlights"]["my_custom_vector"] == ""
 
         # Searching with normal text returns text
         res = tensor_search.search(
@@ -528,7 +612,13 @@ class TestCustomVectorField(MarqoTestCase):
                         "_id": "custom_vector_doc",
                         "my_custom_vector": {
                             "content": "custom content is here!!",
-                            "vector": self.random_vector    # size is 384
+                            "vector": self.random_vector_1    # size is 384
+                        }
+                    },
+                    {
+                        "_id": "empty_content_custom_vector_doc",
+                        "my_custom_vector": {
+                            "vector": self.random_vector_2    # size is 384
                         }
                     },
                     {
@@ -547,6 +637,9 @@ class TestCustomVectorField(MarqoTestCase):
         )
         assert len(res["hits"]) == 1
         assert res["hits"][0]["_id"] == "custom_vector_doc"
+        # Empty content doc should not be in lexical results
+        for hit in res["hits"]:
+            assert hit["_id"] != "empty_content_custom_vector_doc"
 
         # Searching with normal text returns text
         res = tensor_search.search(
@@ -555,6 +648,9 @@ class TestCustomVectorField(MarqoTestCase):
         )
         assert len(res["hits"]) == 1
         assert res["hits"][0]["_id"] == "normal_doc"
+        # Empty content doc should not be in lexical results
+        for hit in res["hits"]:
+            assert hit["_id"] != "empty_content_custom_vector_doc"
 
     def test_bulk_search_with_custom_vector_field(self):
         """
@@ -598,36 +694,40 @@ class TestCustomVectorField(MarqoTestCase):
                         "_id": "custom vector doc 1",
                         "my_custom_vector_1": {
                             "content": "red blue yellow",
-                            "vector": self.random_vector
+                            "vector": self.random_vector_1
                         }
                     },
                     {
                         "_id": "custom vector doc 2",
                         "my_custom_vector_2": {
                             "content": "red",
-                            "vector": self.random_vector
+                            "vector": self.random_vector_1
                         }
                     },
                     {
                         "_id": "custom vector doc 3",
                         "my_custom_vector_2": {
                             "content": "blue",
-                            "vector": self.random_vector
+                            "vector": self.random_vector_1
                         },
                         "my_custom_vector_3": {
                             "content": "chocolate",
-                            "vector": self.random_vector
+                            "vector": self.random_vector_1
                         }
                     },
                     {
                         "_id": "custom vector doc 4",
                         "my_custom_vector_1": {
                             "content": "yellow",
-                            "vector": self.random_vector
+                            "vector": self.random_vector_1
+                        },
+                        # Empty content field. Should not affect the document getting returned.
+                        "my_custom_vector_2": {
+                            "vector": self.random_vector_1
                         },
                         "my_custom_vector_3": {
                             "content": "chocolate",
-                            "vector": self.random_vector
+                            "vector": self.random_vector_1
                         }
                     },
                 ],
@@ -639,7 +739,7 @@ class TestCustomVectorField(MarqoTestCase):
         res = tensor_search.search(
             config=self.config, index_name=self.index_name_1, text={"dummy text": 0},
             search_method=SearchMethod.TENSOR,
-            context=SearchContext(**{"tensor": [{"vector": self.random_vector, "weight": 1}], }),
+            context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], }),
             filter="*:*", result_count=10
         )
         res_ids = set([hit["_id"] for hit in res["hits"]])
@@ -649,7 +749,7 @@ class TestCustomVectorField(MarqoTestCase):
         res = tensor_search.search(
             config=self.config, index_name=self.index_name_1, text={"dummy text": 0},
             search_method=SearchMethod.TENSOR,
-            context=SearchContext(**{"tensor": [{"vector": self.random_vector, "weight": 1}], }),
+            context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], }),
             filter="my_custom_vector_3:chocolate", result_count=10
         )
         res_ids = set([hit["_id"] for hit in res["hits"]])
@@ -659,7 +759,7 @@ class TestCustomVectorField(MarqoTestCase):
         res = tensor_search.search(
             config=self.config, index_name=self.index_name_1, text={"dummy text": 0},
             search_method=SearchMethod.TENSOR,
-            context=SearchContext(**{"tensor": [{"vector": self.random_vector, "weight": 1}], }),
+            context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], }),
             filter="my_custom_vector_3:chocolate AND my_custom_vector_2:blue", result_count=10
         )
         res_ids = set([hit["_id"] for hit in res["hits"]])
@@ -669,7 +769,7 @@ class TestCustomVectorField(MarqoTestCase):
         res = tensor_search.search(
             config=self.config, index_name=self.index_name_1, text={"dummy text": 0},
             search_method=SearchMethod.TENSOR,
-            context=SearchContext(**{"tensor": [{"vector": self.random_vector, "weight": 1}], }),
+            context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], }),
             filter="my_custom_vector_1:red OR my_custom_vector_2:red", result_count=10
         )
         res_ids = set([hit["_id"] for hit in res["hits"]])
@@ -679,7 +779,7 @@ class TestCustomVectorField(MarqoTestCase):
         res = tensor_search.search(
             config=self.config, index_name=self.index_name_1, text={"dummy text": 0},
             search_method=SearchMethod.TENSOR,
-            context=SearchContext(**{"tensor": [{"vector": self.random_vector, "weight": 1}], }),
+            context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], }),
             filter="my_custom_vector_1:(red blue yellow)", result_count=10
         )
         res_ids = set([hit["_id"] for hit in res["hits"]])
@@ -707,21 +807,21 @@ class TestCustomVectorField(MarqoTestCase):
                         "_id": "custom vector doc 1",
                         "my_custom_vector_1": {
                             "content": "doesn't matter",
-                            "vector": self.random_vector
+                            "vector": self.random_vector_1
                         }
                     },
                     {
                         "_id": "custom vector doc 2",
                         "my_custom_vector_2": {
                             "content": "doesn't matter",
-                            "vector": [2*i for i in self.random_vector]
+                            "vector": self.random_vector_2
                         }
                     },
                     {
                         "_id": "custom vector doc 3",
                         "my_custom_vector_3": {
                             "content": "doesn't matter",
-                            "vector": [3*i for i in self.random_vector]
+                            "vector": self.random_vector_3
                         }
                     },
                 ],
@@ -733,7 +833,7 @@ class TestCustomVectorField(MarqoTestCase):
         res = tensor_search.search(
             config=self.config, index_name=self.index_name_1, text={"dummy text": 0},
             search_method=SearchMethod.TENSOR,
-            context=SearchContext(**{"tensor": [{"vector": self.random_vector, "weight": 1}], }),
+            context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], }),
             searchable_attributes=["my_custom_vector_1", "my_custom_vector_2", "my_custom_vector_3"]
         )
         assert res["hits"][0]["_id"] == "custom vector doc 1"
@@ -742,7 +842,7 @@ class TestCustomVectorField(MarqoTestCase):
         res = tensor_search.search(
             config=self.config, index_name=self.index_name_1, text={"dummy text": 0},
             search_method=SearchMethod.TENSOR,
-            context=SearchContext(**{"tensor": [{"vector": self.random_vector, "weight": 1}], }),
+            context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], }),
             searchable_attributes=["my_custom_vector_2", "my_custom_vector_3"]
         )
         assert res["hits"][0]["_id"] == "custom vector doc 2"
@@ -751,7 +851,7 @@ class TestCustomVectorField(MarqoTestCase):
         res = tensor_search.search(
             config=self.config, index_name=self.index_name_1, text={"dummy text": 0},
             search_method=SearchMethod.TENSOR,
-            context=SearchContext(**{"tensor": [{"vector": self.random_vector, "weight": 1}], }),
+            context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], }),
             searchable_attributes=["my_custom_vector_3"]
         )
         assert res["hits"][0]["_id"] == "custom vector doc 3"
@@ -768,7 +868,7 @@ class TestCustomVectorField(MarqoTestCase):
                         "_id": "custom vector doc",
                         "my_custom_vector": {
                             "content": "toxt to search",    # almost matching
-                            "vector": self.random_vector    # size is 384
+                            "vector": self.random_vector_1    # size is 384
                         }
                     },
                     {
