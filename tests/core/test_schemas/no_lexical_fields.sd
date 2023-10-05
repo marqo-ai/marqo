@@ -69,9 +69,6 @@ schema my_index {
         }
     }
 
-    fieldset default {
-    }
-
     document-summary all-non-vector-summary {
         summary title type string { source: title }
         summary description type string { source: description }

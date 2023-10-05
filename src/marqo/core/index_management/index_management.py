@@ -90,41 +90,12 @@ class IndexManagement:
         self.vespa_client.feed_batch(
             [
                 VespaDocument(
-                    id=self._MARQO_SETTINGS_SCHEMA_NAME,
+                    id=marqo_index.name,
                     fields={
                         'index_name': marqo_index.name,
-                        'settings': json.dumps(marqo_index.json())
+                        'settings': marqo_index.json()
                     }
                 )
             ],
             schema=self._MARQO_SETTINGS_SCHEMA_NAME
         )
-
-
-if __name__ == "__main__":
-    marqo_index = MarqoIndex(
-        name='my_index_1', model='clip', distance_metric=DistanceMetric.PrenormalizedAnguar,
-        type=IndexType.Typed,
-        vector_numeric_type=VectorNumericType.Float, hnsw_config=HnswConfig(ef_construction=100, m=16),
-        fields=[
-            Field(name='title', type=FieldType.Text, features=[FieldFeature.LexicalSearch]),
-            Field(name='description', type=FieldType.Text, features=[FieldFeature.LexicalSearch]),
-            Field(name='is_active', type=FieldType.Bool, features=[FieldFeature.Filter]),
-            Field(name='price', type=FieldType.Float, features=[FieldFeature.Filter, FieldFeature.ScoreModifier]),
-            Field(name='category', type=FieldType.Text, features=[FieldFeature.Filter, FieldFeature.LexicalSearch]),
-        ],
-        tensor_fields=[
-            TensorField(name='title'),
-            TensorField(name='description')
-        ]
-    )
-
-    vespa_client = marqo.vespa.vespa_client.VespaClient(
-        config_url='http://localhost:19071',
-        query_url='http://localhost:8080',
-        document_url='http://localhost:8080',
-    )
-
-    index_management = IndexManagement(vespa_client)
-
-    index_management.create_index(marqo_index)

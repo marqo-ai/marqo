@@ -164,15 +164,13 @@ class TypedVespaIndex(VespaIndex):
 
     @classmethod
     def _generate_default_fieldset(cls, marqo_index: MarqoIndex, schema: List[str]) -> None:
-        fieldset_fields = []
-        for field in marqo_index.fields:
-            if field.lexical_field_name:
-                fieldset_fields.append(field.lexical_field_name)
+        fieldset_fields = marqo_index.lexical_fields
 
-        schema.append('fieldset default {')
         if fieldset_fields:
-            schema.append(f'fields: {", ".join(fieldset_fields)}')
-        schema.append('}')
+            schema.append('fieldset default {')
+            if fieldset_fields:
+                schema.append(f'fields: {", ".join(fieldset_fields)}')
+            schema.append('}')
 
     @classmethod
     def _generate_rank_profiles(cls, marqo_index: MarqoIndex, schema: List[str]) -> None:

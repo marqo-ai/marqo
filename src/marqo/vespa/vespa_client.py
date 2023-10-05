@@ -332,4 +332,10 @@ class VespaClient:
         try:
             resp.raise_for_status()
         except httpx.HTTPStatusError as e:
-            raise VespaStatusError(e) from e
+            response = e.response
+            try:
+                json = response.json()
+                message = f'{json["error-code"]}: {json["message"]}'
+                raise VespaStatusError(message=message, cause=e) from e
+            except Exception:
+                raise VespaStatusError(message=response.text, cause=e) from e

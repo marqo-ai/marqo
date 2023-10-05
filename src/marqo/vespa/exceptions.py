@@ -1,5 +1,3 @@
-from httpx import HTTPStatusError
-
 from marqo.exceptions import MarqoError
 
 
@@ -8,8 +6,6 @@ class VespaError(MarqoError):
 
 
 class VespaStatusError(VespaError):
-    def __init__(self, cause: HTTPStatusError):
-        super().__init__(cause=cause)
 
     @property
     def status_code(self) -> int:
