@@ -578,13 +578,243 @@ class TestCustomVectorField(MarqoTestCase):
         """
         Search for the doc, with filter string
         """
-        pass
+        new_mappings = {
+            "my_custom_vector_1": {
+                "type": "custom_vector"
+            },
+            "my_custom_vector_2": {
+                "type": "custom_vector"
+            },
+            "my_custom_vector_3": {
+                "type": "custom_vector"
+            },
+        }
+
+        tensor_search.add_documents(
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1,
+                docs=[
+                    {
+                        "_id": "custom vector doc 1",
+                        "my_custom_vector_1": {
+                            "content": "red blue yellow",
+                            "vector": self.random_vector
+                        }
+                    },
+                    {
+                        "_id": "custom vector doc 2",
+                        "my_custom_vector_2": {
+                            "content": "red",
+                            "vector": self.random_vector
+                        }
+                    },
+                    {
+                        "_id": "custom vector doc 3",
+                        "my_custom_vector_2": {
+                            "content": "blue",
+                            "vector": self.random_vector
+                        },
+                        "my_custom_vector_3": {
+                            "content": "chocolate",
+                            "vector": self.random_vector
+                        }
+                    },
+                    {
+                        "_id": "custom vector doc 4",
+                        "my_custom_vector_1": {
+                            "content": "yellow",
+                            "vector": self.random_vector
+                        },
+                        "my_custom_vector_3": {
+                            "content": "chocolate",
+                            "vector": self.random_vector
+                        }
+                    },
+                ],
+                auto_refresh=True, device="cpu", mappings=new_mappings
+            )
+        )
+
+        # Filter: all
+        res = tensor_search.search(
+            config=self.config, index_name=self.index_name_1, text={"dummy text": 0},
+            search_method=SearchMethod.TENSOR,
+            context=SearchContext(**{"tensor": [{"vector": self.random_vector, "weight": 1}], }),
+            filter="*:*", result_count=10
+        )
+        res_ids = set([hit["_id"] for hit in res["hits"]])
+        assert res_ids == {"custom vector doc 1", "custom vector doc 2", "custom vector doc 3", "custom vector doc 4"}
+
+        # Filter: custom vector 3 has chocolate
+        res = tensor_search.search(
+            config=self.config, index_name=self.index_name_1, text={"dummy text": 0},
+            search_method=SearchMethod.TENSOR,
+            context=SearchContext(**{"tensor": [{"vector": self.random_vector, "weight": 1}], }),
+            filter="my_custom_vector_3:chocolate", result_count=10
+        )
+        res_ids = set([hit["_id"] for hit in res["hits"]])
+        assert res_ids == {"custom vector doc 3", "custom vector doc 4"}
+
+        # Filter: AND statement
+        res = tensor_search.search(
+            config=self.config, index_name=self.index_name_1, text={"dummy text": 0},
+            search_method=SearchMethod.TENSOR,
+            context=SearchContext(**{"tensor": [{"vector": self.random_vector, "weight": 1}], }),
+            filter="my_custom_vector_3:chocolate AND my_custom_vector_2:blue", result_count=10
+        )
+        res_ids = set([hit["_id"] for hit in res["hits"]])
+        assert res_ids == {"custom vector doc 3"}
+
+        # Filter: OR statement
+        res = tensor_search.search(
+            config=self.config, index_name=self.index_name_1, text={"dummy text": 0},
+            search_method=SearchMethod.TENSOR,
+            context=SearchContext(**{"tensor": [{"vector": self.random_vector, "weight": 1}], }),
+            filter="my_custom_vector_1:red OR my_custom_vector_2:red", result_count=10
+        )
+        res_ids = set([hit["_id"] for hit in res["hits"]])
+        assert res_ids == {"custom vector doc 2"}
+
+        # Filter: parenthesis
+        res = tensor_search.search(
+            config=self.config, index_name=self.index_name_1, text={"dummy text": 0},
+            search_method=SearchMethod.TENSOR,
+            context=SearchContext(**{"tensor": [{"vector": self.random_vector, "weight": 1}], }),
+            filter="my_custom_vector_1:(red blue yellow)", result_count=10
+        )
+        res_ids = set([hit["_id"] for hit in res["hits"]])
+        assert res_ids == {"custom vector doc 1"}
+
 
     def test_search_with_custom_vector_field_searchable_attributes(self):
+        new_mappings = {
+            "my_custom_vector_1": {
+                "type": "custom_vector"
+            },
+            "my_custom_vector_2": {
+                "type": "custom_vector"
+            },
+            "my_custom_vector_3": {
+                "type": "custom_vector"
+            },
+        }
+
+        tensor_search.add_documents(
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1,
+                docs=[
+                    {
+                        "_id": "custom vector doc 1",
+                        "my_custom_vector_1": {
+                            "content": "doesn't matter",
+                            "vector": self.random_vector
+                        }
+                    },
+                    {
+                        "_id": "custom vector doc 2",
+                        "my_custom_vector_2": {
+                            "content": "doesn't matter",
+                            "vector": [2*i for i in self.random_vector]
+                        }
+                    },
+                    {
+                        "_id": "custom vector doc 3",
+                        "my_custom_vector_3": {
+                            "content": "doesn't matter",
+                            "vector": [3*i for i in self.random_vector]
+                        }
+                    },
+                ],
+                auto_refresh=True, device="cpu", mappings=new_mappings
+            )
+        )
+
+        # All searchable attributes
+        res = tensor_search.search(
+            config=self.config, index_name=self.index_name_1, text={"dummy text": 0},
+            search_method=SearchMethod.TENSOR,
+            context=SearchContext(**{"tensor": [{"vector": self.random_vector, "weight": 1}], }),
+            searchable_attributes=["my_custom_vector_1", "my_custom_vector_2", "my_custom_vector_3"]
+        )
+        assert res["hits"][0]["_id"] == "custom vector doc 1"
+
+        # Only 2 and 3
+        res = tensor_search.search(
+            config=self.config, index_name=self.index_name_1, text={"dummy text": 0},
+            search_method=SearchMethod.TENSOR,
+            context=SearchContext(**{"tensor": [{"vector": self.random_vector, "weight": 1}], }),
+            searchable_attributes=["my_custom_vector_2", "my_custom_vector_3"]
+        )
+        assert res["hits"][0]["_id"] == "custom vector doc 2"
+
+        # Only 3
+        res = tensor_search.search(
+            config=self.config, index_name=self.index_name_1, text={"dummy text": 0},
+            search_method=SearchMethod.TENSOR,
+            context=SearchContext(**{"tensor": [{"vector": self.random_vector, "weight": 1}], }),
+            searchable_attributes=["my_custom_vector_3"]
+        )
+        assert res["hits"][0]["_id"] == "custom vector doc 3"
+
+    def test_lexical_search_with_custom_vector_field_searchable_attributes(self):
         """
         Search for the doc, with searchable attributes
         """
-        pass
+        tensor_search.add_documents(
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1,
+                docs=[
+                    {
+                        "_id": "custom vector doc",
+                        "my_custom_vector": {
+                            "content": "toxt to search",    # almost matching
+                            "vector": self.random_vector    # size is 384
+                        }
+                    },
+                    {
+                        "_id": "barely matching doc",
+                        "barely field": "random words search"
+                    },
+                    {
+                        "_id": "exactly matching doc",
+                        "exact field": "text to search"
+                    }
+                ],
+                auto_refresh=True, device="cpu", mappings=self.mappings
+            )
+        )
+
+        # All searchable attributes
+        res = tensor_search.search(
+            config=self.config, index_name=self.index_name_1, text="text to search",
+            search_method=SearchMethod.LEXICAL,
+            searchable_attributes=["my_custom_vector", "barely field", "exact field"]
+        )
+        assert res["hits"][0]["_id"] == "exactly matching doc"
+
+        # Only custom and barely matching
+        res = tensor_search.search(
+            config=self.config, index_name=self.index_name_1, text="text to search",
+            search_method=SearchMethod.LEXICAL,
+            searchable_attributes=["my_custom_vector", "barely field"]
+        )
+        assert res["hits"][0]["_id"] == "custom vector doc"
+
+        # Only barely matching
+        res = tensor_search.search(
+            config=self.config, index_name=self.index_name_1, text="text to search",
+            search_method=SearchMethod.LEXICAL,
+            searchable_attributes=["barely field"]
+        )
+        assert res["hits"][0]["_id"] == "barely matching doc"
+
+        # Only custom vector
+        res = tensor_search.search(
+            config=self.config, index_name=self.index_name_1, text="text to search",
+            search_method=SearchMethod.LEXICAL,
+            searchable_attributes=["my_custom_vector"]
+        )
+        assert res["hits"][0]["_id"] == "custom vector doc"
 
 
 
