@@ -1,9 +1,13 @@
+import re
 from typing import Dict, Any, List
 
 from marqo.core.models import MarqoQuery, MarqoIndex
 from marqo.core.models.marqo_index import FieldType, FieldFeature, DistanceMetric, VectorNumericType, HnswConfig, Field, \
-    TensorField, IndexType
+    TensorField, IndexType, Model
 from marqo.core.vespa_index import VespaIndex
+from marqo.exceptions import InvalidArgumentError
+from marqo.s2_inference import s2_inference
+from marqo.s2_inference.errors import UnknownModelError
 
 
 class TypedVespaIndex(VespaIndex):
@@ -104,7 +108,7 @@ class TypedVespaIndex(VespaIndex):
             schema.append(f'field {cls._SCORE_MODIFIERS_FIELD} type tensor<float>(p{{}}) {{ indexing: attribute }}')
 
         # tensor fields
-        model_dim = cls._get_model_dimension(marqo_index.model)
+        model_dim = cls._get_model_dimension(marqo_index)
         for field in marqo_index.tensor_fields:
             chunks_field_name = f'{cls._CHUNKS_FIELD_PREFIX}{field.name}'
             embedding_field_name = f'{cls._EMBEDDING_FIELD_PREFIX}{field.name}'
@@ -150,7 +154,7 @@ class TypedVespaIndex(VespaIndex):
             )
             vector_summary_fields.append(
                 f'summary {field.embeddings_field_name} type tensor<float>(p{{}}, '
-                f'x[{cls._get_model_dimension(marqo_index.model)}]) {{ }}'
+                f'x[{cls._get_model_dimension(marqo_index)}]) {{ }}'
             )
 
         schema.append('document-summary all-non-vector-summary {')
@@ -178,7 +182,7 @@ class TypedVespaIndex(VespaIndex):
         lexical_fields = marqo_index.lexical_fields
         score_modifier_fields = marqo_index.score_modifier_fields
         tensor_fields = [field.name for field in marqo_index.tensor_fields]
-        model_dim = cls._get_model_dimension(marqo_index.model)
+        model_dim = cls._get_model_dimension(marqo_index)
 
         bm25_expression = ' + '.join([f'bm25({field})' for field in lexical_fields])
         embedding_similarity_expression = ' + '.join([
@@ -245,8 +249,26 @@ class TypedVespaIndex(VespaIndex):
             raise ValueError(f'Unknown Marqo distance metric: {marqo_distance_metric}')
 
     @classmethod
-    def _get_model_dimension(cls, model: str) -> int:
-        return 512
+    def _get_model_dimension(cls, marqo_index: MarqoIndex) -> int:
+        if marqo_index.model.properties:
+            model_properties = marqo_index.model.properties
+        else:
+            model_name = marqo_index.model.name
+            try:
+                model_properties = s2_inference.get_model_properties_from_registry(model_name)
+            except UnknownModelError:
+                raise InvalidArgumentError(
+                    f"Could not find model properties for model={model_name}. "
+                    f"Please check that the model name is correct. "
+                    f"Please provide model_properties if the model is a custom model and is not supported by default")
+
+        try:
+            return model_properties["dimensions"]
+        except KeyError:
+            raise InvalidArgumentError(
+                "The given model properties must contain a 'dimensions' key"
+            )
+
     @classmethod
     def _validate_index_type(cls, marqo_index: MarqoIndex) -> None:
         if marqo_index.type != IndexType.Typed:
@@ -255,8 +277,22 @@ class TypedVespaIndex(VespaIndex):
 
 
 if __name__ == "__main__":
+    def remove_whitespace_around_chars(s, chars):
+        # Escape the special characters in the chars string
+        chars = re.escape(chars)
+
+        # Replace whitespace (including newlines) before or after any of the chars
+        pattern = rf"(\s*([{chars}])\s*)"
+        s = re.sub(pattern, r"\2", s)
+
+        # Replace multiple spaces with a single space
+        s = re.sub(r' +', ' ', s)
+
+        return s
+
+
     marqo_index = MarqoIndex(
-        name='my_index', model='clip', distance_metric=DistanceMetric.PrenormalizedAnguar,
+        name='my_index', model=Model(name='ViT-B/32'), distance_metric=DistanceMetric.PrenormalizedAnguar,
         type=IndexType.Typed,
         vector_numeric_type=VectorNumericType.Float, hnsw_config=HnswConfig(ef_construction=100, m=16),
         fields=[
@@ -271,5 +307,10 @@ if __name__ == "__main__":
             TensorField(name='description')
         ]
     )
+    schema = TypedVespaIndex.generate_schema(marqo_index)
+    chars = '{}=+-<>():,;[]| '
+    schema = remove_whitespace_around_chars(schema, chars)
+    # schema = schema.replace('{\n', '{')
+    # schema = schema.replace('\n}', '}')
 
-    print(TypedVespaIndex.generate_schema(marqo_index))
+    print(schema)

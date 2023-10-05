@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Any
 
 from pydantic import BaseModel
 
@@ -58,15 +58,20 @@ class HnswConfig(BaseModel):
     m: int
 
 
+class Model(BaseModel):
+    name: str
+    properties: Optional[Dict[str, Any]]
+
+
 class MarqoIndex(BaseModel):
     name: str
     type: IndexType
-    model: str
+    model: Model
     distance_metric: DistanceMetric
     vector_numeric_type: VectorNumericType
     hnsw_config: HnswConfig
     fields: Optional[List[Field]]
-    tensor_fields: List[TensorField]
+    tensor_fields: Optional[List[TensorField]]
 
     @property
     def lexical_fields(self) -> List[str]:

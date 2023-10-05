@@ -5,7 +5,7 @@ import xml.etree.ElementTree as ET
 
 import marqo.logging
 import marqo.vespa.vespa_client
-from marqo.core.exceptions import MarqoIndexExistsError
+from marqo.core.exceptions import IndexExistsError
 from marqo.core.models import MarqoIndex
 from marqo.core.models.marqo_index import IndexType, DistanceMetric, VectorNumericType, HnswConfig, Field, FieldType, \
     FieldFeature, TensorField
@@ -41,7 +41,7 @@ class IndexManagement:
         self._ensure_marqo_settings_schema(app)
 
         if self._index_exists(marqo_index.name):
-            raise MarqoIndexExistsError(f"Index {marqo_index.name} already exists")
+            raise IndexExistsError(f"Index {marqo_index.name} already exists")
 
         vespa_index = vespa_index_factory(marqo_index)
 

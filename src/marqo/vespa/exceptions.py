@@ -1,19 +1,15 @@
-from typing import Optional
-
 from httpx import HTTPStatusError
 
+from marqo.exceptions import MarqoError
 
-class VespaError(Exception):
-    def __init__(
-            self, cause: Exception
-    ):
-        super().__init__(str(cause))
-        self.cause = cause
+
+class VespaError(MarqoError):
+    pass
 
 
 class VespaStatusError(VespaError):
     def __init__(self, cause: HTTPStatusError):
-        super().__init__(cause)
+        super().__init__(cause=cause)
 
     @property
     def status_code(self) -> int:
