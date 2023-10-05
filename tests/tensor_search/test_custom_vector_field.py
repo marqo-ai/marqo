@@ -328,13 +328,106 @@ class TestCustomVectorField(MarqoTestCase):
         """
         pass
 
-    def test_get_documents_with_custom_vector_field(self):
+    def test_get_document_with_custom_vector_field(self):
         """
         Add a document with a custom vector field:
         Get the doc, both fetched content and embedding must be correct
         """
-        pass
+        tensor_search.add_documents(
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1,
+                docs=[{
+                    "_id": "0",
+                    "my_custom_vector": {
+                        "content": "custom content is here!!",
+                        "vector": self.random_vector
+                    }
+                }],
+                auto_refresh=True, device="cpu", mappings=self.mappings
+            )
+        )
 
+        # Confirm get_document_by_id returns correct content
+        res = tensor_search.get_document_by_id(
+            config=self.config, index_name=self.index_name_1,
+            document_id="0", show_vectors=True)
+        
+        # Check content is correct
+        assert res["_id"] == "0"
+        assert res["my_custom_vector"] == "custom content is here!!"
+
+        # Check tensor facets and embedding are correct
+        assert len(res[TensorField.tensor_facets]) == 1
+        assert res[TensorField.tensor_facets][0]["my_custom_vector"] == "custom content is here!!"
+        assert res[TensorField.tensor_facets][0][TensorField.embedding] == self.random_vector
+
+    def test_get_documents_with_custom_vector_field(self):
+        """
+        Get multiple docs with custom vectors, 
+        both fetched content and embedding must be correct
+        """
+        tensor_search.add_documents(
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1,
+                docs=[
+                    {
+                        "_id": "0",
+                        "my_custom_vector": {
+                            "content": "custom content is here!!",
+                            "vector": self.random_vector
+                        }
+                    },
+                    {
+                        "_id": "1",
+                        "my_custom_vector": {
+                            "content": "second custom vector",
+                            "vector": [2*i for i in self.random_vector]
+                        }
+                    },
+                    {
+                        "_id": "2",
+                        "my_custom_vector": {
+                            "content": "third custom vector",
+                            "vector": [3*i for i in self.random_vector]
+                        }
+                    },
+                ],
+                auto_refresh=True, device="cpu", mappings=self.mappings
+            )
+        )
+
+        # Confirm get_document_by_id returns correct content
+        res = tensor_search.get_documents_by_ids(
+            config=self.config, index_name=self.index_name_1,
+            document_ids=["0", "1", "2"], show_vectors=True)
+        
+        assert len(res["results"]) == 3
+
+        # Check content is correct
+        assert res["results"][0]["_id"] == "0"
+        assert res["results"][0]["my_custom_vector"] == "custom content is here!!"
+        # Check tensor facets and embedding are correct
+        assert len(res["results"][0][TensorField.tensor_facets]) == 1
+        assert res["results"][0][TensorField.tensor_facets][0]["my_custom_vector"] == "custom content is here!!"
+        assert res["results"][0][TensorField.tensor_facets][0][TensorField.embedding] == self.random_vector
+
+        # Check content is correct
+        assert res["results"][1]["_id"] == "1"
+        assert res["results"][1]["my_custom_vector"] == "second custom vector"
+        # Check tensor facets and embedding are correct
+        assert len(res["results"][1][TensorField.tensor_facets]) == 1
+        assert res["results"][1][TensorField.tensor_facets][0]["my_custom_vector"] == "second custom vector"
+        assert res["results"][1][TensorField.tensor_facets][0][TensorField.embedding] == [2*i for i in self.random_vector]
+
+        # Check content is correct
+        assert res["results"][2]["_id"] == "2"
+        assert res["results"][2]["my_custom_vector"] == "third custom vector"
+        # Check tensor facets and embedding are correct
+        assert len(res["results"][2][TensorField.tensor_facets]) == 1
+        assert res["results"][2][TensorField.tensor_facets][0]["my_custom_vector"] == "third custom vector"
+        assert res["results"][2][TensorField.tensor_facets][0][TensorField.embedding] == [3*i for i in self.random_vector]
+
+    
     def test_invalid_custom_vector_field_content(self):
         """
         Add a document with a custom vector field with invalid content/embedding/format

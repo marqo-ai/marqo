@@ -34,8 +34,8 @@ multimodal_combination_mappings_schema = {
       "patternProperties": {
         "^.*$": {
           "type": "number"
-          # TODO: add child_field in constants.ALLOWED_MULTIMODAL_FIELD_TYPES:
-          # TODO: add weights are float or int only
+          # TODO: add child fields must be in constants.ALLOWED_MULTIMODAL_FIELD_TYPES:
+          # TODO: add weights are numbers only
         },
       },
 

@@ -215,11 +215,14 @@ def determine_document_field_type(field_name, field_content, mappings):
     """
 
     if isinstance(field_content, dict):
+        if field_name not in mappings:
+            raise errors.InternalError(f"Invalid dict field {field_name}. Could not find field in mappings object.")
+        
         if mappings[field_name]["type"] == enums.MappingsObjectType.multimodal_combination:
             return enums.DocumentFieldType.multimodal_combination
         elif mappings[field_name]["type"] == enums.MappingsObjectType.custom_vector:
             return enums.DocumentFieldType.custom_vector
         else:
-            raise errors.InternalError(f"Invalid dict field {field_name}. Could not find type in mappings object.")
+            raise errors.InternalError(f"Invalid dict field type {field_name} in mappings. Must be one of {[t.value for t in enums.MappingsObjectType]}")
     else:
         return enums.DocumentFieldType.standard

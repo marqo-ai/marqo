@@ -125,7 +125,7 @@ class DocumentFieldType:
     multimodal_combination = "multimodal_combination"   # dict
     custom_vector = "custom_vector"     # dict
 
-class MappingsObjectType:
+class MappingsObjectType(str, Enum):
     multimodal_combination = "multimodal_combination"
     custom_vector = "custom_vector"
 

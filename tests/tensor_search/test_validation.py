@@ -706,7 +706,29 @@ class TestValidateIndexSettings(unittest.TestCase):
                 }
             },
 
-            # TODO: Add CUSTOM VECTOR and combination tests
+            # Mappings with custom vector
+            {
+                "my_custom_vector": {
+                    "type": "custom_vector"
+                }
+            },
+            # Mappings with both custom vector and multimodal combination
+            {
+                "my_custom_vector": {
+                    "type": "custom_vector"
+                },
+                "abcd ": {
+                    "type": "multimodal_combination",
+                    "weights": {
+                        "some_text": -4.6,
+                        "other_text": 22
+                    }
+                },
+                "my_custom_vector_2": {
+                    "type": "custom_vector"
+                }
+            },
+
         ]
         for d in mappings:
             assert d == validation.validate_mappings_object(d)
@@ -722,6 +744,19 @@ class TestValidateIndexSettings(unittest.TestCase):
 
                     }
                 }
+            },
+            # Field with no type
+            {
+                "my_combination_field": {
+                    "weights": {
+                        "some_text": 0.5
+
+                    }
+                }
+            },
+            # Empty mapping
+            {
+                "empty field": {}
             },
             {
                 "my_combination_field": {
@@ -790,7 +825,27 @@ class TestValidateIndexSettings(unittest.TestCase):
                     }
                 },
             },
-            # TODO: Add CUSTOM VECTOR and combination tests
+            # Custom vector with extra field
+            {
+                "my_custom_vector": {
+                    "type": "custom_vector",
+                    "extra_field": "blah"
+                }
+            },
+            # Custom vector with extra field and multimodal
+            {
+                "my_custom_vector": {
+                    "type": "custom_vector",
+                    "extra_field_2": "blah"
+                },
+                "abcd": {
+                    "type": "multimodal_combination",
+                    "weights": {
+                        "some_text": -4.6,
+                        "other_text": 22
+                    }
+                }
+            },
         ]
         for mapping in mappings:
             try:
@@ -894,97 +949,36 @@ class TestValidateIndexSettings(unittest.TestCase):
                 pass
 
     def test_valid_custom_vector_mappings_object(self):
-        # TODO: CHANGE THIS TO CUSTOM VECTOR
+        # There is only 1 valid format for custom vector mapping.
         mappings = [
             {
-                "type": "multimodal_combination",
-                "weights": {
-                    "some_text": 0.5
-                }
-            },
-            {
-                "type": "multimodal_combination",
-                "weights": {
-                    "some_text": -2
-                }
-            },
-            {
-                "type": "multimodal_combination",
-                "weights": {
-                    "some_text": -4.6,
-                    "other_text": 22
-                }
-            },
-            {
-                "type": "multimodal_combination",
-                "weights": {}
-            },
-            {
-                "type": "multimodal_combination",
-                "weights": {
-                    "some_text": 0,
-                }
-            },
+                "type": "custom_vector"
+            }
         ]
         for d in mappings:
-            assert d == validation.validate_multimodal_combination_mappings_object(d)
+            assert d == validation.validate_custom_vector_mappings_object(d)
 
     def test_invalid_custom_vector_mappings_object(self):
-        # TODO: CHANGE THIS TO CUSTOM VECTOR
         mappings = [
+            # Extra field
             {
-                "my_combination_field": { # valid mappings dir, but not valid multimodal
-                    "type": "multimodal_combination",
-                    "weights": {
-                        "some_text": 0.5
-                    }
-                }
+                "type": "custom_vector",
+                "extra_field": "blah"
             },
+            # Misspelled type field
             {
-                "type": "othertype",  # bad type
-                "weights": {
-                    "some_text": 0.5
-
-                }
+                "typeblahblah": "custom_vector",
             },
+            # Type not custom_vector
             {
-                "type": "multimodal_combination",
-                "non_weights": {  # unknown fieldname 'non_weights' config in multimodal_combination
-                    "some_text": 0.5
-                }
+                "type": "the wrong field type",
             },
-            {
-                "type": "multimodal_combination",
-                # missing weights for multimodal_combination
-            },
-            {
-                "type": "multimodal_combination",
-                "weights": {"blah": "woo"}  # non-number weights
-            },
-            {
-                "type": "multimodal_combination",
-                "weights": {"blah": "1.3"}  # non-number weights
-            },
-            {
-                "type": "multimodal_combination",
-                "weights": {
-                    "some_text": -4.6,
-                    "other_text": 22
-                },
-                "extra_field": {"blah"}  # unknown field
-            },
-            {
-                "type": "multimodal_combination",
-                "weights": {
-                    "some_text": -4.6,
-                    "other_text": 22,
-                    "nontext": True  # non-number
-                },
-            }
+            # Empty
+            {}
         ]
         for mapping in mappings:
             try:
-                validation.validate_multimodal_combination_mappings_object(mapping)
+                validation.validate_custom_vector_mappings_object(mapping)
                 raise AssertionError
             except InvalidArgError as e:
                 pass
