@@ -1,9 +1,7 @@
-import re
 from typing import Dict, Any, List
 
 from marqo.core.models import MarqoQuery, MarqoIndex
-from marqo.core.models.marqo_index import FieldType, FieldFeature, DistanceMetric, VectorNumericType, HnswConfig, Field, \
-    TensorField, IndexType, Model
+from marqo.core.models.marqo_index import FieldType, FieldFeature, DistanceMetric, IndexType
 from marqo.core.vespa_index import VespaIndex
 from marqo.exceptions import InvalidArgumentError
 from marqo.s2_inference import s2_inference
@@ -17,7 +15,6 @@ class TypedVespaIndex(VespaIndex):
         FieldType.Int: 'int',
         FieldType.Float: 'float',
         FieldType.ArrayText: 'array<string>',
-        FieldType.ArrayBool: 'array<bool>',
         FieldType.ArrayInt: 'array<int>',
         FieldType.ArrayFloat: 'array<float>',
         FieldType.ImagePointer: 'string'
@@ -274,43 +271,3 @@ class TypedVespaIndex(VespaIndex):
         if marqo_index.type != IndexType.Typed:
             raise ValueError(f'Vespa index type must be {IndexType.Typed.name}. '
                              f'This module cannot handle index type {marqo_index.type.name}')
-
-
-if __name__ == "__main__":
-    def remove_whitespace_around_chars(s, chars):
-        # Escape the special characters in the chars string
-        chars = re.escape(chars)
-
-        # Replace whitespace (including newlines) before or after any of the chars
-        pattern = rf"(\s*([{chars}])\s*)"
-        s = re.sub(pattern, r"\2", s)
-
-        # Replace multiple spaces with a single space
-        s = re.sub(r' +', ' ', s)
-
-        return s
-
-
-    marqo_index = MarqoIndex(
-        name='my_index', model=Model(name='ViT-B/32'), distance_metric=DistanceMetric.PrenormalizedAnguar,
-        type=IndexType.Typed,
-        vector_numeric_type=VectorNumericType.Float, hnsw_config=HnswConfig(ef_construction=100, m=16),
-        fields=[
-            Field(name='title', type=FieldType.Text, features=[FieldFeature.LexicalSearch]),
-            Field(name='description', type=FieldType.Text, features=[FieldFeature.LexicalSearch]),
-            Field(name='is_active', type=FieldType.Bool, features=[FieldFeature.Filter]),
-            Field(name='price', type=FieldType.Float, features=[FieldFeature.Filter, FieldFeature.ScoreModifier]),
-            Field(name='category', type=FieldType.Text, features=[FieldFeature.Filter, FieldFeature.LexicalSearch]),
-        ],
-        tensor_fields=[
-            TensorField(name='title'),
-            TensorField(name='description')
-        ]
-    )
-    schema = TypedVespaIndex.generate_schema(marqo_index)
-    chars = '{}=+-<>():,;[]| '
-    schema = remove_whitespace_around_chars(schema, chars)
-    # schema = schema.replace('{\n', '{')
-    # schema = schema.replace('\n}', '}')
-
-    print(schema)

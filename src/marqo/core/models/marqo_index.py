@@ -15,7 +15,6 @@ class FieldType(Enum):
     Int = 'int'
     Float = 'float'
     ArrayText = 'array<text>'
-    ArrayBool = 'array<bool>'
     ArrayInt = 'array<int>'
     ArrayFloat = 'array<float>'
     ImagePointer = 'image_pointer'
@@ -28,7 +27,6 @@ class VectorNumericType(Enum):
 
 
 class FieldFeature(Enum):
-    TensorSearch = 'tensor_search'
     LexicalSearch = 'lexical_search'
     ScoreModifier = 'score_modifier'
     Filter = 'filter'
@@ -41,7 +39,7 @@ class DistanceMetric(Enum):
 class Field(BaseModel):
     name: str
     type: FieldType
-    features: List[FieldFeature]
+    features: List[FieldFeature] = []
     dependent_fields: Optional[Dict[str, float]]
     lexical_field_name: Optional[str]
     filter_field_name: Optional[str]
