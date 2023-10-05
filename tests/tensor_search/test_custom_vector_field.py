@@ -2,6 +2,7 @@ from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.errors import IndexNotFoundError, InvalidArgError
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import TensorField, IndexSettingsField, SearchMethod
+from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQueryEntity, ScoreModifier
 from tests.marqo_test import MarqoTestCase
 from marqo.tensor_search.tensor_search import add_documents
 from marqo.tensor_search.models.search import SearchContext
@@ -554,13 +555,13 @@ class TestCustomVectorField(MarqoTestCase):
                         "_id": "custom_vector_doc",
                         "my_custom_vector": {
                             "content": "custom content is here!!",
-                            "vector": self.random_vector_1    # size is 384
+                            "vector": self.random_vector_1    # size is 512
                         }
                     },
                     {
                         "_id": "empty_content_custom_vector_doc",
                         "my_custom_vector": {
-                            "vector": self.random_vector_2    # size is 384
+                            "vector": self.random_vector_2    # size is 512
                         }
                     },
                     {
@@ -612,13 +613,13 @@ class TestCustomVectorField(MarqoTestCase):
                         "_id": "custom_vector_doc",
                         "my_custom_vector": {
                             "content": "custom content is here!!",
-                            "vector": self.random_vector_1    # size is 384
+                            "vector": self.random_vector_1    # size is 512
                         }
                     },
                     {
                         "_id": "empty_content_custom_vector_doc",
                         "my_custom_vector": {
-                            "vector": self.random_vector_2    # size is 384
+                            "vector": self.random_vector_2    # size is 512
                         }
                     },
                     {
@@ -656,19 +657,157 @@ class TestCustomVectorField(MarqoTestCase):
         """
         Bulk search for the doc
         """
-        pass
+        tensor_search.add_documents(
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1,
+                docs=[
+                    {
+                        "_id": "custom_vector_doc",
+                        "my_custom_vector": {
+                            "content": "custom content is here!!",
+                            "vector": self.random_vector_1    # size is 512
+                        }
+                    },
+                    {
+                        "_id": "empty_content_custom_vector_doc",
+                        "my_custom_vector": {
+                            "vector": self.random_vector_2    # size is 512
+                        }
+                    },
+                    {
+                        "_id": "normal_doc",
+                        "text_field": "blah"
+                    }
+                ],
+                auto_refresh=True, device="cpu", mappings=self.mappings
+            )
+        )
+
+        # Searching with context matching custom vector returns custom vector
+        res = tensor_search.bulk_search(
+            marqo_config=self.config,
+            query=BulkSearchQuery(
+                queries=[
+                    BulkSearchQueryEntity(
+                        index=self.index_name_1,
+                        q={"dummy text": 0},
+                        context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], })
+                    )
+                ]
+            )
+        )["result"][0]
+
+        assert res["hits"][0]["_id"] == "custom_vector_doc"
+        assert res["hits"][0]["_score"] == 1.0
+        assert res["hits"][0]["_highlights"]["my_custom_vector"] == "custom content is here!!"
+        
 
     def test_search_with_custom_vector_field_score_modifiers(self):
         """
         Search for the doc, with score modifiers
         """
-        pass
+        # custom vector cannot be used as score modifier, as it cannot be numeric.
+        # Using another field as score modifier on a custom vector:
+        tensor_search.add_documents(
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1,
+                docs=[
+                    {
+                        "_id": "doc0",
+                        "my_custom_vector": {
+                            "content": "vec 1",
+                            "vector": self.random_vector_1    # size is 512
+                        },
+                        "multiply": 0.001               # Should make score tiny 
+                    },
+                    {
+                        "_id": "doc1",
+                        "my_custom_vector": {
+                            "content": "vec 2",
+                            "vector": self.random_vector_2    # size is 512
+                        },
+                        "multiply": 1000                # Should make score huge
+                    },
+                ],
+                auto_refresh=True, device="cpu", mappings=self.mappings
+            )
+        )
+
+        # Normal search should favor doc0
+        res = tensor_search.search(
+            config=self.config, index_name=self.index_name_1, text={"dummy text": 0},
+            search_method=SearchMethod.TENSOR,
+            context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], })
+        )
+        assert res["hits"][0]["_id"] == "doc0"
+
+        # Search with score modifiers multiplyyshould favor doc1
+        res = tensor_search.search(
+            config=self.config, index_name=self.index_name_1, text={"dummy text": 0},
+            search_method=SearchMethod.TENSOR,
+            context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], }),
+            score_modifiers=ScoreModifier(**{"multiply_score_by":
+                                                    [{"field_name": "multiply",
+                                                      "weight": 1}
+                                                    ]
+                                            })
+        )
+        assert res["hits"][0]["_id"] == "doc1"
+
 
     def test_search_with_custom_vector_field_boosting(self):
         """
         Search for the doc, with boosting
         """
-        pass
+        mappings = {
+            "my_custom_vector_1": {
+                "type": "custom_vector"
+            },
+            "my_custom_vector_2": {
+                "type": "custom_vector"
+            },
+        }
+
+        tensor_search.add_documents(
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1,
+                docs=[
+                    {
+                        "_id": "doc0",
+                        "my_custom_vector_1": {
+                            "content": "vec 1",
+                            "vector": self.random_vector_1    # size is 512
+                        },
+                    },
+                    {
+                        "_id": "doc1",
+                        "my_custom_vector_2": {
+                            "content": "vec 2",
+                            "vector": self.random_vector_2    # size is 512
+                        },
+                    },
+                ],
+                auto_refresh=True, device="cpu", mappings=mappings
+            )
+        )
+
+        # Normal search should favor doc0
+        res = tensor_search.search(
+            config=self.config, index_name=self.index_name_1, text={"dummy text": 0},
+            search_method=SearchMethod.TENSOR,
+            context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], })
+        )
+        assert res["hits"][0]["_id"] == "doc0"
+
+        # Search with boosting should favor doc1
+        res = tensor_search.search(
+            config=self.config, index_name=self.index_name_1, text={"dummy text": 0},
+            search_method=SearchMethod.TENSOR,
+            context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], }),
+            boost={"my_custom_vector_2": [5, 1]}
+        )
+        assert res["hits"][0]["_id"] == "doc1"
+
 
     def test_search_with_custom_vector_field_filter_string(self):
         """
@@ -868,7 +1007,7 @@ class TestCustomVectorField(MarqoTestCase):
                         "_id": "custom vector doc",
                         "my_custom_vector": {
                             "content": "toxt to search",    # almost matching
-                            "vector": self.random_vector_1    # size is 384
+                            "vector": self.random_vector_1    # size is 512
                         }
                     },
                     {
