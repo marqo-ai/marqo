@@ -14,7 +14,50 @@
 <a align="center" href="https://bit.ly/marqo-slack"><img src="https://img.shields.io/badge/Slack-blueviolet?logo=slack&amp;logoColor=white"></a>
 
 <p align="center">
-Marqo is more than a vector database, it's an end-to-end vector search engine. Vector generation, storage and retrieval are handled out of the box through a single API. No need to bring your own embeddings.
+Marqo is more than a vector database, it's an end-to-end vector search engine for both text and images. Vector generation, storage and retrieval are handled out of the box through a single API. No need to bring your own embeddings. Here is a code snippet for a minimal example of vector search with Marqo:
+
+```python
+import marqo
+
+mq = marqo.Client(url='http://localhost:8882')
+
+mq.create_index("my-first-index")
+
+mq.index("my-first-index").add_documents([
+    {
+        "Title": "The Travels of Marco Polo",
+        "Description": "A 13th-century travelogue describing Polo's travels"
+    }, 
+    {
+        "Title": "Extravehicular Mobility Unit (EMU)",
+        "Description": "The EMU is a spacesuit that provides environmental protection, "
+                       "mobility, life support, and communications for astronauts",
+        "_id": "article_591"
+    }],
+    tensor_fields=["Title", "Description"],
+    auto_refresh=True
+)
+
+results = mq.index("my-first-index").search(
+    q="What is the best outfit to wear on the moon?", searchable_attributes=["Title", "Description"]
+)
+
+```
+    
+Why Marqo? Vector similarity alone is not enough for vector search. Vector search requires more than a vector database - it also requires machine learning (ML) deployment and management, preprocessing and transformations of inputs as well as the ability to modify search behavior without retraining a model. Marqo contains all these pieces, enabling developers to build vector search into their application with minimal effort.
+Why not X, Y, Z vector database? Vector databases are specialized components for vector similarity. They are “vectors in - vectors out”. They still require the production of vectors, management of the ML models, associated orchestration and processing of the inputs. Marqo makes this easy by being “documents in, documents out”. Preprocessing of text and images, embedding the content, storing meta-data and deployment of inference and storage is all taken care of by Marqo. We have been running Marqo for production workloads with both low-latency and large index requirements.
+Marqo features:
+- Low-latency (10’s ms - configuration dependent), large scale (10’s - 100’s M vectors).
+- Easily integrates with LLM’s and other generative AI - augmented generation using a knowledge base.
+- Pre-configured open source embedding models - SBERT, Huggingface, CLIP/OpenCLIP.
+- Pre-filtering and lexical search.
+- Multimodal model support - search text and/or images.
+- Custom models - load models fine tuned from your own data.
+- Ranking with document meta data - bias the similarity with properties like popularity.
+- Multi-term multi-modal queries - allows per query personalization and topic avoidance.
+- Multi-modal representations - search over documents that have both text and images.
+- GPU/CPU/ONNX/PyTorch inference support
+    
 </p> <br>
     
 <p align="center">
