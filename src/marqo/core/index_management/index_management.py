@@ -1,15 +1,14 @@
-import json
 import os
 import textwrap
+import time
 import xml.etree.ElementTree as ET
 
 import marqo.logging
 import marqo.vespa.vespa_client
 from marqo.core.exceptions import IndexExistsError
 from marqo.core.models import MarqoIndex
-from marqo.core.models.marqo_index import IndexType, DistanceMetric, VectorNumericType, HnswConfig, Field, FieldType, \
-    FieldFeature, TensorField
 from marqo.core.vespa_index import for_marqo_index as vespa_index_factory
+from marqo.exceptions import MarqoError
 from marqo.vespa.models import VespaDocument
 from marqo.vespa.vespa_client import VespaClient
 
@@ -18,7 +17,7 @@ logger = marqo.logging.get_logger(__name__)
 
 class IndexManagement:
     _MARQO_SETTINGS_SCHEMA_NAME = 'marqo__settings'
-    _MARQO_SETTINGS_SCHEMA = textwrap.dedent(
+    _MARQO_SETTINGS_SCHEMA_TEMPLATE = textwrap.dedent(
         '''
         schema %s {
             document %s {
@@ -30,15 +29,27 @@ class IndexManagement:
                 }
             }
         }
-        ''' % (_MARQO_SETTINGS_SCHEMA_NAME, _MARQO_SETTINGS_SCHEMA_NAME)
+        '''
     )
+    # Number of retries if settings schema feed fails with 400. This can happen when the settings schema created as
+    # part of the index creation and is not yet available for feeding.
+    _MARQO_SETTINGS_RETRIES = 10
 
     def __init__(self, vespa_client: VespaClient):
         self.vespa_client = vespa_client
 
-    def create_index(self, marqo_index: MarqoIndex):
+    def create_index(self, marqo_index: MarqoIndex) -> None:
+        """
+        Create a Marqo index.
+        Args:
+            marqo_index: Marqo index to create
+
+        Raises:
+            IndexExistsError: If index already exists
+            InvalidVespaApplicationError: If Vespa application is invalid after applying the index
+        """
         app = self.vespa_client.download_application()
-        self._ensure_marqo_settings_schema(app)
+        settings_schema_created = self._create_marqo_settings_schema(app)
 
         if self._index_exists(marqo_index.name):
             raise IndexExistsError(f"Index {marqo_index.name} already exists")
@@ -49,17 +60,35 @@ class IndexManagement:
 
         self._add_schema(app, marqo_index.name, schema)
         self.vespa_client.deploy_application(app)
-        self._save_index_settings(marqo_index)
+        self._save_index_settings(
+            marqo_index,
+            retries=self._MARQO_SETTINGS_RETRIES if settings_schema_created else 0
+        )
 
     def _index_exists(self, name: str) -> bool:
+        # TODO - implement method after settings cache has been implemented
         return False
 
-    def _ensure_marqo_settings_schema(self, app: str) -> None:
+    def _create_marqo_settings_schema(self, app: str) -> bool:
+        """
+        Create the Marqo settings schema if it does not exist.
+        Args:
+            app: Path to Vespa application package
+        Returns:
+            True if schema was created, False if it already existed
+        """
         schema_path = os.path.join(app, 'schemas', f'{self._MARQO_SETTINGS_SCHEMA_NAME}.sd')
         if not os.path.exists(schema_path):
+            schema = self._MARQO_SETTINGS_SCHEMA_TEMPLATE % (
+                self._MARQO_SETTINGS_SCHEMA_NAME,
+                self._MARQO_SETTINGS_SCHEMA_NAME
+            )
             with open(schema_path, 'w') as f:
-                f.write(self._MARQO_SETTINGS_SCHEMA)
+                f.write(schema)
             self._add_schema_to_services(app, self._MARQO_SETTINGS_SCHEMA_NAME)
+
+            return True
+        return False
 
     def _add_schema(self, app: str, name: str, schema: str) -> None:
         schema_path = os.path.join(app, 'schemas', f'{name}.sd')
@@ -83,11 +112,12 @@ class IndexManagement:
 
         tree.write(services_path)
 
-    def _save_index_settings(self, marqo_index: MarqoIndex):
+    def _save_index_settings(self, marqo_index: MarqoIndex, retries=0, attempt=0):
         """
         Create or update index settings in Vespa settings schema.
         """
-        self.vespa_client.feed_batch(
+        # TODO - implement a public single doc feed method and use that here
+        batch_response = self.vespa_client.feed_batch(
             [
                 VespaDocument(
                     id=marqo_index.name,
@@ -99,3 +129,12 @@ class IndexManagement:
             ],
             schema=self._MARQO_SETTINGS_SCHEMA_NAME
         )
+
+        if batch_response.errors:
+            response = batch_response.responses[0]
+            if response.status == '400' and attempt < retries:
+                logger.warn(f"Failed to feed index settings for {marqo_index.name}, retrying in 1 second")
+                time.sleep(1)
+                self._save_index_settings(marqo_index, retries, attempt + 1)
+            else:
+                raise MarqoError(f"Failed to feed index settings for {marqo_index.name}: {str(response)}")

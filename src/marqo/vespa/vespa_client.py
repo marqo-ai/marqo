@@ -12,13 +12,17 @@ import httpx
 
 import marqo.logging
 import marqo.vespa.concurrency as conc
-from marqo.vespa.exceptions import VespaStatusError, VespaError
+from marqo.vespa.exceptions import VespaStatusError, VespaError, InvalidVespaApplicationError
 from marqo.vespa.models import VespaDocument, QueryResult, FeedResponse, FeedBatchResponse
 
 logger = marqo.logging.get_logger(__name__)
 
 
 class VespaClient:
+    _VESPA_ERROR_CODE_TO_EXCEPTION = {
+        'INVALID_APPLICATION_PACKAGE': InvalidVespaApplicationError
+    }
+
     def __init__(self, config_url: str, document_url: str, query_url: str, pool_size: int = 10):
         """
         Create a VespaClient object.
@@ -328,14 +332,23 @@ class VespaClient:
 
         return FeedResponse(**resp.json(), status=resp.status_code)
 
-    def _raise_for_status(self, resp):
+    def _raise_for_status(self, resp) -> None:
         try:
             resp.raise_for_status()
         except httpx.HTTPStatusError as e:
             response = e.response
             try:
                 json = response.json()
-                message = f'{json["error-code"]}: {json["message"]}'
-                raise VespaStatusError(message=message, cause=e) from e
-            except Exception:
+                error_code = json['error-code']
+                message = json['message']
+            except Exception as e:
                 raise VespaStatusError(message=response.text, cause=e) from e
+
+            self._raise_for_error_code(error_code, message, e)
+
+    def _raise_for_error_code(self, error_code: str, message: str, cause: Exception) -> None:
+        exception = self._VESPA_ERROR_CODE_TO_EXCEPTION.get(error_code, VespaError)
+        if exception:
+            raise exception(message=message, cause=cause) from cause
+
+        raise VespaStatusError(message=f'{error_code}: {message}', cause=cause) from cause
