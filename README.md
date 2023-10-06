@@ -50,7 +50,7 @@ Vector similarity alone is not enough for vector search. Vector search requires 
 
 **Why not X, Y, Z vector database?** 
 
-Vector databases are specialized components for vector similarity. They are “vectors in - vectors out”. They still require the production of vectors, management of the ML models, associated orchestration and processing of the inputs. Marqo makes this easy by being “documents in, documents out”. Preprocessing of text and images, embedding the content, storing meta-data and deployment of inference and storage is all taken care of by Marqo. We have been running Marqo for production workloads with both low-latency and large index requirements.
+Vector databases are specialized components for vector similarity. They are “vectors in - vectors out”. They still require the production of vectors, management of the ML models, associated orchestration and processing of the inputs. Marqo makes this easy by being “documents in, documents out”. Preprocessing of text and images, embedding the content, storing meta-data and deployment of inference and storage is all taken care of by Marqo. 
 
 **Marqo features**:
 
