@@ -16,7 +16,7 @@
 <p align="left">
 Marqo is more than a vector database, it's an end-to-end vector search engine for both text and images. Vector generation, storage and retrieval are handled out of the box through a single API. No need to bring your own embeddings. 
 
-Here is a code snippet for a minimal example of vector search with Marqo:
+Here is a code snippet for a minimal example of vector search with Marqo (see [Getting Started](#-Getting-started)):
 
 ```python
 import marqo
