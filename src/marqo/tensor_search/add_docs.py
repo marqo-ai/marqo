@@ -6,7 +6,7 @@ import math
 import threading
 import random
 
-from typing import List, Optional, Tuple, ContextManager
+from typing import List, Optional, Tuple, ContextManager, Union
 import PIL
 from PIL.ImageFile import ImageFile
 from marqo.s2_inference import clip_utils
@@ -14,6 +14,7 @@ from marqo.tensor_search.telemetry import RequestMetricsStore, RequestMetrics
 import marqo.errors as errors
 from marqo.tensor_search import utils
 from marqo.tensor_search import enums
+from marqo.tensor_search import constants
 
 
 def threaded_download_images(allocated_docs: List[dict], image_repo: dict, tensor_fields: Optional[List[str]],
@@ -203,7 +204,7 @@ def create_chunk_metadata(raw_document: dict):
     return metadata
 
 
-def determine_document_field_type(field_name, field_content, mappings):
+def determine_document_field_type(field_name: str, field_content, mappings: dict):
     """
     Determines the type of a document field
     using its name, content, and the add docs mappings object.
