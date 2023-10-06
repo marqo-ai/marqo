@@ -1328,7 +1328,7 @@ class TestValidateIndexSettings(unittest.TestCase):
             validation.validate_dict('void_field', valid_dict, is_non_tensor_field=False, mappings=test_mappings)
             raise AssertionError
         except InvalidArgError as e:
-            assert "not in the add_document parameter mappings" in e.message
+            assert "must be in the add_documents `mappings` parameter" in e.message
 
         # sub_fields not in mappings["weight"]
         try:
@@ -1351,6 +1351,25 @@ class TestValidateIndexSettings(unittest.TestCase):
         except InvalidArgError as e:
             assert "must be a tensor field" in e.message
         
+        # Field in mappings, but type is not valid (multimodal_combination or custom_vector)
+        try:
+            validation.validate_dict("bad_field", 
+                                     {
+                                        "nothing": "really matters",
+                                        "anyone": "can see",
+                                        "nothing, ": "really matters",
+                                        "to": "me"
+                                     }, 
+                                     is_non_tensor_field=True, 
+                                     mappings={
+                                         "bad_field": {
+                                                "type": "invalid_type"
+                                         }
+                                     })
+            raise AssertionError
+        except InvalidArgError as e:
+            assert "is of invalid type in the `mappings` parameter" in e.message
+
         # ============== custom vector validate_dict tests ==============
         index_model_dimensions = 384
         # custom vector, valid

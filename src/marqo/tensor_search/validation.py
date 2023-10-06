@@ -446,25 +446,28 @@ def validate_dict(field: str, field_content: Dict, is_non_tensor_field: bool, ma
     '''
     if mappings is None:
         raise InvalidArgError(
-            f"The field `{field}` contains a dictionary field content `{field_content}`."
-            f"However, the parameter `mappings` is {mappings}. Dictionary field contents are not supported in"
-            f"Marqo unless `mappings` is provided. Please change the type of field."
-            f"If you aim to use dictionary field content as a special field,"
-            f"please check `https://docs.marqo.ai/0.0.15/Advanced-Usage/document_fields/#multimodal-combination-object` for more info.")
+            f"The `mappings` parameter must be provided to use object field types. "
+            f"Your doc has field `{field}` with object field content `{field_content}`."
+            f"However, the parameter `mappings` is {mappings}. Please change the field content or add the field to `mappings`. "
+            f"See `https://marqo.pages.dev/1.4.0/API-Reference/mappings/` for more info on object fields.")
 
     if field not in mappings:
         raise InvalidArgError(
-            f"The field `{field}` contains a dictionary field content `{field_content}`."
-            f"However, this field `{field}` is not in the add_document parameter mappings `{mappings}`, which is not supported."
-            f"Please change the type of your field content."
-            f"If you aim to use dictionary filed content as a special field,"
-            f"please check `https://docs.marqo.ai/0.0.15/Advanced-Usage/document_fields/#multimodal-combination-object` for more info.")
+            f"The field {field} must be in the add_documents `mappings` parameter to use it as an object field type. "
+            f"However, the `mappings` is {mappings}. Please change the field content or add the field to `mappings`. "
+            f"See `https://marqo.pages.dev/1.4.0/API-Reference/mappings/` for more info on object fields.")
 
     if mappings[field]["type"] == "multimodal_combination":
         field_content = validate_multimodal_combination(field_content, is_non_tensor_field, mappings[field])
-    
-    if mappings[field]["type"] == "custom_vector":
+    elif mappings[field]["type"] == "custom_vector":
         field_content = validate_custom_vector(field_content, is_non_tensor_field, index_model_dimensions)
+    else:
+        raise InvalidArgError(
+            f"The field {field} is of invalid type in the `mappings` parameter. The only object field types supported "
+            f"are `multimodal_combination` and `custom_vector. However, the `mappings` is {mappings}. Please change the "
+            f"type of {field} to one of these."
+            f"See `https://marqo.pages.dev/1.4.0/API-Reference/mappings/` for more info on object fields. "
+        )
 
     return field_content
 
