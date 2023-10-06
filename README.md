@@ -98,7 +98,7 @@ This integration lets you leverage open source or custom fine tuned models throu
 
 This integration lets you leverage open source or custom fine tuned models through Marqo for Hamilton LLM applications. 
 
-**⋙ [Haystack](https://haystack.deepset.ai/integrations/marqo-document-store)**
+**🔃 [Haystack](https://haystack.deepset.ai/integrations/marqo-document-store)**
 
 This integration allows you to use Marqo DB as the document store for your Haystack pipelines.
 
