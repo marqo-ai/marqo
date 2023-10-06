@@ -94,6 +94,14 @@ Griptape enables safe and reliable deployment of LLM-based agents for enterprise
 
 This integration lets you leverage open source or custom fine tuned models through Marqo for LangChain applications with a vector search component. The Marqo vector store implementation can plug into existing chains such as the Retrieval QA and Conversational Retrieval QA.
 
+**⋙ [Hamilton](https://github.com/DAGWorks-Inc/hamilton/)**
+
+This integration lets you leverage open source or custom fine tuned models through Marqo for Hamilton LLM applications. 
+
+**⋙ [Haystack](https://haystack.deepset.ai/integrations/marqo-document-store)**
+
+This integration allows you to use Marqo DB as the document store for your Haystack pipelines.
+
 ## Learn more about Marqo
                                                                                                                                                        
 | | |
