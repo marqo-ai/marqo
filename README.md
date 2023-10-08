@@ -14,6 +14,8 @@
 <a align="center" href="https://bit.ly/marqo-slack"><img src="https://img.shields.io/badge/Slack-blueviolet?logo=slack&amp;logoColor=white"></a>
 
 <p align="left">
+## Marqo
+
 Marqo is more than a vector database, it's an end-to-end vector search engine for both text and images. Vector generation, storage and retrieval are handled out of the box through a single API. No need to bring your own embeddings. 
 
 Here is a code snippet for a minimal example of vector search with Marqo (see [Getting Started](#getting-started)):
