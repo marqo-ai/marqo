@@ -7,3 +7,6 @@ class IndexExistsError(MarqoError):
 
 class IndexNotFoundError(MarqoError):
     pass
+
+class InvalidDataTypeError(MarqoError):
+    pass

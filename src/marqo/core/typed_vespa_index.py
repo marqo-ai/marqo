@@ -1,15 +1,18 @@
-from typing import Dict, Any, List
+import json
+from typing import Union
 
-from marqo.core.models import MarqoQuery, MarqoIndex
-from marqo.core.models.marqo_index import FieldType, FieldFeature, DistanceMetric, IndexType
+import marqo.core.constants as constants
+from marqo.core.exceptions import InvalidDataTypeError
+from marqo.core.models import MarqoQuery
+from marqo.core.models.marqo_index import *
 from marqo.core.vespa_index import VespaIndex
-from marqo.exceptions import InvalidArgumentError
+from marqo.exceptions import InvalidArgumentError, InternalError, MarqoError
 from marqo.s2_inference import s2_inference
 from marqo.s2_inference.errors import UnknownModelError
 
 
 class TypedVespaIndex(VespaIndex):
-    _TYPE_MAP = {
+    _MARQO_TO_VESPA_TYPE_MAP = {
         FieldType.Text: 'string',
         FieldType.Bool: 'bool',
         FieldType.Int: 'int',
@@ -18,6 +21,17 @@ class TypedVespaIndex(VespaIndex):
         FieldType.ArrayInt: 'array<int>',
         FieldType.ArrayFloat: 'array<float>',
         FieldType.ImagePointer: 'string'
+    }
+
+    _MARQO_TO_PYTHON_TYPE_MAP = {
+        FieldType.Text: str,
+        FieldType.Bool: bool,
+        FieldType.Int: int,
+        FieldType.Float: [float, int],
+        FieldType.ArrayText: list,
+        FieldType.ArrayInt: list,
+        FieldType.ArrayFloat: list,
+        FieldType.ImagePointer: str
     }
 
     _DISTANCE_METRIC_MAP = {
@@ -39,11 +53,16 @@ class TypedVespaIndex(VespaIndex):
     _RANK_INPUT_MULT_WEIGHTS = 'mult_weights'
     _RANK_INPUT_ADD_WEIGHTS = 'add_weights'
 
+    _ID_FIELD_NAME = 'id'
+
+    _VESPA_DOC_ID = 'id'
+    _VESPA_DOC_FIELDS = 'fields'
+
     @classmethod
     def generate_schema(cls, marqo_index: MarqoIndex) -> str:
         cls._validate_index_type(marqo_index)
 
-        schema = []
+        schema = list()
 
         schema.append(f'schema {marqo_index.name} {{')
         cls._generate_document(marqo_index, schema)
@@ -56,9 +75,61 @@ class TypedVespaIndex(VespaIndex):
 
     @classmethod
     def to_vespa_document(cls, marqo_document: Dict[str, Any], marqo_index: MarqoIndex) -> Dict[str, Any]:
-        pass
+        cls._validate_index_type(marqo_index)
 
-    @classmethod
+        # Ensure index object is caching otherwise this implementation will be computationally expensive
+        marqo_index = cls._ensure_cache_enabled(marqo_index)
+
+        vespa_id: Optional[int] = None
+        vespa_fields: Dict[str, Any] = dict()
+
+        # ID
+        if constants.MARQO_DOC_ID in marqo_document:
+            vespa_id = marqo_document[constants.MARQO_DOC_ID]
+            vespa_fields[cls._ID_FIELD_NAME] = vespa_id
+
+        # Fields
+        for marqo_field in marqo_document:
+            if marqo_field == constants.MARQO_DOC_TENSORS or marqo_field == constants.MARQO_DOC_ID:
+                continue  # process tensor fields later
+
+            marqo_value = marqo_document[marqo_field]
+            cls._verify_marqo_field_name(marqo_field, marqo_index)
+            cls._verify_marqo_field_type(marqo_field, marqo_value, marqo_index)
+
+            index_field = marqo_index.field_map[marqo_field]
+
+            if index_field.lexical_field_name:
+                vespa_fields[index_field.lexical_field_name] = marqo_value
+            if index_field.filter_field_name:
+                vespa_fields[index_field.filter_field_name] = marqo_value
+            if not index_field.lexical_field_name and not index_field.filter_field_name:
+                vespa_fields[index_field.name] = marqo_value
+
+        # Tensors
+        if constants.MARQO_DOC_TENSORS in marqo_document:
+            for marqo_tensor_field in marqo_document[constants.MARQO_DOC_TENSORS]:
+                cls._verify_marqo_tensor_field_name(marqo_tensor_field, marqo_index)
+
+                marqo_tensor_value = marqo_document[constants.MARQO_DOC_TENSORS][marqo_tensor_field]
+                chunks = marqo_tensor_value[constants.MARQO_DOC_CHUNKS]
+                embeddings = marqo_tensor_value[constants.MARQO_DOC_EMBEDDINGS]
+
+                index_tensor_field = marqo_index.tensor_field_map[marqo_tensor_field]
+
+                vespa_fields[index_tensor_field.chunk_field_name] = chunks
+                vespa_fields[index_tensor_field.embeddings_field_name] = \
+                    {f'{i}': embeddings[i] for i in range(len(embeddings))}
+
+        vespa_doc = {
+            cls._VESPA_DOC_FIELDS: vespa_fields
+        }
+
+        if vespa_id is not None:
+            vespa_doc[cls._VESPA_DOC_ID] = vespa_id
+
+        return vespa_doc
+
     def to_marqo_document(cls, vespa_document: Dict[str, Any], marqo_index: MarqoIndex) -> Dict[str, Any]:
         pass
 
@@ -67,11 +138,41 @@ class TypedVespaIndex(VespaIndex):
         pass
 
     @classmethod
+    def _verify_marqo_field_name(cls, field_name: str, marqo_index: MarqoIndex):
+        field_map = marqo_index.field_map
+        if field_name not in marqo_index.field_map:
+            # TODO - Create a better error type
+            raise MarqoError(f'Invalid field name {field_name} for index {marqo_index.name}. '
+                             f'Valid field names are {list(field_map.keys())}')
+
+    @classmethod
+    def _verify_marqo_tensor_field_name(cls, field_name: str, marqo_index: MarqoIndex):
+        tensor_field_map = marqo_index.tensor_field_map
+        if field_name not in marqo_index.field_map:
+            # TODO - Create a better error type
+            raise MarqoError(f'Invalid tensor field name {field_name} for index {marqo_index.name}. '
+                             f'Valid tensor field names are {list(tensor_field_map.keys())}')
+
+    @classmethod
+    def _verify_marqo_field_type(cls, field_name: str, value: Any, marqo_index: MarqoIndex):
+        marqo_type = marqo_index.field_map[field_name].type
+        python_type = cls._get_python_type(marqo_type)
+        if isinstance(python_type, list) and not any(isinstance(value, t) for t in python_type) or \
+                not isinstance(python_type, list) and not isinstance(value, python_type):
+            raise InvalidDataTypeError(f'Invalid value {value} for field {field_name} with Marqo type '
+                                       f'{marqo_type.name}. Expected a value of type {python_type}, but found '
+                                       f'{type(value)}')
+
+    @classmethod
     def _generate_document(cls, marqo_index: MarqoIndex, schema: List[str]) -> None:
         """
         Generate the document (fields) section of the Vespa schema. Update `marqo_index` with Vespa-level field names.
         """
         schema.append(f'document {marqo_index.name} {{')
+
+        # ID field
+        schema.append(f'field {cls._ID_FIELD_NAME} type string {{ indexing: summary }}')
+
         for field in marqo_index.fields:
             field_type = cls._get_vespa_type(field.type)
 
@@ -232,9 +333,16 @@ class TypedVespaIndex(VespaIndex):
     @classmethod
     def _get_vespa_type(cls, marqo_type: FieldType) -> str:
         try:
-            return cls._TYPE_MAP[marqo_type]
+            return cls._MARQO_TO_VESPA_TYPE_MAP[marqo_type]
         except KeyError:
-            raise ValueError(f'Unknown Marqo type: {marqo_type}')
+            raise InternalError(f'Unknown Marqo type: {marqo_type}')
+
+    @classmethod
+    def _get_python_type(cls, marqo_type: FieldType) -> type:
+        try:
+            return cls._MARQO_TO_PYTHON_TYPE_MAP[marqo_type]
+        except KeyError:
+            raise InternalError(f'Unknown Marqo type: {marqo_type}')
 
     @classmethod
     def _get_distance_metric(cls, marqo_distance_metric: DistanceMetric) -> str:
@@ -269,3 +377,45 @@ class TypedVespaIndex(VespaIndex):
         if marqo_index.type != IndexType.Typed:
             raise ValueError(f'Vespa index type must be {IndexType.Typed.name}. '
                              f'This module cannot handle index type {marqo_index.type.name}')
+
+    @classmethod
+    def _ensure_cache_enabled(cls, marqo_index):
+        if not marqo_index.model_enable_cache:
+            return marqo_index.copy_with_caching()
+
+        return marqo_index
+
+
+if __name__ == '__main__':
+    marqo_index = MarqoIndex(
+        name='index1',
+        model=Model(name='ViT-B/32'),
+        distance_metric=DistanceMetric.PrenormalizedAnguar,
+        type=IndexType.Typed,
+        vector_numeric_type=VectorNumericType.Float,
+        hnsw_config=HnswConfig(ef_construction=100, m=16),
+        fields=[
+            Field(name='title', type=FieldType.Text, features=[FieldFeature.LexicalSearch]),
+            Field(name='description', type=FieldType.Text,
+                  features=[FieldFeature.LexicalSearch, FieldFeature.Filter]),
+            Field(name='price', type=FieldType.Float, features=[FieldFeature.ScoreModifier])
+        ],
+        tensor_fields=[
+            TensorField(name='title'),
+            TensorField(name='description')
+        ],
+        model_enable_cache=True
+    )
+
+    vespa_schema = TypedVespaIndex.generate_schema(marqo_index)
+
+    marqo_doc = {
+        '_id': '123',
+        'title': 'hello world',
+        'description': 'this is a description',
+        'price': '100',
+    }
+
+    vespa_doc = TypedVespaIndex.to_vespa_document(marqo_doc, marqo_index)
+
+    print(json.dumps(vespa_doc, indent=2))
