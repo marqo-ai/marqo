@@ -1,12 +1,11 @@
 import json
-from typing import Union
 
 import marqo.core.constants as constants
-from marqo.core.exceptions import InvalidDataTypeError
+from marqo.core.exceptions import InvalidDataTypeError, InvalidFieldNameError
 from marqo.core.models import MarqoQuery
 from marqo.core.models.marqo_index import *
 from marqo.core.vespa_index import VespaIndex
-from marqo.exceptions import InvalidArgumentError, InternalError, MarqoError
+from marqo.exceptions import InvalidArgumentError, InternalError
 from marqo.s2_inference import s2_inference
 from marqo.s2_inference.errors import UnknownModelError
 
@@ -109,9 +108,11 @@ class TypedVespaIndex(VespaIndex):
         # Tensors
         if constants.MARQO_DOC_TENSORS in marqo_document:
             for marqo_tensor_field in marqo_document[constants.MARQO_DOC_TENSORS]:
-                cls._verify_marqo_tensor_field_name(marqo_tensor_field, marqo_index)
-
                 marqo_tensor_value = marqo_document[constants.MARQO_DOC_TENSORS][marqo_tensor_field]
+
+                cls._verify_marqo_tensor_field_name(marqo_tensor_field, marqo_index)
+                cls._verify_marqo_tensor_field(marqo_tensor_field, marqo_tensor_value)
+
                 chunks = marqo_tensor_value[constants.MARQO_DOC_CHUNKS]
                 embeddings = marqo_tensor_value[constants.MARQO_DOC_EMBEDDINGS]
 
@@ -142,16 +143,22 @@ class TypedVespaIndex(VespaIndex):
         field_map = marqo_index.field_map
         if field_name not in marqo_index.field_map:
             # TODO - Create a better error type
-            raise MarqoError(f'Invalid field name {field_name} for index {marqo_index.name}. '
-                             f'Valid field names are {list(field_map.keys())}')
+            raise InvalidFieldNameError(f'Invalid field name {field_name} for index {marqo_index.name}. '
+                                        f'Valid field names are {list(field_map.keys())}')
 
     @classmethod
     def _verify_marqo_tensor_field_name(cls, field_name: str, marqo_index: MarqoIndex):
         tensor_field_map = marqo_index.tensor_field_map
         if field_name not in marqo_index.field_map:
-            # TODO - Create a better error type
-            raise MarqoError(f'Invalid tensor field name {field_name} for index {marqo_index.name}. '
-                             f'Valid tensor field names are {list(tensor_field_map.keys())}')
+            raise InvalidFieldNameError(f'Invalid tensor field name {field_name} for index {marqo_index.name}. '
+                                        f'Valid tensor field names are {list(tensor_field_map.keys())}')
+
+    @classmethod
+    def _verify_marqo_tensor_field(cls, field_name: str, field_value: Dict[str, Any]):
+        if not set(field_value.keys()) == {constants.MARQO_DOC_CHUNKS, constants.MARQO_DOC_EMBEDDINGS}:
+            raise InternalError(f'Invalid tensor field {field_name}. '
+                                f'Expected keys {constants.MARQO_DOC_CHUNKS}, {constants.MARQO_DOC_EMBEDDINGS} '
+                                f'but found {", ".join(field_value.keys())}')
 
     @classmethod
     def _verify_marqo_field_type(cls, field_name: str, value: Any, marqo_index: MarqoIndex):
@@ -413,7 +420,13 @@ if __name__ == '__main__':
         '_id': '123',
         'title': 'hello world',
         'description': 'this is a description',
-        'price': '100',
+        'price': 100.1,
+        'tensors': {
+            'title': {
+                'chunks': ['hello', 'world'],
+                'embeddings': [[1, 2, 3], [4, 5, 6]]
+            }
+        }
     }
 
     vespa_doc = TypedVespaIndex.to_vespa_document(marqo_doc, marqo_index)
