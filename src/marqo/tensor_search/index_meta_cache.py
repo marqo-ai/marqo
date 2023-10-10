@@ -119,6 +119,10 @@ def populate_cache(config: Config):
     Args:
         config:
     """
+    vespa_client = config.vespa_client
+
+
+
     for ix_name in backend.get_cluster_indices(config=config):
         try:
             found_index_info = backend.get_index_info(config=config, index_name=ix_name)

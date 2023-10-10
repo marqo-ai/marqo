@@ -1,13 +1,15 @@
-import os
 from typing import Optional, Union
+
 from marqo.tensor_search import enums
-from vespa.application import Vespa
+from marqo.vespa.vespa_client import VespaClient
+
 
 class Config:
     def __init__(
-        self,
-        timeout: Optional[int] = None,
-        backend: Optional[Union[enums.SearchDb, str]] = None,
+            self,
+            vespa_client: VespaClient,
+            timeout: Optional[int] = None,
+            backend: Optional[Union[enums.SearchDb, str]] = None,
     ) -> None:
         """
         Parameters
@@ -15,12 +17,19 @@ class Config:
         url:
             The url to the S2Search API (ex: http://localhost:9200)
         """
-        self.cluster_is_remote = False
-        self.vespa_config_client = Vespa(os.getenv("VESPA_CONFIG_URL", "http://localhost:19071/"))
-        self.vespa_query_client = Vespa(os.getenv("VESPA_QUERY_URL", "http://localhost:8080/"))
-        self.vespa_feed_client = Vespa(os.getenv("VESPA_FEED_URL", "http://localhost:8080/"))
+        self.vespa_client = vespa_client
+        self.set_is_remote(vespa_client)
         self.timeout = timeout
-        self.backend = backend if backend is not None else enums.SearchDb.opensearch
+        self.backend = backend if backend is not None else enums.SearchDb.vespa
 
-    def set_url(self, url):
-        pass
+    def set_is_remote(self, vespa_client: VespaClient):
+        local_host_markers = ["localhost", "0.0.0.0", "127.0.0.1"]
+
+        if any(
+                [
+                    marker in url
+                    for marker in local_host_markers
+                    for url in [vespa_client.config_url, vespa_client.query_url, vespa_client.document_url]
+                ]
+        ):
+            self.cluster_is_remote = False

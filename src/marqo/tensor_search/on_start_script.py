@@ -15,9 +15,9 @@ from marqo.tensor_search.tensor_search_logging import get_logger
 from marqo.tensor_search.web import api_utils
 
 
-def on_start(marqo_os_url: str):
+def on_start(config: config.Config):
     to_run_on_start = (
-        PopulateCache(marqo_os_url),
+        PopulateCache(config),
         DownloadStartText(),
         CUDAAvailable(),
         SetBestAvailableDevice(),
@@ -35,16 +35,13 @@ def on_start(marqo_os_url: str):
 class PopulateCache:
     """Populates the cache on start"""
 
-    def __init__(self, marqo_os_url: str):
-        self.marqo_os_url = marqo_os_url
+    def __init__(self, config: config.Config):
+        self.config = config
         pass
 
     def run(self):
-        c = config.Config(api_utils.upconstruct_authorized_url(
-            opensearch_url=self.marqo_os_url
-        ))
         try:
-            index_meta_cache.populate_cache(c)
+            index_meta_cache.populate_cache(self.config)
         except errors.BackendCommunicationError as e:
             raise errors.BackendCommunicationError(
                 message="Can't connect to Marqo-os backend. \n"

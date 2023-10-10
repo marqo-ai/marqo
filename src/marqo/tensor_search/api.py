@@ -14,7 +14,7 @@ from marqo import version
 from marqo.errors import InvalidArgError, MarqoWebError, MarqoError
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.backend import get_index_info
-from marqo.tensor_search.enums import RequestType
+from marqo.tensor_search.enums import RequestType, EnvVars
 from marqo.tensor_search.models.add_docs_objects import (ModelAuth,
                                                          AddDocsBodyParams)
 from marqo.tensor_search.models.api_models import BulkSearchQuery, SearchQuery
@@ -23,38 +23,23 @@ from marqo.tensor_search.telemetry import RequestMetricsStore, TelemetryMiddlewa
 from marqo.tensor_search.throttling.redis_throttle import throttle
 from marqo.tensor_search.utils import add_timing
 from marqo.tensor_search.web import api_validation, api_utils
+from marqo.vespa.vespa_client import VespaClient
 
 
-def replace_host_localhosts(OPENSEARCH_IS_INTERNAL: str, OS_URL: str):
-    """Replaces a host's localhost URL with one that can be referenced from
-    within a container.
+def generate_config() -> config.Config:
+    vespa_client = VespaClient(
+        config_url=os.environ[EnvVars.MARQO_VESPA_CONFIG_URL],
+        query_url=os.environ[EnvVars.MARQO_VESPA_QUERY_URL],
+        document_url=os.environ[EnvVars.MARQO_VESPA_DOCUMENT_URL],
+        pool_size=os.environ.get(EnvVars.MARQO_VESPA_POOL_SIZE, 10),
+    )
+    return config.Config(vespa_client)
 
-    If we are within a docker container, we need to determine if a localhost
-    OpenSearch URL is referring to a URL within our container, or a URL on the
-    host.
 
-    Note this only works if the Docker run command is ran with this option:
-    --add-host host.docker.internal:host-gateway
-
-    Args:
-        OPENSEARCH_IS_INTERNAL: 'False' | 'True'; these are strings because they
-            come from environment vars
-        OS_URL: the URL of OpenSearch
-    """
-    if OPENSEARCH_IS_INTERNAL == "False":
-        for local_domain in ["localhost", "0.0.0.0", "127.0.0.1"]:
-            replaced_str = OS_URL.replace(local_domain, "host.docker.internal")
-            if replaced_str != OS_URL:
-                return replaced_str
-    return OS_URL
-
+config = generate_config()
 
 if __name__ in ["__main__", "api"]:
-    OPENSEARCH_URL = replace_host_localhosts(
-        os.environ.get("OPENSEARCH_IS_INTERNAL", None),
-        os.environ["OPENSEARCH_URL"]
-    )
-    on_start(OPENSEARCH_URL)
+    on_start(config)
 
 app = FastAPI(
     title="Marqo",
@@ -63,10 +48,8 @@ app = FastAPI(
 app.add_middleware(TelemetryMiddleware)
 
 
-def generate_config() -> config.Config:
-    return config.Config(api_utils.upconstruct_authorized_url(
-        opensearch_url=OPENSEARCH_URL
-    ))
+def get_config():
+    return config
 
 
 @app.exception_handler(MarqoWebError)
@@ -131,7 +114,7 @@ def root():
 
 
 @app.post("/indexes/{index_name}")
-def create_index(index_name: str, settings: Dict = None, marqo_config: config.Config = Depends(generate_config)):
+def create_index(index_name: str, settings: Dict = None, marqo_config: config.Config = Depends(get_config)):
     index_settings = dict() if settings is None else settings
     return tensor_search.create_vector_index(
         config=marqo_config, index_name=index_name, index_settings=index_settings
@@ -142,7 +125,7 @@ def create_index(index_name: str, settings: Dict = None, marqo_config: config.Co
 @throttle(RequestType.SEARCH)
 @add_timing
 def bulk_search(query: BulkSearchQuery, device: str = Depends(api_validation.validate_device),
-                marqo_config: config.Config = Depends(generate_config)):
+                marqo_config: config.Config = Depends(get_config)):
     with RequestMetricsStore.for_request().time(f"POST /indexes/bulk/search"):
         return tensor_search.bulk_search(query, marqo_config, device=device)
 
@@ -150,7 +133,7 @@ def bulk_search(query: BulkSearchQuery, device: str = Depends(api_validation.val
 @app.post("/indexes/{index_name}/search")
 @throttle(RequestType.SEARCH)
 def search(search_query: SearchQuery, index_name: str, device: str = Depends(api_validation.validate_device),
-           marqo_config: config.Config = Depends(generate_config)):
+           marqo_config: config.Config = Depends(get_config)):
     with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/search"):
         return tensor_search.search(
             config=marqo_config, text=search_query.q,
@@ -175,7 +158,7 @@ def add_or_replace_documents(
         body: typing.Union[AddDocsBodyParams, List[Dict]],
         index_name: str,
         refresh: bool = True,
-        marqo_config: config.Config = Depends(generate_config),
+        marqo_config: config.Config = Depends(get_config),
         non_tensor_fields: Optional[List[str]] = Query(default=None),
         device: str = Depends(api_validation.validate_device),
         use_existing_tensors: Optional[bool] = False,
@@ -203,7 +186,7 @@ def add_or_replace_documents(
 
 @app.get("/indexes/{index_name}/documents/{document_id}")
 def get_document_by_id(index_name: str, document_id: str,
-                       marqo_config: config.Config = Depends(generate_config),
+                       marqo_config: config.Config = Depends(get_config),
                        expose_facets: bool = False):
     return tensor_search.get_document_by_id(
         config=marqo_config, index_name=index_name, document_id=document_id,
@@ -214,7 +197,7 @@ def get_document_by_id(index_name: str, document_id: str,
 @app.get("/indexes/{index_name}/documents")
 def get_documents_by_ids(
         index_name: str, document_ids: List[str],
-        marqo_config: config.Config = Depends(generate_config),
+        marqo_config: config.Config = Depends(get_config),
         expose_facets: bool = False):
     return tensor_search.get_documents_by_ids(
         config=marqo_config, index_name=index_name, document_ids=document_ids,
@@ -223,14 +206,14 @@ def get_documents_by_ids(
 
 
 @app.get("/indexes/{index_name}/stats")
-def get_index_stats(index_name: str, marqo_config: config.Config = Depends(generate_config)):
+def get_index_stats(index_name: str, marqo_config: config.Config = Depends(get_config)):
     return tensor_search.get_stats(
         config=marqo_config, index_name=index_name
     )
 
 
 @app.delete("/indexes/{index_name}")
-def delete_index(index_name: str, marqo_config: config.Config = Depends(generate_config)):
+def delete_index(index_name: str, marqo_config: config.Config = Depends(get_config)):
     return tensor_search.delete_index(
         config=marqo_config, index_name=index_name
     )
@@ -238,7 +221,7 @@ def delete_index(index_name: str, marqo_config: config.Config = Depends(generate
 
 @app.post("/indexes/{index_name}/documents/delete-batch")
 def delete_docs(index_name: str, documentIds: List[str], refresh: bool = True,
-                marqo_config: config.Config = Depends(generate_config)):
+                marqo_config: config.Config = Depends(get_config)):
     return tensor_search.delete_documents(
         index_name=index_name, config=marqo_config, doc_ids=documentIds,
         auto_refresh=refresh
@@ -246,29 +229,29 @@ def delete_docs(index_name: str, documentIds: List[str], refresh: bool = True,
 
 
 @app.post("/indexes/{index_name}/refresh")
-def refresh_index(index_name: str, marqo_config: config.Config = Depends(generate_config)):
+def refresh_index(index_name: str, marqo_config: config.Config = Depends(get_config)):
     return tensor_search.refresh_index(
         index_name=index_name, config=marqo_config,
     )
 
 
 @app.get("/health")
-def check_health(marqo_config: config.Config = Depends(generate_config)):
+def check_health(marqo_config: config.Config = Depends(get_config)):
     return tensor_search.check_health(config=marqo_config)
 
 
 @app.get("/indexes/{index_name}/health")
-def check_index_health(index_name: str, marqo_config: config.Config = Depends(generate_config)):
+def check_index_health(index_name: str, marqo_config: config.Config = Depends(get_config)):
     return tensor_search.check_index_health(config=marqo_config, index_name=index_name)
 
 
 @app.get("/indexes")
-def get_indexes(marqo_config: config.Config = Depends(generate_config)):
+def get_indexes(marqo_config: config.Config = Depends(get_config)):
     return tensor_search.get_indexes(config=marqo_config)
 
 
 @app.get("/indexes/{index_name}/settings")
-def get_settings(index_name: str, marqo_config: config.Config = Depends(generate_config)):
+def get_settings(index_name: str, marqo_config: config.Config = Depends(get_config)):
     index_info = get_index_info(config=marqo_config, index_name=index_name)
     return index_info.index_settings
 

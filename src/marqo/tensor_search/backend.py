@@ -1,7 +1,6 @@
 """Communication with Marqo's persistence and search layer (OpenSearch)"""
 import copy
 import json
-import os
 import typing
 from marqo.tensor_search.models.index_info import IndexInfo
 # client-specific modules - we may want to replace these:
@@ -15,7 +14,6 @@ from marqo import errors
 from typing import Iterable, List, Union, Optional, Tuple, Dict
 from marqo.tensor_search.index_meta_cache import get_cache
 from marqo.tensor_search.index_meta_cache import get_index_info as get_cached_index_info
-from vespa.application import Vespa
 import pprint
 
 
@@ -33,13 +31,31 @@ def get_index_info(config: Config, index_name: str) -> IndexInfo:
         NonTensorIndexError: If the index's mapping doesn't conform to a Tensor Search index.
         IndexNotFoundError: If index does not exist.
     """
-    res = json.loads(config.vespa_feed_client.get_data(schema = "marqo_settings", data_id = index_name).get_json()["fields"]["settings"])
+    res = HttpRequests(config).get(path=F"{index_name}/_mapping")
 
-    model_name = res["model_name"]
+    if not (index_name in res and "mappings" in res[index_name]
+            and "_meta" in res[index_name]["mappings"]):
+        raise errors.NonTensorIndexError(
+            f"Error retrieving index info for index {index_name}")
 
-    index_settings = res["index_settings"]
+    if "model" in res[index_name]["mappings"]["_meta"]:
+        model_name = res[index_name]["mappings"]["_meta"]["model"]
+    else:
+        raise errors.NonTensorIndexError(
+            "get_index_info: couldn't identify embedding model name "
+            F"in index mappings! Mapping: {res}")
 
-    index_info = IndexInfo(model_name=model_name, index_settings=index_settings)
+    if "index_settings" in res[index_name]["mappings"]["_meta"]:
+        index_settings = res[index_name]["mappings"]["_meta"]["index_settings"]
+    else:
+        raise errors.NonTensorIndexError(
+            "get_index_info: couldn't identify index_settings "
+            F"in index mappings! Mapping: {res}")
+
+    index_properties = res[index_name]["mappings"]["properties"]
+
+    index_info = IndexInfo(model_name=model_name, properties=index_properties,
+                           index_settings=index_settings)
     get_cache()[index_name] = index_info
     return index_info
 

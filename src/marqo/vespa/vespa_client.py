@@ -5,7 +5,7 @@ import tarfile
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from json import JSONDecodeError
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from urllib.parse import urlparse
 
 import httpx
@@ -14,6 +14,7 @@ import marqo.logging
 import marqo.vespa.concurrency as conc
 from marqo.vespa.exceptions import VespaStatusError, VespaError, InvalidVespaApplicationError
 from marqo.vespa.models import VespaDocument, QueryResult, FeedResponse, FeedBatchResponse
+from marqo.vespa.models.get_document_response import GetDocumentResponse, BatchGetDocumentResponse
 
 logger = marqo.logging.get_logger(__name__)
 
@@ -207,6 +208,65 @@ class VespaClient:
                 errors = True
 
         return FeedBatchResponse(responses=responses, errors=errors)
+
+    def get_document(self, id: str, schema: str) -> GetDocumentResponse:
+        """
+        Get a document by ID.
+
+        Args:
+            id: Document ID
+            schema: Schema to get from
+
+        Returns:
+            GetDocumentResponse object
+        """
+        try:
+            resp = self.http_client.get(f'{self.document_url}/document/v1/{schema}/{schema}/docid/{id}')
+        except httpx.HTTPError as e:
+            raise VespaError(e) from e
+
+        self._raise_for_status(resp)
+
+        return GetDocumentResponse(**resp.json())
+
+    def get_all_documents(self,
+                          schema: str,
+                          stream=False,
+                          continuation: Optional[str] = None
+                          ) -> BatchGetDocumentResponse:
+        """
+        Get all documents in a schema.
+        Args:
+            schema: Schema to get from
+            stream: Whether to stream the response
+            continuation: Continuation token for pagination
+
+        Returns:
+            BatchGetDocumentResponse object
+        """
+        try:
+            url = self._add_query_params(
+                url=f'{self.document_url}/document/v1/{schema}/{schema}/docid',
+                query_params={
+                    'stream': str(stream).lower(),
+                    'continuation': continuation
+                }
+            )
+            logger.debug(f'URL: {url}')
+            resp = self.http_client.get(url)
+        except httpx.HTTPError as e:
+            raise VespaError(e) from e
+
+        self._raise_for_status(resp)
+
+        return BatchGetDocumentResponse(**resp.json())
+
+    def _add_query_params(self, url: str, query_params: Dict[str, str]) -> str:
+        if not query_params:
+            return url
+
+        query_string = '&'.join([f'{key}={value}' for key, value in query_params.items() if value])
+        return f'{url.strip("?")}?{query_string}'
 
     def _gzip_compress(self, directory: str) -> io.BytesIO:
         """
