@@ -1,34 +1,32 @@
 import json
 import os
-from marqo.tensor_search import enums
-from marqo.tensor_search.tensor_search_logging import get_logger
 import time
-from marqo.tensor_search.enums import EnvVars
-# we need to import backend before index_meta_cache to prevent circular import error:
-from marqo.tensor_search import backend, index_meta_cache, utils
+
+import torch
+
 from marqo import config
-from marqo.tensor_search.web import api_utils
-from marqo._httprequests import HttpRequests
 from marqo import errors
-from marqo.tensor_search.throttling.redis_throttle import throttle
 from marqo.connections import redis_driver
 from marqo.s2_inference.s2_inference import vectorise
-import torch
+# we need to import backend before index_meta_cache to prevent circular import error:
+from marqo.tensor_search import index_meta_cache, utils
+from marqo.tensor_search.enums import EnvVars
+from marqo.tensor_search.tensor_search_logging import get_logger
+from marqo.tensor_search.web import api_utils
 
 
 def on_start(marqo_os_url: str):
-        
     to_run_on_start = (
-                        PopulateCache(marqo_os_url),
-                        DownloadStartText(),
-                        CUDAAvailable(), 
-                        SetBestAvailableDevice(),
-                        ModelsForCacheing(),
-                        InitializeRedis("localhost", 6379),    # TODO, have these variable
-                        DownloadFinishText(),
-                        MarqoWelcome(),
-                        MarqoPhrase(),
-                        )
+        PopulateCache(marqo_os_url),
+        DownloadStartText(),
+        CUDAAvailable(),
+        SetBestAvailableDevice(),
+        ModelsForCacheing(),
+        InitializeRedis("localhost", 6379),  # TODO, have these variable
+        DownloadFinishText(),
+        MarqoWelcome(),
+        MarqoPhrase(),
+    )
 
     for thing_to_start in to_run_on_start:
         thing_to_start.run()
@@ -49,7 +47,7 @@ class PopulateCache:
             index_meta_cache.populate_cache(c)
         except errors.BackendCommunicationError as e:
             raise errors.BackendCommunicationError(
-                message="Can't connect to Marqo-os backend. \n"  
+                message="Can't connect to Marqo-os backend. \n"
                         "    Possible causes: \n"
                         "        - If this is an arm64 machine, ensure you are using an external Marqo-os instance \n"
                         "        - If you are using an external Marqo-os instance, check if it is running: "
@@ -70,13 +68,12 @@ class PopulateCache:
 
 
 class CUDAAvailable:
-
     """checks the status of cuda
     """
     logger = get_logger('CUDA device summary')
 
     def __init__(self):
-        
+
         pass
 
     def run(self):
@@ -90,16 +87,15 @@ class CUDAAvailable:
         # use -1 for cpu
         device_ids = [-1]
         device_ids += list(range(device_count))
-        
+
         device_names = []
         for device_id in device_ids:
-            device_names.append( {'id':device_id, 'name':id_to_device(device_id)})
+            device_names.append({'id': device_id, 'name': id_to_device(device_id)})
 
         self.logger.info(f"found devices {device_names}")
 
 
 class SetBestAvailableDevice:
-
     """sets the MARQO_BEST_AVAILABLE_DEVICE env var
     """
     logger = get_logger('SetBestAvailableDevice')
@@ -116,7 +112,7 @@ class SetBestAvailableDevice:
             os.environ[EnvVars.MARQO_BEST_AVAILABLE_DEVICE] = "cuda"
         else:
             os.environ[EnvVars.MARQO_BEST_AVAILABLE_DEVICE] = "cpu"
-        
+
         self.logger.info(f"Best available device set to: {os.environ[EnvVars.MARQO_BEST_AVAILABLE_DEVICE]}")
 
 
@@ -155,7 +151,7 @@ class ModelsForCacheing:
         for model in self.models:
             for device in self.default_devices:
                 self.logger.debug(f"Beginning loading for model: {model} on device: {device}")
-                
+
                 # warm it up
                 _ = _preload_model(model=model, content=test_string, device=device)
 
@@ -165,7 +161,7 @@ class ModelsForCacheing:
                     _ = _preload_model(model=model, content=test_string, device=device)
                     t1 = time.time()
                     t += (t1 - t0)
-                message = f"{(t)/float((N))} for {model} and {device}"
+                message = f"{(t) / float((N))} for {model} and {device}"
                 messages.append(message)
                 self.logger.debug(f"{model} {device} vectorise run {N} times.")
                 self.logger.info(f"{model} {device} run succesfully!")
@@ -185,8 +181,8 @@ def _preload_model(model, content, device):
     if isinstance(model, str):
         # For models IN REGISTRY
         _ = vectorise(
-            model_name=model, 
-            content=content, 
+            model_name=model,
+            content=content,
             device=device
         )
     elif isinstance(model, dict):
@@ -197,9 +193,9 @@ def _preload_model(model, content, device):
         """
         try:
             _ = vectorise(
-                model_name=model["model"], 
-                model_properties=model["model_properties"], 
-                content=content, 
+                model_name=model["model"],
+                model_properties=model["model_properties"],
+                content=content,
                 device=device
             )
         except KeyError as e:
@@ -224,7 +220,6 @@ class InitializeRedis:
 class DownloadStartText:
 
     def run(self):
-
         print('\n')
         print("###########################################################")
         print("###########################################################")
@@ -249,7 +244,6 @@ class DownloadFinishText:
 class MarqoPhrase:
 
     def run(self):
-
         message = r"""
      _____                                                   _        __              _                                     
     |_   _|__ _ __  ___  ___  _ __   ___  ___  __ _ _ __ ___| |__    / _| ___  _ __  | |__  _   _ _ __ ___   __ _ _ __  ___ 
@@ -265,7 +259,6 @@ class MarqoPhrase:
 class MarqoWelcome:
 
     def run(self):
-
         message = r"""   
      __    __    ___  _        __   ___   ___ ___    ___      ______   ___       ___ ___   ____  ____   ___    ___   __ 
     |  |__|  |  /  _]| |      /  ] /   \ |   |   |  /  _]    |      | /   \     |   |   | /    ||    \ /   \  /   \ |  |
