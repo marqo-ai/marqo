@@ -2,13 +2,14 @@ import os
 import textwrap
 import time
 import xml.etree.ElementTree as ET
+from typing import List
 
 import marqo.logging
 import marqo.vespa.vespa_client
 from marqo.core.exceptions import IndexExistsError
 from marqo.core.models import MarqoIndex
 from marqo.core.vespa_index import for_marqo_index as vespa_index_factory
-from marqo.exceptions import MarqoError
+from marqo.exceptions import MarqoError, InternalError
 from marqo.vespa.models import VespaDocument
 from marqo.vespa.vespa_client import VespaClient
 
@@ -64,6 +65,17 @@ class IndexManagement:
             marqo_index,
             retries=self._MARQO_SETTINGS_RETRIES if settings_schema_created else 0
         )
+
+    def get_all_indexes(self) -> List[MarqoIndex]:
+        batch_response = self.vespa_client.get_all_documents(self._MARQO_SETTINGS_SCHEMA_NAME, stream=True)
+        if batch_response.continuation:
+            # TODO - Verify expected behaviour when streaming. Do we need to expect and handle pagination?
+            raise InternalError("Unexpected continuation token received")
+
+        return [
+            MarqoIndex.parse_raw(response.fields['settings'])
+            for response in batch_response.documents
+        ]
 
     def _index_exists(self, name: str) -> bool:
         # TODO - implement method after settings cache has been implemented
@@ -138,3 +150,16 @@ class IndexManagement:
                 self._save_index_settings(marqo_index, retries, attempt + 1)
             else:
                 raise MarqoError(f"Failed to feed index settings for {marqo_index.name}: {str(response)}")
+
+if __name__ == '__main__':
+    vespa_client = marqo.vespa.vespa_client.VespaClient(
+        config_url='http://localhost:19071',
+        document_url='http://localhost:8080',
+        query_url='http://localhost:8080',
+    )
+
+    index_management = IndexManagement(vespa_client)
+
+    indexes = index_management.get_all_indexes()
+
+    pass

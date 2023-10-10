@@ -3,20 +3,17 @@
 In the future this may be stored in redis or this logic be bundled with the
 index in the search DB via a plugin.
 """
-import asyncio
-import datetime
-import time
-import traceback
-from multiprocessing import Process, Manager
-from marqo.tensor_search.models.index_info import IndexInfo
+
 from typing import Dict
-from marqo import errors
-from marqo.tensor_search import backend
+
 from marqo.config import Config
+from marqo.core.index_management.index_management import IndexManagement
+from marqo.tensor_search import backend
+from marqo.tensor_search.models.index_info import IndexInfo
 from marqo.tensor_search.tensor_search_logging import get_logger
+from marqo.vespa.vespa_client import VespaClient
 
 logger = get_logger(__name__)
-
 
 index_info_cache = dict()
 
@@ -119,15 +116,34 @@ def populate_cache(config: Config):
     Args:
         config:
     """
-    vespa_client = config.vespa_client
+    index_management = IndexManagement(config.vespa_client)
+    indexes = index_management.get_all_indexes()
+
+    # Enable caching and reset any existing caches
+    index_map = dict()
+    for index in indexes:
+        index_clone = index.copy_with_caching()
+        index_map[index.name] = index_clone
+
+    # Upsert, and delete if index doesn't exist anymore
+    # Do not destroy existing cache, as it may be used by other threads
+    for cached_index in index_info_cache:
+        if cached_index in index_map:
+            index_info_cache[cached_index] = index_map[cached_index]
+        else:
+            del index_info_cache[cached_index]
 
 
+if __name__ == '__main__':
+    vespa_client = VespaClient(
+        config_url='http://localhost:19071',
+        document_url='http://localhost:8080',
+        query_url='http://localhost:8080',
+    )
+    import marqo.config as config
 
-    for ix_name in backend.get_cluster_indices(config=config):
-        try:
-            found_index_info = backend.get_index_info(config=config, index_name=ix_name)
-            index_info_cache[ix_name] = found_index_info
-        except errors.NonTensorIndexError as e:
-            pass
+    config = config.Config(vespa_client=vespa_client)
 
+    populate_cache(config)
 
+    pass
