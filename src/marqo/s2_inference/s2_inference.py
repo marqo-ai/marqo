@@ -14,7 +14,7 @@ from marqo.s2_inference.logger import get_logger
 import torch
 import datetime
 from marqo.s2_inference import constants
-from marqo.tensor_search.enums import AvailableModelsKey
+from marqo.tensor_search.enums import AvailableModelsKey, SpecialModels
 from marqo.tensor_search.configs import EnvVars
 from marqo.tensor_search.models.private_models import ModelAuth
 import threading
@@ -185,7 +185,15 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
 def _validate_model_properties(model_name: str, model_properties: dict) -> dict:
     """validate model_properties, if not given then return model_registry properties
     """
-    if model_properties is not None:
+
+    # no_model should always have model_properties (with dimensions only)
+    if model_name == SpecialModels.no_model:
+        if model_properties is None:
+            raise InternalError("If your index is using `no_model`, you must have `model_properties` set.")
+        if "dimensions" not in model_properties:
+            raise InvalidModelPropertiesError("If your index is using `no_model`, your `model_properties` must have `dimensions` set.")
+        
+    elif model_properties is not None:
         """checks model dict to see if all required keys are present
         """
         required_keys = []
@@ -207,7 +215,7 @@ def _validate_model_properties(model_name: str, model_properties: dict) -> dict:
             if key not in model_properties:
                 raise InvalidModelPropertiesError(f"model_properties has missing key '{key}'."
                                                   f"please update your model properties with required key `{key}`"
-                                                  f"check `https://docs.marqo.ai/0.0.12/Models-Reference/dense_retrieval/` for more info.")
+                                                  f"check `https://docs.marqo.ai/1.4.0/Models-Reference/dense_retrieval/` for more info.")
 
     else:
         model_properties = get_model_properties_from_registry(model_name)
@@ -331,8 +339,14 @@ def _load_model(
         raise RuntimeError(f"The function `{_load_model.__name__}` should only be called by "
                            f"`unit_test` or `_update_available_models` for threading safeness.")
 
-    print(f"loading for: model_name={model_name} and properties={model_properties}")
-    loader = _get_model_loader(model_properties.get('name', None), model_properties)
+    if model_name == SpecialModels.no_model:
+        # Using model_name as to not require unnecessary fields in model_properties
+        print(f"Model-less index selected, with dimensions={model_properties['dimensions']}")
+        loader = _get_model_loader(model_name, model_properties)
+    else:
+        # Normal models should use model_properties["name"]
+        print(f"loading for: model_name={model_name} and properties={model_properties}")
+        loader = _get_model_loader(model_properties.get('name', None), model_properties)
 
     max_sequence_length = model_properties.get('tokens', get_default_seq_length())
     model = loader(
@@ -500,9 +514,13 @@ def _get_model_loader(model_name: str, model_properties: dict) -> Any:
     TODO: standardise these dicts
 
     Returns:
-        dict: a dictionary describing properties of the model.
+        A helper object of class `Model` (subclass depends on the type of model)
     """
 
+    # `no_model` is a special case, we use the name instead of type.
+    if model_name == SpecialModels.no_model:
+        return MODEL_PROPERTIES['loaders'][model_name]
+    
     model_type = model_properties['type']
 
     if model_type not in MODEL_PROPERTIES['loaders']:

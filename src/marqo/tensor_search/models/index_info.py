@@ -1,7 +1,7 @@
 import pprint
 from typing import NamedTuple, Any, Dict
 from marqo.tensor_search import enums
-from marqo.tensor_search.enums import IndexSettingsField as NsField
+from marqo.tensor_search.enums import IndexSettingsField as NsField, SpecialModels
 from marqo.tensor_search import configs
 from marqo.s2_inference import s2_inference
 from marqo import errors
@@ -15,6 +15,13 @@ def get_model_properties_from_index_defaults(index_defaults: Dict, model_name: s
     try:
         model_properties = index_defaults[NsField.model_properties]
     except KeyError:
+        # Enforces that `no_model` can only be used with user-input `model_properties`
+        if model_name is SpecialModels.no_model:
+            raise errors.InvalidArgError(
+                f"When creating an index with `{SpecialModels.no_model}`, you must provide `model_properties` "
+                f"containing `dimensions` in the index settings. Please provide `model_properties` in your index settings or "
+                f"select a different model."
+            )
         try:
             model_properties = s2_inference.get_model_properties_from_registry(model_name)
         except s2_inference_errors.UnknownModelError:

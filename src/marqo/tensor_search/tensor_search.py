@@ -92,7 +92,7 @@ def _get_dimension_from_model_properties(model_properties: dict):
         return model_properties["dimensions"]
     except KeyError:
         raise errors.InvalidArgError(
-            "The given model properties must contain a 'dimensions' key"
+            "The given model properties must contain a 'dimensions' key."
         )
 
 
