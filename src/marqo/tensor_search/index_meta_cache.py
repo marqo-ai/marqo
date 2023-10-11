@@ -3,7 +3,8 @@
 In the future this may be stored in redis or this logic be bundled with the
 index in the search DB via a plugin.
 """
-
+import threading
+import time
 from typing import Dict
 
 from marqo import errors
@@ -25,7 +26,9 @@ index_info_cache = dict()
 # Because it is non thread safe, there is a chance multiple threads push out
 # multiple refresh requests at the same. It isn't a critical problem if that
 # happens.
-index_last_refreshed_time = dict()
+cache_refresh_interval: int = 10  # seconds
+refresh_thread = None
+refresh_lock = threading.Lock()  # to ensure only one thread is operating on refresh_thread
 
 
 def empty_cache():
@@ -109,6 +112,9 @@ def get_index(config: Config, index_name: str, force_refresh=False) -> MarqoInde
     Returns:
 
     """
+    # Make sure refresh thread is running
+    _check_refresh_thread(config)
+
     if force_refresh:
         _refresh_index(config, index_name)
 
@@ -133,6 +139,31 @@ def _refresh_index(config: Config, index_name: str) -> None:
         raise errors.IndexNotFoundError(f"Index {index_name} not found") from e
 
     index_info_cache[index_name] = index.copy_with_caching()
+
+
+def _check_refresh_thread(config: Config):
+    if refresh_lock.locked():
+        # Another thread is running this function, skip as concurrent changes to the thread can error out
+        logger.debug('Refresh thread is locked. Skipping')
+        return
+
+    with refresh_lock:
+        global refresh_thread
+        if refresh_thread is None or not refresh_thread.is_alive():
+            if refresh_thread is not None:
+                # If not None then it's dead
+                logger.warn('Detected dead cache refresh thread')
+
+            logger.info('Starting cache refresh thread')
+
+            def refresh():
+                while True:
+                    logger.debug('Refreshing index cache')
+                    populate_cache(config)
+                    time.sleep(cache_refresh_interval)
+
+            refresh_thread = threading.Thread(target=refresh, daemon=True)
+            refresh_thread.start()
 
 
 def populate_cache(config: Config):
@@ -174,5 +205,10 @@ if __name__ == '__main__':
 
     populate_cache(config)
     index = get_index(config, 'ef05bf9fd96c48a19d9b219521aa9504')
+
+    while True:
+        time.sleep(10)
+        print('Getting index')
+        index = get_index(config, 'ef05bf9fd96c48a19d9b219521aa9504')
 
     print('hi')
