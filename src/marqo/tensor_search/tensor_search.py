@@ -2186,8 +2186,7 @@ def _create_score_modifiers_tensor_search_query(score_modifiers, result_count, o
                         "path": TensorField.chunks,
                         "inner_hits": {
                             "_source": {
-                                "include": ["__chunks.__field_content", "__chunks.__field_name",
-                                            "__chunks.reputation"]
+                                "include": ["__chunks.__field_content", "__chunks.__field_name"]
                             }
                         },
                         "query": {
