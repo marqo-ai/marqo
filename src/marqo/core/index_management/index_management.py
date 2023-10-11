@@ -89,8 +89,11 @@ class IndexManagement:
         return MarqoIndex.parse_raw(response.document.fields['settings'])
 
     def _index_exists(self, name: str) -> bool:
-        # TODO - implement method after settings cache has been implemented
-        return False
+        try:
+            _ = self.get_index(name)
+            return True
+        except IndexNotFoundError:
+            return False
 
     def _create_marqo_settings_schema(self, app: str) -> bool:
         """

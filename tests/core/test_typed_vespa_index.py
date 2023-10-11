@@ -16,7 +16,7 @@ class TestTypedVespaIndex(MarqoTestCase):
             name='my_index',
             model=Model(name='ViT-B/32'),
             distance_metric=DistanceMetric.PrenormalizedAnguar,
-            type=IndexType.Typed,
+            type=IndexType.Structured,
             vector_numeric_type=VectorNumericType.Float,
             hnsw_config=HnswConfig(ef_construction=100, m=16),
             fields=[
@@ -48,7 +48,7 @@ class TestTypedVespaIndex(MarqoTestCase):
     def test_generate_schema_noLexicalFields_successful(self):
         marqo_index = MarqoIndex(
             name='my_index', model=Model(name='ViT-B/32'), distance_metric=DistanceMetric.PrenormalizedAnguar,
-            type=IndexType.Typed,
+            type=IndexType.Structured,
             vector_numeric_type=VectorNumericType.Float, hnsw_config=HnswConfig(ef_construction=100, m=16),
             fields=[
                 Field(name='title', type=FieldType.Text),
@@ -72,7 +72,7 @@ class TestTypedVespaIndex(MarqoTestCase):
     def test_generate_schema_noScoreModifierFields_successful(self):
         marqo_index = MarqoIndex(
             name='my_index', model=Model(name='ViT-B/32'), distance_metric=DistanceMetric.PrenormalizedAnguar,
-            type=IndexType.Typed,
+            type=IndexType.Structured,
             vector_numeric_type=VectorNumericType.Float, hnsw_config=HnswConfig(ef_construction=100, m=16),
             fields=[
                 Field(name='title', type=FieldType.Text, features=[FieldFeature.LexicalSearch]),
@@ -96,7 +96,7 @@ class TestTypedVespaIndex(MarqoTestCase):
     def test_generate_schema_noTensorFields_successful(self):
         marqo_index = MarqoIndex(
             name='my_index', model=Model(name='ViT-B/32'), distance_metric=DistanceMetric.PrenormalizedAnguar,
-            type=IndexType.Typed,
+            type=IndexType.Structured,
             vector_numeric_type=VectorNumericType.Float, hnsw_config=HnswConfig(ef_construction=100, m=16),
             fields=[
                 Field(name='title', type=FieldType.Text, features=[FieldFeature.LexicalSearch]),
@@ -118,7 +118,7 @@ class TestTypedVespaIndex(MarqoTestCase):
         marqo_index = MarqoIndex(
             name='my_index', model=Model(name='ViT-B/32'),
             distance_metric=DistanceMetric.PrenormalizedAnguar,
-            type=IndexType.Dynamic,
+            type=IndexType.Unstructured,
             vector_numeric_type=VectorNumericType.Float,
             hnsw_config=HnswConfig(ef_construction=100, m=16),
             fields=[

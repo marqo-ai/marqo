@@ -1,13 +1,15 @@
 from enum import Enum
 from typing import List, Optional, Dict, Any
 
-from pydantic import BaseModel, PrivateAttr
 from pydantic import Field as PydanticField
+from pydantic import PrivateAttr
+
+from marqo.core.models.strict_base_model import StrictBaseModel
 
 
 class IndexType(Enum):
-    Typed = 'typed'
-    Dynamic = 'dynamic'
+    Structured = 'structured'
+    Unstructured = 'unstructured'
 
 
 class FieldType(Enum):
@@ -37,7 +39,7 @@ class DistanceMetric(Enum):
     PrenormalizedAnguar = 'prenormalized-angular'
 
 
-class Field(BaseModel):
+class Field(StrictBaseModel):
     name: str
     type: FieldType
     features: List[FieldFeature] = []
@@ -46,23 +48,23 @@ class Field(BaseModel):
     filter_field_name: Optional[str]
 
 
-class TensorField(BaseModel):
+class TensorField(StrictBaseModel):
     name: str
     chunk_field_name: Optional[str]
     embeddings_field_name: Optional[str]
 
 
-class HnswConfig(BaseModel):
+class HnswConfig(StrictBaseModel):
     ef_construction: int
     m: int
 
 
-class Model(BaseModel):
+class Model(StrictBaseModel):
     name: str
     properties: Optional[Dict[str, Any]]
 
 
-class MarqoIndex(BaseModel):
+class MarqoIndex(StrictBaseModel):
     name: str
     type: IndexType
     model: Model
@@ -127,7 +129,7 @@ if __name__ == '__main__':
         name='index1',
         model=Model(name='ViT-B/32'),
         distance_metric=DistanceMetric.PrenormalizedAnguar,
-        type=IndexType.Typed,
+        type=IndexType.Structured,
         vector_numeric_type=VectorNumericType.Float,
         hnsw_config=HnswConfig(ef_construction=100, m=16),
         fields=[
@@ -139,7 +141,7 @@ if __name__ == '__main__':
             TensorField(name='title'),
             TensorField(name='description')
         ],
-        model_enable_cache=True
+        model_enable_cache=True,
     )
     marqo_index.lexical_fields
 

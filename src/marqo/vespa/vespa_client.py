@@ -401,7 +401,7 @@ class VespaClient:
                 json = response.json()
                 error_code = json['error-code']
                 message = json['message']
-            except Exception as e:
+            except Exception:
                 raise VespaStatusError(message=response.text, cause=e) from e
 
             self._raise_for_error_code(error_code, message, e)

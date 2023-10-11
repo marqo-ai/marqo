@@ -158,7 +158,7 @@ def _check_refresh_thread(config: Config):
 
             def refresh():
                 while True:
-                    logger.debug('Refreshing index cache')
+                    logger.info('Refreshing index cache')
                     populate_cache(config)
                     time.sleep(cache_refresh_interval)
 

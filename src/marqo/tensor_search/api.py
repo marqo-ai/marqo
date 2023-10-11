@@ -7,11 +7,13 @@ from typing import List, Dict, Optional
 import pydantic
 import uvicorn
 from fastapi import FastAPI, Query
-from fastapi import Request, Depends
+from fastapi import Request, Depends, Response
 from fastapi.responses import JSONResponse
 
-from marqo import config
+from marqo import config, errors
 from marqo import version
+from marqo.core.exceptions import IndexNotFoundError, IndexExistsError
+from marqo.core.index_management.index_management import IndexManagement
 from marqo.errors import InvalidArgError, MarqoWebError, MarqoError
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.backend import get_index_info
@@ -19,6 +21,7 @@ from marqo.tensor_search.enums import RequestType, EnvVars
 from marqo.tensor_search.models.add_docs_objects import (ModelAuth,
                                                          AddDocsBodyParams)
 from marqo.tensor_search.models.api_models import BulkSearchQuery, SearchQuery
+from marqo.tensor_search.models.index_settings import IndexSettings
 from marqo.tensor_search.on_start_script import on_start
 from marqo.tensor_search.telemetry import RequestMetricsStore, TelemetryMiddleware
 from marqo.tensor_search.throttling.redis_throttle import throttle
@@ -115,11 +118,14 @@ def root():
 
 
 @app.post("/indexes/{index_name}")
-def create_index(index_name: str, settings: Dict = None, marqo_config: config.Config = Depends(get_config)):
-    index_settings = dict() if settings is None else settings
-    return tensor_search.create_vector_index(
-        config=marqo_config, index_name=index_name, index_settings=index_settings
-    )
+def create_index(index_name: str, settings: IndexSettings, marqo_config: config.Config = Depends(get_config)):
+    index_management = IndexManagement(vespa_client=marqo_config.vespa_client)
+    try:
+        index_management.create_index(settings.to_marqo_index(index_name))
+    except IndexExistsError as e:
+        raise errors.IndexAlreadyExistsError(f"Index {index_name} already exists") from e
+
+    return Response(status_code=200)
 
 
 @app.post("/indexes/bulk/search")

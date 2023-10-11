@@ -28,7 +28,7 @@ class VespaIndex(ABC):
 
 
 def for_marqo_index(marqo_index: MarqoIndex):
-    if marqo_index.type == IndexType.Typed:
+    if marqo_index.type == IndexType.Structured:
         from marqo.core.typed_vespa_index import TypedVespaIndex
         return TypedVespaIndex
     else:

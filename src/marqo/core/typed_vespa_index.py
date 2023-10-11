@@ -381,8 +381,8 @@ class TypedVespaIndex(VespaIndex):
 
     @classmethod
     def _validate_index_type(cls, marqo_index: MarqoIndex) -> None:
-        if marqo_index.type != IndexType.Typed:
-            raise ValueError(f'Vespa index type must be {IndexType.Typed.name}. '
+        if marqo_index.type != IndexType.Structured:
+            raise ValueError(f'Vespa index type must be {IndexType.Structured.name}. '
                              f'This module cannot handle index type {marqo_index.type.name}')
 
     @classmethod
@@ -398,7 +398,7 @@ if __name__ == '__main__':
         name='index1',
         model=Model(name='ViT-B/32'),
         distance_metric=DistanceMetric.PrenormalizedAnguar,
-        type=IndexType.Typed,
+        type=IndexType.Structured,
         vector_numeric_type=VectorNumericType.Float,
         hnsw_config=HnswConfig(ef_construction=100, m=16),
         fields=[

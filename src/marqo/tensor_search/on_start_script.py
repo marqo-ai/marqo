@@ -12,7 +12,9 @@ from marqo.s2_inference.s2_inference import vectorise
 from marqo.tensor_search import index_meta_cache, utils
 from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.tensor_search_logging import get_logger
-from marqo.vespa.exceptions import VespaError
+from marqo.vespa.exceptions import VespaError, VespaStatusError
+
+logger = get_logger(__name__)
 
 
 def on_start(config: config.Config):
@@ -42,18 +44,23 @@ class PopulateCache:
         try:
             index_meta_cache.populate_cache(self.config)
         except VespaError as e:
-            raise errors.BackendCommunicationError(
-                message="Can't connect to Vespa Document API. \n"
-                        "    Possible causes: \n"
-                        "        - If this is an arm64 machine, ensure you are using an external Marqo-os instance \n"
-                        "        - If you are using an external Marqo-os instance, check if it is running: "
-                        "`curl <YOUR MARQO-OS URL>` \n"
-                        "        - Ensure that the VESPA_DOCUMENT_URL environment variable defined "
-                        "in the `docker run marqo` command points to the Vespa Document API\n",
-                link="https://github.com/marqo-ai/marqo/tree/mainline/src/marqo"
-                     "#c-build-and-run-the-marqo-as-a-docker-container-connecting-"
-                     "to-marqo-os-which-is-running-on-the-host"
-            ) from e
+            if isinstance(e, VespaStatusError) and e.status_code == 400:
+                # This happens when settings schema doesn't exist
+                logger.warn('Failed to populate index cache due to 400 error from Vespa. If you have not created an'
+                            ' index yet, this is expected.')
+            else:
+                raise errors.BackendCommunicationError(
+                    message="Can't connect to Vespa Document API. \n"
+                            "    Possible causes: \n"
+                            "        - If this is an arm64 machine, ensure you are using an external Marqo-os instance \n"
+                            "        - If you are using an external Marqo-os instance, check if it is running: "
+                            "`curl <YOUR MARQO-OS URL>` \n"
+                            "        - Ensure that the VESPA_DOCUMENT_URL environment variable defined "
+                            "in the `docker run marqo` command points to the Vespa Document API\n",
+                    link="https://github.com/marqo-ai/marqo/tree/mainline/src/marqo"
+                         "#c-build-and-run-the-marqo-as-a-docker-container-connecting-"
+                         "to-marqo-os-which-is-running-on-the-host"
+                ) from e
         # the following lines turns off auto create index
         # connection = HttpRequests(c)
         # connection.put(

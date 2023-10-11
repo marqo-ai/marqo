@@ -1,5 +1,5 @@
-from pydantic import BaseModel
+from marqo.core.models.strict_base_model import StrictBaseModel
 
 
-class MarqoQuery(BaseModel):
+class MarqoQuery(StrictBaseModel):
     pass
