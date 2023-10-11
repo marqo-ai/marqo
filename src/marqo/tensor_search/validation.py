@@ -528,9 +528,10 @@ def validate_custom_vector(field_content: dict, is_non_tensor_field: bool, index
         field_content if the validation passes
         "content" key will be added to the field_content as empty string if it is not provided.
     '''
-    if index_model_dimensions is None:
+
+    if not isinstance(index_model_dimensions, int):
         raise InternalError(
-            f"Index model dimensions should not be `None`."
+            f"Index model dimensions should be an `int`."
         )
     
     # Must be a tensor_field

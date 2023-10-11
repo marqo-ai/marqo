@@ -1419,6 +1419,28 @@ class TestValidateIndexSettings(unittest.TestCase):
                 raise AssertionError(case)
             except InvalidArgError:
                 pass
+        
+        # No index model dimensions
+        try:
+            validation.validate_dict(field="my_custom_vector",
+                                     field_content={"content": "custom content is here!!", "vector": [1.0 for _ in range(index_model_dimensions)]}, 
+                                     is_non_tensor_field=False,
+                                     mappings=test_mappings,
+                                     index_model_dimensions=None)
+            raise AssertionError
+        except InternalError as e:
+            assert "Index model dimensions should be an `int`" in e.message
+            
+        # Non-int index model dimensions
+        try:
+            validation.validate_dict(field="my_custom_vector",
+                                     field_content={"content": "custom content is here!!", "vector": [1.0 for _ in range(index_model_dimensions)]}, 
+                                     is_non_tensor_field=False,
+                                     mappings=test_mappings,
+                                     index_model_dimensions="wrong type")
+            raise AssertionError
+        except InternalError as e:
+            assert "Index model dimensions should be an `int`" in e.message
 
 
 class TestValidateDeleteDocsRequest(unittest.TestCase):
