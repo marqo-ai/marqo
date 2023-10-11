@@ -12,7 +12,7 @@ from marqo.s2_inference.s2_inference import vectorise
 from marqo.tensor_search import index_meta_cache, utils
 from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.tensor_search_logging import get_logger
-from marqo.tensor_search.web import api_utils
+from marqo.vespa.exceptions import VespaError
 
 
 def on_start(config: config.Config):
@@ -37,20 +37,19 @@ class PopulateCache:
 
     def __init__(self, config: config.Config):
         self.config = config
-        pass
 
     def run(self):
         try:
             index_meta_cache.populate_cache(self.config)
-        except errors.BackendCommunicationError as e:
+        except VespaError as e:
             raise errors.BackendCommunicationError(
-                message="Can't connect to Marqo-os backend. \n"
+                message="Can't connect to Vespa Document API. \n"
                         "    Possible causes: \n"
                         "        - If this is an arm64 machine, ensure you are using an external Marqo-os instance \n"
                         "        - If you are using an external Marqo-os instance, check if it is running: "
                         "`curl <YOUR MARQO-OS URL>` \n"
-                        "        - Ensure that the OPENSEARCH_URL environment variable defined "
-                        "in the `docker run marqo` command points to Marqo-os\n",
+                        "        - Ensure that the VESPA_DOCUMENT_URL environment variable defined "
+                        "in the `docker run marqo` command points to the Vespa Document API\n",
                 link="https://github.com/marqo-ai/marqo/tree/mainline/src/marqo"
                      "#c-build-and-run-the-marqo-as-a-docker-container-connecting-"
                      "to-marqo-os-which-is-running-on-the-host"
@@ -68,10 +67,6 @@ class CUDAAvailable:
     """checks the status of cuda
     """
     logger = get_logger('CUDA device summary')
-
-    def __init__(self):
-
-        pass
 
     def run(self):
         def id_to_device(id):
@@ -96,9 +91,6 @@ class SetBestAvailableDevice:
     """sets the MARQO_BEST_AVAILABLE_DEVICE env var
     """
     logger = get_logger('SetBestAvailableDevice')
-
-    def __init__(self):
-        pass
 
     def run(self):
         """

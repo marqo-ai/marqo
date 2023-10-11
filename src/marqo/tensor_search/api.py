@@ -5,6 +5,7 @@ import typing
 from typing import List, Dict, Optional
 
 import pydantic
+import uvicorn
 from fastapi import FastAPI, Query
 from fastapi import Request, Depends
 from fastapi.responses import JSONResponse
@@ -28,18 +29,18 @@ from marqo.vespa.vespa_client import VespaClient
 
 def generate_config() -> config.Config:
     vespa_client = VespaClient(
-        config_url=os.environ[EnvVars.MARQO_VESPA_CONFIG_URL],
-        query_url=os.environ[EnvVars.MARQO_VESPA_QUERY_URL],
-        document_url=os.environ[EnvVars.MARQO_VESPA_DOCUMENT_URL],
-        pool_size=os.environ.get(EnvVars.MARQO_VESPA_POOL_SIZE, 10),
+        config_url=os.environ[EnvVars.VESPA_CONFIG_URL],
+        query_url=os.environ[EnvVars.VESPA_QUERY_URL],
+        document_url=os.environ[EnvVars.VESPA_DOCUMENT_URL],
+        pool_size=os.environ.get(EnvVars.VESPA_POOL_SIZE, 10),
     )
     return config.Config(vespa_client)
 
 
-config = generate_config()
+_config = generate_config()
 
 if __name__ in ["__main__", "api"]:
-    on_start(config)
+    on_start(_config)
 
 app = FastAPI(
     title="Marqo",
@@ -49,7 +50,7 @@ app.add_middleware(TelemetryMiddleware)
 
 
 def get_config():
-    return config
+    return _config
 
 
 @app.exception_handler(MarqoWebError)
@@ -275,6 +276,9 @@ def get_cpu_info():
 def get_cuda_info():
     return tensor_search.get_cuda_info()
 
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="localhost", port=8882)
 
 # try these curl commands:
 

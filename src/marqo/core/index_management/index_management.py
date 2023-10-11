@@ -6,10 +6,11 @@ from typing import List
 
 import marqo.logging
 import marqo.vespa.vespa_client
-from marqo.core.exceptions import IndexExistsError
+from marqo.core.exceptions import IndexExistsError, IndexNotFoundError
 from marqo.core.models import MarqoIndex
 from marqo.core.vespa_index import for_marqo_index as vespa_index_factory
 from marqo.exceptions import MarqoError, InternalError
+from marqo.vespa.exceptions import VespaStatusError
 from marqo.vespa.models import VespaDocument
 from marqo.vespa.vespa_client import VespaClient
 
@@ -76,6 +77,16 @@ class IndexManagement:
             MarqoIndex.parse_raw(response.fields['settings'])
             for response in batch_response.documents
         ]
+
+    def get_index(self, index_name) -> MarqoIndex:
+        try:
+            response = self.vespa_client.get_document(index_name, self._MARQO_SETTINGS_SCHEMA_NAME)
+        except VespaStatusError as e:
+            if e.status_code == 404:
+                raise IndexNotFoundError(f"Index {index_name} not found")
+            raise e
+
+        return MarqoIndex.parse_raw(response.document.fields['settings'])
 
     def _index_exists(self, name: str) -> bool:
         # TODO - implement method after settings cache has been implemented
@@ -151,6 +162,7 @@ class IndexManagement:
             else:
                 raise MarqoError(f"Failed to feed index settings for {marqo_index.name}: {str(response)}")
 
+
 if __name__ == '__main__':
     vespa_client = marqo.vespa.vespa_client.VespaClient(
         config_url='http://localhost:19071',
@@ -160,6 +172,7 @@ if __name__ == '__main__':
 
     index_management = IndexManagement(vespa_client)
 
-    indexes = index_management.get_all_indexes()
+    index = index_management.get_index('ef05bf9fd96c48a19d9b219521aa9504')
+    # indexes = index_management.get_all_indexes()
 
-    pass
+    print('hi')
