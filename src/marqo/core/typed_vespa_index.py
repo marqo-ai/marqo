@@ -359,6 +359,7 @@ class TypedVespaIndex(VespaIndex):
             raise ValueError(f'Unknown Marqo distance metric: {marqo_distance_metric}')
 
     @classmethod
+    # TODO - Move this to a new model registry moduleg
     def _get_model_dimension(cls, marqo_index: MarqoIndex) -> int:
         if marqo_index.model.properties:
             model_properties = marqo_index.model.properties
