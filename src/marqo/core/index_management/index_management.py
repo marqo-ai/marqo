@@ -53,7 +53,7 @@ class IndexManagement:
         app = self.vespa_client.download_application()
         settings_schema_created = self._create_marqo_settings_schema(app)
 
-        if self._index_exists(marqo_index.name):
+        if not settings_schema_created and self._index_exists(marqo_index.name):
             raise IndexExistsError(f"Index {marqo_index.name} already exists")
 
         vespa_index = vespa_index_factory(marqo_index)
@@ -89,6 +89,17 @@ class IndexManagement:
         return MarqoIndex.parse_raw(response.document.fields['settings'])
 
     def _index_exists(self, name: str) -> bool:
+        """
+        Check if an index exists.
+
+        Note: Do not call this method if settings schema does not exist.
+
+        Args:
+            name:
+
+        Returns:
+
+        """
         try:
             _ = self.get_index(name)
             return True
@@ -105,6 +116,8 @@ class IndexManagement:
         """
         schema_path = os.path.join(app, 'schemas', f'{self._MARQO_SETTINGS_SCHEMA_NAME}.sd')
         if not os.path.exists(schema_path):
+            logger.debug('Marqo settings schema does not exist. Creating it')
+
             schema = self._MARQO_SETTINGS_SCHEMA_TEMPLATE % (
                 self._MARQO_SETTINGS_SCHEMA_NAME,
                 self._MARQO_SETTINGS_SCHEMA_NAME

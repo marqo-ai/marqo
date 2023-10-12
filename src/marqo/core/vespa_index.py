@@ -31,6 +31,8 @@ def for_marqo_index(marqo_index: MarqoIndex):
     if marqo_index.type == IndexType.Structured:
         from marqo.core.typed_vespa_index import TypedVespaIndex
         return TypedVespaIndex
-    else:
+    elif marqo_index.type == IndexType.Unstructured:
         from marqo.core.dynamic_vespa_index import DynamicVespaIndex
         return DynamicVespaIndex
+    else:
+        raise ValueError(f"No known implementation for index type {marqo_index.type}")

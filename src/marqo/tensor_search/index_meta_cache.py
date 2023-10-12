@@ -27,6 +27,8 @@ index_info_cache = dict()
 # multiple refresh requests at the same. It isn't a critical problem if that
 # happens.
 cache_refresh_interval: int = 10  # seconds
+cache_refresh_log_interval: int = 60
+cache_refresh_last_logged_time: float = 0
 refresh_thread = None
 refresh_lock = threading.Lock()  # to ensure only one thread is operating on refresh_thread
 
@@ -158,7 +160,11 @@ def _check_refresh_thread(config: Config):
 
             def refresh():
                 while True:
-                    logger.info('Refreshing index cache')
+                    global cache_refresh_last_logged_time
+                    if time.time() - cache_refresh_last_logged_time > cache_refresh_log_interval:
+                        logger.info('Refreshing index cache')
+                        cache_refresh_last_logged_time = time.time()
+
                     populate_cache(config)
                     time.sleep(cache_refresh_interval)
 
@@ -204,11 +210,11 @@ if __name__ == '__main__':
     config = config.Config(vespa_client=vespa_client)
 
     populate_cache(config)
-    index = get_index(config, 'ef05bf9fd96c48a19d9b219521aa9504')
+    index = get_index(config, 'my_index_1')
 
     while True:
         time.sleep(10)
         print('Getting index')
-        index = get_index(config, 'ef05bf9fd96c48a19d9b219521aa9504')
+        index = get_index(config, 'my_index_1')
 
     print('hi')
