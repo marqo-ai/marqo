@@ -36,7 +36,24 @@ class FieldFeature(Enum):
 
 
 class DistanceMetric(Enum):
+    Euclidean = 'euclidean'
+    Angular = 'angular'
+    DotProduct = 'dotproduct'
     PrenormalizedAnguar = 'prenormalized-angular'
+    Geodegrees = 'geodegrees'
+    Hamming = 'hamming'
+
+
+class TextSplitMethod(Enum):
+    Character = 'character'
+    Word = 'word'
+    Sentence = 'sentence'
+    Passage = 'passage'
+
+
+class PatchMethod(Enum):
+    Simple = 'simple'
+    Frcnn = 'frcnn'
 
 
 class Field(StrictBaseModel):
@@ -59,6 +76,16 @@ class HnswConfig(StrictBaseModel):
     m: int
 
 
+class TextPreProcessing(StrictBaseModel):
+    split_length: int
+    split_overlap: int
+    split_method: TextSplitMethod
+
+
+class ImagePreProcessing(StrictBaseModel):
+    patch_method: Optional[PatchMethod]
+
+
 class Model(StrictBaseModel):
     name: str
     properties: Optional[Dict[str, Any]]
@@ -68,6 +95,9 @@ class MarqoIndex(StrictBaseModel):
     name: str
     type: IndexType
     model: Model
+    normalize_embeddings: bool
+    text_preprocessing: TextPreProcessing
+    image_preprocessing: ImagePreProcessing
     distance_metric: DistanceMetric
     vector_numeric_type: VectorNumericType
     hnsw_config: HnswConfig
