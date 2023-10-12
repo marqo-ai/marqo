@@ -83,17 +83,20 @@ from marqo.tensor_search.tensor_search_logging import get_logger
 logger = get_logger(__name__)
 
 
-def _get_dimension_from_model_properties(model_properties: dict):
+def _get_dimension_from_model_properties(model_properties: dict) -> int:
     """
     Args:
         model_properties: dict containing model properties
     """
     try:
-        return model_properties["dimensions"]
+        return validation.validate_model_dimensions(model_properties["dimensions"])
     except KeyError:
         raise errors.InvalidArgError(
             "The given model properties must contain a 'dimensions' key."
         )
+    except errors.InternalError as e:
+        # This is caused by bad `dimensions` validation.
+        raise errors.InvalidArgError(str(e)) from e
 
 
 def _add_knn_field(ix_settings: dict):

@@ -643,4 +643,22 @@ def validate_nonnegative_number(input_string: str, field_description: str = "Inp
     return output_number
 
 
+def validate_model_dimensions(input_dimensions: Any):
+    """Validates that input dimensions is an int and is greater than 0
+
+    Args:
+        input_dimensions: the value to validate
+
+    Returns:
+        input_dimensions, if it passes validation
+        
+    Raises:
+        
+    """
+    if isinstance(input_dimensions, int) and input_dimensions > 0:
+        return input_dimensions
+    
+    raise InternalError(f"Model dimensions must be a positive integer! Given model dimensions = {input_dimensions}.")
+
+
 

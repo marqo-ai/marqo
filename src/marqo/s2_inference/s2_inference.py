@@ -2,10 +2,10 @@
 The functions defined here would have endpoints, later on.
 """
 import numpy as np
-from marqo.errors import ModelCacheManagementError, InvalidArgError, ConfigurationError, InternalError
+from marqo.errors import ModelCacheManagementError, InvalidArgError, ConfigurationError, InternalError, BadRequestError
 from marqo.s2_inference.errors import (
     VectoriseError, InvalidModelPropertiesError, ModelLoadError,
-    UnknownModelError, ModelNotInCacheError, ModelDownloadError, S2InferenceError)
+    UnknownModelError, ModelNotInCacheError, ModelDownloadError, IllegalVectoriseError)
 from PIL import UnidentifiedImageError
 from marqo.s2_inference.model_registry import load_model_properties
 from marqo.s2_inference.configs import get_default_normalization, get_default_seq_length
@@ -77,6 +77,9 @@ def vectorise(model_name: str, content: Union[str, List[str]], model_properties:
                 raise RuntimeError(f"Vectorise created an empty list of batches! Content: {content}")
             else:
                 vectorised = np.concatenate(vector_batches, axis=0)
+    except IllegalVectoriseError as e:
+        # This is from attempting to vectorise with no_model.
+        raise BadRequestError(str(e)) from e
     except UnidentifiedImageError as e:
         raise VectoriseError(str(e)) from e
 
@@ -522,7 +525,6 @@ def _get_model_loader(model_name: str, model_properties: dict) -> Any:
         return MODEL_PROPERTIES['loaders'][model_name]
     
     model_type = model_properties['type']
-
     if model_type not in MODEL_PROPERTIES['loaders']:
         raise KeyError(f"model_name={model_name} for model_type={model_type} not in allowed model types")
 

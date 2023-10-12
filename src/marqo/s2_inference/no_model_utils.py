@@ -7,7 +7,7 @@ import functools
 from marqo.s2_inference.sbert_utils import Model
 from marqo.s2_inference.types import Union, FloatTensor, List, ndarray, ImageType
 from marqo.tensor_search.enums import SpecialModels
-from marqo import errors
+from marqo.s2_inference import errors
 
 class NO_MODEL(Model):
 
@@ -18,4 +18,6 @@ class NO_MODEL(Model):
         self.model = None
 
     def encode(self, sentence: Union[str, List[str]], normalize: bool = True, **kwargs) -> Union[FloatTensor, ndarray]:
-        raise errors.InternalError(f"Cannot vectorise anything with {SpecialModels.no_model}. Please use a different model.")
+        raise errors.IllegalVectoriseError(f"Cannot vectorise anything with {SpecialModels.no_model}. This model is intended for "
+                                           f"adding documents and searching with custom vectors only. If vectorisation is needed, "
+                                           f"please use a different model.")
