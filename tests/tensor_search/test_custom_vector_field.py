@@ -422,7 +422,6 @@ class TestCustomVectorField(MarqoTestCase):
             document_id="0", show_vectors=True)
         
         # Check content is correct
-        print(f"DEBUG: res: {res}")
         assert res["_id"] == "0"
         assert res["my_custom_vector"] == "custom content is here!!"
 

@@ -442,7 +442,7 @@ def validate_dict(field: str, field_content: Dict, is_non_tensor_field: bool, ma
         index_model_dimensions: the dimensions of the model of the index. used to validate custom vector field.
 
     Returns:
-        True or raise an error
+        Updated field_content dict or raise an error
     '''
     if mappings is None:
         raise InvalidArgError(
@@ -465,7 +465,7 @@ def validate_dict(field: str, field_content: Dict, is_non_tensor_field: bool, ma
         raise InvalidArgError(
             f"The field {field} is of invalid type in the `mappings` parameter. The only object field types supported "
             f"are `multimodal_combination` and `custom_vector. However, the `mappings` is {mappings}. Please change the "
-            f"type of {field} to one of these."
+            f"type of {field} to one of these. "
             f"See `https://marqo.pages.dev/1.4.0/API-Reference/mappings/` for more info on object fields. "
         )
 
@@ -637,7 +637,7 @@ def validate_multimodal_combination_mappings_object(mappings_object: Dict):
 
 
 def validate_custom_vector_mappings_object(mappings_object: Dict):
-    """Validates the multimodal mappings object
+    """Validates the custom vector mappings object
 
     Args:
         mappings_object:

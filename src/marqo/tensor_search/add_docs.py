@@ -187,7 +187,7 @@ def reduce_thread_metrics(data):
     return result
 
 
-def create_chunk_metadata(raw_document: dict):
+def create_chunk_metadata(raw_document: dict) -> dict:
     """
     Creates a chunk metadata dictionary for a given document.
     This metadata will be put in each OpenSearch child document (chunk) to be used for filtering.
@@ -198,13 +198,14 @@ def create_chunk_metadata(raw_document: dict):
     metadata = {}
     metadata_field_types = {str, bool, int, float, list, dict}
     for key, value in raw_document.items():
-        if type(value) in metadata_field_types:
-            metadata[key] = value
-
+        for cls in metadata_field_types:
+            if isinstance(value, cls):
+                metadata[key] = value
+                break
     return metadata
 
 
-def determine_document_field_type(field_name: str, field_content, mappings: dict):
+def determine_document_field_type(field_name: str, field_content, mappings: dict) -> enums.DocumentFieldType:
     """
     Determines the type of a document field
     using its name, content, and the add docs mappings object.
