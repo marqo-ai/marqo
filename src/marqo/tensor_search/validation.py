@@ -498,7 +498,7 @@ def validate_multimodal_combination(field_content, is_non_tensor_field, field_ma
         raise InvalidArgError(
             f"Field content `{field_content}` \n  "
             f"of type `{type(field_content).__name__}` is the content for a multimodal_combination."
-            f"It must be a tensor field. Add this field to `tensor_fields` or"
+            f"It must be a tensor field. Add this field to `tensor_fields` or "
             f"add it as a normal field to fix this problem."
         )
     return True
