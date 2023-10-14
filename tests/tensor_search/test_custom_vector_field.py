@@ -8,10 +8,7 @@ from marqo.tensor_search.tensor_search import add_documents
 from marqo.tensor_search.models.search import SearchContext
 from marqo.errors import DocumentNotFoundError
 import numpy as np
-from marqo.tensor_search.validation import validate_dict
-from marqo.s2_inference.s2_inference import vectorise
 import requests
-from marqo.s2_inference.clip_utils import load_image_from_path
 import json
 from unittest import mock
 from unittest.mock import patch

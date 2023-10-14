@@ -1392,6 +1392,7 @@ class TestValidateIndexSettings(unittest.TestCase):
         invalid_custom_vector_objects = [
             # Wrong vector length
             {"content": "custom content is here!!", "vector": [1.0, 1.0, 1.0]},
+            {"content": "custom content is here!!", "vector": [1.0]*1000},
             # Wrong content type
             {"content": 12345, "vector": [1.0 for _ in range(index_model_dimensions)]},
             # Wrong vector type inside list (even if correct length)

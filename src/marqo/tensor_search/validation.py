@@ -20,6 +20,7 @@ from marqo.tensor_search.models.mappings_object import (
     multimodal_combination_mappings_schema,
     custom_vector_mappings_schema
 )
+from marqo.tensor_search.models.custom_vector_object import custom_vector_schema
 
 
 def validate_query(q: Union[dict, str], search_method: Union[str, SearchMethod]):
@@ -449,13 +450,13 @@ def validate_dict(field: str, field_content: Dict, is_non_tensor_field: bool, ma
             f"The `mappings` parameter must be provided to use object field types. "
             f"Your doc has field `{field}` with object field content `{field_content}`."
             f"However, the parameter `mappings` is {mappings}. Please change the field content or add the field to `mappings`. "
-            f"See `https://marqo.pages.dev/1.4.0/API-Reference/mappings/` for more info on object fields.")
+            f"See `https://docs.marqo.ai/1.4.0/API-Reference/Documents/mappings/` for more info on object fields.")
 
     if field not in mappings:
         raise InvalidArgError(
             f"The field {field} must be in the add_documents `mappings` parameter to use it as an object field type. "
             f"However, the `mappings` is {mappings}. Please change the field content or add the field to `mappings`. "
-            f"See `https://marqo.pages.dev/1.4.0/API-Reference/mappings/` for more info on object fields.")
+            f"See `https://docs.marqo.ai/1.4.0/API-Reference/Documents/mappings/` for more info on object fields.")
 
     if mappings[field]["type"] == "multimodal_combination":
         field_content = validate_multimodal_combination(field_content, is_non_tensor_field, mappings[field])
@@ -466,7 +467,7 @@ def validate_dict(field: str, field_content: Dict, is_non_tensor_field: bool, ma
             f"The field {field} is of invalid type in the `mappings` parameter. The only object field types supported "
             f"are `multimodal_combination` and `custom_vector. However, the `mappings` is {mappings}. Please change the "
             f"type of {field} to one of these. "
-            f"See `https://marqo.pages.dev/1.4.0/API-Reference/mappings/` for more info on object fields. "
+            f"See `https://docs.marqo.ai/1.4.0/API-Reference/Documents/mappings/` for more info on object fields. "
         )
 
     return field_content
@@ -542,30 +543,11 @@ def validate_custom_vector(field_content: dict, is_non_tensor_field: bool, index
         )
     
     try:
-        custom_vector_schema = {
-            "$schema": "http://json-schema.org/draft-04/schema#",
-            "type": "object",
-            "properties": {
-                "content": {
-                    "type": list(constants.ALLOWED_CUSTOM_VECTOR_CONTENT_TYPES)
-                },
-                "vector": {
-                    "type": "array",
-                    "minItems": index_model_dimensions,
-                    "maxItems": index_model_dimensions,
-                    "items": { 
-                        "type": "number"
-                    }
-                }
-            },
-            "required": ["vector"],     # content is optional.
-            "additionalProperties": False
-        }
-        jsonschema.validate(instance=field_content, schema=custom_vector_schema)
+        jsonschema.validate(instance=field_content, schema=custom_vector_schema(index_model_dimensions))
     except jsonschema.ValidationError as e:
         raise InvalidArgError(
             f"Invalid custom_vector field format. Reason: \n{str(e)}"
-            f"\nFor info on how to use custom_vector, please see: `https://docs.marqo.ai/1.4.0/Advanced-Usage/document_fields/#custom-vectors`"
+            f"\n For info on how to use custom_vector, please see: `https://docs.marqo.ai/1.4.0/Advanced-Usage/document_fields/#custom-vectors`"
         )
 
     # Fill in default content as empty string if not provided.
@@ -594,7 +576,7 @@ def validate_mappings_object(mappings_object: Dict):
     except jsonschema.ValidationError as e:
         raise InvalidArgError(
             f"Error validating mappings object. Reason: \n{str(e)}"
-            f"\nRead about the mappings object here: https://docs.marqo.ai/0.0.15/API-Reference/mappings/"
+            f"\n Read about the mappings object here: https://docs.marqo.ai/1.4.0/API-Reference/Documents/mappings/"
         )
 
 
@@ -613,7 +595,7 @@ def validate_multimodal_combination_mappings_object(mappings_object: Dict):
     except jsonschema.ValidationError as e:
         raise InvalidArgError(
             f"Error validating multimodal combination mappings object. Reason: \n{str(e)}"
-            f"\nRead about the mappings object here: https://docs.marqo.ai/1.4.0/API-Reference/mappings/"
+            f"\n Read about the mappings object here: https://docs.marqo.ai/1.4.0/API-Reference/Documents/mappings/"
         )
     
     # TODO: Move this validation into schema in mappings_object
@@ -656,7 +638,7 @@ def validate_custom_vector_mappings_object(mappings_object: Dict):
     except jsonschema.ValidationError as e:
         raise InvalidArgError(
             f"Error validating custom vector mappings object. Reason: \n{str(e)}"
-            f"\nRead about the mappings object here: https://docs.marqo.ai/1.4.0/API-Reference/mappings/"
+            f"\n Read about the mappings object here: https://docs.marqo.ai/1.4.0/API-Reference/Documents/mappings/"
         )
 
     return mappings_object

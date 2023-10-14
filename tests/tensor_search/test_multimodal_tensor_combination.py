@@ -62,6 +62,13 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
             index_name=self.index_name_1, docs=[
                 expected_doc,
+                # Dummy doc
+                {
+                    "Title": "Horse rider",
+                    "text_field": "A rider is riding a horse jumping over the barrier.",
+                    "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
+                    "_id": "1"
+                },
             ],
             mappings = {
                 "combo_text_image": {"type": "multimodal_combination", "weights" : {
