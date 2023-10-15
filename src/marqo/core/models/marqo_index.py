@@ -98,6 +98,7 @@ class MarqoIndex(StrictBaseModel):
     normalize_embeddings: bool
     text_preprocessing: TextPreProcessing
     image_preprocessing: ImagePreProcessing
+    treat_urls_and_pointers_as_images: Optional[bool]
     distance_metric: DistanceMetric
     vector_numeric_type: VectorNumericType
     hnsw_config: HnswConfig
@@ -139,6 +140,13 @@ class MarqoIndex(StrictBaseModel):
                                   lambda: {tensor_field.name: tensor_field for tensor_field in self.tensor_fields}
                                   )
 
+    @property
+    def image_pointer_field_map(self) -> Dict[str, Field]:
+        return self._cache_or_get('image_pointer_field_map',
+                                  lambda: {field.name: field for field in self.fields if
+                                           field.type == FieldType.ImagePointer}
+                                  )
+
     def _cache_or_get(self, key: str, func):
         if self.model_enable_cache:
             if key not in self._cache:
@@ -151,7 +159,12 @@ class MarqoIndex(StrictBaseModel):
         model_dict = self.dict()
         del model_dict['model_enable_cache']
 
-        return MarqoIndex(**model_dict, model_enable_cache=True)
+        copied = MarqoIndex(**model_dict, model_enable_cache=True)
+
+        # Retrieve all properties to populate cache
+        [getattr(copied, name) for name, value in vars(MarqoIndex).items() if isinstance(value, property)]
+
+        return copied
 
 
 if __name__ == '__main__':
@@ -162,6 +175,9 @@ if __name__ == '__main__':
         type=IndexType.Structured,
         vector_numeric_type=VectorNumericType.Float,
         hnsw_config=HnswConfig(ef_construction=100, m=16),
+        normalize_embeddings=True,
+        text_preprocessing=TextPreProcessing(split_length=100, split_overlap=50, split_method=TextSplitMethod.Sentence),
+        image_preprocessing=ImagePreProcessing(patch_method=PatchMethod.Frcnn),
         fields=[
             Field(name='title', type=FieldType.Text),
             Field(name='description', type=FieldType.Text),
