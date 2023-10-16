@@ -23,7 +23,7 @@ from marqo.tensor_search.models.mappings_object import (
 from marqo.tensor_search.models.custom_vector_object import custom_vector_schema
 
 
-def validate_query(q: Union[dict, str], search_method: Union[str, SearchMethod]):
+def validate_query(q: Union[dict, str, None], search_method: Union[str, SearchMethod]):
     """
     Returns q if an error is not raised"""
     usage_ref = "\nSee query reference here: https://docs.marqo.ai/0.0.13/API-Reference/search/#query-q"
@@ -49,6 +49,8 @@ def validate_query(q: Union[dict, str], search_method: Union[str, SearchMethod])
                     f"{base_invalid_kv_message}Found value of type `{type(v)}` instead of float. Value=`{v}`"
                     f" {usage_ref}"
                 )
+    elif q is None:
+        pass
     elif not isinstance(q, str):
         raise InvalidArgError(
             f"q must be a string or dict! Received q of type `{type(q)}`. "

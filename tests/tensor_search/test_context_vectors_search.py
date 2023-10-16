@@ -130,6 +130,34 @@ class TestContextSearch(MarqoTestCase):
         res = tensor_search.search(config=self.config, index_name=self.index_name_1, text={"": 0}, 
                                    context=SearchContext(**{"tensor": [{"vector": context_vector_1, "weight": 1}], }))
         assert res["hits"][0]["_id"] == expected_doc_id
+    
+    def test_search_no_query_invalid(self):
+        """
+        Tests invalid situations where the search has no text query.
+        """
+        # no query, no context vector
+        try:
+            res = tensor_search.search(config=self.config, index_name=self.index_name_1, search_method=SearchMethod.TENSOR)
+            raise AssertionError
+        except InvalidArgError as e:
+            assert "Either query or context vectors must be provided" in e.message
+        
+        # no query, with context vector, but LEXICAL search.
+        try:
+            res = tensor_search.search(config=self.config, index_name=self.index_name_1, search_method=SearchMethod.LEXICAL,
+                                       context=SearchContext(**{"tensor": [{"vector": [1., ] * 512, "weight": 2}, {"vector": [2., ] * 512, "weight": -1}], }))
+            raise AssertionError
+        except InvalidArgError as e:
+            assert "Lexical search query arg must be of type `str`" in e.message
+        
+        # no query, with context vector, but wrong length
+        try:
+            res = tensor_search.search(config=self.config, index_name=self.index_name_1, search_method=SearchMethod.TENSOR,
+                                       context=SearchContext(**{"tensor": [{"vector": [1., ] * 123, "weight": 2}], }))
+            raise AssertionError
+        except InvalidArgError as e:
+            assert "context vector given has invalid dimensions" in e.message
+
 
 
 class TestContextBulkSearch(MarqoTestCase):

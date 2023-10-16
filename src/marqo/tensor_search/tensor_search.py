@@ -1036,9 +1036,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict]] = N
     if offset < 0:
         raise errors.IllegalRequestedDocCount("search result offset cannot be less than 0!")
 
-    # validate query (if it exists)
-    if text is not None:
-        validation.validate_query(q=text, search_method=search_method)
+    validation.validate_query(q=text, search_method=search_method)
 
     # Validate result_count + offset <= int(max_docs_limit)
     max_docs_limit = utils.read_env_vars_and_defaults(EnvVars.MARQO_MAX_RETRIEVABLE_DOCS)
@@ -1160,7 +1158,7 @@ def _lexical_search(
     """
     if not isinstance(text, str):
         raise errors.InvalidArgError(
-            f"Query arg must be of type str! text arg is of type {type(text)}. "
+            f"Lexical search query arg must be of type `str`! text arg is of type {type(text)}. "
             f"Query arg: {text}")
 
     # SEARCH TIMER-LOGGER (pre-processing)
@@ -1361,8 +1359,11 @@ def bulk_msearch(config: Config, body: List[Dict]) -> List[Dict]:
                 raise errors.IllegalRequestedDocCount("Marqo-OS rejected the response due to too many requested results. Try reducing the query's limit parameter") from e
             elif 'parse_exception' in root_cause_reason:
                 raise errors.InvalidArgError("Syntax error, could not parse filter string") from e
-            elif  root_cause_type == 'query_shard_exception' and root_cause_reason.startswith("Failed to parse query"):
-                raise errors.InvalidArgError("Syntax error, could not parse filter string") from e
+            elif root_cause_type == 'query_shard_exception':
+                if root_cause_reason.startswith("Failed to parse query"):
+                    raise errors.InvalidArgError("Syntax error, could not parse filter string") from e
+                elif "Query vector has invalid dimension" in root_cause_reason:
+                    raise errors.InvalidArgError("Tensor search query or context vector given has invalid dimensions. Please check your index dimensions before searching again") from e
             raise errors.BackendCommunicationError(f"Error communicating with Marqo-OS backend:\n{response}")
         except (KeyError, IndexError):
             raise e
