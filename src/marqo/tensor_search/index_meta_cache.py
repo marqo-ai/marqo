@@ -12,7 +12,6 @@ from marqo.config import Config
 from marqo.core.exceptions import IndexNotFoundError
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models import MarqoIndex
-from marqo.tensor_search import backend
 from marqo.tensor_search.models.index_info import IndexInfo
 from marqo.tensor_search.tensor_search_logging import get_logger
 from marqo.vespa.vespa_client import VespaClient
@@ -39,6 +38,7 @@ def empty_cache():
 
 
 def get_index_info(config: Config, index_name: str) -> IndexInfo:
+    return
     """Looks for the index name in the cache.
 
     If it isn't found there, it will try searching the cluster
@@ -53,12 +53,12 @@ def get_index_info(config: Config, index_name: str) -> IndexInfo:
     Raises:
          MarqoError if the index isn't found on the cluster
     """
-    if index_name in index_info_cache:
-        return index_info_cache[index_name]
-    else:
-        found_index_info = backend.get_index_info(config=config, index_name=index_name)
-        index_info_cache[index_name] = found_index_info
-        return index_info_cache[index_name]
+    # if index_name in index_info_cache:
+    #     return index_info_cache[index_name]
+    # else:
+    #     found_index_info = backend.get_index_info(config=config, index_name=index_name)
+    #     index_info_cache[index_name] = found_index_info
+    #     return index_info_cache[index_name]
 
 
 def get_cache() -> Dict[str, IndexInfo]:
@@ -153,19 +153,21 @@ def _check_refresh_thread(config: Config):
         global refresh_thread
         if refresh_thread is None or not refresh_thread.is_alive():
             if refresh_thread is not None:
-                # If not None then it's dead
-                logger.warn('Detected dead cache refresh thread')
+                # If not None, then it has died
+                logger.warn('Dead index cache refresh thread detected. Will start a new one')
 
-            logger.info('Starting cache refresh thread')
+            logger.info('Starting index cache refresh thread')
 
             def refresh():
                 while True:
                     global cache_refresh_last_logged_time
-                    if time.time() - cache_refresh_last_logged_time > cache_refresh_log_interval:
-                        logger.info('Refreshing index cache')
-                        cache_refresh_last_logged_time = time.time()
 
                     populate_cache(config)
+
+                    if time.time() - cache_refresh_last_logged_time > cache_refresh_log_interval:
+                        cache_refresh_last_logged_time = time.time()
+                        logger.info(f'Last index cache refresh at {cache_refresh_last_logged_time}')
+
                     time.sleep(cache_refresh_interval)
 
             refresh_thread = threading.Thread(target=refresh, daemon=True)

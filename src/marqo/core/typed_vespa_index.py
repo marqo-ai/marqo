@@ -32,7 +32,12 @@ class TypedVespaIndex(VespaIndex):
     }
 
     _DISTANCE_METRIC_MAP = {
-        DistanceMetric.PrenormalizedAnguar: 'prenormalized-angular'
+        DistanceMetric.Euclidean: 'euclidean',
+        DistanceMetric.Angular: 'angular',
+        DistanceMetric.DotProduct: 'dotproduct',
+        DistanceMetric.PrenormalizedAnguar: 'prenormalized-angular',
+        DistanceMetric.Geodegrees: 'geodegrees',
+        DistanceMetric.Hamming: 'hamming'
     }
 
     _INDEX_FIELD_PREFIX = 'marqo__lexical_'
@@ -140,7 +145,6 @@ class TypedVespaIndex(VespaIndex):
     def _verify_marqo_field_name(cls, field_name: str, marqo_index: MarqoIndex):
         field_map = marqo_index.field_map
         if field_name not in marqo_index.field_map:
-            # TODO - Create a better error type
             raise InvalidFieldNameError(f'Invalid field name {field_name} for index {marqo_index.name}. '
                                         f'Valid field names are {list(field_map.keys())}')
 

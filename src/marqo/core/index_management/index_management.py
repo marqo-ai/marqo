@@ -61,6 +61,7 @@ class IndexManagement:
         schema = vespa_index.generate_schema(marqo_index)
 
         self._add_schema(app, marqo_index.name, schema)
+        self._add_schema_to_services(app, marqo_index.name)
         self.vespa_client.deploy_application(app)
         self._save_index_settings(
             marqo_index,

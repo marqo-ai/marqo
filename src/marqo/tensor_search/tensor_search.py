@@ -472,8 +472,7 @@ def _add_documents_structured(add_docs_params: AddDocsParams, marqo_index: Marqo
             #         continue
             #     chunk_values_for_filtering[key] = value
 
-            fields_to_add = {}
-            fields_to_remove = []
+            processed_tensor_fields = {}
             for field in copied:
                 marqo_field = marqo_index.field_map.get(field)
                 if not marqo_field:
@@ -641,8 +640,9 @@ def _add_documents_structured(add_docs_params: AddDocsParams, marqo_index: Marqo
                             continue
 
                 # Add chunks_to_append along with doc metadata to total chunks
-                fields_to_add[tensor_field.chunk_field_name] = chunks
-                fields_to_add[tensor_field.embeddings_field_name] = embeddings
+                processed_tensor_fields[tensor_field.name] = {}
+                processed_tensor_fields[tensor_field.name]['chunks'] = chunks
+                processed_tensor_fields[tensor_field.name]['embeddings'] = embeddings
 
             # Multimodal fields haven't been processed yet, so we do that here
             for tensor_field in marqo_index.tensor_fields:
@@ -653,6 +653,10 @@ def _add_documents_structured(add_docs_params: AddDocsParams, marqo_index: Marqo
                         dependent_field: copied[dependent_field]
                         for dependent_field in marqo_field.dependent_fields if dependent_field in copied
                     }
+                    if not field_content:
+                        # None of the fields are present in the document, so we skip this multimodal field
+                        continue
+
                     if add_docs_params.mappings is not None and tensor_field.name in add_docs_params.mappings:
                         logger.debug(f'Using custom weights for multimodal combination field {tensor_field.name}')
                         mappings = add_docs_params.mappings[tensor_field.name]
@@ -676,14 +680,15 @@ def _add_documents_structured(add_docs_params: AddDocsParams, marqo_index: Marqo
                         unsuccessful_docs.append(unsuccessful_doc_to_append)
                         break
                     else:
-                        chunks = [combo_chunk[TensorField.field_content]]
-                        embeddings = [combo_chunk[TensorField.marqo_knn_field]]
-                        fields_to_add[tensor_field.chunk_field_name] = chunks
-                        fields_to_add[tensor_field.embeddings_field_name] = embeddings
+                        processed_tensor_fields[tensor_field.name] = {}
+                        processed_tensor_fields[tensor_field.name]['chunks'] = [combo_chunk[TensorField.field_content]]
+                        processed_tensor_fields[tensor_field.name]['embeddings'] = [
+                            combo_chunk[TensorField.marqo_knn_field]]
 
             if document_is_valid:
-                copied = {k: v for k, v in copied.items() if k not in fields_to_remove}
-                copied.update(fields_to_add)
+                if processed_tensor_fields:
+                    copied['tensors'] = processed_tensor_fields
+                copied['_id'] = doc_id
                 bulk_parent_dicts.append(copied)
 
         total_preproc_time = 0.001 * RequestMetricsStore.for_request().stop(
@@ -2095,7 +2100,7 @@ def vectorise_multimodal_combination_field_structured(
             with RequestMetricsStore.for_request().time(f"create_vectors"):
                 text_vectors = s2_inference.vectorise(
                     model_name=marqo_index.model.name,
-                    model_properties=marqo_index.get_model_properties(), content=text_content_to_vectorise,
+                    model_properties=marqo_index.model.get_properties(), content=text_content_to_vectorise,
                     device=device, normalize_embeddings=normalize_embeddings,
                     infer=False, model_auth=model_auth
                 )
