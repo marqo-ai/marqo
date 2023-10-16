@@ -102,7 +102,10 @@ class AddDocsParams(BaseModel):
     def validate_fields(cls, values):
         """
         Validates that exactly one of `tensor_fields` or `non_tensor_fields` is defined
+        Note: InternalError is raised here instead of user error, as user errors will be caught separately
+        by the API validation layer.
         """
+        
         field1 = values.get('tensor_fields')
         field2 = values.get('non_tensor_fields')
 

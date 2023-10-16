@@ -119,9 +119,15 @@ class RequestType:
     DELETE = "DELETE"
     CREATE = "CREATE"
 
+# Each type has different add_documents behavior. More can be added to represent special types.
+class DocumentFieldType:
+    standard = "standard"       # str, int, float, bool, or list
+    multimodal_combination = "multimodal_combination"   # dict
+    custom_vector = "custom_vector"     # dict
 
-class MappingsObjectType:
+class MappingsObjectType(str, Enum):
     multimodal_combination = "multimodal_combination"
+    custom_vector = "custom_vector"
 
 
 class SearchDb:
