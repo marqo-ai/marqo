@@ -1074,6 +1074,7 @@ class TestNoModelIndex(MarqoTestCase):
         tensor_search.create_vector_index(
             index_name=self.index_name_1, config=self.config, index_settings={
                 IndexSettingsField.index_defaults: {
+                    IndexSettingsField.normalize_embeddings: False,
                     IndexSettingsField.model: "no_model",
                     IndexSettingsField.model_properties: {
                         "dimensions": 123
@@ -1168,7 +1169,7 @@ class TestNoModelIndex(MarqoTestCase):
         try:
             res = tensor_search.search(
                 config=self.config, index_name=self.index_name_1,
-                text={"BAD! This still needs to be vectorised!": 0.1},
+                text={"BAD! This still needs to be vectorised!": 0},
                 search_method=SearchMethod.TENSOR,
                 context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], })
             )
@@ -1239,7 +1240,7 @@ class TestNoModelIndex(MarqoTestCase):
         res = tensor_search.search(
             config=self.config, index_name=self.index_name_1,
             search_method=SearchMethod.TENSOR,
-            context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], })
+            context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], }),
         )
 
         assert res["hits"][0]["_id"] == "custom_vector_doc"

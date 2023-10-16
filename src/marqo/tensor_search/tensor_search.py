@@ -989,7 +989,7 @@ def refresh_indexes_in_background(config: Config, index_names: List[str]) -> Non
         cache_update_thread.start()
 
 
-def search(config: Config, index_name: str, text: Union[str, dict],
+def search(config: Config, index_name: str, text: Optional[Union[str, dict]] = None,
            result_count: int = 3, offset: int = 0, highlights=True,
            search_method: Union[str, SearchMethod, None] = SearchMethod.TENSOR,
            searchable_attributes: Iterable[str] = None, verbose: int = 0,
@@ -1253,7 +1253,7 @@ def _lexical_search(
     return {'hits': res_list}
 
 
-def construct_vector_input_batches(query: Union[str, Dict], index_info: IndexInfo) -> Tuple[List[str], List[str]]:
+def construct_vector_input_batches(query: Union[str, Dict, None], index_info: IndexInfo) -> Tuple[List[str], List[str]]:
     """Splits images from text in a single query (either a query string, or dict of weighted strings).
 
     Args:
@@ -1264,7 +1264,10 @@ def construct_vector_input_batches(query: Union[str, Dict], index_info: IndexInf
         A tuple of string batches. The first is text content the second is image content.
     """
     treat_urls_as_images = index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]
-    if isinstance(query, str):
+    if query is None:
+        # Nothing should be vectorised.
+        return [], []
+    elif isinstance(query, str):
         if treat_urls_as_images and _is_image(query):
             return [], [query, ]
         else:
@@ -1521,49 +1524,10 @@ def get_query_vectors_from_jobs(
     """
     result: Dict[Qidx, List[float]] = defaultdict(list)
     for qidx, ptrs in qidx_to_job.items():
-
-        # vectors = job_to_vectors[ptrs.job_hash][ptrs.start_idx: ptrs.end_idx]
-
-        # qidx_to_vectors[qidx].append(vectors)
         q = queries[qidx]
         index_info = get_index_info(config=config, index_name=q.index)
-
-        ordered_queries = list(q.q.items()) if isinstance(q.q, dict) else None
-        if ordered_queries:
-            # multiple queries. We have to weight and combine them:
-            vectorised_ordered_queries = [
-                (get_content_vector(
-                    possible_jobs=qidx_to_job[qidx],
-                    jobs=jobs,
-                    job_to_vectors=job_to_vectors,
-                    treat_urls_as_images=index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images],
-                    content=content),
-                 weight,
-                 content
-                ) for content, weight in ordered_queries
-            ]
-            # TODO how do we ensure order?
-            weighted_vectors = [np.asarray(vec) * weight for vec, weight, content in vectorised_ordered_queries]
-
-            context_tensors = q.get_context_tensor()
-            if context_tensors is not None:
-                weighted_vectors += [np.asarray(v.vector) * v.weight for v in context_tensors]
-
-            try:
-                merged_vector = np.mean(weighted_vectors, axis=0)
-            except ValueError as e:
-                raise errors.InvalidArgError(f"The provided vectors are not in the same dimension of the index."
-                                             f"This causes the error when we do `numpy.mean()` over all the vectors.\n"
-                                             f"The original error is `{e}`.\n"
-                                             f"Please check `https://docs.marqo.ai/0.0.16/API-Reference/search/#context`.")
-
-            if index_info.index_settings['index_defaults']['normalize_embeddings']:
-                norm = np.linalg.norm(merged_vector, axis=-1, keepdims=True)
-                if norm > 0:
-                    merged_vector /= np.linalg.norm(merged_vector, axis=-1, keepdims=True)
-            result[qidx] = list(merged_vector)
-        else:
-            # result[qidx] = vectors[0]
+        # Normal single text query
+        if isinstance(q.q, str):
             result[qidx] = get_content_vector(
                 possible_jobs=qidx_to_job.get(qidx, []),
                 jobs=jobs,
@@ -1571,6 +1535,55 @@ def get_query_vectors_from_jobs(
                 treat_urls_as_images=index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images],
                 content=q.q
             )
+            continue
+
+        # Collect and weight all context tensors
+        context_tensors = q.get_context_tensor()
+        if context_tensors is not None:
+            weighted_context_vectors = [np.asarray(v.vector) * v.weight for v in context_tensors]
+        else:
+            weighted_context_vectors = []
+
+        # No query
+        if q.q is None:
+            weighted_vectors = weighted_context_vectors
+        else:
+            # Multiple queries. We have to weight and combine them:
+            # q.q must be dict
+            ordered_queries = list(q.q.items()) if isinstance(q.q, dict) else None
+            if ordered_queries:
+                vectorised_ordered_queries = [
+                    (get_content_vector(
+                        possible_jobs=qidx_to_job[qidx],
+                        jobs=jobs,
+                        job_to_vectors=job_to_vectors,
+                        treat_urls_as_images=index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images],
+                        content=content),
+                    weight,
+                    content
+                    ) for content, weight in ordered_queries
+                ]
+                # TODO how do we ensure order?
+                weighted_query_vectors = [np.asarray(vec) * weight for vec, weight, content in vectorised_ordered_queries]
+
+                # Combine query and context vectors
+                weighted_vectors = weighted_query_vectors + weighted_context_vectors
+
+        # Merge and normalize (if needed) all vectors
+        try:
+            merged_vector = np.mean(weighted_vectors, axis=0)
+        except ValueError as e:
+            raise errors.InvalidArgError(f"The provided vectors are not in the same dimension of the index."
+                                        f"This causes the error when we do `numpy.mean()` over all the vectors.\n"
+                                        f"The original error is `{e}`.\n"
+                                        f"Please check `https://docs.marqo.ai/0.0.16/API-Reference/search/#context`.")
+
+        if index_info.index_settings['index_defaults']['normalize_embeddings']:
+            norm = np.linalg.norm(merged_vector, axis=-1, keepdims=True)
+            if norm > 0:
+                merged_vector /= np.linalg.norm(merged_vector, axis=-1, keepdims=True)
+        result[qidx] = list(merged_vector)
+
     return result
 
 
@@ -1707,7 +1720,7 @@ def create_bulk_search_response(queries: List[BulkSearchQueryEntity], query_to_b
     return results
 
 def _vector_text_search(
-        config: Config, index_name: str, query: Union[str, dict], result_count: int = 5, offset: int = 0,
+        config: Config, index_name: str, query: Optional[Union[str, dict]] = None, result_count: int = 5, offset: int = 0,
         searchable_attributes: Iterable[str] = None, verbose=0, filter_string: str = None, device: str = None,
         attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None,
         image_download_headers: Optional[Dict] = None, context: Optional[Dict] = None,
