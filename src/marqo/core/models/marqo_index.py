@@ -95,6 +95,7 @@ class ImagePreProcessing(StrictBaseModel):
 class Model(StrictBaseModel):
     name: str
     properties: Optional[Dict[str, Any]]
+    custom: bool = False
 
     def get_dimension(self):
         self._update_model_properties_from_registry()
