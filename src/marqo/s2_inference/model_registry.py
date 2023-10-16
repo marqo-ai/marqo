@@ -1733,15 +1733,6 @@ def _get_random_properties() -> Dict:
     }
     return RANDOM_MODEL_PROPERTIES
 
-def _get_no_model_properties() -> Dict:
-    # Just a placeholder, might not even be used.
-    NO_MODEL_PROPERTIES = {
-            "no_model": {
-                "dimensions": -1,
-            }
-    }
-    return NO_MODEL_PROPERTIES
-
 def _get_model_load_mappings() -> Dict:
     return {'clip':CLIP,
             'open_clip': OPEN_CLIP,
