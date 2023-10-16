@@ -5,6 +5,12 @@ from pydantic import Field as PydanticField
 from pydantic import PrivateAttr
 
 from marqo.core.models.strict_base_model import StrictBaseModel
+from marqo.exceptions import InvalidArgumentError
+from marqo.logging import get_logger
+from marqo.s2_inference import s2_inference
+from marqo.s2_inference.errors import UnknownModelError
+
+logger = get_logger(__name__)
 
 
 class IndexType(Enum):
@@ -90,6 +96,35 @@ class Model(StrictBaseModel):
     name: str
     properties: Optional[Dict[str, Any]]
 
+    def get_dimension(self):
+        self._update_model_properties_from_registry()
+        try:
+            return self.properties['dimensions']
+        except KeyError:
+            raise InvalidArgumentError(
+                "The given model properties does not contain a 'dimensions' key"
+            )
+
+    def _update_model_properties_from_registry(self) -> None:
+        """
+        Try to update model properties from the registry if model properties are not populated.
+
+        Raises:
+            InvalidArgumentError: If model properties are not populated and the model is not found in the registry.
+            UnknownModelError: If model properties are not populated and the model is not found in the registry.
+        """
+        if not self.properties:
+            logger.debug('Model properties not populated. Trying to update from registry')
+
+            model_name = self.name
+            try:
+                self.properties = s2_inference.get_model_properties_from_registry(model_name)
+            except UnknownModelError:
+                raise InvalidArgumentError(
+                    f'Could not find model properties for model={model_name}. '
+                    f'Please check that the model name is correct. '
+                    f'Please provide model_properties if the model is a custom model and is not supported by default')
+
 
 class MarqoIndex(StrictBaseModel):
     name: str
@@ -141,10 +176,10 @@ class MarqoIndex(StrictBaseModel):
                                   )
 
     @property
-    def image_pointer_field_map(self) -> Dict[str, Field]:
-        return self._cache_or_get('image_pointer_field_map',
-                                  lambda: {field.name: field for field in self.fields if
-                                           field.type == FieldType.ImagePointer}
+    def field_map_by_type(self):
+        return self._cache_or_get('field_map_by_type',
+                                  lambda: {field_type: [field for field in self.fields if field.type == field_type]
+                                           for field_type in FieldType}
                                   )
 
     def _cache_or_get(self, key: str, func):
@@ -176,7 +211,8 @@ if __name__ == '__main__':
         vector_numeric_type=VectorNumericType.Float,
         hnsw_config=HnswConfig(ef_construction=100, m=16),
         normalize_embeddings=True,
-        text_preprocessing=TextPreProcessing(split_length=100, split_overlap=50, split_method=TextSplitMethod.Sentence),
+        text_preprocessing=TextPreProcessing(split_length=100, split_overlap=50,
+                                             split_method=TextSplitMethod.Sentence),
         image_preprocessing=ImagePreProcessing(patch_method=PatchMethod.Frcnn),
         fields=[
             Field(name='title', type=FieldType.Text),

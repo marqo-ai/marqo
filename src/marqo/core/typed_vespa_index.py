@@ -5,9 +5,7 @@ from marqo.core.exceptions import InvalidDataTypeError, InvalidFieldNameError
 from marqo.core.models import MarqoQuery
 from marqo.core.models.marqo_index import *
 from marqo.core.vespa_index import VespaIndex
-from marqo.exceptions import InvalidArgumentError, InternalError
-from marqo.s2_inference import s2_inference
-from marqo.s2_inference.errors import UnknownModelError
+from marqo.exceptions import InternalError
 
 
 class TypedVespaIndex(VespaIndex):
@@ -213,7 +211,7 @@ class TypedVespaIndex(VespaIndex):
             schema.append(f'field {cls._SCORE_MODIFIERS_FIELD} type tensor<float>(p{{}}) {{ indexing: attribute }}')
 
         # tensor fields
-        model_dim = cls._get_model_dimension(marqo_index)
+        model_dim = marqo_index.model.get_dimension()
         for field in marqo_index.tensor_fields:
             chunks_field_name = f'{cls._CHUNKS_FIELD_PREFIX}{field.name}'
             embedding_field_name = f'{cls._EMBEDDING_FIELD_PREFIX}{field.name}'
@@ -259,7 +257,7 @@ class TypedVespaIndex(VespaIndex):
             )
             vector_summary_fields.append(
                 f'summary {field.embeddings_field_name} type tensor<float>(p{{}}, '
-                f'x[{cls._get_model_dimension(marqo_index)}]) {{ }}'
+                f'x[{marqo_index.model.get_dimension()}]) {{ }}'
             )
 
         schema.append('document-summary all-non-vector-summary {')
@@ -285,7 +283,7 @@ class TypedVespaIndex(VespaIndex):
         lexical_fields = marqo_index.lexical_fields
         score_modifier_fields = marqo_index.score_modifier_fields
         tensor_fields = [field.name for field in marqo_index.tensor_fields]
-        model_dim = cls._get_model_dimension(marqo_index)
+        model_dim = marqo_index.model.get_dimension()
 
         bm25_expression = ' + '.join([f'bm25({field})' for field in lexical_fields])
         embedding_similarity_expression = ' + '.join([
@@ -357,28 +355,6 @@ class TypedVespaIndex(VespaIndex):
             return cls._DISTANCE_METRIC_MAP[marqo_distance_metric]
         except KeyError:
             raise ValueError(f'Unknown Marqo distance metric: {marqo_distance_metric}')
-
-    @classmethod
-    # TODO - Move this to a new model registry moduleg
-    def _get_model_dimension(cls, marqo_index: MarqoIndex) -> int:
-        if marqo_index.model.properties:
-            model_properties = marqo_index.model.properties
-        else:
-            model_name = marqo_index.model.name
-            try:
-                model_properties = s2_inference.get_model_properties_from_registry(model_name)
-            except UnknownModelError:
-                raise InvalidArgumentError(
-                    f"Could not find model properties for model={model_name}. "
-                    f"Please check that the model name is correct. "
-                    f"Please provide model_properties if the model is a custom model and is not supported by default")
-
-        try:
-            return model_properties["dimensions"]
-        except KeyError:
-            raise InvalidArgumentError(
-                "The given model properties must contain a 'dimensions' key"
-            )
 
     @classmethod
     def _validate_index_type(cls, marqo_index: MarqoIndex) -> None:
