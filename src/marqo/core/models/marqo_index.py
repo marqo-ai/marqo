@@ -105,14 +105,19 @@ class Model(StrictBaseModel):
                 "The given model properties does not contain a 'dimensions' key"
             )
 
-    def _update_model_properties_from_registry(self) -> None:
+    def get_properties(self):
         """
-        Try to update model properties from the registry if model properties are not populated.
+        Get model properties. Try to update model properties from the registry first if model properties
+        are not populated.
 
         Raises:
             InvalidArgumentError: If model properties are not populated and the model is not found in the registry.
             UnknownModelError: If model properties are not populated and the model is not found in the registry.
         """
+        self._update_model_properties_from_registry()
+        return self.properties
+
+    def _update_model_properties_from_registry(self) -> None:
         if not self.properties:
             logger.debug('Model properties not populated. Trying to update from registry')
 
@@ -176,7 +181,7 @@ class MarqoIndex(StrictBaseModel):
                                   )
 
     @property
-    def field_map_by_type(self):
+    def field_map_by_type(self) -> Dict[FieldType, List[Field]]:
         return self._cache_or_get('field_map_by_type',
                                   lambda: {field_type: [field for field in self.fields if field.type == field_type]
                                            for field_type in FieldType}

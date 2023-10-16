@@ -381,7 +381,7 @@ def _add_documents_structured(add_docs_params: AddDocsParams, marqo_index: Marqo
         raise errors.BadRequestError(message="Received empty add documents request")
 
     if add_docs_params.mappings is not None:
-        validate_mappings = validation.validate_mappings(add_docs_params.mappings)
+        validation.validate_mappings(add_docs_params.mappings)
 
     unsuccessful_docs = []
     total_vectorise_time = 0
@@ -389,8 +389,7 @@ def _add_documents_structured(add_docs_params: AddDocsParams, marqo_index: Marqo
     image_repo = {}
 
     with ExitStack() as exit_stack:
-        tensor_fields = marqo_index.tensor_field_map.keys()
-        image_fields = marqo_index.image_pointer_field_map.keys()
+        image_fields = [field.name for field in marqo_index.field_map_by_type[FieldType.ImagePointer]]
 
         if image_fields:
             with RequestMetricsStore.for_request().time(
@@ -551,7 +550,7 @@ def _add_documents_structured(add_docs_params: AddDocsParams, marqo_index: Marqo
                                     (marqo_index.type == IndexType.Unstructured and
                                      marqo_index.treat_urls_and_pointers_as_images or
                                      marqo_index.type == IndexType.Structured and
-                                     field in marqo_index.image_pointer_field_map):
+                                     field in image_fields):
 
                                 if not isinstance(image_repo[field_content], Exception):
                                     image_data = image_repo[field_content]
@@ -590,7 +589,7 @@ def _add_documents_structured(add_docs_params: AddDocsParams, marqo_index: Marqo
                         with RequestMetricsStore.for_request().time(f"add_documents.create_vectors"):
                             vector_chunks = s2_inference.vectorise(
                                 model_name=marqo_index.model.name,
-                                model_properties=marqo_index.model.properties, content=content_chunks,
+                                model_properties=marqo_index.model.get_properties(), content=content_chunks,
                                 device=add_docs_params.device, normalize_embeddings=normalize_embeddings,
                                 infer=marqo_field.type == FieldType.ImagePointer, model_auth=add_docs_params.model_auth
                             )
@@ -628,11 +627,12 @@ def _add_documents_structured(add_docs_params: AddDocsParams, marqo_index: Marqo
                     if add_docs_params.mappings[field]["type"] == "multimodal_combination":
                         (combo_chunk, combo_document_is_valid,
                          unsuccessful_doc_to_append, combo_vectorise_time_to_add,
-                         new_fields_from_multimodal_combination) = vectorise_multimodal_combination_field(
+                         new_fields_from_multimodal_combination) = vectorise_multimodal_combination_field_structured(
                             field, field_content, copied, i, doc_id, add_docs_params.device, marqo_index,
                             image_repo, add_docs_params.mappings[field], model_auth=add_docs_params.model_auth)
                         total_vectorise_time = total_vectorise_time + combo_vectorise_time_to_add
                         if combo_document_is_valid is False:
+                            document_is_valid = False
                             unsuccessful_docs.append(unsuccessful_doc_to_append)
                             break
                         else:
@@ -643,6 +643,43 @@ def _add_documents_structured(add_docs_params: AddDocsParams, marqo_index: Marqo
                 # Add chunks_to_append along with doc metadata to total chunks
                 fields_to_add[tensor_field.chunk_field_name] = chunks
                 fields_to_add[tensor_field.embeddings_field_name] = embeddings
+
+            # Multimodal fields haven't been processed yet, so we do that here
+            for tensor_field in marqo_index.tensor_fields:
+                marqo_field = marqo_index.field_map[tensor_field.name]
+                if marqo_field.type == FieldType.MultimodalCombination:
+                    field_name = tensor_field.name
+                    field_content = {
+                        dependent_field: copied[dependent_field]
+                        for dependent_field in marqo_field.dependent_fields if dependent_field in copied
+                    }
+                    if add_docs_params.mappings is not None and tensor_field.name in add_docs_params.mappings:
+                        logger.debug(f'Using custom weights for multimodal combination field {tensor_field.name}')
+                        mappings = add_docs_params.mappings[tensor_field.name]
+                    else:
+                        logger.debug(f'Using default weights for multimodal combination field {tensor_field.name}: '
+                                     f'{marqo_field.dependent_fields}')
+                        mappings = {
+                            'weights': marqo_field.dependent_fields
+                        }
+
+                    (combo_chunk, combo_document_is_valid,
+                     unsuccessful_doc_to_append,
+                     combo_vectorise_time_to_add) = vectorise_multimodal_combination_field_structured(
+                        field_name, field_content, copied, i, doc_id, add_docs_params.device, marqo_index,
+                        image_repo, mappings, model_auth=add_docs_params.model_auth)
+
+                    total_vectorise_time = total_vectorise_time + combo_vectorise_time_to_add
+
+                    if combo_document_is_valid is False:
+                        document_is_valid = False
+                        unsuccessful_docs.append(unsuccessful_doc_to_append)
+                        break
+                    else:
+                        chunks = [combo_chunk[TensorField.field_content]]
+                        embeddings = [combo_chunk[TensorField.marqo_knn_field]]
+                        fields_to_add[tensor_field.chunk_field_name] = chunks
+                        fields_to_add[tensor_field.embeddings_field_name] = embeddings
 
             if document_is_valid:
                 copied = {k: v for k, v in copied.items() if k not in fields_to_remove}
@@ -668,8 +705,8 @@ def _add_documents_structured(add_docs_params: AddDocsParams, marqo_index: Marqo
                     for doc in bulk_parent_dicts
                 ]
                 index_responses = vespa_client.feed_batch(vespa_docs, marqo_index.name)
-            RequestMetricsStore.for_request().add_time("add_documents.opensearch._bulk.internal",
-                                                       float(index_parent_response["took"]))
+            # RequestMetricsStore.for_request().add_time("add_documents.opensearch._bulk.internal",
+            #                                            float(index_parent_response["took"]))
 
             end_time_5 = timer()
             total_http_time = end_time_5 - start_time_5
@@ -718,6 +755,7 @@ def _add_documents_structured(add_docs_params: AddDocsParams, marqo_index: Marqo
 
             # return translate_add_doc_response(response=index_parent_response, time_diff=t1 - t0)
             return index_responses
+
 
 def get_document_by_id(
         config: Config, index_name: str, document_id: str, show_vectors: bool = False):
@@ -1970,12 +2008,12 @@ def get_cuda_info() -> dict:
         ))
 
 
-def vectorise_multimodal_combination_field(
+def vectorise_multimodal_combination_field_structured(
         field: str, multimodal_object: Dict[str, dict], doc: dict, doc_index: int,
-        doc_id: str, device: str, index_info, image_repo, field_map: dict,
+        doc_id: str, device: str, marqo_index, image_repo, field_map: dict,
         model_auth: Optional[ModelAuth] = None
 ):
-    '''
+    """
     This function is used to vectorise multimodal combination field. The field content should
     have the following structure:
     field_conent = {"tensor_field_one" : {"weight":0.5, "parameter": "test-paramater-1"},
@@ -1991,17 +2029,15 @@ def vectorise_multimodal_combination_field(
         doc_index: the index of the document. This is an interator variable `i` in the main body to iterator throught the docs
         doc_id: the document id
         device: device from main body
-        index_info: index_info from main body,
+        marqo_index: index_info from main body,
         model_auth: Model download authorisation information (if required)
     Returns:
         combo_chunk: the combo_chunk to be appended to the main body
         combo_document_is_valid:  if the document is a valid
         unsuccessful_docs: appended unsucessful_docs
         combo_total_vectorise_time: the vectorise time spent in combo field
-        new_fields_from_multimodal_combination: the new fields from multimodal combination field that will be added to
-            index properties
 
-    '''
+    """
     # field_content = {"tensor_field_one" : {"weight":0.5, "parameter": "test-paramater-1"},
     #                 "tensor_field_two" : {"weight": 0.5, parameter": "test-parameter-2"}},
     combo_document_is_valid = True
@@ -2020,48 +2056,37 @@ def vectorise_multimodal_combination_field(
     image_field_names = []
     image_content_to_vectorise = []
 
-    normalize_embeddings = index_info.index_settings[NsField.index_defaults][
-        NsField.normalize_embeddings]
-    infer_if_image = index_info.index_settings[NsField.index_defaults][
-        NsField.treat_urls_and_pointers_as_images]
+    normalize_embeddings = marqo_index.normalize_embeddings
+    image_fields = [field.name for field in marqo_index.field_map_by_type[FieldType.ImagePointer]]
 
-    if infer_if_image is False:
-        text_field_names = list(multimodal_object.keys())
-        text_content_to_vectorise = list(multimodal_object.values())
-        new_fields_from_multimodal_combination = set(
-            [(sub_field_name, _infer_opensearch_data_type(sub_content)) for sub_field_name
-            , sub_content in multimodal_object.items()])
-    else:
-        for sub_field_name, sub_content in multimodal_object.items():
-            if isinstance(sub_content, str) and not _is_image(sub_content):
-                text_field_names.append(sub_field_name)
-                text_content_to_vectorise.append(sub_content)
-            else:
-                try:
-                    if isinstance(sub_content, str) and index_info.index_settings[NsField.index_defaults][
-                        NsField.treat_urls_and_pointers_as_images]:
-                        if not isinstance(image_repo[sub_content], Exception):
-                            image_data = image_repo[sub_content]
-                        else:
-                            raise s2_inference_errors.S2InferenceError(
-                                f"Could not find image found at `{sub_content}`. \n"
-                                f"Reason: {str(image_repo[sub_content])}"
-                            )
+    for sub_field_name, sub_content in multimodal_object.items():
+        if isinstance(sub_content, str) and sub_field_name not in image_fields:
+            text_field_names.append(sub_field_name)
+            text_content_to_vectorise.append(sub_content)
+        else:
+            try:
+                if isinstance(sub_content, str):
+                    if not isinstance(image_repo[sub_content], Exception):
+                        image_data = image_repo[sub_content]
                     else:
-                        image_data = sub_content
+                        raise s2_inference_errors.S2InferenceError(
+                            f"Could not find image found at `{sub_content}`. \n"
+                            f"Reason: {str(image_repo[sub_content])}"
+                        )
+                else:
+                    image_data = sub_content
 
-                    image_content_to_vectorise.append(image_data)
-                    image_field_names.append(sub_field_name)
+                image_content_to_vectorise.append(image_data)
+                image_field_names.append(sub_field_name)
 
-                except s2_inference_errors.S2InferenceError as e:
-                    combo_document_is_valid = False
-                    unsuccessful_doc_to_append = \
-                        (doc_index, {'_id': doc_id, 'error': e.message,
-                                     'status': int(errors.InvalidArgError.status_code),
-                                     'code': errors.InvalidArgError.code})
+            except s2_inference_errors.S2InferenceError as e:
+                combo_document_is_valid = False
+                unsuccessful_doc_to_append = \
+                    (doc_index, {'_id': doc_id, 'error': e.message,
+                                 'status': int(errors.InvalidArgError.status_code),
+                                 'code': errors.InvalidArgError.code})
 
-                    return combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add, new_fields_from_multimodal_combination
-            new_fields_from_multimodal_combination.add((sub_field_name, _infer_opensearch_data_type(sub_content)))
+                return combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add
 
     try:
         start_time = timer()
@@ -2069,19 +2094,19 @@ def vectorise_multimodal_combination_field(
         if len(text_content_to_vectorise) > 0:
             with RequestMetricsStore.for_request().time(f"create_vectors"):
                 text_vectors = s2_inference.vectorise(
-                    model_name=index_info.model_name,
-                    model_properties=index_info.get_model_properties(), content=text_content_to_vectorise,
+                    model_name=marqo_index.model.name,
+                    model_properties=marqo_index.get_model_properties(), content=text_content_to_vectorise,
                     device=device, normalize_embeddings=normalize_embeddings,
-                    infer=infer_if_image, model_auth=model_auth
+                    infer=False, model_auth=model_auth
                 )
         image_vectors = []
         if len(image_content_to_vectorise) > 0:
             with RequestMetricsStore.for_request().time(f"create_vectors"):
                 image_vectors = s2_inference.vectorise(
-                    model_name=index_info.model_name,
-                    model_properties=index_info.get_model_properties(), content=image_content_to_vectorise,
+                    model_name=marqo_index.model_name,
+                    model_properties=marqo_index.model.get_properties(), content=image_content_to_vectorise,
                     device=device, normalize_embeddings=normalize_embeddings,
-                    infer=infer_if_image, model_auth=model_auth
+                    infer=True, model_auth=model_auth
                 )
         end_time = timer()
         combo_vectorise_time_to_add += (end_time - start_time)
@@ -2099,7 +2124,7 @@ def vectorise_multimodal_combination_field(
             (doc_index, {'_id': doc_id, 'error': image_err.message, 'status': int(image_err.status_code),
                          'code': image_err.code})
 
-        return combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add, new_fields_from_multimodal_combination
+        return combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add
 
     sub_field_name_list = text_field_names + image_field_names
     vectors_list = text_vectors + image_vectors
@@ -2122,7 +2147,7 @@ def vectorise_multimodal_combination_field(
         TensorField.field_content: json.dumps(multimodal_object),
         TensorField.field_name: field,
     })
-    return combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add, new_fields_from_multimodal_combination
+    return combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add
 
 
 def _generate_vector_text_search_query_for_verbose_one(original_body: List[Dict[str, Any]]) -> None:
