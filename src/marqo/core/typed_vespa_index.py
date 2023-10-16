@@ -179,6 +179,11 @@ class TypedVespaIndex(VespaIndex):
         schema.append(f'field {cls._ID_FIELD_NAME} type string {{ indexing: summary }}')
 
         for field in marqo_index.fields:
+            if field.type == FieldType.MultimodalCombination:
+                # Subfields will store the value of the multimodal combination field and its tensor field will store
+                # the chunks and embeddings
+                continue
+
             field_type = cls._get_vespa_type(field.type)
 
             if FieldFeature.LexicalSearch in field.features:
@@ -237,6 +242,10 @@ class TypedVespaIndex(VespaIndex):
         non_vector_summary_fields = []
         vector_summary_fields = []
         for field in marqo_index.fields:
+            if field.type == FieldType.MultimodalCombination:
+                # Only has a tensor field which will be added in the next loop
+                continue
+
             target_field_name = field.name
             field_type = cls._get_vespa_type(field.type)
             if field.filter_field_name:
