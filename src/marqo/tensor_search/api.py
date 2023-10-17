@@ -161,29 +161,14 @@ def search(search_query: SearchQuery, index_name: str, device: str = Depends(api
 @app.post("/indexes/{index_name}/documents")
 @throttle(RequestType.INDEX)
 def add_or_replace_documents(
-        request: Request,
-        body: typing.Union[AddDocsBodyParams, List[Dict]],
+        body: AddDocsBodyParams,
         index_name: str,
         refresh: bool = True,
         marqo_config: config.Config = Depends(get_config),
-        non_tensor_fields: Optional[List[str]] = Query(default=None),
-        device: str = Depends(api_validation.validate_device),
-        use_existing_tensors: Optional[bool] = False,
-        image_download_headers: Optional[dict] = Depends(
-            api_utils.decode_image_download_headers
-        ),
-        model_auth: Optional[ModelAuth] = Depends(
-            api_utils.decode_query_string_model_auth
-        ),
-        mappings: Optional[dict] = Depends(api_utils.decode_mappings)):
+        device: str = Depends(api_validation.validate_device)):
     """add_documents endpoint (replace existing docs with the same id)"""
     add_docs_params = api_utils.add_docs_params_orchestrator(index_name=index_name, body=body,
-                                                             device=device, auto_refresh=refresh,
-                                                             non_tensor_fields=non_tensor_fields, mappings=mappings,
-                                                             model_auth=model_auth,
-                                                             image_download_headers=image_download_headers,
-                                                             use_existing_tensors=use_existing_tensors,
-                                                             query_parameters=request.query_params)
+                                                             device=device, auto_refresh=refresh)
 
     with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/documents"):
         return tensor_search.add_documents(
