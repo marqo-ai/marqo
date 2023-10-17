@@ -7,15 +7,13 @@ from marqo.core.exceptions import IndexExistsError
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models.marqo_index import *
 from marqo.vespa.models import VespaDocument
-from marqo.vespa.vespa_client import VespaClient
 from tests.marqo_test import MarqoTestCase
 
 
 class TestIndexManagement(MarqoTestCase):
 
     def setUp(self):
-        self.client = VespaClient("http://localhost:19071", "http://localhost:8080", "http://localhost:8080")
-        self.index_management = IndexManagement(self.client)
+        self.index_management = IndexManagement(self.vespa_client)
 
         # TODO - use Marqo Vespa client instead of pyvespa once get document functionality is implemented
         self.pyvespa_client = pyvespa.Vespa(url="http://localhost", port=8080)
@@ -26,7 +24,7 @@ class TestIndexManagement(MarqoTestCase):
         """
         index_name = 'a' + str(uuid.uuid4()).replace('-', '')
         settings_schema_name = 'a' + str(uuid.uuid4()).replace('-', '')
-        marqo_index = MarqoIndex(
+        marqo_index = self.marqo_index(
             name=index_name,
             model=Model(name='ViT-B/32'),
             distance_metric=DistanceMetric.PrenormalizedAnguar,
@@ -43,11 +41,12 @@ class TestIndexManagement(MarqoTestCase):
                 TensorField(name='description')
             ]
         )
+
         with patch.object(IndexManagement, '_MARQO_SETTINGS_SCHEMA_NAME', settings_schema_name):
             self.index_management.create_index(marqo_index)
 
             # Inserting a document into the new schema to verify it exists
-            self.client.feed_batch(
+            self.vespa_client.feed_batch(
                 [
                     VespaDocument(
                         id='1',
@@ -68,7 +67,7 @@ class TestIndexManagement(MarqoTestCase):
     def test_create_index_settingsSchemaExists_successful(self):
         index_name_1 = 'a' + str(uuid.uuid4()).replace('-', '')
         index_name_2 = 'a' + str(uuid.uuid4()).replace('-', '')
-        marqo_index = MarqoIndex(
+        marqo_index = self.marqo_index(
             name=index_name_1,
             model=Model(name='ViT-B/32'),
             distance_metric=DistanceMetric.PrenormalizedAnguar,
@@ -92,7 +91,7 @@ class TestIndexManagement(MarqoTestCase):
         self.index_management.create_index(marqo_index)
 
         # Inserting a document into the new schema to verify it exists
-        self.client.feed_batch(
+        self.vespa_client.feed_batch(
             [
                 VespaDocument(
                     id='1',
@@ -112,7 +111,7 @@ class TestIndexManagement(MarqoTestCase):
 
     def test_create_index_indexExists_fails(self):
         index_name = str(uuid.uuid4()).replace('-', '')
-        marqo_index = MarqoIndex(
+        marqo_index = self.marqo_index(
             name=index_name,
             model=Model(name='ViT-B/32'),
             distance_metric=DistanceMetric.PrenormalizedAnguar,
