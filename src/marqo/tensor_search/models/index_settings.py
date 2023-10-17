@@ -65,7 +65,8 @@ class IndexSettings(BaseMarqoModel):
             type=self.type,
             model=core.Model(
                 name=self.model,
-                properties=self.model_properties
+                properties=self.model_properties,
+                custom=self.model_properties is not None
             ),
             normalize_embeddings=self.normalize_embeddings,
             text_preprocessing=self.text_preprocessing,
