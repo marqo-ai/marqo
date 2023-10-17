@@ -1371,3 +1371,83 @@ class TestAddDocuments(MarqoTestCase):
 
         assert params.tensor_fields is None
         assert params.non_tensor_fields == ["field1", "field2"]
+
+
+class TestAddDocumentsUtils(MarqoTestCase):
+    def test_create_chunk_metadata(self):
+        """Test that only valid field types are included in the metadata."""
+        doc = {
+            'string_field': 'Hello, World!',
+            'bool_field': True,
+            'int_field': 42,
+            'float_field': 3.14,
+            'list_field': [1, 2, 3],
+            'dict_field': {'a': 1, 'b': 2},
+            'set_field': {4, 5, 6},     # should be removed from metadata
+            'tuple_field': (7, 8, 9)    # should be removed from metadata
+        }
+
+        expected_output = {
+            'string_field': 'Hello, World!',
+            'bool_field': True,
+            'int_field': 42,
+            'float_field': 3.14,
+            'list_field': [1, 2, 3],
+            'dict_field': {'a': 1, 'b': 2},
+        }
+
+        self.assertDictEqual(add_docs.create_chunk_metadata(doc), expected_output)
+
+        # Check empty document
+        self.assertDictEqual(add_docs.create_chunk_metadata({}), {})
+    
+    def test_determine_document_field_type(self):
+        mixed_mappings = {
+            "my_custom_vector": {
+                "type": "custom_vector"
+            },
+            "my_multimodal": {
+                "type": "multimodal_combination",
+                "weights": {
+                    "text": 0.4,
+                    "image": 0.6
+                }
+            },
+            "my_bad_type": {
+                "type": "DOESNT EXIST IN enums.MappingsObjectType"
+            }
+        }
+
+        assert add_docs.determine_document_field_type(
+            field_name="my_custom_vector", 
+            field_content={"vector": [1, 2, 3]},
+            mappings=mixed_mappings
+        ) == enums.DocumentFieldType.custom_vector
+
+        assert add_docs.determine_document_field_type(
+            field_name="my_multimodal", 
+            field_content={"text": "blah", "image": "https://www.marqo.ai/this/image/doesnt/exist.png"},
+            mappings=mixed_mappings
+        ) == enums.DocumentFieldType.multimodal_combination
+
+        with self.assertRaises(InternalError):
+            add_docs.determine_document_field_type(
+                field_name="my_bad_type",   # exists in mappings, but not in enums.MappingsObjectType
+                field_content={"vector": [1, 2, 3]},
+                mappings=mixed_mappings
+            )
+
+        with self.assertRaises(InternalError):
+            add_docs.determine_document_field_type(
+                field_name="BAD NAME, NOT IN MAPPINGS.", 
+                field_content={"vector": [1, 2, 3]},
+                mappings=mixed_mappings
+            )
+
+        assert add_docs.determine_document_field_type(
+            field_name="Any name. Doesn't matter.", 
+            field_content="normal text",
+            mappings=mixed_mappings
+        ) == enums.DocumentFieldType.standard
+            
+    

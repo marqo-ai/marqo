@@ -185,6 +185,7 @@ class TestContextBulkSearch(MarqoTestCase):
                 ]
             )
         )
+        # TODO: This test is missing assertions
 
     def test_bulk_search_with_incorrect_tensor_dimension(self):
         query = {
