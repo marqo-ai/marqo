@@ -143,7 +143,7 @@ class MarqoIndex(StrictBaseModel):
     distance_metric: DistanceMetric
     vector_numeric_type: VectorNumericType
     hnsw_config: HnswConfig
-    fields: Optional[List[Field]]
+    fields: Optional[List[Field]]  # all fields, including tensor fields
     tensor_fields: Optional[List[TensorField]]
     model_enable_cache: bool = PydanticField(default=False, allow_mutation=False)
     _cache: Dict[str, Any] = PrivateAttr()
