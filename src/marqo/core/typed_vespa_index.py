@@ -67,7 +67,7 @@ class TypedVespaIndex(VespaIndex):
         schema = list()
 
         schema.append(f'schema {marqo_index.name} {{')
-        cls._generate_document(marqo_index, schema)
+        cls._generate_document_section(marqo_index, schema)
         cls._generate_rank_profiles(marqo_index, schema)
         cls._generate_default_fieldset(marqo_index, schema)
         cls._generate_summaries(marqo_index, schema)
@@ -173,7 +173,7 @@ class TypedVespaIndex(VespaIndex):
                                        f'{type(value)}')
 
     @classmethod
-    def _generate_document(cls, marqo_index: MarqoIndex, schema: List[str]) -> None:
+    def _generate_document_section(cls, marqo_index: MarqoIndex, schema: List[str]) -> None:
         """
         Generate the document (fields) section of the Vespa schema. Update `marqo_index` with Vespa-level field names.
         """
