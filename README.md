@@ -54,6 +54,10 @@ Marqo is more than a vector database, it's an end-to-end vector search engine. V
 
 Marqo is integrated into popular AI and data processing frameworks, with more on the way.
 
+**💙 [Haystack](https://github.com/deepset-ai/haystack)**
+
+Haystack is an open-source framework for building applications that make use of NLP technology such as LLMs, embedding models and more. This [integration](https://haystack.deepset.ai/integrations/marqo-document-store) allows you to use Marqo as your Document Store for Haystack pipelines such as retrieval-augmentation, question answering, document search and more.
+
 **🛹 [Griptape](https://github.com/griptape-ai/griptape)**
 
 Griptape enables safe and reliable deployment of LLM-based agents for enterprise applications, the MarqoVectorStoreDriver gives these agents access to scalable search with your own data. This integration lets you leverage open source or custom fine-tuned models through Marqo to deliver relevant results to your LLMs.
