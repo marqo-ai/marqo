@@ -67,10 +67,10 @@ class TypedVespaIndex(VespaIndex):
         schema = list()
 
         schema.append(f'schema {marqo_index.name} {{')
-        cls._generate_document_section(marqo_index, schema)
-        cls._generate_rank_profiles(marqo_index, schema)
-        cls._generate_default_fieldset(marqo_index, schema)
-        cls._generate_summaries(marqo_index, schema)
+        schema.extend(cls._generate_document_section(marqo_index))
+        schema.extend(cls._generate_rank_profiles(marqo_index))
+        schema.extend(cls._generate_default_fieldset(marqo_index))
+        schema.extend(cls._generate_summaries(marqo_index))
         schema.append('}')
 
         return '\n'.join(schema)
@@ -173,14 +173,16 @@ class TypedVespaIndex(VespaIndex):
                                        f'{type(value)}')
 
     @classmethod
-    def _generate_document_section(cls, marqo_index: MarqoIndex, schema: List[str]) -> None:
+    def _generate_document_section(cls, marqo_index: MarqoIndex) -> List[str]:
         """
         Generate the document (fields) section of the Vespa schema. Update `marqo_index` with Vespa-level field names.
         """
-        schema.append(f'document {marqo_index.name} {{')
+        document: List[str] = list()
+
+        document.append(f'document {marqo_index.name} {{')
 
         # ID field
-        schema.append(f'field {cls._ID_FIELD_NAME} type string {{ indexing: summary }}')
+        document.append(f'field {cls._ID_FIELD_NAME} type string {{ indexing: summary }}')
 
         for field in marqo_index.fields:
             if field.type == FieldType.MultimodalCombination:
@@ -192,57 +194,61 @@ class TypedVespaIndex(VespaIndex):
 
             if FieldFeature.LexicalSearch in field.features:
                 field_name = f'{cls._INDEX_FIELD_PREFIX}{field.name}'
-                schema.append(f'field {field_name} type {field_type} {{')
-                schema.append(f'indexing: index | summary')
-                schema.append('index: enable-bm25')
-                schema.append('}')
+                document.append(f'field {field_name} type {field_type} {{')
+                document.append(f'indexing: index | summary')
+                document.append('index: enable-bm25')
+                document.append('}')
 
                 field.lexical_field_name = field_name
 
             if FieldFeature.Filter in field.features:
                 field_name = f'{cls._FILTER_FIELD_PREFIX}{field.name}'
-                schema.append(f'field {field_name} type {field_type} {{')
-                schema.append('indexing: attribute | summary')
-                schema.append('attribute: fast-search')
-                schema.append('rank: filter')
-                schema.append('}')
+                document.append(f'field {field_name} type {field_type} {{')
+                document.append('indexing: attribute | summary')
+                document.append('attribute: fast-search')
+                document.append('rank: filter')
+                document.append('}')
 
                 field.filter_field_name = field_name
 
             if FieldFeature.LexicalSearch not in field.features and FieldFeature.Filter not in field.features:
                 field_name = field.name
-                schema.append(f'field {field_name} type {field_type} {{')
-                schema.append('indexing: summary')
-                schema.append('}')
+                document.append(f'field {field_name} type {field_type} {{')
+                document.append('indexing: summary')
+                document.append('}')
 
         # score modifiers
         if marqo_index.score_modifier_fields:
-            schema.append(f'field {cls._SCORE_MODIFIERS_FIELD} type tensor<float>(p{{}}) {{ indexing: attribute }}')
+            document.append(f'field {cls._SCORE_MODIFIERS_FIELD} type tensor<float>(p{{}}) {{ indexing: attribute }}')
 
         # tensor fields
         model_dim = marqo_index.model.get_dimension()
         for field in marqo_index.tensor_fields:
             chunks_field_name = f'{cls._CHUNKS_FIELD_PREFIX}{field.name}'
             embedding_field_name = f'{cls._EMBEDDING_FIELD_PREFIX}{field.name}'
-            schema.append(f'field {chunks_field_name} type array<string> {{')
-            schema.append('indexing: attribute | summary')
-            schema.append('}')
-            schema.append(f'field {embedding_field_name} type tensor<float>(p{{}}, x[{model_dim}]) {{')
-            schema.append('indexing: attribute | index | summary')
-            schema.append(f'attribute {{ distance-metric: {cls._get_distance_metric(marqo_index.distance_metric)} }}')
-            schema.append('index { hnsw {')
-            schema.append(f'max-links-per-node: {marqo_index.hnsw_config.m}')
-            schema.append(f'neighbors-to-explore-at-insert: {marqo_index.hnsw_config.ef_construction}')
-            schema.append('}}')
-            schema.append('}')
+            document.append(f'field {chunks_field_name} type array<string> {{')
+            document.append('indexing: attribute | summary')
+            document.append('}')
+            document.append(f'field {embedding_field_name} type tensor<float>(p{{}}, x[{model_dim}]) {{')
+            document.append('indexing: attribute | index | summary')
+            document.append(f'attribute {{ distance-metric: {cls._get_distance_metric(marqo_index.distance_metric)} }}')
+            document.append('index { hnsw {')
+            document.append(f'max-links-per-node: {marqo_index.hnsw_config.m}')
+            document.append(f'neighbors-to-explore-at-insert: {marqo_index.hnsw_config.ef_construction}')
+            document.append('}}')
+            document.append('}')
 
             field.chunk_field_name = chunks_field_name
             field.embeddings_field_name = embedding_field_name
 
-        schema.append('}')
+        document.append('}')
+
+        return document
 
     @classmethod
-    def _generate_summaries(cls, marqo_index: MarqoIndex, schema: List[str]) -> None:
+    def _generate_summaries(cls, marqo_index: MarqoIndex) -> List[str]:
+        summaries: List[str] = list()
+
         non_vector_summary_fields = []
         vector_summary_fields = []
         for field in marqo_index.fields:
@@ -273,26 +279,34 @@ class TypedVespaIndex(VespaIndex):
                 f'x[{marqo_index.model.get_dimension()}]) {{ }}'
             )
 
-        schema.append('document-summary all-non-vector-summary {')
-        schema.extend(non_vector_summary_fields)
-        schema.append('}')
-        schema.append('document-summary all-vector-summary {')
-        schema.extend(non_vector_summary_fields)
-        schema.extend(vector_summary_fields)
-        schema.append('}')
+        summaries.append('document-summary all-non-vector-summary {')
+        summaries.extend(non_vector_summary_fields)
+        summaries.append('}')
+        summaries.append('document-summary all-vector-summary {')
+        summaries.extend(non_vector_summary_fields)
+        summaries.extend(vector_summary_fields)
+        summaries.append('}')
+
+        return summaries
 
     @classmethod
-    def _generate_default_fieldset(cls, marqo_index: MarqoIndex, schema: List[str]) -> None:
+    def _generate_default_fieldset(cls, marqo_index: MarqoIndex) -> List[str]:
+        fieldsets: List[str] = list()
+
         fieldset_fields = marqo_index.lexical_fields
 
         if fieldset_fields:
-            schema.append('fieldset default {')
+            fieldsets.append('fieldset default {')
             if fieldset_fields:
-                schema.append(f'fields: {", ".join(fieldset_fields)}')
-            schema.append('}')
+                fieldsets.append(f'fields: {", ".join(fieldset_fields)}')
+            fieldsets.append('}')
+
+        return fieldsets
 
     @classmethod
-    def _generate_rank_profiles(cls, marqo_index: MarqoIndex, schema: List[str]) -> None:
+    def _generate_rank_profiles(cls, marqo_index: MarqoIndex) -> List[str]:
+        rank_profiles: List[str] = list()
+
         lexical_fields = marqo_index.lexical_fields
         score_modifier_fields = marqo_index.score_modifier_fields
         tensor_fields = [field.name for field in marqo_index.tensor_fields]
@@ -305,21 +319,21 @@ class TypedVespaIndex(VespaIndex):
         ])
 
         if lexical_fields:
-            schema.append(f'rank-profile {cls._BM25_RANK_PROFILE} inherits default {{ first-phase {{')
-            schema.append(f'expression: {bm25_expression}')
-            schema.append('}}')
+            rank_profiles.append(f'rank-profile {cls._BM25_RANK_PROFILE} inherits default {{ first-phase {{')
+            rank_profiles.append(f'expression: {bm25_expression}')
+            rank_profiles.append('}}')
 
         if tensor_fields:
-            schema.append(f'rank-profile {cls._EMBEDDING_SIMILARITY_RANK_PROFILE} inherits default {{')
-            schema.append('inputs {')
-            schema.append(f'query({cls._RANK_INPUT_QUERY_EMBEDDING}) tensor<float>(x[{model_dim}])')
+            rank_profiles.append(f'rank-profile {cls._EMBEDDING_SIMILARITY_RANK_PROFILE} inherits default {{')
+            rank_profiles.append('inputs {')
+            rank_profiles.append(f'query({cls._RANK_INPUT_QUERY_EMBEDDING}) tensor<float>(x[{model_dim}])')
             for field in tensor_fields:
-                schema.append(f'query({field}): 1')
+                rank_profiles.append(f'query({field}): 1')
 
-            schema.append('}')
-            schema.append('first-phase {')
-            schema.append(f'expression: {embedding_similarity_expression}')
-            schema.append('}}')
+            rank_profiles.append('}')
+            rank_profiles.append('first-phase {')
+            rank_profiles.append(f'expression: {embedding_similarity_expression}')
+            rank_profiles.append('}}')
 
         if score_modifier_fields:
             expression = f'if (count(query({cls._RANK_INPUT_MULT_WEIGHTS})) == 0, 1, ' \
@@ -327,26 +341,29 @@ class TypedVespaIndex(VespaIndex):
                          f'* attribute({cls._SCORE_MODIFIERS_FIELD}), prod)) * score ' \
                          f'+ reduce(query({cls._RANK_INPUT_ADD_WEIGHTS}) ' \
                          f'* attribute({cls._SCORE_MODIFIERS_FIELD}), sum)'
-            schema.append(f'rank-profile {cls._MODIFIERS_RANK_PROFILE} inherits default {{')
-            schema.append('inputs {')
-            schema.append(f'query({cls._RANK_INPUT_MULT_WEIGHTS})  tensor<float>(p{{}})')
-            schema.append(f'query({cls._RANK_INPUT_ADD_WEIGHTS})  tensor<float>(p{{}})')
-            schema.append('}')
-            schema.append('function modify(score) {')
-            schema.append(f'expression: {expression}')
-            schema.append('}}')
+            rank_profiles.append(f'rank-profile {cls._MODIFIERS_RANK_PROFILE} inherits default {{')
+            rank_profiles.append('inputs {')
+            rank_profiles.append(f'query({cls._RANK_INPUT_MULT_WEIGHTS})  tensor<float>(p{{}})')
+            rank_profiles.append(f'query({cls._RANK_INPUT_ADD_WEIGHTS})  tensor<float>(p{{}})')
+            rank_profiles.append('}')
+            rank_profiles.append('function modify(score) {')
+            rank_profiles.append(f'expression: {expression}')
+            rank_profiles.append('}}')
 
             if lexical_fields:
-                schema.append(f'rank-profile {cls._BM25_RANK_PROFILE}_{cls._MODIFIERS_RANK_PROFILE} '
-                              f'inherits {cls._MODIFIERS_RANK_PROFILE} {{ first-phase {{')
-                schema.append(f'expression: modify({bm25_expression})')
-                schema.append('}}')
+                rank_profiles.append(f'rank-profile {cls._BM25_RANK_PROFILE}_{cls._MODIFIERS_RANK_PROFILE} '
+                                     f'inherits {cls._MODIFIERS_RANK_PROFILE} {{ first-phase {{')
+                rank_profiles.append(f'expression: modify({bm25_expression})')
+                rank_profiles.append('}}')
 
             if tensor_fields:
-                schema.append(f'rank-profile {cls._EMBEDDING_SIMILARITY_RANK_PROFILE}_{cls._MODIFIERS_RANK_PROFILE} '
-                              f'inherits {cls._MODIFIERS_RANK_PROFILE} {{ first-phase {{')
-                schema.append(f'expression: modify({embedding_similarity_expression})')
-                schema.append('}}')
+                rank_profiles.append(
+                    f'rank-profile {cls._EMBEDDING_SIMILARITY_RANK_PROFILE}_{cls._MODIFIERS_RANK_PROFILE} '
+                    f'inherits {cls._MODIFIERS_RANK_PROFILE} {{ first-phase {{')
+                rank_profiles.append(f'expression: modify({embedding_similarity_expression})')
+                rank_profiles.append('}}')
+
+        return rank_profiles
 
     @classmethod
     def _get_vespa_type(cls, marqo_type: FieldType) -> str:
@@ -389,6 +406,9 @@ if __name__ == '__main__':
         model=Model(name='ViT-B/32'),
         distance_metric=DistanceMetric.PrenormalizedAnguar,
         type=IndexType.Structured,
+        normalize_embeddings=True,
+        text_preprocessing=TextPreProcessing(split_length=100, split_overlap=50, split_method=TextSplitMethod.Sentence),
+        image_preprocessing=ImagePreProcessing(),
         vector_numeric_type=VectorNumericType.Float,
         hnsw_config=HnswConfig(ef_construction=100, m=16),
         fields=[
@@ -421,4 +441,4 @@ if __name__ == '__main__':
 
     vespa_doc = TypedVespaIndex.to_vespa_document(marqo_doc, marqo_index)
 
-    print(json.dumps(vespa_doc, indent=2))
+    print(vespa_schema)
