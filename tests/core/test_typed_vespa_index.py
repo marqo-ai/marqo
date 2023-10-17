@@ -2,7 +2,7 @@ import os
 import re
 
 from marqo.core.models.marqo_index import *
-from marqo.core.typed_vespa_index import TypedVespaIndex
+from marqo.core.typed_vespa_index import StructuredVespaIndex
 from tests.marqo_test import MarqoTestCase
 
 
@@ -37,7 +37,7 @@ class TestTypedVespaIndex(MarqoTestCase):
             ]
         )
 
-        actual_schema = TypedVespaIndex.generate_schema(marqo_index)
+        actual_schema = StructuredVespaIndex.generate_schema(marqo_index)
         expected_schema = self._read_schema_from_file('test_schemas/healthy_schema_1.sd')
 
         self.assertEqual(
@@ -61,7 +61,7 @@ class TestTypedVespaIndex(MarqoTestCase):
             ]
         )
 
-        actual_schema = TypedVespaIndex.generate_schema(marqo_index)
+        actual_schema = StructuredVespaIndex.generate_schema(marqo_index)
         expected_schema = self._read_schema_from_file('test_schemas/no_lexical_fields.sd')
 
         self.assertEqual(
@@ -85,7 +85,7 @@ class TestTypedVespaIndex(MarqoTestCase):
             ]
         )
 
-        actual_schema = TypedVespaIndex.generate_schema(marqo_index)
+        actual_schema = StructuredVespaIndex.generate_schema(marqo_index)
         expected_schema = self._read_schema_from_file('test_schemas/no_score_modifiers.sd')
 
         self.assertEqual(
@@ -106,7 +106,7 @@ class TestTypedVespaIndex(MarqoTestCase):
             tensor_fields=[]
         )
 
-        actual_schema = TypedVespaIndex.generate_schema(marqo_index)
+        actual_schema = StructuredVespaIndex.generate_schema(marqo_index)
         expected_schema = self._read_schema_from_file('test_schemas/no_tensor_fields.sd')
 
         self.assertEqual(
@@ -131,7 +131,7 @@ class TestTypedVespaIndex(MarqoTestCase):
         )
 
         with self.assertRaises(ValueError):
-            TypedVespaIndex.generate_schema(marqo_index)
+            StructuredVespaIndex.generate_schema(marqo_index)
 
     def _read_schema_from_file(self, path: str) -> str:
         currentdir = os.path.dirname(os.path.abspath(__file__))

@@ -8,7 +8,7 @@ from marqo.core.vespa_index import VespaIndex
 from marqo.exceptions import InternalError
 
 
-class TypedVespaIndex(VespaIndex):
+class StructuredVespaIndex(VespaIndex):
     _MARQO_TO_VESPA_TYPE_MAP = {
         FieldType.Text: 'string',
         FieldType.Bool: 'bool',
@@ -424,7 +424,7 @@ if __name__ == '__main__':
         model_enable_cache=True
     )
 
-    vespa_schema = TypedVespaIndex.generate_schema(marqo_index)
+    vespa_schema = StructuredVespaIndex.generate_schema(marqo_index)
 
     marqo_doc = {
         '_id': '123',
@@ -439,6 +439,6 @@ if __name__ == '__main__':
         }
     }
 
-    vespa_doc = TypedVespaIndex.to_vespa_document(marqo_doc, marqo_index)
+    vespa_doc = StructuredVespaIndex.to_vespa_document(marqo_doc, marqo_index)
 
     print(vespa_schema)

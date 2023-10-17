@@ -54,7 +54,7 @@ from marqo import errors
 from marqo._httprequests import HttpRequests
 from marqo.config import Config
 from marqo.core.models.marqo_index import IndexType, MarqoIndex, FieldType
-from marqo.core.typed_vespa_index import TypedVespaIndex
+from marqo.core.typed_vespa_index import StructuredVespaIndex
 from marqo.s2_inference import errors as s2_inference_errors
 from marqo.s2_inference import s2_inference
 from marqo.s2_inference.clip_utils import _is_image
@@ -678,7 +678,7 @@ def _add_documents_structured(add_docs_params: AddDocsParams, marqo_index: Marqo
         with RequestMetricsStore.for_request().time("add_documents.opensearch._bulk"):
             # serialised_body = utils.dicts_to_jsonl(bulk_parent_dicts)
             vespa_docs = [
-                VespaDocument(**TypedVespaIndex.to_vespa_document(doc, marqo_index))
+                VespaDocument(**StructuredVespaIndex.to_vespa_document(doc, marqo_index))
                 for doc in bulk_parent_dicts
             ]
             index_responses = vespa_client.feed_batch(vespa_docs, marqo_index.name)

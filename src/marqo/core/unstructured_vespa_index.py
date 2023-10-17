@@ -4,7 +4,7 @@ from marqo.core.models import MarqoQuery, MarqoIndex
 from marqo.core.vespa_index import VespaIndex
 
 
-class DynamicVespaIndex(VespaIndex):
+class UnstructuredVespaIndex(VespaIndex):
     @classmethod
     def generate_schema(cls, marqo_index: MarqoIndex) -> str:
         raise NotImplementedError
