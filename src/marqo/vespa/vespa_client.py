@@ -356,7 +356,7 @@ class VespaClient:
         errors = False
         for task in tasks:
             result = task.result()
-            responses.append(task.result())
+            responses.append(result)
             if result.status != '200':
                 errors = True
 

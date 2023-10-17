@@ -81,7 +81,7 @@ from marqo.tensor_search.models.search import Qidx, JHash, SearchContext, Vector
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.tensor_search.tensor_search_logging import get_logger
 from marqo.tensor_search.utils import add_timing
-from marqo.vespa.models import VespaDocument
+from marqo.vespa.models import VespaDocument, FeedBatchResponse
 from marqo.vespa.vespa_client import VespaClient
 
 logger = get_logger(__name__)
@@ -343,6 +343,11 @@ def _get_chunks_for_field(field_name: str, doc_id: str, doc):
 
 
 def add_documents(config: Config, add_docs_params: AddDocsParams):
+    """
+    Args:
+        config: Config object
+        add_docs_params: add_documents()'s parameters
+    """
     try:
         marqo_index = index_meta_cache.get_index(config=config, index_name=add_docs_params.index_name)
     except errors.IndexNotFoundError:
@@ -361,15 +366,9 @@ def _add_documents_unstructured(add_docs_params: AddDocsParams, marqo_index: Mar
 
 
 def _add_documents_structured(add_docs_params: AddDocsParams, marqo_index: MarqoIndex, vespa_client: VespaClient):
-    """
-    Args:
-        config: Config object
-        add_docs_params: add_documents()'s parameters
-    """
     # ADD DOCS TIMER-LOGGER (3)
 
     RequestMetricsStore.for_request().start("add_documents.processing_before_opensearch")
-    start_time_3 = timer()
 
     if add_docs_params.mappings is not None:
         validation.validate_mappings_object(mappings_object=add_docs_params.mappings)
@@ -411,17 +410,8 @@ def _add_documents_structured(add_docs_params: AddDocsParams, marqo_index: Marqo
                 )
 
         if add_docs_params.use_existing_tensors:
+            # TODO - implement this for Vespa after search is implemented
             raise errors.MarqoWebError('use_existing_tensors is not currently supported with Vespa')
-
-            # TODO - implement this for Vespa after get doc is added
-            # doc_ids = []
-            #
-            # # Iterate through the list in reverse, only latest doc with dupe id gets added.
-            # for i in range(len(add_docs_params.docs) - 1, -1, -1):
-            #     if ("_id" in add_docs_params.docs[i]) and (add_docs_params.docs[i]["_id"] not in doc_ids):
-            #         doc_ids.append(add_docs_params.docs[i]["_id"])
-            # existing_docs = _get_documents_for_upsert(
-            #     config=config, index_name=add_docs_params.index_name, document_ids=doc_ids)
 
         for i, doc in enumerate(add_docs_params.docs):
 
@@ -447,39 +437,18 @@ def _add_documents_structured(add_docs_params: AddDocsParams, marqo_index: Marqo
                 )
                 continue
 
-            # indexing_instructions["index"]["_id"] = doc_id
-            # if add_docs_params.use_existing_tensors:
-            #     matching_doc = [doc for doc in existing_docs["docs"] if doc["_id"] == doc_id]
-            #     # Should only have 1 result, as only 1 id matches
-            #     if len(matching_doc) == 1:
-            #         existing_doc = matching_doc[0]
-            #     # When a request isn't sent to get matching docs, because the added docs don't
-            #     # have IDs:
-            #     elif len(matching_doc) == 0:
-            #         existing_doc = {"found": False}
-            #     else:
-            #         raise errors.InternalError(
-            #             message=f"Upsert: found {len(matching_doc)} matching docs for {doc_id} when only 1 or 0 should have been found.")
-            #
-            # # Metadata can be calculated here at the doc level.
-            # # Only add chunk values which are string, boolean, numeric or dictionary.
-            # # Dictionary keys will be store in a list.
-            # chunk_values_for_filtering = {}
-            # for key, value in copied.items():
-            #     if not (isinstance(value, str) or isinstance(value, float)
-            #             or isinstance(value, bool) or isinstance(value, int)
-            #             or isinstance(value, list) or isinstance(value, dict)):
-            #         continue
-            #     chunk_values_for_filtering[key] = value
-
             processed_tensor_fields = {}
             for field in copied:
                 marqo_field = marqo_index.field_map.get(field)
                 if not marqo_field:
-                    raise errors.InvalidArgError(
-                        f"Field {field} is not a valid field for structured index {add_docs_params.index_name}. "
-                        f"Valid fields are: {', '.join(marqo_index.field_map.keys())}"
+                    message = (f"Field {field} is not a valid field for structured index {add_docs_params.index_name}. "
+                               f"Valid fields are: {', '.join(marqo_index.field_map.keys())}")
+                    document_is_valid = False
+                    unsuccessful_docs.append(
+                        (i, {'_id': doc_id, 'error': message, 'status': int(errors.InvalidArgError.status_code),
+                             'code': int(errors.InvalidArgError.code)})
                     )
+                    break
 
                 try:
                     field_content = validation.validate_field_content(
@@ -611,7 +580,8 @@ def _add_documents_structured(add_docs_params: AddDocsParams, marqo_index: Marqo
                                  'code': image_err.code})
                         )
                         break
-                    if (len(vector_chunks) != len(text_chunks)):
+
+                    if len(vector_chunks) != len(text_chunks):
                         raise RuntimeError(
                             f"the input content after preprocessing and its vectorized counterparts must be the same length."
                             f"recevied text_chunks={len(text_chunks)} and vector_chunks={len(vector_chunks)}. "
@@ -657,11 +627,13 @@ def _add_documents_structured(add_docs_params: AddDocsParams, marqo_index: Marqo
                         # None of the fields are present in the document, so we skip this multimodal field
                         continue
 
-                    if add_docs_params.mappings is not None and tensor_field.name in add_docs_params.mappings:
-                        logger.debug(f'Using custom weights for multimodal combination field {tensor_field.name}')
-                        mappings = add_docs_params.mappings[tensor_field.name]
+                    if add_docs_params.mappings is not None and field_name in add_docs_params.mappings and \
+                            add_docs_params.mappings[field_name]["type"] == "multimodal_combination":
+
+                        logger.debug(f'Using custom weights for multimodal combination field {field_name}')
+                        mappings = add_docs_params.mappings[field_name]
                     else:
-                        logger.debug(f'Using default weights for multimodal combination field {tensor_field.name}: '
+                        logger.debug(f'Using default weights for multimodal combination field {field_name}: '
                                      f'{marqo_field.dependent_fields}')
                         mappings = {
                             'weights': marqo_field.dependent_fields
@@ -685,81 +657,79 @@ def _add_documents_structured(add_docs_params: AddDocsParams, marqo_index: Marqo
                         processed_tensor_fields[tensor_field.name]['embeddings'] = [
                             combo_chunk[TensorField.marqo_knn_field]]
 
-            if document_is_valid:
-                if processed_tensor_fields:
-                    copied['tensors'] = processed_tensor_fields
-                copied['_id'] = doc_id
-                bulk_parent_dicts.append(copied)
+        if document_is_valid:
+            if processed_tensor_fields:
+                copied['tensors'] = processed_tensor_fields
+            copied['_id'] = doc_id
+            bulk_parent_dicts.append(copied)
 
-        total_preproc_time = 0.001 * RequestMetricsStore.for_request().stop(
-            "add_documents.processing_before_opensearch")
+    total_preproc_time = 0.001 * RequestMetricsStore.for_request().stop(
+        "add_documents.processing_before_opensearch")
+    logger.debug(
+        f"      add_documents pre-processing: took {(total_preproc_time):.3f}s total for {batch_size} docs, "
+        f"for an average of {(total_preproc_time / batch_size):.3f}s per doc.")
+
+    logger.debug(f"          add_documents vectorise: took {(total_vectorise_time):.3f}s for {batch_size} docs, "
+                 f"for an average of {(total_vectorise_time / batch_size):.3f}s per doc.")
+
+    if bulk_parent_dicts:
+        # ADD DOCS TIMER-LOGGER (5)
+        start_time_5 = timer()
+        with RequestMetricsStore.for_request().time("add_documents.opensearch._bulk"):
+            # serialised_body = utils.dicts_to_jsonl(bulk_parent_dicts)
+            vespa_docs = [
+                VespaDocument(**TypedVespaIndex.to_vespa_document(doc, marqo_index))
+                for doc in bulk_parent_dicts
+            ]
+            index_responses = vespa_client.feed_batch(vespa_docs, marqo_index.name)
+        # RequestMetricsStore.for_request().add_time("add_documents.opensearch._bulk.internal",
+        #                                            float(index_parent_response["took"]))
+
+        end_time_5 = timer()
+        total_http_time = end_time_5 - start_time_5
+        # total_index_time = index_parent_response["took"] * 0.001
         logger.debug(
-            f"      add_documents pre-processing: took {(total_preproc_time):.3f}s total for {batch_size} docs, "
-            f"for an average of {(total_preproc_time / batch_size):.3f}s per doc.")
+            f"      add_documents roundtrip: took {(total_http_time):.3f}s to send {batch_size} docs (roundtrip) to Marqo-os, "
+            f"for an average of {(total_http_time / batch_size):.3f}s per doc.")
 
-        logger.debug(f"          add_documents vectorise: took {(total_vectorise_time):.3f}s for {batch_size} docs, "
-                     f"for an average of {(total_vectorise_time / batch_size):.3f}s per doc.")
+        # logger.debug(
+        #     f"          add_documents Marqo-os index: took {(total_index_time):.3f}s for Marqo-os to index {batch_size} docs, "
+        #     f"for an average of {(total_index_time / batch_size):.3f}s per doc.")
+    else:
+        index_responses = None
 
-        if bulk_parent_dicts:
-            # ADD DOCS TIMER-LOGGER (5)
-            start_time_5 = timer()
-            with RequestMetricsStore.for_request().time("add_documents.opensearch._bulk"):
-                # serialised_body = utils.dicts_to_jsonl(bulk_parent_dicts)
-                vespa_docs = [
-                    VespaDocument(**TypedVespaIndex.to_vespa_document(doc, marqo_index))
-                    for doc in bulk_parent_dicts
-                ]
-                index_responses = vespa_client.feed_batch(vespa_docs, marqo_index.name)
-            # RequestMetricsStore.for_request().add_time("add_documents.opensearch._bulk.internal",
-            #                                            float(index_parent_response["took"]))
+    with RequestMetricsStore.for_request().time("add_documents.postprocess"):
+        t1 = timer()
 
-            end_time_5 = timer()
-            total_http_time = end_time_5 - start_time_5
-            # total_index_time = index_parent_response["took"] * 0.001
-            logger.debug(
-                f"      add_documents roundtrip: took {(total_http_time):.3f}s to send {batch_size} docs (roundtrip) to Marqo-os, "
-                f"for an average of {(total_http_time / batch_size):.3f}s per doc.")
+        def translate_add_doc_response(responses: Optional[FeedBatchResponse], time_diff: float) -> dict:
+            """translates OpenSearch response dict into Marqo dict"""
+            result_dict = {}
+            new_items = []
 
-            # logger.debug(
-            #     f"          add_documents Marqo-os index: took {(total_index_time):.3f}s for Marqo-os to index {batch_size} docs, "
-            #     f"for an average of {(total_index_time / batch_size):.3f}s per doc.")
-        else:
-            index_parent_response = None
+            if responses is not None:
+                result_dict['errors'] = responses.errors
 
-        with RequestMetricsStore.for_request().time("add_documents.postprocess"):
-            t1 = timer()
+                for resp in responses.responses:
+                    id = resp.id.split('::')[-1] if resp.id else None
+                    new_items.append({'status': resp.status})
+                    if id:
+                        new_items[-1].update({'_id': id})
+                    if resp.message:
+                        new_items[-1].update({'message': resp.message})
 
-            def translate_add_doc_response(response: Optional[dict], time_diff: float) -> dict:
-                """translates OpenSearch response dict into Marqo dict"""
-                item_fields_to_remove = ['_index', '_primary_term', '_seq_no', '_shards', '_version']
-                result_dict = {}
-                new_items = []
+            if unsuccessful_docs:
+                result_dict['errors'] = True
 
-                if response is not None:
-                    copied_res = copy.deepcopy(response)
+            for loc, error_info in unsuccessful_docs:
+                new_items.insert(loc, error_info)
 
-                    result_dict['errors'] = copied_res['errors']
-                    actioned = "index"
+            result_dict["processingTimeMs"] = time_diff * 1000
+            result_dict["index_name"] = add_docs_params.index_name
+            result_dict["items"] = new_items
 
-                    for item in copied_res["items"]:
-                        for to_remove in item_fields_to_remove:
-                            if to_remove in item[actioned]:
-                                del item[actioned][to_remove]
-                        new_items.append(item[actioned])
+            return result_dict
 
-                if unsuccessful_docs:
-                    result_dict['errors'] = True
-
-                for loc, error_info in unsuccessful_docs:
-                    new_items.insert(loc, error_info)
-
-                result_dict["processingTimeMs"] = time_diff * 1000
-                result_dict["index_name"] = add_docs_params.index_name
-                result_dict["items"] = new_items
-                return result_dict
-
-            # return translate_add_doc_response(response=index_parent_response, time_diff=t1 - t0)
-            return index_responses
+        return translate_add_doc_response(index_responses, time_diff=t1 - t0)
 
 
 def get_document_by_id(
@@ -1671,7 +1641,8 @@ def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity],
     return qidx_to_vectors
 
 
-def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity], device: str = None) -> List[Dict]:
+def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity], device: str = None) -> List[
+    Dict]:
     """Resolve a batch of search queries in parallel.
 
     Args:
