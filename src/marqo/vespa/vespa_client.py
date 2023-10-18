@@ -13,7 +13,8 @@ import httpx
 import marqo.logging
 import marqo.vespa.concurrency as conc
 from marqo.vespa.exceptions import VespaStatusError, VespaError, InvalidVespaApplicationError
-from marqo.vespa.models import VespaDocument, QueryResult, FeedResponse, FeedBatchResponse
+from marqo.vespa.models import VespaDocument, QueryResult, FeedResponse, FeedBatchResponse, FeedDocumentResponse
+from marqo.vespa.models.delete_document_response import DeleteDocumentResponse
 from marqo.vespa.models.get_document_response import GetDocumentResponse, BatchGetDocumentResponse
 
 logger = marqo.logging.get_logger(__name__)
@@ -125,6 +126,29 @@ class VespaClient:
 
         return QueryResult(**resp.json())
 
+    def feed_document(self, document: VespaDocument, schema: str, timeout: int = 60) -> FeedDocumentResponse:
+        """
+        Feed a document to Vespa.
+
+        Args:
+            document: Document to feed
+            schema: Schema to feed to
+            timeout: Timeout in seconds
+
+        Returns:
+            FeedResponse object
+        """
+        doc_id = document.id
+        data = {'fields': document.fields}
+
+        end_point = f'{self.document_url}/document/v1/{schema}/{schema}/docid/{doc_id}'
+
+        resp = self.http_client.post(end_point, json=data, timeout=timeout)
+
+        self._raise_for_status(resp)
+
+        return FeedDocumentResponse(**resp.json())
+
     def feed_batch(self,
                    batch: List[VespaDocument],
                    schema: str,
@@ -166,11 +190,10 @@ class VespaClient:
         Returns:
             List of FeedResponse objects
         """
-        with httpx.Client(limits=httpx.Limits(max_keepalive_connections=10, max_connections=10)) as sync_client:
-            responses = [
-                self._feed_document_sync(sync_client, document, schema, timeout=60)
-                for document in batch
-            ]
+        responses = [
+            self._feed_document_sync(self.http_client, document, schema, timeout=60)
+            for document in batch
+        ]
 
         errors = False
         for response in responses:
@@ -260,6 +283,25 @@ class VespaClient:
         self._raise_for_status(resp)
 
         return BatchGetDocumentResponse(**resp.json())
+
+    def delete_document(self, id: str, schema: str) -> DeleteDocumentResponse:
+        """
+        Delete a document by ID.
+
+        Note that this method returns a successful response even if the document does not exist.
+
+        Args:
+            id: Document ID
+            schema: Schema to delete from
+        """
+        try:
+            resp = self.http_client.delete(f'{self.document_url}/document/v1/{schema}/{schema}/docid/{id}')
+        except httpx.HTTPError as e:
+            raise VespaError(e) from e
+
+        self._raise_for_status(resp)
+
+        return DeleteDocumentResponse(**resp.json())
 
     def _add_query_params(self, url: str, query_params: Dict[str, str]) -> str:
         if not query_params:

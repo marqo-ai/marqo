@@ -136,6 +136,48 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
 
         self._base_test_feed_batch_successful(self.client.feed_batch_multithreaded, documents)
 
+    def test_delete_document_successful(self):
+        documents = [
+            {"id": "doc1", "fields": {"title": "Title 1", "contents": "Content 1"}},
+            {"id": "doc2", "fields": {"title": "Title 2", "contents": "Content 2"}}
+        ]
+        self.pyvespa_client.feed_batch(documents, self.TEST_SCHEMA)
+
+        resp = self.client.delete_document("doc1", self.TEST_SCHEMA)
+
+        self.assertEqual(resp.pathId.split("/")[-1], "doc1")
+        self.assertEqual(resp.id.split("::")[-1], "doc1")
+
+        # Verify document deleted
+        get_responses = self.pyvespa_client.get_batch(
+            batch=[{"id": "doc1"}, {"id": "doc2"}],
+            schema=self.TEST_SCHEMA
+        )
+        status = [{resp.json['id'].split('::')[-1]: resp.status_code} for resp in get_responses]
+
+        self.assertEqual(status, [{"doc1": 404}, {"doc2": 200}])
+
+    def test_delete_document_notFound_successful(self):
+        documents = [
+            {"id": "doc1", "fields": {"title": "Title 1", "contents": "Content 1"}},
+        ]
+        self.pyvespa_client.feed_batch(documents, self.TEST_SCHEMA)
+
+        # Note it's still 200 if the document doesn't exist
+        resp = self.client.delete_document("docx", self.TEST_SCHEMA)
+
+        self.assertEqual(resp.pathId.split("/")[-1], "docx")
+        self.assertEqual(resp.id.split("::")[-1], "docx")
+
+        # Verify document deleted
+        get_responses = self.pyvespa_client.get_batch(
+            batch=[{"id": "docx"}, {"id": "doc1"}],
+            schema=self.TEST_SCHEMA
+        )
+        status = [{resp.json['id'].split('::')[-1]: resp.status_code} for resp in get_responses]
+
+        self.assertEqual(status, [{"docx": 404}, {"doc1": 200}])
+
     def test_query_found_successful(self):
         documents = [
             {"id": "doc1", "fields": {"title": "Title 1", "contents": "Content 1"}},
