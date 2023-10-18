@@ -68,6 +68,23 @@ class IndexManagement:
             retries=self._MARQO_SETTINGS_RETRIES if settings_schema_created else 0
         )
 
+    def delete_index(self, marqo_index: MarqoIndex):
+        """
+        Delete a Marqo index.
+
+        Args:
+            marqo_index: Marqo index to delete
+        """
+        app = self.vespa_client.download_application()
+
+        if not self._index_exists(marqo_index.name):
+            raise IndexNotFoundError(f"Cannot delete index {marqo_index.name} as it does not exist")
+
+        self._remove_schema(app, marqo_index.name)
+        self._remove_schema_from_services(app, marqo_index.name)
+        self.vespa_client.deploy_application(app)
+        self._delete_index_settings(marqo_index)
+
     def get_all_indexes(self) -> List[MarqoIndex]:
         batch_response = self.vespa_client.get_all_documents(self._MARQO_SETTINGS_SCHEMA_NAME, stream=True)
         if batch_response.continuation:
@@ -138,6 +155,13 @@ class IndexManagement:
         with open(schema_path, 'w') as f:
             f.write(schema)
 
+    def _remove_schema(self, app: str, name: str) -> None:
+        schema_path = os.path.join(app, 'schemas', f'{name}.sd')
+        if not os.path.exists(schema_path):
+            logger.warn(f"Schema {name} does not exist in application package, nothing to remove")
+
+        os.remove(schema_path)
+
     def _add_schema_to_services(self, app: str, name: str) -> None:
         services_path = os.path.join(app, 'services.xml')
 
@@ -152,6 +176,26 @@ class IndexManagement:
 
         tree.write(services_path)
 
+    def _remove_schema_from_services(self, app: str, name: str) -> None:
+        services_path = os.path.join(app, 'services.xml')
+
+        tree = ET.parse(services_path)
+        root = tree.getroot()
+
+        documents_section = root.find(".//documents")
+
+        deleted = False
+        for document in documents_section.findall("document"):
+            if document.get("type") == name:
+                documents_section.remove(document)
+                deleted = True
+                break
+
+        if not deleted:
+            logger.warn(f"Schema {name} does not exist in services.xml, nothing to remove")
+        else:
+            tree.write(services_path)
+
     def _save_index_settings(self, marqo_index: MarqoIndex, retries=0, attempt=0):
         """
         Create or update index settings in Vespa settings schema.
@@ -160,28 +204,30 @@ class IndexManagement:
         if not marqo_index.model.custom:
             marqo_index.model.properties = None
 
-        # TODO - implement a public single doc feed method and use that here
-        batch_response = self.vespa_client.feed_batch(
-            [
+        try:
+            self.vespa_client.feed_document(
                 VespaDocument(
                     id=marqo_index.name,
                     fields={
                         'index_name': marqo_index.name,
                         'settings': marqo_index.json()
                     }
-                )
-            ],
-            schema=self._MARQO_SETTINGS_SCHEMA_NAME
-        )
-
-        if batch_response.errors:
-            response = batch_response.responses[0]
-            if response.status == '400' and attempt < retries:
+                ),
+                schema=self._MARQO_SETTINGS_SCHEMA_NAME
+            )
+        except VespaStatusError as e:
+            if e.status_code == 400 and attempt < retries:
                 logger.warn(f"Failed to feed index settings for {marqo_index.name}, retrying in 1 second")
                 time.sleep(1)
                 self._save_index_settings(marqo_index, retries, attempt + 1)
             else:
-                raise MarqoError(f"Failed to feed index settings for {marqo_index.name}: {str(response)}")
+                raise MarqoError(
+                    f"Failed to feed index settings for {marqo_index.name}: {str(e)}", cause=e
+                ) from e
+
+    def _delete_index_settings(self, marqo_index: MarqoIndex):
+        # Note Vespa delete is 200 even if document doesn't exist
+        self.vespa_client.delete_document(marqo_index.name, self._MARQO_SETTINGS_SCHEMA_NAME)
 
 
 if __name__ == '__main__':

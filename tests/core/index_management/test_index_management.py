@@ -110,7 +110,7 @@ class TestIndexManagement(MarqoTestCase):
         self.assertEqual(settings_json, marqo_index.json())
 
     def test_create_index_indexExists_fails(self):
-        index_name = str(uuid.uuid4()).replace('-', '')
+        index_name = 'a' + str(uuid.uuid4()).replace('-', '')
         marqo_index = self.marqo_index(
             name=index_name,
             model=Model(name='ViT-B/32'),
