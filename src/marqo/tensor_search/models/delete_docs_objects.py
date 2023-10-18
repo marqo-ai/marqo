@@ -13,8 +13,7 @@ class MqDeleteDocsResponse(NamedTuple):
     status_string: Literal["succeeded"]
     document_ids: List[str]
     deleted_docments_count: int
-    success_list: List[dict]
-    failure_list: List[dict]
+    result_list: List[dict]
     deletion_start: datetime.datetime
     deletion_end: datetime.datetime
 
