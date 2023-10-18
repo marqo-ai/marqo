@@ -7,6 +7,7 @@ from marqo._httprequests import HttpRequests
 from marqo.config import Config
 from marqo.tensor_search import validation, utils, enums
 from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsResponse, MqDeleteDocsRequest
+import pprint
 
 # -- Marqo delete endpoint interface: --
 
@@ -15,9 +16,12 @@ def format_delete_docs_response(marqo_response: MqDeleteDocsResponse) -> dict:
     """This formats the delete response for users """
     return {
         "index_name": marqo_response.index_name, "status": marqo_response.status_string,
-        "type": "documentDeletion", "details": {
+        "type": "documentDeletion", 
+        "details": {
             "receivedDocumentIds": len(marqo_response.document_ids),
             "deletedDocuments": marqo_response.deleted_docments_count,
+            "successfulDeletions": marqo_response.success_list,
+            "failedDeletions": marqo_response.failure_list,
         },
         "duration": utils.create_duration_string(marqo_response.deletion_end - marqo_response.deletion_start),
         "startedAt": utils.format_timestamp(marqo_response.deletion_start),
@@ -62,16 +66,34 @@ def delete_documents_marqo_os(config: Config, deletion_instruction: MqDeleteDocs
         path="_bulk",
         body=bulk_request_body,
     )
+    print("DEBUG: delete_res_backend")
+    pprint.pprint(delete_res_backend)
 
     if deletion_instruction.auto_refresh:
         refresh_response = HttpRequests(config).post(path=f"{deletion_instruction.index_name}/_refresh")
 
     t1 = datetime.datetime.utcnow()
-    deleted_documents_count = sum(1 for item in delete_res_backend["items"] if "delete" in item and item["delete"]["status"] == 200)
+
+    deleted_documents_count = 0
+    success_list = []
+    failure_list = []
+
+    for item in delete_res_backend["items"]:
+        if "delete" in item:
+            delete_item_summary = {
+                "_id": item["delete"]["_id"],
+                "status": item["delete"]["status"],
+                "result": item["delete"]["result"] 
+            }
+            if item["delete"]["status"] == 200:
+                deleted_documents_count += 1
+                success_list.append(delete_item_summary)
+            else:
+                failure_list.append(delete_item_summary)
 
     mq_delete_res = MqDeleteDocsResponse(
         index_name=deletion_instruction.index_name, status_string='succeeded', document_ids=deletion_instruction.document_ids,
         deleted_docments_count=deleted_documents_count, deletion_start=t0,
-        deletion_end=t1
+        deletion_end=t1, success_list=success_list, failure_list=failure_list
     )
     return mq_delete_res
