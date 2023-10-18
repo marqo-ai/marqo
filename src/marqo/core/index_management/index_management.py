@@ -2,6 +2,7 @@ import os
 import textwrap
 import time
 import xml.etree.ElementTree as ET
+from datetime import datetime
 from typing import List
 
 import marqo.logging
@@ -9,7 +10,7 @@ import marqo.vespa.vespa_client
 from marqo.core.exceptions import IndexExistsError, IndexNotFoundError
 from marqo.core.models import MarqoIndex
 from marqo.core.vespa_index import for_marqo_index as vespa_index_factory
-from marqo.exceptions import MarqoError, InternalError
+from marqo.exceptions import InternalError
 from marqo.vespa.exceptions import VespaStatusError
 from marqo.vespa.models import VespaDocument
 from marqo.vespa.vespa_client import VespaClient
@@ -68,6 +69,44 @@ class IndexManagement:
             retries=self._MARQO_SETTINGS_RETRIES if settings_schema_created else 0
         )
 
+    def batch_create_indexes(self, marqo_indexes: List[MarqoIndex]) -> None:
+        """
+        Create multiple Marqo indexes as a single Vespa deployment.
+
+        This method is intended to facilitate testing and should not be used in production.
+
+        Args:
+            marqo_indexes: List of Marqo indexes to create
+
+        Raises:
+            IndexExistsError: If an index already exists
+            InvalidVespaApplicationError: If Vespa application is invalid after applying the indexes
+        """
+        app = self.vespa_client.download_application()
+        settings_schema_created = self._create_marqo_settings_schema(app)
+
+        if not settings_schema_created:
+            for index in marqo_indexes:
+                if self._index_exists(index.name):
+                    raise IndexExistsError(f"Index {index.name} already exists")
+
+        schemas = {
+            index.name: vespa_index_factory(index).generate_schema(index)
+            for index in marqo_indexes
+        }
+
+        for name, schema in schemas.items():
+            self._add_schema(app, name, schema)
+            self._add_schema_to_services(app, name)
+
+        self.vespa_client.deploy_application(app)
+
+        for index in marqo_indexes:
+            self._save_index_settings(
+                index,
+                retries=self._MARQO_SETTINGS_RETRIES if settings_schema_created else 0
+            )
+
     def delete_index(self, marqo_index: MarqoIndex):
         """
         Delete a Marqo index.
@@ -82,8 +121,31 @@ class IndexManagement:
 
         self._remove_schema(app, marqo_index.name)
         self._remove_schema_from_services(app, marqo_index.name)
+        self._add_schema_removal_override(app)
         self.vespa_client.deploy_application(app)
         self._delete_index_settings(marqo_index)
+
+    def batch_delete_indexes(self, marqo_indexes: List[MarqoIndex]):
+        """
+        Delete multiple Marqo indexes as a single Vespa deployment.
+
+        This method is intended to facilitate testing and should not be used in production.
+        Args:
+            marqo_indexes: List of Marqo indexes to delete
+        """
+        app = self.vespa_client.download_application()
+
+        for index in marqo_indexes:
+            if not self._index_exists(index.name):
+                raise IndexNotFoundError(f"Cannot delete index {index.name} as it does not exist")
+
+        for index in marqo_indexes:
+            self._remove_schema(app, index.name)
+            self._remove_schema_from_services(app, index.name)
+        self._add_schema_removal_override(app)
+        self.vespa_client.deploy_application(app)
+        for index in marqo_indexes:
+            self._delete_index_settings(index)
 
     def get_all_indexes(self) -> List[MarqoIndex]:
         batch_response = self.vespa_client.get_all_documents(self._MARQO_SETTINGS_SCHEMA_NAME, stream=True)
@@ -196,7 +258,21 @@ class IndexManagement:
         else:
             tree.write(services_path)
 
-    def _save_index_settings(self, marqo_index: MarqoIndex, retries=0, attempt=0):
+    def _add_schema_removal_override(self, app: str) -> None:
+        validation_overrides_path = os.path.join(app, 'validation-overrides.xml')
+        date = datetime.utcnow().strftime('%Y-%m-%d')
+        content = textwrap.dedent(
+            f'''
+            <validation-overrides>
+                 <allow until='{date}'>schema-removal</allow>
+            </validation-overrides>
+            '''
+        ).strip()
+
+        with open(validation_overrides_path, 'w') as f:
+            f.write(content)
+
+    def _save_index_settings(self, marqo_index: MarqoIndex, retries=0, attempt=0) -> None:
         """
         Create or update index settings in Vespa settings schema.
         """
@@ -221,7 +297,7 @@ class IndexManagement:
                 time.sleep(1)
                 self._save_index_settings(marqo_index, retries, attempt + 1)
             else:
-                raise MarqoError(
+                raise InternalError(
                     f"Failed to feed index settings for {marqo_index.name}: {str(e)}", cause=e
                 ) from e
 
