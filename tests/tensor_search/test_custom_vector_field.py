@@ -1465,3 +1465,46 @@ class TestNoModelIndex(MarqoTestCase):
                 raise AssertionError
             except DocumentNotFoundError:
                 pass
+    
+    def test_bulk_search_with_custom_vector_field(self):
+        """
+        Bulk search for the doc
+        """
+        tensor_search.add_documents(
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1,
+                docs=[
+                    {
+                        "_id": "custom_vector_doc",
+                        "my_custom_vector": {
+                            "content": "custom content is here!!",
+                            "vector": self.random_vector_1    # size is 512
+                        }
+                    },
+                    {
+                        "_id": "empty_content_custom_vector_doc",
+                        "my_custom_vector": {
+                            "vector": self.random_vector_2    # size is 512
+                        }
+                    },
+                ],
+                auto_refresh=True, device="cpu", mappings=self.mappings
+            )
+        )
+
+        # Searching with context matching custom vector returns custom vector
+        res = tensor_search.bulk_search(
+            marqo_config=self.config,
+            query=BulkSearchQuery(
+                queries=[
+                    BulkSearchQueryEntity(
+                        index=self.index_name_1,    # works with no text query!
+                        context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], })
+                    )
+                ]
+            )
+        )["result"][0]
+
+        assert res["hits"][0]["_id"] == "custom_vector_doc"
+        assert res["hits"][0]["_score"] == 1.0
+        assert res["hits"][0]["_highlights"]["my_custom_vector"] == "custom content is here!!"
