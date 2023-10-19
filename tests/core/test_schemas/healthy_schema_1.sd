@@ -1,5 +1,8 @@
 schema my_index {
     document my_index {
+        field id type string {
+            indexing:summary
+        }
         field marqo__lexical_title type string {
             indexing: index | summary
             index: enable-bm25
