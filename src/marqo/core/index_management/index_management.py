@@ -1,6 +1,5 @@
 import os
 import textwrap
-import time
 import xml.etree.ElementTree as ET
 from datetime import datetime
 from typing import List
@@ -64,10 +63,9 @@ class IndexManagement:
         self._add_schema(app, marqo_index.name, schema)
         self._add_schema_to_services(app, marqo_index.name)
         self.vespa_client.deploy_application(app)
-        self._save_index_settings(
-            marqo_index,
-            retries=self._MARQO_SETTINGS_RETRIES if settings_schema_created else 0
-        )
+        if settings_schema_created:
+            self.vespa_client.wait_for_application_convergence()
+        self._save_index_settings(marqo_index)
 
     def batch_create_indexes(self, marqo_indexes: List[MarqoIndex]) -> None:
         """
@@ -101,11 +99,11 @@ class IndexManagement:
 
         self.vespa_client.deploy_application(app)
 
+        if settings_schema_created:
+            self.vespa_client.wait_for_application_convergence()
+
         for index in marqo_indexes:
-            self._save_index_settings(
-                index,
-                retries=self._MARQO_SETTINGS_RETRIES if settings_schema_created else 0
-            )
+            self._save_index_settings(index)
 
     def delete_index(self, marqo_index: MarqoIndex):
         """
@@ -272,7 +270,7 @@ class IndexManagement:
         with open(validation_overrides_path, 'w') as f:
             f.write(content)
 
-    def _save_index_settings(self, marqo_index: MarqoIndex, retries=0, attempt=0) -> None:
+    def _save_index_settings(self, marqo_index: MarqoIndex) -> None:
         """
         Create or update index settings in Vespa settings schema.
         """
@@ -280,26 +278,16 @@ class IndexManagement:
         if not marqo_index.model.custom:
             marqo_index.model.properties = None
 
-        try:
-            self.vespa_client.feed_document(
-                VespaDocument(
-                    id=marqo_index.name,
-                    fields={
-                        'index_name': marqo_index.name,
-                        'settings': marqo_index.json()
-                    }
-                ),
-                schema=self._MARQO_SETTINGS_SCHEMA_NAME
-            )
-        except VespaStatusError as e:
-            if e.status_code == 400 and attempt < retries:
-                logger.warn(f"Failed to feed index settings for {marqo_index.name}, retrying in 1 second")
-                time.sleep(1)
-                self._save_index_settings(marqo_index, retries, attempt + 1)
-            else:
-                raise InternalError(
-                    f"Failed to feed index settings for {marqo_index.name}: {str(e)}", cause=e
-                ) from e
+        self.vespa_client.feed_document(
+            VespaDocument(
+                id=marqo_index.name,
+                fields={
+                    'index_name': marqo_index.name,
+                    'settings': marqo_index.json()
+                }
+            ),
+            schema=self._MARQO_SETTINGS_SCHEMA_NAME
+        )
 
     def _delete_index_settings(self, marqo_index: MarqoIndex):
         # Note Vespa delete is 200 even if document doesn't exist

@@ -3,6 +3,7 @@ import io
 import os
 import tarfile
 import tempfile
+import time
 from concurrent.futures import ThreadPoolExecutor
 from json import JSONDecodeError
 from typing import Dict, Any, List, Optional
@@ -24,6 +25,12 @@ class VespaClient:
     _VESPA_ERROR_CODE_TO_EXCEPTION = {
         'INVALID_APPLICATION_PACKAGE': InvalidVespaApplicationError
     }
+
+    class _ConvergenceStatus:
+        def __init__(self, current_generation: int, wanted_generation: int, converged: bool):
+            self.current_generation = current_generation
+            self.wanted_generation = wanted_generation
+            self.converged = converged
 
     def __init__(self, config_url: str, document_url: str, query_url: str, pool_size: int = 10):
         """
@@ -87,6 +94,44 @@ class VespaClient:
         with httpx.Client() as httpx_client:
             session_id = self._create_deploy_session(httpx_client)
             return self._download_application(session_id, httpx_client)
+
+    def get_application_generation(self) -> int:
+        """
+        Get the current application generation.
+
+        Returns:
+            Current application generation
+        """
+        return self._get_convergence_status().current_generation
+
+    def get_application_has_converged(self) -> bool:
+        """
+        Get the current application convergence status.
+
+        Application convergence is asynchronous following a deployment. This method can be used to check if the
+        application has converged after a deployment.
+
+        Returns:
+            True if the application is converged, False otherwise
+        """
+        return self._get_convergence_status().converged
+
+    def wait_for_application_convergence(self, timeout: int = 60) -> None:
+        """
+        Wait for Vespa application to converge, checking every second.
+
+        Args:
+            timeout: Timeout in seconds
+        """
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            if self.get_application_has_converged():
+                return
+            else:
+                logger.debug('Waiting for Vespa application to converge')
+                time.sleep(1)
+
+        raise VespaError(f"Vespa application did not converge within {timeout} seconds")
 
     def query(self, yql: str, hits: int = 10, ranking: str = None, model_restrict: str = None,
               query_features: Dict[str, Any] = None, **kwargs) -> QueryResult:
@@ -380,6 +425,25 @@ class VespaClient:
 
         return temp_dir
 
+    def _get_convergence_status(self):
+        endpoint = f'{self.config_url}/application/v2/tenant/default/application/default/environment/default/region/' \
+                   f'default/instance/default/serviceconverge'
+
+        response = self.http_client.get(endpoint)
+
+        self._raise_for_status(response)
+
+        try:
+            json = response.json()
+            return self._ConvergenceStatus(
+                current_generation=json['currentGeneration'],
+                wanted_generation=json['wantedGeneration'],
+                converged=json['converged']
+            )
+
+        except (JSONDecodeError, KeyError) as e:
+            raise VespaError(f'Unexpected response: {response.text}') from e
+
     async def _feed_batch_async(self, batch: List[VespaDocument],
                                 schema: str,
                                 connections: int, timeout: int) -> FeedBatchResponse:
@@ -421,6 +485,10 @@ class VespaClient:
             # This will cover 200 and document-specific errors. Other unexpected errors will be raised.
             return FeedResponse(**resp.json(), status=resp.status_code)
         except JSONDecodeError:
+            if resp.status_code == 200:
+                # A 200 response shouldn't reach here
+                raise VespaError(f'Unexpected response: {resp.text}')
+
             self._raise_for_status(resp)
 
     def _feed_document_sync(self, sync_client: httpx.Client, document: VespaDocument, schema: str,
