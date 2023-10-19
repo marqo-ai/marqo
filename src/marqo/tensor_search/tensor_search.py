@@ -1536,54 +1536,56 @@ def get_query_vectors_from_jobs(
                 treat_urls_as_images=index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images],
                 content=q.q
             )
-            continue
 
-        # Collect and weight all context tensors
-        context_tensors = q.get_context_tensor()
-        if context_tensors is not None:
-            weighted_context_vectors = [np.asarray(v.vector) * v.weight for v in context_tensors]
+        elif isinstance(q.q, dict) or q.q is None:
+            # Collect and weight all context tensors
+            context_tensors = q.get_context_tensor()
+            if context_tensors is not None:
+                weighted_context_vectors = [np.asarray(v.vector) * v.weight for v in context_tensors]
+            else:
+                weighted_context_vectors = []
+
+            # No query
+            if q.q is None:
+                weighted_vectors = weighted_context_vectors
+            else:
+                # Multiple queries. We have to weight and combine them:
+                ordered_queries = list(q.q.items()) if isinstance(q.q, dict) else None
+                if ordered_queries:
+                    vectorised_ordered_queries = [
+                        (get_content_vector(
+                            possible_jobs=qidx_to_job[qidx],
+                            jobs=jobs,
+                            job_to_vectors=job_to_vectors,
+                            treat_urls_as_images=index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images],
+                            content=content),
+                        weight,
+                        content
+                        ) for content, weight in ordered_queries
+                    ]
+                    # TODO how do we ensure order?
+                    weighted_query_vectors = [np.asarray(vec) * weight for vec, weight, content in vectorised_ordered_queries]
+
+                    # Combine query and context vectors
+                    weighted_vectors = weighted_query_vectors + weighted_context_vectors
+
+            # Merge and normalize (if needed) all vectors
+            try:
+                merged_vector = np.mean(weighted_vectors, axis=0)
+            except ValueError as e:
+                raise errors.InvalidArgError(f"The provided vectors are not in the same dimension of the index."
+                                            f"This causes the error when we do `numpy.mean()` over all the vectors.\n"
+                                            f"The original error is `{e}`.\n"
+                                            f"Please check `https://docs.marqo.ai/0.0.16/API-Reference/search/#context`.")
+
+            if index_info.index_settings['index_defaults']['normalize_embeddings']:
+                norm = np.linalg.norm(merged_vector, axis=-1, keepdims=True)
+                if norm > 0:
+                    merged_vector /= np.linalg.norm(merged_vector, axis=-1, keepdims=True)
+            result[qidx] = list(merged_vector)
+        
         else:
-            weighted_context_vectors = []
-
-        # No query
-        if q.q is None:
-            weighted_vectors = weighted_context_vectors
-        else:
-            # Multiple queries. We have to weight and combine them:
-            # q.q must be dict
-            ordered_queries = list(q.q.items()) if isinstance(q.q, dict) else None
-            if ordered_queries:
-                vectorised_ordered_queries = [
-                    (get_content_vector(
-                        possible_jobs=qidx_to_job[qidx],
-                        jobs=jobs,
-                        job_to_vectors=job_to_vectors,
-                        treat_urls_as_images=index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images],
-                        content=content),
-                    weight,
-                    content
-                    ) for content, weight in ordered_queries
-                ]
-                # TODO how do we ensure order?
-                weighted_query_vectors = [np.asarray(vec) * weight for vec, weight, content in vectorised_ordered_queries]
-
-                # Combine query and context vectors
-                weighted_vectors = weighted_query_vectors + weighted_context_vectors
-
-        # Merge and normalize (if needed) all vectors
-        try:
-            merged_vector = np.mean(weighted_vectors, axis=0)
-        except ValueError as e:
-            raise errors.InvalidArgError(f"The provided vectors are not in the same dimension of the index."
-                                        f"This causes the error when we do `numpy.mean()` over all the vectors.\n"
-                                        f"The original error is `{e}`.\n"
-                                        f"Please check `https://docs.marqo.ai/0.0.16/API-Reference/search/#context`.")
-
-        if index_info.index_settings['index_defaults']['normalize_embeddings']:
-            norm = np.linalg.norm(merged_vector, axis=-1, keepdims=True)
-            if norm > 0:
-                merged_vector /= np.linalg.norm(merged_vector, axis=-1, keepdims=True)
-        result[qidx] = list(merged_vector)
+            raise errors.InternalError(f"Query can only be `str`, `dict`, or `None`. Invalid query type received: {type(q.q)}")
 
     return result
 
