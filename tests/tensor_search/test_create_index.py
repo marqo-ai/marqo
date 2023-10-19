@@ -903,7 +903,6 @@ class TestCreateIndex(MarqoTestCase):
         ]
 
         for case, error_message in test_cases:
-            print(f"DEBUG: starting case {case}")
             try:
                 tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings={NsField.index_defaults: case})
                 raise AssertionError
