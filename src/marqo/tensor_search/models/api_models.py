@@ -59,7 +59,7 @@ class SearchQuery(BaseMarqoModel):
                 raise errors.InvalidArgError("Query must be provided when using lexical search.")
         elif search_method == SearchMethod.TENSOR:
             if query is None and context is None:
-                raise errors.InvalidArgError("Either query or context vectors must be provided when using tensor search.")
+                raise errors.InvalidArgError("At least one of query (`q`) or context vectors (`context`) must be provided when using tensor search.")
         return values
 
     def get_context_tensor(self) -> Optional[List[SearchContextTensor]]:

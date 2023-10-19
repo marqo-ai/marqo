@@ -188,7 +188,7 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
 def _validate_model_properties(model_name: str, model_properties: dict) -> dict:
     """validate model_properties, if not given then return model_registry properties
     """
-
+    # TODO: move model specific validation into the model file or classes themselves
     # no_model should always have model_properties (with dimensions only)
     if model_name == SpecialModels.no_model:
         if model_properties is None:
