@@ -21,6 +21,7 @@ from marqo.tensor_search.models.mappings_object import (
     custom_vector_mappings_schema
 )
 from marqo.tensor_search.models.custom_vector_object import custom_vector_schema
+from marqo.s2_inference.errors import InvalidModelPropertiesError
 
 
 def validate_query(q: Union[dict, str, None], search_method: Union[str, SearchMethod]):
@@ -722,4 +723,22 @@ def validate_model_dimensions(input_dimensions: Any):
     raise InternalError(f"Model dimensions must be a positive integer! Given model dimensions = {input_dimensions}.")
 
 
+def validate_model_properties_no_model(model_properties: dict):
+    """
+    model_properties dict must have exactly 1 key: "dimensions".
+    """
+    if model_properties is None:
+            raise InvalidArgError(
+            f"When creating an index with `{enums.SpecialModels.no_model}`, you must provide `model_properties` "
+            f"containing `dimensions` in the index settings. Please provide `model_properties` in your index settings or "
+            f"select a different model."
+        )
+    if "dimensions" not in model_properties:
+        raise InvalidArgError("If your index is using `no_model`, your `model_properties` must have `dimensions` set.")
+    
+    for key in model_properties:
+        if key != "dimensions":
+            raise InvalidArgError(f"Invalid model_properties key found: `{key}`. If your index is using `no_model`, then `model_properties` can only have `dimensions` set.")
+        
+    return model_properties
 

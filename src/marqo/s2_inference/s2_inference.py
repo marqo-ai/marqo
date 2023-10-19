@@ -20,6 +20,7 @@ from marqo.tensor_search.models.private_models import ModelAuth
 import threading
 from marqo.tensor_search.utils import read_env_vars_and_defaults, generate_batches
 from marqo.tensor_search.configs import EnvVars
+from marqo.tensor_search.validation import validate_model_properties_no_model
 
 logger = get_logger(__name__)
 
@@ -191,10 +192,7 @@ def _validate_model_properties(model_name: str, model_properties: dict) -> dict:
     # TODO: move model specific validation into the model file or classes themselves
     # no_model should always have model_properties (with dimensions only)
     if model_name == SpecialModels.no_model:
-        if model_properties is None:
-            raise InternalError("If your index is using `no_model`, you must have `model_properties` set.")
-        if "dimensions" not in model_properties:
-            raise InvalidModelPropertiesError("If your index is using `no_model`, your `model_properties` must have `dimensions` set.")
+        validate_model_properties_no_model(model_properties)
         
     elif model_properties is not None:
         """checks model dict to see if all required keys are present

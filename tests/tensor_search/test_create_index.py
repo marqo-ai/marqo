@@ -874,7 +874,15 @@ class TestCreateIndex(MarqoTestCase):
                     "model": "no_model",
                     "model_properties": {}
                 },
-                "must contain a 'dimensions' key"
+                "must have `dimensions` set"
+            ),
+            # Extra key (prevents users trying to make Generic CLIP index from using `no_model`)
+            (
+                {
+                    "model": "no_model",
+                    "model_properties": {"dimensions": 123, "url": "http://www.random.com", "type": "CLIP"}
+                },
+                "Invalid model_properties key found:"
             ),
             # Wrong dimensions type
             (
@@ -895,6 +903,7 @@ class TestCreateIndex(MarqoTestCase):
         ]
 
         for case, error_message in test_cases:
+            print(f"DEBUG: starting case {case}")
             try:
                 tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings={NsField.index_defaults: case})
                 raise AssertionError

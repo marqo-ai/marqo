@@ -6,22 +6,25 @@ from marqo.tensor_search import configs
 from marqo.s2_inference import s2_inference
 from marqo import errors
 from marqo.s2_inference import errors as s2_inference_errors
+from marqo.tensor_search.validation import validate_model_properties_no_model
 
 
 # For use outside of this module
 def get_model_properties_from_index_defaults(index_defaults: Dict, model_name: str):
     """ Gets model_properties from index defaults if available. Otherwise, it attempts to get it from the model registry.
     """
+
     try:
         model_properties = index_defaults[NsField.model_properties]
     except KeyError:
-        # Enforces that `no_model` can only be used with user-input `model_properties`
-        if model_name is SpecialModels.no_model:
-            raise errors.InvalidArgError(
-                f"When creating an index with `{SpecialModels.no_model}`, you must provide `model_properties` "
-                f"containing `dimensions` in the index settings. Please provide `model_properties` in your index settings or "
-                f"select a different model."
-            )
+        model_properties = None
+    
+    # Special validation for `no_model`
+    if model_name is SpecialModels.no_model:
+        validate_model_properties_no_model(model_properties)
+
+    # If model_properties not user-provided, try to get it from the model registry
+    elif model_properties is None:
         try:
             model_properties = s2_inference.get_model_properties_from_registry(model_name)
         except s2_inference_errors.UnknownModelError:
@@ -29,6 +32,8 @@ def get_model_properties_from_index_defaults(index_defaults: Dict, model_name: s
                 f"Could not find model properties for model={model_name}. "
                 f"Please check that the model name is correct. "
                 f"Please provide model_properties if the model is a custom model and is not supported by default")
+    
+    
     return model_properties
 
 
