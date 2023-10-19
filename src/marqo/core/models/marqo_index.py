@@ -206,33 +206,3 @@ class MarqoIndex(StrictBaseModel):
         [getattr(copied, name) for name, value in vars(MarqoIndex).items() if isinstance(value, property)]
 
         return copied
-
-
-if __name__ == '__main__':
-    marqo_index = MarqoIndex(
-        name='index1',
-        model=Model(name='ViT-B/32'),
-        distance_metric=DistanceMetric.PrenormalizedAnguar,
-        type=IndexType.Structured,
-        vector_numeric_type=VectorNumericType.Float,
-        hnsw_config=HnswConfig(ef_construction=100, m=16),
-        normalize_embeddings=True,
-        text_preprocessing=TextPreProcessing(split_length=100, split_overlap=50,
-                                             split_method=TextSplitMethod.Sentence),
-        image_preprocessing=ImagePreProcessing(patch_method=PatchMethod.Frcnn),
-        fields=[
-            Field(name='title', type=FieldType.Text),
-            Field(name='description', type=FieldType.Text),
-            Field(name='price', type=FieldType.Float, features=[FieldFeature.ScoreModifier])
-        ],
-        tensor_fields=[
-            TensorField(name='title'),
-            TensorField(name='description')
-        ],
-        model_enable_cache=True,
-    )
-    marqo_index.lexical_fields
-
-    mq1 = marqo_index
-    mq2 = mq1.copy_with_caching()
-    pass

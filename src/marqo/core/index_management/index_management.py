@@ -292,18 +292,3 @@ class IndexManagement:
     def _delete_index_settings(self, marqo_index: MarqoIndex):
         # Note Vespa delete is 200 even if document doesn't exist
         self.vespa_client.delete_document(marqo_index.name, self._MARQO_SETTINGS_SCHEMA_NAME)
-
-
-if __name__ == '__main__':
-    vespa_client = marqo.vespa.vespa_client.VespaClient(
-        config_url='http://localhost:19071',
-        document_url='http://localhost:8080',
-        query_url='http://localhost:8080',
-    )
-
-    index_management = IndexManagement(vespa_client)
-
-    index = index_management.get_index('ef05bf9fd96c48a19d9b219521aa9504')
-    # indexes = index_management.get_all_indexes()
-
-    print('hi')

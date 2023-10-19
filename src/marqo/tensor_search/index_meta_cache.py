@@ -14,7 +14,6 @@ from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models import MarqoIndex
 from marqo.tensor_search.models.index_info import IndexInfo
 from marqo.tensor_search.tensor_search_logging import get_logger
-from marqo.vespa.vespa_client import VespaClient
 
 logger = get_logger(__name__)
 
@@ -199,24 +198,3 @@ def populate_cache(config: Config):
 
     # Add new indexes
     index_info_cache.update(index_map)
-
-
-if __name__ == '__main__':
-    vespa_client = VespaClient(
-        config_url='http://localhost:19071',
-        document_url='http://localhost:8080',
-        query_url='http://localhost:8080',
-    )
-    import marqo.config as config
-
-    config = config.Config(vespa_client=vespa_client)
-
-    populate_cache(config)
-    index = get_index(config, 'my_index_1')
-
-    while True:
-        time.sleep(10)
-        print('Getting index')
-        index = get_index(config, 'my_index_1')
-
-    print('hi')

@@ -1,5 +1,3 @@
-import json
-
 import marqo.core.constants as constants
 from marqo.core.exceptions import InvalidDataTypeError, InvalidFieldNameError
 from marqo.core.models import MarqoQuery
@@ -398,47 +396,3 @@ class StructuredVespaIndex(VespaIndex):
             return marqo_index.copy_with_caching()
 
         return marqo_index
-
-
-if __name__ == '__main__':
-    marqo_index = MarqoIndex(
-        name='index1',
-        model=Model(name='ViT-B/32'),
-        distance_metric=DistanceMetric.PrenormalizedAnguar,
-        type=IndexType.Structured,
-        normalize_embeddings=True,
-        text_preprocessing=TextPreProcessing(split_length=100, split_overlap=50, split_method=TextSplitMethod.Sentence),
-        image_preprocessing=ImagePreProcessing(),
-        vector_numeric_type=VectorNumericType.Float,
-        hnsw_config=HnswConfig(ef_construction=100, m=16),
-        fields=[
-            Field(name='title', type=FieldType.Text, features=[FieldFeature.LexicalSearch]),
-            Field(name='description', type=FieldType.Text,
-                  features=[FieldFeature.LexicalSearch, FieldFeature.Filter]),
-            Field(name='price', type=FieldType.Float, features=[FieldFeature.ScoreModifier])
-        ],
-        tensor_fields=[
-            TensorField(name='title'),
-            TensorField(name='description')
-        ],
-        model_enable_cache=True
-    )
-
-    vespa_schema = StructuredVespaIndex.generate_schema(marqo_index)
-
-    marqo_doc = {
-        '_id': '123',
-        'title': 'hello world',
-        'description': 'this is a description',
-        'price': 100.1,
-        'tensors': {
-            'title': {
-                'chunks': ['hello', 'world'],
-                'embeddings': [[1, 2, 3], [4, 5, 6]]
-            }
-        }
-    }
-
-    vespa_doc = StructuredVespaIndex.to_vespa_document(marqo_doc, marqo_index)
-
-    print(vespa_schema)
