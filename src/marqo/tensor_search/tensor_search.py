@@ -48,13 +48,18 @@ import torch.cuda
 from PIL import Image
 
 import marqo.config as config
+import marqo.core.exceptions as core_exceptions
 from marqo import errors
 # We depend on _httprequests.py for now, but this may be replaced in the future, as
 # _httprequests.py is designed for the client
 from marqo._httprequests import HttpRequests
 from marqo.config import Config
+from marqo.core import constants
+from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models.marqo_index import IndexType, MarqoIndex, FieldType
+from marqo.core.models.marqo_query import MarqoTensorQuery
 from marqo.core.structured_vespa_index import StructuredVespaIndex
+from marqo.core.vespa_index import for_marqo_index as vespa_index_factory
 from marqo.s2_inference import errors as s2_inference_errors
 from marqo.s2_inference import s2_inference
 from marqo.s2_inference.clip_utils import _is_image
@@ -71,7 +76,7 @@ from marqo.tensor_search.enums import (
 from marqo.tensor_search.enums import IndexSettingsField as NsField
 from marqo.tensor_search.formatting import _clean_doc
 from marqo.tensor_search.health import generate_heath_check_response
-from marqo.tensor_search.index_meta_cache import get_cache, get_index_info
+from marqo.tensor_search.index_meta_cache import get_cache, get_index_info, get_index
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQueryEntity, ScoreModifier
 from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest
@@ -81,7 +86,7 @@ from marqo.tensor_search.models.search import Qidx, JHash, SearchContext, Vector
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.tensor_search.tensor_search_logging import get_logger
 from marqo.tensor_search.utils import add_timing
-from marqo.vespa.models import VespaDocument, FeedBatchResponse
+from marqo.vespa.models import VespaDocument, FeedBatchResponse, QueryResult
 from marqo.vespa.vespa_client import VespaClient
 
 logger = get_logger(__name__)
@@ -653,14 +658,15 @@ def _add_documents_structured(add_docs_params: AddDocsParams, marqo_index: Marqo
                         break
                     else:
                         processed_tensor_fields[tensor_field.name] = {}
-                        processed_tensor_fields[tensor_field.name]['chunks'] = [combo_chunk[TensorField.field_content]]
-                        processed_tensor_fields[tensor_field.name]['embeddings'] = [
+                        processed_tensor_fields[tensor_field.name][constants.MARQO_DOC_CHUNKS] = [
+                            combo_chunk[TensorField.field_content]]
+                        processed_tensor_fields[tensor_field.name][constants.MARQO_DOC_EMBEDDINGS] = [
                             combo_chunk[TensorField.marqo_knn_field]]
 
         if document_is_valid:
             if processed_tensor_fields:
-                copied['tensors'] = processed_tensor_fields
-            copied['_id'] = doc_id
+                copied[constants.MARQO_DOC_TENSORS] = processed_tensor_fields
+            copied[constants.MARQO_DOC_ID] = doc_id
             bulk_parent_dicts.append(copied)
 
     total_preproc_time = 0.001 * RequestMetricsStore.for_request().stop(
@@ -736,13 +742,17 @@ def get_document_by_id(
         config: Config, index_name: str, document_id: str, show_vectors: bool = False):
     """returns document by its ID"""
     validation.validate_id(document_id)
-    res = HttpRequests(config).get(
-        f'{index_name}/_doc/{document_id}'
-    )
-    if "_source" in res:
-        return _clean_doc(res["_source"], doc_id=document_id, include_vectors=show_vectors)
-    else:
-        return res
+
+    marqo_index = index_meta_cache.get_index(config=config, index_name=index_name)
+
+    res = config.vespa_client.get_document(document_id, marqo_index.name)
+    vespa_index = vespa_index_factory(marqo_index)
+    marqo_document = vespa_index.to_marqo_document(res.document.dict(), marqo_index)
+
+    if not show_vectors:
+        del marqo_document[constants.MARQO_DOC_TENSORS]
+
+    return marqo_document
 
 
 def get_documents_by_ids(
@@ -759,36 +769,36 @@ def get_documents_by_ids(
         raise errors.IllegalRequestedDocCount(
             f"{len(document_ids)} documents were requested, which is more than the allowed limit of [{max_docs_limit}], "
             f"set by the environment variable `{EnvVars.MARQO_MAX_RETRIEVABLE_DOCS}`")
-    docs = [
-        {"_index": index_name, "_id": validation.validate_id(doc_id)}
-        for doc_id in document_ids
-    ]
-    if not show_vectors:
-        for d in docs:
-            d["_source"] = dict()
-            d["_source"]["exclude"] = f"*{TensorField.vector_prefix}*"
-    res = HttpRequests(config).get(
-        f'_mget/',
-        body={
-            "docs": docs,
-        }
-    )
-    if "docs" in res:
-        to_return = {
-            "results": []
-        }
-        for doc in res['docs']:
-            if not doc['found']:
-                to_return['results'].append({
-                    '_id': doc['_id'],
-                    TensorField.found: False})
-            else:
-                to_return['results'].append(
-                    {TensorField.found: True,
-                     **_clean_doc(doc["_source"], doc_id=doc["_id"], include_vectors=show_vectors)})
-        return to_return
-    else:
-        return res
+    for doc_id in document_ids:
+        validation.validate_id(doc_id)
+
+    batch_get = config.vespa_client.get_batch(document_ids, index_name)
+    marqo_index = index_meta_cache.get_index(config=config, index_name=index_name)
+    vespa_index = vespa_index_factory(marqo_index)
+
+    to_return = {
+        "results": []
+    }
+
+    for response in batch_get.responses:
+        if response.status == 200:
+            marqo_document = vespa_index.to_marqo_document(response.document.dict(), marqo_index)
+            if not show_vectors:
+                del marqo_document[constants.MARQO_DOC_TENSORS]
+            to_return['results'].append(marqo_document)
+        elif response.status == 404:
+            to_return['results'].append({
+                '_id': _get_id_from_vespa_id(response.id),
+                TensorField.found: False})
+        else:  # If not 200 or 404, it should have been raised by the client
+            raise errors.InternalError(f"Unexpected response status code {response.status} for document {response.id}")
+
+    return to_return
+
+
+def _get_id_from_vespa_id(vespa_id: str) -> str:
+    """Returns the document ID from a Vespa ID. Vespa IDs are of the form `namespace::document_id`."""
+    return vespa_id.split('::')[-1]
 
 
 def _get_documents_for_upsert(
@@ -1088,7 +1098,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
             searchable_attributes=searchable_attributes, verbose=verbose,
             filter_string=filter, device=selected_device, attributes_to_retrieve=attributes_to_retrieve, boost=boost,
             image_download_headers=image_download_headers, context=context, score_modifiers=score_modifiers,
-            model_auth=model_auth
+            model_auth=model_auth, highlights=highlights
         )
     elif search_method.upper() == SearchMethod.LEXICAL:
         search_result = _lexical_search(
@@ -1122,10 +1132,6 @@ def search(config: Config, index_name: str, text: Union[str, dict],
     search_result["query"] = text
     search_result["limit"] = result_count
     search_result["offset"] = offset
-
-    if not highlights:
-        for hit in search_result["hits"]:
-            del hit["_highlights"]
 
     time_taken = timer() - t0
     search_result["processingTimeMs"] = round(time_taken * 1000)
@@ -1254,7 +1260,7 @@ def _lexical_search(
     return {'hits': res_list}
 
 
-def construct_vector_input_batches(query: Union[str, Dict], index_info: IndexInfo) -> Tuple[List[str], List[str]]:
+def construct_vector_input_batches(query: Union[str, Dict], index_info: MarqoIndex) -> Tuple[List[str], List[str]]:
     """Splits images from text in a single query (either a query string, or dict of weighted strings).
 
     Args:
@@ -1264,7 +1270,8 @@ def construct_vector_input_batches(query: Union[str, Dict], index_info: IndexInf
     Returns:
         A tuple of string batches. The first is text content the second is image content.
     """
-    treat_urls_as_images = index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]
+    # TODO - infer this from model
+    treat_urls_as_images = True
     if isinstance(query, str):
         if treat_urls_as_images and _is_image(query):
             return [], [query, ]
@@ -1374,37 +1381,25 @@ def bulk_msearch(config: Config, body: List[Dict]) -> List[Dict]:
     return responses
 
 
-def gather_documents_from_response(resp: List[List[Dict[str, Any]]]) -> Dict[str, Any]:
+def gather_documents_from_response(response: QueryResult, marqo_index: MarqoIndex, highlights: bool) -> Dict[str, Any]:
     """
-        For the specific responses to a query, gather correct responses. This is used to aggregate documents, for cases
-        where the same document is retrieved for multiple field-queries.
+    Convert a VespaQueryResponse to a Marqo search response
     """
-    gathered_docs = dict()
+    vespa_index = vespa_index_factory(marqo_index)
+    hits = []
+    for doc in response.hits:
+        marqo_doc = vespa_index.to_marqo_document(doc.dict(), marqo_index, return_highlights=highlights)
+        marqo_doc['_score'] = doc.relevance
+        # Delete chunk data
+        del marqo_doc[constants.MARQO_DOC_TENSORS]
+        hits.append(marqo_doc)
 
-    for i, query_res in enumerate(resp):
-        for doc in query_res:
-            doc_chunks = doc["inner_hits"][TensorField.chunks]["hits"]["hits"]
-            if doc["_id"] in gathered_docs:
-                gathered_docs[doc["_id"]]["doc"] = doc
-                gathered_docs[doc["_id"]]["chunks"].extend(doc_chunks)
-            else:
-                gathered_docs[doc["_id"]] = {
-                    "_id": doc["_id"],
-                    "doc": doc,
-                    "chunks": doc_chunks
-                }
-
-        # Filter out docs with no inner hits:
-        for doc_id in list(gathered_docs.keys()):
-            if not gathered_docs[doc_id]["chunks"]:
-                del gathered_docs[doc_id]
-
-    return gathered_docs
+    return {'hits': hits}
 
 
 def assign_query_to_vector_job(
         q: BulkSearchQueryEntity, jobs: Dict[JHash, VectorisedJobs], grouped_content: Tuple[List[str], List[str]],
-        index_info: IndexInfo, device: str) -> List[VectorisedJobPointer]:
+        index_info: MarqoIndex, device: str) -> List[VectorisedJobPointer]:
     """
     For a individual query, assign its content (to be vectorised) to a vector job. If none exist with the correct
     specifications, create a new job.
@@ -1430,11 +1425,11 @@ def assign_query_to_vector_job(
     for i, grouped_content in enumerate(grouped_content):
         content_type = 'text' if i == 0 else 'image'
         vector_job = VectorisedJobs(
-            model_name=index_info.model_name,
-            model_properties=index_info.get_model_properties(),
+            model_name=index_info.name,
+            model_properties=index_info.model.get_properties(),
             content=grouped_content,
             device=device,
-            normalize_embeddings=index_info.index_settings['index_defaults']['normalize_embeddings'],
+            normalize_embeddings=index_info.normalize_embeddings,
             image_download_headers=q.image_download_headers,
             content_type=content_type,
             model_auth=q.modelAuth
@@ -1469,7 +1464,7 @@ def create_vector_jobs(queries: List[BulkSearchQueryEntity], config: Config, dev
     jobs: Dict[JHash, VectorisedJobs] = {}
     for i, q in enumerate(queries):
         q = queries[i]
-        index_info = get_index_info(config=config, index_name=q.index)
+        index_info = get_index(config=config, index_name=q.index)
         # split images from text:
         to_be_vectorised: Tuple[List[str], List[str]] = construct_vector_input_batches(q.q, index_info)
         qidx_to_job[i] = assign_query_to_vector_job(q, jobs, to_be_vectorised, index_info, device)
@@ -1534,7 +1529,7 @@ def get_query_vectors_from_jobs(
 
         # qidx_to_vectors[qidx].append(vectors)
         q = queries[qidx]
-        index_info = get_index_info(config=config, index_name=q.index)
+        index_info = get_index(config=config, index_name=q.index)
 
         ordered_queries = list(q.q.items()) if isinstance(q.q, dict) else None
         if ordered_queries:
@@ -1544,8 +1539,7 @@ def get_query_vectors_from_jobs(
                     possible_jobs=qidx_to_job[qidx],
                     jobs=jobs,
                     job_to_vectors=job_to_vectors,
-                    treat_urls_as_images=index_info.index_settings[NsField.index_defaults][
-                        NsField.treat_urls_and_pointers_as_images],
+                    treat_urls_as_images=True,  # TODO - infer this from model
                     content=content),
                  weight,
                  content
@@ -1566,7 +1560,7 @@ def get_query_vectors_from_jobs(
                                              f"The original error is `{e}`.\n"
                                              f"Please check `https://docs.marqo.ai/0.0.16/API-Reference/search/#context`.")
 
-            if index_info.index_settings['index_defaults']['normalize_embeddings']:
+            if index_info.normalize_embeddings:
                 norm = np.linalg.norm(merged_vector, axis=-1, keepdims=True)
                 if norm > 0:
                     merged_vector /= np.linalg.norm(merged_vector, axis=-1, keepdims=True)
@@ -1577,8 +1571,7 @@ def get_query_vectors_from_jobs(
                 possible_jobs=qidx_to_job.get(qidx, []),
                 jobs=jobs,
                 job_to_vectors=job_to_vectors,
-                treat_urls_as_images=index_info.index_settings[NsField.index_defaults][
-                    NsField.treat_urls_and_pointers_as_images],
+                treat_urls_as_images=True,  # TODO - infer this from model
                 content=q.q
             )
     return result
@@ -1673,9 +1666,9 @@ def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity
         query_to_body_parts: Dict[Qidx, List[Dict]] = dict()
         query_to_body_count: Dict[Qidx, int] = dict()  # Keep track of count, so we can separate after msearch call.
         for qidx, q in enumerate(queries):
-            index_info = get_index_info(config=config, index_name=q.index)
+            index_info = get_index_info(config=config, index_name=q.index_name)
             body = construct_msearch_body_elements(q.searchableAttributes, q.offset, q.filter, index_info, q.limit,
-                                                   qidx_to_vectors[qidx], q.attributesToRetrieve, q.index,
+                                                   qidx_to_vectors[qidx], q.attributesToRetrieve, q.index_name,
                                                    q.scoreModifiers)
             query_to_body_parts[qidx] = body
             query_to_body_count[qidx] = len(body)
@@ -1732,7 +1725,8 @@ def _vector_text_search(
         searchable_attributes: Iterable[str] = None, verbose=0, filter_string: str = None, device: str = None,
         attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None,
         image_download_headers: Optional[Dict] = None, context: Optional[Dict] = None,
-        score_modifiers: Optional[ScoreModifier] = None, model_auth: Optional[ModelAuth] = None):
+        score_modifiers: Optional[ScoreModifier] = None, model_auth: Optional[ModelAuth] = None,
+        highlights: bool = False) -> Dict:
     """
     
     Args:
@@ -1751,6 +1745,7 @@ def _vector_text_search(
         context: a dictionary to allow custom vectors in search
         score_modifiers: a dictionary to modify the score based on field values, for tensor search only
         model_auth: Authorisation details for downloading a model (if required)
+        highlights: if True, highlights will be returned
     Returns:
 
     Note:
@@ -1779,7 +1774,7 @@ def _vector_text_search(
     RequestMetricsStore.for_request().start("search.vector.processing_before_opensearch")
 
     try:
-        index_info = get_index_info(config=config, index_name=index_name)
+        marqo_index = index_meta_cache.get_index(config=config, index_name=index_name)
     except KeyError as e:
         raise errors.IndexNotFoundError(message="Tried to search a non-existent index: {}".format(index_name))
 
@@ -1793,43 +1788,53 @@ def _vector_text_search(
         qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, device)
     vectorised_text = list(qidx_to_vectors.values())[0]
 
-    body = construct_msearch_body_elements(
-        searchable_attributes, offset, filter_string, index_info, result_count, vectorised_text, attributes_to_retrieve,
-        index_name, score_modifiers
+    marqo_query = MarqoTensorQuery(
+        index_name=index_name,
+        vector_query=vectorised_text,
+        filter=filter_string,
+        limit=result_count,
+        offset=offset,
+        searchable_attributes=searchable_attributes,
+        attributes_to_retrieve=attributes_to_retrieve,
+        score_modifiers=score_modifiers
     )
 
+    vespa_index = vespa_index_factory(marqo_index)
+    vespa_query = vespa_index.to_vespa_query(marqo_query, marqo_index)
+
     if verbose:
-        _vector_text_search_query_verbose(verbose=verbose, body=body)
+        _vector_text_search_query_verbose(verbose=verbose, body=vespa_query)
 
     total_preprocess_time = RequestMetricsStore.for_request().stop("search.vector.processing_before_opensearch")
     logger.debug(
         f"search (tensor) pre-processing: took {(total_preprocess_time):.3f}ms to vectorize and process query.")
 
     # SEARCH TIMER-LOGGER (roundtrip)
-    responses = bulk_msearch(config, body)
+    responses = config.vespa_client.query(**vespa_query)
 
     # SEARCH TIMER-LOGGER (post-processing)
     RequestMetricsStore.for_request().start("search.vector.postprocess")
-    gathered_docs = gather_documents_from_response(responses)
+    gathered_docs = gather_documents_from_response(responses, marqo_index, highlights)
 
     if boost is not None:
-        gathered_docs = boost_score(gathered_docs, boost, searchable_attributes)
+        raise errors.MarqoWebError('Boosting is not currently supported with Vespa')
+        # gathered_docs = boost_score(gathered_docs, boost, searchable_attributes)
 
-    completely_sorted = sort_chunks(gathered_docs)
+    # completely_sorted = sort_chunks(gathered_docs)
 
-    if verbose:
-        print("Chunk vector search, sorted result:")
-        if verbose == 1:
-            pprint.pprint(utils.truncate_dict_vectors(completely_sorted))
-        elif verbose == 2:
-            pprint.pprint(completely_sorted)
+    # if verbose:
+    #     print("Chunk vector search, sorted result:")
+    #     if verbose == 1:
+    #         pprint.pprint(utils.truncate_dict_vectors(completely_sorted))
+    #     elif verbose == 2:
+    #         pprint.pprint(completely_sorted)
 
-    res = _format_ordered_docs_simple(ordered_docs_w_chunks=completely_sorted, result_count=result_count)
+    # res = _format_ordered_docs_simple(ordered_docs_w_chunks=completely_sorted, result_count=result_count)
 
     total_postprocess_time = RequestMetricsStore.for_request().stop("search.vector.postprocess")
     logger.debug(
-        f"search (tensor) post-processing: took {(total_postprocess_time):.3f}ms to sort and format {len(completely_sorted)} results from Marqo-os.")
-    return res
+        f"search (tensor) post-processing: took {(total_postprocess_time):.3f}ms to sort and format {len(gathered_docs)} results from Marqo-os.")
+    return gathered_docs
 
 
 def _format_ordered_docs_simple(ordered_docs_w_chunks: List[dict], result_count: int) -> dict:
@@ -1916,10 +1921,14 @@ def check_health(config: Config) -> dict:
 
 
 def delete_index(config: Config, index_name):
-    res = HttpRequests(config).delete(path=index_name)
+    index_management = IndexManagement(vespa_client=config.vespa_client)
+    try:
+        index_management.delete_index_by_name(index_name)
+    except core_exceptions.IndexNotFoundError as e:
+        raise errors.IndexNotFoundError(f"Index {index_name} does not exist") from e
+
     if index_name in get_cache():
         del get_cache()[index_name]
-    return res
 
 
 def get_indexes(config: Config):
@@ -2262,6 +2271,9 @@ def _create_dummy_query_for_zero_vector_search() -> dict:
 
 def delete_documents(config: Config, index_name: str, doc_ids: List[str], auto_refresh):
     """Delete documents from the Marqo index with the given doc_ids """
+    # Make sure the index exists
+    _ = index_meta_cache.get_index(config=config, index_name=index_name)
+
     return delete_docs.delete_documents(
         config=config,
         del_request=MqDeleteDocsRequest(

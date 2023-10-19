@@ -37,7 +37,6 @@ def empty_cache():
 
 
 def get_index_info(config: Config, index_name: str) -> IndexInfo:
-    return
     """Looks for the index name in the cache.
 
     If it isn't found there, it will try searching the cluster
@@ -52,6 +51,7 @@ def get_index_info(config: Config, index_name: str) -> IndexInfo:
     Raises:
          MarqoError if the index isn't found on the cluster
     """
+    return
     # if index_name in index_info_cache:
     #     return index_info_cache[index_name]
     # else:
@@ -177,6 +177,7 @@ def populate_cache(config: Config):
     """
     Refresh cache for all indexes
     """
+    global index_info_cache
     index_management = IndexManagement(config.vespa_client)
     indexes = index_management.get_all_indexes()
 
@@ -187,14 +188,4 @@ def populate_cache(config: Config):
         index_clone = index.copy_with_caching()
         index_map[index.name] = index_clone
 
-    # Update and delete if index doesn't exist anymore
-    # Do not destroy existing cache, as it may be used by other threads
-    for cached_index in index_info_cache:
-        if cached_index in index_map:
-            index_info_cache[cached_index] = index_map[cached_index]
-            del index_map[cached_index]
-        else:
-            del index_info_cache[cached_index]
-
-    # Add new indexes
-    index_info_cache.update(index_map)
+    index_info_cache = index_map

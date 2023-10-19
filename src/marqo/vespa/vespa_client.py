@@ -14,9 +14,12 @@ import httpx
 import marqo.logging
 import marqo.vespa.concurrency as conc
 from marqo.vespa.exceptions import VespaStatusError, VespaError, InvalidVespaApplicationError
-from marqo.vespa.models import VespaDocument, QueryResult, FeedResponse, FeedBatchResponse, FeedDocumentResponse
-from marqo.vespa.models.delete_document_response import DeleteDocumentResponse
-from marqo.vespa.models.get_document_response import GetDocumentResponse, BatchGetDocumentResponse
+from marqo.vespa.models import VespaDocument, QueryResult, FeedBatchDocumentResponse, FeedBatchResponse, \
+    FeedDocumentResponse
+from marqo.vespa.models.delete_document_response import DeleteDocumentResponse, DeleteBatchDocumentResponse, \
+    DeleteBatchResponse
+from marqo.vespa.models.get_document_response import GetDocumentResponse, VisitDocumentsResponse, GetBatchResponse, \
+    GetBatchDocumentResponse
 
 logger = marqo.logging.get_logger(__name__)
 
@@ -163,7 +166,7 @@ class VespaClient:
         logger.debug(f'Query: {query}')
 
         try:
-            resp = self.http_client.post(f'{self.query_url}/search/', data=query)
+            resp = self.http_client.post(f'{self.query_url}/search/', json=query)
         except httpx.HTTPError as e:
             raise VespaError(e) from e
 
@@ -202,7 +205,7 @@ class VespaClient:
         """
         Feed a batch of documents to Vespa concurrently.
 
-        Documents will be fed in batches of `batch_size` documents, with `concurrency` concurrent pooled connections.
+        Documents will be fed with `concurrency` concurrent pooled connections.
 
         Args:
             batch: List of documents to feed
@@ -211,7 +214,7 @@ class VespaClient:
             timeout: Timeout in seconds per request
 
         Returns:
-            List of FeedResponse objects
+            A FeedBatchResponse object
         """
         if not batch:
             return FeedBatchResponse(responses=[], errors=False)
@@ -301,7 +304,7 @@ class VespaClient:
                           schema: str,
                           stream=False,
                           continuation: Optional[str] = None
-                          ) -> BatchGetDocumentResponse:
+                          ) -> VisitDocumentsResponse:
         """
         Get all documents in a schema.
         Args:
@@ -327,7 +330,37 @@ class VespaClient:
 
         self._raise_for_status(resp)
 
-        return BatchGetDocumentResponse(**resp.json())
+        return VisitDocumentsResponse(**resp.json())
+
+    def get_batch(self,
+                  ids: List[str],
+                  schema: str,
+                  concurrency: int = 10,
+                  timeout: int = 60) -> GetBatchResponse:
+        """
+        Get a batch of documents by ID concurrently.
+
+        Documents will be fetched with `concurrency` concurrent pooled connections.
+
+        Missing (404) documents will be returned in the response. Any other non-200 responses will raise an exception.
+
+        Args:
+            ids: List of document IDs to get
+            schema: Schema to get from
+            concurrency: Number of concurrent get requests
+            timeout: Timeout in seconds per request
+
+        Returns:
+            List of GetDocumentResponse objects containing the documents fetched and any missing documents (404).
+        """
+        if not ids:
+            return GetBatchResponse(responses=[], errors=False)
+
+        batch_response = conc.run_coroutine(
+            self._get_batch_async(ids, schema, concurrency, timeout)
+        )
+
+        return batch_response
 
     def delete_document(self, id: str, schema: str) -> DeleteDocumentResponse:
         """
@@ -347,6 +380,34 @@ class VespaClient:
         self._raise_for_status(resp)
 
         return DeleteDocumentResponse(**resp.json())
+
+    def delete_batch(self,
+                     ids: List[str],
+                     schema: str,
+                     concurrency: int = 10,
+                     timeout: int = 60) -> DeleteBatchResponse:
+        """
+        Delete a batch of documents by ID concurrently.
+
+        Documents will be deleted with `concurrency` concurrent pooled connections.
+
+        Args:
+            ids: List of document IDs to delete
+            schema: Schema to delete from
+            concurrency: Number of concurrent delete requests
+            timeout: Timeout in seconds per request
+
+        Returns:
+            A DeleteBatchResponse object
+        """
+        if not ids:
+            return DeleteBatchResponse(responses=[], errors=False)
+
+        batch_response = conc.run_coroutine(
+            self._delete_batch_async(ids, schema, concurrency, timeout)
+        )
+
+        return batch_response
 
     def _add_query_params(self, url: str, query_params: Dict[str, str]) -> str:
         if not query_params:
@@ -470,7 +531,7 @@ class VespaClient:
 
     async def _feed_document_async(self, semaphore: asyncio.Semaphore, async_client: httpx.AsyncClient,
                                    document: VespaDocument, schema: str,
-                                   timeout: int) -> FeedResponse:
+                                   timeout: int) -> FeedBatchDocumentResponse:
         doc_id = document.id
         data = {'fields': document.fields}
 
@@ -483,7 +544,7 @@ class VespaClient:
 
         try:
             # This will cover 200 and document-specific errors. Other unexpected errors will be raised.
-            return FeedResponse(**resp.json(), status=resp.status_code)
+            return FeedBatchDocumentResponse(**resp.json(), status=resp.status_code)
         except JSONDecodeError:
             if resp.status_code == 200:
                 # A 200 response shouldn't reach here
@@ -492,7 +553,7 @@ class VespaClient:
             self._raise_for_status(resp)
 
     def _feed_document_sync(self, sync_client: httpx.Client, document: VespaDocument, schema: str,
-                            timeout: int) -> FeedResponse:
+                            timeout: int) -> FeedBatchDocumentResponse:
         doc_id = document.id
         data = {'fields': document.fields}
 
@@ -500,7 +561,98 @@ class VespaClient:
 
         resp = sync_client.post(end_point, json=data, timeout=timeout)
 
-        return FeedResponse(**resp.json(), status=resp.status_code)
+        return FeedBatchDocumentResponse(**resp.json(), status=resp.status_code)
+
+    async def _get_batch_async(self,
+                               ids: List[str],
+                               schema: str,
+                               connections: int, timeout: int) -> GetBatchResponse:
+        async with httpx.AsyncClient(limits=httpx.Limits(max_keepalive_connections=connections,
+                                                         max_connections=connections)) as async_client:
+            semaphore = asyncio.Semaphore(connections)
+            tasks = [
+                asyncio.create_task(
+                    self._get_document_async(semaphore, async_client, id, schema, timeout)
+                )
+                for id in ids
+            ]
+            await asyncio.wait(tasks, return_when=asyncio.ALL_COMPLETED)
+
+        responses = []
+        errors = False
+        for task in tasks:
+            result = task.result()
+            responses.append(result)
+            if result.status != '200':
+                errors = True
+
+        return GetBatchResponse(responses=responses, errors=errors)
+
+    async def _get_document_async(self,
+                                  semaphore: asyncio.Semaphore,
+                                  async_client: httpx.AsyncClient,
+                                  id: str,
+                                  schema: str,
+                                  timeout: int) -> GetBatchDocumentResponse:
+        async with semaphore:
+            try:
+                resp = await async_client.get(
+                    f'{self.document_url}/document/v1/{schema}/{schema}/docid/{id}', timeout=timeout
+                )
+            except httpx.HTTPError as e:
+                raise VespaError(e) from e
+
+            if resp.status_code in [200, 404]:
+                return GetBatchDocumentResponse(**resp.json(), status=resp.status_code)
+
+            self._raise_for_status(resp)
+
+    async def _delete_batch_async(self,
+                                  ids: List[str],
+                                  schema: str,
+                                  connections: int, timeout: int) -> DeleteBatchResponse:
+        async with httpx.AsyncClient(limits=httpx.Limits(max_keepalive_connections=connections,
+                                                         max_connections=connections)) as async_client:
+            semaphore = asyncio.Semaphore(connections)
+            tasks = [
+                asyncio.create_task(
+                    self._delete_document_async(semaphore, async_client, id, schema, timeout)
+                )
+                for id in ids
+            ]
+            await asyncio.wait(tasks, return_when=asyncio.ALL_COMPLETED)
+
+        responses = []
+        errors = False
+        for task in tasks:
+            result = task.result()
+            responses.append(result)
+            if result.status != '200':
+                errors = True
+
+        return DeleteBatchResponse(responses=responses, errors=errors)
+
+    async def _delete_document_async(self,
+                                     semaphore: asyncio.Semaphore,
+                                     async_client: httpx.AsyncClient,
+                                     id: str,
+                                     schema: str,
+                                     timeout: int) -> DeleteBatchDocumentResponse:
+        async with semaphore:
+            try:
+                resp = await async_client.delete(f'{self.document_url}/document/v1/{schema}/{schema}/docid/{id}')
+            except httpx.HTTPError as e:
+                raise VespaError(e) from e
+
+        try:
+            # This will cover 200 and document-specific errors. Other unexpected errors will be raised.
+            return DeleteBatchDocumentResponse(**resp.json(), status=resp.status_code)
+        except JSONDecodeError:
+            if resp.status_code == 200:
+                # A 200 response shouldn't reach here
+                raise VespaError(f'Unexpected response: {resp.text}')
+
+            self._raise_for_status(resp)
 
     def _raise_for_status(self, resp) -> None:
         try:

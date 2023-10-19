@@ -1,10 +1,10 @@
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class RootFields(BaseModel):
-    totalCount: int
+    total_count: int = Field(alias='totalCount')
 
 
 class Coverage(BaseModel):
@@ -13,7 +13,7 @@ class Coverage(BaseModel):
     full: bool
     nodes: int
     results: int
-    resultsFull: int
+    results_full: int = Field(alias='resultsFull')
 
 
 class Child(BaseModel):
@@ -33,3 +33,16 @@ class Root(BaseModel):
 
 class QueryResult(BaseModel):
     root: Root
+    trace: Optional[Dict[str, Any]]
+
+    @property
+    def hits(self) -> List[Child]:
+        return self.root.children
+
+    @property
+    def total_count(self) -> int:
+        return self.root.fields.total_count
+
+    @property
+    def total_indexed(self) -> int:
+        return self.root.coverage.documents
