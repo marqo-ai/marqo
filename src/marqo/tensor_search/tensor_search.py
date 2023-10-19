@@ -1723,7 +1723,7 @@ def create_bulk_search_response(queries: List[BulkSearchQueryEntity], query_to_b
     return results
 
 def _vector_text_search(
-        config: Config, index_name: str, query: Optional[Union[str, dict]] = None, result_count: int = 5, offset: int = 0,
+        config: Config, index_name: str, query: Union[str, dict, None], result_count: int = 5, offset: int = 0,
         searchable_attributes: Iterable[str] = None, verbose=0, filter_string: str = None, device: str = None,
         attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None,
         image_download_headers: Optional[Dict] = None, context: Optional[Dict] = None,
