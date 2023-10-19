@@ -54,7 +54,7 @@ from marqo import errors
 from marqo._httprequests import HttpRequests
 from marqo.config import Config
 from marqo.core.models.marqo_index import IndexType, MarqoIndex, FieldType
-from marqo.core.typed_vespa_index import StructuredVespaIndex
+from marqo.core.structured_vespa_index import StructuredVespaIndex
 from marqo.s2_inference import errors as s2_inference_errors
 from marqo.s2_inference import s2_inference
 from marqo.s2_inference.clip_utils import _is_image

@@ -1,13 +1,17 @@
 import unittest
 from unittest.mock import patch, Mock
 
+import vespa.application as pyvespa
+
 from marqo import config
+from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models.marqo_index import *
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.vespa.vespa_client import VespaClient
 
 
 class MarqoTestCase(unittest.TestCase):
+    indexes_to_delete = []
 
     @classmethod
     def configure_request_metrics(cls):
@@ -22,6 +26,8 @@ class MarqoTestCase(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         cls.patcher.stop()
+        if cls.indexes_to_delete:
+            cls.index_management.batch_delete_indexes(cls.indexes_to_delete)
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -33,8 +39,23 @@ class MarqoTestCase(unittest.TestCase):
         cls.configure_request_metrics()
         cls.vespa_client = vespa_client
         cls.config = config.Config(vespa_client=vespa_client)
+        cls.index_management = IndexManagement(cls.vespa_client)
 
-    def marqo_index(self,
+        cls.pyvespa_client = pyvespa.Vespa(url="http://localhost", port=8080)
+        cls.CONTENT_CLUSTER = 'content_default'
+
+    @classmethod
+    def create_indexes(cls, indexes: List[MarqoIndex]):
+        cls.index_management.batch_create_indexes(indexes)
+        cls.vespa_client.wait_for_application_convergence()
+        cls.indexes_to_delete = indexes
+
+    def clear_indexes(self, indexes: List[MarqoIndex]):
+        for index in indexes:
+            self.pyvespa_client.delete_all_docs(self.CONTENT_CLUSTER, index.name)
+
+    @classmethod
+    def marqo_index(cls,
                     name: str,
                     type: IndexType,
                     fields: Optional[List[Field]] = None,

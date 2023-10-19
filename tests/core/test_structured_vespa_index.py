@@ -2,11 +2,11 @@ import os
 import re
 
 from marqo.core.models.marqo_index import *
-from marqo.core.typed_vespa_index import StructuredVespaIndex
+from marqo.core.structured_vespa_index import StructuredVespaIndex
 from tests.marqo_test import MarqoTestCase
 
 
-class TestTypedVespaIndex(MarqoTestCase):
+class TestStructuredVespaIndex(MarqoTestCase):
 
     def test_generate_schema_standardIndex_successful(self):
         """
