@@ -140,7 +140,7 @@ class TestContextSearch(MarqoTestCase):
             res = tensor_search.search(config=self.config, index_name=self.index_name_1, search_method=SearchMethod.TENSOR)
             raise AssertionError
         except InvalidArgError as e:
-            assert "Either query or context vectors must be provided" in e.message
+            assert "one of query (`q`) or context vectors" in e.message
         
         # no query, with context vector, but LEXICAL search.
         try:
