@@ -1544,7 +1544,6 @@ def get_query_vectors_from_jobs(
                 weighted_context_vectors = [np.asarray(v.vector) * v.weight for v in context_tensors]
             else:
                 weighted_context_vectors = []
-
             # No query
             if q.q is None:
                 weighted_vectors = weighted_context_vectors
@@ -1577,10 +1576,10 @@ def get_query_vectors_from_jobs(
                                             f"This causes the error when we do `numpy.mean()` over all the vectors.\n"
                                             f"The original error is `{e}`.\n"
                                             f"Please check `https://docs.marqo.ai/0.0.16/API-Reference/search/#context`.")
-
             if index_info.index_settings['index_defaults']['normalize_embeddings']:
                 norm = np.linalg.norm(merged_vector, axis=-1, keepdims=True)
                 if norm > 0:
+                    # TODO: Why are we calculating norm twice?
                     merged_vector /= np.linalg.norm(merged_vector, axis=-1, keepdims=True)
             result[qidx] = list(merged_vector)
         

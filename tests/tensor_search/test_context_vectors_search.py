@@ -142,6 +142,24 @@ class TestContextSearch(MarqoTestCase):
         except InvalidArgError as e:
             assert "one of query (`q`) or context vectors" in e.message
         
+        # no query, empty context tensor
+        try:
+            res = tensor_search.search(config=self.config, index_name=self.index_name_1, search_method=SearchMethod.TENSOR,
+                                        context=SearchContext(**{"tensor": []}))
+            raise AssertionError
+        except InvalidArgError as e:
+            assert "number of tensors must be between 1 and 64" in e.message
+        
+        # no query, completely empty context dict
+        try:
+            res = tensor_search.search(config=self.config, index_name=self.index_name_1, search_method=SearchMethod.TENSOR,
+                                        context=SearchContext(**{}))
+            raise AssertionError
+        except InvalidArgError as e:
+            # Should fail because `tensor` is a required field in Context object
+            assert "field required" in e.message
+            assert "tensor" in e.message
+        
         # no query, with context vector, but LEXICAL search.
         try:
             res = tensor_search.search(config=self.config, index_name=self.index_name_1, search_method=SearchMethod.LEXICAL,
