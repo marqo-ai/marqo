@@ -688,7 +688,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                 index_parent_response = HttpRequests(config).post(
                     path="_bulk", body=serialised_body,
                     max_retry_attempts=max_add_docs_retry_attempts,
-                    max_add_docs_retry_backoff=max_add_docs_retry_backoff)
+                    max_retry_backoff_seconds=max_add_docs_retry_backoff)
             RequestMetricsStore.for_request().add_time("add_documents.opensearch._bulk.internal", float(index_parent_response["took"]))
 
             end_time_5 = timer()

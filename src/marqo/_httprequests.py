@@ -42,9 +42,14 @@ class HttpRequests:
         path: str,
         body: Optional[Union[Dict[str, Any], List[Dict[str, Any]], List[str], str]] = None,
         content_type: Optional[str] = None,
-        max_retry_attempts: Optional[int] = 0,
-        max_retry_backoff_seconds: Optional[int] = 1
+        max_retry_attempts: Optional[int] = None,
+        max_retry_backoff_seconds: Optional[int] = None
     ) -> Any:
+        if not max_retry_attempts:
+            max_retry_attempts = 0
+        if not max_retry_backoff_seconds:
+            max_retry_backoff_seconds = 1
+
         to_verify = False #  self.config.cluster_is_remote
 
         if http_method not in ALLOWED_OPERATIONS:
@@ -92,8 +97,8 @@ class HttpRequests:
     def get(
         self, path: str,
         body: Optional[Union[Dict[str, Any], List[Dict[str, Any]], List[str], str]] = None,
-        max_retry_attempts: Optional[int] = 0,
-        max_retry_backoff_seconds: Optional[int] = 1
+        max_retry_attempts: Optional[int] = None,
+        max_retry_backoff_seconds: Optional[int] = None
     ) -> Any:
         content_type = None
         if body is not None:
@@ -113,8 +118,8 @@ class HttpRequests:
         path: str,
         body: Optional[Union[Dict[str, Any], List[Dict[str, Any]], List[str], str]] = None,
         content_type: Optional[str] = 'application/json',
-        max_retry_attempts: Optional[int] = 0,
-        max_retry_backoff_seconds: Optional[int] = 1
+        max_retry_attempts: Optional[int] = None,
+        max_retry_backoff_seconds: Optional[int] = None
     ) -> Any:
         return self.send_request(
             http_method=requests.post,
@@ -130,8 +135,8 @@ class HttpRequests:
         path: str,
         body: Optional[Union[Dict[str, Any], List[Dict[str, Any]], List[str], str]] = None,
         content_type: Optional[str] = None,
-        max_retry_attempts: Optional[int] = 0,
-        max_retry_backoff_seconds: Optional[int] = 1
+        max_retry_attempts: Optional[int] = None,
+        max_retry_backoff_seconds: Optional[int] = None
     ) -> Any:
         if body is not None:
             content_type = 'application/json'
@@ -148,8 +153,8 @@ class HttpRequests:
         self,
         path: str,
         body: Optional[Union[Dict[str, Any], List[Dict[str, Any]], List[str]]] = None,
-        max_retry_attempts: Optional[int] = 0,
-        max_retry_backoff_seconds: Optional[int] = 1
+        max_retry_attempts: Optional[int] = None,
+        max_retry_backoff_seconds: Optional[int] = None
     ) -> Any:
         return self.send_request(
             http_method=requests.delete,
