@@ -672,8 +672,8 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
         logger.debug(f"          add_documents vectorise: took {(total_vectorise_time):.3f}s for {doc_count} docs, "
                     f"for an average of {(total_vectorise_time / doc_count):.3f}s per doc.")
         if bulk_parent_dicts:
-            max_add_docs_retry_attempts = utils.read_env_vars_and_defaults(EnvVars.MARQO_OPENSEARCH_MAX_INDEX_RETRY_ATTEMPTS)
-            max_add_docs_retry_backoff = utils.read_env_vars_and_defaults(EnvVars.MARQO_OPENSEARCH_MAX_INDEX_RETRY_BACKOFF)
+            max_add_docs_retry_attempts = utils.read_env_vars_and_defaults(EnvVars.MARQO_OPENSEARCH_MAX_ADD_DOCS_RETRY_ATTEMPTS)
+            max_add_docs_retry_backoff = utils.read_env_vars_and_defaults(EnvVars.MARQO_OPENSEARCH_MAX_ADD_DOCS_RETRY_BACKOFF)
             # the HttpRequest wrapper handles error logic
             update_mapping_response = backend.add_customer_field_properties(
                 config=config, index_name=add_docs_params.index_name, customer_field_names=new_fields,
