@@ -116,6 +116,44 @@ class Test_HttpRequests(MarqoTestCase):
         result = self.httprequest_object.calculate_backoff_sleep(5, 0)
         self.assertEqual(result, 0.0)  # Expected sleep time is always 0 with cap 0
 
+    def test_opensearch_search_lexical_no_retry(self):
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
+        res = tensor_search.search(
+        config=self.config, index_name=self.index_name_1, text="cool match",
+        search_method=SearchMethod.LEXICAL,
+        device='cpu') # populate index_meta_cache
+
+        mock_post = mock.MagicMock()
+        mock_get = mock.MagicMock()
+        mock_response = requests.Response()
+        mock_response.status_code = 500
+        error_message = """HTTPSConnectionPool(host='internal-abcdefghijk-123456789.us-east-1.elb.amazonaws.com', port=9200):
+Max retries exceeded with url: /my-test-index-1/_mapping (Caused by SSLError(SSLEOFError(8, 'EOF occurred in violation of protocol (_ssl.c:1131)'))
+"""
+        mock_get.side_effect = requests.exceptions.ConnectionError(error_message)
+        mock_post.side_effect = requests.exceptions.ConnectionError(error_message)
+        mock_environ = {
+            "MARQO_BEST_AVAILABLE_DEVICE": "cpu"
+        }
+
+        @mock.patch('requests.get', mock_get)
+        @mock.patch('marqo._httprequests.ALLOWED_OPERATIONS', {requests.post, mock_get, requests.put})
+        @mock.patch.dict(os.environ, {**os.environ, **mock_environ})
+        def run():
+            try:
+                res = tensor_search.search(
+                config=self.config, index_name=self.index_name_1, text="cool match",
+                search_method=SearchMethod.LEXICAL)
+                raise AssertionError
+            except BackendCommunicationError as e:
+                assert e.code == "backend_communication_error"
+                assert e.status_code == HTTPStatus.INTERNAL_SERVER_ERROR
+                assert "Max retries exceeded with url" in e.message
+                assert mock_get.call_count == 1 #  should be called once since max_retry_attempts defaults to 0
+
+            return True
+        assert run()
+
     def test_opensearch_search_lexical_retry(self):
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
         res = tensor_search.search(
@@ -152,6 +190,44 @@ Max retries exceeded with url: /my-test-index-1/_mapping (Caused by SSLError(SSL
                 assert e.status_code == HTTPStatus.INTERNAL_SERVER_ERROR
                 assert "Max retries exceeded with url" in e.message
                 assert mock_get.call_count == 4 # 4 since the first call is not a retry
+
+            return True
+        assert run()
+
+    def test_opensearch_search_tensor_no_retry(self):
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
+        res = tensor_search.search(
+        config=self.config, index_name=self.index_name_1, text="cool match",
+        search_method=SearchMethod.LEXICAL,
+        device='cpu') # populate index_meta_cache
+
+        mock_post = mock.MagicMock()
+        mock_get = mock.MagicMock()
+        mock_response = requests.Response()
+        mock_response.status_code = 500
+        error_message = """HTTPSConnectionPool(host='internal-abcdefghijk-123456789.us-east-1.elb.amazonaws.com', port=9200):
+Max retries exceeded with url: /my-test-index-1/_mapping (Caused by SSLError(SSLEOFError(8, 'EOF occurred in violation of protocol (_ssl.c:1131)'))
+"""
+        mock_get.side_effect = requests.exceptions.ConnectionError(error_message)
+        mock_post.side_effect = requests.exceptions.ConnectionError(error_message)
+        mock_environ = {
+            "MARQO_BEST_AVAILABLE_DEVICE": "cpu"
+        }
+
+        @mock.patch('requests.get', mock_get)
+        @mock.patch('marqo._httprequests.ALLOWED_OPERATIONS', {requests.post, mock_get, requests.put})
+        @mock.patch.dict(os.environ, {**os.environ, **mock_environ})
+        def run():
+            try:
+                res = tensor_search.search(
+                config=self.config, index_name=self.index_name_1, text="cool match",
+                search_method=SearchMethod.TENSOR)
+                raise AssertionError
+            except BackendCommunicationError as e:
+                assert e.code == "backend_communication_error"
+                assert e.status_code == HTTPStatus.INTERNAL_SERVER_ERROR
+                assert "Max retries exceeded with url" in e.message
+                assert mock_get.call_count == 1 #  should be called once since max_retry_attempts defaults to 0
 
             return True
         assert run()
@@ -196,6 +272,57 @@ Max retries exceeded with url: /my-test-index-1/_mapping (Caused by SSLError(SSL
             return True
         assert run()
     
+    def test_opensearch_bulk_search_no_retry(self):
+        tensor_search.create_vector_index(config=self.config, index_name=self.bulk_retry_index_name_1)
+        tensor_search.create_vector_index(config=self.config, index_name=self.bulk_retry_index_name_2)
+
+        res = tensor_search.search(
+        config=self.config, index_name=self.bulk_retry_index_name_1, text="cool match",
+        search_method=SearchMethod.LEXICAL,
+        device='cpu') # populate index_meta_cache
+
+        res = tensor_search.search(
+        config=self.config, index_name=self.bulk_retry_index_name_2, text="cool match",
+        search_method=SearchMethod.LEXICAL,
+        device='cpu') # populate index_meta_cache
+
+        mock_post = mock.MagicMock()
+        mock_get = mock.MagicMock()
+        mock_response = requests.Response()
+        mock_response.status_code = 500
+        error_message = """HTTPSConnectionPool(host='internal-abcdefghijk-123456789.us-east-1.elb.amazonaws.com', port=9200):
+Max retries exceeded with url: /my-test-index-1/_mapping (Caused by SSLError(SSLEOFError(8, 'EOF occurred in violation of protocol (_ssl.c:1131)'))
+"""
+        mock_get.side_effect = requests.exceptions.ConnectionError(error_message)
+        mock_post.side_effect = requests.exceptions.ConnectionError(error_message)
+        mock_environ = {
+            "MARQO_BEST_AVAILABLE_DEVICE": "cpu"
+        }
+
+        @mock.patch('requests.get', mock_get)
+        @mock.patch('marqo._httprequests.ALLOWED_OPERATIONS', {requests.post, mock_get, requests.put})
+        @mock.patch.dict(os.environ, {**os.environ, **mock_environ})
+        def run():
+            try:
+                res = tensor_search.bulk_search(
+                    query=BulkSearchQuery(
+                        queries=[
+                            BulkSearchQueryEntity(index=self.bulk_retry_index_name_1, q="a test query", limit=2, searchMethod="LEXICAL"),
+                            BulkSearchQueryEntity(index=self.bulk_retry_index_name_2, q="a test query", limit=2, searchMethod="TENSOR")
+                        ]
+                    ),
+                    marqo_config=self.config
+                )
+                raise AssertionError
+            except BackendCommunicationError as e:
+                assert e.code == "backend_communication_error"
+                assert e.status_code == HTTPStatus.INTERNAL_SERVER_ERROR
+                assert "Max retries exceeded with url" in e.message
+                assert mock_get.call_count == 1 #  should be called once since max_retry_attempts defaults to 0
+
+            return True
+        assert run()
+
     def test_opensearch_bulk_search_retry(self):
         tensor_search.create_vector_index(config=self.config, index_name=self.bulk_retry_index_name_1)
         tensor_search.create_vector_index(config=self.config, index_name=self.bulk_retry_index_name_2)
@@ -246,6 +373,45 @@ Max retries exceeded with url: /my-test-index-1/_mapping (Caused by SSLError(SSL
                 assert "Max retries exceeded with url" in e.message
                 assert mock_get.call_count == 4 # 4 since the first call is not a retry
 
+            return True
+        assert run()
+
+    def test_opensearch_add_docs_no_retry(self):
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
+        res = tensor_search.search(
+        config=self.config, index_name=self.index_name_1, text="cool match",
+        search_method=SearchMethod.LEXICAL,
+        device='cpu') # populate index_meta_cache
+
+        mock_post = mock.MagicMock()
+        mock_get = mock.MagicMock()
+        mock_response = requests.Response()
+        mock_response.status_code = 500
+        error_message = """HTTPSConnectionPool(host='internal-abcdefghijk-123456789.us-east-1.elb.amazonaws.com', port=9200):
+Max retries exceeded with url: /my-test-index-1/_mapping (Caused by SSLError(SSLEOFError(8, 'EOF occurred in violation of protocol (_ssl.c:1131)'))
+"""
+        mock_get.side_effect = requests.exceptions.ConnectionError(error_message)
+        mock_post.side_effect = requests.exceptions.ConnectionError(error_message)
+        mock_environ = {
+            "MARQO_BEST_AVAILABLE_DEVICE": "cpu"
+        }
+
+        @mock.patch('requests.post', mock_post)
+        @mock.patch('marqo._httprequests.ALLOWED_OPERATIONS', {mock_post, requests.get, requests.put})
+        @mock.patch.dict(os.environ, {**os.environ, **mock_environ})
+        def run():
+            try:
+                res = tensor_search.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=self.index_name_1,
+                        docs=[{"some ": "doc"}], auto_refresh=True, device="cpu"
+                    )
+                )
+                raise AssertionError
+            except BackendCommunicationError as e:
+                assert e.code == "backend_communication_error"
+                assert e.status_code == HTTPStatus.INTERNAL_SERVER_ERROR
+                assert mock_post.call_count == 1 #  should be called once since max_retry_attempts defaults to 0
             return True
         assert run()
 
