@@ -858,3 +858,65 @@ class TestCreateIndex(MarqoTestCase):
                 raise AssertionError
             except error_type:
                 pass
+    
+    def test_create_index_no_model_invalid(self):
+        test_cases = [
+            # No model properties
+            (
+                {
+                    "model": "no_model",
+                },
+                "must provide `model_properties`"
+            ),
+            # No dimensions
+            (
+                {
+                    "model": "no_model",
+                    "model_properties": {}
+                },
+                "must have `dimensions` set"
+            ),
+            # Extra key (prevents users trying to make Generic CLIP index from using `no_model`)
+            (
+                {
+                    "model": "no_model",
+                    "model_properties": {"dimensions": 123, "url": "http://www.random.com", "type": "CLIP"}
+                },
+                "Invalid model_properties key found:"
+            ),
+            # Wrong dimensions type
+            (
+                {
+                    "model": "no_model",
+                    "model_properties": {"dimensions": 123.45}
+                },
+                "must be a positive integer"
+            ),
+            # Wrong dimensions type
+            (
+                {
+                    "model": "no_model",
+                    "model_properties": {"dimensions": "hello"}
+                },
+                "must be a positive integer"
+            ),
+        ]
+
+        for case, error_message in test_cases:
+            try:
+                tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings={NsField.index_defaults: case})
+                raise AssertionError
+            except errors.InvalidArgError as e:
+                assert error_message in e.message
+    
+    def test_create_index_no_model_valid(self):
+        """
+        Index must be created with the correct dimensions.
+        """
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, 
+                                          index_settings={
+                                              NsField.index_defaults: {"model": "no_model", "model_properties": {"dimensions": 123}}
+                                        })
+
+        index_info = backend.get_index_info(config=self.config, index_name=self.index_name_1)
+        assert index_info.index_settings[NsField.index_defaults]["model_properties"]["dimensions"] == 123

@@ -150,6 +150,10 @@ class ModelProperties:
     model_location = 'model_location'
 
 
+class SpecialModels:
+    no_model = 'no_model'
+
+
 class InferenceParams:
     model_auth = "model_auth"
 # Perhaps create a ThrottleType to differentiate thread_count and data_size throttling mechanisms

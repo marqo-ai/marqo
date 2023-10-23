@@ -5,6 +5,7 @@ from marqo.s2_inference.random_utils import Random
 from marqo.s2_inference.clip_utils import CLIP, OPEN_CLIP, MULTILINGUAL_CLIP, FP16_CLIP, get_multilingual_clip_properties
 from marqo.s2_inference.types import Any, Dict, List, Optional, Union, FloatTensor
 from marqo.s2_inference.onnx_clip_utils import CLIP_ONNX
+from marqo.s2_inference.no_model_utils import NO_MODEL
 
 # we need to keep track of the embed dim and model load functions/classes
 # we can use this as a registry
@@ -1742,7 +1743,8 @@ def _get_model_load_mappings() -> Dict:
             "multilingual_clip" : MULTILINGUAL_CLIP,
             "fp16_clip": FP16_CLIP,
             'random':Random,
-            'hf':HF_MODEL}
+            'hf':HF_MODEL,
+            'no_model': NO_MODEL}
 
 def load_model_properties() -> Dict:
     # also truncate the name if not already

@@ -60,7 +60,7 @@ class TestLexicalSearch(MarqoTestCase):
                 res = tensor_search._lexical_search(config=self.config, index_name=self.index_name_1, text=a)
                 raise AssertionError
             except InvalidArgError as e:
-                assert "type str" in str(e)
+                assert "type `str`" in str(e)
 
     def test_lexical_search_no_index(self):
         try:

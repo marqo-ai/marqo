@@ -6,15 +6,16 @@ from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQue
 from tests.marqo_test import MarqoTestCase
 from marqo.tensor_search.tensor_search import add_documents
 from marqo.tensor_search.models.search import SearchContext
-from marqo.errors import DocumentNotFoundError
+from marqo.errors import DocumentNotFoundError, BadRequestError
 import numpy as np
 import requests
 import json
 from unittest import mock
 from unittest.mock import patch
-from marqo.errors import MarqoWebError
 import os
 import pprint
+import unittest.mock
+from marqo.s2_inference.s2_inference import vectorise
 
 
 class TestCustomVectorField(MarqoTestCase):
@@ -686,8 +687,7 @@ class TestCustomVectorField(MarqoTestCase):
             query=BulkSearchQuery(
                 queries=[
                     BulkSearchQueryEntity(
-                        index=self.index_name_1,
-                        q={"dummy text": 0},
+                        index=self.index_name_1,    # works with no text query!
                         context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], })
                     )
                 ]
@@ -1051,7 +1051,460 @@ class TestCustomVectorField(MarqoTestCase):
             searchable_attributes=["my_custom_vector"]
         )
         assert res["hits"][0]["_id"] == "custom vector doc"
+    
+    def test_search_no_query(self):
+        """
+        Tests that tensor search is possible with no text query, as long as context vector of correct length is given.
+        Vectorise should not be called at all.
+        """
+        tensor_search.add_documents(
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1,
+                docs=[
+                    {
+                        "_id": "custom_vector_doc",
+                        "my_custom_vector": {
+                            "content": "custom content is here!!",
+                            "vector": self.random_vector_1    # size is 512
+                        }
+                    },
+                    {
+                        "_id": "empty_content_custom_vector_doc",
+                        "my_custom_vector": {
+                            "vector": self.random_vector_2    # size is 512
+                        }
+                    },
+                ],
+                auto_refresh=True, device="cpu", mappings=self.mappings
+            )
+        )
+        
+        def pass_through_vectorise(*arg, **kwargs):
+            """Vectorise will behave as usual, but we will be able to see the call list
+            via mock
+            """
+            return vectorise(*arg, **kwargs)
+
+        mock_vectorise = unittest.mock.MagicMock()
+        mock_vectorise.side_effect = pass_through_vectorise
+        @unittest.mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
+        def run():
+            # Searching with context matching custom vector returns custom vector
+            # No text query given at all
+            res = tensor_search.search(
+                config=self.config, index_name=self.index_name_1,
+                search_method=SearchMethod.TENSOR,
+                context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], }),
+            )
+
+            res = tensor_search.search(
+                config=self.config, index_name=self.index_name_1,
+                search_method=SearchMethod.TENSOR,
+                context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1},
+                                                    {"vector": self.random_vector_2, "weight": 2}], }),
+            )
+
+            res = tensor_search.search(
+                config=self.config, index_name=self.index_name_1,
+                search_method=SearchMethod.TENSOR,
+                context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1},
+                                                    {"vector": self.random_vector_2, "weight": 2},
+                                                    {"vector": self.random_vector_3, "weight": 3}], }),
+            )
+            for call in mock_vectorise.call_args_list:
+                print(call)
+                assert not call
+            assert not mock_vectorise.call_args_list
+            return True
+        
+        assert run()
 
 
+class TestNoModelIndex(MarqoTestCase):
+
+    """
+    Test the `no_model` model in combination with the custom vector field.
+    """
+    def setUp(self):
+        self.index_name_1 = "my-test-index-1"
+        self.mappings = {
+            "my_custom_vector": {
+                "type": "custom_vector"
+            }
+        }
+
+        self.endpoint = self.authorized_url
+        try:
+            tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+        except IndexNotFoundError as e:
+            pass
+
+        tensor_search.create_vector_index(
+            index_name=self.index_name_1, config=self.config, index_settings={
+                IndexSettingsField.index_defaults: {
+                    IndexSettingsField.normalize_embeddings: False,
+                    IndexSettingsField.model: "no_model",
+                    IndexSettingsField.model_properties: {
+                        "dimensions": 123
+                    }
+                }
+            })
+        
+        # Using arbitrary values so they're easy to eyeball
+        self.random_vector_1 = [1. for _ in range(123)]
+        self.random_vector_2 = [i for i in range(123)]
+        self.random_vector_3 = [1/(i+1) for i in range(123)]
+        
+        # Any tests that call add_document, search, bulk_search need this env var
+        self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
+        self.device_patcher.start()
+
+    def tearDown(self) -> None:
+        try:
+            tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+        except:
+            pass
+        self.device_patcher.stop()
+    
+    def test_no_model_add_document_fails(self):
+        """
+        Ensure that you cannot add a document (with a field that needs to be vectorised) to a no_model index
+        """
+
+        # Normal text
+        try:
+            tensor_search.add_documents(
+                config=self.config, add_docs_params=AddDocsParams(
+                    index_name=self.index_name_1,
+                    docs=[
+                        {
+                            "_id": "custom_vector_doc",
+                            "my_custom_vector": {
+                                "content": "custom content is here!!",
+                                "vector": self.random_vector_1    # size is 512
+                            },
+                            "text_field": "Bad! This needs to be vectorised!"
+                        },
+                    ],
+                    auto_refresh=True, device="cpu", mappings=self.mappings
+                )
+            )
+        except BadRequestError as e:
+            assert "Cannot vectorise anything with" in e.message
+        
+        # Multimodal field with an image
+        try:
+            tensor_search.add_documents(
+                config=self.config, add_docs_params=AddDocsParams(
+                    index_name=self.index_name_1,
+                    docs=[
+                        {
+                            "my_multimodal": {
+                                "text": "multimodal text",
+                                "image": 'https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png'
+                            }
+                        } 
+                    ],
+                    auto_refresh=True, device="cpu", mappings={
+                        "my_multimodal": {
+                            "type": "multimodal_combination",
+                            "weights": {
+                                "text": 0.5,
+                                "image": 0.5
+                            },
+                        }
+                    }
+                )
+            )
+        except BadRequestError as e:
+            assert "Cannot vectorise anything with" in e.message
+
+    def test_no_model_search_fails(self):
+        """
+        Ensure that you cannot search (with a query to be vectorised) over a no_model index
+        """
+        # normal search
+        try:
+            res = tensor_search.search(
+                config=self.config, index_name=self.index_name_1,
+                text="BAD! This needs to be vectorised!",
+                search_method=SearchMethod.TENSOR,
+            )
+        except BadRequestError as e:
+            assert "Cannot vectorise anything with" in e.message
+        
+        # with context vector
+        try:
+            res = tensor_search.search(
+                config=self.config, index_name=self.index_name_1,
+                text={"BAD! This still needs to be vectorised!": 0},
+                search_method=SearchMethod.TENSOR,
+                context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], })
+            )
+        except BadRequestError as e:
+            assert "Cannot vectorise anything with" in e.message
+
+    def test_get_document_with_custom_vector_field(self):
+        """
+        Add a document with a custom vector field:
+        Get the doc, both fetched content and embedding must be correct
+        """
+        tensor_search.add_documents(
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1,
+                docs=[{
+                    "_id": "0",
+                    "my_custom_vector": {
+                        "content": "custom content is here!!",
+                        "vector": self.random_vector_1
+                    }
+                }],
+                auto_refresh=True, device="cpu", mappings=self.mappings
+            )
+        )
+
+        # Confirm get_document_by_id returns correct content
+        res = tensor_search.get_document_by_id(
+            config=self.config, index_name=self.index_name_1,
+            document_id="0", show_vectors=True)
+        
+        # Check content is correct
+        assert res["_id"] == "0"
+        assert res["my_custom_vector"] == "custom content is here!!"
+
+        # Check tensor facets and embedding are correct
+        assert len(res[TensorField.tensor_facets]) == 1
+        assert res[TensorField.tensor_facets][0]["my_custom_vector"] == "custom content is here!!"
+        assert res[TensorField.tensor_facets][0][TensorField.embedding] == self.random_vector_1
+
+    def test_search_with_custom_vector_field(self):
+        """
+        Tensor search for the doc, with highlights
+        """
+        tensor_search.add_documents(
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1,
+                docs=[
+                    {
+                        "_id": "custom_vector_doc",
+                        "my_custom_vector": {
+                            "content": "custom content is here!!",
+                            "vector": self.random_vector_1    # size is 512
+                        }
+                    },
+                    {
+                        "_id": "empty_content_custom_vector_doc",
+                        "my_custom_vector": {
+                            "vector": self.random_vector_2    # size is 512
+                        }
+                    },
+                ],
+                auto_refresh=True, device="cpu", mappings=self.mappings
+            )
+        )
+        
+        # Searching with context matching custom vector returns custom vector
+        # No text query given at all
+        res = tensor_search.search(
+            config=self.config, index_name=self.index_name_1,
+            search_method=SearchMethod.TENSOR,
+            context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], }),
+        )
+
+        assert res["hits"][0]["_id"] == "custom_vector_doc"
+        assert res["hits"][0]["_score"] == 1.0
+        assert res["hits"][0]["_highlights"]["my_custom_vector"] == "custom content is here!!"
+
+    def test_search_no_query(self):
+        """
+        Tests that tensor search is possible with no text query, as long as context vector of correct length is given.
+        Vectorise should not be called at all.
+        """
+        tensor_search.add_documents(
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1,
+                docs=[
+                    {
+                        "_id": "custom_vector_doc",
+                        "my_custom_vector": {
+                            "content": "custom content is here!!",
+                            "vector": self.random_vector_1    # size is 512
+                        }
+                    },
+                    {
+                        "_id": "empty_content_custom_vector_doc",
+                        "my_custom_vector": {
+                            "vector": self.random_vector_2    # size is 512
+                        }
+                    },
+                ],
+                auto_refresh=True, device="cpu", mappings=self.mappings
+            )
+        )
+        
+        def pass_through_vectorise(*arg, **kwargs):
+            """Vectorise will behave as usual, but we will be able to see the call list
+            via mock
+            """
+            return vectorise(*arg, **kwargs)
+
+        mock_vectorise = unittest.mock.MagicMock()
+        mock_vectorise.side_effect = pass_through_vectorise
+        @unittest.mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
+        def run():
+            # Searching with context matching custom vector returns custom vector
+            # No text query given at all
+            res = tensor_search.search(
+                config=self.config, index_name=self.index_name_1,
+                search_method=SearchMethod.TENSOR,
+                context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], }),
+            )
+
+            res = tensor_search.search(
+                config=self.config, index_name=self.index_name_1,
+                search_method=SearchMethod.TENSOR,
+                context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1},
+                                                    {"vector": self.random_vector_2, "weight": 2}], }),
+            )
+
+            res = tensor_search.search(
+                config=self.config, index_name=self.index_name_1,
+                search_method=SearchMethod.TENSOR,
+                context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1},
+                                                    {"vector": self.random_vector_2, "weight": 2},
+                                                    {"vector": self.random_vector_3, "weight": 3}], }),
+            )
+            for call in mock_vectorise.call_args_list:
+                print(call)
+                assert not call
+            assert not mock_vectorise.call_args_list
+            return True
+        
+        assert run()
 
 
+    def test_lexical_search_with_custom_vector_field(self):
+        """
+        Lexical search for the doc
+        """
+        tensor_search.add_documents(
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1,
+                docs=[
+                    {
+                        "_id": "custom_vector_doc",
+                        "my_custom_vector": {
+                            "content": "custom content is here!!",
+                            "vector": self.random_vector_1    # size is 512
+                        }
+                    },
+                    {
+                        "_id": "empty_content_custom_vector_doc",
+                        "my_custom_vector": {
+                            "vector": self.random_vector_2    # size is 512
+                        }
+                    },
+                ],
+                auto_refresh=True, device="cpu", mappings=self.mappings
+            )
+        )
+
+        # Searching matching custom vector content returns custom vector
+        res = tensor_search.search(
+            config=self.config, index_name=self.index_name_1, text="custom content is here!!",
+            search_method=SearchMethod.LEXICAL
+        )
+        assert len(res["hits"]) == 1
+        assert res["hits"][0]["_id"] == "custom_vector_doc"
+        # Empty content doc should not be in lexical results
+        for hit in res["hits"]:
+            assert hit["_id"] != "empty_content_custom_vector_doc"
+    
+    def test_invalid_custom_vector_field_content(self):
+        """
+        Add a document with a custom vector field with invalid content/embedding/format
+        Important that this validation works even with `no_model` index.
+        """
+        test_cases = [
+            # Wrong vector length
+            {"content": "custom content is here!!", "vector": [1.0, 1.0, 1.0]},
+            # Wrong content type
+            {"content": 12345, "vector": self.random_vector_1},
+            # Wrong vector type inside list (even if correct length)
+            {"content": "custom content is here!!", "vector": self.random_vector_1[:-1] + ["NOT A FLOAT"]},
+            # Field that shouldn't be there
+            {"content": "custom content is here!!", "vector": self.random_vector_1, "extra_field": "blah"},
+            # No vector
+            {"content": "custom content is here!!"},
+            # Nested dict inside custom vector content
+            {
+                "content": {
+                    "content": "custom content is here!!",
+                    "vector": self.random_vector_1
+                }, 
+                "vector": self.random_vector_1
+            },
+        ]
+        
+        for case in test_cases:
+            res = tensor_search.add_documents(
+                config=self.config, add_docs_params=AddDocsParams(
+                    index_name=self.index_name_1,
+                    docs=[{
+                        "_id": "0",
+                        "my_custom_vector": case
+                    }],
+                    auto_refresh=True, device="cpu", mappings=self.mappings
+                )
+            )
+
+            assert res["errors"]
+            assert not json.loads(requests.get(url = f"{self.endpoint}/{self.index_name_1}/_doc/0", verify=False).text)["found"]
+            try:
+                tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="0")
+                raise AssertionError
+            except DocumentNotFoundError:
+                pass
+    
+    def test_bulk_search_with_custom_vector_field(self):
+        """
+        Bulk search for the doc
+        """
+        tensor_search.add_documents(
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1,
+                docs=[
+                    {
+                        "_id": "custom_vector_doc",
+                        "my_custom_vector": {
+                            "content": "custom content is here!!",
+                            "vector": self.random_vector_1    # size is 512
+                        }
+                    },
+                    {
+                        "_id": "empty_content_custom_vector_doc",
+                        "my_custom_vector": {
+                            "vector": self.random_vector_2    # size is 512
+                        }
+                    },
+                ],
+                auto_refresh=True, device="cpu", mappings=self.mappings
+            )
+        )
+
+        # Searching with context matching custom vector returns custom vector
+        res = tensor_search.bulk_search(
+            marqo_config=self.config,
+            query=BulkSearchQuery(
+                queries=[
+                    BulkSearchQueryEntity(
+                        index=self.index_name_1,    # works with no text query!
+                        context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], })
+                    )
+                ]
+            )
+        )["result"][0]
+
+        assert res["hits"][0]["_id"] == "custom_vector_doc"
+        assert res["hits"][0]["_score"] == 1.0
+        assert res["hits"][0]["_highlights"]["my_custom_vector"] == "custom content is here!!"

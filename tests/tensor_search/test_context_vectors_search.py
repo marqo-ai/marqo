@@ -130,6 +130,52 @@ class TestContextSearch(MarqoTestCase):
         res = tensor_search.search(config=self.config, index_name=self.index_name_1, text={"": 0}, 
                                    context=SearchContext(**{"tensor": [{"vector": context_vector_1, "weight": 1}], }))
         assert res["hits"][0]["_id"] == expected_doc_id
+    
+    def test_search_no_query_invalid(self):
+        """
+        Tests invalid situations where the search has no text query.
+        """
+        # no query, no context vector
+        try:
+            res = tensor_search.search(config=self.config, index_name=self.index_name_1, search_method=SearchMethod.TENSOR)
+            raise AssertionError
+        except InvalidArgError as e:
+            assert "one of query (`q`) or context vectors" in e.message
+        
+        # no query, empty context tensor
+        try:
+            res = tensor_search.search(config=self.config, index_name=self.index_name_1, search_method=SearchMethod.TENSOR,
+                                        context=SearchContext(**{"tensor": []}))
+            raise AssertionError
+        except InvalidArgError as e:
+            assert "number of tensors must be between 1 and 64" in e.message
+        
+        # no query, completely empty context dict
+        try:
+            res = tensor_search.search(config=self.config, index_name=self.index_name_1, search_method=SearchMethod.TENSOR,
+                                        context=SearchContext(**{}))
+            raise AssertionError
+        except InvalidArgError as e:
+            # Should fail because `tensor` is a required field in Context object
+            assert "field required" in e.message
+            assert "tensor" in e.message
+        
+        # no query, with context vector, but LEXICAL search.
+        try:
+            res = tensor_search.search(config=self.config, index_name=self.index_name_1, search_method=SearchMethod.LEXICAL,
+                                       context=SearchContext(**{"tensor": [{"vector": [1., ] * 512, "weight": 2}, {"vector": [2., ] * 512, "weight": -1}], }))
+            raise AssertionError
+        except InvalidArgError as e:
+            assert "Lexical search query arg must be of type `str`" in e.message
+        
+        # no query, with context vector, but wrong length
+        try:
+            res = tensor_search.search(config=self.config, index_name=self.index_name_1, search_method=SearchMethod.TENSOR,
+                                       context=SearchContext(**{"tensor": [{"vector": [1., ] * 123, "weight": 2}], }))
+            raise AssertionError
+        except InvalidArgError as e:
+            assert "context vector given has invalid dimensions" in e.message
+
 
 
 class TestContextBulkSearch(MarqoTestCase):

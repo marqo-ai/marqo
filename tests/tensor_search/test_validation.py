@@ -1496,3 +1496,44 @@ class TestValidateDeleteDocsRequest(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             validation.validate_delete_docs_request(delete_request, None)
 
+
+class TestValidateModelProperties(unittest.TestCase):
+    def test_validate_model_properties_no_model(self):
+        """
+        Tests model properties if model="no_model"
+        """
+        # Invalid cases
+        test_cases = [
+            # None
+            (
+                None,
+                "must provide `model_properties`"
+            ),
+            # No dimensions key
+            (
+                {
+                    "dimension": 123
+                },
+                "must have `dimensions` set"
+            ),
+            # Extra key
+            (
+                {
+                    "dimensions": 123,
+                    "url": "http://www.blah.com"
+                },
+                "Invalid model_properties key found: `url`"
+            )
+        ]
+
+        for case, error_message in test_cases:
+            try:
+                validation.validate_model_properties_no_model(case)
+                raise AssertionError
+            except InvalidArgError as e:
+                assert error_message in e.message
+
+        # Ensure valid case passes
+        validation.validate_model_properties_no_model({
+            "dimensions": 123
+        })

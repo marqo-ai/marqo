@@ -21,9 +21,10 @@ from marqo.tensor_search.models.mappings_object import (
     custom_vector_mappings_schema
 )
 from marqo.tensor_search.models.custom_vector_object import custom_vector_schema
+from marqo.s2_inference.errors import InvalidModelPropertiesError
 
 
-def validate_query(q: Union[dict, str], search_method: Union[str, SearchMethod]):
+def validate_query(q: Union[dict, str, None], search_method: Union[str, SearchMethod]):
     """
     Returns q if an error is not raised"""
     usage_ref = "\nSee query reference here: https://docs.marqo.ai/0.0.13/API-Reference/search/#query-q"
@@ -49,6 +50,8 @@ def validate_query(q: Union[dict, str], search_method: Union[str, SearchMethod])
                     f"{base_invalid_kv_message}Found value of type `{type(v)}` instead of float. Value=`{v}`"
                     f" {usage_ref}"
                 )
+    elif q is None:
+        pass
     elif not isinstance(q, str):
         raise InvalidArgError(
             f"q must be a string or dict! Received q of type `{type(q)}`. "
@@ -181,11 +184,11 @@ def validate_field_content(field_content: Any, is_non_tensor_field: bool) -> Any
             f"Allowed content types: {[ty.__name__ for ty in constants.ALLOWED_CUSTOMER_FIELD_TYPES]}"
         )
 
-def validate_context(context: Optional[SearchContext], search_method: SearchMethod, query: Union[str, Dict[str, Any]]): 
+def validate_context(context: Optional[SearchContext], search_method: SearchMethod, query: Union[None, str, Dict[str, Any]]): 
     """Validate the SearchContext.
 
     'validate_context' ensures that if the context is provided for a tensor search
-    operation, the query must be a dictionary (not a str). 'context' 
+    operation, the query must be a dictionary (not a str) or None. 'context' 
     structure is validated internally.
     
     """
@@ -702,4 +705,40 @@ def validate_nonnegative_number(input_string: str, field_description: str = "Inp
     return output_number
 
 
+def validate_model_dimensions(input_dimensions: Any):
+    """Validates that input dimensions is an int and is greater than 0
+
+    Args:
+        input_dimensions: the value to validate
+
+    Returns:
+        input_dimensions, if it passes validation
+        
+    Raises:
+        
+    """
+    if isinstance(input_dimensions, int) and input_dimensions > 0:
+        return input_dimensions
+    
+    raise InternalError(f"Model dimensions must be a positive integer! Given model dimensions = {input_dimensions}.")
+
+
+def validate_model_properties_no_model(model_properties: dict):
+    """
+    model_properties dict must have exactly 1 key: "dimensions".
+    """
+    if model_properties is None:
+            raise InvalidArgError(
+            f"When creating an index with `{enums.SpecialModels.no_model}`, you must provide `model_properties` "
+            f"containing `dimensions` in the index settings. Please provide `model_properties` in your index settings or "
+            f"select a different model."
+        )
+    if "dimensions" not in model_properties:
+        raise InvalidArgError("If your index is using `no_model`, your `model_properties` must have `dimensions` set.")
+    
+    for key in model_properties:
+        if key != "dimensions":
+            raise InvalidArgError(f"Invalid model_properties key found: `{key}`. If your index is using `no_model`, then `model_properties` can only have `dimensions` set.")
+        
+    return model_properties
 
