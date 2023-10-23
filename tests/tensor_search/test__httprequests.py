@@ -100,8 +100,8 @@ Max retries exceeded with url: /my-test-index-1/_mapping (Caused by SSLError(SSL
         mock_get.side_effect = requests.exceptions.ConnectionError(error_message)
         mock_post.side_effect = requests.exceptions.ConnectionError(error_message)
         mock_environ = {
-            EnvVars.MARQO_OPENSEARCH_MAX_SEARCH_RETRY_ATTEMPTS: str(3),
-            EnvVars.MARQO_OPENSEARCH_MAX_ADD_DOCS_RETRY_ATTEMPTS: str(3),
+            EnvVars.MARQO_MAX_BACKEND_SEARCH_RETRY_ATTEMPTS: str(3),
+            EnvVars.MARQO_MAX_BACKEND_ADD_DOCS_RETRY_ATTEMPTS: str(3),
             "MARQO_BEST_AVAILABLE_DEVICE": "cpu"
         }
 

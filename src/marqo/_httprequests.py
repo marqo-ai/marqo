@@ -22,6 +22,7 @@ from marqo.errors import (
 from urllib3.exceptions import InsecureRequestWarning
 import warnings
 from marqo.tensor_search.tensor_search_logging import get_logger
+from marqo.tensor_search.constants import DEFAULT_MARQO_MAX_BACKEND_RETRY_ATTEMPTS, DEFAULT_MARQO_MAX_BACKEND_RETRY_BACKOFF
 
 logger = get_logger(__name__)
 
@@ -45,10 +46,10 @@ class HttpRequests:
         max_retry_attempts: Optional[int] = None,
         max_retry_backoff_seconds: Optional[int] = None
     ) -> Any:
-        if not max_retry_attempts:
-            max_retry_attempts = 0
-        if not max_retry_backoff_seconds:
-            max_retry_backoff_seconds = 1
+        if max_retry_attempts is None:
+            max_retry_attempts = DEFAULT_MARQO_MAX_BACKEND_RETRY_ATTEMPTS
+        if max_retry_backoff_seconds is None:
+            max_retry_backoff_seconds = DEFAULT_MARQO_MAX_BACKEND_RETRY_BACKOFF
 
         to_verify = False #  self.config.cluster_is_remote
 
@@ -90,7 +91,7 @@ class HttpRequests:
                     if (attempt == max_retry_attempts):
                         raise BackendCommunicationError(str(err)) from err
                     else:
-                        logger.info(f"BackendCommunicationError encountered... Retrying request to {request_path}.")
+                        logger.info(f"BackendCommunicationError encountered... Retrying request to {request_path}. Attempt {attempt + 1} of {max_retry_attempts}")
                         backoff_sleep = self.calculate_backoff_sleep(attempt, max_retry_backoff_seconds)
                         time.sleep(backoff_sleep)
 

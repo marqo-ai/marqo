@@ -14,6 +14,7 @@ from marqo import errors
 from typing import Iterable, List, Union, Optional, Tuple, Dict
 from marqo.tensor_search.index_meta_cache import get_cache
 from marqo.tensor_search.index_meta_cache import get_index_info as get_cached_index_info
+from marqo.tensor_search.constants import DEFAULT_MARQO_MAX_BACKEND_RETRY_ATTEMPTS, DEFAULT_MARQO_MAX_BACKEND_RETRY_BACKOFF
 import pprint
 
 
@@ -63,8 +64,8 @@ def get_index_info(config: Config, index_name: str) -> IndexInfo:
 def add_customer_field_properties(config: Config, index_name: str,
                                   customer_field_names: Iterable[Tuple[str, enums.OpenSearchDataType]],
                                   multimodal_combination_fields: Dict[str, Iterable[Tuple[str, enums.OpenSearchDataType]]],
-                                  max_retry_attempts: int = 0,
-                                  max_retry_backoff_seconds: int = 1) -> None:
+                                  max_retry_attempts: int = DEFAULT_MARQO_MAX_BACKEND_RETRY_ATTEMPTS,
+                                  max_retry_backoff_seconds: int = DEFAULT_MARQO_MAX_BACKEND_RETRY_BACKOFF) -> None:
     """Adds new customer fields to index mapping.
 
     Pushes the updated mapping to OpenSearch, and updates the local cache.
