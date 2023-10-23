@@ -21,6 +21,9 @@ from marqo.errors import (
 )
 from urllib3.exceptions import InsecureRequestWarning
 import warnings
+from marqo.tensor_search.tensor_search_logging import get_logger
+
+logger = get_logger(__name__)
 
 ALLOWED_OPERATIONS = {requests.delete, requests.get, requests.post, requests.put}
 
@@ -82,6 +85,7 @@ class HttpRequests:
                     if (attempt == max_retry_attempts):
                         raise BackendCommunicationError(str(err)) from err
                     else:
+                        logger.info(f"BackendCommunicationError encountered... Retrying request to {request_path}.")
                         backoff_sleep = self.calculate_backoff_sleep(attempt, max_retry_backoff_seconds)
                         time.sleep(backoff_sleep)
 
