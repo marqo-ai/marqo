@@ -1,5 +1,6 @@
 import copy
 import json
+import time
 import pprint
 from http import HTTPStatus
 from typing import Any, Callable, Dict, List, Optional, Union
@@ -38,6 +39,8 @@ class HttpRequests:
         path: str,
         body: Optional[Union[Dict[str, Any], List[Dict[str, Any]], List[str], str]] = None,
         content_type: Optional[str] = None,
+        max_retry_attempts: Optional[int] = 0,
+        max_retry_backoff_seconds: Optional[int] = 1
     ) -> Any:
         to_verify = False #  self.config.cluster_is_remote
 
@@ -52,38 +55,53 @@ class HttpRequests:
         with warnings.catch_warnings():
             if not self.config.cluster_is_remote:
                 warnings.simplefilter('ignore', InsecureRequestWarning)
-            try:
-                request_path = self.config.url + '/' + path
-                if isinstance(body, (bytes, str)):
-                    response = http_method(
-                        request_path,
-                        timeout=self.config.timeout,
-                        headers=req_headers,
-                        data=body,
-                        verify=to_verify
-                    )
-                else:
-                    response = http_method(
-                        request_path,
-                        timeout=self.config.timeout,
-                        headers=req_headers,
-                        data=json.dumps(body) if body else None,
-                        verify=to_verify
-                    )
-                return self.__validate(response)
-            except requests.exceptions.Timeout as err:
-                raise BackendTimeoutError(str(err)) from err
-            except requests.exceptions.ConnectionError as err:
-                raise BackendCommunicationError(str(err)) from err
+            
+            for attempt in range(max_retry_attempts + 1):
+                try:
+                    request_path = self.config.url + '/' + path
+                    if isinstance(body, (bytes, str)):
+                        response = http_method(
+                            request_path,
+                            timeout=self.config.timeout,
+                            headers=req_headers,
+                            data=body,
+                            verify=to_verify
+                        )
+                    else:
+                        response = http_method(
+                            request_path,
+                            timeout=self.config.timeout,
+                            headers=req_headers,
+                            data=json.dumps(body) if body else None,
+                            verify=to_verify
+                        )
+                    return self.__validate(response)
+                except requests.exceptions.Timeout as err:
+                    raise BackendTimeoutError(str(err)) from err
+                except requests.exceptions.ConnectionError as err:
+                    if (attempt == max_retry_attempts):
+                        raise BackendCommunicationError(str(err)) from err
+                    else:
+                        backoff_sleep = self.calculate_backoff_sleep(attempt, max_retry_backoff_seconds)
+                        time.sleep(backoff_sleep)
 
     def get(
         self, path: str,
         body: Optional[Union[Dict[str, Any], List[Dict[str, Any]], List[str], str]] = None,
+        max_retry_attempts: Optional[int] = 0,
+        max_retry_backoff_seconds: Optional[int] = 1
     ) -> Any:
         content_type = None
         if body is not None:
             content_type = 'application/json'
-        res = self.send_request(requests.get, path=path, body=body, content_type=content_type)
+        res = self.send_request(
+            http_method=requests.get,
+            path=path,
+            body=body,
+            content_type=content_type,
+            max_retry_attempts=max_retry_attempts,
+            max_retry_backoff_seconds=max_retry_backoff_seconds
+        )
         return res
 
     def post(
@@ -91,25 +109,51 @@ class HttpRequests:
         path: str,
         body: Optional[Union[Dict[str, Any], List[Dict[str, Any]], List[str], str]] = None,
         content_type: Optional[str] = 'application/json',
+        max_retry_attempts: Optional[int] = 0,
+        max_retry_backoff_seconds: Optional[int] = 1
     ) -> Any:
-        return self.send_request(requests.post, path, body, content_type)
+        return self.send_request(
+            http_method=requests.post,
+            path=path,
+            body=body,
+            content_type=content_type,
+            max_retry_attempts=max_retry_attempts,
+            max_retry_backoff_seconds=max_retry_backoff_seconds
+        )
 
     def put(
         self,
         path: str,
         body: Optional[Union[Dict[str, Any], List[Dict[str, Any]], List[str], str]] = None,
         content_type: Optional[str] = None,
+        max_retry_attempts: Optional[int] = 0,
+        max_retry_backoff_seconds: Optional[int] = 1
     ) -> Any:
         if body is not None:
             content_type = 'application/json'
-        return self.send_request(requests.put, path, body, content_type)
+        return self.send_request(
+            http_method=requests.put,
+            path=path,
+            body=body,
+            content_type=content_type,
+            max_retry_attempts=max_retry_attempts,
+            max_retry_backoff_seconds=max_retry_backoff_seconds
+        )
 
     def delete(
         self,
         path: str,
         body: Optional[Union[Dict[str, Any], List[Dict[str, Any]], List[str]]] = None,
+        max_retry_attempts: Optional[int] = 0,
+        max_retry_backoff_seconds: Optional[int] = 1
     ) -> Any:
-        return self.send_request(requests.delete, path, body)
+        return self.send_request(
+            http_method=requests.delete,
+            path=path,
+            body=body,
+            max_retry_attempts=max_retry_attempts,
+            max_retry_backoff_seconds=max_retry_backoff_seconds
+        )
 
     @staticmethod
     def __to_json(
@@ -129,6 +173,19 @@ class HttpRequests:
         except requests.exceptions.HTTPError as err:
             convert_to_marqo_web_error_and_raise(response=request, err=err)
 
+    def calculate_backoff_sleep(self, attempt: int, cap: int) -> float:
+        """Calculates the backoff sleep time for a given attempt
+
+        Args:
+            attempt (int): the attempt number
+
+        Returns:
+            float: the backoff sleep time
+        """
+        return min(
+            cap * 1000, # convert to milliseconds
+            (2 ** attempt) * 10 # start at 10ms for first attempt
+        ) / 1000 # convert to seconds
 
 def convert_to_marqo_web_error_and_raise(response: requests.Response, err: requests.exceptions.HTTPError):
     """Translates OpenSearch errors into Marqo errors, which are then raised

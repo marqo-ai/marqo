@@ -1221,9 +1221,16 @@ def _lexical_search(
     total_preprocess_time = RequestMetricsStore.for_request().stop("search.lexical.processing_before_opensearch")
     logger.debug(f"search (lexical) pre-processing: took {(total_preprocess_time):.3f}ms to process query.")
 
+    max_search_retry_attempts = utils.read_env_vars_and_defaults(EnvVars.MARQO_OPENSEARCH_MAX_SEARCH_RETRY_ATTEMPTS)
+    max_search_retry_backoff = utils.read_env_vars_and_defaults(EnvVars.MARQO_OPENSEARCH_MAX_SEARCH_RETRY_BACKOFF)
     start_search_http_time = timer()
     with RequestMetricsStore.for_request().time("search.opensearch._search"):
-        search_res = HttpRequests(config).get(path=f"{index_name}/_search", body=body)
+        search_res = HttpRequests(config).get(
+            path=f"{index_name}/_search",
+            body=body,
+            max_retry_attempts=max_search_retry_attempts,
+            max_retry_backoff_seconds=max_search_retry_backoff
+        )
     RequestMetricsStore.for_request().add_time("search.opensearch._search.internal", search_res["took"] * 0.001) # internal, not round trip time
 
     end_search_http_time = timer()
@@ -1334,11 +1341,18 @@ def construct_msearch_body_elements(searchableAttributes: List[str], offset: int
 
 def bulk_msearch(config: Config, body: List[Dict]) -> List[Dict]:
     """Send an `/_msearch` request to MarqoOS and translate errors into a user-friendly format."""
+    max_search_retry_attempts = utils.read_env_vars_and_defaults(EnvVars.MARQO_OPENSEARCH_MAX_SEARCH_RETRY_ATTEMPTS)
+    max_search_retry_backoff = utils.read_env_vars_and_defaults(EnvVars.MARQO_OPENSEARCH_MAX_SEARCH_RETRY_BACKOFF)
     start_search_http_time = timer()
     try:
         with RequestMetricsStore.for_request().time("search.opensearch._msearch"):
             serialised_search_body = utils.dicts_to_jsonl(body)
-            response = HttpRequests(config).get(path=F"_msearch", body=serialised_search_body)
+            response = HttpRequests(config).get(
+                path=F"_msearch",
+                body=serialised_search_body,
+                max_retry_attempts=max_search_retry_attempts,
+                max_retry_backoff_seconds=max_search_retry_backoff
+            )
         RequestMetricsStore.for_request().add_time("search.opensearch._msearch.internal", float(response["took"])) # internal, not round trip time
 
         end_search_http_time = timer()
