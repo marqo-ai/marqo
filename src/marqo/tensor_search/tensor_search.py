@@ -347,6 +347,9 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
         config: Config object
         add_docs_params: add_documents()'s parameters
     """
+    
+    max_add_docs_retry_attempts = utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_BACKEND_ADD_DOCS_RETRY_ATTEMPTS)
+    max_add_docs_retry_backoff = utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_BACKEND_ADD_DOCS_RETRY_BACKOFF)
     # ADD DOCS TIMER-LOGGER (3)
 
     RequestMetricsStore.for_request().start("add_documents.processing_before_opensearch")
@@ -359,7 +362,12 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
     bulk_parent_dicts = []
 
     try:
-        index_info = backend.get_index_info(config=config, index_name=add_docs_params.index_name)
+        index_info = backend.get_index_info(
+            config=config,
+            index_name=add_docs_params.index_name,
+            max_retry_attempts=max_add_docs_retry_attempts,
+            max_retry_backoff_seconds=max_add_docs_retry_backoff
+        )
         # Retrieve model dimensions from index info
         index_model_dimensions = index_info.get_model_properties()["dimensions"]
     except errors.IndexNotFoundError:
@@ -672,8 +680,6 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
         logger.debug(f"          add_documents vectorise: took {(total_vectorise_time):.3f}s for {doc_count} docs, "
                     f"for an average of {(total_vectorise_time / doc_count):.3f}s per doc.")
         if bulk_parent_dicts:
-            max_add_docs_retry_attempts = utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_BACKEND_ADD_DOCS_RETRY_ATTEMPTS)
-            max_add_docs_retry_backoff = utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_BACKEND_ADD_DOCS_RETRY_BACKOFF)
             # the HttpRequest wrapper handles error logic
             update_mapping_response = backend.add_customer_field_properties(
                 config=config, index_name=add_docs_params.index_name, customer_field_names=new_fields,
@@ -706,7 +712,11 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
 
         with RequestMetricsStore.for_request().time("add_documents.postprocess"):
             if add_docs_params.auto_refresh:
-                HttpRequests(config).post(path=F"{add_docs_params.index_name}/_refresh")
+                HttpRequests(config).post(
+                    path=F"{add_docs_params.index_name}/_refresh",
+                    max_retry_attempts=max_add_docs_retry_attempts,
+                    max_retry_backoff_seconds=max_add_docs_retry_backoff
+                )
 
             t1 = timer()
 
