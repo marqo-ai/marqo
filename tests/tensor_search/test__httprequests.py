@@ -90,6 +90,7 @@ class Test_HttpRequests(MarqoTestCase):
         assert run()
         
     def test_opensearch_search_retry(self):
+        mock_post = mock.MagicMock()
         mock_get = mock.MagicMock()
         mock_response = requests.Response()
         mock_response.status_code = 500
@@ -97,19 +98,45 @@ class Test_HttpRequests(MarqoTestCase):
 Max retries exceeded with url: /my-test-index-1/_mapping (Caused by SSLError(SSLEOFError(8, 'EOF occurred in violation of protocol (_ssl.c:1131)'))
 """
         mock_get.side_effect = requests.exceptions.ConnectionError(error_message)
-        
-        mock_environ = {EnvVars.MARQO_OPENSEARCH_MAX_SEARCH_RETRY_ATTEMPTS: str(3), "MARQO_BEST_AVAILABLE_DEVICE": "cpu"}
-        # tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
+        mock_post.side_effect = requests.exceptions.ConnectionError(error_message)
+        mock_environ = {
+            EnvVars.MARQO_OPENSEARCH_MAX_SEARCH_RETRY_ATTEMPTS: str(3),
+            EnvVars.MARQO_OPENSEARCH_MAX_INDEX_RETRY_ATTEMPTS: str(3),
+            "MARQO_BEST_AVAILABLE_DEVICE": "cpu"
+        }
 
+        @mock.patch('requests.post', mock_post)
         @mock.patch('requests.get', mock_get)
-        @mock.patch('marqo._httprequests.ALLOWED_OPERATIONS', {requests.post, mock_get, requests.put})
+        @mock.patch('marqo._httprequests.ALLOWED_OPERATIONS', {mock_post, mock_get, requests.put})
         @mock.patch.dict(os.environ, {**os.environ, **mock_environ})
         def run():
+            try:
+                res = tensor_search.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=self.index_name_1,
+                        docs=[{"some ": "doc"}], auto_refresh=True, device="cpu"
+                    )
+                )
+                raise AssertionError
+            except BackendCommunicationError as e:
+                assert e.code == "backend_communication_error"
+                assert e.status_code == HTTPStatus.INTERNAL_SERVER_ERROR
+                assert "Max retries exceeded with url" in e.message
+
             try:
                 res = tensor_search.search(
                 config=self.config, index_name=self.index_name_1, text="cool match",
                 search_method=SearchMethod.LEXICAL)
-                print("Hello")
+                raise AssertionError
+            except BackendCommunicationError as e:
+                assert e.code == "backend_communication_error"
+                assert e.status_code == HTTPStatus.INTERNAL_SERVER_ERROR
+                assert "Max retries exceeded with url" in e.message
+
+            try:
+                res = tensor_search.search(
+                config=self.config, index_name=self.index_name_1, text="cool match",
+                search_method=SearchMethod.TENSOR)
                 raise AssertionError
             except BackendCommunicationError as e:
                 assert e.code == "backend_communication_error"

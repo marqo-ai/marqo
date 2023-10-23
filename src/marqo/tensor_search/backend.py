@@ -62,7 +62,9 @@ def get_index_info(config: Config, index_name: str) -> IndexInfo:
 
 def add_customer_field_properties(config: Config, index_name: str,
                                   customer_field_names: Iterable[Tuple[str, enums.OpenSearchDataType]],
-                                  multimodal_combination_fields: Dict[str, Iterable[Tuple[str, enums.OpenSearchDataType]]]):
+                                  multimodal_combination_fields: Dict[str, Iterable[Tuple[str, enums.OpenSearchDataType]]],
+                                  max_retry_attempts: int = 0,
+                                  max_retry_backoff_seconds: int = 1) -> None:
     """Adds new customer fields to index mapping.
 
     Pushes the updated mapping to OpenSearch, and updates the local cache.
@@ -110,7 +112,12 @@ def add_customer_field_properties(config: Config, index_name: str,
         },
     }
 
-    mapping_res = HttpRequests(config).put(path=F"{index_name}/_mapping", body=json.dumps(body))
+    mapping_res = HttpRequests(config).put(
+        path=F"{index_name}/_mapping",
+        body=json.dumps(body),
+        max_retry_attempts=max_retry_attempts,
+        max_retry_backoff_seconds=max_retry_backoff_seconds
+    )
 
     merged_chunk_properties = {
         **existing_info.properties[enums.TensorField.chunks]["properties"],

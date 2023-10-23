@@ -672,17 +672,23 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
         logger.debug(f"          add_documents vectorise: took {(total_vectorise_time):.3f}s for {doc_count} docs, "
                     f"for an average of {(total_vectorise_time / doc_count):.3f}s per doc.")
         if bulk_parent_dicts:
+            max_add_docs_retry_attempts = utils.read_env_vars_and_defaults(EnvVars.MARQO_OPENSEARCH_MAX_INDEX_RETRY_ATTEMPTS)
+            max_add_docs_retry_backoff = utils.read_env_vars_and_defaults(EnvVars.MARQO_OPENSEARCH_MAX_INDEX_RETRY_BACKOFF)
             # the HttpRequest wrapper handles error logic
             update_mapping_response = backend.add_customer_field_properties(
                 config=config, index_name=add_docs_params.index_name, customer_field_names=new_fields,
-                multimodal_combination_fields=new_obj_fields)
+                multimodal_combination_fields=new_obj_fields, max_retry_attempts=max_add_docs_retry_attempts,
+                max_retry_backoff_seconds=max_add_docs_retry_backoff)
 
             # ADD DOCS TIMER-LOGGER (5)
             start_time_5 = timer()
             with RequestMetricsStore.for_request().time("add_documents.opensearch._bulk"):
                 serialised_body = utils.dicts_to_jsonl(bulk_parent_dicts)
+                
                 index_parent_response = HttpRequests(config).post(
-                    path="_bulk", body=serialised_body)
+                    path="_bulk", body=serialised_body,
+                    max_retry_attempts=max_add_docs_retry_attempts,
+                    max_add_docs_retry_backoff=max_add_docs_retry_backoff)
             RequestMetricsStore.for_request().add_time("add_documents.opensearch._bulk.internal", float(index_parent_response["took"]))
 
             end_time_5 = timer()
