@@ -88,7 +88,7 @@ class TestCustomVectorField(MarqoTestCase):
         assert run()
 
         call_args = mock_post.call_args_list
-        assert len(call_args) == 2      # 2nd call is the refresh
+        assert len(call_args) == 1
 
         post_args, post_kwargs = call_args[0]
         request_body_lines = [json.loads(line) for line in post_kwargs["body"].splitlines() if line]
@@ -140,7 +140,7 @@ class TestCustomVectorField(MarqoTestCase):
         assert run()
 
         call_args = mock_post.call_args_list
-        assert len(call_args) == 2      # 2nd call is the refresh
+        assert len(call_args) == 1
 
         post_args, post_kwargs = call_args[0]
         request_body_lines = [json.loads(line) for line in post_kwargs["body"].splitlines() if line]
@@ -232,7 +232,7 @@ class TestCustomVectorField(MarqoTestCase):
         assert run()
 
         call_args = mock_post.call_args_list
-        assert len(call_args) == 2      # 2nd call is the refresh
+        assert len(call_args) == 1 
 
         post_args, post_kwargs = call_args[0]
         request_body_lines = [json.loads(line) for line in post_kwargs["body"].splitlines() if line]
