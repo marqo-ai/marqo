@@ -347,6 +347,9 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
         config: Config object
         add_docs_params: add_documents()'s parameters
     """
+    
+    max_add_docs_retry_attempts = utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_BACKEND_ADD_DOCS_RETRY_ATTEMPTS)
+    max_add_docs_retry_backoff = utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_BACKEND_ADD_DOCS_RETRY_BACKOFF)
     # ADD DOCS TIMER-LOGGER (3)
 
     RequestMetricsStore.for_request().start("add_documents.processing_before_opensearch")
@@ -359,7 +362,12 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
     bulk_parent_dicts = []
 
     try:
-        index_info = backend.get_index_info(config=config, index_name=add_docs_params.index_name)
+        index_info = backend.get_index_info(
+            config=config,
+            index_name=add_docs_params.index_name,
+            max_retry_attempts=max_add_docs_retry_attempts,
+            max_retry_backoff_seconds=max_add_docs_retry_backoff
+        )
         # Retrieve model dimensions from index info
         index_model_dimensions = index_info.get_model_properties()["dimensions"]
     except errors.IndexNotFoundError:
@@ -675,14 +683,26 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
             # the HttpRequest wrapper handles error logic
             update_mapping_response = backend.add_customer_field_properties(
                 config=config, index_name=add_docs_params.index_name, customer_field_names=new_fields,
-                multimodal_combination_fields=new_obj_fields)
+                multimodal_combination_fields=new_obj_fields, max_retry_attempts=max_add_docs_retry_attempts,
+                max_retry_backoff_seconds=max_add_docs_retry_backoff)
 
             # ADD DOCS TIMER-LOGGER (5)
             start_time_5 = timer()
             with RequestMetricsStore.for_request().time("add_documents.opensearch._bulk"):
                 serialised_body = utils.dicts_to_jsonl(bulk_parent_dicts)
+                
+                bulk_path = "_bulk"
+                if add_docs_params.auto_refresh:
+                    bulk_path += "?refresh=true"
+                else:
+                    bulk_path += "?refresh=false"
+                
                 index_parent_response = HttpRequests(config).post(
-                    path="_bulk", body=serialised_body)
+                    path=bulk_path,
+                    body=serialised_body,
+                    max_retry_attempts=max_add_docs_retry_attempts,
+                    max_retry_backoff_seconds=max_add_docs_retry_backoff
+                )
             RequestMetricsStore.for_request().add_time("add_documents.opensearch._bulk.internal", float(index_parent_response["took"]))
 
             end_time_5 = timer()
@@ -699,9 +719,6 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
             index_parent_response = None
 
         with RequestMetricsStore.for_request().time("add_documents.postprocess"):
-            if add_docs_params.auto_refresh:
-                HttpRequests(config).post(path=F"{add_docs_params.index_name}/_refresh")
-
             t1 = timer()
 
             def translate_add_doc_response(response: Optional[dict], time_diff: float) -> dict:
@@ -902,7 +919,8 @@ def bulk_search(query: BulkSearchQuery, marqo_config: config.Config, verbose: in
             process non-erroring queries.
     """
     refresh_indexes_in_background(marqo_config, [q.index for q in query.queries])
-
+    max_search_retry_attempts = utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_BACKEND_SEARCH_RETRY_ATTEMPTS)
+    max_search_retry_backoff = utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_BACKEND_SEARCH_RETRY_BACKOFF)
     # TODO: Let non-errored docs to propagate.
     errs = [validation.validate_bulk_query_input(q) for q in query.queries]
     if any(errs):
@@ -923,9 +941,18 @@ def bulk_search(query: BulkSearchQuery, marqo_config: config.Config, verbose: in
     tensor_queries: Dict[int, BulkSearchQueryEntity] = dict(filter(lambda e: e[1].searchMethod == SearchMethod.TENSOR, enumerate(query.queries)))
     lexical_queries: Dict[int, BulkSearchQueryEntity] = dict(filter(lambda e: e[1].searchMethod == SearchMethod.LEXICAL, enumerate(query.queries)))
 
-    tensor_search_results = dict(zip(tensor_queries.keys(), _bulk_vector_text_search(
-            marqo_config, list(tensor_queries.values()), device=selected_device,
-        )))
+    tensor_search_results = dict(
+        zip(
+            tensor_queries.keys(),
+            _bulk_vector_text_search(
+                marqo_config,
+                list(tensor_queries.values()),
+                device=selected_device,
+                max_retry_attempts=max_search_retry_attempts,
+                max_retry_backoff_seconds=max_search_retry_backoff
+            )
+        )
+    )
 
     # TODO: combine lexical + tensor queries into /_msearch
     lexical_search_results = dict(zip(lexical_queries.keys(), [_lexical_search(
@@ -1038,6 +1065,9 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict]] = N
 
     validation.validate_query(q=text, search_method=search_method)
 
+    max_search_retry_attempts = utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_BACKEND_SEARCH_RETRY_ATTEMPTS)
+    max_search_retry_backoff = utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_BACKEND_SEARCH_RETRY_BACKOFF)
+
     # Validate result_count + offset <= int(max_docs_limit)
     max_docs_limit = utils.read_env_vars_and_defaults(EnvVars.MARQO_MAX_RETRIEVABLE_DOCS)
     check_upper = True if max_docs_limit is None else result_count + offset <= int(max_docs_limit)
@@ -1063,7 +1093,12 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict]] = N
         print(f"determined_search_method: {search_method}, text query: {text}")
     # if we can't see the index name in cache, we request it and wait for the info
     if index_name not in index_meta_cache.get_cache():
-        backend.get_index_info(config=config, index_name=index_name)
+        backend.get_index_info(
+            config=config,
+            index_name=index_name,
+            max_retry_attempts=max_search_retry_attempts,
+            max_retry_backoff_seconds=max_search_retry_backoff
+        )
 
     REFRESH_INTERVAL_SECONDS = 2
     # update cache in the background
@@ -1086,13 +1121,14 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict]] = N
             searchable_attributes=searchable_attributes, verbose=verbose,
             filter_string=filter, device=selected_device, attributes_to_retrieve=attributes_to_retrieve, boost=boost,
             image_download_headers=image_download_headers, context=context, score_modifiers=score_modifiers,
-            model_auth=model_auth
+            model_auth=model_auth, max_retry_attempts=max_search_retry_attempts, max_retry_backoff_seconds=max_search_retry_backoff
         )
     elif search_method.upper() == SearchMethod.LEXICAL:
         search_result = _lexical_search(
             config=config, index_name=index_name, text=text, result_count=result_count, offset=offset,
             searchable_attributes=searchable_attributes, verbose=verbose,
-            filter_string=filter, attributes_to_retrieve=attributes_to_retrieve
+            filter_string=filter, attributes_to_retrieve=attributes_to_retrieve,
+            max_retry_attempts=max_search_retry_attempts, max_retry_backoff_seconds=max_search_retry_backoff
         )
     else:
         raise errors.InvalidArgError(f"Search called with unknown search method: {search_method}")
@@ -1135,7 +1171,8 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict]] = N
 def _lexical_search(
         config: Config, index_name: str, text: str, result_count: int = 3, offset: int = 0,
         searchable_attributes: Sequence[str] = None, verbose: int = 0, filter_string: str = None,
-        attributes_to_retrieve: Optional[List[str]] = None, expose_facets: bool = False):
+        attributes_to_retrieve: Optional[List[str]] = None, expose_facets: bool = False,
+        max_retry_attempts: int = None, max_retry_backoff_seconds: int = None):
     """
 
     Args:
@@ -1171,7 +1208,9 @@ def _lexical_search(
         fields_to_search = searchable_attributes
     else:
         fields_to_search = index_meta_cache.get_index_info(
-            config=config, index_name=index_name
+            config=config, index_name=index_name,
+            max_retry_attempts=max_retry_attempts,
+            max_retry_backoff_seconds=max_retry_backoff_seconds
         ).get_true_text_properties()
 
     # Parse text into required and optional terms.
@@ -1223,7 +1262,12 @@ def _lexical_search(
 
     start_search_http_time = timer()
     with RequestMetricsStore.for_request().time("search.opensearch._search"):
-        search_res = HttpRequests(config).get(path=f"{index_name}/_search", body=body)
+        search_res = HttpRequests(config).get(
+            path=f"{index_name}/_search",
+            body=body,
+            max_retry_attempts=max_retry_attempts,
+            max_retry_backoff_seconds=max_retry_backoff_seconds
+        )
     RequestMetricsStore.for_request().add_time("search.opensearch._search.internal", search_res["took"] * 0.001) # internal, not round trip time
 
     end_search_http_time = timer()
@@ -1332,13 +1376,23 @@ def construct_msearch_body_elements(searchableAttributes: List[str], offset: int
     return body
 
 
-def bulk_msearch(config: Config, body: List[Dict]) -> List[Dict]:
+def bulk_msearch(
+        config: Config,
+        body: List[Dict],
+        max_retry_attempts: int = None,
+        max_retry_backoff: int = None,
+    ) -> List[Dict]:
     """Send an `/_msearch` request to MarqoOS and translate errors into a user-friendly format."""
     start_search_http_time = timer()
     try:
         with RequestMetricsStore.for_request().time("search.opensearch._msearch"):
             serialised_search_body = utils.dicts_to_jsonl(body)
-            response = HttpRequests(config).get(path=F"_msearch", body=serialised_search_body)
+            response = HttpRequests(config).get(
+                path=F"_msearch",
+                body=serialised_search_body,
+                max_retry_attempts=max_retry_attempts,
+                max_retry_backoff_seconds=max_retry_backoff
+            )
         RequestMetricsStore.for_request().add_time("search.opensearch._msearch.internal", float(response["took"])) # internal, not round trip time
 
         end_search_http_time = timer()
@@ -1642,7 +1696,13 @@ def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity],
     )
     return qidx_to_vectors
 
-def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity], device: str = None) -> List[Dict]:
+def _bulk_vector_text_search(
+        config: Config,
+        queries: List[BulkSearchQueryEntity],
+        device: str = None,
+        max_retry_attempts: int = None,
+        max_retry_backoff_seconds: int = None
+    ) -> List[Dict]:
     """Resolve a batch of search queries in parallel.
 
     Args:
@@ -1672,7 +1732,7 @@ def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity
         query_to_body_parts: Dict[Qidx, List[Dict]] = dict()
         query_to_body_count: Dict[Qidx, int] = dict() # Keep track of count, so we can separate after msearch call.
         for qidx, q in enumerate(queries):
-            index_info = get_index_info(config=config, index_name=q.index)
+            index_info = get_index_info(config=config, index_name=q.index, max_retry_attempts=max_retry_attempts, max_retry_backoff_seconds=max_retry_backoff_seconds)
             body = construct_msearch_body_elements(q.searchableAttributes, q.offset, q.filter, index_info, q.limit, qidx_to_vectors[qidx], q.attributesToRetrieve, q.index, q.scoreModifiers)
             query_to_body_parts[qidx] = body
             query_to_body_count[qidx] = len(body)
@@ -1684,7 +1744,7 @@ def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity
             return create_empty_query_response(queries)
 
     ## 5. POST aggregate  to /_msearch
-    responses = bulk_msearch(config, aggregate_body)
+    responses = bulk_msearch(config, aggregate_body, max_retry_attempts=max_retry_attempts, max_retry_backoff=max_retry_backoff_seconds)
 
     with RequestMetricsStore.for_request().time("bulk_search.vector.postprocess",
         lambda t : logger.debug(f"bulk search (tensor) post-processing: took {t:.3f}ms")
@@ -1726,7 +1786,8 @@ def _vector_text_search(
         searchable_attributes: Iterable[str] = None, verbose=0, filter_string: str = None, device: str = None,
         attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None,
         image_download_headers: Optional[Dict] = None, context: Optional[Dict] = None,
-        score_modifiers: Optional[ScoreModifier] = None, model_auth: Optional[ModelAuth] = None):
+        score_modifiers: Optional[ScoreModifier] = None, model_auth: Optional[ModelAuth] = None,
+        max_retry_attempts: int = None, max_retry_backoff_seconds: int = None):
     """
 
     Args:
@@ -1773,7 +1834,12 @@ def _vector_text_search(
     RequestMetricsStore.for_request().start("search.vector.processing_before_opensearch")
 
     try:
-        index_info = get_index_info(config=config, index_name=index_name)
+        index_info = get_index_info(
+            config=config,
+            index_name=index_name,
+            max_retry_attempts=max_retry_attempts,
+            max_retry_backoff_seconds=max_retry_backoff_seconds
+        )
     except KeyError as e:
         raise errors.IndexNotFoundError(message="Tried to search a non-existent index: {}".format(index_name))
 
@@ -1795,7 +1861,7 @@ def _vector_text_search(
     logger.debug(f"search (tensor) pre-processing: took {(total_preprocess_time):.3f}ms to vectorize and process query.")
 
     # SEARCH TIMER-LOGGER (roundtrip)
-    responses = bulk_msearch(config, body)
+    responses = bulk_msearch(config=config, body=body, max_retry_attempts=max_retry_attempts, max_retry_backoff=max_retry_backoff_seconds)
 
     # SEARCH TIMER-LOGGER (post-processing)
     RequestMetricsStore.for_request().start("search.vector.postprocess")
