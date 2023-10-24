@@ -128,7 +128,7 @@ class Test_HttpRequests(MarqoTestCase):
 
         mock_response = requests.Response()
         mock_response.status_code = 200
-        mock_response.json = lambda: {'succes': {'hits': ['test']}}
+        mock_response.json = lambda: {'success': {'hits': ['test']}}
         mock_environ = {
             "MARQO_BEST_AVAILABLE_DEVICE": "cpu"
         }
@@ -151,7 +151,7 @@ class Test_HttpRequests(MarqoTestCase):
                 except Exception as e:
                     return False
                 assert method.call_count == 1
-                assert res == {'succes': {'hits': ['test']}}
+                assert res == {'success': {'hits': ['test']}}
             return True
         assert run()
 
