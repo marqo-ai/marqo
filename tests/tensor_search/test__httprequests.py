@@ -155,6 +155,51 @@ class Test_HttpRequests(MarqoTestCase):
             return True
         assert run()
 
+    def test_httprequest_raw_send_request_no_params_passed(self):
+        mock_get = mock.MagicMock()
+        mock_post = mock.MagicMock()
+        mock_put = mock.MagicMock()
+        mock_delete = mock.MagicMock()
+
+        mock_allowed_operations = {mock_post, mock_get, mock_put, mock_delete}
+
+
+        mock_response = requests.Response()
+        mock_response.status_code = 500
+        error_message = """HTTPSConnectionPool(host='internal-abcdefghijk-123456789.us-east-1.elb.amazonaws.com', port=9200):
+Max retries exceeded with url: /my-test-index-1/_mapping (Caused by SSLError(SSLEOFError(8, 'EOF occurred in violation of protocol (_ssl.c:1131)'))
+"""
+        mock_get.side_effect = requests.exceptions.ConnectionError(error_message)
+        mock_post.side_effect = requests.exceptions.ConnectionError(error_message)
+        mock_put.side_effect = requests.exceptions.ConnectionError(error_message)
+        mock_delete.side_effect = requests.exceptions.ConnectionError(error_message)
+        mock_environ = {
+            "MARQO_BEST_AVAILABLE_DEVICE": "cpu"
+        }
+
+        @mock.patch('requests.get', mock_get)
+        @mock.patch('requests.post', mock_post)
+        @mock.patch('requests.put', mock_put)
+        @mock.patch('requests.delete', mock_delete)
+        @mock.patch('marqo._httprequests.ALLOWED_OPERATIONS', mock_allowed_operations)
+        @mock.patch.dict(os.environ, {**os.environ, **mock_environ})
+        def run():
+            for method in mock_allowed_operations:
+                try:
+                    res = self.httprequest_object.send_request(
+                        http_method=method,
+                        path="some_path",
+                        body="some_body",
+                    )
+                    raise AssertionError
+                except BackendCommunicationError as e:
+                    assert e.code == "backend_communication_error"
+                    assert e.status_code == HTTPStatus.INTERNAL_SERVER_ERROR
+                    assert "Max retries exceeded with url" in e.message
+                    assert method.call_count == 1
+            return True
+        assert run()
+
     def test_httprequest_raw_send_request(self):
         mock_get = mock.MagicMock()
         mock_post = mock.MagicMock()
