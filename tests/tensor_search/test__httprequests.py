@@ -116,6 +116,160 @@ class Test_HttpRequests(MarqoTestCase):
         result = self.httprequest_object.calculate_backoff_sleep(5, 0)
         self.assertEqual(result, 0.0)  # Expected sleep time is always 0 with cap 0
 
+    def test_httprequest_raw_send_request(self):
+        mock_get = mock.MagicMock()
+        mock_post = mock.MagicMock()
+        mock_put = mock.MagicMock()
+        mock_delete = mock.MagicMock()
+
+        mock_allowed_operations = {mock_post, mock_get, mock_put, mock_delete}
+
+
+        mock_response = requests.Response()
+        mock_response.status_code = 500
+        error_message = """HTTPSConnectionPool(host='internal-abcdefghijk-123456789.us-east-1.elb.amazonaws.com', port=9200):
+Max retries exceeded with url: /my-test-index-1/_mapping (Caused by SSLError(SSLEOFError(8, 'EOF occurred in violation of protocol (_ssl.c:1131)'))
+"""
+        mock_get.side_effect = requests.exceptions.ConnectionError(error_message)
+        mock_post.side_effect = requests.exceptions.ConnectionError(error_message)
+        mock_put.side_effect = requests.exceptions.ConnectionError(error_message)
+        mock_delete.side_effect = requests.exceptions.ConnectionError(error_message)
+        mock_environ = {
+            "MARQO_BEST_AVAILABLE_DEVICE": "cpu"
+        }
+
+        @mock.patch('requests.get', mock_get)
+        @mock.patch('requests.post', mock_post)
+        @mock.patch('requests.put', mock_put)
+        @mock.patch('requests.delete', mock_delete)
+        @mock.patch('marqo._httprequests.ALLOWED_OPERATIONS', mock_allowed_operations)
+        @mock.patch.dict(os.environ, {**os.environ, **mock_environ})
+        def run():
+            for method in mock_allowed_operations:
+                try:
+                    res = self.httprequest_object.send_request(
+                        http_method=method,
+                        path="some_path",
+                        body="some_body",
+                        max_retry_attempts=None,
+                        max_retry_backoff_seconds=None
+                    )
+                    raise AssertionError
+                except BackendCommunicationError as e:
+                    assert e.code == "backend_communication_error"
+                    assert e.status_code == HTTPStatus.INTERNAL_SERVER_ERROR
+                    assert "Max retries exceeded with url" in e.message
+                    assert method.call_count == 1
+            return True
+        assert run()
+
+    def test_httprequest_send_request_variable_default_retry_and_backoff(self):
+        retry_backoff_list = [
+            {'retry_attempts': 5, 'backoff_seconds': 3}, 
+            {'retry_attempts': 3, 'backoff_seconds': 2},
+            {'retry_attempts': 10, 'backoff_seconds': 5},
+            {'retry_attempts': 7, 'backoff_seconds': 1}
+        ]
+        for mock_retry_pair in retry_backoff_list:
+            mock_get = mock.MagicMock()
+            mock_post = mock.MagicMock()
+            mock_put = mock.MagicMock()
+            mock_delete = mock.MagicMock()
+
+            mock_allowed_operations = {mock_post, mock_get, mock_put, mock_delete}
+
+
+            mock_response = requests.Response()
+            mock_response.status_code = 500
+            error_message = """HTTPSConnectionPool(host='internal-abcdefghijk-123456789.us-east-1.elb.amazonaws.com', port=9200):
+    Max retries exceeded with url: /my-test-index-1/_mapping (Caused by SSLError(SSLEOFError(8, 'EOF occurred in violation of protocol (_ssl.c:1131)'))
+    """
+            mock_get.side_effect = requests.exceptions.ConnectionError(error_message)
+            mock_post.side_effect = requests.exceptions.ConnectionError(error_message)
+            mock_put.side_effect = requests.exceptions.ConnectionError(error_message)
+            mock_delete.side_effect = requests.exceptions.ConnectionError(error_message)
+
+            mock_environ = {
+                "DEFAULT_MARQO_MAX_BACKEND_RETRY_ATTEMPTS": str(mock_retry_pair['retry_attempts']),
+                "MARQO_BEST_AVAILABLE_DEVICE": "cpu"
+            }
+            @mock.patch('requests.get', mock_get)
+            @mock.patch('requests.post', mock_post)
+            @mock.patch('requests.put', mock_put)
+            @mock.patch('requests.delete', mock_delete)
+            @mock.patch('marqo._httprequests.ALLOWED_OPERATIONS', mock_allowed_operations)
+            @mock.patch.dict(os.environ, {**os.environ, **mock_environ})
+            def run():
+                for method in mock_allowed_operations:
+                    try:
+                        res = self.httprequest_object.send_request(
+                            http_method=method,
+                            path="some_path",
+                            body="some_body",
+                        )
+                        raise AssertionError
+                    except BackendCommunicationError as e:
+                        assert e.code == "backend_communication_error"
+                        assert e.status_code == HTTPStatus.INTERNAL_SERVER_ERROR
+                        assert "Max retries exceeded with url" in e.message
+                        assert method.call_count == mock_retry_pair['retry_attempts'] + 1 # +1 since the first call is not a retry
+                return True
+            assert run()
+
+    def test_httprequest_send_request_variable_retry_and_backoff(self):
+        retry_backoff_list = [
+            {'retry_attempts': 5, 'backoff_seconds': 3}, 
+            {'retry_attempts': 3, 'backoff_seconds': 2},
+            {'retry_attempts': 10, 'backoff_seconds': 5},
+            {'retry_attempts': 7, 'backoff_seconds': 1}
+        ]
+        for mock_retry_pair in retry_backoff_list:
+            mock_get = mock.MagicMock()
+            mock_post = mock.MagicMock()
+            mock_put = mock.MagicMock()
+            mock_delete = mock.MagicMock()
+
+            mock_allowed_operations = {mock_post, mock_get, mock_put, mock_delete}
+
+
+            mock_response = requests.Response()
+            mock_response.status_code = 500
+            error_message = """HTTPSConnectionPool(host='internal-abcdefghijk-123456789.us-east-1.elb.amazonaws.com', port=9200):
+    Max retries exceeded with url: /my-test-index-1/_mapping (Caused by SSLError(SSLEOFError(8, 'EOF occurred in violation of protocol (_ssl.c:1131)'))
+    """
+            mock_get.side_effect = requests.exceptions.ConnectionError(error_message)
+            mock_post.side_effect = requests.exceptions.ConnectionError(error_message)
+            mock_put.side_effect = requests.exceptions.ConnectionError(error_message)
+            mock_delete.side_effect = requests.exceptions.ConnectionError(error_message)
+
+            mock_environ = {
+                "MARQO_BEST_AVAILABLE_DEVICE": "cpu"
+            }
+            @mock.patch('requests.get', mock_get)
+            @mock.patch('requests.post', mock_post)
+            @mock.patch('requests.put', mock_put)
+            @mock.patch('requests.delete', mock_delete)
+            @mock.patch('marqo._httprequests.ALLOWED_OPERATIONS', mock_allowed_operations)
+            @mock.patch.dict(os.environ, {**os.environ, **mock_environ})
+            def run():
+                for method in mock_allowed_operations:
+                    try:
+                        res = self.httprequest_object.send_request(
+                            http_method=method,
+                            path="some_path",
+                            body="some_body",
+                            max_retry_attempts=mock_retry_pair['retry_attempts'],
+                            max_retry_backoff_seconds=mock_retry_pair['backoff_seconds']
+                        )
+                        raise AssertionError
+                    except BackendCommunicationError as e:
+                        assert e.code == "backend_communication_error"
+                        assert e.status_code == HTTPStatus.INTERNAL_SERVER_ERROR
+                        assert "Max retries exceeded with url" in e.message
+                        assert method.call_count == mock_retry_pair['retry_attempts'] + 1 # +1 since the first call is not a retry
+                return True
+            assert run()
+
     def test_opensearch_search_lexical_no_retry(self):
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
         res = tensor_search.search(
