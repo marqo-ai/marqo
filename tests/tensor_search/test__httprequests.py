@@ -1,3 +1,4 @@
+import time
 import requests
 from tests.marqo_test import MarqoTestCase
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
@@ -116,6 +117,44 @@ class Test_HttpRequests(MarqoTestCase):
         result = self.httprequest_object.calculate_backoff_sleep(5, 0)
         self.assertEqual(result, 0.0)  # Expected sleep time is always 0 with cap 0
 
+    def test_httprequest_success_request(self):
+        mock_get = mock.MagicMock()
+        mock_post = mock.MagicMock()
+        mock_put = mock.MagicMock()
+        mock_delete = mock.MagicMock()
+
+        mock_allowed_operations = {mock_post, mock_get, mock_put, mock_delete}
+
+
+        mock_response = requests.Response()
+        mock_response.status_code = 200
+        mock_response.json = lambda: {'succes': {'hits': ['test']}}
+        mock_environ = {
+            "MARQO_BEST_AVAILABLE_DEVICE": "cpu"
+        }
+
+        @mock.patch('requests.get', mock_get)
+        @mock.patch('requests.post', mock_post)
+        @mock.patch('requests.put', mock_put)
+        @mock.patch('requests.delete', mock_delete)
+        @mock.patch('marqo._httprequests.ALLOWED_OPERATIONS', mock_allowed_operations)
+        @mock.patch.dict(os.environ, {**os.environ, **mock_environ})
+        def run():
+            for method in mock_allowed_operations:
+                method.return_value = mock_response
+                try:
+                    res = self.httprequest_object.send_request(
+                        http_method=method,
+                        path="some_path",
+                        body="some_body"
+                    )
+                except Exception as e:
+                    return False
+                assert method.call_count == 1
+                assert res == {'succes': {'hits': ['test']}}
+            return True
+        assert run()
+
     def test_httprequest_raw_send_request(self):
         mock_get = mock.MagicMock()
         mock_post = mock.MagicMock()
@@ -191,6 +230,7 @@ Max retries exceeded with url: /my-test-index-1/_mapping (Caused by SSLError(SSL
 
             mock_environ = {
                 "DEFAULT_MARQO_MAX_BACKEND_RETRY_ATTEMPTS": str(mock_retry_pair['retry_attempts']),
+                "DEFAULT_MARQO_MAX_BACKEND_RETRY_BACKOFF": str(mock_retry_pair['backoff_seconds']),
                 "MARQO_BEST_AVAILABLE_DEVICE": "cpu"
             }
             @mock.patch('requests.get', mock_get)
@@ -202,6 +242,7 @@ Max retries exceeded with url: /my-test-index-1/_mapping (Caused by SSLError(SSL
             def run():
                 for method in mock_allowed_operations:
                     try:
+                        start_time = time.time()
                         res = self.httprequest_object.send_request(
                             http_method=method,
                             path="some_path",
@@ -213,6 +254,11 @@ Max retries exceeded with url: /my-test-index-1/_mapping (Caused by SSLError(SSL
                         assert e.status_code == HTTPStatus.INTERNAL_SERVER_ERROR
                         assert "Max retries exceeded with url" in e.message
                         assert method.call_count == mock_retry_pair['retry_attempts'] + 1 # +1 since the first call is not a retry
+                        expected_total_wait_time = 0
+                        for i in range(mock_retry_pair['retry_attempts']):
+                            expected_total_wait_time += self.httprequest_object.calculate_backoff_sleep(i, mock_retry_pair['backoff_seconds'])
+                        end_time = time.time() - start_time
+                        assert expected_total_wait_time <= end_time # time should be <= once max retries reach
                 return True
             assert run()
 
@@ -254,6 +300,7 @@ Max retries exceeded with url: /my-test-index-1/_mapping (Caused by SSLError(SSL
             def run():
                 for method in mock_allowed_operations:
                     try:
+                        start_time = time.time()
                         res = self.httprequest_object.send_request(
                             http_method=method,
                             path="some_path",
@@ -267,6 +314,12 @@ Max retries exceeded with url: /my-test-index-1/_mapping (Caused by SSLError(SSL
                         assert e.status_code == HTTPStatus.INTERNAL_SERVER_ERROR
                         assert "Max retries exceeded with url" in e.message
                         assert method.call_count == mock_retry_pair['retry_attempts'] + 1 # +1 since the first call is not a retry
+                        expected_total_wait_time = 0
+                        for i in range(mock_retry_pair['retry_attempts']):
+                            expected_total_wait_time += self.httprequest_object.calculate_backoff_sleep(i, mock_retry_pair['backoff_seconds'])
+                        end_time = time.time() - start_time
+                        assert expected_total_wait_time <= end_time # time should be <= once max retries reach
+                return True
                 return True
             assert run()
 
