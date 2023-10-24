@@ -14,7 +14,6 @@ from marqo import errors
 from typing import Iterable, List, Union, Optional, Tuple, Dict
 from marqo.tensor_search.index_meta_cache import get_cache
 from marqo.tensor_search.index_meta_cache import get_index_info as get_cached_index_info
-from marqo.tensor_search.constants import DEFAULT_MARQO_MAX_BACKEND_RETRY_ATTEMPTS, DEFAULT_MARQO_MAX_BACKEND_RETRY_BACKOFF
 import pprint
 
 

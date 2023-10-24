@@ -22,7 +22,7 @@ from marqo.errors import (
 from urllib3.exceptions import InsecureRequestWarning
 import warnings
 from marqo.tensor_search.tensor_search_logging import get_logger
-from marqo.tensor_search.constants import DEFAULT_MARQO_MAX_BACKEND_RETRY_ATTEMPTS, DEFAULT_MARQO_MAX_BACKEND_RETRY_BACKOFF
+from marqo.tensor_search.utils import read_env_vars_and_defaults_ints
 
 logger = get_logger(__name__)
 
@@ -47,9 +47,9 @@ class HttpRequests:
         max_retry_backoff_seconds: Optional[int] = None
     ) -> Any:
         if max_retry_attempts is None:
-            max_retry_attempts = DEFAULT_MARQO_MAX_BACKEND_RETRY_ATTEMPTS
+            max_retry_attempts = read_env_vars_and_defaults_ints("DEFAULT_MARQO_MAX_BACKEND_RETRY_ATTEMPTS")
         if max_retry_backoff_seconds is None:
-            max_retry_backoff_seconds = DEFAULT_MARQO_MAX_BACKEND_RETRY_BACKOFF
+            max_retry_backoff_seconds = read_env_vars_and_defaults_ints("DEFAULT_MARQO_MAX_BACKEND_RETRY_ATTEMPTS")
 
         to_verify = False #  self.config.cluster_is_remote
 
