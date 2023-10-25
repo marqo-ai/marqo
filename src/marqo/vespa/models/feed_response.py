@@ -13,3 +13,8 @@ class FeedResponse(BaseModel):
 class FeedBatchResponse(BaseModel):
     responses: List[FeedResponse]
     errors: bool
+
+
+class FeedDocumentResponse(BaseModel):
+    pathId: str
+    id: str

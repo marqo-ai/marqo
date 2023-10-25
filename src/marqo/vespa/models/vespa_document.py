@@ -1,7 +1,8 @@
+from typing import Any, Dict, Optional
+
 from pydantic import BaseModel
-from typing import Any, Dict
 
 
 class VespaDocument(BaseModel):
-    id: str
+    id: Optional[str]
     fields: Dict[str, Any]

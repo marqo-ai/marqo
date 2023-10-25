@@ -92,6 +92,10 @@ class OpenSearchDataType:
 
 
 class EnvVars:
+    VESPA_CONFIG_URL = "VESPA_CONFIG_URL"
+    VESPA_QUERY_URL = "VESPA_QUERY_URL"
+    VESPA_DOCUMENT_URL = "VESPA_DOCUMENT_URL"
+    VESPA_POOL_SIZE = "VESPA_POOL_SIZE"
     MARQO_MAX_INDEX_FIELDS = "MARQO_MAX_INDEX_FIELDS"
     MARQO_MAX_DOC_BYTES = "MARQO_MAX_DOC_BYTES"
     MARQO_MAX_RETRIEVABLE_DOCS = "MARQO_MAX_RETRIEVABLE_DOCS"
@@ -124,7 +128,7 @@ class MappingsObjectType:
 
 
 class SearchDb:
-    opensearch = 'opensearch'
+    vespa = 'vespa'
 
 
 class AvailableModelsKey:
