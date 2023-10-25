@@ -34,57 +34,6 @@ function wait_for_process () {
 
 OPENSEARCH_IS_INTERNAL=False
 # Start opensearch in the background
-if [[ ! $OPENSEARCH_URL ]]; then
-
-  which docker > /dev/null 2>&1
-  rc=$?
-  if [ $rc != 0 ]; then
-      echo "Docker not found. Installing it..."
-      bash /app/dind_setup/setup_dind.sh &
-      setup_dind_pid=$!
-      wait "$setup_dind_pid"
-  fi
-
-  echo "Starting supervisor"
-  /usr/bin/supervisord -n >> /dev/null 2>&1 &
-
-  dockerd &
-  echo "called dockerd command"
-
-  echo "Waiting for processes to be running"
-  processes=(dockerd)
-  for process in "${processes[@]}"; do
-      wait_for_process "$process"
-      if [ $? -ne 0 ]; then
-          echo "$process is not running after max time"
-          exit 1
-      else
-          echo "$process is running"
-      fi
-  done
-  OPENSEARCH_URL="https://localhost:9200"
-  OPENSEARCH_IS_INTERNAL=True
-  if [[ $(docker ps -a | grep marqo-os) ]]; then
-      if [[ $(docker ps -a | grep marqo-os | grep -v Up) ]]; then
-        docker start marqo-os &
-        until [[ $(curl -v --silent --insecure $OPENSEARCH_URL 2>&1 | grep Unauthorized) ]]; do
-          sleep 0.1;
-        done;
-        echo "Opensearch started"
-      fi
-      echo "OpenSearch is running"
-  else
-      echo "OpenSearch not found; running OpenSearch"
-      docker run --name marqo-os -id -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" marqoai/marqo-os:0.0.3 &
-      docker start marqo-os &
-      until [[ $(curl -v --silent --insecure $OPENSEARCH_URL 2>&1 | grep Unauthorized) ]]; do
-        sleep 0.1;
-      done;
-  fi
-fi
-
-export OPENSEARCH_URL
-export OPENSEARCH_IS_INTERNAL
 
 # Start up redis
 if [ "$MARQO_ENABLE_THROTTLING" != "FALSE" ]; then
