@@ -1,0 +1,134 @@
+# Runs all Marqo tests.
+#  - The goal is a single workflow that, if all jobs pass, is sufficient to
+#    merge.
+#  - This can be run manually. It is automatically triggered if a PR is
+#    approved.
+#  - The automatic trigger on PR approvals is skipped if only markdown files
+#    have changed.
+
+name: Run all Marqo tests
+
+on:
+  pull_request_review:
+    types: [submitted]
+    branches:
+      - mainline
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  should-tests-run:
+    name: Determine whether tests should run
+    runs-on: ubuntu-latest
+    outputs:
+      decision: ${{ steps.decision.outputs.result }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Check if only markdown files have changed
+        id: filter
+        uses: dorny/paths-filter@v2
+        with:
+          filters: |
+            proceed:
+              - '**'
+              - '!*.md'
+
+      - name: Decide whether to run tests
+        id: decision
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request_review" && \
+                "${{ github.event.review.state }}" == "approved" && \
+                "${{ steps.filter.outputs.proceed }}" == "true" ]] \
+              || [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "::set-output name=result::true"
+          else
+            echo "::set-output name=result::false"
+          fi
+
+  run-arm64-tests:
+    needs: should-tests-run
+    if: needs.should-tests-run.outputs.decision == 'true'
+    uses: ./.github/workflows/arm64_local_os_CI.yml
+    secrets: inherit
+
+  run-cuda-dind-tests:
+    needs: should-tests-run
+    if: needs.should-tests-run.outputs.decision == 'true'
+    uses: ./.github/workflows/cuda_dind_os_CI.yml
+    secrets: inherit
+
+  run-dind-os-tests:
+    needs: should-tests-run
+    if: needs.should-tests-run.outputs.decision == 'true'
+    uses: ./.github/workflows/dind_os_CI.yml
+    secrets: inherit
+
+  run-largemodel-unit-tests:
+    needs: should-tests-run
+    if: needs.should-tests-run.outputs.decision == 'true'
+    uses: ./.github/workflows/largemodel_unit_test_CI.yml
+    secrets: inherit
+
+  run-local-os-tests:
+    needs: should-tests-run
+    if: needs.should-tests-run.outputs.decision == 'true'
+    uses: ./.github/workflows/local_os_CI.yml
+    secrets: inherit
+
+  run-unit-tests:
+    needs: should-tests-run
+    if: needs.should-tests-run.outputs.decision == 'true'
+    uses: ./.github/workflows/unit_test_200gb_CI.yml
+    secrets: inherit
+
+  summary:
+    if: ${{ always() }}
+    name: Test Summary
+    needs: [should-tests-run, run-arm64-tests, run-cuda-dind-tests, run-dind-os-tests, run-largemodel-unit-tests, run-local-os-tests, run-unit-tests]
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check test results
+      run: |
+        # If tests weren't intended to run, consider this a success
+        if [[ "${{ needs.should-tests-run.outputs.decision }}" != "true" ]]; then
+          echo "Tests were skipped. No further checks required."
+          exit 0
+        fi
+  
+        if [[ "${{ needs.run-arm64-tests.result }}" != "success" && "${{ needs.run-arm64-tests.result }}" != "skipped" ]]; then
+          echo "Job run-arm64-tests did not succeed."
+          exit 1
+        fi
+        
+        if [[ "${{ needs.run-cuda-dind-tests.result }}" != "success" && "${{ needs.run-cuda-dind-tests.result }}" != "skipped" ]]; then
+          echo "Job run-cuda-dind-tests did not succeed."
+          exit 1
+        fi
+  
+        if [[ "${{ needs.run-dind-os-tests.result }}" != "success" && "${{ needs.run-dind-os-tests.result }}" != "skipped" ]]; then
+          echo "Job run-dind-os-tests did not succeed."
+          exit 1
+        fi
+  
+        if [[ "${{ needs.run-largemodel-unit-tests.result }}" != "success" && "${{ needs.run-largemodel-unit-tests.result }}" != "skipped" ]]; then
+          echo "Job run-largemodel-unit-tests did not succeed."
+          exit 1
+        fi
+  
+        if [[ "${{ needs.run-local-os-tests.result }}" != "success" && "${{ needs.run-local-os-tests.result }}" != "skipped" ]]; then
+          echo "Job run-local-os-tests did not succeed."
+          exit 1
+        fi
+  
+        if [[ "${{ needs.run-unit-tests.result }}" != "success" && "${{ needs.run-unit-tests.result }}" != "skipped" ]]; then
+          echo "Job run-unit-tests did not succeed."
+          exit 1
+        fi
+  
+        echo "All tests either passed or were skipped."
+  
+          

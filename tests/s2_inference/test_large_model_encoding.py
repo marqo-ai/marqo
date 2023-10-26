@@ -13,23 +13,49 @@ from marqo.s2_inference.s2_inference import (
 import functools
 from marqo.s2_inference.s2_inference import _load_model as og_load_model
 _load_model = functools.partial(og_load_model, calling_func = "unit_test")
+from marqo.s2_inference.configs import ModelCache
+import shutil
 
+
+def remove_cached_clip_files():
+    '''
+    This function removes all the cached models from the clip cache path to save disk space
+    '''
+    clip_cache_path = ModelCache.clip_cache_path
+    if os.path.exists(clip_cache_path):
+        for item in os.listdir(clip_cache_path):
+            item_path = os.path.join(clip_cache_path, item)
+            # Check if the item is a file or directory
+            if os.path.isfile(item_path):
+                os.remove(item_path)
+            elif os.path.isdir(item_path):
+                shutil.rmtree(item_path)
 
 @pytest.mark.largemodel
 @pytest.mark.skipif(torch.cuda.is_available() is False, reason="We skip the large model test if we don't have cuda support")
 class TestLargeModelEncoding(unittest.TestCase):
 
     def setUp(self) -> None:
-        self.large_clip_models = ["open_clip/ViT-L-14/openai", "open_clip/ViT-L-14/laion400m_e32"]
+        self.large_clip_models = [ "open_clip/ViT-L-14/laion400m_e32",
+                                   'open_clip/coca_ViT-L-14/mscoco_finetuned_laion2b_s13b_b90k',
+                                   #'open_clip/convnext_xxlarge/laion2b_s34b_b82k_augreg_soup',  this model is not currently available in open_clip
+                                   'open_clip/convnext_large_d_320/laion2b_s29b_b131k_ft_soup',
+                                   'open_clip/convnext_large_d/laion2b_s26b_b102k_augreg']
 
-        self.multilingual_models = ["multilingual-clip/XLM-Roberta-Large-Vit-L-14"]
+        self.multilingual_models = ["hf/multilingual-e5-small", "hf/multilingual-e5-base", "hf/multilingual-e5-large"]
 
         self.e5_models = ["hf/e5-large", "hf/e5-large-unsupervised"]
-
 
     def tearDown(self) -> None:
         clear_loaded_models()
 
+    @classmethod
+    def setUpClass(cls) -> None:
+        remove_cached_clip_files()
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        remove_cached_clip_files()
 
     def test_vectorize(self):
         names = self.large_clip_models + self.e5_models
@@ -123,34 +149,24 @@ class TestLargeModelEncoding(unittest.TestCase):
             del model
             clear_loaded_models()
 
-    # This block is commented out due to its memory issue.
-    # The visual part can be loaded into the target device, but the textual part is always loaded into the cpu device.
-    # def test_multilingual_clip_performance(self):
-    #
-    #     clear_loaded_models()
-    #
-    #     names = self.multilingual_models
-    #     device = "cuda"
-    #     texts = [
-    #         "skiing person",
-    #         "滑雪的人",
-    #         "лыжник",
-    #         "persona che scia",
-    #     ]
-    #     image = "https://raw.githubusercontent.com/marqo-ai/marqo-clip-onnx/main/examples/coco.jpg"
-    #     e = 0.1
-    #     with patch.dict(os.environ, {"MARQO_MAX_CUDA_MODEL_MEMORY": "10"}):
-    #         for name in names:
-    #             text_feature = np.array(vectorise(model_name=name, content=texts, normalize_embeddings=True, device=device))
-    #             image_feature = np.array(vectorise(model_name=name, content=image, normalize_embeddings=True, device=device))
-    #
-    #             clear_loaded_models()
-    #             similarity_score = (text_feature @ image_feature.T).flatten()
-    #
-    #             assert np.abs(np.max(similarity_score) - np.min(similarity_score)) < e
-    #
-    #             del similarity_score
-    #             clear_loaded_models()
+    def test_multilingual_e5_model_performance(self):
+        clear_loaded_models()
+        device = "cuda"
+        english_text = "skiing person"
+        other_language_texts = [
+            "滑雪的人",
+            "лыжник",
+            "persona che scia",
+        ]
+        e = 1
+        with patch.dict(os.environ, {"MARQO_MAX_CUDA_MODEL_MEMORY": "10"}):
+            for model_name in self.multilingual_models:
+                english_feature = np.array(
+                    vectorise(model_name=model_name, content=english_text, normalize_embeddings=True, device=device))
+                for other_language_text in other_language_texts:
+                    other_language_feature = np.array(vectorise(model_name=model_name, content=other_language_text,
+                                                                normalize_embeddings=True, device=device))
+                    assert np.allclose(english_feature, other_language_feature, atol=e)
 
     def test_cuda_encode_type(self):
         names = self.large_clip_models + self.e5_models
@@ -175,3 +191,14 @@ class TestLargeModelEncoding(unittest.TestCase):
 
             del model
             clear_loaded_models()
+
+    @patch("torch.cuda.amp.autocast")
+    def test_autocast_called_in_open_clip(self, mock_autocast):
+        names = ["open_clip/ViT-B-32/laion400m_e31"]
+        contents = ['this is a test sentence. so is this.',
+                    "https://marqo-assets.s3.amazonaws.com/tests/images/image0.jpg"]
+        for model_name in names:
+            for content in contents:
+                vectorise(model_name=model_name, content=content, device="cuda")
+                mock_autocast.assert_called_once()
+                mock_autocast.reset_mock()

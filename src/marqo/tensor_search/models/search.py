@@ -1,6 +1,10 @@
 import json
-from pydantic import BaseModel
+
+from pydantic import BaseModel, validator, ValidationError
 from typing import Any, Union, List, Dict, Optional, NewType, Literal
+
+from marqo.errors import InvalidArgError
+from marqo.tensor_search.models.private_models import ModelAuth
 
 Qidx = NewType('Qidx', int) # Indicates the position of a search query in a bulk search request
 JHash = NewType('JHash', int) # hash of a VectoriseJob. Used for quick access of VectorisedJobs
@@ -24,6 +28,7 @@ class VectorisedJobs(BaseModel):
     normalize_embeddings: bool
     image_download_headers: Optional[Dict]
     content_type: Literal['text', 'image']
+    model_auth: Optional[ModelAuth]
 
     def __hash__(self):
         return self.groupby_key() + hash(json.dumps(self.content, sort_keys=True))
@@ -51,3 +56,23 @@ class VectorisedJobs(BaseModel):
             start_idx=start_idx,
             end_idx=len(self.content)
         )
+
+class SearchContextTensor(BaseModel):
+    vector: List[float]
+    weight: float
+
+
+class SearchContext(BaseModel):
+    tensor: List[SearchContextTensor]
+
+    def __init__(self, **data):
+        try:
+            super().__init__(**data)
+        except ValidationError as e:
+            raise InvalidArgError(message=e.json())
+
+    @validator('tensor', pre=True, always=True)
+    def check_vector_length(cls, v):
+        if not (1 <= len(v) <= 64):
+            raise InvalidArgError('The number of tensors must be between 1 and 64')
+        return v

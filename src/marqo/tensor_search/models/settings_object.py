@@ -1,6 +1,6 @@
 from marqo.tensor_search import enums as ns_enums
-from marqo.tensor_search.enums import IndexSettingsField as NsFields, EnvVars
-from marqo.tensor_search.utils import read_env_vars_and_defaults
+from marqo.tensor_search.enums import IndexSettingsField as NsFields, EnvVars, ObjectStores
+from marqo.tensor_search.utils import read_env_vars_and_defaults, read_env_vars_and_defaults_ints
 
 settings_schema = {
     "$schema": "https://json-schema.org/draft/2019-09/schema",
@@ -128,7 +128,7 @@ settings_schema = {
                                 NsFields.hnsw_ef_construction: {
                                     "type": "integer",
                                     "minimum": 1,
-                                    "maximum": int(read_env_vars_and_defaults(EnvVars.MARQO_EF_CONSTRUCTION_MAX_VALUE)),
+                                    "maximum": read_env_vars_and_defaults_ints(EnvVars.MARQO_EF_CONSTRUCTION_MAX_VALUE),
                                     "examples": [
                                         128
                                     ]
@@ -192,6 +192,7 @@ settings_schema = {
         NsFields.number_of_replicas: {
             "type": "integer",
             "minimum": 0,
+            "maximum": read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_NUMBER_OF_REPLICAS),
             "examples": [
                 1
             ]
@@ -220,7 +221,7 @@ settings_schema = {
                 }
             }
         },
-        NsFields.number_of_shards: 5,
-        NsFields.number_of_replicas: 1
+        NsFields.number_of_shards: 3,
+        NsFields.number_of_replicas: 0
     }]
 }

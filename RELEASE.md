@@ -1,4 +1,216 @@
-## Release 0.0.17 
+# Release 1.3.0
+
+## New features
+
+- New E5 models added to model registry (https://github.com/marqo-ai/marqo/pull/568). E5 V2 and Multilingual E5 models are now available for use. The new E5 V2 models outperform their E5 counterparts in the BEIR benchmark, as seen [here](https://github.com/microsoft/unilm/tree/master/e5#english-pre-trained-models). See all available models [here](https://marqo.pages.dev/1.2.0/Models-Reference/dense_retrieval/).
+- Dockerfile optimisation (https://github.com/marqo-ai/marqo/pull/569). A pre-built Marqo base image results in reduced image layers and increased build speed, meaning neater docker pulls and an overall better development experience.
+
+
+## Bug fixes and minor changes
+
+- Major README overhaul (https://github.com/marqo-ai/marqo/pull/573). The README has been revamped with up-to-date examples and easier to follow instructions.
+- New security policy (https://github.com/marqo-ai/marqo/pull/574).
+- Improved testing pipeline (https://github.com/marqo-ai/marqo/pull/582 & https://github.com/marqo-ai/marqo/pull/586). Tests now trigger on pull request updates. This results in safer and easier merges to mainline.
+- Updated requirements files. Now the `requirements.dev.txt` should be used to install requirements for development environments (https://github.com/marqo-ai/marqo/pull/569). Version pins for `protobuf` & `onnx` have been removed while a version pin for `anyio` has been added (https://github.com/marqo-ai/marqo/pull/581, & https://github.com/marqo-ai/marqo/pull/589).
+- General readability improvements (https://github.com/marqo-ai/marqo/pull/577, https://github.com/marqo-ai/marqo/pull/578, https://github.com/marqo-ai/marqo/pull/587, & https://github.com/marqo-ai/marqo/pull/580)
+
+## Contributor shout-outs
+
+- A huge thank you to all our 3.5k stargazers!
+- Shoutout to @vladdoster for all the useful spelling and grammar edits!
+- Thanks everyone for keeping our [forum](https://community.marqo.ai/) bustling. Don't hesitate to keep posting your insights, questions, and feedback!
+
+
+# Release 1.2.0
+
+## New features
+
+- Storage status in health check endpoint (https://github.com/marqo-ai/marqo/pull/555 & https://github.com/marqo-ai/marqo/pull/559). The `GET /indexes/{index-name}/health` endpoint's `backend` object will now return the boolean `storage_is_available`, to indicate if there is remaining storage space. If space is not available, health status will now return `yellow`. See [here](https://marqo.pages.dev/1.2.0/API-Reference/health/) for detailed usage.
+
+- Score Modifiers search optimization (https://github.com/marqo-ai/marqo/pull/566). This optimization reduces latency for searches with the `score_modifiers` parameter when field names or weights are changed. See [here](https://marqo.pages.dev/1.2.0/API-Reference/search/#score-modifiers) for detailed usage.
+
+## Bug fixes and minor changes
+
+- Improved error message for full storage (https://github.com/marqo-ai/marqo/pull/555 & https://github.com/marqo-ai/marqo/pull/559). When storage is full, Marqo will return `400 Bad Request` instead of `429 Too Many Requests`.
+- Searching with a zero vector now returns an empty list instead of an internal error (https://github.com/marqo-ai/marqo/pull/562).
+
+## Contributor shout-outs
+
+- A huge thank you to all our 3.3k stargazers!
+- Thank you for all the continued discussion in our [forum](https://community.marqo.ai/). Keep all the insights, questions, and feedback coming!
+
+
+# Release 1.1.0
+
+## New features
+
+- New field `numberOfVectors` in the `get_stats` response object (https://github.com/marqo-ai/marqo/pull/553). 
+This field counts all vectors from all documents in a given index. See [here](https://docs.marqo.ai/1.1.0/API-Reference/stats/) for detailed usage.
+
+- New per-index health check endpoint `GET /indexes/{index-name}/health` (https://github.com/marqo-ai/marqo/pull/552). 
+This replaces the cluster-level health check endpoint, `GET /health`,
+which is deprecated and will be removed in Marqo 2.0.0. See [here](https://docs.marqo.ai/1.1.0/API-Reference/health/) for detailed usage.
+
+## Bug fixes and minor changes
+
+- Improved image download validation and resource management (https://github.com/marqo-ai/marqo/pull/551). Image downloading in Marqo is more stable and resource-efficient now.
+
+- Adding documents now returns an error when `tensorFields` is not specified explicitly (https://github.com/marqo-ai/marqo/pull/554). This prevents users accidentally creating unwanted tensor fields.
+
+## Contributor shout-outs
+
+- Thank you for the vibrant discussion in our [forum](https://community.marqo.ai/). We love hearing your questions and about your use cases.
+
+
+# Release 1.0.0
+
+## Breaking Changes
+
+- New parameter `tensor_fields` will replace `non_tensor_fields` in the `add_documents` endpoint (https://github.com/marqo-ai/marqo/pull/538). Only fields in `tensor_fields` will have embeddings generated, offering more granular control over which fields are vectorised. See [here](https://docs.marqo.ai/1.0.0/API-Reference/documents/#add-or-replace-documents) for the full list of `add_documents` parameters and their usage. The `non_tensor_fields` parameter is deprecated and will be removed in a future release. Calls to `add_documents` with neither of these parameters specified will now fail.
+
+- Multiple tensor field optimisation ([#530](https://github.com/marqo-ai/marqo/pull/530)). This optimisation results in faster and more stable searches across multiple tensor fields. Please note that indexed documents will now have a different internal document structure, so documents indexed with previous Marqo versions cannot be searched with this version, and vice versa.
+
+- The `add_documents` endpoint's request body is now an object, with the list of documents under the `documents` key ([#535](https://github.com/marqo-ai/marqo/pull/535)). The query parameters `use_existing_tensors`, `image_download_headers`, `model_auth`, and `mappings` have been moved to the body as optional keys, and support for these parameters in the query string is deprecated. This change results in shorter URLs and better readability, as values for these parameters no longer need to be URL-encoded. See [here](https://docs.marqo.ai/1.0.0/API-Reference/documents/#add-or-replace-documents) for the new `add_documents` API usage. Backwards compatibility is supported at the moment but will be removed in a future release.
+
+- Better validation for index creation with custom models (https://github.com/marqo-ai/marqo/pull/530). When creating an index with a `model` not in the registry, Marqo will check if `model_properties` is specified with a proper `dimension`, and raise an error if not. See [here](https://docs.marqo.ai/1.0.0/Models-Reference/bring_your_own_model) for a guide on using custom models. This validation is now done at index creation time, rather than at add documents or search time.
+
+- Stricter `filter_string` syntax for `search` ([#530](https://github.com/marqo-ai/marqo/pull/530)). The `filter_string` parameter must have special Lucene characters escaped with a backslash (`\`) to filter as expected. This will affect filtering on field names or content that contains special characters. See [here](https://lucene.apache.org/core/2_9_4/queryparsersyntax.html) for more information on special characters and see [here](https://docs.marqo.ai/1.0.0/query_dsl) for a guide on using Marqo filter strings.
+
+- Removed server-side batching (`batch_size` parameter) for the `add_documents` endpoint ([#527](https://github.com/marqo-ai/marqo/pull/527)). Instead, client-side batching is encouraged (use `client_batch_size` instead of `server_batch_size` in the python client).
+
+## New Features
+- Multi-field pagination ([#530](https://github.com/marqo-ai/marqo/pull/530)). The `offset` parameter in `search` can now be used to paginate through results spanning multiple `searchable_attributes`. This works for both `TENSOR` and `LEXICAL` search. See [here](https://docs.marqo.ai/1.0.0/API-Reference/search/#search-result-pagination) for a guide on pagination.
+- Optimised default index configuration (https://github.com/marqo-ai/marqo/pull/540).
+
+## Bug Fixes & Minor Changes
+- Removed or updated all references to outdated features in the examples and the README (https://github.com/marqo-ai/marqo/pull/529).
+- Enhanced bulk search test stability (https://github.com/marqo-ai/marqo/pull/544).
+
+## Contributor shout-outs
+- Thank you to our 3.2k stargazers!
+- We've finally come to our first major release, Marqo 1.0.0! Thanks to all our users and contributors, new and old, for your feedback and support to help us reach this huge milestone. We're excited to continue building Marqo with you. Happy searching!
+
+
+# Release 0.1.0
+
+## New features
+- Telemetry. Marqo now includes various timing metrics for the `search`, `bulk_search` and `add_documents` endpoints
+when the query parameter `telemetry=True` is specified (https://github.com/marqo-ai/marqo/pull/506). The metrics will be
+returned in the response body and provide a breakdown of latencies for various stages of the API call.
+- Consolidate default device to CUDA when available (https://github.com/marqo-ai/marqo/pull/508). By default,
+Marqo now uses CUDA devices for search and indexing if available.
+See [here](https://docs.marqo.ai/0.1.0/API-Reference/search/#query-parameters) for more information. This helps ensure
+you get the best indexing and search experience without having to explicitly add the device parameter to search and
+add_documents calls.
+- Model download integrity verification (https://github.com/marqo-ai/marqo/pull/502). Model files are validated and
+removed if corrupted during download. This helps ensure that models are not loaded if they are corrupted.
+
+## Breaking changes
+- Remove deprecated `add_or_update_documents` endpoint (https://github.com/marqo-ai/marqo/pull/517).
+- Disable automatic index creation. Marqo will no longer automatically create an index if it does not exist 
+(https://github.com/marqo-ai/marqo/pull/516).
+Attempting to add documents to a non-existent index will now result in an error. This helps provide more certainty about
+the properties of the index you are adding documents to, and also helps prevent accidental indexing to the wrong index.
+- Remove parallel indexing (https://github.com/marqo-ai/marqo/pull/523). Marqo no longer supports server-side parallel
+indexing. This helps deliver a more stable and efficient indexing experience. Parallelisation can still be implemented
+by the user.
+
+## Bug fixes and minor changes
+- Improve error messages (https://github.com/marqo-ai/marqo/pull/494, https://github.com/marqo-ai/marqo/pull/499).
+- Improve API request validation (https://github.com/marqo-ai/marqo/pull/495).
+- Add new multimodal search example (https://github.com/marqo-ai/marqo/pull/503).
+- Remove autocast for CPU to speed up vectorisation on ARM64 machines (https://github.com/marqo-ai/marqo/pull/491).
+- Enhance test stability (https://github.com/marqo-ai/marqo/pull/514).
+- Ignore `.kibana` index (https://github.com/marqo-ai/marqo/pull/512).
+- Improve handling of whitespace when indexing documents (https://github.com/marqo-ai/marqo/pull/521).
+- Update CUDA version to 11.4.3 (https://github.com/marqo-ai/marqo/pull/525).
+
+## Contributor shout-outs
+- Thank you to our 3.1k stargazers!
+
+# Release 0.0.21
+
+## New features
+- Load custom SBERT models from cloud storage with authentication (https://github.com/marqo-ai/marqo/pull/474). 
+Marqo now supports fetching your fine-tuned public and private SBERT models from Hugging Face and AWS s3. Learn more about using your own SBERT model [here](https://docs.marqo.ai/0.0.21/Models-Reference/bring_your_own_model/#bring-your-own-hugging-face-sbert-models). For instructions on loading a private model using authentication, check
+[model auth during search](https://docs.marqo.ai/0.0.19/API-Reference/search/#model-auth) and 
+[model auth during add_documents](https://docs.marqo.ai/0.0.19/API-Reference/documents/#model-auth).
+
+- Bulk search score modifier and context vector support (https://github.com/marqo-ai/marqo/pull/469). 
+Support has been added for [score modifiers](https://docs.marqo.ai/0.0.21/API-Reference/search/#score-modifiers) 
+and [context vectors](https://docs.marqo.ai/0.0.21/API-Reference/search/#context) to our bulk search API. 
+This can help enhance throughput and performance for certain workloads. Please see [documentation](https://docs.marqo.ai/0.0.21/API-Reference/bulk/) for usage. 
+
+## Bug fixes and minor changes
+- README enhancements (https://github.com/marqo-ai/marqo/pull/482, https://github.com/marqo-ai/marqo/pull/481).
+
+## Contributor shout-outs
+- A special thank you to our 3.0k stargazers!
+
+
+# Release 0.0.20
+
+## New features
+- Custom model pre-loading (https://github.com/marqo-ai/marqo/pull/475). Public CLIP and OpenCLIP models specified by URL can now be loaded on Marqo startup via the `MARQO_MODELS_TO_PRELOAD` environment variable. These must be formatted as JSON objects with `model` and `model_properties`.
+  See [here (configuring pre-loaded models)](https://marqo.pages.dev/0.0.20/Advanced-Usage/configuration/#configuring-preloaded-models) for usage.
+
+## Bug fixes and minor changes
+- Fixed arm64 build issue caused by package version conflicts (https://github.com/marqo-ai/marqo/pull/478)
+
+
+# Release 0.0.19
+
+## New features
+- Model authorisation(https://github.com/marqo-ai/marqo/pull/460). Non-public OpenCLIP and CLIP models can now be loaded 
+  from Hugging Face and AWS s3 via the `model_location` settings object and `model_auth`. 
+  See [here (model auth during search)](https://docs.marqo.ai/0.0.19/API-Reference/search/#model-auth)
+  and [here (model auth during add_documents)](https://docs.marqo.ai/0.0.19/API-Reference/documents/#model-auth) for usage.
+- Max replicas configuration (https://github.com/marqo-ai/marqo/pull/465). 
+  Marqo admins now have more control over the max number of replicas that can be set for indexes on the Marqo instance.
+  See [here](https://docs.marqo.ai/0.0.19/Advanced-Usage/configuration/#configuring-usage-limits) for how to configure this.
+
+## Breaking changes
+- Marqo now allows for a maximum of 1 replica per index by default (https://github.com/marqo-ai/marqo/pull/465).
+
+## Bug fixes and minor changes
+- README improvements (https://github.com/marqo-ai/marqo/pull/468)
+- OpenCLIP version bumped (https://github.com/marqo-ai/marqo/pull/461)
+- Added extra tests (https://github.com/marqo-ai/marqo/pull/464/)
+- Unneeded files are now excluded in Docker builds (https://github.com/marqo-ai/marqo/pull/448, https://github.com/marqo-ai/marqo/pull/426)
+
+## Contributor shout-outs
+- Thank you to our 2.9k stargazers!
+- Thank you to community members for the increasingly exciting discussions on our Slack channel. 
+  Feedback, questions and hearing about use cases helps us build a great open source product.
+- Thank you to [@jalajk24](https://github.com/jalajk24) for the PR to exclude unneeded files from Docker builds!
+
+
+# Release 0.0.18
+
+## New features
+- New E5 model type is available (https://github.com/marqo-ai/marqo/pull/419). E5 models are state of the art general-purpose text embedding models that obtained the best results on the MTEB benchmark when released in Dec 2022. Read more about these models [here](https://docs.marqo.ai/0.0.18/Models-Reference/dense_retrieval/#text).
+- Automatic model ejection (https://github.com/marqo-ai/marqo/pull/372). Automatic model ejection helps prevent out-of-memory (OOM) errors on machines with a larger amount of CPU memory (16GB+) by ejecting the least recently used model. 
+- Speech processing article and example (https://github.com/marqo-ai/marqo/pull/431). [@OwenPendrighElliott](https://github.com/OwenPendrighElliott) demonstrates how you can build and query a Marqo index from audio clips. 
+
+## Optimisations 
+- Delete optimisation (https://github.com/marqo-ai/marqo/pull/436). The `/delete` endpoint can now handle a higher volume of requests.
+- Inference calls can now execute in batches, with batch size configurable by an environment variable (https://github.com/marqo-ai/marqo/pull/376).
+
+## Bug fixes and minor changes
+- Configurable max value validation for HNSW graph parameters (https://github.com/marqo-ai/marqo/pull/424). See [here](https://docs.marqo.ai/0.0.18/Advanced-Usage/configuration/#other-configurations) for how to configure.
+- Configurable maximum number of tensor search attributes (https://github.com/marqo-ai/marqo/pull/430). See [here](https://docs.marqo.ai/0.0.18/Advanced-Usage/configuration/#other-configurations) for how to configure.
+- Unification of vectorise output type (https://github.com/marqo-ai/marqo/pull/432)
+- Improved test pipeline reliability (https://github.com/marqo-ai/marqo/pull/438, https://github.com/marqo-ai/marqo/pull/439)
+- Additional image download tests (https://github.com/marqo-ai/marqo/pull/402, https://github.com/marqo-ai/marqo/pull/442)
+- Minor fix in the Iron Manual example (https://github.com/marqo-ai/marqo/pull/440)
+- Refactored HTTP requests wrapper (https://github.com/marqo-ai/marqo/pull/367)
+
+## Contributor shout-outs
+- Thank you to our 2.8k stargazers!
+- Thank you community members raising issues and discussions in our Slack channel. 
+- Thank you [@jess-lord](https://github.com/jess-lord) and others for raising issues
+
+# Release 0.0.17 
 
 ## New features
 - New parameters that allow tweaking of Marqo indexes' underlying HNSW graph. `ef_construction` and `m`  can be defined at index time (https://github.com/marqo-ai/marqo/pull/386, https://github.com/marqo-ai/marqo/pull/420, https://github.com/marqo-ai/marqo/pull/421), giving you more control over the relevancy/speed tradeoff. See usage and more details [here](https://docs.marqo.ai/0.0.17/API-Reference/indexes/#example_1).
@@ -46,7 +258,7 @@ Check out the usage guide [here](https://docs.marqo.ai/0.0.16/API-Reference/sear
 - Thank you to [@ed-muthiah](https://github.com/ed-muthiah) for submitting a PR (https://github.com/marqo-ai/marqo/pull/349) 
 that added missing descriptions and requirement files on our [GPT-examples](https://github.com/marqo-ai/marqo/tree/mainline/examples/GPT-examples).
 
-## Release 0.0.15
+# Release 0.0.15
 
 ## New features 
 - Multimodal tensor combination (https://github.com/marqo-ai/marqo/pull/332, https://github.com/marqo-ai/marqo/pull/355). Combine image and text data into a single vector! Multimodal combination objects can be added as Marqo document fields. For example, this can be used to encode text metadata into image vectors. See usage [here](https://docs.marqo.ai/0.0.15/Advanced-Usage/document_fields/#multimodal-combination-object).

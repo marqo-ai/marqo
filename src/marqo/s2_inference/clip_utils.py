@@ -1,7 +1,6 @@
-# from torch import FloatTensor
-# from typing import Any, Dict, List, Optional, Union
 import os
-import PIL.Image
+from marqo.tensor_search.enums import ModelProperties, InferenceParams
+from marqo.tensor_search.models.private_models import ModelLocation, ModelAuth
 import validators
 import requests
 import numpy as np
@@ -15,9 +14,11 @@ from marqo.s2_inference.types import *
 from marqo.s2_inference.logger import get_logger
 from marqo.s2_inference.errors import IncompatibleModelDeviceError, InvalidModelPropertiesError
 from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize
-from marqo.s2_inference.processing.custom_clip_utils import HFTokenizer, download_pretrained_from_url
+from marqo.s2_inference.processing.custom_clip_utils import HFTokenizer, download_model
 from torchvision.transforms import InterpolationMode
 from marqo.s2_inference.configs import ModelCache
+from marqo.errors import InternalError
+from marqo.tensor_search.telemetry import RequestMetrics, RequestMetricsStore
 
 logger = get_logger(__name__)
 
@@ -80,7 +81,8 @@ def format_and_load_CLIP_images(images: List[Union[str, ndarray, ImageType]], im
     return results
 
 
-def load_image_from_path(image_path: str, image_download_headers: dict, timeout=3) -> ImageType:
+def load_image_from_path(image_path: str, image_download_headers: dict, timeout=3,
+                         metrics_obj: Optional[RequestMetrics] = None) -> ImageType:
     """Loads an image into PIL from a string path that is either local or a url
 
     Args:
@@ -98,7 +100,19 @@ def load_image_from_path(image_path: str, image_download_headers: dict, timeout=
         img = Image.open(image_path)
     elif validators.url(image_path):
         try:
-            resp = requests.get(image_path, stream=True, timeout=timeout, headers=image_download_headers)
+            if metrics_obj is not None:
+                metrics_obj.start(f"image_download.{image_path}")
+
+            with requests.get(image_path, stream=True, timeout=timeout, headers=image_download_headers) as resp:
+                if not resp.ok:
+                    raise UnidentifiedImageError(
+                        f"image url `{image_path}` returned {resp.status_code}. Reason: {resp.reason}")
+
+                img = Image.open(resp.raw)
+
+            if metrics_obj is not None:
+                metrics_obj.stop(f"image_download.{image_path}")
+
         except (requests.exceptions.ConnectTimeout, requests.exceptions.ConnectionError,
                 requests.exceptions.RequestException
                 ) as e:
@@ -106,9 +120,6 @@ def load_image_from_path(image_path: str, image_download_headers: dict, timeout=
                 f"image url `{image_path}` is unreachable, perhaps due to timeout. "
                 f"Timeout threshold is set to {timeout} seconds."
                 f"\nConnection error type: `{e.__class__.__name__}`")
-        if not resp.ok:
-            raise UnidentifiedImageError(f"image url `{image_path}` returned {resp.status_code}. Reason: {resp.reason}")
-        img = Image.open(resp.raw)
     else:
         raise UnidentifiedImageError(f"input str of `{image_path}` is not a local file or a valid url")
 
@@ -193,10 +204,13 @@ class CLIP:
     conveniance class wrapper to make clip work easily for both text and image encoding
     """
 
-    def __init__(self, model_type: str = "ViT-B/32", device: str = 'cpu',  embedding_dim: int = None,
+    def __init__(self, model_type: str = "ViT-B/32", device: str = None,  embedding_dim: int = None,
                             truncate: bool = True, **kwargs) -> None:
 
         self.model_type = model_type
+
+        if not device:
+            raise InternalError("`device` is required for loading CLIP models!")
         self.device = device
         self.model = None
         self.tokenizer = None
@@ -205,11 +219,43 @@ class CLIP:
         self.truncate = truncate
         self.model_properties = kwargs.get("model_properties", dict())
 
+        # model_auth gets passed through add_docs and search requests:
+        self.model_auth = kwargs.get(InferenceParams.model_auth, None)
+
+
+    def _download_from_repo(self):
+        """Downloads model from an external repo like s3 and returns the filepath
+
+        Returns:
+            The model's filepath
+
+        Raises:
+            RunTimeError if an empty filepath is detected. This is important
+                because OpenCLIP will instantiate a model with random weights, if
+                a filepath isn't specified, and the model isn't a publicly
+                available HF or OpenAI one.
+        """
+        model_location = ModelLocation(**self.model_properties[ModelProperties.model_location])
+        download_model_params = {"repo_location": model_location}
+
+        if model_location.auth_required:
+            download_model_params['auth'] = self.model_auth
+
+        model_file_path = download_model(**download_model_params)
+        if model_file_path is None or model_file_path == '':
+            raise RuntimeError(
+                'download_model() needs to return a valid filepath to the model! Instead, received '
+                f' filepath `{model_file_path}`')
+        return model_file_path
+
     def load(self) -> None:
+
+        model_location_presence = ModelProperties.model_location in self.model_properties
 
         path = self.model_properties.get("localpath", None) or self.model_properties.get("url",None)
 
-        if path is None:
+        if path is None and not model_location_presence:
+            # We must load the model into CPU then transfer it to the desired device, always
             # The original method to load the openai clip model
             # https://github.com/openai/CLIP/issues/30
             self.model, self.preprocess = clip.load(self.model_type, device='cpu', jit=False, download_root=ModelCache.clip_cache_path)
@@ -217,10 +263,17 @@ class CLIP:
             self.tokenizer = clip.tokenize
         else:
             logger.info("Detecting custom clip model path. We use generic clip model loading.")
-            if os.path.isfile(path):
+            if path and model_location_presence:
+                raise InvalidModelPropertiesError(
+                    "Only one of `url`, `localpath` or `model_location can be specified in "
+                    "model_properties`. Please ensure that only one of these is specified in "
+                    "model_properties and retry.")
+            if model_location_presence:
+                self.model_path = self._download_from_repo()
+            elif os.path.isfile(path):
                 self.model_path = path
             elif validators.url(path):
-                self.model_path = download_pretrained_from_url(path)
+                self.model_path = download_model(url=path)
             else:
                 raise InvalidModelPropertiesError(f"Marqo can not load the custom clip model."
                                                   f"The provided model path `{path}` is neither a local file nor a valid url."
@@ -237,6 +290,7 @@ class CLIP:
         self.model_name = self.model_properties.get("name", None)
 
         logger.info(f"The name of the custom clip model is {self.model_name}. We use openai clip load")
+        # We must load the model into CPU then transfer it to the desired device, always
         model, preprocess = clip.load(name=self.model_path, device="cpu", jit= self.jit, download_root=ModelCache.clip_cache_path)
         model = model.to(self.device)
         return model, preprocess
@@ -320,7 +374,7 @@ class CLIP:
 
 
 class FP16_CLIP(CLIP):
-    def __init__(self, model_type: str = "fp16/ViT-B/32", device: str = 'cuda',  embedding_dim: int = None,
+    def __init__(self, model_type: str = "fp16/ViT-B/32", device: str = None,  embedding_dim: int = None,
                             truncate: bool = True, **kwargs) -> None:
         super().__init__(model_type, device, embedding_dim, truncate, **kwargs)
         '''This class loads the provided clip model directly from cuda in float16 version. The inference time is halved
@@ -346,7 +400,7 @@ class FP16_CLIP(CLIP):
 
 
 class OPEN_CLIP(CLIP):
-    def __init__(self, model_type: str = "open_clip/ViT-B-32-quickgelu/laion400m_e32", device: str = 'cpu',  embedding_dim: int = None,
+    def __init__(self, model_type: str = "open_clip/ViT-B-32-quickgelu/laion400m_e32", device: str = None,  embedding_dim: int = None,
                             truncate: bool = True, **kwargs) -> None:
         super().__init__(model_type, device,  embedding_dim, truncate , **kwargs)
         self.model_name = model_type.split("/", 3)[1] if model_type.startswith("open_clip/") else model_type
@@ -356,44 +410,89 @@ class OPEN_CLIP(CLIP):
         # https://github.com/mlfoundations/open_clip
         path = self.model_properties.get("localpath", None) or self.model_properties.get("url", None)
 
-        if path is None:
+        model_location_presence = ModelProperties.model_location in self.model_properties
+        if path is None and not model_location_presence:
             self.model, _, self.preprocess = open_clip.create_model_and_transforms(self.model_name,
                                                                                    pretrained=self.pretrained,
                                                                                    device=self.device, jit=False, cache_dir=ModelCache.clip_cache_path)
             self.tokenizer = open_clip.get_tokenizer(self.model_name)
             self.model.eval()
         else:
+            if path and model_location_presence:
+                raise InvalidModelPropertiesError(
+                    "Only one of `url`, `localpath` or `model_location can be specified in "
+                    "model_properties`. Please ensure that only one of these is specified in "
+                    "model_properties and retry.")
             logger.info("Detecting custom clip model path. We use generic clip model loading.")
-            if os.path.isfile(path):
+            if model_location_presence:
+                self.model_path = self._download_from_repo()
+            elif os.path.isfile(path):
                 self.model_path = path
             elif validators.url(path):
-                self.model_path = download_pretrained_from_url(path)
+                self.model_path = download_model(url=path)
             else:
-                raise InvalidModelPropertiesError(f"Marqo can not load the custom clip model."
-                                                  f"The provided model path `{path}` is neither a local file nor a valid url."
-                                                  f"Please check your provided model url and retry."
-                                                  f"Check `https://docs.marqo.ai/0.0.13/Models-Reference/dense_retrieval/#generic-clip-models` for more info.")
+                raise InvalidModelPropertiesError(
+                    f"Marqo cannot load the custom clip model. "
+                    f"The provided model path `{path}` is neither a local file nor a valid url. "
+                    f"Please check your provided model url and retry. "
+                    f"Check `https://docs.marqo.ai/0.0.13/Models-Reference/dense_retrieval/#generic-clip-models` for more info.")
 
             self.precision = self.model_properties.get("precision", "fp32")
             self.jit = self.model_properties.get("jit", False)
             self.mean = self.model_properties.get("mean", None)
             self.std = self.model_properties.get("std", None)
-
             self.model, self.preprocess = self.custom_clip_load()
             self.tokenizer = self.load_tokenizer()
 
             self.model.eval()
 
-
     def custom_clip_load(self):
         self.model_name = self.model_properties.get("name", None)
-
-
         logger.info(f"The name of the custom clip model is {self.model_name}. We use open_clip load")
-        model, _, preprocess = open_clip.create_model_and_transforms(model_name=self.model_name, jit = self.jit, pretrained=self.model_path, precision = self.precision,
-                                                                     image_mean=self.mean, image_std=self.std, device = self.device, cache_dir=ModelCache.clip_cache_path)
+        try:
+            model, _, preprocess = open_clip.create_model_and_transforms(
+                model_name=self.model_name, jit=self.jit, pretrained=self.model_path, precision=self.precision,
+                image_mean=self.mean, image_std=self.std, device=self.device, cache_dir=ModelCache.clip_cache_path)
+            return model, preprocess
+        except Exception as e:
+            if (isinstance(e, RuntimeError) and "The file might be corrupted" in str(e)):
+                try:
+                    os.remove(self.model_path)
+                except Exception as remove_e:
+                    raise RuntimeError(
+                        f"Marqo encountered an error while attempting to delete a corrupted file `{self.model_path}`. "
+                        f"Please report this issue on Marqo's Github Repo and replace the problematic Marqo instance "
+                        f"with a new one. \n "
+                        f"Error message: `{str(remove_e)}`"
+                    )
+                raise InvalidModelPropertiesError(
+                    f"Marqo encountered a corrupted file when loading open_clip file `{self.model_path}`. "
+                    f"Marqo has removed this file from the disk. "
+                    f"Some possible causes are: \n"
+                    f"1. the file was not a valid open_clip checkpoint, \n"
+                    f"2. the file was corrupted during download or incompletely downloaded, \n"
+                    f"3. you may have tried to load a `clip` model even though `model_properties['type']` is set to 'open_clip'. \n"
+                    f"Please check and update your model properties and retry. "
+                    f"You can find more details at `https://docs.marqo.ai/0.0.21/Models-Reference/bring_your_own_model/#bring-your-own-clip-model`")
+            # It is tricky to cacth the error when loading clip model using type = open_clip. Different pytorch version will raise different error.
+            elif isinstance(e, (AttributeError, RuntimeError)) or ("This could be because the operator doesn't exist for this backend" in str(e)):
+                raise InvalidModelPropertiesError(
+                    f"Marqo encountered an error when loading custom open_clip model `{self.model_name}` with "
+                    f"model properties = `{self.model_properties}`. \n"
+                    f"The error message is `{str(e)}`. \n"
+                    f"You may have tried to load a `clip` model even though `model_properties['type']` is set to 'open_clip' \n"
+                    f"Please check and update your model properties and retry. "
+                    f"You can find more details at `https://docs.marqo.ai/0.0.21/Models-Reference/bring_your_own_model/#bring-your-own-clip-model`"
+                )
 
-        return model, preprocess
+            else:
+                raise RuntimeError(
+                    f"Marqo encountered an error when loading custom open_clip model `{self.model_name}` with "
+                    f"model properties = `{self.model_properties}`. \n"
+                    f"The error message is `{str(e)}`. \n"
+                    f"Please check and update your model properties and retry. "
+                    f"You can find more details at `https://docs.marqo.ai/0.0.21/Models-Reference/bring_your_own_model/#bring-your-own-clip-model`"
+                )
 
     def load_tokenizer(self):
         tokenizer_name = self.model_properties.get("tokenizer", "clip")
@@ -421,8 +520,13 @@ class OPEN_CLIP(CLIP):
 
         self.image_input_processed = torch.stack([self.preprocess(_img).to(self.device) for _img in image_input])
 
-        with torch.no_grad(), torch.autocast(device_type="cuda" if self.device.startswith("cuda") else "cpu"):
-            outputs = self.model.encode_image(self.image_input_processed).to(torch.float32)
+        with torch.no_grad():
+            if self.device.startswith("cuda"):
+                with torch.cuda.amp.autocast():
+                    outputs = self.model.encode_image(self.image_input_processed).to(torch.float32)
+            else:
+                outputs = self.model.encode_image(self.image_input_processed).to(torch.float32)
+
 
         if normalize:
             _shape_before = outputs.shape
@@ -438,8 +542,12 @@ class OPEN_CLIP(CLIP):
 
         text = self.tokenizer(sentence).to(self.device)
 
-        with torch.no_grad(), torch.autocast(device_type="cuda" if self.device.startswith("cuda") else "cpu"):
-            outputs = self.model.encode_text(text).to(torch.float32)
+        with torch.no_grad():
+            if self.device.startswith("cuda"):
+                with torch.cuda.amp.autocast():
+                    outputs = self.model.encode_text(text).to(torch.float32)
+            else:
+                outputs = self.model.encode_text(text).to(torch.float32)
 
         if normalize:
             _shape_before = outputs.shape
@@ -450,9 +558,12 @@ class OPEN_CLIP(CLIP):
 
 
 class MULTILINGUAL_CLIP(CLIP):
-    def __init__(self, model_type: str = "multilingual-clip/ViT-L/14", device: str = 'cpu',  embedding_dim: int = None,
+    def __init__(self, model_type: str = "multilingual-clip/ViT-L/14", device: str = None,  embedding_dim: int = None,
                             truncate: bool = True, **kwargs) -> None:
 
+        if not device:
+            raise InternalError("`device` is required for loading MULTILINGUAL CLIP models!")
+        
         self.model_name = model_type
         self.model_info = get_multilingual_clip_properties()[self.model_name]
         self.visual_name = self.model_info["visual_model"]
@@ -465,6 +576,8 @@ class MULTILINGUAL_CLIP(CLIP):
     def load(self) -> None:
         if self.visual_name.startswith("openai/"):
             clip_name = self.visual_name.replace("openai/", "")
+            # We must load the model into CPU then transfer it to the desired device, always
+            # The reason is this issue: https://github.com/openai/CLIP/issues/30
             self.visual_model, self.preprocess = clip.load(name = clip_name, device = "cpu", jit = False, download_root=ModelCache.clip_cache_path)
             self.visual_model = self.visual_model.to(self.device)
             self.visual_model = self.visual_model.visual

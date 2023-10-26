@@ -17,13 +17,12 @@ from marqo.tensor_search.index_meta_cache import get_index_info as get_cached_in
 import pprint
 
 
-def get_num_shards(config: Config, index_name: str) -> int:
-    """Returns the number of shards assigned to an index from Opensearch"""
-    resp  = HttpRequests(config).get(path=F"_cat/shards/{index_name}?format=json")
-    return len(set(d["shard"] for d in resp))
-
-
-def get_index_info(config: Config, index_name: str) -> IndexInfo:
+def get_index_info(
+        config: Config,
+        index_name: str,
+        max_retry_attempts: int = None,
+        max_retry_backoff_seconds: int = None
+    ) -> IndexInfo:
     """Gets useful information about the index. Also updates the IndexInfo cache
 
     Args:
@@ -34,10 +33,14 @@ def get_index_info(config: Config, index_name: str) -> IndexInfo:
         IndexInfo of the index
 
     Raises:
-        NonTensorIndexError, if the index's mapping doesn't conform to a Tensor Search index
-
+        NonTensorIndexError: If the index's mapping doesn't conform to a Tensor Search index.
+        IndexNotFoundError: If index does not exist.
     """
-    res = HttpRequests(config).get(path=F"{index_name}/_mapping")
+    res = HttpRequests(config).get(
+        path=F"{index_name}/_mapping",
+        max_retry_attempts=max_retry_attempts,
+        max_retry_backoff_seconds=max_retry_backoff_seconds
+    )
 
     if not (index_name in res and "mappings" in res[index_name]
             and "_meta" in res[index_name]["mappings"]):
@@ -68,7 +71,9 @@ def get_index_info(config: Config, index_name: str) -> IndexInfo:
 
 def add_customer_field_properties(config: Config, index_name: str,
                                   customer_field_names: Iterable[Tuple[str, enums.OpenSearchDataType]],
-                                  model_properties: dict, multimodal_combination_fields: Dict[str, Iterable[Tuple[str, enums.OpenSearchDataType]]]):
+                                  multimodal_combination_fields: Dict[str, Iterable[Tuple[str, enums.OpenSearchDataType]]],
+                                  max_retry_attempts: int = None,
+                                  max_retry_backoff_seconds: int = None) -> None:
     """Adds new customer fields to index mapping.
 
     Pushes the updated mapping to OpenSearch, and updates the local cache.
@@ -86,25 +91,11 @@ def add_customer_field_properties(config: Config, index_name: str,
     """
     existing_info = get_cached_index_info(config=config, index_name=index_name)
 
-    # check if there is multimodal fie;ds and convert the fields name to a list with the same
-    # format of customer_field_names
-    knn_field_names = copy.deepcopy(customer_field_names)
-    if len(multimodal_combination_fields) > 0:
-        multimodal_customer_field_names = set([(field_name, "_") for field_name in list(multimodal_combination_fields)])
-        knn_field_names = knn_field_names.union(multimodal_customer_field_names)
-
     body = {
         "properties": {
             enums.TensorField.chunks: {
                 "type": "nested",
-                "properties": {
-                    validation.validate_vector_name(
-                        utils.generate_vector_name(field_name[0])): {
-                        "type": "knn_vector",
-                        "dimension": model_properties["dimensions"],
-                        "method": existing_info.get_ann_parameters()
-                    } for field_name in knn_field_names
-                }
+                "properties": {}
             }
         }
     }
@@ -130,7 +121,12 @@ def add_customer_field_properties(config: Config, index_name: str,
         },
     }
 
-    mapping_res = HttpRequests(config).put(path=F"{index_name}/_mapping", body=json.dumps(body))
+    mapping_res = HttpRequests(config).put(
+        path=F"{index_name}/_mapping",
+        body=json.dumps(body),
+        max_retry_attempts=max_retry_attempts,
+        max_retry_backoff_seconds=max_retry_backoff_seconds
+    )
 
     merged_chunk_properties = {
         **existing_info.properties[enums.TensorField.chunks]["properties"],
@@ -152,7 +148,6 @@ def add_customer_field_properties(config: Config, index_name: str,
             "type": type_to_set
         }
 
-
     for multimodal_field, child_fields in multimodal_combination_fields.items():
         # update the new multimodal_field if it's not in it
         if multimodal_field not in new_index_properties:
@@ -172,7 +167,7 @@ def add_customer_field_properties(config: Config, index_name: str,
     return mapping_res
 
 
-def get_cluster_indices(config: Config):
+def get_cluster_indices(config: Config) -> set:
     """Gets the name of all indices, excluding system indices"""
     res = HttpRequests(config).get(path="_aliases")
     return _remove_system_indices(res.keys())

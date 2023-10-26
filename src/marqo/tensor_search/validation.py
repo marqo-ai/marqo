@@ -1,28 +1,30 @@
+from enum import Enum
+import jsonschema
 import json
-import pprint
-import typing
-from marqo.config import Config
+from typing import Any, Container, Dict, Iterable, List, Optional, Tuple, Type, Sequence, Union
+
 from marqo.tensor_search import constants
 from marqo.tensor_search import enums, utils
-from typing import Container, Iterable, List, Optional, Union
 from marqo.errors import (
     MarqoError, InvalidFieldNameError, InvalidArgError, InternalError,
     InvalidDocumentIdError, DocTooLargeError, InvalidIndexNameError,
     IllegalRequestedDocCount)
 from marqo.tensor_search.enums import TensorField, SearchMethod
 from marqo.tensor_search import constants
-from typing import Any, Type, Sequence
+from marqo.tensor_search.models.search import SearchContext
 
-from enum import Enum
-import jsonschema
 from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest
 from marqo.tensor_search.models.settings_object import settings_schema
-from marqo.tensor_search.models.mappings_object import mappings_schema, multimodal_combination_schema
-from marqo.tensor_search.models.context_object import context_schema
-from marqo.tensor_search.models.score_modifiers_object import score_modifiers_object_schema
+from marqo.tensor_search.models.mappings_object import (
+    mappings_schema, 
+    multimodal_combination_mappings_schema,
+    custom_vector_mappings_schema
+)
+from marqo.tensor_search.models.custom_vector_object import custom_vector_schema
+from marqo.s2_inference.errors import InvalidModelPropertiesError
 
 
-def validate_query(q: Union[dict, str], search_method: Union[str, SearchMethod]):
+def validate_query(q: Union[dict, str, None], search_method: Union[str, SearchMethod]):
     """
     Returns q if an error is not raised"""
     usage_ref = "\nSee query reference here: https://docs.marqo.ai/0.0.13/API-Reference/search/#query-q"
@@ -48,6 +50,8 @@ def validate_query(q: Union[dict, str], search_method: Union[str, SearchMethod])
                     f"{base_invalid_kv_message}Found value of type `{type(v)}` instead of float. Value=`{v}`"
                     f" {usage_ref}"
                 )
+    elif q is None:
+        pass
     elif not isinstance(q, str):
         raise InvalidArgError(
             f"q must be a string or dict! Received q of type `{type(q)}`. "
@@ -70,6 +74,8 @@ def validate_bulk_query_input(q: 'BulkSearchQueryEntity') -> Optional[MarqoError
     except Exception as e:
         return e
 
+    validate_context(context=q.context, query=q.q, search_method=q.searchMethod)
+    
     # Validate result_count + offset <= int(max_docs_limit)
     max_docs_limit = utils.read_env_vars_and_defaults(enums.EnvVars.MARQO_MAX_RETRIEVABLE_DOCS)
     check_upper = True if max_docs_limit is None else q.limit + q.offset <= int(max_docs_limit)
@@ -81,11 +87,11 @@ def validate_bulk_query_input(q: 'BulkSearchQueryEntity') -> Optional[MarqoError
 
     validate_boost(boost=q.boost, search_method=q.searchMethod)
     if q.searchableAttributes is not None:
-        if not isinstance(q.searchableAttributes, (List, typing.Tuple)):
+        if not isinstance(q.searchableAttributes, (List, Tuple)):
             raise InvalidArgError("searchableAttributes must be a sequence!")
         [validate_field_name(attribute) for attribute in q.searchableAttributes]
     if q.attributesToRetrieve is not None:
-        if not isinstance(q.attributesToRetrieve, (List, typing.Tuple)):
+        if not isinstance(q.attributesToRetrieve, (List, Tuple)):
             raise InvalidArgError("attributesToRetrieve must be a sequence!")
         [validate_field_name(attribute) for attribute in q.attributesToRetrieve]
 
@@ -134,11 +140,11 @@ def validate_str_against_enum(value: Any, enum_class: Type[Enum], case_sensitive
     return value
 
 
-def list_contains_only_strings(field_content: typing.List) -> bool:
+def list_contains_only_strings(field_content: List) -> bool:
     return all(isinstance(s, str) for s in field_content)
 
 
-def validate_list(field_content: typing.List, is_non_tensor_field: bool):
+def validate_list(field_content: List, is_non_tensor_field: bool):
     if type(field_content) is list and not list_contains_only_strings(field_content):
         # if the field content is a list, it should only contain strings.
         raise InvalidArgError(
@@ -155,7 +161,7 @@ def validate_list(field_content: typing.List, is_non_tensor_field: bool):
     return True
 
 
-def validate_field_content(field_content: typing.Any, is_non_tensor_field: bool) -> typing.Any:
+def validate_field_content(field_content: Any, is_non_tensor_field: bool) -> Any:
     """
     field: the field name of the field content. we need this to passed to validate_dict
     Returns
@@ -178,8 +184,25 @@ def validate_field_content(field_content: typing.Any, is_non_tensor_field: bool)
             f"Allowed content types: {[ty.__name__ for ty in constants.ALLOWED_CUSTOMER_FIELD_TYPES]}"
         )
 
+def validate_context(context: Optional[SearchContext], search_method: SearchMethod, query: Union[None, str, Dict[str, Any]]): 
+    """Validate the SearchContext.
 
-def validate_boost(boost: dict, search_method: typing.Union[str, SearchMethod]):
+    'validate_context' ensures that if the context is provided for a tensor search
+    operation, the query must be a dictionary (not a str) or None. 'context' 
+    structure is validated internally.
+    
+    """
+    if context is not None and search_method == SearchMethod.TENSOR and isinstance(query, str):
+        raise InvalidArgError(
+            f"Marqo received a query = `{query}` with type =`{type(query).__name__}` "
+            f"and a parameter `context`.\n" # do not return true {context} here as it might be huge.
+            f"This is not supported as the context only works when the query is a dictionary."
+            f"If you aim to search with your custom vectors, reformat the query as a dictionary.\n"
+            f"Please check `https://docs.marqo.ai/0.0.16/API-Reference/search/#context` for more information."
+        )
+
+
+def validate_boost(boost: Dict, search_method: Union[str, SearchMethod]):
     if boost is not None:
         further_info_message = ("\nRead about boost usage here: "
                                 "https://docs.marqo.ai/0.0.13/API-Reference/search/#boost")
@@ -263,7 +286,7 @@ def validate_field_name(field_name) -> str:
         raise InvalidFieldNameError(f"field name can't be a protected field. Please rename this field: {field_name}")
 
 
-def validate_doc(doc: dict) -> dict:
+def validate_doc(doc: Dict) -> dict:
     """
     Args:
         doc: a document indexed by the client
@@ -412,7 +435,7 @@ def validate_settings_object(settings_object):
         )
 
 
-def validate_dict(field: str, field_content: typing.Dict, is_non_tensor_field: bool, mappings: dict):
+def validate_dict(field: str, field_content: Dict, is_non_tensor_field: bool, mappings: Dict, index_model_dimensions: int = None):
     '''
 
     Args:
@@ -420,28 +443,35 @@ def validate_dict(field: str, field_content: typing.Dict, is_non_tensor_field: b
         field_content: the field when it is a dict, especially used for multimodal tensor combination field
         is_non_tensor_field: for multimodal tensor combination field, this should be True
         mappings: a dictionary to help validate the object field content
+        index_model_dimensions: the dimensions of the model of the index. used to validate custom vector field.
 
     Returns:
-        True or raise an error
+        Updated field_content dict or raise an error
     '''
     if mappings is None:
         raise InvalidArgError(
-            f"The field `{field}` contains a dictionary field content `{field_content}`."
-            f"However, the parameter `mappings` is {mappings}. Dictionary field contents are not supported in"
-            f"Marqo unless `mappings` is provided. Please change the type of field."
-            f"If you aim to use dictionary filed content as a special field,"
-            f"please check `https://docs.marqo.ai/0.0.15/Advanced-Usage/document_fields/#multimodal-combination-object` for more info.")
+            f"The `mappings` parameter must be provided to use object field types. "
+            f"Your doc has field `{field}` with object field content `{field_content}`."
+            f"However, the parameter `mappings` is {mappings}. Please change the field content or add the field to `mappings`. "
+            f"See `https://docs.marqo.ai/1.4.0/API-Reference/Documents/mappings/` for more info on object fields.")
 
     if field not in mappings:
         raise InvalidArgError(
-            f"The field `{field}` contains a dictionary field content `{field_content}`."
-            f"However, this field `{field}` is not in the add_document parameter mappings `{mappings}`, which is not supported."
-            f"Please change the type of your field content."
-            f"If you aim to use dictionary filed content as a special field,"
-            f"please check `https://docs.marqo.ai/0.0.15/Advanced-Usage/document_fields/#multimodal-combination-object` for more info.")
+            f"The field {field} must be in the add_documents `mappings` parameter to use it as an object field type. "
+            f"However, the `mappings` is {mappings}. Please change the field content or add the field to `mappings`. "
+            f"See `https://docs.marqo.ai/1.4.0/API-Reference/Documents/mappings/` for more info on object fields.")
 
     if mappings[field]["type"] == "multimodal_combination":
-        validate_multimodal_combination(field_content, is_non_tensor_field, mappings[field])
+        field_content = validate_multimodal_combination(field_content, is_non_tensor_field, mappings[field])
+    elif mappings[field]["type"] == "custom_vector":
+        field_content = validate_custom_vector(field_content, is_non_tensor_field, index_model_dimensions)
+    else:
+        raise InvalidArgError(
+            f"The field {field} is of invalid type in the `mappings` parameter. The only object field types supported "
+            f"are `multimodal_combination` and `custom_vector. However, the `mappings` is {mappings}. Please change the "
+            f"type of {field} to one of these. "
+            f"See `https://docs.marqo.ai/1.4.0/API-Reference/Documents/mappings/` for more info on object fields. "
+        )
 
     return field_content
 
@@ -449,20 +479,21 @@ def validate_dict(field: str, field_content: typing.Dict, is_non_tensor_field: b
 def validate_multimodal_combination(field_content, is_non_tensor_field, field_mapping):
     '''
 
+    Validates the field content if it is a multimodal combination field (dict)
     Args:
         field_content: the field content
         is_non_tensor_field: whether this is a non-tensor-field
         field_mapping: the mapping to help validate this field content
 
     Returns:
-
+        The field content
     '''
     if len(field_content) < 1:
         raise InvalidArgError(
-            f"The multimodal_combination_field `{field_content}` is an empty dictionary. "
+            f"The multimodal_combination field `{field_content}` is an empty dictionary. "
             f"This is not a valid format of field content."
             f"If you aim to use multimodal_combination, it must contain at least 1 field. "
-            f"please check `https://docs.marqo.ai/0.0.15/Advanced-Usage/document_fields/#multimodal-combination-object` for more info.")
+            f"please check `https://docs.marqo.ai/1.4.0/Advanced-Usage/document_fields/#multimodal-combination-object` for more info.")
 
     for key, value in field_content.items():
         if not ((type(key) in constants.ALLOWED_MULTIMODAL_FIELD_TYPES) and (
@@ -475,38 +506,61 @@ def validate_multimodal_combination(field_content, is_non_tensor_field, field_ma
         if not key in field_mapping["weights"]:
             raise InvalidArgError(
                 f"Multimodal-combination field content `{key}:{value}` \n  "
-                f"is not in the multimodal_field mappings weights `{field_mapping['weights']}`. Each sub_field requires a weights."
-                f"Please add the `{key}` to the mappings."
-                f"please check `https://docs.marqo.ai/0.0.15/Advanced-Usage/document_fields/#multimodal-combination-object` for more info.")
+                f"is not in the multimodal_field mappings weights `{field_mapping['weights']}`. Each sub_field requires a weight."
+                f"Please add `{key}` to the mappings."
+                f"Please check `https://docs.marqo.ai/1.4.0/Advanced-Usage/document_fields/#multimodal-combination-object` for more info.")
 
     if is_non_tensor_field:
         raise InvalidArgError(
             f"Field content `{field_content}` \n  "
             f"of type `{type(field_content).__name__}` is the content for a multimodal_combination."
-            f"It CANNOT be a `non_tensor_field`. Remove this field from `non_tensor_field` or"
-            f"add them as normal fields to fix this problem."
+            f"It must be a tensor field. Add this field to `tensor_fields` or "
+            f"add it as a normal field to fix this problem."
         )
-    return True
+    return field_content
 
 
-def validate_context_object(context_object: dict):
-    """validates the mappings object.
-        Returns
-            the given context_object if passed the validation
+def validate_custom_vector(field_content: dict, is_non_tensor_field: bool, index_model_dimensions: int):
+    '''
+    Validates the field content if it is a custom vector field (dict)
+    Args:
+        field_content: the field content
+        is_non_tensor_field: whether this is a non-tensor-field
+        index_model_dimensions: the `dimensions` property of the index to be added to
 
-        Raises an InvalidArgError if the context object is badly formatted
-        """
+    Returns:
+        field_content if the validation passes
+        "content" key will be added to the field_content as empty string if it is not provided.
+    '''
+
+    if not isinstance(index_model_dimensions, int):
+        raise InternalError(
+            f"Index model dimensions should be an `int`."
+        )
+    
+    # Must be a tensor_field
+    if is_non_tensor_field:
+        raise InvalidArgError(
+            f"Cannot create custom_vector field (given field content: `{field_content}`) as a non-tensor field. "
+            f"Add this field to `tensor_fields` to fix this problem."
+        )
+    
     try:
-        jsonschema.validate(instance=context_object, schema=context_schema)
-        return context_object
+        jsonschema.validate(instance=field_content, schema=custom_vector_schema(index_model_dimensions))
     except jsonschema.ValidationError as e:
         raise InvalidArgError(
-            f"Error validating mappings object. Reason: \n{str(e)}"
-            f"\nRead about the mappings object here: https://docs.marqo.ai/0.0.16"
+            f"Invalid custom_vector field format. Reason: \n{str(e)}"
+            f"\n For info on how to use custom_vector, please see: `https://docs.marqo.ai/1.4.0/Advanced-Usage/document_fields/#custom-vectors`"
         )
 
+    # Fill in default content as empty string if not provided.
+    if "content" not in field_content:
+        field_content["content"] = ""
+    
+    return field_content
 
-def validate_mappings_object(mappings_object: dict):
+
+def validate_mappings_object(mappings_object: Dict):
     """validates the mappings object.
     Returns
         The given mappings object if validation has passed
@@ -516,89 +570,81 @@ def validate_mappings_object(mappings_object: dict):
     try:
         jsonschema.validate(instance=mappings_object, schema=mappings_schema)
         for field_name, config in mappings_object.items():
+            validate_field_name(field_name)
             if config["type"] == enums.MappingsObjectType.multimodal_combination:
-                validate_multimodal_combination_object(config)
+                validate_multimodal_combination_mappings_object(config)
+            elif config["type"] == enums.MappingsObjectType.custom_vector:
+                validate_custom_vector_mappings_object(config)
         return mappings_object
     except jsonschema.ValidationError as e:
         raise InvalidArgError(
             f"Error validating mappings object. Reason: \n{str(e)}"
-            f"\nRead about the mappings object here: https://docs.marqo.ai/0.0.15/API-Reference/mappings/"
+            f"\n Read about the mappings object here: https://docs.marqo.ai/1.4.0/API-Reference/Documents/mappings/"
         )
 
 
-def validate_multimodal_combination_object(multimodal_mappings: dict):
+def validate_multimodal_combination_mappings_object(mappings_object: Dict):
     """Validates the multimodal mappings object
 
     Args:
-        multimodal_mappings:
+        mappings_object:
 
     Returns:
         The original object, if it passes validation
     Raises InvalidArgError if the object is badly formatted
     """
     try:
-        jsonschema.validate(instance=multimodal_mappings, schema=multimodal_combination_schema)
-        return multimodal_mappings
+        jsonschema.validate(instance=mappings_object, schema=multimodal_combination_mappings_schema)
     except jsonschema.ValidationError as e:
         raise InvalidArgError(
-            f"Error validating multimodal combination object. Reason: \n{str(e)}"
-            f"\nRead about the mappings object here: https://docs.marqo.ai/0.0.15/API-Reference/mappings/"
+            f"Error validating multimodal combination mappings object. Reason: \n{str(e)}"
+            f"\n Read about the mappings object here: https://docs.marqo.ai/1.4.0/API-Reference/Documents/mappings/"
         )
-
-
-def validate_mappings(mappings: dict):
-    '''
-    Args:
-        mappings:  a dictionary to help handle object content field
-    Returns:
-    '''
-    for field, field_mapping in mappings.items():
-        validate_field_name(field)
-        if field_mapping["type"] not in constants.MARQO_OBJECT_TYPES:
-            raise InvalidArgError(
-                f"The type `{field_mapping['type']}` in mappings for filed `{field}` is not supported."
-                f"Please check the type of your mappings."
-                f"Supported mappings can be found in `https://docs.marqo.ai/0.0.15/API-Reference/mappings/`."
-            )
-        if field_mapping["type"] == "multimodal_combination":
-            validate_multimodal_combination_mapping(field_mapping)
-
-    return True
-
-
-def validate_multimodal_combination_mapping(field_mapping: dict):
-    if "weights" not in field_mapping:
-        raise InvalidArgError(
-            f"The multimodal_combination mapping `{field_mapping}` does not contain `weights`"
-            f"Please check `https://docs.marqo.ai/0.0.15/Advanced-Usage/document_fields/#multimodal-combination-object` for more info."
-        )
-
-    for child_field, weight in field_mapping["weights"].items():
+    
+    # TODO: Move this validation into schema in mappings_object
+    for child_field, weight in mappings_object["weights"].items():
+        # TODO: We may need to validate field name of child field.
         if type(child_field) not in constants.ALLOWED_MULTIMODAL_FIELD_TYPES:
             raise InvalidArgError(
-                f"The multimodal_combination mapping `{field_mapping}` has an invalid child_field `{child_field}` of type `{type(child_field).__name__}`."
+                f"The multimodal_combination mapping `{mappings_object}` has an invalid child_field `{child_field}` of type `{type(child_field).__name__}`."
                 f"In multimodal_combination fields, it must be a string."
-                f"Please check `https://docs.marqo.ai/0.0.15/Advanced-Usage/document_fields/#multimodal-combination-object` for more info."
+                f"Please check `https://docs.marqo.ai/1.4.0/Advanced-Usage/document_fields/#multimodal-combination-object` for more info."
             )
 
         if not isinstance(weight, (float, int)):
             raise InvalidArgError(
-                f"The multimodal_combination mapping `{field_mapping}` has an invalid weight `{weight}` of type `{type(weight).__name__}`."
+                f"The multimodal_combination mapping `{mappings_object}` has an invalid weight `{weight}` of type `{type(weight).__name__}`."
                 f"In multimodal_combination fields, weight must be an int or float."
-                f"Please check `https://docs.marqo.ai/0.0.15/Advanced-Usage/document_fields/#multimodal-combination-object` for more info."
+                f"Please check `https://docs.marqo.ai/1.4.0/Advanced-Usage/document_fields/#multimodal-combination-object` for more info."
             )
+        
+    return mappings_object
 
 
-def validate_score_modifiers_object(score_modifiers: List[dict]):
+def validate_custom_vector_mappings_object(mappings_object: Dict):
+    """Validates the custom vector mappings object
+
+    Args:
+        mappings_object:
+
+    Returns:
+        The original object, if it passes validation
+    Raises InvalidArgError if the object is badly formatted
+
+    Example custom vector mappings must look exactly like this:
+    "my_custom_vector_field": {
+        "type": "custom_vector"
+    }
+    """
     try:
-        jsonschema.validate(instance=score_modifiers, schema=score_modifiers_object_schema)
-        return score_modifiers
+        jsonschema.validate(instance=mappings_object, schema=custom_vector_mappings_schema)
     except jsonschema.ValidationError as e:
         raise InvalidArgError(
-            f"Error validating score_modifiers = `{score_modifiers}`. Reason: \n{str(e)} "
-            f"Please revise your score_modifiers based on the provided error."
-            f"\n Check `https://docs.marqo.ai/0.0.17/API-Reference/search/#score-modifiers` for more info."
+            f"Error validating custom vector mappings object. Reason: \n{str(e)}"
+            f"\n Read about the mappings object here: https://docs.marqo.ai/1.4.0/API-Reference/Documents/mappings/"
         )
+
+    return mappings_object
 
 
 def validate_delete_docs_request(delete_request: MqDeleteDocsRequest, max_delete_docs_count: int):
@@ -634,4 +680,65 @@ def validate_delete_docs_request(delete_request: MqDeleteDocsRequest, max_delete
         validate_id(_id)
 
     return delete_request
+
+
+def validate_nonnegative_number(input_string: str, field_description: str = "Input"):
+    """Validates that a string is a non-negative number
+
+    Args:
+        input_string: the string to validate
+        field_description: description of the value being validated, to be used in error messages
+
+    Returns:
+        input_string converted to a float, if it is a non-negative number
+        
+    Raises:
+        InternalError if the string is not a non-negative number,
+        with a message dependent on field_description
+    """
+    try:
+        output_number = float(input_string)
+    except ValueError:
+        raise InternalError(f"`{field_description} must be a valid number! It is currently: {input_string}.`")
+    if output_number < 0:
+        raise InternalError(f"{field_description} cannot be a negative number! It is currently: `{input_string}`.")
+    return output_number
+
+
+def validate_model_dimensions(input_dimensions: Any):
+    """Validates that input dimensions is an int and is greater than 0
+
+    Args:
+        input_dimensions: the value to validate
+
+    Returns:
+        input_dimensions, if it passes validation
+        
+    Raises:
+        
+    """
+    if isinstance(input_dimensions, int) and input_dimensions > 0:
+        return input_dimensions
+    
+    raise InternalError(f"Model dimensions must be a positive integer! Given model dimensions = {input_dimensions}.")
+
+
+def validate_model_properties_no_model(model_properties: dict):
+    """
+    model_properties dict must have exactly 1 key: "dimensions".
+    """
+    if model_properties is None:
+            raise InvalidArgError(
+            f"When creating an index with `{enums.SpecialModels.no_model}`, you must provide `model_properties` "
+            f"containing `dimensions` in the index settings. Please provide `model_properties` in your index settings or "
+            f"select a different model."
+        )
+    if "dimensions" not in model_properties:
+        raise InvalidArgError("If your index is using `no_model`, your `model_properties` must have `dimensions` set.")
+    
+    for key in model_properties:
+        if key != "dimensions":
+            raise InvalidArgError(f"Invalid model_properties key found: `{key}`. If your index is using `no_model`, then `model_properties` can only have `dimensions` set.")
+        
+    return model_properties
 

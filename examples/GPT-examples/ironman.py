@@ -100,9 +100,11 @@ if __name__ == "__main__":
         }
     }
 
-    # create the index - if no settings are present then sensible deffaults are used    
+    # create the index - if no settings are present then sensible defaults are used
     mq.create_index(index_name, settings_dict=index_settings)
-    res = mq.index(index_name).add_documents(documents)
+    res = mq.index(index_name).add_documents(documents, tensor_fields = ["name", "backstory", "location", "occupation",
+                                                                         "family_history", "work_history", "favorite_color",
+                                                                         "hobbies", "favorite_food", "dislikes"])
 
     #############################################################
     #       3. Regular NPC superhero                                         
@@ -158,7 +160,9 @@ if __name__ == "__main__":
 
     # add some more info
     extra_docs = [{"text":text, "name":persona} for text in get_extra_data()]
-    res = mq.index(index_name).add_documents(extra_docs, non_tensor_fields=['filename'])
+    res = mq.index(index_name).add_documents(extra_docs, tensor_fields = ["name", "backstory", "location", "occupation",
+                                                                         "family_history", "work_history", "favorite_color",
+                                                                         "hobbies", "favorite_food", "dislikes"])
 
     # we pre-opulate them here to complete a conversation but it can easily be made interactive
     human_questions = [ "hi, what is your name?",

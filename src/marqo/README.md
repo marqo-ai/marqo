@@ -18,10 +18,9 @@ docker run --name marqo-os -id -p 9200:9200 -p 9600:9600 -e "discovery.type=sing
 ```
 git clone https://github.com/marqo-ai/marqo.git
 ```
-3. Install marqo dependencies
+3. Pip install Marqo's dev dependencies.
 ```
-cd marqo
-pip install -r requirements.txt
+pip install -r requirements.dev.txt
 ```
 4. Run the following command:
 ```bash
@@ -133,17 +132,16 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs/ | sh;
 
 6. Set up redis (follow instructions in Option A)
 
-7. Install marqo dependencies,
+7. Pip install Marqo's dev dependencies.
 ```
-pip install -r requirements.txt
+pip install -r requirements.dev.txt
 ```
-
 8. Change into the tensor search directory,
 ```
 CWD=$(pwd)
 cd src/marqo/tensor_search/
 ```
-9. Run Marqo,
+9. Run Marqo
 ```
 export OPENSEARCH_URL="https://localhost:9200" && 
     export PYTHONPATH="${PYTHONPATH}:${CWD}/src" &&
@@ -237,3 +235,8 @@ curl http://localhost:8882/openapi.json
 ```
 To get the human readable spec, visit `http://localhost:8882/docs`
 
+## IDE tips
+
+## PyCharm
+Pydantic dataclasses are used in this project. By default, PyCharm can't parse initialisations of these dataclasses. 
+[This plugin](https://plugins.jetbrains.com/plugin/12861-pydantic) can help.

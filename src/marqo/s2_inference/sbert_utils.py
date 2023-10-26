@@ -2,8 +2,8 @@ from sentence_transformers import SentenceTransformer
 import numpy as np
 from torch import nn
 
+from marqo.errors import InternalError
 from marqo.s2_inference.types import *
-
 from marqo.s2_inference.logger import get_logger
 logger = get_logger(__name__)
 
@@ -11,9 +11,11 @@ logger = get_logger(__name__)
 class Model:
     """ generic model wrapper class
     """
-    def __init__(self, model_name: str, device: str = 'cpu', batch_size: int = 2048, embedding_dim=None, max_seq_length=None , **kwargs) -> None:
+    def __init__(self, model_name: Optional[str] = None, device: str = None, batch_size: int = 2048, embedding_dim=None, max_seq_length=None , **kwargs) -> None:
 
         self.model_name = model_name
+        if not device:
+            raise InternalError("`device` is required to be set when loading models!")
         self.device = device
         self.model = None
         self.embedding_dimension = embedding_dim

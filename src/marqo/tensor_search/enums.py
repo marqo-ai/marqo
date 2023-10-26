@@ -29,6 +29,7 @@ class TensorField:
     chunk_ids = "__chunk_ids"
     # the prefix will have the customer's field name appended to the end of it
     vector_prefix = "__vector_"
+    marqo_knn_field = "__vector_marqo_knn_field"
     chunks = "__chunks"
     output_highlights = "_highlights"
     output_score = "_score"
@@ -107,6 +108,15 @@ class EnvVars:
     MARQO_MAX_VECTORISE_BATCH_SIZE = "MARQO_MAX_VECTORISE_BATCH_SIZE"
     MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES = "MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES"
     MARQO_MAX_DELETE_DOCS_COUNT = "MARQO_MAX_DELETE_DOCS_COUNT"
+    MARQO_MAX_NUMBER_OF_REPLICAS = "MARQO_MAX_NUMBER_OF_REPLICAS"
+    MARQO_BEST_AVAILABLE_DEVICE = "MARQO_BEST_AVAILABLE_DEVICE"
+    MARQO_MAX_ADD_DOCS_COUNT = "MARQO_MAX_ADD_DOCS_COUNT"
+    MARQO_MAX_BACKEND_SEARCH_RETRY_ATTEMPTS = "MARQO_MAX_BACKEND_SEARCH_RETRY_ATTEMPTS"
+    MARQO_MAX_BACKEND_SEARCH_RETRY_BACKOFF = "MARQO_MAX_BACKEND_SEARCH_RETRY_BACKOFF"
+    MARQO_MAX_BACKEND_ADD_DOCS_RETRY_ATTEMPTS = "MARQO_MAX_BACKEND_ADD_DOCS_RETRY_ATTEMPTS"
+    MARQO_MAX_BACKEND_ADD_DOCS_RETRY_BACKOFF = "MARQO_MAX_BACKEND_ADD_DOCS_RETRY_BACKOFF"
+    DEFAULT_MARQO_MAX_BACKEND_RETRY_ATTEMPTS = "DEFAULT_MARQO_MAX_BACKEND_RETRY_ATTEMPTS"
+    DEFAULT_MARQO_MAX_BACKEND_RETRY_BACKOFF = "DEFAULT_MARQO_MAX_BACKEND_RETRY_BACKOFF"
 
 
 class RequestType:
@@ -115,9 +125,15 @@ class RequestType:
     DELETE = "DELETE"
     CREATE = "CREATE"
 
+# Each type has different add_documents behavior. More can be added to represent special types.
+class DocumentFieldType:
+    standard = "standard"       # str, int, float, bool, or list
+    multimodal_combination = "multimodal_combination"   # dict
+    custom_vector = "custom_vector"     # dict
 
-class MappingsObjectType:
+class MappingsObjectType(str, Enum):
     multimodal_combination = "multimodal_combination"
+    custom_vector = "custom_vector"
 
 
 class SearchDb:
@@ -130,8 +146,36 @@ class AvailableModelsKey:
     model_size = "model_size"
 
 
+class ObjectStores:
+    s3 = 's3'
+    hf = 'hf'
+
+
+class ModelProperties:
+    auth_required = 'auth_required'
+    model_location = 'model_location'
+
+
+class SpecialModels:
+    no_model = 'no_model'
+
+
+class InferenceParams:
+    model_auth = "model_auth"
 # Perhaps create a ThrottleType to differentiate thread_count and data_size throttling mechanisms
-    
 
 
+class HealthStatuses(str, Enum):
+    green = "green"
+    yellow = "yellow"
+    red = "red"
 
+    def _status_index(self):
+        status_order = [self.green, self.yellow, self.red]
+        return status_order.index(self)
+
+    def __gt__(self, other):
+        return self._status_index() > other._status_index()
+
+    def __lt__(self, other):
+        return self._status_index() < other._status_index()

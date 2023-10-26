@@ -8,10 +8,11 @@ from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search import backend, index_meta_cache, utils
 from marqo import config
 from marqo.tensor_search.web import api_utils
-from marqo._httprequests import HttpRequests
 from marqo import errors
 from marqo.tensor_search.throttling.redis_throttle import throttle
 from marqo.connections import redis_driver
+from marqo.s2_inference.s2_inference import vectorise
+import torch
 
 
 def on_start(marqo_os_url: str):
@@ -20,7 +21,8 @@ def on_start(marqo_os_url: str):
                         PopulateCache(marqo_os_url),
                         DownloadStartText(),
                         CUDAAvailable(), 
-                        ModelsForCacheing(), 
+                        SetBestAvailableDevice(),
+                        ModelsForCacheing(),
                         InitializeRedis("localhost", 6379),    # TODO, have these variable
                         DownloadFinishText(),
                         MarqoWelcome(),
@@ -70,20 +72,18 @@ class CUDAAvailable:
 
     """checks the status of cuda
     """
-    logger = get_logger('CUDA device summary')
+    logger = get_logger('DeviceSummary')
 
     def __init__(self):
         
         pass
 
     def run(self):
-        import torch
-
         def id_to_device(id):
             if id < 0:
                 return ['cpu']
             return [torch.cuda.get_device_name(id)]
-        
+
         device_count = 0 if not torch.cuda.is_available() else torch.cuda.device_count()
 
         # use -1 for cpu
@@ -93,7 +93,31 @@ class CUDAAvailable:
         device_names = []
         for device_id in device_ids:
             device_names.append( {'id':device_id, 'name':id_to_device(device_id)})
+
         self.logger.info(f"found devices {device_names}")
+
+
+class SetBestAvailableDevice:
+
+    """sets the MARQO_BEST_AVAILABLE_DEVICE env var
+    """
+    logger = get_logger('SetBestAvailableDevice')
+
+    def __init__(self):
+        pass
+
+    def run(self):
+        """
+            This is set once at startup time. We assume it will NOT change,
+            if it does, health check should throw a warning.
+        """
+        if torch.cuda.is_available():
+            os.environ[EnvVars.MARQO_BEST_AVAILABLE_DEVICE] = "cuda"
+        else:
+            os.environ[EnvVars.MARQO_BEST_AVAILABLE_DEVICE] = "cpu"
+        
+        self.logger.info(f"Best available device set to: {os.environ[EnvVars.MARQO_BEST_AVAILABLE_DEVICE]}")
+
 
 class ModelsForCacheing:
     """warms the in-memory model cache by preloading good defaults
@@ -101,7 +125,6 @@ class ModelsForCacheing:
     logger = get_logger('ModelsForStartup')
 
     def __init__(self):
-        import torch
         warmed_models = utils.read_env_vars_and_defaults(EnvVars.MARQO_MODELS_TO_PRELOAD)
         if warmed_models is None:
             self.models = []
@@ -109,10 +132,12 @@ class ModelsForCacheing:
             try:
                 self.models = json.loads(warmed_models)
             except json.JSONDecodeError as e:
+                # TODO: Change error message to match new format
                 raise errors.EnvVarError(
                     f"Could not parse environment variable `{EnvVars.MARQO_MODELS_TO_PRELOAD}`. "
-                    f"Please ensure that this a JSON-encoded array of strings. For example:\n"
+                    f"Please ensure that this a JSON-encoded array of strings or dicts. For example:\n"
                     f"""export {EnvVars.MARQO_MODELS_TO_PRELOAD}='["ViT-L/14", "onnx/all_datasets_v4_MiniLM-L6"]'"""
+                    f"""To add a custom model, it must be a dict with keys `model` and `model_properties` as defined in `https://marqo.pages.dev/0.0.20/Models-Reference/bring_your_own_model/`"""
                 ) from e
         else:
             self.models = warmed_models
@@ -123,30 +148,64 @@ class ModelsForCacheing:
         self.logger.info(f"pre-loading {self.models} onto devices={self.default_devices}")
 
     def run(self):
-        from marqo.s2_inference.s2_inference import vectorise
-       
         test_string = 'this is a test string'
         N = 10
         messages = []
         for model in self.models:
             for device in self.default_devices:
+                self.logger.debug(f"Beginning loading for model: {model} on device: {device}")
                 
                 # warm it up
-                _ = vectorise(model, test_string, device=device)
+                _ = _preload_model(model=model, content=test_string, device=device)
 
                 t = 0
                 for n in range(N):
                     t0 = time.time()
-                    _ = vectorise(model, test_string, device=device)
+                    _ = _preload_model(model=model, content=test_string, device=device)
                     t1 = time.time()
                     t += (t1 - t0)
                 message = f"{(t)/float((N))} for {model} and {device}"
                 messages.append(message)
+                self.logger.debug(f"{model} {device} vectorise run {N} times.")
                 self.logger.info(f"{model} {device} run succesfully!")
 
         for message in messages:
             self.logger.info(message)
         self.logger.info("completed loading models")
+
+
+def _preload_model(model, content, device):
+    """
+        Calls vectorise for a model once. This will load in the model if it isn't already loaded.
+        If `model` is a str, it should be a model name in the registry
+        If `model is a dict, it should be an object containing `model_name` and `model_properties`
+        Model properties will be passed to vectorise call if object exists
+    """
+    if isinstance(model, str):
+        # For models IN REGISTRY
+        _ = vectorise(
+            model_name=model, 
+            content=content, 
+            device=device
+        )
+    elif isinstance(model, dict):
+        # For models from URL
+        """
+        TODO: include validation from on start script (model name properties etc)
+        _check_model_name(index_settings)
+        """
+        try:
+            _ = vectorise(
+                model_name=model["model"], 
+                model_properties=model["model_properties"], 
+                content=content, 
+                device=device
+            )
+        except KeyError as e:
+            raise errors.EnvVarError(
+                f"Your custom model {model} is missing either `model` or `model_properties`."
+                f"""To add a custom model, it must be a dict with keys `model` and `model_properties` as defined in `https://marqo.pages.dev/0.0.20/Advanced-Usage/configuration/#configuring-preloaded-models`"""
+            ) from e
 
 
 class InitializeRedis:
@@ -180,7 +239,7 @@ class DownloadFinishText:
         print('\n')
         print("###########################################################")
         print("###########################################################")
-        print("###### !!COMPLETED SUCCESFULLY!!!          ################")
+        print("###### !!COMPLETED SUCCESSFULLY!!!         ################")
         print("###########################################################")
         print("###########################################################")
         print('\n')
