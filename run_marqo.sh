@@ -1,28 +1,44 @@
 #!/bin/bash
-#source /opt/bash-utils/logger.sh
+
+# set the default value to info and convert to lower case
+export MARQO_LOG_LEVEL=${MARQO_LOG_LEVEL:-info}
+MARQO_LOG_LEVEL=`echo "$MARQO_LOG_LEVEL" | tr '[:upper:]' '[:lower:]'`
+
 export PYTHONPATH="${PYTHONPATH}:/app/src/"
 export CUDA_HOME=/usr/local/cuda/
 export LD_LIBRARY_PATH=${CUDA_HOME}/lib64
 export PATH=${CUDA_HOME}/bin:${PATH}
 
 trap "bash /app/scripts/shutdown.sh; exit" SIGTERM SIGINT
-echo "Python packages:"
-pip freeze
+
+if [ "$MARQO_LOG_LEVEL" = "debug" ]; then
+  echo "Python packages:"
+  pip freeze
+fi
 
 function wait_for_process () {
     local max_retries=30
     local n_restarts_before_sigkill=3
     local process_name="$1"
     local retries=0
-    while ! [[ $(docker ps -a | grep CONTAINER) ]] >/dev/null && ((retries < max_retries)); do
-        echo "Process $process_name is not running yet. Retrying in 1 seconds"
-        echo "Retry $retries of a maximum of $max_retries retries"
+    while ! [[ $(docker ps -a | grep CONTAINER) ]] > /dev/null 2>&1 && ((retries < max_retries)); do
+        if [ "$MARQO_LOG_LEVEL" = "debug" ]; then
+          echo "Process $process_name is not running yet. Retrying in 1 seconds"
+          echo "Retry $retries of a maximum of $max_retries retries"
+        fi
+        echo "Preparing to start Marqo-OS..."
         ((retries=retries+1))
         if ((retries >= n_restarts_before_sigkill)); then
-            echo "sending SIGKILL to dockerd and restarting "
-            ps axf | grep docker | grep -v grep | awk '{print "kill -9 " $1}' | sh; rm /var/run/docker.pid; dockerd &
+            if [ "$MARQO_LOG_LEVEL" = "debug" ]; then
+              echo "sending SIGKILL to dockerd and restarting "
+            fi
+            ps axf | grep docker | grep -v grep | awk '{print "kill -9 " $1}' | sh; rm /var/run/docker.pid; dockerd > /dev/null 2>&1 &
         else
-            dockerd &
+            if [ "$MARQO_LOG_LEVEL" = "debug" ]; then
+              dockerd &
+            else
+              dockerd > /dev/null 2>&1 &
+            fi
         fi
         sleep 3
         if ((retries >= max_retries)); then
@@ -45,13 +61,18 @@ if [[ ! $OPENSEARCH_URL ]]; then
       wait "$setup_dind_pid"
   fi
 
-  echo "Starting supervisor"
+  if [ "$MARQO_LOG_LEVEL" = "debug" ]; then
+    echo "Starting supervisor"
+  fi
+
   /usr/bin/supervisord -n >> /dev/null 2>&1 &
 
-  dockerd &
-  echo "called dockerd command"
+  dockerd > /dev/null 2>&1 &
 
-  echo "Waiting for processes to be running"
+  if [ "$MARQO_LOG_LEVEL" = "debug" ]; then
+    echo "Called dockerd command. Waiting for dockerd to start."
+  fi
+
   processes=(dockerd)
   for process in "${processes[@]}"; do
       wait_for_process "$process"
@@ -59,28 +80,39 @@ if [[ ! $OPENSEARCH_URL ]]; then
           echo "$process is not running after max time"
           exit 1
       else
-          echo "$process is running"
+          if [ "$MARQO_LOG_LEVEL" = "debug" ]; then
+            echo "$process is running"
+          fi
       fi
   done
   OPENSEARCH_URL="https://localhost:9200"
   OPENSEARCH_IS_INTERNAL=True
   if [[ $(docker ps -a | grep marqo-os) ]]; then
       if [[ $(docker ps -a | grep marqo-os | grep -v Up) ]]; then
-        docker start marqo-os &
+        docker start marqo-os > /dev/null 2>&1 &
         until [[ $(curl -v --silent --insecure $OPENSEARCH_URL 2>&1 | grep Unauthorized) ]]; do
           sleep 0.1;
         done;
-        echo "Opensearch started"
+        echo "Marqo-OS started"
       fi
-      echo "OpenSearch is running"
+      echo "Marqo-OS is running"
   else
-      echo "OpenSearch not found; running OpenSearch"
-      docker run --name marqo-os -id -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" marqoai/marqo-os:0.0.3 &
-      docker start marqo-os &
+      echo "Marqo-OS not found; starting Marqo-OS..."
+      if [ "$MARQO_LOG_LEVEL" = "debug" ]; then
+        docker run --name marqo-os -id -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" marqoai/marqo-os:0.0.3 &
+      else
+        docker run --name marqo-os -id -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" marqoai/marqo-os:0.0.3  > /dev/null 2>&1 &
+      fi
+      if [ "$MARQO_LOG_LEVEL" = "debug" ]; then
+        docker start marqo-os > /dev/null 2>&1 &
+      fi
       until [[ $(curl -v --silent --insecure $OPENSEARCH_URL 2>&1 | grep Unauthorized) ]]; do
         sleep 0.1;
       done;
+      echo "Marqo-OS started successfully."
   fi
+else
+    echo "Found Marqo-OS URL. Skipping internal Marqo-OS configuration."
 fi
 
 export OPENSEARCH_URL
@@ -88,9 +120,11 @@ export OPENSEARCH_IS_INTERNAL
 
 # Start up redis
 if [ "$MARQO_ENABLE_THROTTLING" != "FALSE" ]; then
-    echo "Starting redis-server"
+    echo "Starting Marqo throttling..."
     redis-server /etc/redis/redis.conf
-    echo "Called redis-server command"
+    if [ "$MARQO_LOG_LEVEL" = "debug" ]; then
+      echo "Called redis-server command"
+    fi
 
     start_time=$(($(date +%s%N)/1000000))
     while true; do
@@ -103,21 +137,22 @@ if [ "$MARQO_ENABLE_THROTTLING" != "FALSE" ]; then
         elapsed_time=$(expr $current_time - $start_time)
         if [ $elapsed_time -ge 2000 ]; then
             # Expected start time should be < 30ms in reality.
-            echo "redis-server failed to start within 2s. skipping."
+            # redis-server failed to start:
+            echo "Marqo throttling failed to start within 2s. Continuing without throttling."
             break
         fi
         sleep 0.1
         
     done
-    echo "redis-server is now running"
+    # redis server is now running
+    echo "Marqo throttling successfully started."
 
 else
-    echo "Throttling has been disabled. Skipping redis-server start."
+    # skip starting Redis
+    echo "Marqo throttling has been disabled. Throttling start-up skipped."
 fi
 
-# set the default value to info and convert to lower case
-export MARQO_LOG_LEVEL=${MARQO_LOG_LEVEL:-info}
-MARQO_LOG_LEVEL=`echo "$MARQO_LOG_LEVEL" | tr '[:upper:]' '[:lower:]'`
+
 
 # Start the tensor search web app in the background
 cd /app/src/marqo/tensor_search || exit

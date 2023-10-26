@@ -110,6 +110,13 @@ class EnvVars:
     MARQO_MAX_DELETE_DOCS_COUNT = "MARQO_MAX_DELETE_DOCS_COUNT"
     MARQO_MAX_NUMBER_OF_REPLICAS = "MARQO_MAX_NUMBER_OF_REPLICAS"
     MARQO_BEST_AVAILABLE_DEVICE = "MARQO_BEST_AVAILABLE_DEVICE"
+    MARQO_MAX_ADD_DOCS_COUNT = "MARQO_MAX_ADD_DOCS_COUNT"
+    MARQO_MAX_BACKEND_SEARCH_RETRY_ATTEMPTS = "MARQO_MAX_BACKEND_SEARCH_RETRY_ATTEMPTS"
+    MARQO_MAX_BACKEND_SEARCH_RETRY_BACKOFF = "MARQO_MAX_BACKEND_SEARCH_RETRY_BACKOFF"
+    MARQO_MAX_BACKEND_ADD_DOCS_RETRY_ATTEMPTS = "MARQO_MAX_BACKEND_ADD_DOCS_RETRY_ATTEMPTS"
+    MARQO_MAX_BACKEND_ADD_DOCS_RETRY_BACKOFF = "MARQO_MAX_BACKEND_ADD_DOCS_RETRY_BACKOFF"
+    DEFAULT_MARQO_MAX_BACKEND_RETRY_ATTEMPTS = "DEFAULT_MARQO_MAX_BACKEND_RETRY_ATTEMPTS"
+    DEFAULT_MARQO_MAX_BACKEND_RETRY_BACKOFF = "DEFAULT_MARQO_MAX_BACKEND_RETRY_BACKOFF"
 
 
 class RequestType:
@@ -118,9 +125,15 @@ class RequestType:
     DELETE = "DELETE"
     CREATE = "CREATE"
 
+# Each type has different add_documents behavior. More can be added to represent special types.
+class DocumentFieldType:
+    standard = "standard"       # str, int, float, bool, or list
+    multimodal_combination = "multimodal_combination"   # dict
+    custom_vector = "custom_vector"     # dict
 
-class MappingsObjectType:
+class MappingsObjectType(str, Enum):
     multimodal_combination = "multimodal_combination"
+    custom_vector = "custom_vector"
 
 
 class SearchDb:
@@ -141,6 +154,10 @@ class ObjectStores:
 class ModelProperties:
     auth_required = 'auth_required'
     model_location = 'model_location'
+
+
+class SpecialModels:
+    no_model = 'no_model'
 
 
 class InferenceParams:

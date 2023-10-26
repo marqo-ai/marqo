@@ -1,7 +1,7 @@
 import math
 import os
 import sys
-from tests.utils.transition import add_docs_caller
+from tests.utils.transition import add_docs_caller, add_docs_batched
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from unittest import mock
 from marqo.s2_inference.s2_inference import vectorise, get_model_properties_from_registry
@@ -22,6 +22,7 @@ from marqo.tensor_search.tensor_search import (_create_dummy_query_for_zero_vect
                                                _vector_text_search_query_verbose,
                                                _generate_vector_text_search_query_for_verbose_one)
 import pprint
+from marqo.tensor_search.models.index_info import IndexInfo
 
 
 class TestVectorSearch(MarqoTestCase):
@@ -856,10 +857,10 @@ class TestVectorSearch(MarqoTestCase):
 
         vocab = requests.get(vocab_source).text.splitlines()
 
-        add_docs_caller(
+        add_docs_batched(
             config=self.config, index_name=self.index_name_1,
             docs=[{"Title": "a " + (" ".join(random.choices(population=vocab, k=25)))}
-                  for _ in range(2000)], auto_refresh=False
+                  for _ in range(2000)], auto_refresh=False, device="cpu"
         )
         tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
         for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
@@ -899,12 +900,10 @@ class TestVectorSearch(MarqoTestCase):
 
         vocab = requests.get(vocab_source).text.splitlines()
 
-        tensor_search.add_documents(
-            config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1,
-                                                              docs=[{"Title": "a " + (
-                                                                  " ".join(random.choices(population=vocab, k=25)))}
-                                                                    for _ in range(700)], auto_refresh=False,
-                                                              device="cpu")
+        add_docs_batched(
+            config=self.config, index_name=self.index_name_1,
+            docs=[{"Title": "a " + (" ".join(random.choices(population=vocab, k=25)))}
+            for _ in range(700)], auto_refresh=False, device="cpu"
         )
         tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
 
@@ -1374,3 +1373,112 @@ class TestVectorSearch(MarqoTestCase):
             return True
 
         assert run()
+
+
+class TestVectorSearchUtils(MarqoTestCase):
+
+    def setUp(self) -> None:
+        self.index_name_1 = "my-test-index-1"
+        self.index_name_2 = "my-test-index-2"
+        self.index_name_3 = "my-test-index-3"
+        self._delete_test_indices()
+        self._create_test_indices()
+
+        # Any tests that call add_document, search, bulk_search need this env var
+        # Ensure other os.environ patches in indiv tests do not erase this one.
+        self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
+        self.device_patcher.start()
+
+    def tearDown(self):
+        self.device_patcher.stop()
+
+    def _delete_test_indices(self, indices=None):
+        if indices is None or not indices:
+            ix_to_delete = [self.index_name_1, self.index_name_2, self.index_name_3]
+        else:
+            ix_to_delete = indices
+        for ix_name in ix_to_delete:
+            try:
+                tensor_search.delete_index(config=self.config, index_name=ix_name)
+            except IndexNotFoundError as s:
+                pass
+
+    def _create_test_indices(self, indices=None):
+        if indices is None or not indices:
+            ix_to_create = [self.index_name_1, self.index_name_2, self.index_name_3]
+        else:
+            ix_to_create = indices
+        for ix_name in ix_to_create:
+            tensor_search.create_vector_index(config=self.config, index_name=ix_name)
+    
+    def test_construct_vector_input_batches(self):
+        index_info_with_images = IndexInfo(
+            model_name = "PLACEHOLDER. ViT-B/32",
+            properties = {"PLACEHOLDER": "PLACEHOLDER"},
+            index_settings = {
+                IndexSettingsField.index_defaults: {
+                    IndexSettingsField.treat_urls_and_pointers_as_images: True
+                }
+            }
+        )
+
+        index_info_without_images = IndexInfo(
+            model_name = "PLACEHOLDER. ViT-B/32",
+            properties = {"PLACEHOLDER": "PLACEHOLDER"},
+            index_settings = {
+                IndexSettingsField.index_defaults: {
+                    IndexSettingsField.treat_urls_and_pointers_as_images: False
+                }
+            }
+        )
+        
+        # query is None
+        res = tensor_search.construct_vector_input_batches(None, index_info_with_images)
+        assert res == ([], [])
+
+        # query string
+        res = tensor_search.construct_vector_input_batches("some text", index_info_with_images)
+        assert res == (["some text"], [])
+
+        # query string, image, with urls as images
+        res = tensor_search.construct_vector_input_batches("https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png", index_info_with_images)
+        assert res == ([], ["https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png"])
+
+        # query dict, mixed text and image, with urls as images
+        res = tensor_search.construct_vector_input_batches({
+            "some text": 1, 
+            "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png": 2}, 
+        index_info_with_images)
+        assert res == (["some text"], ["https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png"])
+
+        # query dict, all text
+        res = tensor_search.construct_vector_input_batches({
+            "some text": 1, 
+            "some other text": 2},
+        index_info_with_images)
+        assert res == (["some text", "some other text"], [])
+
+        # query dict, all image, with urls as images
+        res = tensor_search.construct_vector_input_batches({
+            "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png": 1, 
+            "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_statue.png": 2},
+        index_info_with_images)
+        assert res == ([], ["https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png", "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_statue.png"])
+
+        # query string, image, no urls as images
+        res = tensor_search.construct_vector_input_batches("https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png", index_info_without_images)
+        assert res == (["https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png"], [])
+
+        # query dict, mixed text and image, no urls as images
+        res = tensor_search.construct_vector_input_batches({
+            "some text": 1, 
+            "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png": 2},
+        index_info_without_images)
+        assert res == (["some text", "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png"], [])
+
+        # query dict, all image, no urls as images
+        res = tensor_search.construct_vector_input_batches({
+            "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png": 1, 
+            "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_statue.png": 2},
+        index_info_without_images)
+        assert res == (["https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png", "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_statue.png"], [])

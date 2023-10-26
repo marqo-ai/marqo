@@ -7,6 +7,8 @@ from marqo._httprequests import HttpRequests
 from marqo.config import Config
 from marqo.tensor_search import validation, utils, enums
 from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsResponse, MqDeleteDocsRequest
+import pprint
+from marqo import errors
 
 # -- Marqo delete endpoint interface: --
 
@@ -15,9 +17,11 @@ def format_delete_docs_response(marqo_response: MqDeleteDocsResponse) -> dict:
     """This formats the delete response for users """
     return {
         "index_name": marqo_response.index_name, "status": marqo_response.status_string,
-        "type": "documentDeletion", "details": {
+        "type": "documentDeletion", 
+        "items": marqo_response.result_list,
+        "details": {
             "receivedDocumentIds": len(marqo_response.document_ids),
-            "deletedDocuments": marqo_response.deleted_docments_count,
+            "deletedDocuments": marqo_response.deleted_documents_count,
         },
         "duration": utils.create_duration_string(marqo_response.deletion_end - marqo_response.deletion_start),
         "startedAt": utils.format_timestamp(marqo_response.deletion_start),
@@ -67,11 +71,29 @@ def delete_documents_marqo_os(config: Config, deletion_instruction: MqDeleteDocs
         refresh_response = HttpRequests(config).post(path=f"{deletion_instruction.index_name}/_refresh")
 
     t1 = datetime.datetime.utcnow()
-    deleted_documents_count = sum(1 for item in delete_res_backend["items"] if "delete" in item and item["delete"]["status"] == 200)
+
+    deleted_documents_count = 0
+    result_list = []
+
+    for item in delete_res_backend["items"]:
+        if "delete" in item:
+            try:
+                result_list.append({
+                    "_id": item["delete"]["_id"],
+                    "_shards": item["delete"]["_shards"],
+                    "status": item["delete"]["status"],
+                    "result": item["delete"]["result"],
+                })
+                if item["delete"]["status"] == 200:
+                    deleted_documents_count += 1
+            except KeyError as e:
+                raise errors.InternalError(f"Failed to parse delete response from backend. "
+                                           f"Missing key in response. Reason: {e}")
+
 
     mq_delete_res = MqDeleteDocsResponse(
         index_name=deletion_instruction.index_name, status_string='succeeded', document_ids=deletion_instruction.document_ids,
-        deleted_docments_count=deleted_documents_count, deletion_start=t0,
-        deletion_end=t1
+        deleted_documents_count=deleted_documents_count, deletion_start=t0,
+        deletion_end=t1, result_list=result_list
     )
     return mq_delete_res

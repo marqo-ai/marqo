@@ -2,10 +2,10 @@
 The functions defined here would have endpoints, later on.
 """
 import numpy as np
-from marqo.errors import ModelCacheManagementError, InvalidArgError, ConfigurationError, InternalError
+from marqo.errors import ModelCacheManagementError, InvalidArgError, ConfigurationError, InternalError, BadRequestError
 from marqo.s2_inference.errors import (
     VectoriseError, InvalidModelPropertiesError, ModelLoadError,
-    UnknownModelError, ModelNotInCacheError, ModelDownloadError, S2InferenceError)
+    UnknownModelError, ModelNotInCacheError, ModelDownloadError, IllegalVectoriseError)
 from PIL import UnidentifiedImageError
 from marqo.s2_inference.model_registry import load_model_properties
 from marqo.s2_inference.configs import get_default_normalization, get_default_seq_length
@@ -14,12 +14,13 @@ from marqo.s2_inference.logger import get_logger
 import torch
 import datetime
 from marqo.s2_inference import constants
-from marqo.tensor_search.enums import AvailableModelsKey
+from marqo.tensor_search.enums import AvailableModelsKey, SpecialModels
 from marqo.tensor_search.configs import EnvVars
 from marqo.tensor_search.models.private_models import ModelAuth
 import threading
 from marqo.tensor_search.utils import read_env_vars_and_defaults, generate_batches
 from marqo.tensor_search.configs import EnvVars
+from marqo.tensor_search.validation import validate_model_properties_no_model
 
 logger = get_logger(__name__)
 
@@ -77,6 +78,9 @@ def vectorise(model_name: str, content: Union[str, List[str]], model_properties:
                 raise RuntimeError(f"Vectorise created an empty list of batches! Content: {content}")
             else:
                 vectorised = np.concatenate(vector_batches, axis=0)
+    except IllegalVectoriseError as e:
+        # This is from attempting to vectorise with no_model.
+        raise BadRequestError(str(e)) from e
     except UnidentifiedImageError as e:
         raise VectoriseError(str(e)) from e
 
@@ -185,7 +189,12 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
 def _validate_model_properties(model_name: str, model_properties: dict) -> dict:
     """validate model_properties, if not given then return model_registry properties
     """
-    if model_properties is not None:
+    # TODO: move model specific validation into the model file or classes themselves
+    # no_model should always have model_properties (with dimensions only)
+    if model_name == SpecialModels.no_model:
+        validate_model_properties_no_model(model_properties)
+        
+    elif model_properties is not None:
         """checks model dict to see if all required keys are present
         """
         required_keys = []
@@ -207,7 +216,7 @@ def _validate_model_properties(model_name: str, model_properties: dict) -> dict:
             if key not in model_properties:
                 raise InvalidModelPropertiesError(f"model_properties has missing key '{key}'."
                                                   f"please update your model properties with required key `{key}`"
-                                                  f"check `https://docs.marqo.ai/0.0.12/Models-Reference/dense_retrieval/` for more info.")
+                                                  f"check `https://docs.marqo.ai/1.4.0/Models-Reference/dense_retrieval/` for more info.")
 
     else:
         model_properties = get_model_properties_from_registry(model_name)
@@ -331,8 +340,14 @@ def _load_model(
         raise RuntimeError(f"The function `{_load_model.__name__}` should only be called by "
                            f"`unit_test` or `_update_available_models` for threading safeness.")
 
-    print(f"loading for: model_name={model_name} and properties={model_properties}")
-    loader = _get_model_loader(model_properties.get('name', None), model_properties)
+    if model_name == SpecialModels.no_model:
+        # Using model_name as to not require unnecessary fields in model_properties
+        print(f"Model-less index selected, with dimensions={model_properties['dimensions']}")
+        loader = _get_model_loader(model_name, model_properties)
+    else:
+        # Normal models should use model_properties["name"]
+        print(f"loading for: model_name={model_name} and properties={model_properties}")
+        loader = _get_model_loader(model_properties.get('name', None), model_properties)
 
     max_sequence_length = model_properties.get('tokens', get_default_seq_length())
     model = loader(
@@ -500,11 +515,14 @@ def _get_model_loader(model_name: str, model_properties: dict) -> Any:
     TODO: standardise these dicts
 
     Returns:
-        dict: a dictionary describing properties of the model.
+        A helper object of class `Model` (subclass depends on the type of model)
     """
 
+    # `no_model` is a special case, we use the name instead of type.
+    if model_name == SpecialModels.no_model:
+        return MODEL_PROPERTIES['loaders'][model_name]
+    
     model_type = model_properties['type']
-
     if model_type not in MODEL_PROPERTIES['loaders']:
         raise KeyError(f"model_name={model_name} for model_type={model_type} not in allowed model types")
 

@@ -489,6 +489,78 @@ class TestAddDocuments(MarqoTestCase):
         except BadRequestError:
             pass
 
+    def test_add_documents_below_max_doc_count(self):
+        """
+        Ensures that there is no error when adding documents equal to or less than
+        the max doc count limit
+        """
+        test_cases = [
+            # (max_doc_count, actual_doc_count)
+            # default max (= 64)
+            (64, 64),
+            (64, 63),
+            (64, 1),
+
+            # non-default max (!= 64)
+            (200, 200),
+            (200, 199),
+            (200, 1)
+        ]
+
+        for case in test_cases:
+            max_doc_count = case[0]
+            mock_environ = {enums.EnvVars.MARQO_MAX_ADD_DOCS_COUNT: str(max_doc_count)}
+
+            @mock.patch.dict(os.environ, {**os.environ, **mock_environ})
+            def run():
+                tensor_search.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=self.index_name_1, 
+                        # actual doc count is case[1]
+                        docs=[{"some": "doc"} for _ in range(case[1])],
+                    auto_refresh=True, device="cpu")
+                )
+                return True
+            
+            assert run()
+
+    def test_add_documents_exceeded_max_doc_count(self):
+        """
+        Ensures that there is a bad request error when adding documents greater than
+        the max doc count limit
+        """
+        test_cases = [
+            # (max_doc_count, actual_doc_count)
+            # default max (= 64)
+            (64, 65),
+            (64, 200),
+
+            # non-default max (!= 64)
+            (200, 201),
+            (200, 300)
+        ]
+
+        for case in test_cases:
+            max_doc_count = case[0]
+            mock_environ = {enums.EnvVars.MARQO_MAX_ADD_DOCS_COUNT: str(max_doc_count)}
+
+            @mock.patch.dict(os.environ, {**os.environ, **mock_environ})
+            def run():
+                try:
+                    tensor_search.add_documents(
+                        config=self.config, add_docs_params=AddDocsParams(
+                            index_name=self.index_name_1, 
+                            # actual doc count is case[1]
+                            docs=[{"some": "doc"} for _ in range(case[1])],
+                        auto_refresh=True, device="cpu")
+                    )
+                    raise AssertionError
+                except BadRequestError as e:
+                    assert f"exceeds limit of {max_doc_count}" in e.message
+                    return True
+        
+        assert run()
+
     def test_resilient_add_images(self):
         image_index_configs = [
             # NO CHUNKING
@@ -1253,7 +1325,7 @@ class TestAddDocuments(MarqoTestCase):
     def test_params_validation_tensors_and_nontensors(self):
         with pytest.raises(InternalError):
             AddDocsParams(
-                docs=[],
+                docs=[{"dummy": "doc"}],
                 index_name="my_index",
                 auto_refresh=True,
                 tensor_fields=["field1"],
@@ -1262,7 +1334,7 @@ class TestAddDocuments(MarqoTestCase):
 
         with pytest.raises(InternalError):
             AddDocsParams(
-                docs=[],
+                docs=[{"dummy": "doc"}],
                 index_name="my_index",
                 auto_refresh=True,
                 tensor_fields=["field1"],
@@ -1272,7 +1344,7 @@ class TestAddDocuments(MarqoTestCase):
     def test_params_validation_no_tensors_no_nontensors(self):
         with pytest.raises(InternalError):
             AddDocsParams(
-                docs=[],
+                docs=[{"dummy": "doc"}],
                 index_name="my_index",
                 auto_refresh=True,
                 tensor_fields=None,
@@ -1281,7 +1353,7 @@ class TestAddDocuments(MarqoTestCase):
 
     def test_params_validation_default(self):
         params = AddDocsParams(
-            docs=[],
+            docs=[{"dummy": "doc"}],
             index_name="my_index",
             auto_refresh=True
         )
@@ -1291,7 +1363,7 @@ class TestAddDocuments(MarqoTestCase):
 
     def test_params_validation_non_tensor_fields_only(self):
         params = AddDocsParams(
-            docs=[],
+            docs=[{"dummy": "doc"}],
             index_name="my_index",
             auto_refresh=True,
             non_tensor_fields=["field1", "field2"]
@@ -1299,3 +1371,83 @@ class TestAddDocuments(MarqoTestCase):
 
         assert params.tensor_fields is None
         assert params.non_tensor_fields == ["field1", "field2"]
+
+
+class TestAddDocumentsUtils(MarqoTestCase):
+    def test_create_chunk_metadata(self):
+        """Test that only valid field types are included in the metadata."""
+        doc = {
+            'string_field': 'Hello, World!',
+            'bool_field': True,
+            'int_field': 42,
+            'float_field': 3.14,
+            'list_field': [1, 2, 3],
+            'dict_field': {'a': 1, 'b': 2},
+            'set_field': {4, 5, 6},     # should be removed from metadata
+            'tuple_field': (7, 8, 9)    # should be removed from metadata
+        }
+
+        expected_output = {
+            'string_field': 'Hello, World!',
+            'bool_field': True,
+            'int_field': 42,
+            'float_field': 3.14,
+            'list_field': [1, 2, 3],
+            'dict_field': {'a': 1, 'b': 2},
+        }
+
+        self.assertDictEqual(add_docs.create_chunk_metadata(doc), expected_output)
+
+        # Check empty document
+        self.assertDictEqual(add_docs.create_chunk_metadata({}), {})
+    
+    def test_determine_document_field_type(self):
+        mixed_mappings = {
+            "my_custom_vector": {
+                "type": "custom_vector"
+            },
+            "my_multimodal": {
+                "type": "multimodal_combination",
+                "weights": {
+                    "text": 0.4,
+                    "image": 0.6
+                }
+            },
+            "my_bad_type": {
+                "type": "DOESNT EXIST IN enums.MappingsObjectType"
+            }
+        }
+
+        assert add_docs.determine_document_field_type(
+            field_name="my_custom_vector", 
+            field_content={"vector": [1, 2, 3]},
+            mappings=mixed_mappings
+        ) == enums.DocumentFieldType.custom_vector
+
+        assert add_docs.determine_document_field_type(
+            field_name="my_multimodal", 
+            field_content={"text": "blah", "image": "https://www.marqo.ai/this/image/doesnt/exist.png"},
+            mappings=mixed_mappings
+        ) == enums.DocumentFieldType.multimodal_combination
+
+        with self.assertRaises(InternalError):
+            add_docs.determine_document_field_type(
+                field_name="my_bad_type",   # exists in mappings, but not in enums.MappingsObjectType
+                field_content={"vector": [1, 2, 3]},
+                mappings=mixed_mappings
+            )
+
+        with self.assertRaises(InternalError):
+            add_docs.determine_document_field_type(
+                field_name="BAD NAME, NOT IN MAPPINGS.", 
+                field_content={"vector": [1, 2, 3]},
+                mappings=mixed_mappings
+            )
+
+        assert add_docs.determine_document_field_type(
+            field_name="Any name. Doesn't matter.", 
+            field_content="normal text",
+            mappings=mixed_mappings
+        ) == enums.DocumentFieldType.standard
+            
+    

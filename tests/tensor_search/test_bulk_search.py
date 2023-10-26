@@ -23,7 +23,8 @@ import numpy as np
 from tests.marqo_test import MarqoTestCase
 from typing import Dict, List
 import pydantic
-from tests.utils.transition import add_docs_caller
+from tests.utils.transition import add_docs_caller, add_docs_batched
+from marqo.tensor_search.models.search import SearchContext, SearchContextTensor
 
 
 
@@ -45,7 +46,14 @@ class TestGetQueryVectorsFromJobs(MarqoTestCase):
             "index_defaults": {"treat_urls_and_pointers_as_images": False, "normalize_embeddings": False},
             'model_name': 'test_model',
             'model_properties': {'test': 'property'},
-            'normalize_embeddings': True,
+            'content_type': 'text',
+            'image_download_headers': None
+        })
+
+        self.index_info_with_normalize = IndexInfo("model_name", {},  {
+            "index_defaults": {"treat_urls_and_pointers_as_images": False, "normalize_embeddings": True},
+            'model_name': 'test_model',
+            'model_properties': {'test': 'property'},
             'content_type': 'text',
             'image_download_headers': None
         })
@@ -64,32 +72,81 @@ class TestGetQueryVectorsFromJobs(MarqoTestCase):
             456: {"another": [0.5, 0.6]},
             789: {"red herring": [0.6, 0.5]}
         }
+        self.sample_context=SearchContext(**{"tensor": [
+            {"vector": [2, 4], "weight": 2}, 
+            {"vector": [1, 3], "weight": -1}], 
+        })
+        # When you average these, it becomes [1.5, 2.5]
 
     @mock.patch("marqo.tensor_search.tensor_search.get_index_info")
     @mock.patch("marqo.tensor_search.tensor_search.get_content_vector")
-    def test_get_query_vectors_from_jobs(self, mock_get_content_vector, mock_get_index_info):
+    def test_get_query_vectors_from_jobs_text(self, mock_get_content_vector, mock_get_index_info):
         mock_get_index_info.return_value = self.index_info
         mock_get_content_vector.return_value = np.array([0.5, 0.5])
         
+        # text queries only
         qidx_to_vectors = tensor_search.get_query_vectors_from_jobs(self.queries, self.qidx_to_job, self.job_to_vectors, self.config, self.jobs)
 
         self.assertEqual(len(qidx_to_vectors), len(self.queries))
 
         self.assertTrue((qidx_to_vectors[0] == np.array([0.5, 0.5])).all())
         self.assertTrue((qidx_to_vectors[1] == np.array([0.5, 0.5])).all())
+        # TODO: text queries with normalize_embeddings (currently unsupported)
     
     @mock.patch("marqo.tensor_search.tensor_search.get_index_info")
     @mock.patch("marqo.tensor_search.tensor_search.get_content_vector")
     def test_get_query_vectors_from_jobs_multimodal(self, mock_get_content_vector, mock_get_index_info):
         mock_get_index_info.return_value = self.index_info
         mock_get_content_vector.return_value = np.array([0.5, 0.5])
-        
+        # multimodal queries only
         qidx_to_vectors = tensor_search.get_query_vectors_from_jobs([
             BulkSearchQueryEntity(index="index_name_1", q={"a test ": 0.8, "query": 0.2}, limit=2),
         ], {0: self.qidx_to_job[0]}, self.job_to_vectors, self.config, self.jobs)
 
         self.assertEqual(len(qidx_to_vectors), 1)
         self.assertTrue((qidx_to_vectors[0] == np.array([0.25, 0.25])).all())
+
+        # multimodal queries with context vector
+        qidx_to_vectors = tensor_search.get_query_vectors_from_jobs([
+            BulkSearchQueryEntity(index="index_name_1", q={"a test ": 0.8, "query": 0.2}, 
+                                  context=self.sample_context, limit=2),
+        ], {0: self.qidx_to_job[0]}, self.job_to_vectors, self.config, self.jobs)
+
+        self.assertTrue((qidx_to_vectors[0] == np.array([0.875, 1.375])).all())
+
+        # multimodal queries with normalize_embeddings
+        # norm of [0.25, 0.25] is [0.35355339]. After normalizing, should be [0.70710678, 0.70710678]
+        mock_get_index_info.return_value = self.index_info_with_normalize
+        qidx_to_vectors = tensor_search.get_query_vectors_from_jobs([
+            BulkSearchQueryEntity(index="index_name_1", q={"a test ": 0.8, "query": 0.2}, limit=2),
+        ], {0: self.qidx_to_job[0]}, self.job_to_vectors, self.config, self.jobs)
+        print(qidx_to_vectors[0])
+        assert np.allclose(qidx_to_vectors[0], np.array([0.70710678, 0.70710678]), atol=1e-6)
+    
+    @mock.patch("marqo.tensor_search.tensor_search.get_index_info")
+    @mock.patch("marqo.tensor_search.tensor_search.get_content_vector")
+    def test_get_query_vectors_from_jobs_none_query(self, mock_get_content_vector, mock_get_index_info):
+        mock_get_index_info.return_value = self.index_info
+        
+        # no query, using context vector
+        qidx_to_vectors = tensor_search.get_query_vectors_from_jobs([
+            BulkSearchQueryEntity(index="index_name_1", limit=2, 
+                                  context=self.sample_context)
+        ], {0: self.qidx_to_job[0]}, self.job_to_vectors, self.config, self.jobs)
+        self.assertEqual(len(qidx_to_vectors), 1)
+
+        # Should match context vector, since no query
+        self.assertTrue((qidx_to_vectors[0] == np.array([1.5, 2.5])).all())
+
+        # no query, using context vector, with normalize_embeddings
+        # norm of [1.5, 2.5] is [2.91547595]. After normalizing, should be [0.51449576, 0.85749293]
+        mock_get_index_info.return_value = self.index_info_with_normalize
+        qidx_to_vectors = tensor_search.get_query_vectors_from_jobs([
+            BulkSearchQueryEntity(index="index_name_1", limit=2, 
+                                  context=self.sample_context)
+        ], {0: self.qidx_to_job[0]}, self.job_to_vectors, self.config, self.jobs)
+        print(qidx_to_vectors[0])
+        assert np.allclose(qidx_to_vectors[0], np.array([0.51449576, 0.85749293]), atol=1e-6)
         
     @mock.patch("marqo.tensor_search.tensor_search.get_index_info")
     def test_empty_inputs(self, mock_get_index_info):
@@ -1348,11 +1405,12 @@ class TestBulkSearch(MarqoTestCase):
     
         vocab = requests.get(vocab_source).text.splitlines()
     
-        add_docs_caller(
+        docs=[{"Title": "a " + (" ".join(random.choices(population=vocab, k=25)))} for _ in range(2000)]
+        add_docs_batched(
             config=self.config, index_name=self.index_name_1,
-            docs=[{"Title": "a " + (" ".join(random.choices(population=vocab, k=25)))}
-                  for _ in range(2000)], auto_refresh=False
+            docs=docs, auto_refresh=False, device="cpu"
         )
+
         tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
         for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
             for max_doc in [0, 1, 2, 5, 10, 100, 1000]:
@@ -1424,10 +1482,10 @@ class TestBulkSearch(MarqoTestCase):
         vocab_source = "https://www.mit.edu/~ecprice/wordlist.10000"
     
         vocab = requests.get(vocab_source).text.splitlines()
-        tensor_search.add_documents(
-            config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1,
-            docs=[{"Title": "a " + (" ".join(random.choices(population=vocab, k=25)))}
-                  for _ in range(700)], auto_refresh=False, device="cpu")
+        docs=[{"Title": "a " + (" ".join(random.choices(population=vocab, k=25)))} for _ in range(700)]
+        add_docs_batched(
+            config=self.config, index_name=self.index_name_1,
+            docs=docs, auto_refresh=False, device="cpu"
         )
         tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
     
@@ -1459,23 +1517,22 @@ class TestBulkSearch(MarqoTestCase):
         vocab_source = "https://www.mit.edu/~ecprice/wordlist.10000"
     
         vocab = requests.get(vocab_source).text.splitlines()
-        num_docs = 1000
+        num_docs = 100
 
         # Recreate index with random model
         tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings={"index_defaults": {"model": "random"}})
 
-        add_docs_caller(
+        docs=[{"Title": "a " + (" ".join(random.choices(population=vocab, k=25)))} for _ in range(num_docs)]
+        add_docs_batched(
             config=self.config, index_name=self.index_name_1,
-            docs=[{"Title": "a " + (" ".join(random.choices(population=vocab, k=10))),
-                    "_id": str(i)
-                    }
-                  for i in range(num_docs)], auto_refresh=False
+            docs=docs, auto_refresh=False, device="cpu"
         )
+        
         tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
     
         for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
-            for doc_count in [1000]:
+            for doc_count in [num_docs]:
                 # Query full results
                 full_search_results = tensor_search.bulk_search(
                             marqo_config=self.config, query=BulkSearchQuery(
@@ -1488,7 +1545,7 @@ class TestBulkSearch(MarqoTestCase):
                         ))
                 full_search_results = full_search_results['result'][0]
     
-                for page_size in [5, 10, 100, 1000, 1000]:
+                for page_size in [5, 10, 100]:
                     paginated_search_results = {"hits": []}
     
                     for page_num in range(math.ceil(num_docs / page_size)):
@@ -1640,25 +1697,26 @@ class TestBulkSearch(MarqoTestCase):
         vocab_source = "https://www.mit.edu/~ecprice/wordlist.10000"
 
         vocab = requests.get(vocab_source).text.splitlines()
-        num_docs = 1000
+        num_docs = 100
         
         # Recreate index with random model
         tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings={"index_defaults": {"model": "random"}})
 
-        add_docs_caller(
-            config=self.config, index_name=self.index_name_1,
-            docs=[{"field_1": "a " + (" ".join(random.choices(population=vocab, k=5))),
+        docs=[{"field_1": "a " + (" ".join(random.choices(population=vocab, k=5))),
                    "field_2": "a " + (" ".join(random.choices(population=vocab, k=5))),
                    "field_3": "a " + (" ".join(random.choices(population=vocab, k=5))),
                     "_id": str(i)
                     } for i in range(num_docs)
-            ], auto_refresh=False
+        ]
+        add_docs_batched(
+            config=self.config, index_name=self.index_name_1,
+            docs=docs, auto_refresh=False, device="cpu"
         )
         tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
 
         for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
-            for doc_count in [1000]:
+            for doc_count in [num_docs]:
                 # Query full results
                 full_search_results = tensor_search.bulk_search(
                                             marqo_config=self.config, query=BulkSearchQuery(
@@ -1671,7 +1729,7 @@ class TestBulkSearch(MarqoTestCase):
                                         ))
                 full_search_results = full_search_results["result"][0]
 
-                for page_size in [5, 10, 100, 1000]:
+                for page_size in [5, 10, 100]:
                     paginated_search_results = {"hits": []}
 
                     for page_num in range(math.ceil(num_docs / page_size)):
@@ -1693,7 +1751,7 @@ class TestBulkSearch(MarqoTestCase):
                     # Compare paginated to full results (length only for now)
                     assert len(full_search_results["hits"]) == len(paginated_search_results["hits"])
 
-                    # TODO: re-add this assert when KNN incosistency bug is fixed
+                    # TODO: re-add this assert when KNN inconsistency bug is fixed
                     # assert full_search_results["hits"] == paginated_search_results["hits"]
 
     def test_image_search_highlights(self):

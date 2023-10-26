@@ -54,6 +54,10 @@ Marqo is more than a vector database, it's an end-to-end vector search engine. V
 
 Marqo is integrated into popular AI and data processing frameworks, with more on the way.
 
+**💙 [Haystack](https://github.com/deepset-ai/haystack)**
+
+Haystack is an open-source framework for building applications that make use of NLP technology such as LLMs, embedding models and more. This [integration](https://haystack.deepset.ai/integrations/marqo-document-store) allows you to use Marqo as your Document Store for Haystack pipelines such as retrieval-augmentation, question answering, document search and more.
+
 **🛹 [Griptape](https://github.com/griptape-ai/griptape)**
 
 Griptape enables safe and reliable deployment of LLM-based agents for enterprise applications, the MarqoVectorStoreDriver gives these agents access to scalable search with your own data. This integration lets you leverage open source or custom fine-tuned models through Marqo to deliver relevant results to your LLMs.
@@ -93,6 +97,8 @@ docker run --name marqo -it --privileged -p 8882:8882 --add-host host.docker.int
 
 ```
 
+Note: If your `marqo` container keeps getting killed, this is most likely due to a lack of memory being allocated to Docker. Increasing the memory limit for Docker to at least 6GB (8GB recommended) in your Docker settings may fix the problem.
+
 3. Install the Marqo client:
 
 ```bash
@@ -119,7 +125,8 @@ mq.index("my-first-index").add_documents([
                        "mobility, life support, and communications for astronauts",
         "_id": "article_591"
     }],
-    tensor_fields=["Title", "Description"]
+    tensor_fields=["Title", "Description"],
+    auto_refresh=True
 )
 
 results = mq.index("my-first-index").search(
@@ -131,6 +138,7 @@ results = mq.index("my-first-index").search(
 - `mq` is the client that wraps the `marqo` API.
 - `create_index()` creates a new index with default settings. You have the option to specify what model to use. For example, `mq.create_index("my-first-index", model="hf/all_datasets_v4_MiniLM-L6")` will create an index with the default text model `hf/all_datasets_v4_MiniLM-L6`. Experimentation with different models is often required to achieve the best retrieval for your specific use case. Different models also offer a tradeoff between inference speed and relevancy. See [here](https://docs.marqo.ai/1.0.0/Models-Reference/dense_retrieval/) for the full list of models.
 - `add_documents()` takes a list of documents, represented as python dicts for indexing.
+    - The `auto_refresh` parameter ensures that documents are available for search after being added. When performing heavy add_documents operations, leave this as `False` for optimal indexing and search performance.
 - You can optionally set a document's ID with the special `_id` field. Otherwise, Marqo will generate one.
 
 Let's have a look at the results:
@@ -238,9 +246,7 @@ response = mq.index("my-multimodal-index").add_documents([{
     "My Image": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
     "Description": "The hippopotamus, also called the common hippopotamus or river hippopotamus, is a large semiaquatic mammal native to sub-Saharan Africa",
     "_id": "hippo-facts"
-}], tensor_fields=["My Image", "Description"])
-
-```
+}], tensor_fields=["My Image", "Description"], auto_refresh=True)
 
 ```
 
@@ -301,7 +307,8 @@ mq.index("my-weighted-query-index").add_documents(
             "The last known of its species died in 1936.",
         },
     ],
-    tensor_fields=["Title", "Description"]
+    tensor_fields=["Title", "Description"],
+    auto_refresh=True
 )
 
 # initially we ask for a type of communications device which is popular in the 21st century
@@ -390,7 +397,8 @@ mq.index("my-first-multimodal-index").add_documents(
     },
     # We specify which fields to create vectors for. 
     # Note that captioned_image is treated as a single field.
-    tensor_fields=["Title", "captioned_image"]
+    tensor_fields=["Title", "captioned_image"],
+    auto_refresh=True
 )
 
 # Search this index with a simple text query
