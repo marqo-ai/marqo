@@ -36,7 +36,7 @@ More detailed logs can be accessed by setting `MARQO_LOG_LEVEL` to `debug`.
 
 ## Contributor shout-outs
 - A huge thank you to all our 3.7k stargazers!
-- Shoutout to @TuanaCelik (https://github.com/TuanaCelik) for helping out with the Haystack integration!
+- Shoutout to @TuanaCelik for helping out with the Haystack integration!
 - Thanks everyone for keeping our [forum](https://community.marqo.ai/) busy. Don't hesitate to keep posting your insights, questions, and feedback!
 
 
