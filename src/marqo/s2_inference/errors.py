@@ -19,6 +19,8 @@ class ChunkerMethodProcessError(S2InferenceError):
 class VectoriseError(S2InferenceError):
     pass
 
+class IllegalVectoriseError(VectoriseError):
+    pass
 
 class InvalidModelPropertiesError(S2InferenceError):
     pass

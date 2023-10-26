@@ -6,6 +6,7 @@ from marqo.tensor_search import add_docs
 from marqo.s2_inference.s2_inference import vectorise
 from marqo.s2_inference.clip_utils import load_image_from_path
 from marqo.tensor_search import tensor_search, index_meta_cache, backend
+from marqo.tensor_search.enums import TensorField
 from marqo.errors import IndexNotFoundError, InvalidArgError, BadRequestError
 
 
@@ -14,11 +15,15 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
     def setUp(self) -> None:
         self.endpoint = self.authorized_url
         self.generic_header = {"Content-type": "application/json"}
-        self.index_name_1 = "my-test-index-1"
+        self.index_name_1 = "my-test-index-1"  # standard index created by setUp
+        self.index_name_2 = "my-test-index-2"  # for tests that need custom index config
         try:
             tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+            tensor_search.delete_index(config=self.config, index_name=self.index_name_2)
         except IndexNotFoundError as s:
             pass
+
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
 
     def test_use_existing_tensors_resilience(self):
         """should if one doc fails validation, the rest should still be inserted
@@ -30,13 +35,13 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
         # 1 valid ID doc:
         res = tensor_search.add_documents(
             config=self.config, add_docs_params=AddDocsParams( index_name=self.index_name_1, docs=[d1, {'_id': 1224}, {"_id": "fork", "abc": "123"}],
-            auto_refresh=True, use_existing_tensors=True))
+            auto_refresh=True, use_existing_tensors=True, device="cpu"))
         assert [item['status'] for item in res['items']] == [201, 400, 201]
 
         # no valid IDs
         res_no_valid_id = tensor_search.add_documents(
             config=self.config, add_docs_params=AddDocsParams( index_name=self.index_name_1, docs=[d1, {'_id': 1224}, d1],
-            auto_refresh=True, use_existing_tensors=True))
+            auto_refresh=True, use_existing_tensors=True, device="cpu"))
         # we also should not be send in a get request as there are no valid document IDs
         assert [item['status'] for item in res_no_valid_id['items']] == [201, 400, 201]
 
@@ -49,10 +54,10 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
         }
         r1 = tensor_search.add_documents(
             config=self.config, add_docs_params=AddDocsParams( index_name=self.index_name_1, docs=[d1],
-            auto_refresh=True, use_existing_tensors=True))
+            auto_refresh=True, use_existing_tensors=True, device="cpu"))
         r2 = tensor_search.add_documents(
             config=self.config, add_docs_params=AddDocsParams( index_name=self.index_name_1, docs=[d1, d1],
-            auto_refresh=True, use_existing_tensors=True))
+            auto_refresh=True, use_existing_tensors=True, device="cpu"))
 
         for item in r1['items']:
             assert item['result'] == 'created'
@@ -70,7 +75,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
                 "_id": "123",
                 "title 1": "content 1",
                 "desc 2": "content 2. blah blah blah"
-            }], auto_refresh=True, use_existing_tensors=False))
+            }], auto_refresh=True, use_existing_tensors=False, device="cpu"))
 
         
         regular_doc = tensor_search.get_document_by_id(
@@ -78,6 +83,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
             document_id="123", show_vectors=True)
 
         tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
 
         tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
             index_name=self.index_name_1, docs=[
@@ -85,7 +91,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
                 "_id": "123",
                 "title 1": "content 1",
                 "desc 2": "content 2. blah blah blah"
-            }], auto_refresh=True, use_existing_tensors=True))
+            }], auto_refresh=True, use_existing_tensors=True, device="cpu"))
         use_existing_tensors_doc = tensor_search.get_document_by_id(
             config=self.config, index_name=self.index_name_1,
             document_id="123", show_vectors=True)
@@ -97,7 +103,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
                 "_id": "123",
                 "title 1": "content 1",
                 "desc 2": "content 2. blah blah blah"
-            }], auto_refresh=True, use_existing_tensors=True))
+            }], auto_refresh=True, use_existing_tensors=True, device="cpu"))
         overwritten_doc = tensor_search.get_document_by_id(
             config=self.config, index_name=self.index_name_1,
             document_id="123", show_vectors=True)
@@ -116,13 +122,14 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
                 "title": "doc 3b"
             },
         
-        ], auto_refresh=True))
+        ], auto_refresh=True, device="cpu"))
         
         doc_3_solo = tensor_search.get_document_by_id(
             config=self.config, index_name=self.index_name_1,
             document_id="3", show_vectors=True)
 
         tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
         tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
             index_name=self.index_name_1, docs=[
                 {
@@ -141,7 +148,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
                     "_id": "3",
                     "title": "doc 3b"
                 }],
-            auto_refresh=True, use_existing_tensors=True))
+            auto_refresh=True, use_existing_tensors=True, device="cpu"))
         
         doc_3_duped = tensor_search.get_document_by_id(
             config=self.config, index_name=self.index_name_1,
@@ -168,7 +175,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
                 "title": "doc 3b"
             },
         
-        ], auto_refresh=True, use_existing_tensors=True))
+        ], auto_refresh=True, use_existing_tensors=True, device="cpu"))
         
         doc_3_overwritten = tensor_search.get_document_by_id(
             config=self.config, index_name=self.index_name_1,
@@ -193,7 +200,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
                 "title 3": True,
                 "title 4": "content 4"
             }], auto_refresh=True, use_existing_tensors=True,
-            non_tensor_fields=["title 1", "title 2", "title 3", "title 4"]))
+            non_tensor_fields=["title 1", "title 2", "title 3", "title 4"], device="cpu"))
         d1 = tensor_search.get_document_by_id(
             config=self.config, index_name=self.index_name_1,
             document_id="123", show_vectors=True)
@@ -207,7 +214,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
                 "title 2": 2,
                 "title 3": True,
                 "title 4": "content 4"
-            }], auto_refresh=True, use_existing_tensors=True))
+            }], auto_refresh=True, use_existing_tensors=True, device="cpu"))
         d2 = tensor_search.get_document_by_id(
             config=self.config, index_name=self.index_name_1,
             document_id="123", show_vectors=True)
@@ -226,7 +233,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
                 "_id": "123",
                 "title 1": "content 1",
                 "non-tensor-field": "content 2. blah blah blah"
-            }], auto_refresh=True, non_tensor_fields=["non-tensor-field"]))
+            }], auto_refresh=True, non_tensor_fields=["non-tensor-field"], device="cpu"))
         d1 = tensor_search.get_document_by_id(
             config=self.config, index_name=self.index_name_1,
             document_id="123", show_vectors=True)
@@ -239,7 +246,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
                 "_id": "123",
                 "title 1": "content 1",
                 "non-tensor-field": "content 2. blah blah blah"
-            }], auto_refresh=True, use_existing_tensors=True))
+            }], auto_refresh=True, use_existing_tensors=True, device="cpu"))
         d2 = tensor_search.get_document_by_id(
             config=self.config, index_name=self.index_name_1,
             document_id="123", show_vectors=True)
@@ -251,7 +258,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
             {
                 "_id": "999",
                 "non-tensor-field": "content 2. blah blah blah"
-            }], auto_refresh=True, non_tensor_fields=["non-tensor-field"]))
+            }], auto_refresh=True, non_tensor_fields=["non-tensor-field"], device="cpu"))
         d1 = tensor_search.get_document_by_id(
             config=self.config, index_name=self.index_name_1,
             document_id="999", show_vectors=True)
@@ -262,7 +269,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
             {
                 "_id": "999",
                 "non-tensor-field": "content 2. blah blah blah"
-            }], auto_refresh=True, use_existing_tensors=True))
+            }], auto_refresh=True, use_existing_tensors=True, device="cpu"))
         d2 = tensor_search.get_document_by_id(
             config=self.config, index_name=self.index_name_1,
             document_id="999", show_vectors=True)
@@ -278,7 +285,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
                 "title 1": "content 1",
                 "modded field": "original content",
                 "non-tensor-field": "content 2. blah blah blah"
-            }], auto_refresh=True, non_tensor_fields=["non-tensor-field"]))
+            }], auto_refresh=True, non_tensor_fields=["non-tensor-field"], device="cpu"))
 
         def pass_through_vectorise(*arg, **kwargs):
             """Vectorise will behave as usual, but we will be able to see the call list
@@ -299,7 +306,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
                     "modded field": "updated content",  # new vectors because the content is modified
                     "non-tensor-field": "content 2. blah blah blah",  # this would should still have no vectors
                     "2nd-non-tensor-field": "content 2. blah blah blah"  # this one is explicitly being non-tensorised
-                }], auto_refresh=True, non_tensor_fields=["2nd-non-tensor-field"], use_existing_tensors=True))
+                }], auto_refresh=True, non_tensor_fields=["2nd-non-tensor-field"], use_existing_tensors=True, device="cpu"))
             content_to_be_vectorised = [call_kwargs['content'] for call_args, call_kwargs
                                         in mock_vectorise.call_args_list]
             assert content_to_be_vectorised == [["cat on mat"], ["updated content"]]
@@ -322,7 +329,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
                 "field_that_will_disappear": "some stuff",  # this gets dropped during the next add docs call,
                 "field_to_be_list": "some stuff",
                 "fl": 1.51
-            }], auto_refresh=True, non_tensor_fields=["non-tensor-field"]))
+            }], auto_refresh=True, non_tensor_fields=["non-tensor-field"], device="cpu"))
 
         use_existing_tensor_doc = {
                 "title 1": "content 1",  # this one should keep the same vectors
@@ -340,7 +347,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
             config=self.config, add_docs_params=AddDocsParams(
                 index_name=self.index_name_1, docs=[{"_id": "123", **use_existing_tensor_doc}],
             auto_refresh=True, non_tensor_fields=["2nd-non-tensor-field", "field_to_be_list", 'new_field_list'],
-            use_existing_tensors=True))
+            use_existing_tensors=True, device="cpu"))
 
         updated_doc = requests.get(
             url=F"{self.endpoint}/{self.index_name_1}/_doc/123",
@@ -360,7 +367,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
                 if ch["__field_name"] == vector_field:
                     found_vector_field = True
                     assert ch['__field_content'] == use_existing_tensor_doc[vector_field]
-                    assert isinstance(ch[f"__vector_{vector_field}"], list)
+                assert isinstance(ch[TensorField.marqo_knn_field], list)
             assert found_vector_field
 
     def test_use_existing_tensors_check_meta_data_mappings(self):
@@ -374,7 +381,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
                 "field_that_will_disappear": "some stuff",  # this gets dropped during the next add docs call
                 "field_to_be_list": "some stuff",
                 "fl": 1.51
-            }], auto_refresh=True, non_tensor_fields=["non-tensor-field"]))
+            }], auto_refresh=True, non_tensor_fields=["non-tensor-field"], device="cpu"))
 
         use_existing_tensor_doc = {
             "title 1": "content 1",  # this one should keep the same vectors
@@ -391,7 +398,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
         tensor_search.add_documents(
             config=self.config, add_docs_params=AddDocsParams( index_name=self.index_name_1, docs=[{"_id": "123", **use_existing_tensor_doc}],
             auto_refresh=True, non_tensor_fields=["2nd-non-tensor-field", "field_to_be_list", 'new_field_list'],
-            use_existing_tensors=True))
+            use_existing_tensors=True, device="cpu"))
 
         tensor_search.index_meta_cache.refresh_index(config=self.config, index_name=self.index_name_1)
 
@@ -404,8 +411,8 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
             assert index_info.properties[text_field]['type'] == 'text'
             assert index_info.properties['__chunks']['properties'][text_field]['type'] == 'keyword'
 
-        for vector_field in ["title 1", "my new field", "modded field"]:
-            assert index_info.properties['__chunks']['properties'][f"__vector_{vector_field}"]['type'] == 'knn_vector'
+        # Only 1 tensor field
+        assert index_info.properties['__chunks']['properties'][TensorField.marqo_knn_field]['type'] == 'knn_vector'
 
         for field_name, os_type in [('fl', "float"), ('new_bool', "boolean")]:
             assert index_info.properties[field_name]['type'] == os_type
@@ -424,11 +431,11 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
             }
         }
         tensor_search.create_vector_index(
-            index_name=self.index_name_1, index_settings=index_settings, config=self.config)
-        hippo_img = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
-        artefact_hippo_img = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png'
+            index_name=self.index_name_2, index_settings=index_settings, config=self.config)
+        hippo_img = 'https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png'
+        artefact_hippo_img = 'https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_statue.png'
         tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
-            index_name=self.index_name_1, docs=[
+            index_name=self.index_name_2, docs=[
             {
                 "_id": "123",
                 "txt_to_be_the_same": "some text to leave unchanged. I repeat, unchanged",
@@ -440,7 +447,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
                 "fl": 1.23,
                 "non-tensor-field": ["what", "is", "the", "time"]
 
-            }], auto_refresh=True, non_tensor_fields=["non-tensor-field"]))
+            }], auto_refresh=True, non_tensor_fields=["non-tensor-field"], device="cpu"))
 
         def pass_through_vectorise(*arg, **kwargs):
             """Vectorise will behave as usual, but we will be able to see the call list
@@ -450,7 +457,10 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
 
         mock_vectorise = unittest.mock.MagicMock()
         mock_vectorise.side_effect = pass_through_vectorise
+        mock_close = unittest.mock.MagicMock()
+
         @unittest.mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
+        @unittest.mock.patch("PIL.Image.Image.close", mock_close)  # disable .close so we can access images in this test
         def run():
             use_existing_tensor_doc = {
                 "txt_to_be_the_same": "some text to leave unchanged. I repeat, unchanged",
@@ -463,9 +473,9 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
                 "non-tensor-field": ["it", "is", "9", "o clock"]
             }
             tensor_search.add_documents(
-                config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1, docs=[{"_id": "123", **use_existing_tensor_doc}],
+                config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_2, docs=[{"_id": "123", **use_existing_tensor_doc}],
                 auto_refresh=True, non_tensor_fields=["non-tensor-field"],
-                use_existing_tensors=True))
+                use_existing_tensors=True, device="cpu"))
 
             vectorised_content = [call_kwargs['content'] for call_args, call_kwargs
                                   in mock_vectorise.call_args_list]
@@ -477,7 +487,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
             assert vectorised_content == expected_to_be_vectorised
 
             updated_doc = requests.get(
-                url=F"{self.endpoint}/{self.index_name_1}/_doc/123",
+                url=F"{self.endpoint}/{self.index_name_2}/_doc/123",
                 verify=False
             )
 
@@ -499,7 +509,8 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
                     if ch["__field_name"] == vector_field:
                         found_vector_field = True
                         assert ch['__field_content'] == use_existing_tensor_doc[vector_field]
-                        assert isinstance(ch[f"__vector_{vector_field}"], list)
+                    # Only 1 tensor field
+                    assert isinstance(ch[TensorField.marqo_knn_field], list)
                 assert found_vector_field
 
             expected_text_chunks = {
@@ -542,7 +553,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
             # Add doc normally without use_existing_tensors
             add_res = tensor_search.add_documents(
                 config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1, 
-                    docs=doc_arg, auto_refresh=True, update_mode='replace'))
+                    docs=doc_arg, auto_refresh=True, device="cpu"))
 
             d1 = tensor_search.get_documents_by_ids(
                 config=self.config, index_name=self.index_name_1,
@@ -551,7 +562,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
             # Then replace doc with use_existing_tensors
             add_res = tensor_search.add_documents(
                 config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1, 
-                docs=doc_arg, auto_refresh=True, update_mode='replace', use_existing_tensors=True))
+                docs=doc_arg, auto_refresh=True, use_existing_tensors=True, device="cpu"))
             
             d2 = tensor_search.get_documents_by_ids(
                 config=self.config, index_name=self.index_name_1,

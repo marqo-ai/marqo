@@ -66,8 +66,7 @@ settings = {
            "treat_urls_and_pointers_as_images": True,
            }
 client.create_index("hot-dogs-100k", **settings)
-responses = client.index("hot-dogs-100k").add_documents(documents, 
-                                            device="cuda", processes=4, batch_size=50)
+responses = client.index("hot-dogs-100k").add_documents(documents, device="cuda", client_batch_size=50, tensor_fields=["image_docker"])
 
 ```
 Check we have our images in the index:
@@ -140,7 +139,7 @@ settings = {
 client.create_index(index_name, **settings)
 
 # add our labels to the index
-responses = client.index(index_name).add_documents(labels)
+responses = client.index(index_name).add_documents(labels, tensor_fields=["label"])
 
 # loop through the documents and search against the labels to get scores
 for doc in documents:
@@ -163,8 +162,7 @@ We have now calculated scores for the different categories described previously.
 
 ```python
 documents_image_docker = [doc.pop('image_docker') for doc in documents]
-responses = client.index("hot-dogs-100k").add_documents(documents, device='cpu', 
-                                                            processes=3, batch_size=50)
+responses = client.index("hot-dogs-100k").add_documents(documents, device='cpu', client_batch_size=50, tensor_fields=["image_docker"])
 ```
 
 ## Animating the hot-dog 100k dataset

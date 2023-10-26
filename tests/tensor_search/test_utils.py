@@ -7,6 +7,7 @@ from marqo.tensor_search import utils
 from marqo.tensor_search import enums
 from marqo import errors
 from unittest import mock
+from unittest.mock import patch, MagicMock
 
 
 class TestUtils(unittest.TestCase):
@@ -34,16 +35,6 @@ class TestUtils(unittest.TestCase):
         assert "https://:@localhost:9200" == utils.construct_authorized_url(
             url_base="https://localhost:9200", username="", password=""
         )
-
-    def test_contextualise_filter(self):
-        expected_mappings = [
-            ("(an_int:[0 TO 30] and an_int:2) AND abc:(some text)",
-             f"({enums.TensorField.chunks}.an_int:[0 TO 30] and {enums.TensorField.chunks}.an_int:2) AND {enums.TensorField.chunks}.abc:(some text)")
-        ]
-        for given, expected in expected_mappings:
-            assert expected == utils.contextualise_filter(
-                given, simple_properties=["an_int", "abc"]
-            )
 
     def test_check_device_is_available(self):
         mock_cuda_is_available = mock.MagicMock()
@@ -166,7 +157,7 @@ class TestUtils(unittest.TestCase):
             mock_default_env_vars.return_value = default_vars
 
             @mock.patch("marqo.tensor_search.configs.default_env_vars", mock_default_env_vars)
-            @mock.patch("os.environ", mock_real_environ)
+            @mock.patch.dict(os.environ, mock_real_environ)
             def run():
                 assert expected == utils.read_env_vars_and_defaults(var=key)
                 return True
@@ -193,7 +184,7 @@ class TestUtils(unittest.TestCase):
             mock_default_env_vars.return_value = default_vars
 
             @mock.patch("marqo.tensor_search.configs.default_env_vars", mock_default_env_vars)
-            @mock.patch("os.environ", mock_real_environ)
+            @mock.patch.dict(os.environ, mock_real_environ)
             def run():
                 result = utils.read_env_vars_and_defaults_ints(var=key)
                 assert result == expected, f"Expected {expected}, got {result}"
@@ -213,7 +204,7 @@ class TestUtils(unittest.TestCase):
             mock_default_env_vars.return_value = default_vars
 
             @mock.patch("marqo.tensor_search.configs.default_env_vars", mock_default_env_vars)
-            @mock.patch("os.environ", mock_real_environ)
+            @mock.patch.dict(os.environ, mock_real_environ)
             def run():
                 with self.assertRaises(errors.ConfigurationError):
                     utils.read_env_vars_and_defaults_ints(var=key)
@@ -323,11 +314,12 @@ class TestUtils(unittest.TestCase):
 
     def test_get_marqo_root_from_env_returns_env_var_if_exists(self):
         expected = "/Users/CoolUser/marqo/src/marqo"
-        with mock.patch.dict('os.environ', {enums.EnvVars.MARQO_ROOT_PATH: expected}):
+        with mock.patch.dict(os.environ, {enums.EnvVars.MARQO_ROOT_PATH: expected}):
             actual = utils.get_marqo_root_from_env()
         self.assertEqual(actual, expected)
 
-    def test_creates_env_var_if_not_exists(self):
+    def test_get_marqo_root_from_env_creates_env_var_if_not_exists(self):
+        # Empty entire dict
         @mock.patch("os.environ", dict())
         def run():
             assert enums.EnvVars.MARQO_ROOT_PATH not in os.environ
@@ -381,3 +373,56 @@ class TestUtils(unittest.TestCase):
         except ValueError as e:
             assert "must be greater than 0" in str(e)
 
+    def test_is_tensor_field_field_in_tensor_fields(self):
+        tensor_fields = ['field1', 'field2', 'field3']
+        result = utils.is_tensor_field('field1', tensor_fields=tensor_fields)
+        self.assertTrue(result)
+
+    def test_is_tensor_field_field_not_in_non_tensor_fields(self):
+        non_tensor_fields = ['field4', 'field5', 'field6']
+        result = utils.is_tensor_field('field1', non_tensor_fields=non_tensor_fields)
+        self.assertTrue(result)
+
+    def test_is_tensor_field_missing_both_fields(self):
+        with self.assertRaises(errors.InternalError):
+            utils.is_tensor_field('field1')
+
+    def test_is_tensor_field_providing_both_fields(self):
+        tensor_fields = ['field1', 'field2', 'field3']
+        non_tensor_fields = ['field4', 'field5', 'field6']
+        with self.assertRaises(errors.InternalError):
+            utils.is_tensor_field('field1', tensor_fields=tensor_fields, non_tensor_fields=non_tensor_fields)
+
+    def test_is_tensor_field_providing_one_empty(self):
+        tensor_fields = ['field1', 'field2', 'field3']
+        non_tensor_fields = []
+        with self.assertRaises(errors.InternalError):
+            utils.is_tensor_field('field1', tensor_fields=tensor_fields, non_tensor_fields=non_tensor_fields)
+
+    def test_check_is_zero_vector_empty_vector(self):
+        vector = []
+        self.assertTrue(utils.check_is_zero_vector(vector))
+
+    def test_check_is_zero_vector_zero_vector(self):
+        vector = [0, 0, 0, 0]
+        self.assertTrue(utils.check_is_zero_vector(vector))
+
+    def test_check_is_zero_vector_non_zero_vector(self):
+        vector = [1, 2, 3, 4]
+        self.assertFalse(utils.check_is_zero_vector(vector))
+
+    def test_check_is_zero_vector_mixed_vector(self):
+        vector = [0, 1, 0, 2]
+        self.assertFalse(utils.check_is_zero_vector(vector))
+
+    def test_check_is_zero_vector_large_vector(self):
+        vector = [0] * 1000
+        self.assertTrue(utils.check_is_zero_vector(vector))
+
+    def test_check_is_zero_vector_float_vector(self):
+        vector = [0.0, 0.0, 0.0]
+        self.assertTrue(utils.check_is_zero_vector(vector))
+
+    def test_check_is_zero_vector_negative_vector(self):
+        vector = [-1, -2, -3]
+        self.assertFalse(utils.check_is_zero_vector(vector))
