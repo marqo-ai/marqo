@@ -4,8 +4,7 @@
 - Configurable document count limit for `add_documents()` calls (https://github.com/marqo-ai/marqo/pull/592). This mitigates Marqo getting overloaded 
 due to add_documents requests with a very high number of documents. If you are adding documents in batches larger than the default (64), you will now 
 receive an error. You can ensure your add_documents request complies to this limit by setting the Python client’s `client_batch_size` or changing this 
-limit via the  `MARQO_MAX_ADD_DOCS_COUNT` variable. Read more on configuring the doc count limit [here](https://marqo.pages.dev/1.4.0/Guides/
-Advanced-Usage/configuration/#configuring-usage-limits).
+limit via the  `MARQO_MAX_ADD_DOCS_COUNT` variable. Read more on configuring the doc count limit [here](https://marqo.pages.dev/1.4.0/Guides/Advanced-Usage/configuration/#configuring-usage-limits).
 - Default `refresh` value for `add_documents()` and `delete_documents()` set to `false` (https://github.com/marqo-ai/marqo/pull/601). This prevents 
 unnecessary refreshes, which can negatively impact search and add_documents performance, after these API calls, especially for applications that are 
 constantly adding or deleting documents. If you search or get documents immediately after adding or deleting documents, you may still get some extra 
