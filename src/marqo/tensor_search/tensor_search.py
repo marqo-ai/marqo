@@ -209,12 +209,20 @@ def create_vector_index(
 
 
 def _check_model_name(index_settings):
-    """Ensures that if model_properties is given, then model_name is given as well
+    """Ensures that:
+    1. if model_properties is given, then model is given as well.
+    2. if search_model is given, then search_model_properties must be given as well.
     """
     model_name = index_settings[NsField.index_defaults].get(NsField.model)
     model_properties = index_settings[NsField.index_defaults].get(NsField.model_properties)
+    search_model_name = index_settings[NsField.index_defaults].get(NsField.search_model)
+    search_model_properties = index_settings[NsField.index_defaults].get(NsField.search_model_properties)
+
     if model_properties is not None and model_name is None:
         raise s2_inference_errors.UnknownModelError(f"No model name found for model_properties={model_properties}")
+    
+    if search_model_properties is not None and search_model_name is None:
+        raise s2_inference_errors.UnknownModelError(f"No model name found for search_model_properties={search_model_properties}")
 
 
 def _marqo_field_limit_to_os_limit(marqo_index_field_limit: int) -> int:
