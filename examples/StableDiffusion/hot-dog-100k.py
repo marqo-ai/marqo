@@ -58,9 +58,8 @@ settings = {
         }
 client.create_index(index_name, **settings)
 
-# here we use parallel indexing to speed up the task - a gpu is recomended (device='cuda')
-responses = client.index(index_name).add_documents(documents, device='cpu'
-                                                    , processes=4, batch_size=50)
+# Here we index. A gpu is recommended (device='cuda')
+responses = client.index(index_name).add_documents(documents, device='cpu', client_batch_size=50, tensor_fields=["image_docker"])
 
 
 #####################################################
@@ -87,7 +86,7 @@ settings = {
 client.create_index(index_name, **settings)
 
 # add our labels to the index
-responses = client.index(index_name).add_documents(labels)
+responses = client.index(index_name).add_documents(labels, tensor_fields=["label"])
 
 # loop through the documents and search against the labels to get scores
 for doc in documents:
@@ -101,8 +100,7 @@ for doc in documents:
         doc[lab.replace(' ','_')] = [r['_score'] for r in responses['hits'] if r['label'] == lab][0]
 
 documents_image_docker = [doc.pop('image_docker') for doc in documents]
-responses = client.index("hot-dogs-100k").add_documents(documents, device='cpu',
-                                                            processes=3, batch_size=50)
+responses = client.index("hot-dogs-100k").add_documents(documents, device='cpu', client_batch_size=50, tensor_fields=["image_docker"])
 
 #####################################################
 ### Step 4. Remove the black images

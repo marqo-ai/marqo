@@ -38,6 +38,26 @@ class TestSplitText(unittest.TestCase):
             result = split_text(self.none_string, split_by=split_by)
             assert result == [' ']
 
+    def test_split_text_single_character(self):
+        text = "a"
+        for split_by in self.split_by_valid:
+            result = split_text(text, split_by=split_by)
+            assert result == [text]
+
+    def test_split_text_whitespace(self):
+        ws = [
+            " ",
+            "\r",
+            "   ",
+            "\r\t",
+            "\r  \t"
+        ]
+
+        for text in ws:
+            for split_by in self.split_by_valid:
+                result = split_text(text, split_by=split_by)
+                assert result == [" "]
+
     def test_split_text_single_word(self):
         
         text = 'short'

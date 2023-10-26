@@ -59,7 +59,8 @@ class RedisDriver:
             self.faulty = False
 
             t1 = time.time()
-            logger.info(f"Took {((t1-t0)*1000):.3f}ms to connect to redis and load scripts.")
+            logger.debug(f"Took {((t1-t0)*1000):.3f}ms to connect to redis...")
+            logger.info(f"Took {((t1-t0)*1000):.3f}ms to connect to Marqo throttling and load scripts.")
 
         except Exception as e:
             logger.warn(generate_redis_warning(skipped_operation="loading throttling scripts", exc=e))

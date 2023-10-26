@@ -2,7 +2,7 @@ import PIL
 from marqo.s2_inference import random_utils, s2_inference
 import unittest
 from unittest import mock
-from marqo.errors import ConfigurationError
+from marqo.errors import ConfigurationError, InternalError
 from marqo.tensor_search.enums import AvailableModelsKey
 import datetime
 
@@ -14,7 +14,7 @@ class TestVectorise(unittest.TestCase):
         mock_model = mock.MagicMock()
         mock_model.encode = mock.MagicMock()
 
-        random_model = random_utils.Random(model_name='mock_model', embedding_dim=128)
+        random_model = random_utils.Random(model_name='mock_model', embedding_dim=128, device="cpu")
 
         def func(*args,**kwargs):
             return random_model.encode(*args, **kwargs)
@@ -40,7 +40,7 @@ class TestVectorise(unittest.TestCase):
         @mock.patch('marqo.s2_inference.s2_inference._update_available_models', mock.MagicMock())
         def run():
             s2_inference.vectorise(model_name='mock_model', content=['just a single content'],
-                                   model_properties=mock_model_props)
+                                   model_properties=mock_model_props, device="cpu")
 
             return True
         assert run()
@@ -49,7 +49,7 @@ class TestVectorise(unittest.TestCase):
         mock_model = mock.MagicMock()
         mock_model.encode = mock.MagicMock()
 
-        random_model = random_utils.Random(model_name='mock_model', embedding_dim=128)
+        random_model = random_utils.Random(model_name='mock_model', embedding_dim=128, device="cpu")
 
         def func(*args, **kwargs):
             return random_model.encode(*args, **kwargs)
@@ -76,7 +76,7 @@ class TestVectorise(unittest.TestCase):
         def run():
             try:
                 s2_inference.vectorise(model_name='mock_model', content=[],
-                                       model_properties=mock_model_props)
+                                       model_properties=mock_model_props, device="cpu")
                 raise AssertionError
             except RuntimeError as e:
                 assert 'empty list of batches' in str(e).lower()
@@ -87,7 +87,7 @@ class TestVectorise(unittest.TestCase):
         mock_model = mock.MagicMock()
         mock_model.encode = mock.MagicMock()
 
-        random_model = random_utils.Random(model_name='mock_model', embedding_dim=128)
+        random_model = random_utils.Random(model_name='mock_model', embedding_dim=128, device="cpu")
 
         def func(*args, **kwargs):
             return random_model.encode(*args, **kwargs)
@@ -117,7 +117,7 @@ class TestVectorise(unittest.TestCase):
         def run(mock_read_env_vars_and_defaults):
             # Test with batch size 2
             s2_inference.vectorise(model_name='mock_model', content=content_list,
-                                   model_properties=mock_model_props)
+                                   model_properties=mock_model_props, device="cpu")
 
             call_args_list = mock_model.encode.call_args_list
             assert len(call_args_list) == 3
@@ -130,7 +130,7 @@ class TestVectorise(unittest.TestCase):
 
             # Test with batch size 3
             s2_inference.vectorise(model_name='mock_model', content=content_list,
-                                   model_properties=mock_model_props)
+                                   model_properties=mock_model_props, device="cpu")
 
             call_args_list = mock_model.encode.call_args_list
             assert len(call_args_list) == 2
@@ -146,7 +146,7 @@ class TestVectorise(unittest.TestCase):
         mock_model = mock.MagicMock()
         mock_model.encode = mock.MagicMock()
 
-        random_model = random_utils.Random(model_name='mock_model', embedding_dim=128)
+        random_model = random_utils.Random(model_name='mock_model', embedding_dim=128, device="cpu")
 
         def func(*args, **kwargs):
             return random_model.encode(*args, **kwargs)
@@ -176,7 +176,7 @@ class TestVectorise(unittest.TestCase):
         def run(mock_read_env_vars_and_defaults):
             # Test with batch size 2
             s2_inference.vectorise(model_name='mock_model', content=content_list,
-                                   model_properties=mock_model_props)
+                                   model_properties=mock_model_props, device="cpu")
 
             call_args_list = mock_model.encode.call_args_list
             assert len(call_args_list) == 3
@@ -189,7 +189,7 @@ class TestVectorise(unittest.TestCase):
 
             # Test with batch size 3
             s2_inference.vectorise(model_name='mock_model', content=content_list,
-                                   model_properties=mock_model_props)
+                                   model_properties=mock_model_props, device="cpu")
 
             call_args_list = mock_model.encode.call_args_list
             assert len(call_args_list) == 2
@@ -205,7 +205,7 @@ class TestVectoriseBatching(unittest.TestCase):
         self.mock_model = mock.MagicMock()
         self.mock_model.encode = mock.MagicMock()
 
-        random_model = random_utils.Random(model_name='mock_model', embedding_dim=128)
+        random_model = random_utils.Random(model_name='mock_model', embedding_dim=128, device="cpu")
 
         def func(*args, **kwargs):
             return random_model.encode(*args, **kwargs)
@@ -236,7 +236,7 @@ class TestVectoriseBatching(unittest.TestCase):
 
         single_content = 'just a single content'
         result = s2_inference.vectorise(model_name='mock_model', content=single_content,
-                                        model_properties=self.mock_model_props)
+                                        model_properties=self.mock_model_props, device="cpu")
 
         self.mock_model.encode.assert_called_once_with(single_content, normalize=True)
         self.assertIsInstance(result, list)
@@ -253,7 +253,7 @@ class TestVectoriseBatching(unittest.TestCase):
             'this content item is quite a bit longer than the others and should be processed correctly'
         ]
         result = s2_inference.vectorise(model_name='mock_model', content=varying_length_content,
-                                        model_properties=self.mock_model_props)
+                                        model_properties=self.mock_model_props, device="cpu")
 
         self.assertEqual(self.mock_model.encode.call_count, 1)
         self.assertIsInstance(result, list)
@@ -269,7 +269,7 @@ class TestVectoriseBatching(unittest.TestCase):
 
         # Test with a batch size larger than the number of content items
         s2_inference.vectorise(model_name='mock_model', content=self.content_list,
-                               model_properties=self.mock_model_props)
+                               model_properties=self.mock_model_props, device="cpu")
 
         call_args_list = self.mock_model.encode.call_args_list
         self.assertEqual(len(call_args_list), 1)
@@ -281,7 +281,7 @@ class TestVectoriseBatching(unittest.TestCase):
 
         # Test with a batch size of 1
         s2_inference.vectorise(model_name='mock_model', content=self.content_list,
-                               model_properties=self.mock_model_props)
+                               model_properties=self.mock_model_props, device="cpu")
 
         call_args_list = self.mock_model.encode.call_args_list
         self.assertEqual(len(call_args_list), len(self.content_list))
@@ -297,7 +297,7 @@ class TestVectoriseBatching(unittest.TestCase):
 
         with self.assertRaises(s2_inference.VectoriseError):
             s2_inference.vectorise(model_name='mock_model', content=self.content_list,
-                                   model_properties=self.mock_model_props)
+                                   model_properties=self.mock_model_props, device="cpu")
 
     @mock.patch('marqo.s2_inference.s2_inference.read_env_vars_and_defaults',
                 side_effect=[1, "1", "100", 10])
@@ -318,4 +318,19 @@ class TestVectoriseBatching(unittest.TestCase):
                     pass
             return True
         assert run()
+    
+    def test_vectorise_with_no_device_fails(self):
+        """
+            when device is not set,
+            vectorise call should raise an internal error
+        """
+        try:
+            s2_inference.available_models.update(self.mock_available_models)
+
+            # Test with a batch size of 1
+            s2_inference.vectorise(model_name='mock_model', content=self.content_list,
+                                model_properties=self.mock_model_props)
+            raise AssertionError
+        except InternalError:
+            pass
 

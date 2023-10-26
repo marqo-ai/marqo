@@ -5,6 +5,7 @@ import os
 import numpy as np
 from PIL import Image
 from marqo.s2_inference.s2_inference import clear_loaded_models
+from marqo.errors import InternalError
 
 from marqo.s2_inference.processing.image import (
     PatchifySimple,
@@ -51,11 +52,13 @@ class TestImageChunking(unittest.TestCase):
 
         image_size = (400,500)
         with tempfile.TemporaryDirectory() as d:
+            # device must be explicitly passed to inner functions
+            TEST_DEVICE = "cpu"
             temp_file_name = os.path.join(d, 'test_image.png')
             img = Image.fromarray(np.random.randint(0,255,size=image_size).astype(np.uint8))
             img.save(temp_file_name)
 
-            patcher = PatchifyPytorch(size=image_size)
+            patcher = PatchifyPytorch(size=image_size, device=TEST_DEVICE)
             patcher.infer(img)
             patcher.process()
 
@@ -63,13 +66,26 @@ class TestImageChunking(unittest.TestCase):
             assert len(patcher.patches) == len(patcher.bboxes_orig)
             assert abs(np.array(patcher.patches[0]) - np.array(patcher.image)).sum() < 1e-6
 
-            patcher = PatchifyPytorch(size=image_size)
+            patcher = PatchifyPytorch(size=image_size, device=TEST_DEVICE)
             patcher.infer(temp_file_name)
             patcher.process()
 
             assert len(patcher.patches) == len(patcher.bboxes)
             assert len(patcher.patches) == len(patcher.bboxes_orig)
             assert abs(np.array(patcher.patches[0]) - np.array(patcher.image)).sum() < 1e-6
+    
+    def test_PatchifyPytorch_no_device(self):
+        try:
+            image_size = (400,500)
+            with tempfile.TemporaryDirectory() as d:
+                temp_file_name = os.path.join(d, 'test_image.png')
+                img = Image.fromarray(np.random.randint(0,255,size=image_size).astype(np.uint8))
+                img.save(temp_file_name)
+
+                patcher = PatchifyPytorch(size=image_size)
+            raise AssertionError
+        except InternalError:
+            pass
     
     def test_PatchifyOverlap(self):
 
@@ -102,11 +118,14 @@ class TestImageChunking(unittest.TestCase):
 
         image_size = (400,500)
         with tempfile.TemporaryDirectory() as d:
+            # device must be explicitly passed to inner functions
+            TEST_DEVICE = "cpu"
+
             temp_file_name = os.path.join(d, 'test_image.png')
             img = Image.fromarray(np.random.randint(0,255,size=image_size).astype(np.uint8))
             img.save(temp_file_name)
 
-            patcher = PatchifyViT(size=image_size, attention_method='abs')
+            patcher = PatchifyViT(size=image_size, attention_method='abs', device=TEST_DEVICE)
             patcher.infer(img)
             patcher.process()
 
@@ -114,7 +133,7 @@ class TestImageChunking(unittest.TestCase):
             assert len(patcher.patches) == len(patcher.bboxes_orig)
             assert abs(np.array(patcher.patches[0]) - np.array(patcher.image)).sum() < 1e-6
 
-            patcher = PatchifyViT(size=image_size)
+            patcher = PatchifyViT(size=image_size, device=TEST_DEVICE)
             patcher.infer(temp_file_name)
             patcher.process()
 
@@ -122,7 +141,7 @@ class TestImageChunking(unittest.TestCase):
             assert len(patcher.patches) == len(patcher.bboxes_orig)
             assert abs(np.array(patcher.patches[0]) - np.array(patcher.image)).sum() < 1e-6
 
-            patcher = PatchifyViT(size=image_size, attention_method='pos')
+            patcher = PatchifyViT(size=image_size, attention_method='pos', device=TEST_DEVICE)
             patcher.infer(img)
             patcher.process()
 
@@ -130,23 +149,40 @@ class TestImageChunking(unittest.TestCase):
             assert len(patcher.patches) == len(patcher.bboxes_orig)
             assert abs(np.array(patcher.patches[0]) - np.array(patcher.image)).sum() < 1e-6
 
-            patcher = PatchifyViT(size=image_size)
+            patcher = PatchifyViT(size=image_size, device=TEST_DEVICE)
             patcher.infer(temp_file_name)
             patcher.process()
 
             assert len(patcher.patches) == len(patcher.bboxes)
             assert len(patcher.patches) == len(patcher.bboxes_orig)
             assert abs(np.array(patcher.patches[0]) - np.array(patcher.image)).sum() < 1e-6
+    
+    def test_PatchifyVit_no_device(self):
+        try:
+            image_size = (400,500)
+            with tempfile.TemporaryDirectory() as d:
+
+                temp_file_name = os.path.join(d, 'test_image.png')
+                img = Image.fromarray(np.random.randint(0,255,size=image_size).astype(np.uint8))
+                img.save(temp_file_name)
+
+                patcher = PatchifyViT(size=image_size, attention_method='abs')
+            raise AssertionError
+        except InternalError:
+            pass
 
     def test_PatchifyYolox(self):
 
         image_size = (400,500)
         with tempfile.TemporaryDirectory() as d:
+            # device must be explicitly passed to inner functions
+            TEST_DEVICE = "cpu"
+
             temp_file_name = os.path.join(d, 'test_image.png')
             img = Image.fromarray(np.random.randint(0,255,size=image_size).astype(np.uint8))
             img.save(temp_file_name)
 
-            patcher = PatchifyYolox(size=image_size)
+            patcher = PatchifyYolox(size=image_size, device=TEST_DEVICE)
             patcher.infer(img)
             patcher.process()
 
@@ -154,7 +190,7 @@ class TestImageChunking(unittest.TestCase):
             assert len(patcher.patches) == len(patcher.bboxes_orig)
             assert abs(np.array(patcher.patches[0]) - np.array(patcher.image)).sum() < 1e-6
 
-            patcher = PatchifyYolox(size=image_size)
+            patcher = PatchifyYolox(size=image_size, device=TEST_DEVICE)
             patcher.infer(temp_file_name)
             patcher.process()
 
@@ -162,7 +198,7 @@ class TestImageChunking(unittest.TestCase):
             assert len(patcher.patches) == len(patcher.bboxes_orig)
             assert abs(np.array(patcher.patches[0]) - np.array(patcher.image)).sum() < 1e-6
 
-            patcher = PatchifyYolox(size=image_size)
+            patcher = PatchifyYolox(size=image_size, device=TEST_DEVICE)
             patcher.infer(img)
             patcher.process()
 
@@ -170,13 +206,28 @@ class TestImageChunking(unittest.TestCase):
             assert len(patcher.patches) == len(patcher.bboxes_orig)
             assert abs(np.array(patcher.patches[0]) - np.array(patcher.image)).sum() < 1e-6
 
-            patcher = PatchifyYolox(size=image_size)
+            patcher = PatchifyYolox(size=image_size, device=TEST_DEVICE)
             patcher.infer(temp_file_name)
             patcher.process()
 
             assert len(patcher.patches) == len(patcher.bboxes)
             assert len(patcher.patches) == len(patcher.bboxes_orig)
             assert abs(np.array(patcher.patches[0]) - np.array(patcher.image)).sum() < 1e-6
+
+
+    def test_PatchifyYolox_no_device(self):
+        try:
+            image_size = (400,500)
+            with tempfile.TemporaryDirectory() as d:
+                temp_file_name = os.path.join(d, 'test_image.png')
+                img = Image.fromarray(np.random.randint(0,255,size=image_size).astype(np.uint8))
+                img.save(temp_file_name)
+
+                patcher = PatchifyYolox(size=image_size, attention_method='abs')
+            raise AssertionError
+        except InternalError:
+            pass
+    
 
     def test_chunk_image_simple(self):
 

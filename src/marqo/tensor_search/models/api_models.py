@@ -12,6 +12,7 @@ from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifier
 from marqo.tensor_search.models.search import SearchContext, SearchContextTensor
+from marqo import errors
 
 
 class BaseMarqoModel(BaseModel):
@@ -21,7 +22,7 @@ class BaseMarqoModel(BaseModel):
 
 
 class SearchQuery(BaseMarqoModel):
-    q: Union[str, Dict[str, float]]
+    q: Optional[Union[str, Dict[str, float]]] = None
     searchableAttributes: Union[None, List[str]] = None
     searchMethod: Union[None, str] = "TENSOR"
     limit: int = 10
@@ -43,9 +44,28 @@ class SearchQuery(BaseMarqoModel):
             case_sensitive=False
         )
     
+    @pydantic.root_validator
+    def validate_query_and_context(cls, values):
+        """
+        Validates that if LEXICAL search, query must be present.
+        If TENSOR search, either query or context must be present.
+        """
+        search_method = values.get("searchMethod")
+        query = values.get("q")
+        context = values.get("context")
+
+        if search_method == SearchMethod.LEXICAL:
+            if query is None:
+                raise errors.InvalidArgError("Query must be provided when using lexical search.")
+        elif search_method == SearchMethod.TENSOR:
+            if query is None and context is None:
+                raise errors.InvalidArgError("At least one of query (`q`) or context vectors (`context`) must be provided when using tensor search.")
+        return values
+
     def get_context_tensor(self) -> Optional[List[SearchContextTensor]]:
         """Extract the tensor from the context, if provided"""
         return self.context.tensor if self.context is not None else None
+    
 
 class BulkSearchQueryEntity(SearchQuery):
     index: str

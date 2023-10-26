@@ -139,7 +139,7 @@ output:
 
 Add the documents into the previously created index using function `add_documents()`
 ```python
-mq.index(index_name).add_documents(documents, device="cpu", processes=1, client_batch_size= 1)
+mq.index(index_name).add_documents(documents, tensor_fields=["image_docker"], device="cpu", client_batch_size= 1, auto_refresh=True)
 ```
 ```python
 outputs:

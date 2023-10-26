@@ -93,7 +93,7 @@ class TestGenericModelSupport(MarqoTestCase):
         auto_refresh = True
 
         tensor_search.add_documents(config=config, add_docs_params=AddDocsParams(
-            index_name=index_name, docs=docs, auto_refresh=auto_refresh))
+            index_name=index_name, docs=docs, auto_refresh=auto_refresh, device="cpu"))
 
     def test_validate_model_properties_missing_required_keys(self):
         """_validate_model_properties should throw an exception if required keys are not given.
@@ -150,17 +150,11 @@ class TestGenericModelSupport(MarqoTestCase):
     def test_validate_model_properties_unknown_model_error(self):
         """_validate_model_properties should throw an error if model is not in registry,
             and if model_properties have not been given in index
+
+            note: this validation is executed at vectorise time, however an InvalidArgError will already be raised
+            at index creation time given this model_name and model_properties combination
         """
         model_name = "test-model"
-        tensor_search.create_vector_index(
-            index_name=self.index_name_1, config=self.config,
-            index_settings={
-                "index_defaults": {
-                    'model': model_name
-                }
-            }
-        )
-
         model_properties = None
 
         self.assertRaises(UnknownModelError, _validate_model_properties, model_name, model_properties)
@@ -190,7 +184,7 @@ class TestGenericModelSupport(MarqoTestCase):
                             "tokens": 128,
                             "type": "sbert"}
 
-        result = vectorise(model_name=model_name, model_properties=model_properties, content="some string")
+        result = vectorise(model_name=model_name, model_properties=model_properties, content="some string", device="cpu")
 
         self.assertEqual(np.array(result).shape[-1], model_properties['dimensions'])
 
@@ -213,8 +207,8 @@ class TestGenericModelSupport(MarqoTestCase):
                   "argument. This loading path is slower than converting the TensorFlow checkpoint in a PyTorch model " \
                   "using the provided conversion scripts and loading the PyTorch model afterwards. "
 
-        res_default = vectorise(model_name=model_name, model_properties=model_properties_default, content=content)
-        res_custom = vectorise(model_name='custom-model', model_properties=model_properties_custom, content=content)
+        res_default = vectorise(model_name=model_name, model_properties=model_properties_default, content=content, device="cpu")
+        res_custom = vectorise(model_name='custom-model', model_properties=model_properties_custom, content=content, device="cpu")
 
         self.assertNotEqual(res_default, res_custom)
         # self.assertEqual(np.array(res_default).shape[-1], np.array(res_custom).shape[-1])
@@ -239,7 +233,7 @@ class TestGenericModelSupport(MarqoTestCase):
             config=self.config, index_settings=index_settings
         )
 
-        vectorise(model_name=model_name, model_properties=model_properties, content="some string")
+        vectorise(model_name=model_name, model_properties=model_properties, content="some string", device="cpu")
         tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
 
         old_num_of_available_models = len(available_models)
@@ -248,7 +242,7 @@ class TestGenericModelSupport(MarqoTestCase):
         tensor_search.create_vector_index(index_name=self.index_name_1,
             config=self.config, index_settings=index_settings
         )
-        vectorise(model_name=model_name, model_properties=model_properties, content="some string")
+        vectorise(model_name=model_name, model_properties=model_properties, content="some string", device="cpu")
 
         new_num_of_available_models = len(available_models)
 

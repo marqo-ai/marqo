@@ -1,14 +1,12 @@
 import unittest
-import os
 import torch
-
+from unittest.mock import MagicMock, patch
 from marqo.s2_inference.types import FloatTensor
 from marqo.s2_inference.s2_inference import clear_loaded_models, get_model_properties_from_registry
 from marqo.s2_inference.model_registry import load_model_properties, _get_open_clip_properties
 from marqo.s2_inference.s2_inference import _convert_tensor_to_numpy
 import numpy as np
 import functools
-from unittest.mock import MagicMock
 
 from marqo.s2_inference.s2_inference import (
     _check_output_type, vectorise,
@@ -30,7 +28,8 @@ class TestEncoding(unittest.TestCase):
                  "all-MiniLM-L6-v1", "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6",
                  "onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]
 
-        names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised"]
+        names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised", "hf/e5-base-v2",
+                    "hf/multilingual-e5-small"]
         names += names_e5
                  
         sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
@@ -39,7 +38,7 @@ class TestEncoding(unittest.TestCase):
 
         for name in names:
             model_properties = get_model_properties_from_registry(name)
-            model = _load_model(model_properties['name'], model_properties=model_properties, device=device, )
+            model = _load_model(model_properties['name'], model_properties=model_properties, device=device)
 
             for sentence in sentences:
                 output_v = vectorise(name, sentence, model_properties, device, normalize_embeddings=True)
@@ -57,7 +56,8 @@ class TestEncoding(unittest.TestCase):
                  "all-MiniLM-L6-v1", "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6",
                  "onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]
 
-        names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised",     "hf/e5-base-unsupervised"]
+        names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised",
+                    "hf/e5-base-v2", "hf/multilingual-e5-small"]
         names += names_e5
 
         sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
@@ -65,7 +65,7 @@ class TestEncoding(unittest.TestCase):
 
         for name in names:
             model_properties = get_model_properties_from_registry(name)
-            model = _load_model(model_properties['name'], model_properties=model_properties, device=device, )
+            model = _load_model(model_properties['name'], model_properties=model_properties, device=device)
 
             for sentence in sentences:
                 output_v = _convert_tensor_to_numpy(model.encode(sentence, normalize=True))
@@ -109,7 +109,8 @@ class TestEncoding(unittest.TestCase):
     def test_load_hf_text_model(self):
         names = ["hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6"]
 
-        names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised"]
+        names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised",
+                    "hf/e5-base-v2", "hf/multilingual-e5-small"]
         names += names_e5
 
         device = 'cpu'
@@ -161,7 +162,8 @@ class TestEncoding(unittest.TestCase):
                  "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1",
                  "hf/all_datasets_v4_MiniLM-L6", "onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]
 
-        names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised"]
+        names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised", "hf/e5-base-v2",
+                    "hf/multilingual-e5-small"]
         names += names_e5
                  
         sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
@@ -184,7 +186,8 @@ class TestEncoding(unittest.TestCase):
                  "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6",
                  "onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]
 
-        names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised"]
+        names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised", "hf/e5-base-v2",
+                    "hf/multilingual-e5-small"]
         names += names_e5
                  
         sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
@@ -213,7 +216,8 @@ class TestEncoding(unittest.TestCase):
         names = [ 'RN50', "ViT-B/16", "hf/all-MiniLM-L6-v1",
                  "hf/all_datasets_v4_MiniLM-L6", "onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]
 
-        names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised"]
+        names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised", "hf/e5-base-v2",
+                    "hf/multilingual-e5-small"]
         names += names_e5
 
         sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
@@ -319,9 +323,9 @@ class TestOpenClipModelEncoding(unittest.TestCase):
 
         device = 'cpu'
         eps = 1e-9
-        images = ["https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image0.jpg",
-                  "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
-                  "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg"]
+        images = ["https://marqo-assets.s3.amazonaws.com/tests/images/image0.jpg",
+                  "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
+                  "https://marqo-assets.s3.amazonaws.com/tests/images/image2.jpg"]
 
         for name in names:
 
@@ -342,7 +346,7 @@ class TestOpenClipModelEncoding(unittest.TestCase):
 
         for name in names:
             model_properties = get_model_properties_from_registry(name)
-            model = _load_model(model_properties['name'], model_properties=model_properties, device=device, )
+            model = _load_model(model_properties['name'], model_properties=model_properties, device=device)
 
             for sentence in sentences:
                 output_v = _convert_tensor_to_numpy(model.encode(sentence, normalize=True))
@@ -432,3 +436,11 @@ class TestOpenClipModelEncoding(unittest.TestCase):
 
             clear_loaded_models()
 
+    @patch("torch.cuda.amp.autocast")
+    def test_autocast_called_when_cuda(self, mock_autocast):
+        names = self.open_clip_test_model
+        contents = ['this is a test sentence. so is this.', "https://marqo-assets.s3.amazonaws.com/tests/images/image0.jpg"]
+        for model_name in names:
+            for content in contents:
+                vectorise(model_name=model_name, content=content, device="cpu")
+                mock_autocast.assert_not_called()

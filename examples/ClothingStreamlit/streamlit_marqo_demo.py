@@ -34,7 +34,7 @@ def load_index(number_data):
         mq.create_index("demo-search-index", **settings)
 
         with st.spinner("Creating Index..."):
-            mq.index("demo-search-index").add_documents(shirt_data)
+            mq.index("demo-search-index").add_documents(shirt_data, tensor_fields=['image', 'label', 'kids'], auto_refresh=True)
 
         st.success("Index successfully created.")
     except:
