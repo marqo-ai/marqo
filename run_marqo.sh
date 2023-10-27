@@ -42,7 +42,6 @@ for i in {1..20}; do
     echo -ne "Waiting... $i seconds\r"
     sleep 1
 done
-
 echo -e "\nDone waiting."
 
 
