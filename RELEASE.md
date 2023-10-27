@@ -1,5 +1,5 @@
 # Release 1.4.0
-
+ 
 ## Breaking Changes
 - Configurable document count limit for `add_documents()` calls (https://github.com/marqo-ai/marqo/pull/592). This mitigates Marqo getting overloaded 
 due to add_documents requests with a very high number of documents. If you are adding documents in batches larger than the default (64), you will now 
