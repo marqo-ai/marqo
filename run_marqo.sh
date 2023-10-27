@@ -37,12 +37,15 @@ echo "Running Vespa Locally"
 tmux new-session -d -s vespa "/usr/local/bin/start_vespa.sh"
 # Start opensearch in the background
 
-echo "Waiting for Vespa to converge"
-for i in {1..20}; do
+echo "Waiting for Vespa to start"
+for i in {1..5}; do
     echo -ne "Waiting... $i seconds\r"
     sleep 1
 done
 echo -e "\nDone waiting."
+
+vespa clone album-recommendation dummy_app
+vespa deploy dummy_app/ --wait 300
 
 
 # Start up redis
