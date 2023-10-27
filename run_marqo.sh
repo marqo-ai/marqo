@@ -9,6 +9,9 @@ trap "bash /app/scripts/shutdown.sh; exit" SIGTERM SIGINT
 echo "Python packages:"
 pip freeze
 
+# Start local vespa
+bash /usr/local/bin/start_vespa.sh
+
 function wait_for_process () {
     local max_retries=30
     local n_restarts_before_sigkill=3
