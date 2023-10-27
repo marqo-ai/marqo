@@ -44,6 +44,7 @@ for i in {1..5}; do
 done
 echo -e "\nDone waiting."
 
+# Deploy a dummy app
 vespa clone album-recommendation dummy_app
 vespa deploy dummy_app/ --wait 300
 
