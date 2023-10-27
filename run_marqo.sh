@@ -45,6 +45,7 @@ done
 echo -e "\nDone waiting."
 
 # Deploy a dummy app
+vespa config set target local
 vespa clone album-recommendation dummy_app
 vespa deploy dummy_app/ --wait 300
 
