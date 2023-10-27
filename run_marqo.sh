@@ -35,7 +35,7 @@ function wait_for_process () {
 # Start local vespa
 echo "Running Vespa Locally"
 export VESPA_LOG_STDOUT="false"
-/usr/local/bin/start_vespa.sh &
+bash /usr/local/bin/start_vespa.sh &
 # Start opensearch in the background
 
 # Start up redis
