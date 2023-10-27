@@ -38,7 +38,7 @@ tmux new-session -d -s vespa "/usr/local/bin/start_vespa.sh"
 # Start opensearch in the background
 
 echo "Waiting for Vespa to start"
-for i in {1..5}; do
+for i in {1..20}; do
     echo -ne "Waiting... $i seconds\r"
     sleep 1
 done
