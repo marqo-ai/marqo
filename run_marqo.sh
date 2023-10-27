@@ -34,7 +34,7 @@ function wait_for_process () {
 
 # Start local vespa
 echo "Running Vespa Locally"
-tmux new-session -d -s vespa "/usr/local/bin/start_vespa.sh"
+tmux new-session -d -s vespa "bash /usr/local/bin/start_vespa.sh"
 # Start opensearch in the background
 
 echo "Waiting for Vespa to start"
