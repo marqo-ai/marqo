@@ -10,7 +10,8 @@ echo "Python packages:"
 pip freeze
 
 # Start local vespa
-bash /usr/local/bin/start_vespa.sh
+echo "Running Vespa Locally"
+/usr/local/bin/start_vespa.sh &
 
 function wait_for_process () {
     local max_retries=30
