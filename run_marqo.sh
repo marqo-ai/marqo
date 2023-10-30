@@ -32,22 +32,48 @@ function wait_for_process () {
     return 0
 }
 
-# Start local vespa
-echo "Running Vespa Locally"
-tmux new-session -d -s vespa "bash /usr/local/bin/start_vespa.sh"
-# Start opensearch in the background
+OPENSEARCH_IS_INTERNAL=False
+# Start Vespa in the background
+if [[ ! $VESPA_CONFIG_URL ]]; then
+  # Start local vespa
+  echo "Running Vespa Locally"
+  tmux new-session -d -s vespa "bash /usr/local/bin/start_vespa.sh"
+  # Start opensearch in the background
 
-echo "Waiting for Vespa to start"
-for i in {1..20}; do
-    echo -ne "Waiting... $i seconds\r"
-    sleep 1
-done
-echo -e "\nDone waiting."
+  echo "Waiting for Vespa to start"
+  for i in {1..5}; do
+      echo -ne "Waiting... $i seconds\r"
+      sleep 1
+  done
+  echo -e "\nDone waiting."
+  tmux vespa "deploy /app/scripts/vespa_dummy_app/ --wait 300"
 
-# Deploy a dummy app
-vespa config set target local
-vespa clone album-recommendation dummy_app
-vespa deploy dummy_app/ --wait 300
+  export VESPA_QUERY_URL="http://localhost:8080"
+  export VESPA_DOCUMENT_URL="http://localhost:8080/8080"
+  export VESPA_CONFIG_URL="http://localhost:8080/19071"
+
+else
+  echo "Found VESPA_CONFIG_URL. Skipping internal Vespa configuration"
+fi
+
+
+
+## Start local vespa
+#echo "Running Vespa Locally"
+#tmux new-session -d -s vespa "bash /usr/local/bin/start_vespa.sh"
+## Start opensearch in the background
+#
+#echo "Waiting for Vespa to start"
+#for i in {1..20}; do
+#    echo -ne "Waiting... $i seconds\r"
+#    sleep 1
+#done
+#echo -e "\nDone waiting."
+#
+## Deploy a dummy app
+#vespa config set target local
+#vespa clone album-recommendation dummy_app
+#vespa deploy dummy_app/ --wait 300
 
 
 # Start up redis
