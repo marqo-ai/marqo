@@ -46,7 +46,7 @@ if [[ ! $VESPA_CONFIG_URL ]]; then
       sleep 1
   done
   echo -e "\nDone waiting."
-  tmux vespa "deploy /app/scripts/vespa_dummy_app/ --wait 300"
+  tmux send-keys -t vespa "vespa deploy /app/scripts/vespa_dummy_app/ --wait 300" C-m
 
   export VESPA_QUERY_URL="http://localhost:8080"
   export VESPA_DOCUMENT_URL="http://localhost:8080/8080"
