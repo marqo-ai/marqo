@@ -524,7 +524,7 @@ class VespaClient:
         for task in tasks:
             result = task.result()
             responses.append(result)
-            if result.status != '200':
+            if result.status != 200:
                 errors = True
 
         return FeedBatchResponse(responses=responses, errors=errors)
@@ -583,7 +583,7 @@ class VespaClient:
         for task in tasks:
             result = task.result()
             responses.append(result)
-            if result.status != '200':
+            if result.status != 200:
                 errors = True
 
         return GetBatchResponse(responses=responses, errors=errors)
@@ -627,7 +627,7 @@ class VespaClient:
         for task in tasks:
             result = task.result()
             responses.append(result)
-            if result.status != '200':
+            if result.status != 200:
                 errors = True
 
         return DeleteBatchResponse(responses=responses, errors=errors)

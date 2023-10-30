@@ -6,6 +6,9 @@ import datetime
 from marqo.config import Config
 from marqo.tensor_search import validation, utils, enums
 from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsResponse, MqDeleteDocsRequest
+from marqo.tensor_search.tensor_search_logging import get_logger
+
+logger = get_logger(__name__)
 
 
 # -- Marqo delete endpoint interface: --
@@ -85,6 +88,8 @@ def delete_documents_vespa(config: Config, deletion_instruction: MqDeleteDocsReq
                     'result': 'error'
                 }
             )
+            logger.error(f'Failed to delete document: {response}')
+
     mq_delete_res = MqDeleteDocsResponse(
         index_name=deletion_instruction.index_name, status_string='succeeded',
         document_ids=deletion_instruction.document_ids,

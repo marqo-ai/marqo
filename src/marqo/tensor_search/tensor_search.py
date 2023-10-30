@@ -86,6 +86,7 @@ from marqo.tensor_search.models.search import Qidx, JHash, SearchContext, Vector
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.tensor_search.tensor_search_logging import get_logger
 from marqo.tensor_search.utils import add_timing
+from marqo.vespa.exceptions import VespaStatusError
 from marqo.vespa.models import VespaDocument, FeedBatchResponse, QueryResult
 from marqo.vespa.vespa_client import VespaClient
 
@@ -745,7 +746,14 @@ def get_document_by_id(
 
     marqo_index = index_meta_cache.get_index(config=config, index_name=index_name)
 
-    res = config.vespa_client.get_document(document_id, marqo_index.name)
+    try:
+        res = config.vespa_client.get_document(document_id, marqo_index.name)
+    except VespaStatusError as e:
+        if e.status_code == 404:
+            raise errors.DocumentNotFoundError(f"Document with ID {document_id} not found in index {index_name}")
+        else:
+            raise e
+
     vespa_index = vespa_index_factory(marqo_index)
     marqo_document = vespa_index.to_marqo_document(res.document.dict(), marqo_index)
 
