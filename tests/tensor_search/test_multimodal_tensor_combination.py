@@ -3,7 +3,7 @@ from marqo.errors import IndexNotFoundError, InvalidArgError
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import TensorField, IndexSettingsField, SearchMethod
 from tests.marqo_test import MarqoTestCase
-from marqo.tensor_search.tensor_search import add_documents, vectorise_multimodal_combination_field
+from marqo.tensor_search.tensor_search import add_documents, vectorise_multimodal_combination_field_structured
 from marqo.errors import DocumentNotFoundError
 import numpy as np
 from marqo.tensor_search.validation import validate_dict
@@ -305,7 +305,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             """Vectorise will behave as usual, but we will be able to see the call list
             via mock
             """
-            return vectorise_multimodal_combination_field(*arg, **kwargs)
+            return vectorise_multimodal_combination_field_structured(*arg, **kwargs)
 
         mock_multimodal_combination = mock.MagicMock()
         mock_multimodal_combination.side_effect = pass_through_multimodal

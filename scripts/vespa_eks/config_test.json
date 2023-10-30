@@ -6,7 +6,7 @@
   "content": {
     "replicas": 2,
     "memory": "44G",
-    "storage": "200G"
+    "storage": "50G"
   },
   "feed": {
     "replicas": 0,

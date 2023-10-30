@@ -1,0 +1,155 @@
+schema my_index {
+    document my_index {
+        field id type string {
+            indexing:summary
+        }
+        field marqo__lexical_title type string {
+            indexing: index | summary
+            index: enable-bm25
+        }
+        field description type string {
+            indexing: summary
+        }
+        field marqo__lexical_category type string {
+            indexing: index | summary
+            index: enable-bm25
+        }
+        field marqo__filter_category type string {
+            indexing: attribute | summary
+            attribute: fast-search
+            rank: filter
+        }
+        field marqo__filter_tags type array<string> {
+            indexing: attribute | summary
+            attribute: fast-search
+            rank: filter
+        }
+        field image type string {
+            indexing: summary
+        }
+        field marqo__filter_is_active type bool {
+            indexing: attribute | summary
+            attribute: fast-search
+            rank: filter
+        }
+        field price type float {
+            indexing: summary
+        }
+        field rank type int {
+            indexing: summary
+        }
+        field marqo__filter_click_per_day type array<int> {
+            indexing: attribute | summary
+            attribute: fast-search
+            rank: filter
+        }
+        field marqo__filter_last_updated type array<float> {
+            indexing: attribute | summary
+            attribute: fast-search
+            rank: filter
+        }
+        field marqo__score_modifiers type tensor<float>(p{}) {
+            indexing: attribute
+        }
+        field marqo__chunks_title type array<string> {
+            indexing: attribute | summary
+        }
+        field marqo__embeddings_title type tensor<float>(p{}, x[512]) {
+            indexing: attribute | index | summary
+            attribute {
+                distance-metric: prenormalized-angular
+            }
+            index {
+                hnsw {
+                    max-links-per-node: 16
+                    neighbors-to-explore-at-insert: 100
+                }
+            }
+        }
+        field marqo__chunks_description type array<string> {
+            indexing: attribute | summary
+        }
+        field marqo__embeddings_description type tensor<float>(p{}, x[512]) {
+            indexing: attribute | index | summary
+            attribute {
+                distance-metric: prenormalized-angular
+            }
+            index {
+                hnsw {
+                    max-links-per-node: 16
+                    neighbors-to-explore-at-insert: 100
+                }
+            }
+        }
+    }
+
+    rank-profile bm25 inherits default {
+        first-phase {
+            expression: bm25(marqo__lexical_title) + bm25(marqo__lexical_category)
+        }
+    }
+    rank-profile embedding_similarity inherits default {
+        inputs {
+            query(query_embedding) tensor<float>(x[512])
+            query(title): 1
+            query(description): 1
+        }
+        first-phase {
+            expression: if (query(title) > 0, closeness(field, marqo__embeddings_title), 0) + if (query(description) > 0, closeness(field, marqo__embeddings_description), 0)
+        }
+    }
+    rank-profile modifiers inherits default {
+        inputs {
+            query(mult_weights)  tensor<float>(p{})
+            query(add_weights)  tensor<float>(p{})
+        }
+        function modify(score) {
+            expression: if (count(query(mult_weights)) == 0, 1, reduce(query(mult_weights) * attribute(marqo__score_modifiers), prod)) * score + reduce(query(add_weights) * attribute(marqo__score_modifiers), sum)
+        }
+    }
+    rank-profile bm25_modifiers inherits modifiers {
+        first-phase {
+            expression: modify(bm25(marqo__lexical_title) + bm25(marqo__lexical_category))
+        }
+    }
+    rank-profile embedding_similarity_modifiers inherits modifiers {
+        first-phase {
+            expression: modify(if (query(title) > 0, closeness(field, marqo__embeddings_title), 0) + if (query(description) > 0, closeness(field, marqo__embeddings_description), 0))
+        }
+    }
+
+    fieldset default {
+        fields: marqo__lexical_title, marqo__lexical_category
+    }
+
+    document-summary all-non-vector-summary {
+        summary title type string { source: marqo__lexical_title }
+        summary description type string { source: description }
+        summary category type string { source: marqo__filter_category }
+        summary tags type array<string> { source: marqo__filter_tags }
+        summary image type string { source: image }
+        summary is_active type bool { source: marqo__filter_is_active }
+        summary price type float { source: price }
+        summary rank type int { source: rank }
+        summary click_per_day type array<int> { source: marqo__filter_click_per_day }
+        summary last_updated type array<float> { source: marqo__filter_last_updated }
+        summary marqo__chunks_title type array<string> { }
+        summary marqo__chunks_description type array<string> { }
+    }
+    document-summary all-vector-summary {
+        summary title type string { source: marqo__lexical_title }
+        summary description type string { source: description }
+        summary category type string { source: marqo__filter_category }
+        summary tags type array<string> { source: marqo__filter_tags }
+        summary image type string { source: image }
+        summary is_active type bool { source: marqo__filter_is_active }
+        summary price type float { source: price }
+        summary rank type int { source: rank }
+        summary click_per_day type array<int> { source: marqo__filter_click_per_day }
+        summary last_updated type array<float> { source: marqo__filter_last_updated }
+        summary marqo__chunks_title type array<string> { }
+        summary marqo__chunks_description type array<string> { }
+        summary marqo__embeddings_title type tensor<float>(p{}, x[512]) { }
+        summary marqo__embeddings_description type tensor<float>(p{}, x[512]) { }
+    }
+}

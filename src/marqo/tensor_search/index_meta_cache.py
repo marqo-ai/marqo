@@ -3,20 +3,19 @@
 In the future this may be stored in redis or this logic be bundled with the
 index in the search DB via a plugin.
 """
-import asyncio
-import datetime
+import threading
 import time
-import traceback
-from multiprocessing import Process, Manager
-from marqo.tensor_search.models.index_info import IndexInfo
 from typing import Dict
+
 from marqo import errors
-from marqo.tensor_search import backend
 from marqo.config import Config
+from marqo.core.exceptions import IndexNotFoundError
+from marqo.core.index_management.index_management import IndexManagement
+from marqo.core.models import MarqoIndex
+from marqo.tensor_search.models.index_info import IndexInfo
 from marqo.tensor_search.tensor_search_logging import get_logger
 
 logger = get_logger(__name__)
-
 
 index_info_cache = dict()
 
@@ -25,7 +24,11 @@ index_info_cache = dict()
 # Because it is non thread safe, there is a chance multiple threads push out
 # multiple refresh requests at the same. It isn't a critical problem if that
 # happens.
-index_last_refreshed_time = dict()
+cache_refresh_interval: int = 10  # seconds
+cache_refresh_log_interval: int = 60
+cache_refresh_last_logged_time: float = 0
+refresh_thread = None
+refresh_lock = threading.Lock()  # to ensure only one thread is operating on refresh_thread
 
 
 def empty_cache():
@@ -34,6 +37,7 @@ def empty_cache():
 
 
 def get_index_info(config: Config, index_name: str) -> IndexInfo:
+    return
     """Looks for the index name in the cache.
 
     If it isn't found there, it will try searching the cluster
@@ -48,12 +52,12 @@ def get_index_info(config: Config, index_name: str) -> IndexInfo:
     Raises:
          MarqoError if the index isn't found on the cluster
     """
-    if index_name in index_info_cache:
-        return index_info_cache[index_name]
-    else:
-        found_index_info = backend.get_index_info(config=config, index_name=index_name)
-        index_info_cache[index_name] = found_index_info
-        return index_info_cache[index_name]
+    # if index_name in index_info_cache:
+    #     return index_info_cache[index_name]
+    # else:
+    #     found_index_info = backend.get_index_info(config=config, index_name=index_name)
+    #     index_info_cache[index_name] = found_index_info
+    #     return index_info_cache[index_name]
 
 
 def get_cache() -> Dict[str, IndexInfo]:
@@ -98,32 +102,99 @@ def refresh_index_info_on_interval(config: Config, index_name: str, interval_sec
     #         raise e2
 
 
-def refresh_index(config: Config, index_name: str) -> IndexInfo:
-    """function to update an index, from the cluster.
+def get_index(config: Config, index_name: str, force_refresh=False) -> MarqoIndex:
+    """
+    Get an index.
 
     Args:
-        config:
-        index_name
+        force_refresh: Get index from Vespa even if already in cache. If False, Vespa is called only if index is not
+        found in cache.
 
     Returns:
 
     """
-    found_index_info = backend.get_index_info(config=config, index_name=index_name)
-    index_info_cache[index_name] = found_index_info
-    return found_index_info
+    # Make sure refresh thread is running
+    _check_refresh_thread(config)
+
+    if force_refresh:
+        _refresh_index(config, index_name)
+
+    if index_name in index_info_cache:
+        return index_info_cache[index_name]
+    elif not force_refresh:
+        _refresh_index(config, index_name)
+        if index_name in index_info_cache:
+            return index_info_cache[index_name]
+
+    raise errors.IndexNotFoundError(f"Index {index_name} not found")
+
+
+def _refresh_index(config: Config, index_name: str) -> None:
+    """
+    Refresh cache for a specific index
+    """
+    index_management = IndexManagement(config.vespa_client)
+    try:
+        index = index_management.get_index(index_name)
+    except IndexNotFoundError as e:
+        raise errors.IndexNotFoundError(f"Index {index_name} not found") from e
+
+    index_info_cache[index_name] = index.copy_with_caching()
+
+
+def _check_refresh_thread(config: Config):
+    if refresh_lock.locked():
+        # Another thread is running this function, skip as concurrent changes to the thread can error out
+        logger.debug('Refresh thread is locked. Skipping')
+        return
+
+    with refresh_lock:
+        global refresh_thread
+        if refresh_thread is None or not refresh_thread.is_alive():
+            if refresh_thread is not None:
+                # If not None, then it has died
+                logger.warn('Dead index cache refresh thread detected. Will start a new one')
+
+            logger.info('Starting index cache refresh thread')
+
+            def refresh():
+                while True:
+                    global cache_refresh_last_logged_time
+
+                    populate_cache(config)
+
+                    if time.time() - cache_refresh_last_logged_time > cache_refresh_log_interval:
+                        cache_refresh_last_logged_time = time.time()
+                        logger.info(f'Last index cache refresh at {cache_refresh_last_logged_time}')
+
+                    time.sleep(cache_refresh_interval)
+
+            refresh_thread = threading.Thread(target=refresh, daemon=True)
+            refresh_thread.start()
 
 
 def populate_cache(config: Config):
-    """Identify available index names and use them to populate the cache.
-
-    Args:
-        config:
     """
-    for ix_name in backend.get_cluster_indices(config=config):
-        try:
-            found_index_info = backend.get_index_info(config=config, index_name=ix_name)
-            index_info_cache[ix_name] = found_index_info
-        except errors.NonTensorIndexError as e:
-            pass
+    Refresh cache for all indexes
+    """
+    index_management = IndexManagement(config.vespa_client)
+    indexes = index_management.get_all_indexes()
 
+    # Enable caching and reset any existing model caches
+    # Create a map for one-pass cache update
+    index_map = dict()
+    for index in indexes:
+        index_clone = index.copy_with_caching()
+        index_map[index.name] = index_clone
 
+    # Update and delete if index doesn't exist anymore
+    # Do not destroy existing cache, as it may be used by other threads
+    for cached_index in index_info_cache:
+        if cached_index in index_map:
+            index_info_cache[cached_index] = index_map[cached_index]
+            del index_map[cached_index]
+        else:
+            del index_info_cache[cached_index]
+
+    # Add new indexes
+    index_info_cache.update(index_map)

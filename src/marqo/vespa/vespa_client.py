@@ -3,22 +3,35 @@ import io
 import os
 import tarfile
 import tempfile
+import time
 from concurrent.futures import ThreadPoolExecutor
 from json import JSONDecodeError
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from urllib.parse import urlparse
 
 import httpx
 
 import marqo.logging
 import marqo.vespa.concurrency as conc
-from marqo.vespa.exceptions import VespaStatusError, VespaError
-from marqo.vespa.models import VespaDocument, QueryResult, FeedResponse, FeedBatchResponse
+from marqo.vespa.exceptions import VespaStatusError, VespaError, InvalidVespaApplicationError
+from marqo.vespa.models import VespaDocument, QueryResult, FeedResponse, FeedBatchResponse, FeedDocumentResponse
+from marqo.vespa.models.delete_document_response import DeleteDocumentResponse
+from marqo.vespa.models.get_document_response import GetDocumentResponse, BatchGetDocumentResponse
 
 logger = marqo.logging.get_logger(__name__)
 
 
 class VespaClient:
+    _VESPA_ERROR_CODE_TO_EXCEPTION = {
+        'INVALID_APPLICATION_PACKAGE': InvalidVespaApplicationError
+    }
+
+    class _ConvergenceStatus:
+        def __init__(self, current_generation: int, wanted_generation: int, converged: bool):
+            self.current_generation = current_generation
+            self.wanted_generation = wanted_generation
+            self.converged = converged
+
     def __init__(self, config_url: str, document_url: str, query_url: str, pool_size: int = 10):
         """
         Create a VespaClient object.
@@ -63,11 +76,62 @@ class VespaClient:
         """
         Download the Vespa application.
 
+        Application download happens in two steps:
+        1. Create a session
+        2. Download the application using the session ID
+
+        The session created in step 1 is local to the config node that created it and subsequent requests will return a
+        404 error if the request is routed to a different config node. This method attempts to ensure the same config
+        node is used for all requests by using the same httpx client for all requests. However, this is not guaranteed.
+
+        The likelihood of getting a 404 error is further reduced if config cluster uses a load balancer with sticky
+        sessions. Since we are using a single httpx client, cookie-based sticky sessions will work with this
+        implementation.
+
         Returns:
             Path to the downloaded application
         """
-        session_id = self._create_deploy_session()
-        return self._download_application(session_id)
+        with httpx.Client() as httpx_client:
+            session_id = self._create_deploy_session(httpx_client)
+            return self._download_application(session_id, httpx_client)
+
+    def get_application_generation(self) -> int:
+        """
+        Get the current application generation.
+
+        Returns:
+            Current application generation
+        """
+        return self._get_convergence_status().current_generation
+
+    def get_application_has_converged(self) -> bool:
+        """
+        Get the current application convergence status.
+
+        Application convergence is asynchronous following a deployment. This method can be used to check if the
+        application has converged after a deployment.
+
+        Returns:
+            True if the application is converged, False otherwise
+        """
+        return self._get_convergence_status().converged
+
+    def wait_for_application_convergence(self, timeout: int = 60) -> None:
+        """
+        Wait for Vespa application to converge, checking every second.
+
+        Args:
+            timeout: Timeout in seconds
+        """
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            if self.get_application_has_converged():
+                return
+            else:
+                logger.debug('Waiting for Vespa application to converge')
+                time.sleep(1)
+
+        raise VespaError(f"Vespa application did not converge within {timeout} seconds")
 
     def query(self, yql: str, hits: int = 10, ranking: str = None, model_restrict: str = None,
               query_features: Dict[str, Any] = None, **kwargs) -> QueryResult:
@@ -106,6 +170,29 @@ class VespaClient:
         self._raise_for_status(resp)
 
         return QueryResult(**resp.json())
+
+    def feed_document(self, document: VespaDocument, schema: str, timeout: int = 60) -> FeedDocumentResponse:
+        """
+        Feed a document to Vespa.
+
+        Args:
+            document: Document to feed
+            schema: Schema to feed to
+            timeout: Timeout in seconds
+
+        Returns:
+            FeedResponse object
+        """
+        doc_id = document.id
+        data = {'fields': document.fields}
+
+        end_point = f'{self.document_url}/document/v1/{schema}/{schema}/docid/{doc_id}'
+
+        resp = self.http_client.post(end_point, json=data, timeout=timeout)
+
+        self._raise_for_status(resp)
+
+        return FeedDocumentResponse(**resp.json())
 
     def feed_batch(self,
                    batch: List[VespaDocument],
@@ -148,11 +235,10 @@ class VespaClient:
         Returns:
             List of FeedResponse objects
         """
-        with httpx.Client(limits=httpx.Limits(max_keepalive_connections=10, max_connections=10)) as sync_client:
-            responses = [
-                self._feed_document_sync(sync_client, document, schema, timeout=60)
-                for document in batch
-            ]
+        responses = [
+            self._feed_document_sync(self.http_client, document, schema, timeout=60)
+            for document in batch
+        ]
 
         errors = False
         for response in responses:
@@ -191,6 +277,84 @@ class VespaClient:
 
         return FeedBatchResponse(responses=responses, errors=errors)
 
+    def get_document(self, id: str, schema: str) -> GetDocumentResponse:
+        """
+        Get a document by ID.
+
+        Args:
+            id: Document ID
+            schema: Schema to get from
+
+        Returns:
+            GetDocumentResponse object
+        """
+        try:
+            resp = self.http_client.get(f'{self.document_url}/document/v1/{schema}/{schema}/docid/{id}')
+        except httpx.HTTPError as e:
+            raise VespaError(e) from e
+
+        self._raise_for_status(resp)
+
+        return GetDocumentResponse(**resp.json())
+
+    def get_all_documents(self,
+                          schema: str,
+                          stream=False,
+                          continuation: Optional[str] = None
+                          ) -> BatchGetDocumentResponse:
+        """
+        Get all documents in a schema.
+        Args:
+            schema: Schema to get from
+            stream: Whether to stream the response
+            continuation: Continuation token for pagination
+
+        Returns:
+            BatchGetDocumentResponse object
+        """
+        try:
+            url = self._add_query_params(
+                url=f'{self.document_url}/document/v1/{schema}/{schema}/docid',
+                query_params={
+                    'stream': str(stream).lower(),
+                    'continuation': continuation
+                }
+            )
+            logger.debug(f'URL: {url}')
+            resp = self.http_client.get(url)
+        except httpx.HTTPError as e:
+            raise VespaError(e) from e
+
+        self._raise_for_status(resp)
+
+        return BatchGetDocumentResponse(**resp.json())
+
+    def delete_document(self, id: str, schema: str) -> DeleteDocumentResponse:
+        """
+        Delete a document by ID.
+
+        Note that this method returns a successful response even if the document does not exist.
+
+        Args:
+            id: Document ID
+            schema: Schema to delete from
+        """
+        try:
+            resp = self.http_client.delete(f'{self.document_url}/document/v1/{schema}/{schema}/docid/{id}')
+        except httpx.HTTPError as e:
+            raise VespaError(e) from e
+
+        self._raise_for_status(resp)
+
+        return DeleteDocumentResponse(**resp.json())
+
+    def _add_query_params(self, url: str, query_params: Dict[str, str]) -> str:
+        if not query_params:
+            return url
+
+        query_string = '&'.join([f'{key}={value}' for key, value in query_params.items() if value])
+        return f'{url.strip("?")}?{query_string}'
+
     def _gzip_compress(self, directory: str) -> io.BytesIO:
         """
         Gzip all files in the given directory and return an in-memory byte buffer.
@@ -206,61 +370,79 @@ class VespaClient:
         byte_stream.seek(0)
         return byte_stream
 
-    def _create_deploy_session(self) -> int:
+    def _create_deploy_session(self, httpx_client: httpx.Client) -> int:
         endpoint = f'{self.config_url}/application/v2/tenant/default/session?from=' \
                    f'{self.config_url}/application/v2/tenant/default/application/default/environment' \
                    f'/default/region/default/instance/default'
 
-        response = httpx.post(endpoint)
+        response = httpx_client.post(endpoint)
 
         self._raise_for_status(response)
 
         return response.json()['session-id']
 
-    def _download_application(self, session_id: int) -> str:
+    def _download_application(self, session_id: int, httpx_client: httpx.Client) -> str:
         endpoint = f'{self.config_url}/application/v2/tenant/default/session/{session_id}/content/?recursive=true'
 
-        with httpx.Client() as httpx_client:
-            response = httpx_client.get(endpoint)
+        response = httpx_client.get(endpoint)
 
+        self._raise_for_status(response)
+
+        urls = response.json()
+
+        logger.debug(f'URLs: {urls}')
+
+        def is_file(url: str) -> bool:
+            last_component = urlparse(url).path.split('/')[-1]
+            return '.' in last_component
+
+        temp_dir = tempfile.mkdtemp()
+
+        logger.debug(f'Downloading application to {temp_dir}')
+
+        for url in urls:
+            if not is_file(url):
+                continue  # Skip directories
+
+            # Parse the URL
+            parsed = urlparse(url)
+            path_parts = parsed.path.split('/')
+
+            # Find the index for 'content' and use it as root
+            content_index = path_parts.index('content')
+            rel_path = os.path.join(*path_parts[content_index + 1:])
+            abs_path = os.path.join(temp_dir, rel_path)
+
+            # Ensure directory exists before downloading
+            os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+
+            response = httpx_client.get(url)
             self._raise_for_status(response)
 
-            urls = response.json()
-
-            logger.debug(f'URLs: {urls}')
-
-            def is_file(url: str) -> bool:
-                last_component = urlparse(url).path.split('/')[-1]
-                return '.' in last_component
-
-            temp_dir = tempfile.mkdtemp()
-
-            logger.debug(f'Downloading application to {temp_dir}')
-
-            for url in urls:
-                if not is_file(url):
-                    continue  # Skip directories
-
-                # Parse the URL
-                parsed = urlparse(url)
-                path_parts = parsed.path.split('/')
-
-                # Find the index for 'content' and use it as root
-                content_index = path_parts.index('content')
-                rel_path = os.path.join(*path_parts[content_index + 1:])
-                abs_path = os.path.join(temp_dir, rel_path)
-
-                # Ensure directory exists before downloading
-                os.makedirs(os.path.dirname(abs_path), exist_ok=True)
-
-                response = httpx_client.get(url)
-                self._raise_for_status(response)
-
-                # Save the downloaded content
-                with open(abs_path, 'wb') as f:
-                    f.write(response.content)
+            # Save the downloaded content
+            with open(abs_path, 'wb') as f:
+                f.write(response.content)
 
         return temp_dir
+
+    def _get_convergence_status(self):
+        endpoint = f'{self.config_url}/application/v2/tenant/default/application/default/environment/default/region/' \
+                   f'default/instance/default/serviceconverge'
+
+        response = self.http_client.get(endpoint)
+
+        self._raise_for_status(response)
+
+        try:
+            json = response.json()
+            return self._ConvergenceStatus(
+                current_generation=json['currentGeneration'],
+                wanted_generation=json['wantedGeneration'],
+                converged=json['converged']
+            )
+
+        except (JSONDecodeError, KeyError) as e:
+            raise VespaError(f'Unexpected response: {response.text}') from e
 
     async def _feed_batch_async(self, batch: List[VespaDocument],
                                 schema: str,
@@ -280,7 +462,7 @@ class VespaClient:
         errors = False
         for task in tasks:
             result = task.result()
-            responses.append(task.result())
+            responses.append(result)
             if result.status != '200':
                 errors = True
 
@@ -303,6 +485,10 @@ class VespaClient:
             # This will cover 200 and document-specific errors. Other unexpected errors will be raised.
             return FeedResponse(**resp.json(), status=resp.status_code)
         except JSONDecodeError:
+            if resp.status_code == 200:
+                # A 200 response shouldn't reach here
+                raise VespaError(f'Unexpected response: {resp.text}')
+
             self._raise_for_status(resp)
 
     def _feed_document_sync(self, sync_client: httpx.Client, document: VespaDocument, schema: str,
@@ -316,8 +502,23 @@ class VespaClient:
 
         return FeedResponse(**resp.json(), status=resp.status_code)
 
-    def _raise_for_status(self, resp):
+    def _raise_for_status(self, resp) -> None:
         try:
             resp.raise_for_status()
         except httpx.HTTPStatusError as e:
-            raise VespaStatusError(e) from e
+            response = e.response
+            try:
+                json = response.json()
+                error_code = json['error-code']
+                message = json['message']
+            except Exception:
+                raise VespaStatusError(message=response.text, cause=e) from e
+
+            self._raise_for_error_code(error_code, message, e)
+
+    def _raise_for_error_code(self, error_code: str, message: str, cause: Exception) -> None:
+        exception = self._VESPA_ERROR_CODE_TO_EXCEPTION.get(error_code, VespaError)
+        if exception:
+            raise exception(message=message, cause=cause) from cause
+
+        raise VespaStatusError(message=f'{error_code}: {message}', cause=cause) from cause
