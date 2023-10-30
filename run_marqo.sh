@@ -49,8 +49,8 @@ if [[ ! $VESPA_CONFIG_URL ]]; then
   tmux send-keys -t vespa "vespa deploy /app/scripts/vespa_dummy_app/ --wait 300" C-m
 
   export VESPA_QUERY_URL="http://localhost:8080"
-  export VESPA_DOCUMENT_URL="http://localhost:8080/8080"
-  export VESPA_CONFIG_URL="http://localhost:8080/19071"
+  export VESPA_DOCUMENT_URL="http://localhost:8080"
+  export VESPA_CONFIG_URL="http://localhost:19071"
 
 else
   echo "Found VESPA_CONFIG_URL. Skipping internal Vespa configuration"
