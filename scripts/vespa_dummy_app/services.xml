@@ -11,10 +11,10 @@
     <content id="content_default" version="1.0">
         <redundancy>2</redundancy>
         <documents>
+            <document type="vespa_dummy_schema" mode="index"/>
         </documents>
         <nodes>
             <node hostalias="node1" distribution-key="0"/>
         </nodes>
     </content>
-
 </services>
