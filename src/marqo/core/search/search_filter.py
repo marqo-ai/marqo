@@ -272,21 +272,3 @@ class MarqoFilterStringParser:
         root = stack.pop()
 
         return SearchFilter(root)
-
-
-if __name__ == '__main__':
-    # filter = MarqoFilterStringParser.parse('a )AND b OR')
-    filter = MarqoFilterStringParser.parse('')
-    print(filter.print_tree())
-    pass
-
-    tree1 = SearchFilter(
-        root=Or(None, None)
-    )
-    tree2 = SearchFilter(
-        root=Or(None, None)
-    )
-
-    print(tree1 == tree2)
-
-# a OR OR c
