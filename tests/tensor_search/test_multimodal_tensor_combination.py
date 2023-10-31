@@ -421,7 +421,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                             "text_field": "A rider is riding a horse jumping over the barrier.",
                             "image_field": {
                                 "image_url": "https://marqo-assets.s3.amazonaws.com/tests/images/image2.jpg",
-                                },
+                            },
                         },
                         "_id": "123",
                     }],
@@ -1250,4 +1250,3 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         stats = tensor_search.get_stats(config=self.config, index_name=self.index_name_1)
         assert stats['numberOfDocuments'] == 3
         assert stats["numberOfVectors"] == 3
-
