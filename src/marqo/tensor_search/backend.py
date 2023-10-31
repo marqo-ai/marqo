@@ -17,7 +17,12 @@ from marqo.tensor_search.index_meta_cache import get_index_info as get_cached_in
 import pprint
 
 
-def get_index_info(config: Config, index_name: str) -> IndexInfo:
+def get_index_info(
+        config: Config,
+        index_name: str,
+        max_retry_attempts: int = None,
+        max_retry_backoff_seconds: int = None
+    ) -> IndexInfo:
     """Gets useful information about the index. Also updates the IndexInfo cache
 
     Args:
@@ -31,7 +36,11 @@ def get_index_info(config: Config, index_name: str) -> IndexInfo:
         NonTensorIndexError: If the index's mapping doesn't conform to a Tensor Search index.
         IndexNotFoundError: If index does not exist.
     """
-    res = HttpRequests(config).get(path=F"{index_name}/_mapping")
+    res = HttpRequests(config).get(
+        path=F"{index_name}/_mapping",
+        max_retry_attempts=max_retry_attempts,
+        max_retry_backoff_seconds=max_retry_backoff_seconds
+    )
 
     if not (index_name in res and "mappings" in res[index_name]
             and "_meta" in res[index_name]["mappings"]):
@@ -62,7 +71,9 @@ def get_index_info(config: Config, index_name: str) -> IndexInfo:
 
 def add_customer_field_properties(config: Config, index_name: str,
                                   customer_field_names: Iterable[Tuple[str, enums.OpenSearchDataType]],
-                                  multimodal_combination_fields: Dict[str, Iterable[Tuple[str, enums.OpenSearchDataType]]]):
+                                  multimodal_combination_fields: Dict[str, Iterable[Tuple[str, enums.OpenSearchDataType]]],
+                                  max_retry_attempts: int = None,
+                                  max_retry_backoff_seconds: int = None) -> None:
     """Adds new customer fields to index mapping.
 
     Pushes the updated mapping to OpenSearch, and updates the local cache.
@@ -110,7 +121,12 @@ def add_customer_field_properties(config: Config, index_name: str,
         },
     }
 
-    mapping_res = HttpRequests(config).put(path=F"{index_name}/_mapping", body=json.dumps(body))
+    mapping_res = HttpRequests(config).put(
+        path=F"{index_name}/_mapping",
+        body=json.dumps(body),
+        max_retry_attempts=max_retry_attempts,
+        max_retry_backoff_seconds=max_retry_backoff_seconds
+    )
 
     merged_chunk_properties = {
         **existing_info.properties[enums.TensorField.chunks]["properties"],

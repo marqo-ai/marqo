@@ -33,7 +33,12 @@ def empty_cache():
     index_info_cache = dict()
 
 
-def get_index_info(config: Config, index_name: str) -> IndexInfo:
+def get_index_info(
+        config: Config,
+        index_name: str,
+        max_retry_attempts: int = None,
+        max_retry_backoff_seconds: int = None
+    ) -> IndexInfo:
     """Looks for the index name in the cache.
 
     If it isn't found there, it will try searching the cluster
@@ -51,7 +56,12 @@ def get_index_info(config: Config, index_name: str) -> IndexInfo:
     if index_name in index_info_cache:
         return index_info_cache[index_name]
     else:
-        found_index_info = backend.get_index_info(config=config, index_name=index_name)
+        found_index_info = backend.get_index_info(
+            config=config,
+            index_name=index_name,
+            max_retry_attempts=max_retry_attempts,
+            max_retry_backoff_seconds=max_retry_backoff_seconds
+        )
         index_info_cache[index_name] = found_index_info
         return index_info_cache[index_name]
 
