@@ -57,7 +57,7 @@ from marqo.config import Config
 from marqo.core import constants
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models.marqo_index import IndexType, MarqoIndex, FieldType
-from marqo.core.models.marqo_query import MarqoTensorQuery
+from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery
 from marqo.core.structured_vespa_index import StructuredVespaIndex
 from marqo.core.vespa_index import for_marqo_index as vespa_index_factory
 from marqo.s2_inference import errors as s2_inference_errors
@@ -1177,95 +1177,47 @@ def _lexical_search(
             f"Query arg must be of type str! text arg is of type {type(text)}. "
             f"Query arg: {text}")
 
-    # SEARCH TIMER-LOGGER (pre-processing)
-    RequestMetricsStore.for_request().start("search.lexical.processing_before_opensearch")
-    if searchable_attributes is not None:
-        # Empty searchable attributes should produce empty results.
-        if len(searchable_attributes) == 0:
-            return {"hits": []}
+    marqo_index = index_meta_cache.get_index(config=config, index_name=index_name)
 
-        fields_to_search = searchable_attributes
-    else:
-        fields_to_search = index_meta_cache.get_index_info(
-            config=config, index_name=index_name
-        ).get_true_text_properties()
+    # SEARCH TIMER-LOGGER (pre-processing)
+    RequestMetricsStore.for_request().start("search.lexical.processing_before_vespa")
 
     # Parse text into required and optional terms.
-    (required_terms, optional_blob) = utils.parse_lexical_query(text)
+    (required_terms, optional_terms) = utils.parse_lexical_query(text)
 
-    body = {
-        "query": {
-            "bool": {
-                # Optional blob terms SHOULD be in results.
-                "should": [
-                    {"match": {field: optional_blob}}
-                    for field in fields_to_search
-                ],
-                # Required terms MUST be in results.
-                "must": [
-                    {
-                        # Nested bool, since required term can be in ANY field.
-                        "bool": {
-                            "should": [
-                                {"match_phrase": {field: term}}
-                                for field in fields_to_search
-                            ]
-                        }
-                    }
-                    for term in required_terms
-                ],
-                "must_not": [
-                    {"exists": {"field": TensorField.field_name}}
-                ],
-            }
-        },
-        "size": result_count,
-        "from": offset
-    }
+    marqo_query = MarqoLexicalQuery(
+        index_name=index_name,
+        or_phrases=optional_terms,
+        and_phrases=required_terms,
+        filter=filter_string,
+        limit=result_count,
+        offset=offset,
+        searchable_attributes=searchable_attributes,
+        attributes_to_retrieve=attributes_to_retrieve
+    )
 
-    if filter_string is not None:
-        body["query"]["bool"]["filter"] = [{
-            "query_string": {"query": filter_string}}]
-    if attributes_to_retrieve is not None:
-        body["_source"] = {"include": attributes_to_retrieve} if len(attributes_to_retrieve) > 0 else False
-    if not expose_facets:
-        if "_source" not in body:
-            body["_source"] = dict()
-        if body["_source"] is not False:
-            body["_source"]["exclude"] = [f"*{TensorField.vector_prefix}*"]
+    vespa_index = vespa_index_factory(marqo_index)
+    vespa_query = vespa_index.to_vespa_query(marqo_query, marqo_index)
 
-    total_preprocess_time = RequestMetricsStore.for_request().stop("search.lexical.processing_before_opensearch")
+    total_preprocess_time = RequestMetricsStore.for_request().stop("search.lexical.processing_before_vespa")
     logger.debug(f"search (lexical) pre-processing: took {(total_preprocess_time):.3f}ms to process query.")
 
-    start_search_http_time = timer()
-    with RequestMetricsStore.for_request().time("search.opensearch._search"):
-        search_res = HttpRequests(config).get(path=f"{index_name}/_search", body=body)
-    RequestMetricsStore.for_request().add_time("search.opensearch._search.internal",
-                                               search_res["took"] * 0.001)  # internal, not round trip time
-
-    end_search_http_time = timer()
-    total_search_http_time = end_search_http_time - start_search_http_time
-    total_os_process_time = search_res["took"] * 0.001
-    num_results = len(search_res['hits']['hits'])
-    logger.debug(
-        f"search (lexical) roundtrip: took {(total_search_http_time):.3f}s to send search query (roundtrip) to Marqo-os and received {num_results} results.")
-    logger.debug(
-        f"  search (lexical) Marqo-os processing time: took {(total_os_process_time):.3f}s for Marqo-os to execute the search.")
+    with RequestMetricsStore.for_request().time("search.lexical.vespa",
+                                                lambda t: logger.debug(f"Vespa search: took {t:.3f}ms")
+                                                ):
+        responses = config.vespa_client.query(**vespa_query)
 
     # SEARCH TIMER-LOGGER (post-processing)
     RequestMetricsStore.for_request().start("search.lexical.postprocess")
-    res_list = []
-    for doc in search_res['hits']['hits']:
-        just_doc = _clean_doc(doc["_source"].copy()) if "_source" in doc else dict()
-        just_doc["_id"] = doc["_id"]
-        just_doc["_score"] = doc["_score"]
-        res_list.append({**just_doc, "_highlights": []})
+    gathered_docs = gather_documents_from_response(responses, marqo_index, False)
 
     total_postprocess_time = RequestMetricsStore.for_request().stop("search.lexical.postprocess")
     logger.debug(
-        f"search (lexical) post-processing: took {(total_postprocess_time):.3f}ms to format {len(res_list)} results.")
+        f"search (lexical) post-processing: took {(total_postprocess_time):.3f}ms to format "
+        f"{len(gathered_docs)} results."
+    )
 
-    return {'hits': res_list}
+    return {"hits": gathered_docs}
 
 
 def construct_vector_input_batches(query: Union[str, Dict], index_info: MarqoIndex) -> Tuple[List[str], List[str]]:
@@ -1399,7 +1351,8 @@ def gather_documents_from_response(response: QueryResult, marqo_index: MarqoInde
         marqo_doc = vespa_index.to_marqo_document(doc.dict(), marqo_index, return_highlights=highlights)
         marqo_doc['_score'] = doc.relevance
         # Delete chunk data
-        del marqo_doc[constants.MARQO_DOC_TENSORS]
+        if constants.MARQO_DOC_TENSORS in marqo_doc:
+            del marqo_doc[constants.MARQO_DOC_TENSORS]
         hits.append(marqo_doc)
 
     return {'hits': hits}
@@ -1779,12 +1732,9 @@ def _vector_text_search(
     if not device:
         raise errors.InternalError("_vector_text_search cannot be called without `device`!")
 
-    RequestMetricsStore.for_request().start("search.vector.processing_before_opensearch")
+    RequestMetricsStore.for_request().start("search.vector.processing_before_vespa")
 
-    try:
-        marqo_index = index_meta_cache.get_index(config=config, index_name=index_name)
-    except KeyError as e:
-        raise errors.IndexNotFoundError(message="Tried to search a non-existent index: {}".format(index_name))
+    marqo_index = index_meta_cache.get_index(config=config, index_name=index_name)
 
     queries = [BulkSearchQueryEntity(
         q=query, searchableAttributes=searchable_attributes, searchMethod=SearchMethod.TENSOR, limit=result_count,
@@ -1813,12 +1763,15 @@ def _vector_text_search(
     if verbose:
         _vector_text_search_query_verbose(verbose=verbose, body=vespa_query)
 
-    total_preprocess_time = RequestMetricsStore.for_request().stop("search.vector.processing_before_opensearch")
+    total_preprocess_time = RequestMetricsStore.for_request().stop("search.vector.processing_before_vespa")
     logger.debug(
         f"search (tensor) pre-processing: took {(total_preprocess_time):.3f}ms to vectorize and process query.")
 
     # SEARCH TIMER-LOGGER (roundtrip)
-    responses = config.vespa_client.query(**vespa_query)
+    with RequestMetricsStore.for_request().time("search.vector.vespa",
+                                                lambda t: logger.debug(f"Vespa search: took {t:.3f}ms")
+                                                ):
+        responses = config.vespa_client.query(**vespa_query)
 
     # SEARCH TIMER-LOGGER (post-processing)
     RequestMetricsStore.for_request().start("search.vector.postprocess")
@@ -1837,12 +1790,13 @@ def _vector_text_search(
     #     elif verbose == 2:
     #         pprint.pprint(completely_sorted)
 
-    # res = _format_ordered_docs_simple(ordered_docs_w_chunks=completely_sorted, result_count=result_count)
-
     total_postprocess_time = RequestMetricsStore.for_request().stop("search.vector.postprocess")
     logger.debug(
-        f"search (tensor) post-processing: took {(total_postprocess_time):.3f}ms to sort and format {len(gathered_docs)} results from Marqo-os.")
-    return gathered_docs
+        f"search (tensor) post-processing: took {(total_postprocess_time):.3f}ms to sort and format "
+        f"{len(gathered_docs)} results from Vespa."
+    )
+
+    return {"hits": gathered_docs}
 
 
 def _format_ordered_docs_simple(ordered_docs_w_chunks: List[dict], result_count: int) -> dict:

@@ -1,18 +1,19 @@
-import os
-import typing
-import functools
-import json
-from timeit import default_timer as timer
-import torch
-from marqo import errors
-from marqo.tensor_search import enums, configs, constants
-from typing import (
-    List, Optional, Union, Callable, Iterable, Sequence, Dict, Tuple
-)
-from marqo.marqo_logging import logger
 import copy
 import datetime
+import functools
+import json
+import os
 import pathlib
+from timeit import default_timer as timer
+from typing import (
+    List, Optional, Union, Sequence, Dict, Tuple
+)
+
+import torch
+
+from marqo import errors
+from marqo.marqo_logging import logger
+from marqo.tensor_search import enums, configs
 from marqo.tensor_search.enums import EnvVars
 
 
@@ -88,6 +89,7 @@ def construct_authorized_url(url_base: str, username: str, password: str) -> str
         raise errors.MarqoError(f"Could not parse url: {url_base}")
     http_part, domain_part = url_split
     return f"{http_part}{http_sep}{username}:{password}@{domain_part}"
+
 
 def check_device_is_available(device: str) -> bool:
     """Checks if a device is available on the machine
@@ -197,10 +199,11 @@ def read_env_vars_and_defaults_ints(var: str) -> Optional[int]:
     return as_int
 
 
-def parse_lexical_query(text: str) -> Tuple[List[str], str]:
-    """Find required terms enclosed within double quotes.
+def parse_lexical_query(text: str) -> Tuple[List[str], List[str]]:
+    """
+    Find required terms enclosed within double quotes.
 
-    All other terms go into optional_blob, separated by whitespace.
+    All other terms go into optional_terms, split by whitespace.
 
     Syntax:
         Required strings must be enclosed by quotes. These quotes must be enclosed by spaces or the start
@@ -215,10 +218,10 @@ def parse_lexical_query(text: str) -> Tuple[List[str], str]:
     Users need to escape the backslash itself. (Single \ get ignored) -> q='dwayne \\"the rock\\" johnson'
 
     Return:
-        2-tuple of <required terms> (for "must" clause) <optional blob> (for "should" clause)
+        2-tuple of <required terms> (for "must" clause) <optional terms> (for "should" clause)
     """
     required_terms = []
-    optional_blob = ""
+    optional_terms = ""
     opening_quote_idx = None
 
     if not isinstance(text, str):
@@ -226,46 +229,46 @@ def parse_lexical_query(text: str) -> Tuple[List[str], str]:
 
     for i in range(len(text)):
         # Add all characters to blob initially
-        optional_blob += text[i]
+        optional_terms += text[i]
 
         if text[i] == '"':
             # Check if ESCAPED
-            if i > 0 and text[i-1] == '\\':
+            if i > 0 and text[i - 1] == '\\':
                 # Read quote literally. Backslash should be ignored (both blob and required)
                 pass
 
             # Check if CLOSING QUOTE
             # Closing " must have space on the right (or is last character) while opening exists.
-            elif (opening_quote_idx is not None) and (i == len(text) - 1 or text[i+1] == " "):
-                    # Add everything in between the quotes as a required term
-                    new_required_term = text[opening_quote_idx+1:i]
-                    required_terms.append(new_required_term)
+            elif (opening_quote_idx is not None) and (i == len(text) - 1 or text[i + 1] == " "):
+                # Add everything in between the quotes as a required term
+                new_required_term = text[opening_quote_idx + 1:i]
+                required_terms.append(new_required_term)
 
-                    # Remove this required term from the optional blob
-                    optional_blob = optional_blob[:-(len(new_required_term)+2)]
-                    opening_quote_idx = None
+                # Remove this required term from the optional blob
+                optional_terms = optional_terms[:-(len(new_required_term) + 2)]
+                opening_quote_idx = None
 
             # Check if OPENING QUOTE
             # Opening " must have space on the left (or is first character).
-            elif i == 0 or text[i-1] == " ":
+            elif i == 0 or text[i - 1] == " ":
                 opening_quote_idx = i
 
             # None of the above: Syntax error. Interpret text literally instead.
             else:
-                return([], text)
+                return ([], text)
 
     if opening_quote_idx is not None:
         # string parsing finished with a quote still open: syntax error.
         return ([], text)
 
     # Remove double/leading white spaces
-    optional_blob = " ".join(optional_blob.split())
+    optional_terms = optional_terms.split()
 
     # Remove escape character. `\"` becomes just `"`
     required_terms = [term.replace('\\"', '"') for term in required_terms]
-    optional_blob = optional_blob.replace('\\"', '"')
+    optional_terms = [term.replace('\\"', '"') for term in optional_terms]
 
-    return (required_terms, optional_blob)
+    return required_terms, optional_terms
 
 
 def get_marqo_root_from_env() -> str:
@@ -303,12 +306,14 @@ def _get_marqo_root() -> str:
     marqo_base_dir = tensor_search_dir.parent.resolve()
     return str(marqo_base_dir)
 
+
 def add_timing(f, key: str = "processingTimeMs"):
     """ Function decorator to add function timing to response payload.
 
     Decorator for functions that adds the processing time to the return Dict (NOTE: must return value of function must
     be a dictionary). `key` param denotes what the processing time will be stored against.
     """
+
     @functools.wraps(f)
     def wrap(*args, **kw):
         t0 = timer()
@@ -316,6 +321,7 @@ def add_timing(f, key: str = "processingTimeMs"):
         time_taken = timer() - t0
         r[key] = round(time_taken * 1000)
         return r
+
     return wrap
 
 
@@ -327,12 +333,14 @@ def generate_batches(seq: Sequence, batch_size: int):
     for i in range(0, len(seq), batch_size):
         yield seq[i:i + batch_size]
 
+
 def get_best_available_device() -> str:
     """Get the best available device for Marqo to use and validate it."""
     device = read_env_vars_and_defaults(EnvVars.MARQO_BEST_AVAILABLE_DEVICE)
     if device is None or not check_device_is_available(device):
-        raise errors.InternalError(f"Marqo encountered an error when loading device from environment variable `MARQO_BEST_AVAILABLE_DEVICE`. "
-                           f"Invalid device: {device}. Must be either 'cpu' or start with 'cuda'.")
+        raise errors.InternalError(
+            f"Marqo encountered an error when loading device from environment variable `MARQO_BEST_AVAILABLE_DEVICE`. "
+            f"Invalid device: {device}. Must be either 'cpu' or start with 'cuda'.")
     return device
 
 
@@ -354,7 +362,7 @@ def is_tensor_field(field: str,
 def calculate_health_status(marqo_os_health_check_response: Optional[Dict]) -> dict:
     """Calculate the health status of Marqo based on the response API from Marqo-os ."""
     statuses = {
-        "green" : 0,
+        "green": 0,
         "yellow": 1,
         "red": 2,
     }
@@ -377,4 +385,3 @@ def calculate_health_status(marqo_os_health_check_response: Optional[Dict]) -> d
 def check_is_zero_vector(vector: List[float]) -> bool:
     """Check if a vector is all zero. We assume the input to this function is of valid type, List[Float]"""
     return all([x == 0 for x in vector])
-

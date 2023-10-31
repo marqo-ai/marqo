@@ -2,11 +2,9 @@ import marqo.core.constants as constants
 from marqo.core.exceptions import InvalidDataTypeError, InvalidFieldNameError, VespaDocumentParsingError
 from marqo.core.models import MarqoQuery
 from marqo.core.models.marqo_index import *
-from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery, MarqoHybridQuery, ScoreModifierType, \
-    ScoreModifier
+from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery, MarqoHybridQuery, ScoreModifierType
 from marqo.core.vespa_index import VespaIndex
 from marqo.exceptions import InternalError
-from tests.marqo_test import MarqoTestCase
 
 
 class StructuredVespaIndex(VespaIndex):
@@ -231,7 +229,6 @@ class StructuredVespaIndex(VespaIndex):
 
     @classmethod
     def _to_vespa_tensor_query(cls, marqo_query: MarqoTensorQuery, marqo_index: MarqoIndex) -> Dict[str, Any]:
-        # Validate field names
         if marqo_query.searchable_attributes is not None:
             for att in marqo_query.searchable_attributes:
                 if att not in marqo_index.tensor_field_map:
@@ -240,17 +237,17 @@ class StructuredVespaIndex(VespaIndex):
                         f'Available tensor fields are {", ".join(marqo_index.tensor_field_map.keys())}'
                     )
 
-            fields_to_search = [f for f in marqo_query.searchable_attributes if f in marqo_index.tensor_field_map]
+            fields_to_search = marqo_query.searchable_attributes
         else:
             fields_to_search = marqo_index.tensor_field_map.keys()
 
         tensor_term = cls._get_tensor_search_term(marqo_query, marqo_index)
-        filter_term = cls._get_filter_term(marqo_query, marqo_index)
+        filter_term = cls._get_filter_term(marqo_query)
         if filter_term:
             filter_term = f' AND {filter_term}'
         else:
             filter_term = ''
-        select_attributes = cls._get_select_attributes(marqo_query, marqo_index)
+        select_attributes = cls._get_select_attributes(marqo_query)
         summary = cls._SUMMARY_ALL_VECTOR if marqo_query.expose_facets else cls._SUMMARY_ALL_NON_VECTOR
         score_modifiers = cls._get_score_modifiers(marqo_query, marqo_index)
         ranking = cls._RANK_PROFILE_EMBEDDING_SIMILARITY_MODIFIERS if score_modifiers \
@@ -280,7 +277,50 @@ class StructuredVespaIndex(VespaIndex):
 
     @classmethod
     def _to_vespa_lexical_query(cls, marqo_query: MarqoLexicalQuery, marqo_index: MarqoIndex) -> Dict[str, Any]:
-        raise NotImplementedError()
+        if marqo_query.searchable_attributes is not None:
+            for att in marqo_query.searchable_attributes:
+                if att not in marqo_index.lexically_searchable_fields_names:
+                    raise InvalidFieldNameError(
+                        f'Index {marqo_index.name} has no lexically searchable field {att}. '
+                        f'Available lexically searchable fields are '
+                        f'{", ".join(marqo_index.lexically_searchable_fields_names)}'
+                    )
+            fields_to_search = marqo_query.searchable_attributes
+        else:
+            fields_to_search = marqo_index.lexical_fields_names
+
+        lexical_term = cls._get_lexical_search_term(marqo_query, marqo_index)
+        filter_term = cls._get_filter_term(marqo_query)
+        if filter_term:
+            filter_term = f' AND {filter_term}'
+        else:
+            filter_term = ''
+
+        select_attributes = cls._get_select_attributes(marqo_query)
+        summary = cls._SUMMARY_ALL_VECTOR if marqo_query.expose_facets else cls._SUMMARY_ALL_NON_VECTOR
+        score_modifiers = cls._get_score_modifiers(marqo_query, marqo_index)
+        ranking = cls._RANK_PROFILE_BM25_MODIFIERS if score_modifiers \
+            else cls._RANK_PROFILE_BM25
+
+        query_inputs = {}
+        query_inputs.update({
+            f: 1 for f in fields_to_search
+        })
+        if score_modifiers:
+            query_inputs.update(score_modifiers)
+
+        query = {
+            'yql': f'select {select_attributes} from {marqo_query.index_name} where {lexical_term}{filter_term}',
+            'model_restrict': marqo_query.index_name,
+            'hits': marqo_query.limit,
+            'offset': marqo_query.offset,
+            'query_features': query_inputs,
+            'presentation.summary': summary,
+            'ranking': ranking
+        }
+        query = {k: v for k, v in query.items() if v is not None}
+
+        return query
 
     @classmethod
     def _to_vespa_hybrid_query(cls, marqo_query: MarqoHybridQuery, marqo_index: MarqoIndex) -> Dict[str, Any]:
@@ -313,14 +353,14 @@ class StructuredVespaIndex(VespaIndex):
             return ''
 
     @classmethod
-    def _get_filter_term(cls, marqo_query: MarqoQuery, marqo_index: MarqoIndex) -> str:
+    def _get_filter_term(cls, marqo_query: MarqoQuery) -> str:
         if marqo_query.filter is not None:
             raise NotImplementedError('Filters are not supported yet')
 
         return None
 
     @classmethod
-    def _get_select_attributes(cls, marqo_query: MarqoQuery, marqo_index: MarqoIndex) -> str:
+    def _get_select_attributes(cls, marqo_query: MarqoQuery) -> str:
         if marqo_query.attributes_to_retrieve is not None:
             return ', '.join(marqo_query.attributes_to_retrieve)
         else:
@@ -345,6 +385,35 @@ class StructuredVespaIndex(VespaIndex):
             }
 
         return None
+
+    @classmethod
+    def _get_lexical_search_term(cls, marqo_query: MarqoLexicalQuery, marqo_index: MarqoIndex) -> str:
+        if marqo_query.or_phrases:
+            or_terms = 'weakAnd(%s)' % ', '.join([
+                cls._get_lexical_contains_term(phrase, marqo_query, marqo_index) for phrase in marqo_query.or_phrases
+            ])
+        else:
+            or_terms = ''
+        if marqo_query.and_phrases:
+            and_terms = ' AND '.join([
+                cls._get_lexical_contains_term(phrase, marqo_query, marqo_index) for phrase in marqo_query.and_phrases
+            ])
+            if or_terms:
+                and_terms = f' AND ({and_terms})'
+        else:
+            and_terms = ''
+
+        return f'{or_terms}{and_terms}'
+
+    @classmethod
+    def _get_lexical_contains_term(cls, phrase, query: MarqoQuery, marqo_index: MarqoIndex) -> str:
+        if query.searchable_attributes is not None:
+            return ' OR '.join([
+                f'{marqo_index.field_map[field].lexical_field_name} contains "{phrase}"'
+                for field in query.searchable_attributes
+            ])
+        else:
+            return f'default contains "{phrase}"'
 
     @classmethod
     def _verify_marqo_field_name(cls, field_name: str, marqo_index: MarqoIndex):
