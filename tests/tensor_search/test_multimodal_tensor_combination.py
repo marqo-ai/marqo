@@ -1229,12 +1229,20 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             "_id": "invalid_0",
             "combo_text_image": {
                 "text_field_1": "A rider is riding a horse jumping over the barrier.",
+                "image_field_1": "https://invalid/url/image0.jpg",
+            },
+        }
+
+        invalid_doc_1 = {
+            "_id": "invalid_1",
+            "combo_text_image": {
+                "text_field_1": "A rider is riding a horse jumping over the barrier.",
                 "image_field_1": "https://invalid/url/image1.jpg",
             },
         }
 
-        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
-            index_name=self.index_name_1, docs=[valid_doc_0, valid_doc_1, valid_doc_2, invalid_doc_0],
+        res = tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+            index_name=self.index_name_1, docs=[valid_doc_0, valid_doc_1, valid_doc_2, invalid_doc_0, invalid_doc_1],
             mappings={
                 "combo_text_image": {
                     "type": "multimodal_combination",
@@ -1250,3 +1258,13 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         stats = tensor_search.get_stats(config=self.config, index_name=self.index_name_1)
         assert stats['numberOfDocuments'] == 3
         assert stats["numberOfVectors"] == 3
+
+        # Check the response body from add_documents
+        assert res["errors"]
+        assert len(res["items"]) == 5
+        for item in res["items"]:
+            if item["_id"] in ["valid_0", "valid_1", "valid_2"]:
+                assert item["result"] == "created"
+            elif item["_id"] in ["invalid_0", "invalid_1"]:
+                assert "error" in item
+                assert "https://invalid/url/" in item["error"]
