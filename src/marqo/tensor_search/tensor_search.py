@@ -646,6 +646,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                     total_vectorise_time = total_vectorise_time + combo_vectorise_time_to_add
                     
                     if combo_document_is_valid is False:
+                        document_is_valid = False
                         unsuccessful_docs.append(unsuccessful_doc_to_append)
                         break
                     else:
