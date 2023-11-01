@@ -50,6 +50,7 @@ class TestGetDocuments(MarqoTestCase):
             config=self.config, index_name=self.index_name_1, document_ids=['1', '2', '3'],
             show_vectors=True)
         pprint.pprint(res)
+        # TODO: Confirm the content is actually correct
 
     def test_get_documents_vectors_format(self):
         keys = [("title 1", "desc 2", "_id"), ("title 1", "desc 2", "_id")]

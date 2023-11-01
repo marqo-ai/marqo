@@ -13,6 +13,8 @@ from marqo import errors
 from marqo.tensor_search import enums
 from tests.utils.transition import add_docs_caller, add_docs_batched
 import os
+import pprint
+from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 
 
 class TestDeleteDocuments(MarqoTestCase):
@@ -23,7 +25,6 @@ class TestDeleteDocuments(MarqoTestCase):
 
         self.generic_header = {"Content-type": "application/json"}
         self.index_name_1 = "my-test-index-1"
-
         self._delete_testing_indices()
 
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
@@ -267,7 +268,55 @@ class TestDeleteDocuments(MarqoTestCase):
         remaining_document = tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1,
                                                               document_id="doc_id_2")
         self.assertEqual(remaining_document["_id"], "doc_id_2")
+    
+    def test_delete_documents_some_missing(self):
+        """
+        Tests that `items` list is correctly made, some documents were successfully deleted, some were not.
+        """
+        # Add the documents
+        tensor_search.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                device="cpu",
+                docs=[
+                    {"_id": "doc1", "field1": "value1"},
+                    {"_id": "doc2", "field1": "value1"},
+                ], 
+                index_name=self.index_name_1,
+                auto_refresh=True
+            )
+        )
 
+        # Delete the documents (with extras)
+        response = tensor_search.delete_documents(
+            config=self.config, index_name=self.index_name_1, doc_ids=["doc1", "doc2", "doc3", "doc4"], auto_refresh=True
+        )
+        
+        expected_response = {
+            'details': {'deletedDocuments': 2, 'receivedDocumentIds': 4},
+            'index_name': 'my-test-index-1',
+            'items': [{'_id': 'doc1',
+                        '_shards': {'failed': 0, 'successful': 1, 'total': 1},
+                        'result': 'deleted',
+                        'status': 200},
+                    {'_id': 'doc2',
+                        '_shards': {'failed': 0, 'successful': 1, 'total': 1},
+                        'result': 'deleted',
+                        'status': 200},
+                    {'_id': 'doc3',
+                        '_shards': {'failed': 0, 'successful': 1, 'total': 1},
+                        'result': 'not_found',
+                        'status': 404},
+                    {'_id': 'doc4',
+                        '_shards': {'failed': 0, 'successful': 1, 'total': 1},
+                        'result': 'not_found',
+                        'status': 404}],
+            'status': 'succeeded',
+            'type': 'documentDeletion'
+        }
+
+        for key in expected_response:
+            self.assertEqual(response[key], expected_response[key])
 
 class TestDeleteDocumentsEndpoint(MarqoTestCase):
     """Module that has tests at the tensor_search level"""
@@ -276,7 +325,32 @@ class TestDeleteDocumentsEndpoint(MarqoTestCase):
         super().setUp()
 
         self.index_name_1 = "my-test-index-1"
-
+        self.mock_result_list = [
+            {
+                "delete": {
+                    '_id': '1',
+                    '_shards': {'failed': 0, 'successful': 1, 'total': 1},
+                    'result': 'deleted',
+                    'status': 200
+                }
+            },
+            {
+                "delete": {
+                    '_id': '2',
+                    '_shards': {'failed': 0, 'successful': 1, 'total': 1},
+                    'result': 'deleted',
+                    'status': 200
+                }
+            },
+            {
+                "delete": {
+                    '_id': '3',
+                    '_shards': {'failed': 0, 'successful': 1, 'total': 1},
+                    'result': 'deleted',
+                    'status': 200
+                }
+            },
+        ]
         self._delete_testing_indices()
 
     def _delete_testing_indices(self):
@@ -291,7 +365,8 @@ class TestDeleteDocumentsEndpoint(MarqoTestCase):
             index_name=self.index_name_1,
             status_string="succeeded",
             document_ids=["1", "2", "3"],
-            deleted_docments_count=3,
+            result_list=self.mock_result_list,
+            deleted_documents_count=3,
             deletion_start=datetime.datetime(2023, 4, 17, 0, 0, 0),
             deletion_end=datetime.datetime(2023, 4, 17, 0, 0, 5),
         )
@@ -306,6 +381,7 @@ class TestDeleteDocumentsEndpoint(MarqoTestCase):
         self.assertEqual(formatted_response["duration"], "PT5.0S")
         self.assertEqual(formatted_response["startedAt"], "2023-04-17T00:00:00Z")
         self.assertEqual(formatted_response["finishedAt"], "2023-04-17T00:00:05Z")
+        self.assertEqual(formatted_response["items"], self.mock_result_list)
 
     def test_delete_documents_valid_request(self):
         config_copy = deepcopy(self.config)
@@ -319,7 +395,8 @@ class TestDeleteDocumentsEndpoint(MarqoTestCase):
                 index_name=self.index_name_1,
                 status_string="succeeded",
                 document_ids=["1", "2", "3"],
-                deleted_docments_count=3,
+                result_list=self.mock_result_list,
+                deleted_documents_count=3,
                 deletion_start=datetime.datetime(2023, 4, 17, 0, 0, 0),
                 deletion_end=datetime.datetime(2023, 4, 17, 0, 0, 5),
             )
@@ -358,11 +435,7 @@ class TestDeleteDocumentsEndpoint(MarqoTestCase):
         with patch("marqo.tensor_search.delete_docs.HttpRequests.post") as mock_post:
             mock_post.side_effect = [
                 {
-                    "items": [
-                        {"delete": {"status": 200}},
-                        {"delete": {"status": 200}},
-                        {"delete": {"status": 200}},
-                    ]
+                    "items": self.mock_result_list
                 }
             ]
 
@@ -371,16 +444,18 @@ class TestDeleteDocumentsEndpoint(MarqoTestCase):
             self.assertEqual(response.index_name, self.index_name_1)
             self.assertEqual(response.status_string, "succeeded")
             self.assertEqual(response.document_ids, ["1", "2", "3"])
-            self.assertEqual(response.deleted_docments_count, 3)
+            self.assertEqual(response.deleted_documents_count, 3)
+            self.assertEqual(response.result_list, [item["delete"] for item in self.mock_result_list])
 
     def test_format_delete_docs_response_valid_input(self):
         mq_delete_res = MqDeleteDocsResponse(
             index_name="test_index",
             status_string="succeeded",
             document_ids=["1", "2", "3"],
-            deleted_docments_count=3,
+            deleted_documents_count=3,
             deletion_start=datetime.datetime(2023, 4, 17, 0, 0, 0),
             deletion_end=datetime.datetime(2023, 4, 17, 0, 0, 5),
+            result_list=self.mock_result_list
         )
 
         formatted_response = delete_docs.format_delete_docs_response(mq_delete_res)
@@ -395,6 +470,7 @@ class TestDeleteDocumentsEndpoint(MarqoTestCase):
             "duration": "PT5.0S",
             "startedAt": "2023-04-17T00:00:00Z",
             "finishedAt": "2023-04-17T00:00:05Z",
+            "items": self.mock_result_list
         }
 
         self.assertEqual(formatted_response, expected_response)

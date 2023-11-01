@@ -50,11 +50,11 @@ import marqo.config as config
 from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest
 from marqo.tensor_search.enums import (
     Device, MediaType, MlModel, TensorField, SearchMethod, OpenSearchDataType,
-    EnvVars
+    EnvVars, MappingsObjectType, DocumentFieldType
 )
 from marqo.tensor_search.enums import IndexSettingsField as NsField
 from marqo.tensor_search import utils, backend, validation, configs, add_docs, filtering
-from marqo_commons.settings_validation.settings_validation import validate_index_settings
+
 from marqo.tensor_search.formatting import _clean_doc
 from marqo.tensor_search.index_meta_cache import get_cache, get_index_info
 from marqo.tensor_search import index_meta_cache
@@ -79,25 +79,31 @@ from marqo._httprequests import HttpRequests
 from marqo.config import Config
 from marqo import errors
 from marqo.s2_inference import errors as s2_inference_errors
-import threading
+
+from marqo_commons.settings_validation.settings_validation import validate_index_settings
 from marqo_commons.shared_utils.errors import InvalidSettingsArgError
+
+import threading
 from dataclasses import replace
 from marqo.tensor_search.tensor_search_logging import get_logger
 
 logger = get_logger(__name__)
 
 
-def _get_dimension_from_model_properties(model_properties: dict):
+def _get_dimension_from_model_properties(model_properties: dict) -> int:
     """
     Args:
         model_properties: dict containing model properties
     """
     try:
-        return model_properties["dimensions"]
+        return validation.validate_model_dimensions(model_properties["dimensions"])
     except KeyError:
         raise errors.InvalidArgError(
-            "The given model properties must contain a 'dimensions' key"
+            "The given model properties must contain a 'dimensions' key."
         )
+    except errors.InternalError as e:
+        # This is caused by bad `dimensions` validation.
+        raise errors.InvalidArgError(str(e)) from e
 
 
 def _add_knn_field(ix_settings: dict):
@@ -358,6 +364,9 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
         config: Config object
         add_docs_params: add_documents()'s parameters
     """
+    
+    max_add_docs_retry_attempts = utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_BACKEND_ADD_DOCS_RETRY_ATTEMPTS)
+    max_add_docs_retry_backoff = utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_BACKEND_ADD_DOCS_RETRY_BACKOFF)
     # ADD DOCS TIMER-LOGGER (3)
 
     RequestMetricsStore.for_request().start("add_documents.processing_before_opensearch")
@@ -370,12 +379,16 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
     bulk_parent_dicts = []
 
     try:
-        index_info = backend.get_index_info(config=config, index_name=add_docs_params.index_name)
+        index_info = backend.get_index_info(
+            config=config,
+            index_name=add_docs_params.index_name,
+            max_retry_attempts=max_add_docs_retry_attempts,
+            max_retry_backoff_seconds=max_add_docs_retry_backoff
+        )
+        # Retrieve model dimensions from index info
+        index_model_dimensions = index_info.get_model_properties()["dimensions"]
     except errors.IndexNotFoundError:
         raise errors.IndexNotFoundError(f"Cannot add documents to non-existent index {add_docs_params.index_name}")
-
-    if add_docs_params.mappings is not None:
-        validate_mappings = validation.validate_mappings(add_docs_params.mappings)
 
     existing_fields = set(index_info.properties.keys())
     new_fields = set()
@@ -422,7 +435,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                     doc_ids.append(add_docs_params.docs[i]["_id"])
             existing_docs = _get_documents_for_upsert(
                 config=config, index_name=add_docs_params.index_name, document_ids=doc_ids)
-
+        
         for i, doc in enumerate(add_docs_params.docs):
 
             indexing_instructions = {'index': {"_index": add_docs_params.index_name}}
@@ -462,21 +475,9 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                 else:
                     raise errors.InternalError(message= f"Upsert: found {len(matching_doc)} matching docs for {doc_id} when only 1 or 0 should have been found.")
 
-            # Metadata can be calculated here at the doc level.
-            # Only add chunk values which are string, boolean, numeric or dictionary.
-            # Dictionary keys will be store in a list.
-            chunk_values_for_filtering = {}
-            for key, value in copied.items():
-                if not (isinstance(value, str) or isinstance(value, float)
-                        or isinstance(value, bool) or isinstance(value, int)
-                        or isinstance(value, list) or isinstance(value, dict)):
-                    continue
-                chunk_values_for_filtering[key] = value
-
-            chunks = []
-
+            doc_chunks = []
             for field in copied:
-
+                # Validation phase for field
                 try:
                     field_content = validation.validate_field_content(
                         field_content=copied[field],
@@ -487,7 +488,8 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                             field=field, field_content=field_content,
                             is_non_tensor_field=not utils.is_tensor_field(field, add_docs_params.tensor_fields,
                                                                           add_docs_params.non_tensor_fields),
-                            mappings=add_docs_params.mappings)
+                            mappings=add_docs_params.mappings,
+                            index_model_dimensions=index_model_dimensions)
                 except errors.InvalidArgError as err:
                     document_is_valid = False
                     unsuccessful_docs.append(
@@ -496,22 +498,52 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                     )
                     break
 
-                if (field not in existing_fields) and (not isinstance(field_content, dict)):
-                    new_fields_from_doc.add((field, _infer_opensearch_data_type(copied[field])))
+                # Document field type used for:
+                # 1. Determining how to add field to OpenSearch index
+                # 2. Determining chunk and vectorise behavior
+                # Multimodal fields not here because they will get added later (with nesting)
+                document_field_type = add_docs.determine_document_field_type(field, field_content, add_docs_params.mappings)
+                if field not in existing_fields:
+                    if document_field_type == DocumentFieldType.standard:
+                        # Normal field (str, int, float, bool, or list)
+                        new_fields_from_doc.add((field, _infer_opensearch_data_type(field_content)))
+                    elif document_field_type == DocumentFieldType.custom_vector:
+                        # Custom vector field type in OpenSearch assimilates type of its content
+                        new_fields_from_doc.add((field, _infer_opensearch_data_type(field_content["content"])))
 
                 # Don't process text/image fields when explicitly told not to.
                 if not utils.is_tensor_field(field, add_docs_params.tensor_fields, add_docs_params.non_tensor_fields):
                     continue
 
-                # chunks generated by processing this field for this doc:
-                chunks_to_append = []
-                # Check if content of this field changed. If no, skip all chunking and vectorisation
-                if (add_docs_params.use_existing_tensors
+                # 4 current options for chunking/vectorisation behavior:
+                # A) field type is custom_vector -> no chunking or vectorisation
+                # B) use_existing_tensors=True and field content hasn't changed -> no chunking or vectorisation
+                # C) field type is standard -> chunking and vectorisation
+                # D) field type is multimodal -> use vectorise_multimodal_combination_field (does chunking and vectorisation)
+                
+                field_chunks_to_append = []     # Used by all cases. chunks generated by processing this field for this doc:
+                
+                # A) custom_vector fields -> no chunking or vectorisation
+                if document_field_type == DocumentFieldType.custom_vector:
+                    # No real vectorisation or chunking will happen for custom vector fields.
+                    # No error handling, dict validation happens before this.
+                    # Adding chunk (Only 1 chunk gets added for a custom vector field). No metadata yet.
+                    field_chunks_to_append.append({
+                        TensorField.marqo_knn_field: field_content["vector"],
+                        TensorField.field_content: field_content["content"],
+                        TensorField.field_name: field
+                    })
+                    # Update parent document (copied) to fit new format. Use content (text) to replace input dict
+                    copied[field] = field_content["content"]
+
+                # B) If field content hasn't changed -> use existing tensors, no chunking or vectorisation
+                elif (add_docs_params.use_existing_tensors
                         and existing_doc["found"]
                         and (field in existing_doc["_source"]) and (existing_doc["_source"][field] == field_content)):
-                    chunks_to_append = _get_chunks_for_field(field_name=field, doc_id=doc_id, doc=existing_doc)
+                    field_chunks_to_append = _get_chunks_for_field(field_name=field, doc_id=doc_id, doc=existing_doc)
 
-                # Chunk and vectorise, since content changed.
+                # Chunking and vectorising phase (only if content changed).
+                # C) Standard document field type
                 elif isinstance(field_content, (str, Image.Image)):
 
                     # TODO: better/consistent handling of a no-op for processing (but still vectorize)
@@ -610,43 +642,52 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                     if (len(vector_chunks) != len(text_chunks)):
                         raise RuntimeError(
                             f"the input content after preprocessing and its vectorized counterparts must be the same length."
-                            f"recevied text_chunks={len(text_chunks)} and vector_chunks={len(vector_chunks)}. "
+                            f"received text_chunks={len(text_chunks)} and vector_chunks={len(vector_chunks)}. "
                             f"check the preprocessing functions and try again. ")
 
                     for text_chunk, vector_chunk in zip(text_chunks, vector_chunks):
-                        # We do not put in metadata yet at this stage.
-                        chunks_to_append.append({
+                        # Chunk added to field chunks_to_append (no metadata yet).
+                        field_chunks_to_append.append({
                             TensorField.marqo_knn_field: vector_chunk,
                             TensorField.field_content: text_chunk,
                             TensorField.field_name: field
                         })
 
-                elif isinstance(field_content, dict):
-                    if add_docs_params.mappings[field]["type"] == "multimodal_combination":
-                        (combo_chunk, combo_document_is_valid,
-                         unsuccessful_doc_to_append, combo_vectorise_time_to_add,
-                         new_fields_from_multimodal_combination) = vectorise_multimodal_combination_field(
-                                field, field_content, copied, i, doc_id, add_docs_params.device, index_info,
-                                image_repo, add_docs_params.mappings[field], model_auth=add_docs_params.model_auth)
-                        total_vectorise_time = total_vectorise_time + combo_vectorise_time_to_add
-                        if combo_document_is_valid is False:
-                            unsuccessful_docs.append(unsuccessful_doc_to_append)
-                            break
-                        else:
-                            if field not in new_obj_fields:
-                                new_obj_fields[field] = set()
-                            new_obj_fields[field] = new_obj_fields[field].union(new_fields_from_multimodal_combination)
-                            # TODO: we may want to use chunks_to_append here to make it uniform with use_existing_tensors and normal vectorisation
-                            chunks.append({**combo_chunk, **chunk_values_for_filtering})
-                            continue
+                # D) Multimodal chunking and vectorisation
+                elif document_field_type == DocumentFieldType.multimodal_combination:
+                    (combo_chunk, combo_document_is_valid,
+                        unsuccessful_doc_to_append, combo_vectorise_time_to_add,
+                        new_fields_from_multimodal_combination) = vectorise_multimodal_combination_field(
+                            field, field_content, copied, i, doc_id, add_docs_params.device, index_info,
+                            image_repo, add_docs_params.mappings[field], model_auth=add_docs_params.model_auth)
+                    total_vectorise_time = total_vectorise_time + combo_vectorise_time_to_add
+                    
+                    if combo_document_is_valid is False:
+                        document_is_valid = False
+                        unsuccessful_docs.append(unsuccessful_doc_to_append)
+                        break
+                    else:
+                        if field not in new_obj_fields:
+                            new_obj_fields[field] = set()
+                        new_obj_fields[field] = new_obj_fields[field].union(new_fields_from_multimodal_combination)
+                        # Multimodal combo chunk added to field_chunks_to_append (no metadata yet)
+                        field_chunks_to_append.append(combo_chunk)
 
-                # Add chunks_to_append along with doc metadata to total chunks
-                for chunk in chunks_to_append:
-                    chunks.append({**chunk, **chunk_values_for_filtering})
+                # Executes REGARDLESS of document field type.
+                # Add field_chunks_to_append to total document chunk list
+                for chunk in field_chunks_to_append:
+                    doc_chunks.append(chunk)
 
             if document_is_valid:
                 new_fields = new_fields.union(new_fields_from_doc)
-                copied[TensorField.chunks] = chunks
+
+                # Create metadata to put in doc chunks (from altered doc)
+                chunk_values_for_filtering = add_docs.create_chunk_metadata(raw_document=copied)
+                for chunk in doc_chunks:
+                    # Add metadata to each doc chunk
+                    chunk.update(chunk_values_for_filtering)
+                copied[TensorField.chunks] = doc_chunks
+
                 bulk_parent_dicts.append(indexing_instructions)
                 bulk_parent_dicts.append(copied)
 
@@ -656,19 +697,30 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
 
         logger.debug(f"          add_documents vectorise: took {(total_vectorise_time):.3f}s for {doc_count} docs, "
                     f"for an average of {(total_vectorise_time / doc_count):.3f}s per doc.")
-
         if bulk_parent_dicts:
             # the HttpRequest wrapper handles error logic
             update_mapping_response = backend.add_customer_field_properties(
                 config=config, index_name=add_docs_params.index_name, customer_field_names=new_fields,
-                multimodal_combination_fields=new_obj_fields)
+                multimodal_combination_fields=new_obj_fields, max_retry_attempts=max_add_docs_retry_attempts,
+                max_retry_backoff_seconds=max_add_docs_retry_backoff)
 
             # ADD DOCS TIMER-LOGGER (5)
             start_time_5 = timer()
             with RequestMetricsStore.for_request().time("add_documents.opensearch._bulk"):
                 serialised_body = utils.dicts_to_jsonl(bulk_parent_dicts)
+                
+                bulk_path = "_bulk"
+                if add_docs_params.auto_refresh:
+                    bulk_path += "?refresh=true"
+                else:
+                    bulk_path += "?refresh=false"
+                
                 index_parent_response = HttpRequests(config).post(
-                    path="_bulk", body=serialised_body)
+                    path=bulk_path,
+                    body=serialised_body,
+                    max_retry_attempts=max_add_docs_retry_attempts,
+                    max_retry_backoff_seconds=max_add_docs_retry_backoff
+                )
             RequestMetricsStore.for_request().add_time("add_documents.opensearch._bulk.internal", float(index_parent_response["took"]))
 
             end_time_5 = timer()
@@ -685,9 +737,6 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
             index_parent_response = None
 
         with RequestMetricsStore.for_request().time("add_documents.postprocess"):
-            if add_docs_params.auto_refresh:
-                HttpRequests(config).post(path=F"{add_docs_params.index_name}/_refresh")
-
             t1 = timer()
 
             def translate_add_doc_response(response: Optional[dict], time_diff: float) -> dict:
@@ -888,7 +937,8 @@ def bulk_search(query: BulkSearchQuery, marqo_config: config.Config, verbose: in
             process non-erroring queries.
     """
     refresh_indexes_in_background(marqo_config, [q.index for q in query.queries])
-
+    max_search_retry_attempts = utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_BACKEND_SEARCH_RETRY_ATTEMPTS)
+    max_search_retry_backoff = utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_BACKEND_SEARCH_RETRY_BACKOFF)
     # TODO: Let non-errored docs to propagate.
     errs = [validation.validate_bulk_query_input(q) for q in query.queries]
     if any(errs):
@@ -909,9 +959,18 @@ def bulk_search(query: BulkSearchQuery, marqo_config: config.Config, verbose: in
     tensor_queries: Dict[int, BulkSearchQueryEntity] = dict(filter(lambda e: e[1].searchMethod == SearchMethod.TENSOR, enumerate(query.queries)))
     lexical_queries: Dict[int, BulkSearchQueryEntity] = dict(filter(lambda e: e[1].searchMethod == SearchMethod.LEXICAL, enumerate(query.queries)))
 
-    tensor_search_results = dict(zip(tensor_queries.keys(), _bulk_vector_text_search(
-            marqo_config, list(tensor_queries.values()), device=selected_device,
-        )))
+    tensor_search_results = dict(
+        zip(
+            tensor_queries.keys(),
+            _bulk_vector_text_search(
+                marqo_config,
+                list(tensor_queries.values()),
+                device=selected_device,
+                max_retry_attempts=max_search_retry_attempts,
+                max_retry_backoff_seconds=max_search_retry_backoff
+            )
+        )
+    )
 
     # TODO: combine lexical + tensor queries into /_msearch
     lexical_search_results = dict(zip(lexical_queries.keys(), [_lexical_search(
@@ -975,7 +1034,7 @@ def refresh_indexes_in_background(config: Config, index_names: List[str]) -> Non
         cache_update_thread.start()
 
 
-def search(config: Config, index_name: str, text: Union[str, dict],
+def search(config: Config, index_name: str, text: Optional[Union[str, dict]] = None,
            result_count: int = 3, offset: int = 0, highlights=True,
            search_method: Union[str, SearchMethod, None] = SearchMethod.TENSOR,
            searchable_attributes: Iterable[str] = None, verbose: int = 0,
@@ -1022,8 +1081,10 @@ def search(config: Config, index_name: str, text: Union[str, dict],
     if offset < 0:
         raise errors.IllegalRequestedDocCount("search result offset cannot be less than 0!")
 
-        # validate query
     validation.validate_query(q=text, search_method=search_method)
+
+    max_search_retry_attempts = utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_BACKEND_SEARCH_RETRY_ATTEMPTS)
+    max_search_retry_backoff = utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_BACKEND_SEARCH_RETRY_BACKOFF)
 
     # Validate result_count + offset <= int(max_docs_limit)
     max_docs_limit = utils.read_env_vars_and_defaults(EnvVars.MARQO_MAX_RETRIEVABLE_DOCS)
@@ -1050,7 +1111,12 @@ def search(config: Config, index_name: str, text: Union[str, dict],
         print(f"determined_search_method: {search_method}, text query: {text}")
     # if we can't see the index name in cache, we request it and wait for the info
     if index_name not in index_meta_cache.get_cache():
-        backend.get_index_info(config=config, index_name=index_name)
+        backend.get_index_info(
+            config=config,
+            index_name=index_name,
+            max_retry_attempts=max_search_retry_attempts,
+            max_retry_backoff_seconds=max_search_retry_backoff
+        )
 
     REFRESH_INTERVAL_SECONDS = 2
     # update cache in the background
@@ -1073,13 +1139,14 @@ def search(config: Config, index_name: str, text: Union[str, dict],
             searchable_attributes=searchable_attributes, verbose=verbose,
             filter_string=filter, device=selected_device, attributes_to_retrieve=attributes_to_retrieve, boost=boost,
             image_download_headers=image_download_headers, context=context, score_modifiers=score_modifiers,
-            model_auth=model_auth
+            model_auth=model_auth, max_retry_attempts=max_search_retry_attempts, max_retry_backoff_seconds=max_search_retry_backoff
         )
     elif search_method.upper() == SearchMethod.LEXICAL:
         search_result = _lexical_search(
             config=config, index_name=index_name, text=text, result_count=result_count, offset=offset,
             searchable_attributes=searchable_attributes, verbose=verbose,
-            filter_string=filter, attributes_to_retrieve=attributes_to_retrieve
+            filter_string=filter, attributes_to_retrieve=attributes_to_retrieve,
+            max_retry_attempts=max_search_retry_attempts, max_retry_backoff_seconds=max_search_retry_backoff
         )
     else:
         raise errors.InvalidArgError(f"Search called with unknown search method: {search_method}")
@@ -1122,7 +1189,8 @@ def search(config: Config, index_name: str, text: Union[str, dict],
 def _lexical_search(
         config: Config, index_name: str, text: str, result_count: int = 3, offset: int = 0,
         searchable_attributes: Sequence[str] = None, verbose: int = 0, filter_string: str = None,
-        attributes_to_retrieve: Optional[List[str]] = None, expose_facets: bool = False):
+        attributes_to_retrieve: Optional[List[str]] = None, expose_facets: bool = False,
+        max_retry_attempts: int = None, max_retry_backoff_seconds: int = None):
     """
 
     Args:
@@ -1145,7 +1213,7 @@ def _lexical_search(
     """
     if not isinstance(text, str):
         raise errors.InvalidArgError(
-            f"Query arg must be of type str! text arg is of type {type(text)}. "
+            f"Lexical search query arg must be of type `str`! text arg is of type {type(text)}. "
             f"Query arg: {text}")
 
     # SEARCH TIMER-LOGGER (pre-processing)
@@ -1158,7 +1226,9 @@ def _lexical_search(
         fields_to_search = searchable_attributes
     else:
         fields_to_search = index_meta_cache.get_index_info(
-            config=config, index_name=index_name
+            config=config, index_name=index_name,
+            max_retry_attempts=max_retry_attempts,
+            max_retry_backoff_seconds=max_retry_backoff_seconds
         ).get_true_text_properties()
 
     # Parse text into required and optional terms.
@@ -1210,7 +1280,12 @@ def _lexical_search(
 
     start_search_http_time = timer()
     with RequestMetricsStore.for_request().time("search.opensearch._search"):
-        search_res = HttpRequests(config).get(path=f"{index_name}/_search", body=body)
+        search_res = HttpRequests(config).get(
+            path=f"{index_name}/_search",
+            body=body,
+            max_retry_attempts=max_retry_attempts,
+            max_retry_backoff_seconds=max_retry_backoff_seconds
+        )
     RequestMetricsStore.for_request().add_time("search.opensearch._search.internal", search_res["took"] * 0.001) # internal, not round trip time
 
     end_search_http_time = timer()
@@ -1238,7 +1313,7 @@ def _lexical_search(
     return {'hits': res_list}
 
 
-def construct_vector_input_batches(query: Union[str, Dict], index_info: IndexInfo) -> Tuple[List[str], List[str]]:
+def construct_vector_input_batches(query: Union[str, Dict, None], index_info: IndexInfo) -> Tuple[List[str], List[str]]:
     """Splits images from text in a single query (either a query string, or dict of weighted strings).
 
     Args:
@@ -1249,7 +1324,10 @@ def construct_vector_input_batches(query: Union[str, Dict], index_info: IndexInf
         A tuple of string batches. The first is text content the second is image content.
     """
     treat_urls_as_images = index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]
-    if isinstance(query, str):
+    if query is None:
+        # Nothing should be vectorised.
+        return [], []
+    elif isinstance(query, str):
         if treat_urls_as_images and _is_image(query):
             return [], [query, ]
         else:
@@ -1316,13 +1394,23 @@ def construct_msearch_body_elements(searchableAttributes: List[str], offset: int
     return body
 
 
-def bulk_msearch(config: Config, body: List[Dict]) -> List[Dict]:
+def bulk_msearch(
+        config: Config,
+        body: List[Dict],
+        max_retry_attempts: int = None,
+        max_retry_backoff: int = None,
+    ) -> List[Dict]:
     """Send an `/_msearch` request to MarqoOS and translate errors into a user-friendly format."""
     start_search_http_time = timer()
     try:
         with RequestMetricsStore.for_request().time("search.opensearch._msearch"):
             serialised_search_body = utils.dicts_to_jsonl(body)
-            response = HttpRequests(config).get(path=F"_msearch", body=serialised_search_body)
+            response = HttpRequests(config).get(
+                path=F"_msearch",
+                body=serialised_search_body,
+                max_retry_attempts=max_retry_attempts,
+                max_retry_backoff_seconds=max_retry_backoff
+            )
         RequestMetricsStore.for_request().add_time("search.opensearch._msearch.internal", float(response["took"])) # internal, not round trip time
 
         end_search_http_time = timer()
@@ -1343,8 +1431,11 @@ def bulk_msearch(config: Config, body: List[Dict]) -> List[Dict]:
                 raise errors.IllegalRequestedDocCount("Marqo-OS rejected the response due to too many requested results. Try reducing the query's limit parameter") from e
             elif 'parse_exception' in root_cause_reason:
                 raise errors.InvalidArgError("Syntax error, could not parse filter string") from e
-            elif  root_cause_type == 'query_shard_exception' and root_cause_reason.startswith("Failed to parse query"):
-                raise errors.InvalidArgError("Syntax error, could not parse filter string") from e
+            elif root_cause_type == 'query_shard_exception':
+                if root_cause_reason.startswith("Failed to parse query"):
+                    raise errors.InvalidArgError("Syntax error, could not parse filter string") from e
+                elif "Query vector has invalid dimension" in root_cause_reason:
+                    raise errors.InvalidArgError("Tensor search query or context vector given has invalid dimensions. Please check your index dimensions before searching again") from e
             raise errors.BackendCommunicationError(f"Error communicating with Marqo-OS backend:\n{response}")
         except (KeyError, IndexError):
             raise e
@@ -1506,49 +1597,10 @@ def get_query_vectors_from_jobs(
     """
     result: Dict[Qidx, List[float]] = defaultdict(list)
     for qidx, ptrs in qidx_to_job.items():
-
-        # vectors = job_to_vectors[ptrs.job_hash][ptrs.start_idx: ptrs.end_idx]
-
-        # qidx_to_vectors[qidx].append(vectors)
         q = queries[qidx]
         index_info = get_index_info(config=config, index_name=q.index)
-
-        ordered_queries = list(q.q.items()) if isinstance(q.q, dict) else None
-        if ordered_queries:
-            # multiple queries. We have to weight and combine them:
-            vectorised_ordered_queries = [
-                (get_content_vector(
-                    possible_jobs=qidx_to_job[qidx],
-                    jobs=jobs,
-                    job_to_vectors=job_to_vectors,
-                    treat_urls_as_images=index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images],
-                    content=content),
-                 weight,
-                 content
-                ) for content, weight in ordered_queries
-            ]
-            # TODO how doe we ensure order?
-            weighted_vectors = [np.asarray(vec) * weight for vec, weight, content in vectorised_ordered_queries]
-
-            context_tensors = q.get_context_tensor()
-            if context_tensors is not None:
-                weighted_vectors += [np.asarray(v.vector) * v.weight for v in context_tensors]
-
-            try:
-                merged_vector = np.mean(weighted_vectors, axis=0)
-            except ValueError as e:
-                raise errors.InvalidArgError(f"The provided vectors are not in the same dimension of the index."
-                                             f"This causes the error when we do `numpy.mean()` over all the vectors.\n"
-                                             f"The original error is `{e}`.\n"
-                                             f"Please check `https://docs.marqo.ai/0.0.16/API-Reference/search/#context`.")
-
-            if index_info.index_settings['index_defaults']['normalize_embeddings']:
-                norm = np.linalg.norm(merged_vector, axis=-1, keepdims=True)
-                if norm > 0:
-                    merged_vector /= np.linalg.norm(merged_vector, axis=-1, keepdims=True)
-            result[qidx] = list(merged_vector)
-        else:
-            # result[qidx] = vectors[0]
+        # Normal single text query
+        if isinstance(q.q, str):
             result[qidx] = get_content_vector(
                 possible_jobs=qidx_to_job.get(qidx, []),
                 jobs=jobs,
@@ -1556,6 +1608,56 @@ def get_query_vectors_from_jobs(
                 treat_urls_as_images=index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images],
                 content=q.q
             )
+
+        elif isinstance(q.q, dict) or q.q is None:
+            # Collect and weight all context tensors
+            context_tensors = q.get_context_tensor()
+            if context_tensors is not None:
+                weighted_context_vectors = [np.asarray(v.vector) * v.weight for v in context_tensors]
+            else:
+                weighted_context_vectors = []
+            # No query
+            if q.q is None:
+                weighted_vectors = weighted_context_vectors
+            else:
+                # Multiple queries. We have to weight and combine them:
+                ordered_queries = list(q.q.items()) if isinstance(q.q, dict) else None
+                if ordered_queries:
+                    vectorised_ordered_queries = [
+                        (get_content_vector(
+                            possible_jobs=qidx_to_job[qidx],
+                            jobs=jobs,
+                            job_to_vectors=job_to_vectors,
+                            treat_urls_as_images=index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images],
+                            content=content),
+                        weight,
+                        content
+                        ) for content, weight in ordered_queries
+                    ]
+                    # TODO how do we ensure order?
+                    weighted_query_vectors = [np.asarray(vec) * weight for vec, weight, content in vectorised_ordered_queries]
+
+                    # Combine query and context vectors
+                    weighted_vectors = weighted_query_vectors + weighted_context_vectors
+
+            # Merge and normalize (if needed) all vectors
+            try:
+                merged_vector = np.mean(weighted_vectors, axis=0)
+            except ValueError as e:
+                raise errors.InvalidArgError(f"The provided vectors are not in the same dimension of the index."
+                                            f"This causes the error when we do `numpy.mean()` over all the vectors.\n"
+                                            f"The original error is `{e}`.\n"
+                                            f"Please check `https://docs.marqo.ai/0.0.16/API-Reference/search/#context`.")
+            if index_info.index_settings['index_defaults']['normalize_embeddings']:
+                norm = np.linalg.norm(merged_vector, axis=-1, keepdims=True)
+                if norm > 0:
+                    # TODO: Why are we calculating norm twice?
+                    merged_vector /= np.linalg.norm(merged_vector, axis=-1, keepdims=True)
+            result[qidx] = list(merged_vector)
+        
+        else:
+            raise errors.InternalError(f"Query can only be `str`, `dict`, or `None`. Invalid query type received: {type(q.q)}")
+
     return result
 
 
@@ -1612,7 +1714,13 @@ def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity],
     )
     return qidx_to_vectors
 
-def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity], device: str = None) -> List[Dict]:
+def _bulk_vector_text_search(
+        config: Config,
+        queries: List[BulkSearchQueryEntity],
+        device: str = None,
+        max_retry_attempts: int = None,
+        max_retry_backoff_seconds: int = None
+    ) -> List[Dict]:
     """Resolve a batch of search queries in parallel.
 
     Args:
@@ -1642,7 +1750,7 @@ def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity
         query_to_body_parts: Dict[Qidx, List[Dict]] = dict()
         query_to_body_count: Dict[Qidx, int] = dict() # Keep track of count, so we can separate after msearch call.
         for qidx, q in enumerate(queries):
-            index_info = get_index_info(config=config, index_name=q.index)
+            index_info = get_index_info(config=config, index_name=q.index, max_retry_attempts=max_retry_attempts, max_retry_backoff_seconds=max_retry_backoff_seconds)
             body = construct_msearch_body_elements(q.searchableAttributes, q.offset, q.filter, index_info, q.limit, qidx_to_vectors[qidx], q.attributesToRetrieve, q.index, q.scoreModifiers)
             query_to_body_parts[qidx] = body
             query_to_body_count[qidx] = len(body)
@@ -1654,7 +1762,7 @@ def _bulk_vector_text_search(config: Config, queries: List[BulkSearchQueryEntity
             return create_empty_query_response(queries)
 
     ## 5. POST aggregate  to /_msearch
-    responses = bulk_msearch(config, aggregate_body)
+    responses = bulk_msearch(config, aggregate_body, max_retry_attempts=max_retry_attempts, max_retry_backoff=max_retry_backoff_seconds)
 
     with RequestMetricsStore.for_request().time("bulk_search.vector.postprocess",
         lambda t : logger.debug(f"bulk search (tensor) post-processing: took {t:.3f}ms")
@@ -1692,11 +1800,12 @@ def create_bulk_search_response(queries: List[BulkSearchQueryEntity], query_to_b
     return results
 
 def _vector_text_search(
-        config: Config, index_name: str, query: Union[str, dict], result_count: int = 5, offset: int = 0,
+        config: Config, index_name: str, query: Union[str, dict, None], result_count: int = 5, offset: int = 0,
         searchable_attributes: Iterable[str] = None, verbose=0, filter_string: str = None, device: str = None,
         attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None,
         image_download_headers: Optional[Dict] = None, context: Optional[Dict] = None,
-        score_modifiers: Optional[ScoreModifier] = None, model_auth: Optional[ModelAuth] = None):
+        score_modifiers: Optional[ScoreModifier] = None, model_auth: Optional[ModelAuth] = None,
+        max_retry_attempts: int = None, max_retry_backoff_seconds: int = None):
     """
 
     Args:
@@ -1743,7 +1852,12 @@ def _vector_text_search(
     RequestMetricsStore.for_request().start("search.vector.processing_before_opensearch")
 
     try:
-        index_info = get_index_info(config=config, index_name=index_name)
+        index_info = get_index_info(
+            config=config,
+            index_name=index_name,
+            max_retry_attempts=max_retry_attempts,
+            max_retry_backoff_seconds=max_retry_backoff_seconds
+        )
     except KeyError as e:
         raise errors.IndexNotFoundError(message="Tried to search a non-existent index: {}".format(index_name))
 
@@ -1765,7 +1879,7 @@ def _vector_text_search(
     logger.debug(f"search (tensor) pre-processing: took {(total_preprocess_time):.3f}ms to vectorize and process query.")
 
     # SEARCH TIMER-LOGGER (roundtrip)
-    responses = bulk_msearch(config, body)
+    responses = bulk_msearch(config=config, body=body, max_retry_attempts=max_retry_attempts, max_retry_backoff=max_retry_backoff_seconds)
 
     # SEARCH TIMER-LOGGER (post-processing)
     RequestMetricsStore.for_request().start("search.vector.postprocess")
@@ -2059,7 +2173,7 @@ def vectorise_multimodal_combination_field(
             s2_inference_errors.ModelLoadError) as model_error:
         raise errors.BadRequestError(
             message=f'Problem vectorising query. Reason: {str(model_error)}',
-            link="https://marqo.pages.dev/latest/Models-Reference/dense_retrieval/"
+            link="https://marqo.pages.dev/1.4.0/Models-Reference/dense_retrieval/"
         )
     except s2_inference_errors.S2InferenceError:
         combo_document_is_valid = False
@@ -2175,8 +2289,7 @@ def _create_score_modifiers_tensor_search_query(score_modifiers, result_count, o
                         "path": TensorField.chunks,
                         "inner_hits": {
                             "_source": {
-                                "include": ["__chunks.__field_content", "__chunks.__field_name",
-                                            "__chunks.reputation"]
+                                "include": ["__chunks.__field_content", "__chunks.__field_name"]
                             }
                         },
                         "query": {
