@@ -513,8 +513,9 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                             constants.MARQO_DOC_TENSORS in existing_docs_dict[doc_id] and
                             field in existing_docs_dict[doc_id][constants.MARQO_DOC_TENSORS]
                     ):
-                        chunks = existing_docs[doc_id][constants.MARQO_DOC_TENSORS][field][constants.MARQO_DOC_CHUNKS]
-                        embeddings = existing_docs[doc_id][constants.MARQO_DOC_TENSORS][field][
+                        chunks = existing_docs_dict[doc_id][constants.MARQO_DOC_TENSORS][field][
+                            constants.MARQO_DOC_CHUNKS]
+                        embeddings = existing_docs_dict[doc_id][constants.MARQO_DOC_TENSORS][field][
                             constants.MARQO_DOC_EMBEDDINGS]
                         logger.debug(f"Using existing tensors for field {field} for doc {doc_id}")
                     else:
@@ -684,15 +685,15 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                                 current_weights == mappings['weights'] and
                                 field_name in existing_doc[constants.MARQO_DOC_TENSORS]
                         ):
-                            chunks = existing_docs[doc_id][constants.MARQO_DOC_TENSORS][field_name][
+                            chunks = existing_doc[constants.MARQO_DOC_TENSORS][field_name][
                                 constants.MARQO_DOC_CHUNKS]
-                            embeddings = existing_docs[doc_id][constants.MARQO_DOC_TENSORS][field][
+                            embeddings = existing_doc[constants.MARQO_DOC_TENSORS][field_name][
                                 constants.MARQO_DOC_EMBEDDINGS]
                             logger.debug(
-                                f"Using existing tensors for multimodal combination field {field} for doc {doc_id}"
+                                f"Using existing tensors for multimodal combination field {field_name} for doc {doc_id}"
                             )
                         else:
-                            logger.debug(f'Not using existing tensors for multimodal combination field {field} for '
+                            logger.debug(f'Not using existing tensors for multimodal combination field {field_name} for '
                                          f'doc {doc_id} because field content or config has changed')
 
                     if len(chunks) == 0:  # Not using existing tensors or didn't find it

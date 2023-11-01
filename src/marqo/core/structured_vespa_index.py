@@ -173,14 +173,20 @@ class StructuredVespaIndex(VespaIndex):
 
                 if constants.MARQO_DOC_TENSORS not in marqo_document:
                     marqo_document[constants.MARQO_DOC_TENSORS] = dict()
-                if field not in marqo_document[constants.MARQO_DOC_TENSORS]:
+                if tensor_field.name not in marqo_document[constants.MARQO_DOC_TENSORS]:
                     marqo_document[constants.MARQO_DOC_TENSORS][tensor_field.name] = dict()
 
                 if field == tensor_field.chunk_field_name:
                     marqo_document[constants.MARQO_DOC_TENSORS][tensor_field.name][constants.MARQO_DOC_CHUNKS] = value
                 elif field == tensor_field.embeddings_field_name:
-                    marqo_document[constants.MARQO_DOC_TENSORS][tensor_field.name][
-                        constants.MARQO_DOC_EMBEDDINGS] = value
+                    try:
+                        marqo_document[constants.MARQO_DOC_TENSORS][tensor_field.name][
+                            constants.MARQO_DOC_EMBEDDINGS] = list(value['blocks'].values())
+                    except (KeyError, AttributeError, TypeError) as e:
+                        raise VespaDocumentParsingError(
+                            f'Cannot parse embeddings field {field} with value {value}'
+                        ) from e
+
                 else:
                     raise VespaDocumentParsingError(f'Unexpected tensor subfield {field}')
             elif field == cls._FIELD_ID:
@@ -679,7 +685,9 @@ class StructuredVespaIndex(VespaIndex):
             if closest_feature in match_features and len(match_features[closest_feature]['cells']) > 0:
                 distance_feature = f'distance(field,{tensor_field.embeddings_field_name})'
                 if distance_feature not in match_features:
-                    raise InternalError(f'Expected {distance_feature} in match features but it was not found')
+                    raise VespaDocumentParsingError(
+                        f'Expected {distance_feature} in match features but it was not found'
+                    )
                 distance = match_features[distance_feature]
                 if min_distance is None or distance < min_distance:
                     min_distance = distance
@@ -693,7 +701,7 @@ class StructuredVespaIndex(VespaIndex):
             try:
                 chunk_index = int(chunk_index_str)
             except ValueError as e:
-                raise InternalError(
+                raise VespaDocumentParsingError(
                     f'Expected integer as chunk index, but found {chunk_index_str}', cause=e
                 ) from e
 
@@ -701,7 +709,7 @@ class StructuredVespaIndex(VespaIndex):
             try:
                 chunk = vespa_document_fields[closest_tensor_field.chunk_field_name][chunk_index]
             except (KeyError, TypeError) as e:
-                raise InternalError(
+                raise VespaDocumentParsingError(
                     f'Cannot extract chunk value from {closest_tensor_field.chunk_field_name}: {str(e)}',
                     cause=e
                 ) from e
@@ -710,7 +718,7 @@ class StructuredVespaIndex(VespaIndex):
                 closest_tensor_field.name: chunk
             }
 
-        raise InternalError('Failed to extract highlights from Vespa document')
+        raise VespaDocumentParsingError('Failed to extract highlights from Vespa document')
 
     @classmethod
     def _get_vespa_type(cls, marqo_type: FieldType) -> str:
