@@ -671,11 +671,11 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                         processed_tensor_fields[tensor_field.name][constants.MARQO_DOC_EMBEDDINGS] = [
                             combo_chunk[TensorField.marqo_knn_field]]
 
-        if document_is_valid:
-            if processed_tensor_fields:
-                copied[constants.MARQO_DOC_TENSORS] = processed_tensor_fields
-            copied[constants.MARQO_DOC_ID] = doc_id
-            bulk_parent_dicts.append(copied)
+            if document_is_valid:
+                if processed_tensor_fields:
+                    copied[constants.MARQO_DOC_TENSORS] = processed_tensor_fields
+                copied[constants.MARQO_DOC_ID] = doc_id
+                bulk_parent_dicts.append(copied)
 
     total_preproc_time = 0.001 * RequestMetricsStore.for_request().stop(
         "add_documents.processing_before_opensearch")
