@@ -386,7 +386,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
         raise errors.BadRequestError(message="Received empty add documents request")
 
     if add_docs_params.mappings is not None:
-        validation.validate_mappings(add_docs_params.mappings)
+        validation.validate_mappings_object(add_docs_params.mappings)
 
     unsuccessful_docs = []
     total_vectorise_time = 0
@@ -417,7 +417,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
 
         if add_docs_params.use_existing_tensors:
             ids = [doc["_id"] for doc in add_docs_params.docs if "_id" in doc]
-            existing_docs_dict = {}
+            existing_docs_dict: Dict[str, dict] = {}
             if len(ids) > 0:
                 existing_docs = get_documents_by_ids(config, marqo_index.name, ids, show_vectors=True)['results']
                 for doc in existing_docs:
@@ -460,6 +460,14 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                 if not marqo_field:
                     message = (f"Field {field} is not a valid field for structured index {add_docs_params.index_name}. "
                                f"Valid fields are: {', '.join(marqo_index.field_map.keys())}")
+                    document_is_valid = False
+                    unsuccessful_docs.append(
+                        (i, {'_id': doc_id, 'error': message, 'status': int(errors.InvalidArgError.status_code),
+                             'code': int(errors.InvalidArgError.code)})
+                    )
+                    break
+                if marqo_field.type == FieldType.MultimodalCombination:
+                    message = f"Field {field} is a multimodal combination field and cannot be assigned a value."
                     document_is_valid = False
                     unsuccessful_docs.append(
                         (i, {'_id': doc_id, 'error': message, 'status': int(errors.InvalidArgError.status_code),
@@ -588,7 +596,8 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                                     model_name=marqo_index.model.name,
                                     model_properties=marqo_index.model.get_properties(), content=content_chunks,
                                     device=add_docs_params.device, normalize_embeddings=normalize_embeddings,
-                                    infer=marqo_field.type == FieldType.ImagePointer, model_auth=add_docs_params.model_auth
+                                    infer=marqo_field.type == FieldType.ImagePointer,
+                                    model_auth=add_docs_params.model_auth
                                 )
 
                             end_time = timer()
@@ -603,7 +612,8 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                             )
                         except s2_inference_errors.S2InferenceError:
                             document_is_valid = False
-                            image_err = errors.InvalidArgError(message=f'Could not process given image: {field_content}')
+                            image_err = errors.InvalidArgError(
+                                message=f'Could not process given image: {field_content}')
                             unsuccessful_docs.append(
                                 (i, {'_id': doc_id, 'error': image_err.message, 'status': int(image_err.status_code),
                                      'code': image_err.code})
@@ -624,8 +634,8 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
 
                 # Add chunks_to_append along with doc metadata to total chunks
                 processed_tensor_fields[tensor_field.name] = {}
-                processed_tensor_fields[tensor_field.name]['chunks'] = chunks
-                processed_tensor_fields[tensor_field.name]['embeddings'] = embeddings
+                processed_tensor_fields[tensor_field.name][constants.MARQO_DOC_CHUNKS] = chunks
+                processed_tensor_fields[tensor_field.name][constants.MARQO_DOC_EMBEDDINGS] = embeddings
 
             # Multimodal fields haven't been processed yet, so we do that here
             for tensor_field in marqo_index.tensor_fields:
@@ -640,10 +650,14 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                         # None of the fields are present in the document, so we skip this multimodal field
                         continue
 
-                    if add_docs_params.mappings is not None and field_name in add_docs_params.mappings and \
-                            add_docs_params.mappings[field_name]["type"] == "multimodal_combination":
-
+                    if (
+                            add_docs_params.mappings is not None and
+                            field_name in add_docs_params.mappings and
+                            add_docs_params.mappings[field_name]["type"] == "multimodal_combination"
+                    ):
                         mappings = add_docs_params.mappings[field_name]
+                        # Record custom weights in the document
+                        copied[field_name] = mappings['weights']
                         logger.debug(f'Using custom weights for multimodal combination field {field_name}')
                     else:
                         mappings = {
@@ -652,24 +666,55 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                         logger.debug(f'Using default weights for multimodal combination field {field_name}: '
                                      f'{marqo_field.dependent_fields}')
 
-                    (combo_chunk, combo_document_is_valid,
-                     unsuccessful_doc_to_append,
-                     combo_vectorise_time_to_add) = vectorise_multimodal_combination_field_structured(
-                        field_name, field_content, copied, i, doc_id, add_docs_params.device, marqo_index,
-                        image_repo, mappings, model_auth=add_docs_params.model_auth)
+                    chunks = []
+                    embeddings = []
 
-                    total_vectorise_time = total_vectorise_time + combo_vectorise_time_to_add
+                    if (
+                            add_docs_params.use_existing_tensors and
+                            doc_id in existing_docs_dict
+                    ):
+                        existing_doc = existing_docs_dict[doc_id]
+                        current_field_contents = {
+                            dependent_field: existing_doc.get(dependent_field)
+                            for dependent_field in marqo_field.dependent_fields if dependent_field in copied
+                        }
+                        current_weights = existing_doc.get(field_name) or marqo_field.dependent_fields
+                        if (
+                                field_content == current_field_contents and
+                                current_weights == mappings['weights'] and
+                                field_name in existing_doc[constants.MARQO_DOC_TENSORS]
+                        ):
+                            chunks = existing_docs[doc_id][constants.MARQO_DOC_TENSORS][field_name][
+                                constants.MARQO_DOC_CHUNKS]
+                            embeddings = existing_docs[doc_id][constants.MARQO_DOC_TENSORS][field][
+                                constants.MARQO_DOC_EMBEDDINGS]
+                            logger.debug(
+                                f"Using existing tensors for multimodal combination field {field} for doc {doc_id}"
+                            )
+                        else:
+                            logger.debug(f'Not using existing tensors for multimodal combination field {field} for '
+                                         f'doc {doc_id} because field content or config has changed')
 
-                    if combo_document_is_valid is False:
-                        document_is_valid = False
-                        unsuccessful_docs.append(unsuccessful_doc_to_append)
-                        break
-                    else:
-                        processed_tensor_fields[tensor_field.name] = {}
-                        processed_tensor_fields[tensor_field.name][constants.MARQO_DOC_CHUNKS] = [
-                            combo_chunk[TensorField.field_content]]
-                        processed_tensor_fields[tensor_field.name][constants.MARQO_DOC_EMBEDDINGS] = [
-                            combo_chunk[TensorField.marqo_knn_field]]
+                    if len(chunks) == 0:  # Not using existing tensors or didn't find it
+                        (combo_chunk, combo_document_is_valid,
+                         unsuccessful_doc_to_append,
+                         combo_vectorise_time_to_add) = vectorise_multimodal_combination_field_structured(
+                            field_name, field_content, copied, i, doc_id, add_docs_params.device, marqo_index,
+                            image_repo, mappings, model_auth=add_docs_params.model_auth)
+
+                        total_vectorise_time = total_vectorise_time + combo_vectorise_time_to_add
+
+                        if combo_document_is_valid is False:
+                            document_is_valid = False
+                            unsuccessful_docs.append(unsuccessful_doc_to_append)
+                            break
+                        else:
+                            chunks = [combo_chunk[TensorField.field_content]]
+                            embeddings = [combo_chunk[TensorField.marqo_knn_field]]
+
+                    processed_tensor_fields[tensor_field.name] = {}
+                    processed_tensor_fields[tensor_field.name][constants.MARQO_DOC_CHUNKS] = chunks
+                    processed_tensor_fields[tensor_field.name][constants.MARQO_DOC_EMBEDDINGS] = embeddings
 
             if document_is_valid:
                 if processed_tensor_fields:
