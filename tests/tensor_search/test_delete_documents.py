@@ -365,7 +365,7 @@ class TestDeleteDocumentsEndpoint(MarqoTestCase):
                 }
             ]
 
-            response = delete_docs.delete_documents_marqo_os(config_copy, request)
+            response = delete_docs.delete_documents_vespa(config_copy, request)
 
             self.assertEqual(response.index_name, self.index_name_1)
             self.assertEqual(response.status_string, "succeeded")

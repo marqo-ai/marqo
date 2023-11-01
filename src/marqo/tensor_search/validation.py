@@ -385,7 +385,7 @@ def validate_id(_id: str):
             "Document _id must be a string type! "
             f"Received _id {_id} of type `{type(_id).__name__}`")
     if not _id:
-        raise InvalidDocumentIdError("Document ID must can't be empty")
+        raise InvalidDocumentIdError("Document ID can't be empty")
     return _id
 
 

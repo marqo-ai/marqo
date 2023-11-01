@@ -105,25 +105,35 @@ class IndexManagement:
         for index in marqo_indexes:
             self._save_index_settings(index)
 
-    def delete_index(self, marqo_index: MarqoIndex):
+    def delete_index(self, marqo_index: MarqoIndex) -> None:
         """
         Delete a Marqo index.
 
         Args:
             marqo_index: Marqo index to delete
         """
+        self.delete_index_by_name(marqo_index.name)
+
+    def delete_index_by_name(self, index_name: str) -> None:
+        """
+        Delete a Marqo index by name.
+
+        Args:
+            index_name: Name of Marqo index to delete
+
+        """
         app = self.vespa_client.download_application()
 
-        if not self._index_exists(marqo_index.name):
-            raise IndexNotFoundError(f"Cannot delete index {marqo_index.name} as it does not exist")
+        if not self._index_exists(index_name):
+            raise IndexNotFoundError(f"Cannot delete index {index_name} as it does not exist")
 
-        self._remove_schema(app, marqo_index.name)
-        self._remove_schema_from_services(app, marqo_index.name)
+        self._remove_schema(app, index_name)
+        self._remove_schema_from_services(app, index_name)
         self._add_schema_removal_override(app)
         self.vespa_client.deploy_application(app)
-        self._delete_index_settings(marqo_index)
+        self._delete_index_settings_by_name(index_name)
 
-    def batch_delete_indexes(self, marqo_indexes: List[MarqoIndex]):
+    def batch_delete_indexes(self, marqo_indexes: List[MarqoIndex]) -> None:
         """
         Delete multiple Marqo indexes as a single Vespa deployment.
 
@@ -290,5 +300,8 @@ class IndexManagement:
         )
 
     def _delete_index_settings(self, marqo_index: MarqoIndex):
+        self._delete_index_settings_by_name(marqo_index.name)
+
+    def _delete_index_settings_by_name(self, index_name: str):
         # Note Vespa delete is 200 even if document doesn't exist
-        self.vespa_client.delete_document(marqo_index.name, self._MARQO_SETTINGS_SCHEMA_NAME)
+        self.vespa_client.delete_document(index_name, self._MARQO_SETTINGS_SCHEMA_NAME)
