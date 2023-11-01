@@ -66,9 +66,9 @@ class Field(StrictBaseModel):
     name: str
     type: FieldType
     features: List[FieldFeature] = []
-    dependent_fields: Optional[Dict[str, float]]
     lexical_field_name: Optional[str]
     filter_field_name: Optional[str]
+    dependent_fields: Optional[Dict[str, float]]
 
 
 class TensorField(StrictBaseModel):

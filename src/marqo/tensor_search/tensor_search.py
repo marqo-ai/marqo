@@ -643,14 +643,14 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                     if add_docs_params.mappings is not None and field_name in add_docs_params.mappings and \
                             add_docs_params.mappings[field_name]["type"] == "multimodal_combination":
 
-                        logger.debug(f'Using custom weights for multimodal combination field {field_name}')
                         mappings = add_docs_params.mappings[field_name]
+                        logger.debug(f'Using custom weights for multimodal combination field {field_name}')
                     else:
-                        logger.debug(f'Using default weights for multimodal combination field {field_name}: '
-                                     f'{marqo_field.dependent_fields}')
                         mappings = {
                             'weights': marqo_field.dependent_fields
                         }
+                        logger.debug(f'Using default weights for multimodal combination field {field_name}: '
+                                     f'{marqo_field.dependent_fields}')
 
                     (combo_chunk, combo_document_is_valid,
                      unsuccessful_doc_to_append,

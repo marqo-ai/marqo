@@ -19,7 +19,8 @@ class StructuredVespaIndex(VespaIndex):
         FieldType.ArrayText: 'array<string>',
         FieldType.ArrayInt: 'array<int>',
         FieldType.ArrayFloat: 'array<float>',
-        FieldType.ImagePointer: 'string'
+        FieldType.ImagePointer: 'string',
+        FieldType.MultimodalCombination: 'map<string, float>'
     }
 
     _MARQO_TO_PYTHON_TYPE_MAP = {
@@ -30,7 +31,8 @@ class StructuredVespaIndex(VespaIndex):
         FieldType.ArrayText: list,
         FieldType.ArrayInt: list,
         FieldType.ArrayFloat: list,
-        FieldType.ImagePointer: str
+        FieldType.ImagePointer: str,
+        FieldType.MultimodalCombination: dict
     }
 
     _DISTANCE_METRIC_MAP = {
@@ -440,8 +442,10 @@ class StructuredVespaIndex(VespaIndex):
     def _verify_marqo_field_type(cls, field_name: str, value: Any, marqo_index: MarqoIndex):
         marqo_type = marqo_index.field_map[field_name].type
         python_type = cls._get_python_type(marqo_type)
-        if isinstance(python_type, list) and not any(isinstance(value, t) for t in python_type) or \
-                not isinstance(python_type, list) and not isinstance(value, python_type):
+        if (
+                isinstance(python_type, list) and not any(isinstance(value, t) for t in python_type) or
+                not isinstance(python_type, list) and not isinstance(value, python_type)
+        ):
             raise InvalidDataTypeError(f'Invalid value {value} for field {field_name} with Marqo type '
                                        f'{marqo_type.name}. Expected a value of type {python_type}, but found '
                                        f'{type(value)}')
@@ -459,11 +463,6 @@ class StructuredVespaIndex(VespaIndex):
         document.append(f'field {cls._FIELD_ID} type string {{ indexing: summary }}')
 
         for field in marqo_index.fields:
-            if field.type == FieldType.MultimodalCombination:
-                # Subfields will store the value of the multimodal combination field and its tensor field will store
-                # the chunks and embeddings
-                continue
-
             field_type = cls._get_vespa_type(field.type)
 
             if FieldFeature.LexicalSearch in field.features:
@@ -531,12 +530,16 @@ class StructuredVespaIndex(VespaIndex):
         )
 
         for field in marqo_index.fields:
-            if field.type == FieldType.MultimodalCombination:
-                # Only has a tensor field which will be added in the next loop
-                continue
-
             target_field_name = field.name
             field_type = cls._get_vespa_type(field.type)
+
+            if field.type == FieldType.MultimodalCombination:
+                # return combination weights only for vector summary
+                vector_summary_fields.append(
+                    f'summary {target_field_name} type {field_type} {{ }}'
+                )
+                continue
+
             if field.filter_field_name:
                 # Filter fields are in-memory attributes so use this even if there's a lexical field
                 source_field_name = field.filter_field_name
