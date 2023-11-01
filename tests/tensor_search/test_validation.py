@@ -13,6 +13,7 @@ from marqo.errors import (
     InvalidDocumentIdError, InvalidArgError, DocTooLargeError,
     InvalidIndexNameError
 )
+from marqo.s2_inference import errors as s2_inference_errors
 
 class TestValidation(unittest.TestCase):
 
@@ -1581,7 +1582,7 @@ class TestValidateModelProperties(unittest.TestCase):
             try:
                 validation.validate_model_name_and_properties(case)
                 raise AssertionError
-            except InvalidArgError as e:
+            except s2_inference_errors.UnknownModelError as e:
                 assert error_message in e.message
 
         # Valid cases

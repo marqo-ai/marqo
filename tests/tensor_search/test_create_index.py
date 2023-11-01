@@ -920,3 +920,43 @@ class TestCreateIndex(MarqoTestCase):
 
         index_info = backend.get_index_info(config=self.config, index_name=self.index_name_1)
         assert index_info.index_settings[NsField.index_defaults]["model_properties"]["dimensions"] == 123
+    
+    def test_create_index_with_search_model_valid(self):
+        """
+        Ensures that indexes can be created with search_model and search_model_properties
+        Should have correct interactions with model and model_properties.
+        """
+        # model and search_model (both in registry)
+        tensor_search.create_vector_index(
+            config=self.config, index_name=self.index_name_1, 
+            index_settings={
+                NsField.index_defaults: {
+                    "model": "ViT-B/32",          # dimension is 512
+                    "search_model": "onnx32/open_clip/ViT-B-32/laion2b_e16"   # dimension is 512
+                }
+            }
+        )
+
+        index_info = backend.get_index_info(config=self.config, index_name=self.index_name_1)
+        assert index_info.index_settings[NsField.index_defaults]["model"] == "ViT-B/32"
+        assert index_info.index_settings[NsField.index_defaults]["search_model"] == "onnx32/open_clip/ViT-B-32/laion2b_e16"
+        assert index_info.model_name == "ViT-B/32"
+        assert index_info.search_model_name == "onnx32/open_clip/ViT-B-32/laion2b_e16"
+
+        fetched_model_properties = index_info.get_model_properties()
+        fetched_search_model_properties = index_info.get_search_model_properties()
+        assert fetched_model_properties["dimensions"] == 512
+        assert fetched_model_properties["type"] == "clip"
+        assert fetched_search_model_properties["dimensions"] == 512
+        assert fetched_search_model_properties["type"] == "clip_onnx"
+
+        # model, model_properties, search_model, search_model_properties (both custom)
+        # model, model_properties, search_model (model in registry, search_model is custom)
+        # model, search_model is no_model
+        # model is no_model, search_model
+        pass
+
+    def test_create_index_with_search_model_invalid(self):
+        """
+        """
+        pass
