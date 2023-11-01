@@ -150,7 +150,7 @@ def validate_list(field_content: List, is_non_tensor_field: bool):
         raise InvalidArgError(
             f"Field content `{field_content}` \n"
             f"of type `{type(field_content).__name__}` is not of valid content."
-            f"Lists can only be non_tensor fields."
+            f" Lists can only be non_tensor fields."
         )
     return True
 
