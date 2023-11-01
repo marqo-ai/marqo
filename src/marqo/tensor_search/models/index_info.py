@@ -10,12 +10,20 @@ from marqo.tensor_search.validation import validate_model_properties_no_model
 
 
 # For use outside of this module
-def get_model_properties_from_index_defaults(index_defaults: Dict, model_name: str):
-    """ Gets model_properties from index defaults if available. Otherwise, it attempts to get it from the model registry.
+def get_model_properties_from_index_defaults(index_defaults: Dict, model_name: str, properties_key: str):
+    """ Gets model_properties or search_model_properties from index defaults if available. Otherwise, it attempts to get it from the model registry.
+
+    Args:
+        index_defaults: index_defaults from index_settings
+        model_name: name of the model search_model
+        properties_key: Either NsField.model_properties or NsField.search_model_properties
+
+    Returns:
+        dict of model properties. Could either represent model_properties or search_model_properties.
     """
 
     try:
-        model_properties = index_defaults[NsField.model_properties]
+        model_properties = index_defaults[properties_key]
     except KeyError:
         model_properties = None
     
@@ -29,22 +37,23 @@ def get_model_properties_from_index_defaults(index_defaults: Dict, model_name: s
             model_properties = s2_inference.get_model_properties_from_registry(model_name)
         except s2_inference_errors.UnknownModelError:
             raise errors.InvalidArgError(
-                f"Could not find model properties for model={model_name}. "
+                f"Could not find {properties_key} for model={model_name}. "
                 f"Please check that the model name is correct. "
-                f"Please provide model_properties if the model is a custom model and is not supported by default")
-    
+                f"Please provide {properties_key} if the model is a custom model and is not supported by default")
     
     return model_properties
 
 
 class IndexInfo(NamedTuple):
     """
-    model_name: name of the ML model used to encode the data
+    model_name: name of the ML model used to encode the data (for add documents)
+    search_model_name: name of the ML model used to encode the data (for search)
     properties: keys are different index field names, values
         provide info about the properties
     index_settings: settings for the index
     """
     model_name: str
+    search_model_name: str
     properties: dict
     index_settings: dict
 
@@ -93,9 +102,14 @@ class IndexInfo(NamedTuple):
     def get_model_properties(self) -> dict:
         index_defaults = self.index_settings["index_defaults"]
         return get_model_properties_from_index_defaults(
-            index_defaults=index_defaults, model_name=self.model_name
+            index_defaults=index_defaults, model_name=self.model_name, properties_key=NsField.model_properties
         )
-
+    
+    def get_search_model_properties(self) -> dict:
+        index_defaults = self.index_settings["index_defaults"]
+        return get_model_properties_from_index_defaults(
+            index_defaults=index_defaults, model_name=self.search_model_name, properties_key=NsField.search_model_properties
+        )
 
     def get_true_text_properties(self) -> dict:
         """returns a dict containing only names and properties of fields that

@@ -9,7 +9,7 @@ from marqo.errors import (
     MarqoError, InvalidFieldNameError, InvalidArgError, InternalError,
     InvalidDocumentIdError, DocTooLargeError, InvalidIndexNameError,
     IllegalRequestedDocCount)
-from marqo.tensor_search.enums import TensorField, SearchMethod
+from marqo.tensor_search.enums import TensorField, SearchMethod, IndexSettingsField
 from marqo.tensor_search import constants
 from marqo.tensor_search.models.search import SearchContext
 
@@ -21,7 +21,7 @@ from marqo.tensor_search.models.mappings_object import (
     custom_vector_mappings_schema
 )
 from marqo.tensor_search.models.custom_vector_object import custom_vector_schema
-from marqo.s2_inference.errors import InvalidModelPropertiesError
+from marqo.s2_inference.errors import InvalidModelPropertiesError, UnknownModelError
 
 
 def validate_query(q: Union[dict, str, None], search_method: Union[str, SearchMethod]):
@@ -742,3 +742,25 @@ def validate_model_properties_no_model(model_properties: dict):
         
     return model_properties
 
+
+def validate_model_name_and_properties(index_settings):
+    """
+    Ensures that:
+    1. If search_model is given, then model must be given as well.
+    2. if model_properties is given, then model is given as well.
+    3. if search_model_properties is given, then search_model must be given as well.
+    """
+    model_name = index_settings[IndexSettingsField.index_defaults].get(IndexSettingsField.model)
+    model_properties = index_settings[IndexSettingsField.index_defaults].get(IndexSettingsField.model_properties)
+    search_model_name = index_settings[IndexSettingsField.index_defaults].get(IndexSettingsField.search_model)
+    search_model_properties = index_settings[IndexSettingsField.index_defaults].get(IndexSettingsField.search_model_properties)
+
+
+    if search_model_name is not None and model_name is None:
+        raise IndexSettingsField.UnknownModelError(f"`search_model` cannot be specified without also specifying `model`. Received search_model={search_model_name} but found no `model`")
+    
+    if model_properties is not None and model_name is None:
+        raise IndexSettingsField.UnknownModelError(f"If `model_properties` is set, `model` must also be set. No `model` found for model_properties={model_properties}")
+    
+    if search_model_properties is not None and search_model_name is None:
+        raise IndexSettingsField.UnknownModelError(f"If `search_model_properties` is set, `search_model` must also be set. No `search_model` found for search_model_properties={search_model_properties}")

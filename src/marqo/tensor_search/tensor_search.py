@@ -101,24 +101,42 @@ def _get_dimension_from_model_properties(model_properties: dict) -> int:
 
 def _add_knn_field(ix_settings: dict):
     """
-    This adds the OpenSearch knn field to the index's mappings
+    This adds the OpenSearch knn field to the index's mappings.
+    Adds dimensions based on the model properties. Ensures that dimensions of model properties match search model properties first.
 
     Args:
         ix_settings: the index settings
     """
+
+    ix_defaults = ix_settings["mappings"]["_meta"]["index_settings"][NsField.index_defaults]
+
+    # get model properties
     model_prop = get_model_properties_from_index_defaults(
-        index_defaults=(
-            ix_settings["mappings"]["_meta"]
-            ["index_settings"][NsField.index_defaults]),
-        model_name=(
-            ix_settings["mappings"]["_meta"]
-            ["index_settings"][NsField.index_defaults][NsField.model])
+        index_defaults=ix_defaults,
+        model_name=ix_defaults[NsField.model],
+        properties_key=NsField.model_properties
     )
+
+    # get search model properties
+    search_model_prop = get_model_properties_from_index_defaults(
+        index_defaults=ix_defaults,
+        model_name=ix_defaults[NsField.search_model],
+        properties_key=NsField.search_model_properties
+    )
+
+    # validate dimensions of model properties and search model properties match
+    model_dim = _get_dimension_from_model_properties(model_prop)
+    search_model_dim = _get_dimension_from_model_properties(search_model_prop)
+    if model_dim != search_model_dim:
+        raise errors.InvalidArgError(
+            f"Model properties dimensions ({model_dim}) and search model properties dimensions ({search_model_dim}) "
+            f"must be equal."
+        )
 
     ix_settings_with_knn = ix_settings.copy()
     ix_settings_with_knn["mappings"]["properties"][TensorField.chunks]["properties"][TensorField.marqo_knn_field] = {
         "type": "knn_vector",
-        "dimension": _get_dimension_from_model_properties(model_prop),
+        "dimension": model_dim,
         "method": (
             ix_settings["mappings"]["_meta"]
             ["index_settings"][NsField.index_defaults][NsField.ann_parameters]
@@ -138,7 +156,7 @@ def create_vector_index(
 
     if index_settings is not None:
         if NsField.index_defaults in index_settings:
-            _check_model_name(index_settings)
+            validation.validate_model_name_and_properties(index_settings)
         the_index_settings = _autofill_index_settings(index_settings=index_settings)
     else:
         the_index_settings = configs.get_default_index_settings()
@@ -192,9 +210,13 @@ def create_vector_index(
         max_os_fields = _marqo_field_limit_to_os_limit(int(max_marqo_fields))
         vector_index_settings["settings"]["mapping"] = {"total_fields": {"limit": int(max_os_fields)}}
 
+    # Add model and search model names to mappings metadata.
     model_name = the_index_settings[NsField.index_defaults][NsField.model]
-    vector_index_settings["mappings"]["_meta"][NsField.index_settings] = the_index_settings
+    search_model_name = the_index_settings[NsField.index_defaults][NsField.search_model]
     vector_index_settings["mappings"]["_meta"]["model"] = model_name
+    vector_index_settings["mappings"]["_meta"]["search_model"] = search_model_name
+
+    vector_index_settings["mappings"]["_meta"][NsField.index_settings] = the_index_settings
 
     vector_index_settings_with_knn = _add_knn_field(ix_settings=vector_index_settings)
 
@@ -202,27 +224,10 @@ def create_vector_index(
     response = HttpRequests(config).put(path=index_name, body=vector_index_settings_with_knn)
 
     get_cache()[index_name] = IndexInfo(
-        model_name=model_name, properties=vector_index_settings_with_knn["mappings"]["properties"].copy(),
+        model_name=model_name, search_model_name=search_model_name, properties=vector_index_settings_with_knn["mappings"]["properties"].copy(),
         index_settings=the_index_settings
     )
     return response
-
-
-def _check_model_name(index_settings):
-    """Ensures that:
-    1. if model_properties is given, then model is given as well.
-    2. if search_model is given, then search_model_properties must be given as well.
-    """
-    model_name = index_settings[NsField.index_defaults].get(NsField.model)
-    model_properties = index_settings[NsField.index_defaults].get(NsField.model_properties)
-    search_model_name = index_settings[NsField.index_defaults].get(NsField.search_model)
-    search_model_properties = index_settings[NsField.index_defaults].get(NsField.search_model_properties)
-
-    if model_properties is not None and model_name is None:
-        raise s2_inference_errors.UnknownModelError(f"No model name found for model_properties={model_properties}")
-    
-    if search_model_properties is not None and search_model_name is None:
-        raise s2_inference_errors.UnknownModelError(f"No model name found for search_model_properties={search_model_properties}")
 
 
 def _marqo_field_limit_to_os_limit(marqo_index_field_limit: int) -> int:
@@ -1491,7 +1496,7 @@ def assign_query_to_vector_job(
         content_type = 'text' if i == 0 else 'image'
         vector_job = VectorisedJobs(
             model_name=index_info.model_name,
-            model_properties=index_info.get_model_properties(),
+            model_properties=index_info.get_search_model_properties(),    # search model should be used to vectorise for all search queries.
             content=grouped_content,
             device=device,
             normalize_embeddings=index_info.index_settings['index_defaults']['normalize_embeddings'],

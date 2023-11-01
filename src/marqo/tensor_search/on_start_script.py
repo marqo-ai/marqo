@@ -190,10 +190,6 @@ def _preload_model(model, content, device):
         )
     elif isinstance(model, dict):
         # For models from URL
-        """
-        TODO: include validation from on start script (model name properties etc)
-        _check_model_name(index_settings)
-        """
         try:
             _ = vectorise(
                 model_name=model["model"], 

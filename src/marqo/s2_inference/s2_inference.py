@@ -57,7 +57,7 @@ def vectorise(model_name: str, content: Union[str, List[str]], model_properties:
     if not device:
         raise InternalError(message=f"vectorise (internal function) cannot be called without setting device!")
     
-    validated_model_properties = _validate_model_properties(model_name, model_properties)
+    validated_model_properties = _validate_model_properties(model_name, model_properties)       # This will be called on model_properties or search_model_properties, depending on what vectorise was called with.
     model_cache_key = _create_model_cache_key(model_name, device, validated_model_properties)
 
     _update_available_models(
