@@ -3,7 +3,7 @@ import torch
 from unittest.mock import MagicMock, patch
 from marqo.s2_inference.types import FloatTensor
 from marqo.s2_inference.s2_inference import clear_loaded_models, get_model_properties_from_registry
-from marqo_commons.model_registry.open_clip_properties import _get_open_clip_properties
+from marqo_commons.model_registry.model_properties_data.open_clip_properties import _get_open_clip_properties
 from marqo.s2_inference.s2_inference import _convert_tensor_to_numpy
 import numpy as np
 import functools
