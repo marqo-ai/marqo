@@ -51,7 +51,7 @@ from marqo.tensor_search.enums import (
     EnvVars, MappingsObjectType, DocumentFieldType
 )
 from marqo.tensor_search.enums import IndexSettingsField as NsField
-from marqo.tensor_search import utils, backend, validation, configs, add_docs, filtering
+from marqo.tensor_search import utils, backend, validation, configs, add_docs, filtering, create_index
 from marqo.tensor_search.formatting import _clean_doc
 from marqo.tensor_search.index_meta_cache import get_cache, get_index_info
 from marqo.tensor_search import index_meta_cache
@@ -92,7 +92,7 @@ def _get_dimension_from_model_properties(model_properties: dict) -> int:
         return validation.validate_model_dimensions(model_properties["dimensions"])
     except KeyError:
         raise errors.InvalidArgError(
-            "The given model properties must contain a 'dimensions' key."
+            f"The given model properties must contain a 'dimensions' key. Received: {model_properties}"
         )
     except errors.InternalError as e:
         # This is caused by bad `dimensions` validation.
@@ -156,10 +156,16 @@ def create_vector_index(
 
     if index_settings is not None:
         if NsField.index_defaults in index_settings:
-            validation.validate_model_name_and_properties(index_settings)
+            try:
+                validation.validate_model_name_and_properties(index_settings)
+            except s2_inference_errors.UnknownModelError as e:
+                raise errors.InvalidArgError(message=str(e)) from e
         the_index_settings = _autofill_index_settings(index_settings=index_settings)
     else:
         the_index_settings = configs.get_default_index_settings()
+
+    # `search_model` is determined by `model` and `model_properties`
+    the_index_settings = create_index.autofill_search_model(the_index_settings)
 
     validation.validate_settings_object(settings_object=the_index_settings)
 
@@ -262,6 +268,7 @@ def _autofill_index_settings(index_settings: dict):
 
     copied_settings = utils.merge_dicts(default_settings, copied_settings)
 
+    # Default to CLIP model if we are using treat_urls_and_pointers_as_images
     if NsField.treat_urls_and_pointers_as_images in copied_settings[NsField.index_defaults] and \
             copied_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images] is True \
             and copied_settings[NsField.index_defaults][NsField.model] is None:
