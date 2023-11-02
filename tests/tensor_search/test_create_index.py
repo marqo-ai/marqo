@@ -6,7 +6,7 @@ import os
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.tensor_search.enums import IndexSettingsField, EnvVars
 from marqo.errors import MarqoApiError, MarqoError, IndexNotFoundError
-from marqo.tensor_search import tensor_search, configs, backend
+from marqo.tensor_search import tensor_search, configs, backend, create_index
 from marqo.tensor_search.utils import read_env_vars_and_defaults
 from tests.marqo_test import MarqoTestCase
 from marqo.tensor_search.enums import IndexSettingsField as NsField, TensorField
@@ -53,9 +53,13 @@ class TestCreateIndex(MarqoTestCase):
             url=f"{self.endpoint}/{self.index_name_1}/_mapping",
             verify=False
         ).json()
+
+        default_index_settings = configs.get_default_index_settings()
+        default_index_settings = create_index.autofill_search_model(default_index_settings)
+        assert default_index_settings is not None
         
         assert settings[self.index_name_1]["mappings"]["_meta"][IndexSettingsField.index_settings] \
-            == tensor_search.configs.get_default_index_settings()
+            == default_index_settings
 
     def test_create_vector_index__invalid_settings(self):
         custom_index_defaults = [
@@ -134,6 +138,7 @@ class TestCreateIndex(MarqoTestCase):
         pprint.pprint(settings)
         retrieved_settings = settings[self.index_name_1]["mappings"]["_meta"][IndexSettingsField.index_settings]
         del retrieved_settings[IndexSettingsField.index_defaults][IndexSettingsField.model]
+        del retrieved_settings[IndexSettingsField.index_defaults][IndexSettingsField.search_model]
 
         default_settings = tensor_search.configs.get_default_index_settings()
         default_text_preprocessing = default_settings[IndexSettingsField.index_defaults][IndexSettingsField.text_preprocessing]
@@ -305,13 +310,14 @@ class TestCreateIndex(MarqoTestCase):
             }
         )
         
-        default_index_defaults = configs.get_default_index_settings()[NsField.index_defaults]
-        assert default_index_defaults is not None
+        default_index_settings = configs.get_default_index_settings()
+        default_index_settings = create_index.autofill_search_model(default_index_settings)
+        assert default_index_settings is not None
         
         index_info = backend.get_index_info(config=self.config, index_name=self.index_name_1)
         test_index_defaults = index_info.index_settings[NsField.index_defaults]
 
-        assert default_index_defaults == test_index_defaults
+        assert default_index_settings[NsField.index_defaults] == test_index_defaults
 
     def test_set_number_of_shards(self):
         """ does it work if other params are filled?"""
@@ -776,7 +782,8 @@ class TestCreateIndex(MarqoTestCase):
                         'number_of_shards': 5, 
                         'number_of_replicas': 1
                     }, 
-                    'model': 'hf/all_datasets_v4_MiniLM-L6'
+                    'model': 'hf/all_datasets_v4_MiniLM-L6',
+                    'search_model': 'hf/all_datasets_v4_MiniLM-L6'
                 }, 
                 'dynamic_templates': [{
                     'strings': {
@@ -804,7 +811,10 @@ class TestCreateIndex(MarqoTestCase):
             # format: (model_data, expected_knn_properties)
             # model in registry
             (
-                {"model": "hf/all_datasets_v4_MiniLM-L6"}, 
+                {
+                    "model": "hf/all_datasets_v4_MiniLM-L6",
+                    "search_model": "hf/all_datasets_v4_MiniLM-L6"
+                }, 
                 {
                     'type': 'knn_vector', 
                     'dimension': 384, 
@@ -818,7 +828,12 @@ class TestCreateIndex(MarqoTestCase):
             ),
             # custom model
             (
-                {"model": "my-custom-model", "model_properties": {"url": "https://www.random.com", "type": "open_clip", "dimensions": 512}},
+                {
+                    "model": "my-custom-model", 
+                    "model_properties": {"url": "https://www.random.com", "type": "open_clip", "dimensions": 512},
+                    "search_model": "my-custom-model",
+                    "search_model_properties": {"url": "https://www.random.com", "type": "open_clip", "dimensions": 512}
+                },
                 {
                     'type': 'knn_vector', 
                     'dimension': 512,   # dimension should match custom model properties
@@ -844,10 +859,17 @@ class TestCreateIndex(MarqoTestCase):
     def test_add_knn_field_failures(self):
         test_cases = (
             # custom model with no model properties
-            ({"model": "my-custom-model"}, 
+            ({"model": "my-custom-model", "search_model": "hf/all_datasets_v4_MiniLM-L6"}, 
+             errors.InvalidArgError),
+            # custom search_model with no search_model_properties
+            ({"model": "hf/all_datasets_v4_MiniLM-L6", "search_model": "my_custom_search_model"}, 
              errors.InvalidArgError),
             # custom model with model properties but no dimensions
-            ({"model": "my-custom-model", "model_properties": {"url": "https://www.random.com", "type": "open_clip"}},
+            ({
+                "model": "my-custom-model", 
+                "model_properties": {"url": "https://www.random.com", "type": "open_clip"},
+                "search_model": "hf/all_datasets_v4_MiniLM-L6"
+            },
              errors.InvalidArgError),
         )
 
