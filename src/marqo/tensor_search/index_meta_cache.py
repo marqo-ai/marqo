@@ -179,7 +179,6 @@ def populate_cache(config: Config):
     """
     global index_info_cache
     index_management = IndexManagement(config.vespa_client)
-    index_management.vespa_client.wait_for_application_convergence()
     indexes = index_management.get_all_indexes()
 
     # Enable caching and reset any existing model caches

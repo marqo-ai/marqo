@@ -47,13 +47,9 @@ if [[ ! $VESPA_CONFIG_URL ]]; then
   done
   echo -e "\nDone waiting."
   # Deploy a dummy application to Vespa
-  tmux new-session -d -s deploy "vespa deploy /app/scripts/vespa_dummy_app --wait 300"
-  echo "Waiting for dummy application to be deployed"
-  for i in {1..5}; do
-      echo -ne "Waiting... $i seconds\r"
-      sleep 1
-  done
-  echo -e "\nDone waiting."
+  echo "Deploying dummy application to Vespa for local run"
+  vespa deploy "vespa deploy /app/scripts/vespa_dummy_app --wait 300"
+  echo "Done. Local Vespa configuration is finished"
   export VESPA_QUERY_URL="http://localhost:8080"
   export VESPA_DOCUMENT_URL="http://localhost:8080"
   export VESPA_CONFIG_URL="http://localhost:19071"
