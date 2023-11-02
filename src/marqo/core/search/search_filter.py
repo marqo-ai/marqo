@@ -121,45 +121,44 @@ class MarqoFilterStringParser:
         stack: List[Union[str, Operator, Term]] = []
 
         def get_term(token: str,
-                     field: Optional[str],
-                     equality_term_value: Optional[str],
-                     range_term_lower: Optional[str],
-                     rane_term_upper: Optional[str]) -> Term:
-            if (
-                    equality_term_value and
-                    range_term_lower is None and
-                    rane_term_upper is None
-            ):
-                return EqualityTerm(field, equality_term_value, token)
-            elif (
-                    equality_term_value is None and
-                    (range_term_lower or rane_term_upper)
-            ):
-                def get_range_limit(limit: str) -> Optional[RangeLimit]:
-                    if limit == '*':
-                        return None
-
-                    try:
-                        return int(limit)
-                    except ValueError:
-                        try:
-                            return float(limit)
-                        except ValueError:
-                            error(f'Invalid range limit {limit}')
-
-                return RangeTerm(
-                    field,
-                    get_range_limit(range_term_lower),
-                    get_range_limit(rane_term_upper),
-                    token
-                )
+                     field: str,
+                     value: str,
+                     pos: int) -> Term:
+            pass
+            # if (
+            #         equality_term_value and
+            #         range_term_lower is None and
+            #         rane_term_upper is None
+            # ):
+            #     return EqualityTerm(field, equality_term_value, token)
+            # elif (
+            #         equality_term_value is None and
+            #         (range_term_lower or rane_term_upper)
+            # ):
+            #     def get_range_limit(limit: str) -> Optional[RangeLimit]:
+            #         if limit == '*':
+            #             return None
+            #
+            #         try:
+            #             return int(limit)
+            #         except ValueError:
+            #             try:
+            #                 return float(limit)
+            #             except ValueError:
+            #                 error(f'Invalid range limit {limit}')
+            #
+            #     return RangeTerm(
+            #         field,
+            #         get_range_limit(range_term_lower),
+            #         get_range_limit(rane_term_upper),
+            #         token
+            #     )
 
         def push_token(token: str,
-                       field: Optional[str],
-                       equality_term_value: Optional[str],
-                       range_term_lower: Optional[str],
-                       rane_term_upper: Optional[str],
-                       pos):
+                       pos: int,
+                       field: Optional[str] = None,
+                       value: Optional[str] = None,
+                       ):
             if token == '':
                 return
 
@@ -187,12 +186,16 @@ class MarqoFilterStringParser:
 
                 stack.append(Or(stack.pop(), None))
             else:
+                # Term
+                if not field or not value:
+                    error(f"Cannot parse token '{token}'", pos)
+
                 # Term must come at the beginning of an expression or after an operator
                 if not (prev is None or prev == '(' or is_operator(prev)):
                     # Term after term or expression
-                    error(f"Unexpected term '{token}. Expected an operator", pos - len(token))
+                    error(f"Unexpected term '{token}'. Expected an operator", pos - len(token))
 
-                node = get_term(token, field, equality_term_value, range_term_lower, rane_term_upper)
+                node = get_term(token, field, value, pos)
                 if isinstance(prev, Operator):
                     operator = prev
                     if operator.greedy:
@@ -297,39 +300,45 @@ class MarqoFilterStringParser:
                 raise FilterStringParsingError(f'Error parsing filter string {pos}: {msg}')
 
         current_token = []
-        field = []
-        equality_term_value = None
-        range_term_lower = None
-        range_term_upper = None
+        term_field = []
+        term_value = []
 
         parenthesis_count = 0
         escape = False
-        term = False
-        equality_term = False
-        range_term = False
+        read_term_value = False
+        read_space_until = None  # ignore space until reaching the value of this variable
         for i in range(len(filter_string)):
             c = filter_string[i]
 
-            if term and not (not escape and c == ' '):
+            # Special processing if we are reading a term value
+            if read_term_value and not (c == ' ' and not escape and read_space_until is None):
                 if escape:
-
+                    current_token.append(c)
+                    term_value.append(c)
+                    escape = False
                 elif c == '\\':
                     escape = True
-                elif not equality_term and not range_term:  # start of term value
-                    if c == '(':
-                        pass
-                    elif c == '[':
-                        pass
-                    else:
-                        equality_term = True
-                        equality_term_value = [c]
+                else:
+                    if c == read_space_until:
+                        read_space_until = None
+                        read_term_value = False
+                    elif len(term_value) == 0 and c == '(':  # start of term value
+                        read_space_until = ')'
+                    elif len(term_value) == 0 and c == '[':
+                        read_space_until = ']'
 
+                    current_token.append(c)
+                    term_value.append(c)
+
+                continue
 
             if escape:
                 current_token.append(c)
                 escape = False
             elif c == ':':
-                term = True
+                read_term_value = True
+                term_field = current_token
+                current_token.append(c)
             elif c == '(':
                 if len(current_token) > 0:
                     error('Unexpected (', i)
@@ -345,14 +354,22 @@ class MarqoFilterStringParser:
             elif c == '\\':
                 escape = True
             elif c == ' ':
-                push_token(''.join(current_token),  i)
+                if len(term_value) > 0:
+                    push_token(''.join(current_token), i, ''.join(term_field), ''.join(term_value))
+                    read_term_value = False
+                    term_value = []
+                else:
+                    push_token(''.join(current_token), i)
+
                 current_token = []
             else:
                 current_token.append(c)
 
-
         if len(current_token) > 0:
-            push_token(''.join(current_token), len(filter_string))
+            if read_term_value:
+                push_token(''.join(current_token), len(filter_string), ''.join(term_field), ''.join(term_value))
+            else:
+                push_token(''.join(current_token), len(filter_string))
 
         if parenthesis_count != 0:
             # merge_stack will catch this, but this is a more specific error message
