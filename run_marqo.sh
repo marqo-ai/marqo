@@ -57,26 +57,6 @@ else
   echo "Found VESPA_CONFIG_URL. Skipping internal Vespa configuration"
 fi
 
-
-
-## Start local vespa
-#echo "Running Vespa Locally"
-#tmux new-session -d -s vespa "bash /usr/local/bin/start_vespa.sh"
-## Start opensearch in the background
-#
-#echo "Waiting for Vespa to start"
-#for i in {1..20}; do
-#    echo -ne "Waiting... $i seconds\r"
-#    sleep 1
-#done
-#echo -e "\nDone waiting."
-#
-## Deploy a dummy app
-#vespa config set target local
-#vespa clone album-recommendation dummy_app
-#vespa deploy dummy_app/ --wait 300
-
-
 # Start up redis
 if [ "$MARQO_ENABLE_THROTTLING" != "FALSE" ]; then
     echo "Starting redis-server"

@@ -18,7 +18,7 @@ class AnnParameters(BaseMarqoModel):
 
 class IndexSettings(BaseMarqoModel):
     type: core.IndexType = core.IndexType.Unstructured
-    fields: Optional[List[Field]]
+    all_fields: Optional[List[Field]]
     tensor_fields: Optional[List[str]]
     model: str = 'hf/all_datasets_v4_MiniLM-L6'
     model_properties: Optional[Dict[str, Any]]
@@ -42,14 +42,14 @@ class IndexSettings(BaseMarqoModel):
 
     def to_marqo_index(self, index_name: str):
         marqo_fields = None
-        if self.fields is not None:
+        if self.all_fields is not None:
             marqo_fields = [
                 core.Field(
                     name=field.name,
                     type=field.type,
                     features=field.features,
                     dependent_fields=field.dependent_fields
-                ) for field in self.fields
+                ) for field in self.all_fields
             ]
 
         marqo_tensor_fields = None
