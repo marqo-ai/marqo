@@ -416,7 +416,7 @@ def validate_index_name(name: str) -> str:
     return name
 
 
-def validate_dict(field: str, field_content: Dict, is_non_tensor_field: bool, mappings: Dict):
+def validate_dict(field: str, field_content: Dict, is_non_tensor_field: bool, mappings: Dict, index_model_dimensions: int = None) -> Dict:
     '''
 
     Args:
