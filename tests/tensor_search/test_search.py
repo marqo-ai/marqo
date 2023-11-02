@@ -1414,6 +1414,7 @@ class TestVectorSearchUtils(MarqoTestCase):
     def test_construct_vector_input_batches(self):
         index_info_with_images = IndexInfo(
             model_name = "PLACEHOLDER. ViT-B/32",
+            search_model_name = "PLACEHOLDER. ViT-B/32",
             properties = {"PLACEHOLDER": "PLACEHOLDER"},
             index_settings = {
                 IndexSettingsField.index_defaults: {
@@ -1424,6 +1425,7 @@ class TestVectorSearchUtils(MarqoTestCase):
 
         index_info_without_images = IndexInfo(
             model_name = "PLACEHOLDER. ViT-B/32",
+            search_model_name = "PLACEHOLDER. ViT-B/32",
             properties = {"PLACEHOLDER": "PLACEHOLDER"},
             index_settings = {
                 IndexSettingsField.index_defaults: {

@@ -11,7 +11,7 @@ class TestIndexInfo(unittest.TestCase):
     def test_get_vector_properties_empty(self):
         """This shouldn't happen, because there would at least be __field_name from
         index creation"""
-        ii = IndexInfo(model_name='a', properties=dict(),
+        ii = IndexInfo(model_name='a', search_model_name="b", properties=dict(),
                        index_settings=configs.get_default_index_settings())
         try:
             ii.get_vector_properties()
@@ -21,13 +21,14 @@ class TestIndexInfo(unittest.TestCase):
 
     def test_get_text_properties_empty(self):
         """Text properties aren't nested, so it handles empty properties fine. (no KeyError)"""
-        ii = IndexInfo(model_name='a', properties=dict(),
+        ii = IndexInfo(model_name='a', search_model_name="b", properties=dict(),
                        index_settings=configs.get_default_index_settings())
         assert dict() == ii.get_text_properties()
 
     def test_get_vector_properties(self):
         ii = IndexInfo(
             model_name='a',
+            search_model_name="b", 
             properties={
                 "a": {1: 2}, "b": {1: 2},
                 TensorField.chunks: {"properties":{
@@ -39,7 +40,9 @@ class TestIndexInfo(unittest.TestCase):
 
     def test_get_vector_properties_tricky_names(self):
         ii = IndexInfo(
-            model_name='a', properties={
+            model_name='a', 
+            search_model_name="b", 
+            properties={
                 "a": {1: 2},
                 TensorField.chunks: {"properties": {
                     TensorField.field_name: {'a': 'b'},
@@ -52,7 +55,7 @@ class TestIndexInfo(unittest.TestCase):
                 "__vector_Some title": {1: 2}} == ii.get_vector_properties()
 
     def test_get_vector_properties_no_vectors(self):
-        ii = IndexInfo(model_name='a', properties={
+        ii = IndexInfo(model_name='a', search_model_name="b", properties={
             "a": {1: 2}, "b_a": {1: 2}, "blah blah": {1: 2},
             TensorField.chunks: {"properties": {
                 TensorField.field_name: {'a': 'b'},
@@ -63,7 +66,7 @@ class TestIndexInfo(unittest.TestCase):
 
     def test_get_text_properties(self):
         ii = IndexInfo(
-            model_name='a',
+            model_name='a', search_model_name="b",
             properties={
                 "a": {1: 2}, "b_a": {1: 2}, "blah blah": {1: 2},
                 TensorField.chunks: {"properties": {
@@ -78,7 +81,7 @@ class TestIndexInfo(unittest.TestCase):
 
     def test_get_text_properties_no_text_props(self):
         ii = IndexInfo(
-            model_name='some model',
+            model_name='some model', search_model_name="some other model",
             properties={
                 "__vector_a": {1: 2}, "__vector_b_a": {1: 2},  "__vector_blah blah": {1: 2},
                 "__field_name": {1:2},
@@ -88,7 +91,7 @@ class TestIndexInfo(unittest.TestCase):
 
     def test_get_text_properties_some_text_props(self):
         ii = IndexInfo(
-            model_name='some model',
+            model_name='some model', search_model_name="some other model", 
             properties={
             "__vector_a": {1: 2}, "__vector_b_a": {1: 2},  "__vector_blah blah": {1: 2},
             "__field_name": {1: 2}, "some_text_prop": {1:2334}, "cat": {"hat": "ter"},
@@ -101,7 +104,7 @@ class TestIndexInfo(unittest.TestCase):
 
     def test_get_ann_parameters__default_index_param(self):
         ii = IndexInfo(
-            model_name='some model',
+            model_name='some model', search_model_name="some other model",
             properties={},
             index_settings=configs.get_default_index_settings()
         )
@@ -112,7 +115,7 @@ class TestIndexInfo(unittest.TestCase):
         del index_settings[NsFields.index_defaults][NsFields.ann_parameters]
 
         ii = IndexInfo(
-            model_name='some model',
+            model_name='some model', search_model_name="some other model",
             properties={},
             index_settings=index_settings
         )
@@ -123,7 +126,7 @@ class TestIndexInfo(unittest.TestCase):
         index_settings[NsFields.index_defaults][NsFields.ann_parameters][NsFields.ann_method_name] = "not-hnsw"
 
         ii = IndexInfo(
-            model_name='some model',
+            model_name='some model', search_model_name="some other model",
             properties={},
             index_settings=index_settings
         )
@@ -144,7 +147,7 @@ class TestIndexInfo(unittest.TestCase):
         }
 
         ii = IndexInfo(
-            model_name='some model',
+            model_name='some model', search_model_name="some other model",
             properties={},
             index_settings=index_settings
         )
