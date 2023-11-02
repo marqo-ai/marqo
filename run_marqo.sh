@@ -48,7 +48,7 @@ if [[ ! $VESPA_CONFIG_URL ]]; then
   echo -e "\nDone waiting."
   # Deploy a dummy application to Vespa
   echo "Deploying dummy application to Vespa for local run"
-  vespa deploy deploy /app/scripts/vespa_dummy_app --wait 300
+  vespa deploy /app/scripts/vespa_dummy_app --wait 300
   echo "Done. Local Vespa configuration is finished"
   export VESPA_QUERY_URL="http://localhost:8080"
   export VESPA_DOCUMENT_URL="http://localhost:8080"
