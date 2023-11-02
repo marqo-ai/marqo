@@ -8,15 +8,43 @@ class Node(ABC):
     pass
 
 
-class Term(Node):
-    def __init__(self, term: str):
-        self.term = term
+class Term(Node, ABC):
+    def __init__(self, field: str, raw: str):
+        self.field = field
+        self.raw = raw
 
     def __str__(self):
-        return self.term
+        return self.raw
+
+
+class EqualityTerm(Term):
+    def __init__(self, field: str, value: str, raw: str):
+        super().__init__(field, raw)
+        self.value = value
 
     def __eq__(self, other):
-        return type(self) == type(other) and self.term == other.term
+        return type(self) == type(other) and self.field == other.field and self.value == other.value
+
+
+RangeLimit = Union[int, float]
+
+
+class RangeTerm(Term):
+    def __init__(self, field: str, lower: Optional[RangeLimit], upper: Optional[RangeLimit], raw: str):
+        super().__init__(field, raw)
+        self.lower = lower
+        self.upper = upper
+
+        if lower is None and upper is None:
+            raise ValueError(f'At least one of lower or upper must be specified')
+
+    def __eq__(self, other):
+        return (
+                type(self) == type(other) and
+                self.field == other.field and
+                self.lower == other.lower and
+                self.upper == other.upper
+        )
 
 
 class Operator(Node, ABC):
@@ -92,7 +120,46 @@ class MarqoFilterStringParser:
 
         stack: List[Union[str, Operator, Term]] = []
 
-        def push_token(token, pos):
+        def get_term(token: str,
+                     field: Optional[str],
+                     equality_term_value: Optional[str],
+                     range_term_lower: Optional[str],
+                     rane_term_upper: Optional[str]) -> Term:
+            if (
+                    equality_term_value and
+                    range_term_lower is None and
+                    rane_term_upper is None
+            ):
+                return EqualityTerm(field, equality_term_value, token)
+            elif (
+                    equality_term_value is None and
+                    (range_term_lower or rane_term_upper)
+            ):
+                def get_range_limit(limit: str) -> Optional[RangeLimit]:
+                    if limit == '*':
+                        return None
+
+                    try:
+                        return int(limit)
+                    except ValueError:
+                        try:
+                            return float(limit)
+                        except ValueError:
+                            error(f'Invalid range limit {limit}')
+
+                return RangeTerm(
+                    field,
+                    get_range_limit(range_term_lower),
+                    get_range_limit(rane_term_upper),
+                    token
+                )
+
+        def push_token(token: str,
+                       field: Optional[str],
+                       equality_term_value: Optional[str],
+                       range_term_lower: Optional[str],
+                       rane_term_upper: Optional[str],
+                       pos):
             if token == '':
                 return
 
@@ -125,7 +192,7 @@ class MarqoFilterStringParser:
                     # Term after term or expression
                     error(f"Unexpected term '{token}. Expected an operator", pos - len(token))
 
-                node = Term(token)
+                node = get_term(token, field, equality_term_value, range_term_lower, rane_term_upper)
                 if isinstance(prev, Operator):
                     operator = prev
                     if operator.greedy:
@@ -178,7 +245,7 @@ class MarqoFilterStringParser:
 
                 if not isinstance(prev, Operator):
                     # Expected to be unreachable
-                    error(f'Unexpected term {prev.term} in expression ending at position {pos}')
+                    error(f'Unexpected term {prev.field} in expression ending at position {pos}')
 
                 prev.right = node
 
@@ -229,36 +296,63 @@ class MarqoFilterStringParser:
             else:
                 raise FilterStringParsingError(f'Error parsing filter string {pos}: {msg}')
 
-        current_token = ''
+        current_token = []
+        field = []
+        equality_term_value = None
+        range_term_lower = None
+        range_term_upper = None
+
         parenthesis_count = 0
         escape = False
+        term = False
+        equality_term = False
+        range_term = False
         for i in range(len(filter_string)):
             c = filter_string[i]
+
+            if term and not (not escape and c == ' '):
+                if escape:
+
+                elif c == '\\':
+                    escape = True
+                elif not equality_term and not range_term:  # start of term value
+                    if c == '(':
+                        pass
+                    elif c == '[':
+                        pass
+                    else:
+                        equality_term = True
+                        equality_term_value = [c]
+
+
             if escape:
-                current_token += c
+                current_token.append(c)
                 escape = False
+            elif c == ':':
+                term = True
             elif c == '(':
-                if current_token != '':
+                if len(current_token) > 0:
                     error('Unexpected (', i)
 
                 stack.append(c)
                 parenthesis_count += 1
             elif c == ')':
-                push_token(current_token, i)
-                current_token = ''
+                push_token(''.join(current_token), i)
+                current_token = []
 
                 merge_expression(i)
                 parenthesis_count -= 1
             elif c == '\\':
                 escape = True
             elif c == ' ':
-                push_token(current_token, i)
-                current_token = ''
+                push_token(''.join(current_token),  i)
+                current_token = []
             else:
-                current_token += c
+                current_token.append(c)
 
-        if current_token != '':
-            push_token(current_token, len(filter_string))
+
+        if len(current_token) > 0:
+            push_token(''.join(current_token), len(filter_string))
 
         if parenthesis_count != 0:
             # merge_stack will catch this, but this is a more specific error message
