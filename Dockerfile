@@ -5,7 +5,7 @@ WORKDIR /app
 
 COPY requirements.txt requirements.txt
 RUN pip3 install --no-cache-dir -r requirements.txt
-
+COPY scripts scripts
 FROM base_image
 COPY . /app
 ENV PYTHONPATH "${PYTHONPATH}:/app"
