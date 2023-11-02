@@ -1,25 +1,23 @@
 """The API entrypoint for Tensor Search"""
 import json
 import os
-import typing
-from typing import List, Dict, Optional
+from typing import List
 
 import pydantic
 import uvicorn
-from fastapi import FastAPI, Query
-from fastapi import Request, Depends, Response
+from fastapi import FastAPI
+from fastapi import Request, Depends
 from fastapi.responses import JSONResponse
 
 from marqo import config, errors
 from marqo import version
-from marqo.core.exceptions import IndexNotFoundError, IndexExistsError
+from marqo.core.exceptions import IndexExistsError
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.errors import InvalidArgError, MarqoWebError, MarqoError
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.backend import get_index_info
 from marqo.tensor_search.enums import RequestType, EnvVars
-from marqo.tensor_search.models.add_docs_objects import (ModelAuth,
-                                                         AddDocsBodyParams)
+from marqo.tensor_search.models.add_docs_objects import (AddDocsBodyParams)
 from marqo.tensor_search.models.api_models import BulkSearchQuery, SearchQuery
 from marqo.tensor_search.models.index_settings import IndexSettings
 from marqo.tensor_search.on_start_script import on_start
@@ -125,7 +123,13 @@ def create_index(index_name: str, settings: IndexSettings, marqo_config: config.
     except IndexExistsError as e:
         raise errors.IndexAlreadyExistsError(f"Index {index_name} already exists") from e
 
-    return Response(status_code=200)
+    return JSONResponse(
+        content={
+            "acknowledged": True,
+            "index": index_name
+        },
+        status_code=200
+    )
 
 
 @app.post("/indexes/bulk/search")
@@ -206,9 +210,9 @@ def get_index_stats(index_name: str, marqo_config: config.Config = Depends(get_c
 
 @app.delete("/indexes/{index_name}")
 def delete_index(index_name: str, marqo_config: config.Config = Depends(get_config)):
-    return tensor_search.delete_index(
-        config=marqo_config, index_name=index_name
-    )
+    tensor_search.delete_index(index_name=index_name, config=marqo_config)
+
+    return JSONResponse(content={"acknowledged": True}, status_code=200)
 
 
 @app.post("/indexes/{index_name}/documents/delete-batch")

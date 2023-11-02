@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Set
 
 from pydantic import Field as PydanticField
 from pydantic import PrivateAttr
@@ -72,6 +72,11 @@ class Field(StrictBaseModel):
 
 
 class TensorField(StrictBaseModel):
+    """
+    A tensor field that has a corresponding field.
+
+    chunk_field_name and embeddings_field_name must be unique across all tensor fields.
+    """
     name: str
     chunk_field_name: Optional[str]
     embeddings_field_name: Optional[str]
@@ -156,23 +161,41 @@ class MarqoIndex(StrictBaseModel):
         self._cache = dict()
 
     @property
-    def lexical_fields(self) -> List[str]:
+    def lexical_fields_names(self) -> Set[str]:
         return self._cache_or_get('lexical_fields',
-                                  lambda: [field.lexical_field_name for field in self.fields if
-                                           field.lexical_field_name is not None]
+                                  lambda: {field.lexical_field_name for field in self.fields if
+                                           field.lexical_field_name is not None}
                                   )
 
     @property
-    def score_modifier_fields(self) -> List[str]:
+    def score_modifier_fields_names(self) -> Set[str]:
         return self._cache_or_get('score_modifier_fields',
-                                  lambda: [field.name for field in self.fields if
-                                           FieldFeature.ScoreModifier in field.features]
+                                  lambda: {field.name for field in self.fields if
+                                           FieldFeature.ScoreModifier in field.features}
                                   )
 
     @property
     def field_map(self) -> Dict[str, Field]:
+        """
+        A map from field name to the field.
+        """
         return self._cache_or_get('field_map',
                                   lambda: {field.name: field for field in self.fields}
+                                  )
+
+    @property
+    def all_field_map(self) -> Dict[str, Field]:
+        """
+        A map from field name, lexical name and filter name to the field.
+        """
+        return self._cache_or_get('all_field_map',
+                                  lambda: {
+                                      **{field.name: field for field in self.fields + self.tensor_fields},
+                                      **{field.lexical_field_name: field for field in self.fields if
+                                         field.lexical_field_name is not None},
+                                      **{field.filter_field_name: field for field in self.fields if
+                                         field.filter_field_name is not None}
+                                  }
                                   )
 
     @property
@@ -180,6 +203,34 @@ class MarqoIndex(StrictBaseModel):
         return self._cache_or_get('tensor_field_map',
                                   lambda: {tensor_field.name: tensor_field for tensor_field in self.tensor_fields}
                                   )
+
+    @property
+    def tensor_subfield_map(self) -> Dict[str, TensorField]:
+        """
+        A map from tensor chunk and embeddings field name to the tensor field.
+        """
+
+        def generate():
+            the_map = dict()
+            for tensor_field in self.tensor_fields:
+                if tensor_field.chunk_field_name is not None:
+                    if tensor_field.chunk_field_name in the_map:
+                        raise ValueError(
+                            f"Duplicate chunk field name {tensor_field.chunk_field_name} "
+                            f"for tensor field {tensor_field.name}"
+                        )
+                    the_map[tensor_field.chunk_field_name] = tensor_field
+                if tensor_field.embeddings_field_name is not None:
+                    if tensor_field.embeddings_field_name in the_map:
+                        raise ValueError(
+                            f"Duplicate embeddings field name {tensor_field.embeddings_field_name} "
+                            f"for tensor field {tensor_field.name}"
+                        )
+                    the_map[tensor_field.embeddings_field_name] = tensor_field
+
+            return the_map
+
+        return self._cache_or_get('tensor_subfield_map', generate)
 
     @property
     def field_map_by_type(self) -> Dict[FieldType, List[Field]]:
@@ -203,6 +254,8 @@ class MarqoIndex(StrictBaseModel):
         copied = MarqoIndex(**model_dict, model_enable_cache=True)
 
         # Retrieve all properties to populate cache
-        [getattr(copied, name) for name, value in vars(MarqoIndex).items() if isinstance(value, property)]
+        for name, value in vars(MarqoIndex).items():
+            if isinstance(value, property):
+                getattr(copied, name)
 
         return copied

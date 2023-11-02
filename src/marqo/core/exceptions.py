@@ -9,13 +9,25 @@ class IndexNotFoundError(MarqoError):
     pass
 
 
-class DocumentParsingError(MarqoError):
+class ParsingError(MarqoError):
     pass
 
 
-class InvalidDataTypeError(DocumentParsingError):
+class VespaDocumentParsingError(ParsingError):
     pass
 
 
-class InvalidFieldNameError(DocumentParsingError):
+class MarqoDocumentParsingError(ParsingError):
+    pass
+
+
+class InvalidDataTypeError(MarqoDocumentParsingError):
+    pass
+
+
+class InvalidFieldNameError(MarqoDocumentParsingError):
+    pass
+
+
+class FilterStringParsingError(MarqoError):
     pass
