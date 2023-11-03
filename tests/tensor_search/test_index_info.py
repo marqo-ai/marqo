@@ -161,3 +161,28 @@ class TestIndexInfo(unittest.TestCase):
         del default[NsFields.ann_method_parameters]
         
         assert actual == default
+    
+    def test_get_search_model_properties(self):
+        index_settings = configs.get_default_index_settings()
+        index_settings[NsFields.index_defaults][NsFields.search_model] = "my_custom_search_model"
+        index_settings[NsFields.index_defaults][NsFields.search_model_properties] = {
+            "dimensions": 512,
+            "name": "ViT-B-32-quickgelu",
+            "dimensions": 512,
+            "url": "https://github.com/mlfoundations/open_clip/releases/download/v0.2-weights/vit_b_32-quickgelu-laion400m_avg-8a00ab3c.pt",
+            "type": "open_clip",
+        }
+
+        ii = IndexInfo(
+            model_name='my_custom_model', search_model_name="my_custom_search_model",
+            properties={},
+            index_settings=index_settings
+        )
+
+        assert ii.get_search_model_properties() == {
+            "dimensions": 512,
+            "name": "ViT-B-32-quickgelu",
+            "dimensions": 512,
+            "url": "https://github.com/mlfoundations/open_clip/releases/download/v0.2-weights/vit_b_32-quickgelu-laion400m_avg-8a00ab3c.pt",
+            "type": "open_clip",
+        }

@@ -23,6 +23,7 @@ from marqo.tensor_search.tensor_search import (_create_dummy_query_for_zero_vect
                                                _generate_vector_text_search_query_for_verbose_one)
 import pprint
 from marqo.tensor_search.models.index_info import IndexInfo
+from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQueryEntity
 
 
 class TestIndexWithSearchModel(MarqoTestCase):
@@ -88,9 +89,10 @@ class TestIndexWithSearchModel(MarqoTestCase):
             }
         )
 
-    def test_search_model_loading_from_registry(self):
+    def test_search_model_loading_from_registry_with_eject(self):
         """
-        Ensures that search model is loaded correctly when using add_documents then search
+        Ensures that search model is loaded correctly when using add_documents then search.
+        Ejected models in between to isolate model list.
         """
         # Registry models
         # Add documents
@@ -129,10 +131,46 @@ class TestIndexWithSearchModel(MarqoTestCase):
 
         # Assert correct result found
         assert search_result["hits"][0]["_id"] == "correct_doc"
-        
-    def test_search_model_loading_custom(self):
+    
+    def test_search_model_loading_from_registry(self):
         """
-        Ensures that custom search model is loaded correctly when using add_documents then search
+        Ensures that search model is loaded correctly when using search then add_documents
+        """
+        # Search first
+        search_result = tensor_search.search(
+            config=self.config, index_name=self.index_with_search_model_registry,
+            text="a yellow fruit", device="cpu"
+        )
+
+        # Assert `onnx32/open_clip/ViT-B-32/laion2b_e16` is loaded (this is `search_model`)
+        loaded_models = tensor_search.get_loaded_models().get("models")
+        assert len(loaded_models) == 1
+        assert loaded_models[0]["model_name"] == "onnx32/open_clip/ViT-B-32/laion2b_e16"     # ViT-B-32 should not be loaded
+        assert loaded_models[0]["model_device"] == "cpu"
+
+        # Add documents
+        tensor_search.add_documents(
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_with_search_model_registry,
+                docs=[
+                    {"_id": "correct_doc", "description": "lemon"},
+                    {"_id": "dummy_doc_1", "description": "DUMMY RESULT"},
+                    {"_id": "dummy_doc_2", "description": "DONT SEARCH FOR ME LOL"},
+                ],
+                auto_refresh=True, device="cpu", 
+            )
+        )
+
+        # Assert ViT-B/32 is also loaded (this is `model`)
+        loaded_models = tensor_search.get_loaded_models().get("models")
+        assert len(loaded_models) == 2
+        assert loaded_models[1]["model_name"] == "ViT-B/32"     # onnx32/open_clip/ViT-B-32/laion2b_e16 should not be loaded
+        assert loaded_models[1]["model_device"] == "cpu"
+        
+    def test_search_model_loading_custom_with_eject(self):
+        """
+        Ensures that custom search model is loaded correctly when using add_documents then search.
+        Ejects add docs model to isolate model list for search.
         """
         # Registry models
         # Add documents
@@ -168,7 +206,84 @@ class TestIndexWithSearchModel(MarqoTestCase):
         assert len(loaded_models) == 1
         assert loaded_models[0]["model_name"] == "my_custom_search_model"     # ViT-B-32 should not be loaded
         assert loaded_models[0]["model_device"] == "cpu"
-    # try without ejecting
-    # try 
-    # bulk search
+    
+    def test_search_model_loading_custom(self):
+        """
+        Ensures that custom search model is loaded correctly when using search first then add_documents
+        """
+        # Registry models
+
+        # Search first
+        search_result = tensor_search.search(
+            config=self.config, index_name=self.index_with_search_model_custom,
+            text="a yellow fruit", device="cpu"
+        )
+
+        # Assert `my_custom_search_model` is loaded (this is `search_model`)
+        loaded_models = tensor_search.get_loaded_models().get("models")
+        assert len(loaded_models) == 1
+        assert loaded_models[0]["model_name"] == "my_custom_search_model"     # ViT-B-32 should not be loaded
+        assert loaded_models[0]["model_device"] == "cpu"
+
+        # Add documents
+        tensor_search.add_documents(
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_with_search_model_custom,
+                docs=[
+                    {"_id": "correct_doc", "description": "lemon"},
+                    {"_id": "dummy_doc_1", "description": "DUMMY RESULT"},
+                    {"_id": "dummy_doc_2", "description": "DONT SEARCH FOR ME LOL"},
+                ],
+                auto_refresh=True, device="cpu", 
+            )
+        )
+
+        # Assert both models are loaded (this is `model`)
+        loaded_models = tensor_search.get_loaded_models().get("models")
+        assert len(loaded_models) == 2
+        assert loaded_models[1]["model_name"] == "ViT-B/32"     # my_custom_search_model should not be loaded
+        assert loaded_models[1]["model_device"] == "cpu"
+    
+    def test_search_model_bulk_search(self):
+        """
+        Ensures that custom search model is loaded correctly when using bulk_search
+        Add docs first, then bulk search
+        """
+        # Add documents
+        tensor_search.add_documents(
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_with_search_model_custom,
+                docs=[
+                    {"_id": "correct_doc", "description": "lemon"},
+                    {"_id": "dummy_doc_1", "description": "DUMMY RESULT"},
+                    {"_id": "dummy_doc_2", "description": "DONT SEARCH FOR ME LOL"},
+                ],
+                auto_refresh=True, device="cpu", 
+            )
+        )
+
+        # Assert only ViT-B/32 is loaded (this is `model`)
+        loaded_models = tensor_search.get_loaded_models().get("models")
+        assert len(loaded_models) == 1
+        assert loaded_models[0]["model_name"] == "ViT-B/32"     # my_custom_search_model should not be loaded
+        assert loaded_models[0]["model_device"] == "cpu"
+
+        # Bulk search
+        search_result = tensor_search.bulk_search(
+            query=BulkSearchQuery(queries=[
+                BulkSearchQueryEntity(index=self.index_with_search_model_custom, q="a yellow fruit")
+            ]),
+            marqo_config=self.config,
+        )
+
+        # Assert now `my_custom_search_model` is also loaded (this is `search_model`)
+        loaded_models = tensor_search.get_loaded_models().get("models")
+        assert len(loaded_models) == 2
+        assert loaded_models[1]["model_name"] == "my_custom_search_model"     # ViT-B-32 should not be loaded
+        assert loaded_models[1]["model_device"] == "cpu"
+
+        assert search_result["result"][0]["hits"][0]["_id"] == "correct_doc"
+        
+    # try manually calculating vectors
+    # model is no_model, but search_model can still vectorise
     
