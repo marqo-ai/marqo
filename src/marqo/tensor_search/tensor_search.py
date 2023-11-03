@@ -1502,8 +1502,8 @@ def assign_query_to_vector_job(
     for i, grouped_content in enumerate(grouped_content):
         content_type = 'text' if i == 0 else 'image'
         vector_job = VectorisedJobs(
-            model_name=index_info.model_name,
-            model_properties=index_info.get_search_model_properties(),    # search model should be used to vectorise for all search queries.
+            model_name=index_info.search_model_name,                      # search_model should be used to vectorise for all search queries.
+            model_properties=index_info.get_search_model_properties(),    # search_model should be used to vectorise for all search queries.
             content=grouped_content,
             device=device,
             normalize_embeddings=index_info.index_settings['index_defaults']['normalize_embeddings'],
@@ -2021,6 +2021,7 @@ def get_loaded_models() -> dict:
     message = {"models": []}
 
     for ix in available_models:
+        print(f"DEBUG: ix: {ix}")
         if isinstance(ix, str):
             message["models"].append({"model_name": ix.split("||")[0], "model_device": ix.split("||")[-1]})
     return message

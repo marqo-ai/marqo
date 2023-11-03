@@ -1145,6 +1145,90 @@ class TestCreateIndex(MarqoTestCase):
         assert fetched_search_model_properties["type"] == "clip"
         tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
 
+    def test_create_index_with_search_model_and_update(self):
+        """
+        Ensures that index settings stay correct with search model even after adding new fields to index.
+        """
+        tensor_search.create_vector_index(
+            config=self.config, index_name=self.index_name_1, 
+            index_settings={
+                NsField.index_defaults: {
+                    "model": "my_custom_model",          # dimension is 512
+                    "model_properties": {
+                        "name": "ViT-B/32",
+                        "dimensions": 512,
+                        "url": "https://openaipublic.azureedge.net/clip/models/40d365715913c9da98579312b702a82c18be219cc2a73407c4526f58eba950af/ViT-B-32.pt",
+                        "type": "clip",
+                    },
+                    "search_model": "my_custom_search_model",
+                    "search_model_properties": {
+                        "name": "ViT-B-32-quickgelu",
+                        "dimensions": 512,
+                        "url": "https://github.com/mlfoundations/open_clip/releases/download/v0.2-weights/vit_b_32-quickgelu-laion400m_avg-8a00ab3c.pt",
+                        "type": "open_clip",
+                    }
+                }
+            }
+        )
+        index_info = backend.get_index_info(config=self.config, index_name=self.index_name_1)
+        assert index_info.index_settings[NsField.index_defaults]["model"] == "my_custom_model"
+        assert index_info.index_settings[NsField.index_defaults]["search_model"] == "my_custom_search_model"
+        assert index_info.model_name == "my_custom_model"
+        assert index_info.search_model_name == "my_custom_search_model"
+
+        fetched_model_properties = index_info.get_model_properties()
+        fetched_search_model_properties = index_info.get_search_model_properties()
+        assert fetched_model_properties["dimensions"] == 512
+        assert fetched_model_properties["type"] == "clip"
+        assert fetched_search_model_properties["dimensions"] == 512
+        assert fetched_search_model_properties["type"] == "open_clip"
+        
+        # Add normal text and multimodal fields to index
+        tensor_search.add_documents(
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1,
+                docs=[{
+                    "_id": "0",
+                    "text_field": "blah",
+                    "my_custom_vector": {
+                        "content": "custom content is here!!",
+                        "vector": [1.0 for _ in range(512)]
+                    },
+                    "my_multimodal": {
+                        "text": "multimodal text",
+                        "image": 'https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png'
+                    }
+                }],
+                auto_refresh=True, device="cpu", 
+                mappings={
+                    "my_custom_vector": {
+                        "type": "custom_vector"
+                    },
+                    "my_multimodal": {
+                        "type": "multimodal_combination",
+                        "weights": {
+                            "text": 0.4,
+                            "image": 0.6
+                        }
+                    }
+                }
+            )
+        )
+
+        # index settings should remain the same
+        index_info = backend.get_index_info(config=self.config, index_name=self.index_name_1)
+        assert index_info.index_settings[NsField.index_defaults]["model"] == "my_custom_model"
+        assert index_info.index_settings[NsField.index_defaults]["search_model"] == "my_custom_search_model"
+        assert index_info.model_name == "my_custom_model"
+        assert index_info.search_model_name == "my_custom_search_model"
+
+        fetched_model_properties = index_info.get_model_properties()
+        fetched_search_model_properties = index_info.get_search_model_properties()
+        assert fetched_model_properties["dimensions"] == 512
+        assert fetched_model_properties["type"] == "clip"
+        assert fetched_search_model_properties["dimensions"] == 512
+        assert fetched_search_model_properties["type"] == "open_clip"
+
     def test_create_index_with_search_model_invalid(self):
         """
         Ensures that creating an index with search_model with improper settings fails with the correct error message.
