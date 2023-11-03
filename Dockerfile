@@ -1,4 +1,4 @@
-FROM marqo-base:poc as base_image
+FROM marqoai/marqo-base:poc as base_image
 VOLUME /var/lib/docker
 ARG TARGETPLATFORM
 WORKDIR /app
