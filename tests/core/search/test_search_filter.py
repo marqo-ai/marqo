@@ -7,29 +7,29 @@ class TestMarqoFilterStringParser(MarqoTestCase):
     def test_parse_successful(self):
         test_cases = [
             (
-                'a',
-                SearchFilter(root=Term('a')),
+                'a:b',
+                SearchFilter(root=EqualityTerm('a', 'b', 'a:b')),
                 'single term'
             ),
             (
-                '(a)',
-                SearchFilter(root=Term('a')),
+                '(a:b)',
+                SearchFilter(root=EqualityTerm('a', 'b', 'a:b')),
                 'single term with parentheses'
             ),
             (
-                '(((a)))',
-                SearchFilter(root=Term('a')),
+                '(((a:n)))',
+                SearchFilter(root=EqualityTerm('a', 'b', 'a:b')),
                 'single term with extra parentheses'
             ),
             (
-                'a AND b OR c',
+                'a:1 AND b:2 OR c:3',
                 SearchFilter(
                     root=Or(
                         left=And(
-                            left=Term('a'),
-                            right=Term('b')
+                            left=EqualityTerm('a', '1', 'a:b'),
+                            right=EqualityTerm('a', '2', 'a:b')
                         ),
-                        right=Term('c')
+                        right=EqualityTerm('a', 'b', 'a:b')
                     )
                 ),
                 'simple filter string'

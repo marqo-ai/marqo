@@ -1278,7 +1278,7 @@ def _lexical_search(
         f"{len(gathered_docs)} results."
     )
 
-    return {"hits": gathered_docs}
+    return gathered_docs
 
 
 def construct_vector_input_batches(query: Union[str, Dict], index_info: MarqoIndex) -> Tuple[List[str], List[str]]:
@@ -1857,7 +1857,7 @@ def _vector_text_search(
         f"{len(gathered_docs)} results from Vespa."
     )
 
-    return {"hits": gathered_docs}
+    return gathered_docs
 
 
 def _format_ordered_docs_simple(ordered_docs_w_chunks: List[dict], result_count: int) -> dict:
