@@ -33,58 +33,30 @@ function wait_for_process () {
 }
 
 OPENSEARCH_IS_INTERNAL=False
-# Start opensearch in the background
-if [[ ! $OPENSEARCH_URL ]]; then
+# Start Vespa in the background
+if [[ ! $VESPA_CONFIG_URL ]]; then
+  # Start local vespa
+  echo "Running Vespa Locally"
+  tmux new-session -d -s vespa "bash /usr/local/bin/start_vespa.sh"
+  # Start opensearch in the background
 
-  which docker > /dev/null 2>&1
-  rc=$?
-  if [ $rc != 0 ]; then
-      echo "Docker not found. Installing it..."
-      bash /app/dind_setup/setup_dind.sh &
-      setup_dind_pid=$!
-      wait "$setup_dind_pid"
-  fi
-
-  echo "Starting supervisor"
-  /usr/bin/supervisord -n >> /dev/null 2>&1 &
-
-  dockerd &
-  echo "called dockerd command"
-
-  echo "Waiting for processes to be running"
-  processes=(dockerd)
-  for process in "${processes[@]}"; do
-      wait_for_process "$process"
-      if [ $? -ne 0 ]; then
-          echo "$process is not running after max time"
-          exit 1
-      else
-          echo "$process is running"
-      fi
+  echo "Waiting for Vespa to start"
+  for i in {1..5}; do
+      echo -ne "Waiting... $i seconds\r"
+      sleep 1
   done
-  OPENSEARCH_URL="https://localhost:9200"
-  OPENSEARCH_IS_INTERNAL=True
-  if [[ $(docker ps -a | grep marqo-os) ]]; then
-      if [[ $(docker ps -a | grep marqo-os | grep -v Up) ]]; then
-        docker start marqo-os &
-        until [[ $(curl -v --silent --insecure $OPENSEARCH_URL 2>&1 | grep Unauthorized) ]]; do
-          sleep 0.1;
-        done;
-        echo "Opensearch started"
-      fi
-      echo "OpenSearch is running"
-  else
-      echo "OpenSearch not found; running OpenSearch"
-      docker run --name marqo-os -id -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" marqoai/marqo-os:0.0.3 &
-      docker start marqo-os &
-      until [[ $(curl -v --silent --insecure $OPENSEARCH_URL 2>&1 | grep Unauthorized) ]]; do
-        sleep 0.1;
-      done;
-  fi
-fi
+  echo -e "\nDone waiting."
+  # Deploy a dummy application to Vespa
+  echo "Deploying dummy application to Vespa for local run"
+  vespa deploy /app/scripts/vespa_dummy_app --wait 300
+  echo "Done. Local Vespa configuration is finished"
+  export VESPA_QUERY_URL="http://localhost:8080"
+  export VESPA_DOCUMENT_URL="http://localhost:8080"
+  export VESPA_CONFIG_URL="http://localhost:19071"
 
-export OPENSEARCH_URL
-export OPENSEARCH_IS_INTERNAL
+else
+  echo "Found VESPA_CONFIG_URL. Skipping internal Vespa configuration"
+fi
 
 # Start up redis
 if [ "$MARQO_ENABLE_THROTTLING" != "FALSE" ]; then
