@@ -31,7 +31,7 @@ def validate_add_docs_count(docs: Union[Sequence[Union[dict, Any]], np.ndarray])
         raise BadRequestError(message=f"Number of docs in add documents request ({doc_count}) exceeds limit of {max_add_docs_count}. "
                                     f"This limit can be increased by setting the environment variable `{EnvVars.MARQO_MAX_ADD_DOCS_COUNT}`. "
                                     f"If using the Python client, break up your `add_documents` request into smaller batches using its `client_batch_size` parameter. "
-                                    f"See https://marqo.pages.dev/1.3.0/API-Reference/documents/#body for more details.")
+                                    f"See https://docs.marqo.ai/1.3.0/API-Reference/documents/#body for more details.")
 
     return docs
 

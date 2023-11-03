@@ -612,7 +612,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                             s2_inference.ModelDownloadError) as model_error:
                         raise errors.BadRequestError(
                             message=f'Problem vectorising query. Reason: {str(model_error)}',
-                            link="https://marqo.pages.dev/latest/Models-Reference/dense_retrieval/"
+                            link="https://docs.marqo.ai/latest/Models-Reference/dense_retrieval/"
                         )
                     except s2_inference_errors.S2InferenceError:
                         document_is_valid = False
@@ -1553,7 +1553,7 @@ def vectorise_jobs(jobs: List[VectorisedJobs]) -> Dict[JHash, Dict[str, List[flo
                 s2_inference.ModelDownloadError) as model_error:
             raise errors.BadRequestError(
                 message=f'Problem vectorising query. Reason: {str(model_error)}',
-                link="https://marqo.pages.dev/latest/Models-Reference/dense_retrieval/"
+                link="https://docs.marqo.ai/latest/Models-Reference/dense_retrieval/"
             )
 
         except s2_inference_errors.S2InferenceError as e:
@@ -2156,7 +2156,7 @@ def vectorise_multimodal_combination_field(
             s2_inference_errors.ModelLoadError) as model_error:
         raise errors.BadRequestError(
             message=f'Problem vectorising query. Reason: {str(model_error)}',
-            link="https://marqo.pages.dev/1.4.0/Models-Reference/dense_retrieval/"
+            link="https://docs.marqo.ai/1.4.0/Models-Reference/dense_retrieval/"
         )
     except s2_inference_errors.S2InferenceError:
         combo_document_is_valid = False

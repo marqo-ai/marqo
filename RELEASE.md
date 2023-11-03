@@ -4,26 +4,26 @@
 - Configurable document count limit for `add_documents()` calls (https://github.com/marqo-ai/marqo/pull/592). This mitigates Marqo getting overloaded 
 due to add_documents requests with a very high number of documents. If you are adding documents in batches larger than the default (64), you will now 
 receive an error. You can ensure your add_documents request complies to this limit by setting the Python client’s `client_batch_size` or changing this 
-limit via the  `MARQO_MAX_ADD_DOCS_COUNT` variable. Read more on configuring the doc count limit [here](https://marqo.pages.dev/1.4.0/Guides/Advanced-Usage/configuration/#configuring-usage-limits).
+limit via the  `MARQO_MAX_ADD_DOCS_COUNT` variable. Read more on configuring the doc count limit [here](https://docs.marqo.ai/1.4.0/Guides/Advanced-Usage/configuration/#configuring-usage-limits).
 - Default `refresh` value for `add_documents()` and `delete_documents()` set to `false` (https://github.com/marqo-ai/marqo/pull/601). This prevents 
 unnecessary refreshes, which can negatively impact search and add_documents performance, especially for applications that are 
 constantly adding or deleting documents. If you search or get documents immediately after adding or deleting documents, you may still get some extra 
 or missing documents. To see results of these operations more immediately, simply set the `refresh` parameter to `true`. Read more on this parameter 
-[here](https://marqo.pages.dev/1.4.0/API-Reference/Documents/add_or_replace_documents/#query-parameters).
+[here](https://docs.marqo.ai/1.4.0/API-Reference/Documents/add_or_replace_documents/#query-parameters).
 
 ## New Features
 - Custom vector field type added (https://github.com/marqo-ai/marqo/pull/610). You can now add externally generated vectors to Marqo documents! See 
-usage [here](https://marqo.pages.dev/1.4.0/Guides/Advanced-Usage/document_fields/#custom-vector-object).
+usage [here](https://docs.marqo.ai/1.4.0/Guides/Advanced-Usage/document_fields/#custom-vector-object).
 - `no_model` option added for index creation (https://github.com/marqo-ai/marqo/pull/617). This allows for indexes that do no vectorisation, providing 
-easy use of custom vectors with no risk of accidentally mixing them up with Marqo-generated vectors. See usage [here](https://marqo.pages.dev/1.4.0/API-Reference/Indexes/create_index/#no-model).
+easy use of custom vectors with no risk of accidentally mixing them up with Marqo-generated vectors. See usage [here](https://docs.marqo.ai/1.4.0/API-Reference/Indexes/create_index/#no-model).
 - The search endpoint's `q` parameter is now optional if `context` vectors are provided. (https://github.com/marqo-ai/marqo/pull/617). This is 
-particularly useful when using context vectors to search across your documents that have custom vector fields. See usage [here](https://marqo.pages.dev/1.4.0/API-Reference/Search/search/#context).
+particularly useful when using context vectors to search across your documents that have custom vector fields. See usage [here](https://docs.marqo.ai/1.4.0/API-Reference/Search/search/#context).
 - Configurable retries added to backend requests (https://github.com/marqo-ai/marqo/pull/623). This makes `add_documents()` and `search()` requests 
 more resilient to transient network errors. Use with caution, as retries in Marqo will change the consistency guarantees for these endpoints. For more 
 control over retry error handling, you can leave retry attempts at the default value (0) and implement your own backend communication error handling. 
-See retry configuration instructions and how it impacts these endpoints' behaviour [here](https://marqo.pages.dev/1.4.0/Guides/Advanced-Usage/configuration/#configuring-marqo-os-request-retries).
+See retry configuration instructions and how it impacts these endpoints' behaviour [here](https://docs.marqo.ai/1.4.0/Guides/Advanced-Usage/configuration/#configuring-marqo-os-request-retries).
 - More informative `delete_documents()` response (https://github.com/marqo-ai/marqo/pull/619). The response object now includes a list of document 
-ids, status codes, and results (success or reason for failure). See delete documents usage [here](https://marqo.pages.dev/1.4.0/API-Reference/Documents/delete_documents/).
+ids, status codes, and results (success or reason for failure). See delete documents usage [here](https://docs.marqo.ai/1.4.0/API-Reference/Documents/delete_documents/).
 - Friendlier startup experience (https://github.com/marqo-ai/marqo/pull/600). Startup output has been condensed, with unhelpful log messages removed. 
 More detailed logs can be accessed by setting `MARQO_LOG_LEVEL` to `debug`.
 
@@ -44,7 +44,7 @@ More detailed logs can be accessed by setting `MARQO_LOG_LEVEL` to `debug`.
 
 ## New features
 
-- New E5 models added to model registry (https://github.com/marqo-ai/marqo/pull/568). E5 V2 and Multilingual E5 models are now available for use. The new E5 V2 models outperform their E5 counterparts in the BEIR benchmark, as seen [here](https://github.com/microsoft/unilm/tree/master/e5#english-pre-trained-models). See all available models [here](https://marqo.pages.dev/1.2.0/Models-Reference/dense_retrieval/).
+- New E5 models added to model registry (https://github.com/marqo-ai/marqo/pull/568). E5 V2 and Multilingual E5 models are now available for use. The new E5 V2 models outperform their E5 counterparts in the BEIR benchmark, as seen [here](https://github.com/microsoft/unilm/tree/master/e5#english-pre-trained-models). See all available models [here](https://docs.marqo.ai/1.2.0/Models-Reference/dense_retrieval/).
 - Dockerfile optimisation (https://github.com/marqo-ai/marqo/pull/569). A pre-built Marqo base image results in reduced image layers and increased build speed, meaning neater docker pulls and an overall better development experience.
 
 
@@ -67,9 +67,9 @@ More detailed logs can be accessed by setting `MARQO_LOG_LEVEL` to `debug`.
 
 ## New features
 
-- Storage status in health check endpoint (https://github.com/marqo-ai/marqo/pull/555 & https://github.com/marqo-ai/marqo/pull/559). The `GET /indexes/{index-name}/health` endpoint's `backend` object will now return the boolean `storage_is_available`, to indicate if there is remaining storage space. If space is not available, health status will now return `yellow`. See [here](https://marqo.pages.dev/1.2.0/API-Reference/health/) for detailed usage.
+- Storage status in health check endpoint (https://github.com/marqo-ai/marqo/pull/555 & https://github.com/marqo-ai/marqo/pull/559). The `GET /indexes/{index-name}/health` endpoint's `backend` object will now return the boolean `storage_is_available`, to indicate if there is remaining storage space. If space is not available, health status will now return `yellow`. See [here](https://docs.marqo.ai/1.2.0/API-Reference/health/) for detailed usage.
 
-- Score Modifiers search optimization (https://github.com/marqo-ai/marqo/pull/566). This optimization reduces latency for searches with the `score_modifiers` parameter when field names or weights are changed. See [here](https://marqo.pages.dev/1.2.0/API-Reference/search/#score-modifiers) for detailed usage.
+- Score Modifiers search optimization (https://github.com/marqo-ai/marqo/pull/566). This optimization reduces latency for searches with the `score_modifiers` parameter when field names or weights are changed. See [here](https://docs.marqo.ai/1.2.0/API-Reference/search/#score-modifiers) for detailed usage.
 
 ## Bug fixes and minor changes
 
@@ -194,7 +194,7 @@ This can help enhance throughput and performance for certain workloads. Please s
 
 ## New features
 - Custom model pre-loading (https://github.com/marqo-ai/marqo/pull/475). Public CLIP and OpenCLIP models specified by URL can now be loaded on Marqo startup via the `MARQO_MODELS_TO_PRELOAD` environment variable. These must be formatted as JSON objects with `model` and `model_properties`.
-  See [here (configuring pre-loaded models)](https://marqo.pages.dev/0.0.20/Advanced-Usage/configuration/#configuring-preloaded-models) for usage.
+  See [here (configuring pre-loaded models)](https://docs.marqo.ai/0.0.20/Advanced-Usage/configuration/#configuring-preloaded-models) for usage.
 
 ## Bug fixes and minor changes
 - Fixed arm64 build issue caused by package version conflicts (https://github.com/marqo-ai/marqo/pull/478)
@@ -386,7 +386,7 @@ Thank you to our 2.2k stargazers and 80+ forkers!
 # Release 0.0.10
 
 ## New features 
-- Generic model support (https://github.com/marqo-ai/marqo/pull/179). Create an index with your favourite SBERT-type models from HuggingFace! Read about usage [here](https://marqo.pages.dev/0.0.10/Models-Reference/dense_retrieval/#generic-models)
+- Generic model support (https://github.com/marqo-ai/marqo/pull/179). Create an index with your favourite SBERT-type models from HuggingFace! Read about usage [here](https://docs.marqo.ai/0.0.10/Models-Reference/dense_retrieval/#generic-models)
 - Visual search update 2. (https://github.com/marqo-ai/marqo/pull/214). Search-time image reranking and open-vocabulary localization, based on users' queries, is now available with the Owl-ViT model. **Locate the part of the image corresponding to your query!** Read about usage [here](https://docs.marqo.ai/0.0.10/Models-Reference/reranking/) 
 - Visual search update 1. (https://github.com/marqo-ai/marqo/pull/214). Better image patching. In addition to faster-rcnn, you can now use yolox or attention based (DINO) region proposal as a patching method at indexing time. This allows localization as the sub patches of the image can be searched. Read about usage [here](https://docs.marqo.ai/0.0.10/Preprocessing/Images/). 
 
@@ -500,13 +500,13 @@ Added Open CLIP models and added features to the get document endpoint.
 ## New features
 <!--NON BREAKING CHANGES GO HERE-->
 - Added Open CLIP models ([#116](https://github.com/marqo-ai/marqo/pull/116)). 
-Read about usage [here](https://marqo.pages.dev/Models-Reference/dense_retrieval/#open-clip)
+Read about usage [here](https://docs.marqo.ai/Models-Reference/dense_retrieval/#open-clip)
 - Added the ability to get multiple documents by ID 
 ([#122](https://github.com/marqo-ai/marqo/pull/122)). 
-Read about usage [here](https://marqo.pages.dev/API-Reference/documents/#get-multiple-documents)
+Read about usage [here](https://docs.marqo.ai/API-Reference/documents/#get-multiple-documents)
 - Added the ability to get document tensor facets through the get document endpoint 
 ([#122](https://github.com/marqo-ai/marqo/pull/122)). 
-Read about usage [here](https://marqo.pages.dev/API-Reference/documents/#example_2)
+Read about usage [here](https://docs.marqo.ai/API-Reference/documents/#example_2)
 
 # Release 0.0.4
 
