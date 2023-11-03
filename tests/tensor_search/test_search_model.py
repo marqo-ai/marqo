@@ -7,6 +7,7 @@ from unittest import mock
 from marqo.s2_inference.s2_inference import available_models, _create_model_cache_key, _validate_model_properties, clear_loaded_models
 import numpy as np
 from marqo.tensor_search import utils
+from marqo.tensor_search.models.private_models import S3Auth, ModelAuth, HfAuth
 import typing
 from marqo.tensor_search.enums import TensorField, SearchMethod, EnvVars, IndexSettingsField, MlModel
 from marqo.errors import (
@@ -21,9 +22,10 @@ import random
 from marqo.tensor_search.tensor_search import (_create_dummy_query_for_zero_vector_search,
                                                _vector_text_search_query_verbose,
                                                _generate_vector_text_search_query_for_verbose_one)
-import pprint
 from marqo.tensor_search.models.index_info import IndexInfo
 from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQueryEntity
+import unittest
+import pprint
 
 
 class TestIndexWithSearchModel(MarqoTestCase):
@@ -34,6 +36,8 @@ class TestIndexWithSearchModel(MarqoTestCase):
     def setUp(self) -> None:
         self.index_with_search_model_registry = "my-index-with-search-model-registry"
         self.index_with_search_model_custom = "my-index-with-search-model-custom"
+        self.index_with_model_auth = "my-index-with-model-auth"
+        self.index_with_no_model = "my-index-with-no-model"
 
         self._delete_test_indices()
         self._create_test_indices()
@@ -49,7 +53,7 @@ class TestIndexWithSearchModel(MarqoTestCase):
 
     def _delete_test_indices(self, indices=None):
         if indices is None or not indices:
-            ix_to_delete = [self.index_with_search_model_registry, self.index_with_search_model_custom]
+            ix_to_delete = [self.index_with_search_model_registry, self.index_with_search_model_custom, self.index_with_model_auth, self.index_with_no_model]
         else:
             ix_to_delete = indices
         for ix_name in ix_to_delete:
@@ -283,7 +287,94 @@ class TestIndexWithSearchModel(MarqoTestCase):
         assert loaded_models[1]["model_device"] == "cpu"
 
         assert search_result["result"][0]["hits"][0]["_id"] == "correct_doc"
-        
-    # try manually calculating vectors
-    # model is no_model, but search_model can still vectorise
+    
+    def test_search_model_auth_hf_search(self):
+        """
+        Ensures that model auth works properly when searching with a custom search_model
+        """
+        hf_object = "some_model.pt"
+        hf_repo_name = "MyRepo/test-private"
+        hf_token = "hf_some_secret_key"
+
+        search_model_properties = {
+            "name": "ViT-B/32",
+            "dimensions": 512,
+            "model_location": {
+                "hf": {
+                    "repo_id": hf_repo_name,
+                    "filename": hf_object,
+                },
+                "auth_required": True
+            },
+            "type": "open_clip",
+        }
+        hf_settings = {
+            "index_defaults": {
+                "model": "ViT-B/32",
+                "search_model": "my_custom_search_model",
+                "search_model_properties": search_model_properties,
+            }
+        }
+
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_with_model_auth, index_settings=hf_settings)
+
+        mock_hf_hub_download = mock.MagicMock()
+        mock_hf_hub_download.return_value = 'cache/path/to/model.pt'
+
+        mock_open_clip_create_model = mock.MagicMock()
+
+        with unittest.mock.patch('open_clip.create_model_and_transforms', mock_open_clip_create_model):
+            with unittest.mock.patch('marqo.s2_inference.model_downloading.from_hf.hf_hub_download', mock_hf_hub_download):
+                try:
+                    res = tensor_search.search(
+                        config=self.config, text='hello', index_name=self.index_with_model_auth,
+                        model_auth=ModelAuth(hf=HfAuth(token=hf_token)))
+                except BadRequestError:
+                    # bad request due to no models actually being loaded
+                    pass
+
+        mock_hf_hub_download.assert_called_once_with(
+            token=hf_token,
+            repo_id=hf_repo_name,
+            filename=hf_object,
+            cache_dir = None,
+        )
+
+        # is the open clip model being loaded with the expected args?
+        called_with_expected_args = any(
+            call.kwargs.get("pretrained") == "cache/path/to/model.pt"
+            and call.kwargs.get("model_name") == "ViT-B/32"
+            for call in mock_open_clip_create_model.call_args_list
+        )
+        assert len(mock_open_clip_create_model.call_args_list) == 1
+        assert called_with_expected_args, "Expected call not found"
+
+    def test_search_model_no_model(self):
+        """
+        Ensures that model can be no_model while search_model still does vectorisation
+        """
+        tensor_search.create_vector_index(
+            config=self.config, 
+            index_name=self.index_with_no_model,
+            index_settings={
+                IndexSettingsField.index_defaults: {
+                    "model": "no_model",          # dimension is 512
+                    "model_properties": {
+                        "dimensions": 512
+                    },
+                    "search_model": "ViT-B/32",
+                }
+            }
+        )
+
+        search_result = tensor_search.search(
+            config=self.config, index_name=self.index_with_no_model,
+            text="a random query", device="cpu"
+        )
+
+        # Assert `my_custom_search_model` is loaded (this is `search_model`)
+        loaded_models = tensor_search.get_loaded_models().get("models")
+        assert len(loaded_models) == 1
+        assert loaded_models[0]["model_name"] == "ViT-B/32"     # ViT-B-32 should not be loaded
+        assert loaded_models[0]["model_device"] == "cpu"
     
