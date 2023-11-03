@@ -1,25 +1,13 @@
-import copy
-import functools
-import json
-import math
 import os
-import pprint
-import re
 import uuid
 from unittest import mock
 
-import PIL
 import pytest
-import requests
 
 from marqo.core.models.marqo_index import *
 from marqo.errors import IndexNotFoundError, BadRequestError
-from marqo.s2_inference import types, s2_inference
-from marqo.tensor_search import add_docs
 from marqo.tensor_search import enums
-from marqo.tensor_search import tensor_search, index_meta_cache, backend
-from marqo.tensor_search.tensor_search import add_documents
-from marqo.tensor_search.enums import IndexSettingsField
+from marqo.tensor_search import tensor_search
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from tests.marqo_test import MarqoTestCase
 
@@ -114,7 +102,7 @@ class TestAddDocumentsStructuredIndex(MarqoTestCase):
 
         expected_document = {
             "_id": "3",
-            "title": "doc 3b"
+            "title": "doc 3a"
         }
 
         self.add_documents_helper(
@@ -130,9 +118,10 @@ class TestAddDocumentsStructuredIndex(MarqoTestCase):
                 {
                     "_id": "3",
                     "title": "doc 3a",
-                },
-                expected_document]
+                }]
             )
+
+        self.add_documents_helper(index_name=self.text_index_name, docs=[expected_document])
 
         actual_document = tensor_search.get_document_by_id(config=self.config,
                                                            index_name=self.text_index_name,
