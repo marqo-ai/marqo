@@ -345,8 +345,7 @@ def get_best_available_device() -> str:
 
 
 def is_tensor_field(field: str,
-                    tensor_fields: Optional[List[str]] = None,
-                    non_tensor_fields: Optional[List[str]] = None
+                    tensor_fields: Optional[List[str]] = None
                     ) -> bool:
     """Determine whether a field is a tensor field or not for add_documents calls."""
     if tensor_fields is not None and non_tensor_fields is not None or \

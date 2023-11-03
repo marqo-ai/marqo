@@ -376,6 +376,9 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
 
     RequestMetricsStore.for_request().start("add_documents.processing_before_opensearch")
 
+    if add_docs_params.tensor_fields is not None:
+        raise errors.InvalidArgError('Cannot specify `tensorFields` for a structured index')
+
     if add_docs_params.mappings is not None:
         validation.validate_mappings_object(mappings_object=add_docs_params.mappings)
 
@@ -457,6 +460,8 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
             processed_tensor_fields = {}
             for field in copied:
                 marqo_field = marqo_index.field_map.get(field)
+                tensor_field = marqo_index.tensor_field_map.get(field)
+                is_tensor_field = tensor_field is not None
                 if not marqo_field:
                     message = (f"Field {field} is not a valid field for structured index {add_docs_params.index_name}. "
                                f"Valid fields are: {', '.join(marqo_index.field_map.keys())}")
@@ -478,14 +483,12 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                 try:
                     field_content = validation.validate_field_content(
                         field_content=copied[field],
-                        is_non_tensor_field=not utils.is_tensor_field(field, add_docs_params.tensor_fields,
-                                                                      add_docs_params.non_tensor_fields)
+                        is_non_tensor_field=not is_tensor_field
                     )
                     if isinstance(field_content, dict):
                         field_content = validation.validate_dict(
                             field=field, field_content=field_content,
-                            is_non_tensor_field=not utils.is_tensor_field(field, add_docs_params.tensor_fields,
-                                                                          add_docs_params.non_tensor_fields),
+                            is_non_tensor_field=not is_tensor_field,
                             mappings=add_docs_params.mappings)
                 except errors.InvalidArgError as err:
                     document_is_valid = False
@@ -496,7 +499,6 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                     break
 
                 # Proceed from here only for tensor fields
-                tensor_field = marqo_index.tensor_field_map.get(field)
                 if not tensor_field:
                     continue
 
@@ -693,8 +695,9 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                                 f"Using existing tensors for multimodal combination field {field_name} for doc {doc_id}"
                             )
                         else:
-                            logger.debug(f'Not using existing tensors for multimodal combination field {field_name} for '
-                                         f'doc {doc_id} because field content or config has changed')
+                            logger.debug(
+                                f'Not using existing tensors for multimodal combination field {field_name} for '
+                                f'doc {doc_id} because field content or config has changed')
 
                     if len(chunks) == 0:  # Not using existing tensors or didn't find it
                         (combo_chunk, combo_document_is_valid,
