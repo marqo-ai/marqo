@@ -463,7 +463,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                     document_is_valid = False
                     unsuccessful_docs.append(
                         (i, {'_id': doc_id, 'error': message, 'status': int(errors.InvalidArgError.status_code),
-                             'code': int(errors.InvalidArgError.code)})
+                             'code': errors.InvalidArgError.code})
                     )
                     break
                 if marqo_field.type == FieldType.MultimodalCombination:
@@ -471,7 +471,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                     document_is_valid = False
                     unsuccessful_docs.append(
                         (i, {'_id': doc_id, 'error': message, 'status': int(errors.InvalidArgError.status_code),
-                             'code': int(errors.InvalidArgError.code)})
+                             'code': errors.InvalidArgError.code})
                     )
                     break
 
@@ -1279,7 +1279,7 @@ def _lexical_search(
         f"{len(gathered_docs)} results."
     )
 
-    return {"hits": gathered_docs}
+    return gathered_docs
 
 
 def construct_vector_input_batches(query: Union[str, Dict], index_info: MarqoIndex) -> Tuple[List[str], List[str]]:
@@ -1858,7 +1858,7 @@ def _vector_text_search(
         f"{len(gathered_docs)} results from Vespa."
     )
 
-    return {"hits": gathered_docs}
+    return gathered_docs
 
 
 def _format_ordered_docs_simple(ordered_docs_w_chunks: List[dict], result_count: int) -> dict:
