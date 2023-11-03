@@ -1,20 +1,45 @@
+import re
 from abc import ABC, abstractmethod
+from enum import Enum
 from typing import Optional, Union, List
 
 from marqo.core.exceptions import FilterStringParsingError
+from marqo.exceptions import InternalError
 
 
 class Node(ABC):
-    pass
+    def __init__(self, raw: str):
+        self.raw = raw
 
 
 class Term(Node, ABC):
     def __init__(self, field: str, raw: str):
+        super().__init__(raw)
         self.field = field
-        self.raw = raw
 
     def __str__(self):
         return self.raw
+
+
+class Operator(Node, ABC):
+    def __init__(self, left: Node, right: Node, raw: str):
+        super().__init__(raw)
+        self.left = left
+        self.right = right
+
+    @property
+    @abstractmethod
+    def greedy(self) -> bool:
+        pass
+
+    def __eq__(self, other):
+        return type(self) == type(other) and self.left == other.left and self.right == other.right
+
+    def __str__(self):
+        if self.greedy:
+            return f'{str(self.left)} {self.raw} {str(self.right)}'
+        else:
+            return f'({str(self.left)} {self.raw} {str(self.right)})'
 
 
 class EqualityTerm(Term):
@@ -46,33 +71,42 @@ class RangeTerm(Term):
                 self.upper == other.upper
         )
 
+    @classmethod
+    def parse(cls, field: str, value: str, raw: str) -> "RangeTerm":
+        # Value must be in the form of 'lower TO upper' (brackets have been stripped)
+        lower_str, upper_str = value.lower().split(' to ')
 
-class Operator(Node, ABC):
-    def __init__(self, left, right):
-        self.left = left
-        self.right = right
+        def parse_limit(limit: str):
+            try:
+                return int(limit)
+            except ValueError:
+                try:
+                    return float(limit)
+                except ValueError:
+                    raise ValueError(f"Invalid range limit '{limit}'")
 
-    @property
-    @abstractmethod
-    def greedy(self) -> bool:
-        pass
+        lower = None
+        if lower_str != '*':
+            lower = parse_limit(lower_str)
+        upper = None
+        if upper_str != '*':
+            upper = parse_limit(upper_str)
 
-    def __eq__(self, other):
-        return type(self) == type(other) and self.left == other.left and self.right == other.right
+        return cls(field, lower, upper, raw)
 
 
 class And(Operator):
-    greedy = True
+    def __init__(self, left: Node, right: Node):
+        super().__init__(left, right, 'AND')
 
-    def __str__(self):
-        return 'AND'
+    greedy = True
 
 
 class Or(Operator):
-    greedy = False
+    def __init__(self, left: Node, right: Node):
+        super().__init__(left, right, 'OR')
 
-    def __str__(self):
-        return 'OR'
+    greedy = False
 
 
 class SearchFilter:
@@ -87,25 +121,14 @@ class SearchFilter:
     def __eq__(self, other):
         return type(self) == type(other) and self.root == other.root
 
-    def print_tree(self) -> str:
+    def __str__(self) -> str:
         if not self.root:
             return ''
 
-        def _print_node(node):
-            if isinstance(node, Term):
-                return str(node)
-            elif isinstance(node, Operator):
-                if node.greedy:
-                    return f'{_print_node(node.left)} {str(node)} {_print_node(node.right)}'
-                else:
-                    return f'({_print_node(node.left)} {str(node)} {_print_node(node.right)})'
-            else:
-                raise Exception(f'Unexpected node type {type(node)}')
-
-        printed_filter = _print_node(self.root)
-        if printed_filter.startswith('(') and printed_filter.endswith(')'):
-            return printed_filter[1:-1]
-        return printed_filter
+        filter_string = str(self.root)
+        if filter_string.startswith('(') and filter_string.endswith(')'):
+            return filter_string[1:-1]
+        return filter_string
 
 
 class MarqoFilterStringParser:
@@ -113,273 +136,274 @@ class MarqoFilterStringParser:
     This class parses a Marqo filter string into a SearchFilter object.
     """
 
-    @classmethod
-    def parse(cls, filter_string: str) -> SearchFilter:
+    _range_term_regex = re.compile(r'[^:]+:\[(\d+|\*)\s+TO\s+(\d+|\*)]', re.IGNORECASE)
+
+    class _TermType(Enum):
+        Equality = 1
+        Range = 2
+
+    def _push_token(self,
+                    stack: List[Union[str, Operator, Term]],
+                    current_token: List[str],
+                    term_field: Optional[str],
+                    term_value: Optional[List[str]],
+                    term_type: Optional[_TermType],
+                    pos: int):
+        if len(current_token) == 0:
+            return
+
+        token = ''.join(current_token)
+
+        prev = stack[-1] if len(stack) > 0 else None
+        if token == 'AND':
+            # Operator must come after a term or an expression
+            if not (self._is_term(prev) or self._is_expression(prev)):
+                if not isinstance(prev, Node):
+                    # Operator at the beginning of expression
+                    self._error('Unexpected AND', pos - 3)
+                else:
+                    # Consecutive operators
+                    self._error(f'Expected term or expression, but found AND', pos - 3)
+
+            stack.append(And(stack.pop(), None))
+        elif token == 'OR':
+            # Operator must come after a term or an expression
+            if not (self._is_term(prev) or self._is_expression(prev)):
+                if not isinstance(prev, Node):
+                    # Operator at the beginning of expression
+                    self._error('Unexpected OR', pos - 2)
+                else:
+                    # Consecutive operators
+                    self._error(f'Expected term or expression, but found OR', pos - 2)
+
+            stack.append(Or(stack.pop(), None))
+        else:
+            # Term
+            if not term_field or not term_value:
+                self._error(f"Cannot parse token '{token}'", pos)
+
+            term_value = ''.join(term_value)
+
+            # Term must come at the beginning of an expression or after an operator
+            if not (prev is None or prev == '(' or self._is_operator(prev)):
+                # Term after term or expression
+                self._error(f"Unexpected term '{token}'. Expected an operator", pos - len(token))
+
+            node = None
+            if term_type == self._TermType.Equality:
+                node = EqualityTerm(term_field, term_value, token)
+            elif term_type == self._TermType.Range:
+                try:
+                    node = RangeTerm.parse(term_field, term_value, token)
+                except ValueError as e:
+                    self._error(f"Cannot parse range term '{token}': {str(e)}", pos)
+            else:
+                raise InternalError(f'Unexpected term type {term_type}')
+
+            if isinstance(prev, Operator):
+                operator = prev
+                if operator.greedy:
+                    # AND is our only greedy operator
+                    operator.right = node
+                    return
+
+            # Not coming after AND, so just push into the stack
+            stack.append(node)
+
+    def _merge_expression(self, stack: List[Union[str, Operator, Term]], pos):
+        # Expression must end with a term or an expression
+        last = stack[-1] if len(stack) > 0 else None
+        if not (self._is_term(last) or self._is_expression(last)):
+            if last is None:
+                self._error('Unexpected )', pos)
+            elif last == '(':
+                # Empty expression
+                self._error('Empty expression', pos - 1)
+            else:
+                # Expression ending with operator
+                self._error(f'Expected term or expression, but found {str(last)}', pos - len(str(last)))
+
+        while len(stack) > 1:
+            node = stack.pop()
+
+            if not isinstance(node, Node):
+                # Expected to be unreachable
+                self._error(f"Unexpected token '{node}' in expression ending at position {pos}", pos)
+
+            prev = stack[-1]
+            if prev == '(':
+                # We've reached the start of the parenthetical expression
+                stack.pop()
+
+                # Expression must come at the beginning of an expression or after an operator
+                if not (len(stack) == 0 or stack[-1] == '(' or self._is_operator(stack[-1])):
+                    self._error(f'Unexpected expression ending at position {pos}', pos)
+
+                # Check if the previous operator is greedy (AND)
+                if len(stack) > 0 and isinstance(stack[-1], Operator):
+                    operator = stack[-1]
+
+                    if operator.greedy:
+                        operator.right = node
+                        return
+
+                stack.append(node)
+                return
+
+            if not isinstance(prev, Operator):
+                # Expected to be unreachable
+                self._error(f'Unexpected term {prev.field} in expression ending at position {pos}')
+
+            prev.right = node
+
+        # No corresponding ( if we get here
+        self._error('Unexpected )', pos)
+
+    def _merge_stack(self, stack: List[Union[str, Operator, Term]]):
+        if len(stack) == 0:
+            # Expected to be unreachable due to earlier checks
+            self._error('Empty filter string')
+
+        # The string (expression) must end with a term or an expression
+        last = stack[-1]
+        if not (self._is_term(last) or self._is_expression(last)):
+            self._error(f'Expected term or expression, but found {str(last)}', len(filter_string) - len(str(last)))
+
+        while len(stack) > 1:
+            node = stack.pop()
+
+            if not isinstance(node, Node):
+                # Expected to be unreachable
+                self._error(f"Unexpected token '{node}'")
+
+            prev = stack[-1]
+            if not isinstance(prev, Operator):
+                # Expected to be unreachable due to parenthesis balance check prior to this
+                self._error(f"Unexpected token '{prev}'")
+
+            prev.right = node
+
+    def _is_expression(self, node: Node):
+        return isinstance(node, Operator) and node.right is not None
+
+    def _is_operator(self, node: Node):
+        return isinstance(node, Operator) and node.right is None
+
+    def _is_term(self, node: Node):
+        return isinstance(node, Term)
+
+    def _error(self, msg, pos: Optional[int] = None):
+        if pos is not None:
+            prefix = '\nError parsing filter: '
+            error_msg = f'{prefix}{filter_string}\n'
+            error_msg += ' ' * (pos + len("Error parsing filter: ")) + '^\n'
+            error_msg += f'at position {pos}: {msg}'
+
+            raise FilterStringParsingError(error_msg)
+        else:
+            raise FilterStringParsingError(f'Error parsing filter string {pos}: {msg}')
+
+    def _reset_state(self):
+        self._current_token: List[str] = []
+        self._term_field: Optional[str] = None
+        self._term_value: List[str] = []
+        self._read_term_value: bool = False
+        self._reached_term_end: bool = False
+        self._term_type: Optional[MarqoFilterStringParser._TermType] = None
+
+    def parse(self, filter_string: str) -> SearchFilter:
+        self._reset_state()
+
         if filter_string == '':
             raise FilterStringParsingError('Cannot parse empty filter string')
 
         stack: List[Union[str, Operator, Term]] = []
-
-        def get_term(token: str,
-                     field: str,
-                     value: str,
-                     pos: int) -> Term:
-            pass
-            # if (
-            #         equality_term_value and
-            #         range_term_lower is None and
-            #         rane_term_upper is None
-            # ):
-            #     return EqualityTerm(field, equality_term_value, token)
-            # elif (
-            #         equality_term_value is None and
-            #         (range_term_lower or rane_term_upper)
-            # ):
-            #     def get_range_limit(limit: str) -> Optional[RangeLimit]:
-            #         if limit == '*':
-            #             return None
-            #
-            #         try:
-            #             return int(limit)
-            #         except ValueError:
-            #             try:
-            #                 return float(limit)
-            #             except ValueError:
-            #                 error(f'Invalid range limit {limit}')
-            #
-            #     return RangeTerm(
-            #         field,
-            #         get_range_limit(range_term_lower),
-            #         get_range_limit(rane_term_upper),
-            #         token
-            #     )
-
-        def push_token(token: str,
-                       pos: int,
-                       field: Optional[str] = None,
-                       value: Optional[str] = None,
-                       ):
-            if token == '':
-                return
-
-            prev = stack[-1] if len(stack) > 0 else None
-            if token == 'AND':
-                # Operator must come after a term or an expression
-                if not (is_term(prev) or is_expression(prev)):
-                    if not isinstance(prev, Node):
-                        # Operator at the beginning of expression
-                        error('Unexpected AND', pos - 3)
-                    else:
-                        # Consecutive operators
-                        error(f'Expected term or expression, but found AND', pos - 3)
-
-                stack.append(And(stack.pop(), None))
-            elif token == 'OR':
-                # Operator must come after a term or an expression
-                if not (is_term(prev) or is_expression(prev)):
-                    if not isinstance(prev, Node):
-                        # Operator at the beginning of expression
-                        error('Unexpected OR', pos - 2)
-                    else:
-                        # Consecutive operators
-                        error(f'Expected term or expression, but found OR', pos - 2)
-
-                stack.append(Or(stack.pop(), None))
-            else:
-                # Term
-                if not field or not value:
-                    error(f"Cannot parse token '{token}'", pos)
-
-                # Term must come at the beginning of an expression or after an operator
-                if not (prev is None or prev == '(' or is_operator(prev)):
-                    # Term after term or expression
-                    error(f"Unexpected term '{token}'. Expected an operator", pos - len(token))
-
-                node = get_term(token, field, value, pos)
-                if isinstance(prev, Operator):
-                    operator = prev
-                    if operator.greedy:
-                        # AND is our only greedy operator
-                        operator.right = node
-                        return
-
-                # Not coming after AND, so just push into the stack
-                stack.append(Term(token))
-
-        def merge_expression(pos):
-            # Expression must end with a term or an expression
-            last = stack[-1] if len(stack) > 0 else None
-            if not (is_term(last) or is_expression(last)):
-                if last is None:
-                    error('Unexpected )', pos)
-                elif last == '(':
-                    # Empty expression
-                    error('Empty expression', pos - 1)
-                else:
-                    # Expression ending with operator
-                    error(f'Expected term or expression, but found {str(last)}', pos - len(str(last)))
-
-            while len(stack) > 1:
-                node = stack.pop()
-
-                if not isinstance(node, Node):
-                    # Expected to be unreachable
-                    error(f"Unexpected token '{node}' in expression ending at position {pos}", pos)
-
-                prev = stack[-1]
-                if prev == '(':
-                    # We've reached the start of the parenthetical expression
-                    stack.pop()
-
-                    # Expression must come at the beginning of an expression or after an operator
-                    if not (len(stack) == 0 or stack[-1] == '(' or is_operator(stack[-1])):
-                        error(f'Unexpected expression ending at position {pos}', pos)
-
-                    # Check if the previous operator is greedy (AND)
-                    if len(stack) > 0 and isinstance(stack[-1], Operator):
-                        operator = stack[-1]
-
-                        if operator.greedy:
-                            operator.right = node
-                            return
-
-                    stack.append(node)
-                    return
-
-                if not isinstance(prev, Operator):
-                    # Expected to be unreachable
-                    error(f'Unexpected term {prev.field} in expression ending at position {pos}')
-
-                prev.right = node
-
-            # No corresponding ( if we get here
-            error('Unexpected )', pos)
-
-        def merge_stack():
-            if len(stack) == 0:
-                # Expected to be unreachable due to earlier checks
-                error('Empty filter string')
-
-            # The string (expression) must end with a term or an expression
-            last = stack[-1]
-            if not (is_term(last) or is_expression(last)):
-                error(f'Expected term or expression, but found {str(last)}', len(filter_string) - len(str(last)))
-
-            while len(stack) > 1:
-                node = stack.pop()
-
-                if not isinstance(node, Node):
-                    # Expected to be unreachable
-                    error(f"Unexpected token '{node}'")
-
-                prev = stack[-1]
-                if not isinstance(prev, Operator):
-                    # Expected to be unreachable due to parenthesis balance check prior to this
-                    error(f"Unexpected token '{prev}'")
-
-                prev.right = node
-
-        def is_expression(node: Node):
-            return isinstance(node, Operator) and node.right is not None
-
-        def is_operator(node: Node):
-            return isinstance(node, Operator) and node.right is None
-
-        def is_term(node: Node):
-            return isinstance(node, Term)
-
-        def error(msg, pos: Optional[int] = None):
-            if pos is not None:
-                prefix = '\nError parsing filter: '
-                error_msg = f'{prefix}{filter_string}\n'
-                error_msg += ' ' * (pos + len("Error parsing filter: ")) + '^\n'
-                error_msg += f'at position {pos}: {msg}'
-
-                raise FilterStringParsingError(error_msg)
-            else:
-                raise FilterStringParsingError(f'Error parsing filter string {pos}: {msg}')
-
-        current_token = []
-        term_field = []
-        term_value = []
-
         parenthesis_count = 0
         escape = False
-        read_term_value = False
         read_space_until = None  # ignore space until reaching the value of this variable
+
         for i in range(len(filter_string)):
             c = filter_string[i]
 
             # Special processing if we are reading a term value
-            if read_term_value and not (c == ' ' and not escape and read_space_until is None):
+            if self._read_term_value and not (c in [' ', ')'] and not escape and read_space_until is None):
+                if self._reached_term_end:
+                    self._error(f"Expected end of term, but found '{c}'", i)
+
                 if escape:
-                    current_token.append(c)
-                    term_value.append(c)
+                    self._current_token.append(c)
+                    self._term_value.append(c)
                     escape = False
                 elif c == '\\':
                     escape = True
                 else:
                     if c == read_space_until:
                         read_space_until = None
-                        read_term_value = False
-                    elif len(term_value) == 0 and c == '(':  # start of term value
+                        self._reached_term_end = True
+                    elif len(self._term_value) == 0 and c == '(' and not read_space_until:  # start of term value
                         read_space_until = ')'
-                    elif len(term_value) == 0 and c == '[':
+                    elif len(self._term_value) == 0 and c == '[' and not read_space_until:  # start of term value
                         read_space_until = ']'
+                        self._term_type = MarqoFilterStringParser._TermType.Range
+                    else:
+                        self._term_value.append(c)
 
-                    current_token.append(c)
-                    term_value.append(c)
+                    self._current_token.append(c)
 
                 continue
 
             if escape:
-                current_token.append(c)
+                self._current_token.append(c)
                 escape = False
             elif c == ':':
-                read_term_value = True
-                term_field = current_token
-                current_token.append(c)
+                self._read_term_value = True
+                self._term_type = MarqoFilterStringParser._TermType.Equality
+                self._term_field = ''.join(self._current_token)
+                self._current_token.append(c)
             elif c == '(':
-                if len(current_token) > 0:
-                    error('Unexpected (', i)
+                if len(self._current_token) > 0:
+                    self._error('Unexpected (', i)
 
                 stack.append(c)
                 parenthesis_count += 1
             elif c == ')':
-                push_token(''.join(current_token), i)
-                current_token = []
+                self._push_token(stack, self._current_token, self._term_field, self._term_value, self._term_type, i)
+                self._reset_state()
 
-                merge_expression(i)
+                self._merge_expression(stack, i)
                 parenthesis_count -= 1
             elif c == '\\':
                 escape = True
             elif c == ' ':
-                if len(term_value) > 0:
-                    push_token(''.join(current_token), i, ''.join(term_field), ''.join(term_value))
-                    read_term_value = False
-                    term_value = []
-                else:
-                    push_token(''.join(current_token), i)
-
-                current_token = []
+                self._push_token(stack, self._current_token, self._term_field, self._term_value, self._term_type, i)
+                self._reset_state()
             else:
-                current_token.append(c)
+                self._current_token.append(c)
 
-        if len(current_token) > 0:
-            if read_term_value:
-                push_token(''.join(current_token), len(filter_string), ''.join(term_field), ''.join(term_value))
-            else:
-                push_token(''.join(current_token), len(filter_string))
+        if len(self._current_token) > 0:
+            self._push_token(
+                stack, self._current_token, self._term_field, self._term_value, self._term_type, len(filter_string)
+            )
 
         if parenthesis_count != 0:
             # merge_stack will catch this, but this is a more specific error message
-            error('Unbalanced parentheses')
+            self._error('Unbalanced parentheses')
 
-        merge_stack()
+        self._merge_stack(stack)
+
         if len(stack) != 1:
             # This should be unreachable
-            error('Failed to parse filter string')
+            self._error('Failed to parse filter string')
 
         root = stack.pop()
 
         return SearchFilter(root)
+
+
+if __name__ == '__main__':
+    filter_string = 'title:(hello world) AND tags:shirt OR tags:pants AND age:[1 TO 50]'
+    parser = MarqoFilterStringParser()
+    parsed = parser.parse(filter_string)
+
+    print(str(parsed))
+    pass
