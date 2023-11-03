@@ -216,7 +216,7 @@ def _validate_model_properties(model_name: str, model_properties: dict) -> dict:
             if key not in model_properties:
                 raise InvalidModelPropertiesError(f"model_properties has missing key '{key}'."
                                                   f"please update your model properties with required key `{key}`"
-                                                  f"check `https://docs.marqo.ai/1.4.0/Models-Reference/dense_retrieval/` for more info.")
+                                                  f"check `https://docs.marqo.ai/1.4.0/Guides/Models-Reference/dense_retrieval/` for more info.")
 
     else:
         model_properties = get_model_properties_from_registry(model_name)
