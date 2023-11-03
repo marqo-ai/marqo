@@ -463,7 +463,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                     document_is_valid = False
                     unsuccessful_docs.append(
                         (i, {'_id': doc_id, 'error': message, 'status': int(errors.InvalidArgError.status_code),
-                             'code': int(errors.InvalidArgError.code)})
+                             'code': errors.InvalidArgError.code})
                     )
                     break
                 if marqo_field.type == FieldType.MultimodalCombination:
@@ -471,7 +471,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                     document_is_valid = False
                     unsuccessful_docs.append(
                         (i, {'_id': doc_id, 'error': message, 'status': int(errors.InvalidArgError.status_code),
-                             'code': int(errors.InvalidArgError.code)})
+                             'code': errors.InvalidArgError.code})
                     )
                     break
 
