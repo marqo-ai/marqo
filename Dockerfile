@@ -1,4 +1,4 @@
-FROM marqo-base-centos:latest as base_image
+FROM marqo-base:poc as base_image
 VOLUME /var/lib/docker
 ARG TARGETPLATFORM
 WORKDIR /app
