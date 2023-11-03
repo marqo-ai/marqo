@@ -2,11 +2,9 @@ import marqo.core.constants as constants
 from marqo.core.exceptions import InvalidDataTypeError, InvalidFieldNameError, VespaDocumentParsingError
 from marqo.core.models import MarqoQuery
 from marqo.core.models.marqo_index import *
-from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery, MarqoHybridQuery, ScoreModifierType, \
-    ScoreModifier
+from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery, MarqoHybridQuery, ScoreModifierType
 from marqo.core.vespa_index import VespaIndex
 from marqo.exceptions import InternalError
-from tests.marqo_test import MarqoTestCase
 
 
 class StructuredVespaIndex(VespaIndex):
@@ -21,7 +19,8 @@ class StructuredVespaIndex(VespaIndex):
         FieldType.ArrayText: 'array<string>',
         FieldType.ArrayInt: 'array<int>',
         FieldType.ArrayFloat: 'array<float>',
-        FieldType.ImagePointer: 'string'
+        FieldType.ImagePointer: 'string',
+        FieldType.MultimodalCombination: 'map<string, float>'
     }
 
     _MARQO_TO_PYTHON_TYPE_MAP = {
@@ -32,7 +31,8 @@ class StructuredVespaIndex(VespaIndex):
         FieldType.ArrayText: list,
         FieldType.ArrayInt: list,
         FieldType.ArrayFloat: list,
-        FieldType.ImagePointer: str
+        FieldType.ImagePointer: str,
+        FieldType.MultimodalCombination: dict
     }
 
     _DISTANCE_METRIC_MAP = {
@@ -173,14 +173,20 @@ class StructuredVespaIndex(VespaIndex):
 
                 if constants.MARQO_DOC_TENSORS not in marqo_document:
                     marqo_document[constants.MARQO_DOC_TENSORS] = dict()
-                if field not in marqo_document[constants.MARQO_DOC_TENSORS]:
+                if tensor_field.name not in marqo_document[constants.MARQO_DOC_TENSORS]:
                     marqo_document[constants.MARQO_DOC_TENSORS][tensor_field.name] = dict()
 
                 if field == tensor_field.chunk_field_name:
                     marqo_document[constants.MARQO_DOC_TENSORS][tensor_field.name][constants.MARQO_DOC_CHUNKS] = value
                 elif field == tensor_field.embeddings_field_name:
-                    marqo_document[constants.MARQO_DOC_TENSORS][tensor_field.name][
-                        constants.MARQO_DOC_EMBEDDINGS] = value
+                    try:
+                        marqo_document[constants.MARQO_DOC_TENSORS][tensor_field.name][
+                            constants.MARQO_DOC_EMBEDDINGS] = list(value['blocks'].values())
+                    except (KeyError, AttributeError, TypeError) as e:
+                        raise VespaDocumentParsingError(
+                            f'Cannot parse embeddings field {field} with value {value}'
+                        ) from e
+
                 else:
                     raise VespaDocumentParsingError(f'Unexpected tensor subfield {field}')
             elif field == cls._FIELD_ID:
@@ -231,7 +237,6 @@ class StructuredVespaIndex(VespaIndex):
 
     @classmethod
     def _to_vespa_tensor_query(cls, marqo_query: MarqoTensorQuery, marqo_index: MarqoIndex) -> Dict[str, Any]:
-        # Validate field names
         if marqo_query.searchable_attributes is not None:
             for att in marqo_query.searchable_attributes:
                 if att not in marqo_index.tensor_field_map:
@@ -240,17 +245,17 @@ class StructuredVespaIndex(VespaIndex):
                         f'Available tensor fields are {", ".join(marqo_index.tensor_field_map.keys())}'
                     )
 
-            fields_to_search = [f for f in marqo_query.searchable_attributes if f in marqo_index.tensor_field_map]
+            fields_to_search = marqo_query.searchable_attributes
         else:
             fields_to_search = marqo_index.tensor_field_map.keys()
 
         tensor_term = cls._get_tensor_search_term(marqo_query, marqo_index)
-        filter_term = cls._get_filter_term(marqo_query, marqo_index)
+        filter_term = cls._get_filter_term(marqo_query)
         if filter_term:
             filter_term = f' AND {filter_term}'
         else:
             filter_term = ''
-        select_attributes = cls._get_select_attributes(marqo_query, marqo_index)
+        select_attributes = cls._get_select_attributes(marqo_query)
         summary = cls._SUMMARY_ALL_VECTOR if marqo_query.expose_facets else cls._SUMMARY_ALL_NON_VECTOR
         score_modifiers = cls._get_score_modifiers(marqo_query, marqo_index)
         ranking = cls._RANK_PROFILE_EMBEDDING_SIMILARITY_MODIFIERS if score_modifiers \
@@ -280,7 +285,50 @@ class StructuredVespaIndex(VespaIndex):
 
     @classmethod
     def _to_vespa_lexical_query(cls, marqo_query: MarqoLexicalQuery, marqo_index: MarqoIndex) -> Dict[str, Any]:
-        raise NotImplementedError()
+        if marqo_query.searchable_attributes is not None:
+            for att in marqo_query.searchable_attributes:
+                if att not in marqo_index.lexically_searchable_fields_names:
+                    raise InvalidFieldNameError(
+                        f'Index {marqo_index.name} has no lexically searchable field {att}. '
+                        f'Available lexically searchable fields are '
+                        f'{", ".join(marqo_index.lexically_searchable_fields_names)}'
+                    )
+            fields_to_search = marqo_query.searchable_attributes
+        else:
+            fields_to_search = marqo_index.lexical_fields_names
+
+        lexical_term = cls._get_lexical_search_term(marqo_query, marqo_index)
+        filter_term = cls._get_filter_term(marqo_query)
+        if filter_term:
+            filter_term = f' AND {filter_term}'
+        else:
+            filter_term = ''
+
+        select_attributes = cls._get_select_attributes(marqo_query)
+        summary = cls._SUMMARY_ALL_VECTOR if marqo_query.expose_facets else cls._SUMMARY_ALL_NON_VECTOR
+        score_modifiers = cls._get_score_modifiers(marqo_query, marqo_index)
+        ranking = cls._RANK_PROFILE_BM25_MODIFIERS if score_modifiers \
+            else cls._RANK_PROFILE_BM25
+
+        query_inputs = {}
+        query_inputs.update({
+            f: 1 for f in fields_to_search
+        })
+        if score_modifiers:
+            query_inputs.update(score_modifiers)
+
+        query = {
+            'yql': f'select {select_attributes} from {marqo_query.index_name} where {lexical_term}{filter_term}',
+            'model_restrict': marqo_query.index_name,
+            'hits': marqo_query.limit,
+            'offset': marqo_query.offset,
+            'query_features': query_inputs,
+            'presentation.summary': summary,
+            'ranking': ranking
+        }
+        query = {k: v for k, v in query.items() if v is not None}
+
+        return query
 
     @classmethod
     def _to_vespa_hybrid_query(cls, marqo_query: MarqoHybridQuery, marqo_index: MarqoIndex) -> Dict[str, Any]:
@@ -313,14 +361,14 @@ class StructuredVespaIndex(VespaIndex):
             return ''
 
     @classmethod
-    def _get_filter_term(cls, marqo_query: MarqoQuery, marqo_index: MarqoIndex) -> str:
+    def _get_filter_term(cls, marqo_query: MarqoQuery) -> str:
         if marqo_query.filter is not None:
             raise NotImplementedError('Filters are not supported yet')
 
         return None
 
     @classmethod
-    def _get_select_attributes(cls, marqo_query: MarqoQuery, marqo_index: MarqoIndex) -> str:
+    def _get_select_attributes(cls, marqo_query: MarqoQuery) -> str:
         if marqo_query.attributes_to_retrieve is not None:
             return ', '.join(marqo_query.attributes_to_retrieve)
         else:
@@ -347,6 +395,35 @@ class StructuredVespaIndex(VespaIndex):
         return None
 
     @classmethod
+    def _get_lexical_search_term(cls, marqo_query: MarqoLexicalQuery, marqo_index: MarqoIndex) -> str:
+        if marqo_query.or_phrases:
+            or_terms = 'weakAnd(%s)' % ', '.join([
+                cls._get_lexical_contains_term(phrase, marqo_query, marqo_index) for phrase in marqo_query.or_phrases
+            ])
+        else:
+            or_terms = ''
+        if marqo_query.and_phrases:
+            and_terms = ' AND '.join([
+                cls._get_lexical_contains_term(phrase, marqo_query, marqo_index) for phrase in marqo_query.and_phrases
+            ])
+            if or_terms:
+                and_terms = f' AND ({and_terms})'
+        else:
+            and_terms = ''
+
+        return f'{or_terms}{and_terms}'
+
+    @classmethod
+    def _get_lexical_contains_term(cls, phrase, query: MarqoQuery, marqo_index: MarqoIndex) -> str:
+        if query.searchable_attributes is not None:
+            return ' OR '.join([
+                f'{marqo_index.field_map[field].lexical_field_name} contains "{phrase}"'
+                for field in query.searchable_attributes
+            ])
+        else:
+            return f'default contains "{phrase}"'
+
+    @classmethod
     def _verify_marqo_field_name(cls, field_name: str, marqo_index: MarqoIndex):
         field_map = marqo_index.field_map
         if field_name not in marqo_index.field_map:
@@ -371,8 +448,10 @@ class StructuredVespaIndex(VespaIndex):
     def _verify_marqo_field_type(cls, field_name: str, value: Any, marqo_index: MarqoIndex):
         marqo_type = marqo_index.field_map[field_name].type
         python_type = cls._get_python_type(marqo_type)
-        if isinstance(python_type, list) and not any(isinstance(value, t) for t in python_type) or \
-                not isinstance(python_type, list) and not isinstance(value, python_type):
+        if (
+                isinstance(python_type, list) and not any(isinstance(value, t) for t in python_type) or
+                not isinstance(python_type, list) and not isinstance(value, python_type)
+        ):
             raise InvalidDataTypeError(f'Invalid value {value} for field {field_name} with Marqo type '
                                        f'{marqo_type.name}. Expected a value of type {python_type}, but found '
                                        f'{type(value)}')
@@ -390,11 +469,6 @@ class StructuredVespaIndex(VespaIndex):
         document.append(f'field {cls._FIELD_ID} type string {{ indexing: summary }}')
 
         for field in marqo_index.fields:
-            if field.type == FieldType.MultimodalCombination:
-                # Subfields will store the value of the multimodal combination field and its tensor field will store
-                # the chunks and embeddings
-                continue
-
             field_type = cls._get_vespa_type(field.type)
 
             if FieldFeature.LexicalSearch in field.features:
@@ -462,12 +536,16 @@ class StructuredVespaIndex(VespaIndex):
         )
 
         for field in marqo_index.fields:
-            if field.type == FieldType.MultimodalCombination:
-                # Only has a tensor field which will be added in the next loop
-                continue
-
             target_field_name = field.name
             field_type = cls._get_vespa_type(field.type)
+
+            if field.type == FieldType.MultimodalCombination:
+                # return combination weights only for vector summary
+                vector_summary_fields.append(
+                    f'summary {target_field_name} type {field_type} {{ }}'
+                )
+                continue
+
             if field.filter_field_name:
                 # Filter fields are in-memory attributes so use this even if there's a lexical field
                 source_field_name = field.filter_field_name
@@ -607,7 +685,9 @@ class StructuredVespaIndex(VespaIndex):
             if closest_feature in match_features and len(match_features[closest_feature]['cells']) > 0:
                 distance_feature = f'distance(field,{tensor_field.embeddings_field_name})'
                 if distance_feature not in match_features:
-                    raise InternalError(f'Expected {distance_feature} in match features but it was not found')
+                    raise VespaDocumentParsingError(
+                        f'Expected {distance_feature} in match features but it was not found'
+                    )
                 distance = match_features[distance_feature]
                 if min_distance is None or distance < min_distance:
                     min_distance = distance
@@ -621,7 +701,7 @@ class StructuredVespaIndex(VespaIndex):
             try:
                 chunk_index = int(chunk_index_str)
             except ValueError as e:
-                raise InternalError(
+                raise VespaDocumentParsingError(
                     f'Expected integer as chunk index, but found {chunk_index_str}', cause=e
                 ) from e
 
@@ -629,7 +709,7 @@ class StructuredVespaIndex(VespaIndex):
             try:
                 chunk = vespa_document_fields[closest_tensor_field.chunk_field_name][chunk_index]
             except (KeyError, TypeError) as e:
-                raise InternalError(
+                raise VespaDocumentParsingError(
                     f'Cannot extract chunk value from {closest_tensor_field.chunk_field_name}: {str(e)}',
                     cause=e
                 ) from e
@@ -638,7 +718,7 @@ class StructuredVespaIndex(VespaIndex):
                 closest_tensor_field.name: chunk
             }
 
-        raise InternalError('Failed to extract highlights from Vespa document')
+        raise VespaDocumentParsingError('Failed to extract highlights from Vespa document')
 
     @classmethod
     def _get_vespa_type(cls, marqo_type: FieldType) -> str:

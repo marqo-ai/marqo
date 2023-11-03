@@ -41,6 +41,8 @@ class MarqoQuery(StrictBaseModel, ABC):
 
         return None
 
+    # TODO - add validation to make sure searchable_attributes and attributes_to_retrieve are not empty lists
+
 
 class MarqoTensorQuery(MarqoQuery):
     vector_query: List[float]
@@ -49,7 +51,9 @@ class MarqoTensorQuery(MarqoQuery):
 
 
 class MarqoLexicalQuery(MarqoQuery):
-    lexical_query: str
+    or_phrases: List[str]
+    and_phrases: List[str]
+    # TODO - validate at least one of or_phrases and and_phrases is not empty
 
 
 class MarqoHybridQuery(MarqoTensorQuery, MarqoLexicalQuery):
