@@ -693,8 +693,9 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                                 f"Using existing tensors for multimodal combination field {field_name} for doc {doc_id}"
                             )
                         else:
-                            logger.debug(f'Not using existing tensors for multimodal combination field {field_name} for '
-                                         f'doc {doc_id} because field content or config has changed')
+                            logger.debug(
+                                f'Not using existing tensors for multimodal combination field {field_name} for '
+                                f'doc {doc_id} because field content or config has changed')
 
                     if len(chunks) == 0:  # Not using existing tensors or didn't find it
                         (combo_chunk, combo_document_is_valid,
