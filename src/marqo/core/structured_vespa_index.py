@@ -814,31 +814,3 @@ class StructuredVespaIndex(VespaIndex):
             return marqo_index.copy_with_caching()
 
         return marqo_index
-
-if __name__ == '__main__':
-    marqo_query = MarqoTensorQuery(
-        index_name='test',
-        limit=10,
-        vector_query=[1, 2, 3],
-        filter='tags:shirt OR tags:jeans AND NOT tags:blue AND price:[* TO 20]',
-    )
-    marqo_index = MarqoTestCase.marqo_index(
-        name='my_index',
-        model=Model(name='ViT-B/32'),
-        distance_metric=DistanceMetric.PrenormalizedAnguar,
-        type=IndexType.Structured,
-        vector_numeric_type=VectorNumericType.Float,
-        hnsw_config=HnswConfig(ef_construction=100, m=16),
-        fields=[
-            Field(name='title', type=FieldType.Text, features=[FieldFeature.LexicalSearch]),
-            Field(name='description', type=FieldType.Text),
-            Field(name='tags', type=FieldType.ArrayText, features=[FieldFeature.Filter]),
-            Field(name='price', type=FieldType.Float, features=[FieldFeature.Filter, FieldFeature.ScoreModifier]),
-        ],
-        tensor_fields=[
-            TensorField(name='title'),
-        ],
-    )
-    vespa_query = StructuredVespaIndex.to_vespa_query(marqo_query, marqo_index)
-    print(vespa_query)
-    pass
