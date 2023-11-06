@@ -1,4 +1,3 @@
-import re
 from abc import ABC, abstractmethod
 from enum import Enum
 from typing import Optional, Union, List
@@ -165,8 +164,6 @@ class MarqoFilterStringParser:
 
     This class is not thread-safe.
     """
-
-    _range_term_regex = re.compile(r'[^:]+:\[(\d+|\*)\s+TO\s+(\d+|\*)]', re.IGNORECASE)
 
     class _TermType(Enum):
         Equality = 1
