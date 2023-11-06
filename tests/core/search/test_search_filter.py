@@ -17,67 +17,72 @@ class TestMarqoFilterStringParser(MarqoTestCase):
                 'single term with parentheses'
             ),
             (
+                '(NOT a:b)',
+                SearchFilter(root=Not(EqualityTerm('a', 'b', 'a:b'))),
+                'single modifier term with parentheses'
+            ),
+            (
                 '(((a:n)))',
-                SearchFilter(root=EqualityTerm('a', 'b', 'a:b')),
+                SearchFilter(root=EqualityTerm('a', 'n', 'a:n')),
                 'single term with extra parentheses'
             ),
             (
-                'a:1 AND b:2 OR c:3',
+                'NOT a:1 AND b:2 OR NOT c:3',
                 SearchFilter(
                     root=Or(
                         left=And(
-                            left=EqualityTerm('a', '1', 'a:b'),
-                            right=EqualityTerm('a', '2', 'a:b')
+                            left=Not(EqualityTerm('a', '1', 'a:1')),
+                            right=EqualityTerm('b', '2', 'b:2')
                         ),
-                        right=EqualityTerm('a', 'b', 'a:b')
+                        right=Not(EqualityTerm('c', '3', 'c:3'))
                     )
                 ),
                 'simple filter string'
             ),
             (
-                '(((a AND b)) OR c)',
+                '(((a:1 AND NOT b:2)) OR (NOT c:3))',
                 SearchFilter(
                     root=Or(
                         left=And(
-                            left=Term('a'),
-                            right=Term('b')
+                            left=EqualityTerm('a', '1', 'a:1'),
+                            right=Not(EqualityTerm('b', '2', 'b:2'))
                         ),
-                        right=Term('c')
+                        right=Not(EqualityTerm('c', '3', 'c:3'))
                     )
                 ),
                 'extra parantheses'
             ),
             (
-                'a AND (b OR c)',
+                'a:1 AND (b:2 OR c:3)',
                 SearchFilter(
                     root=And(
-                        left=Term('a'),
+                        left=EqualityTerm('a', '1', 'a:1'),
                         right=Or(
-                            left=Term('b'),
-                            right=Term('c')
+                            left=EqualityTerm('b', '2', 'b:2'),
+                            right=EqualityTerm('c', '3', 'c:3')
                         )
                     )
                 ),
                 'or expression'
             ),
             (
-                'a AND (b OR (c AND (d OR e))) OR d',
+                'a:1 AND (b:2 OR (c:3 AND (d:4 OR e:5))) OR d:6',
                 SearchFilter(
                     root=Or(
                         left=And(
-                            left=Term('a'),
+                            left=EqualityTerm('a', '1', 'a:1'),
                             right=Or(
-                                left=Term('b'),
+                                left=EqualityTerm('b', '2', 'b:2'),
                                 right=And(
-                                    left=Term('c'),
+                                    left=EqualityTerm('c', '3', 'c:3'),
                                     right=Or(
-                                        left=Term('d'),
-                                        right=Term('e')
+                                        left=EqualityTerm('d', '4', 'd:4'),
+                                        right=EqualityTerm('e', '5', 'e:5')
                                     )
                                 )
                             )
                         ),
-                        right=Term('d')
+                        right=EqualityTerm('d', '6', 'd:6')
                     )
                 ),
                 'nested filter string'
@@ -86,36 +91,46 @@ class TestMarqoFilterStringParser(MarqoTestCase):
 
         for filter_string, expected_filter, msg in test_cases:
             with self.subTest(msg):
-                self.assertEqual(expected_filter, MarqoFilterStringParser.parse(filter_string), msg)
+                parser = MarqoFilterStringParser()
+                self.assertEqual(expected_filter, parser.parse(filter_string), msg)
 
     def test_parse_malformedString_fails(self):
+        # modifeir valid at start or after an operatopr
+        # modifier not valid after term, after modifier, at the end of exp, end of string
+        # after modifier, can only have a term
         test_cases = [
-            ('AND a OR b', 'string starts with operator'),
-            ('a AND b (OR c)', 'expression starts with operator'),
-            ('a AND b OR', 'string ends with operator'),
-            ('a AND (b OR c AND) OR e', 'expression ends with operator'),
-            ('a AND b OR OR', 'operator after operator'),
-            ('a a', 'term after term'),
-            ('(a AND b) b', 'term after expression'),
-            ('(a AND b)(c AND d)', 'expression after expression'),
-            ('a (c AND d)', 'expression after term'),
-            ('a AND b)', 'expression not opened'),
-            ('(a AND b', 'expression not closed'),
+            ('AND a:1 OR b:2', 'string starts with operator'),
+            ('a:1 AND b:2 (OR c:3)', 'expression starts with operator'),
+            ('a:1 AND b:2 OR', 'string ends with operator'),
+            ('a:1 AND (b:2 OR c:3 AND) OR e:5', 'expression ends with operator'),
+            ('a:1 AND b:2 OR OR c:3', 'operator after operator'),
+            ('a:1 AND b:2 OR NOT OR c:3', 'operator after modifier'),
+            ('a:1 AND b:2 OR NOT', 'string ends with a modifier'),
+            ('a:1 AND (b:2 OR c:3 NOT) OR e:5', 'expression ends with a modifier'),
+            ('a:1 AND b:2 OR NOT NOT c:3', 'modifier after modifier'),
+            ('a:1 NOT a:1', 'modifier after term'),
+            ('a:1 a:1', 'term after term'),
+            ('(a:1 AND b:2) b:2', 'term after expression'),
+            ('(a:1 AND b:2)(c:3 AND d:4)', 'expression after expression'),
+            ('a:1 (c:3 AND d:4)', 'expression after term'),
+            ('a:1 AND b:2)', 'expression not opened'),
+            ('(a:1 AND b:2', 'expression not closed'),
             ('', 'empty expression'),
             (' ', 'empty expression'),
             ('   ', 'empty expression'),
             ('(', '('),
             (')', ')'),
             ('()', '()'),
-            ('a AND (b OR (c AND (d OR e)) OR d', 'imbalanced parentheses, not closed'),
-            ('a AND b OR (c AND (d OR e))) OR d', 'imbalanced parentheses, not opened')
+            ('a:1 AND (b:2 OR (c:3 AND (d:4 OR e:5)) OR d:6', 'imbalanced parentheses, not closed'),
+            ('a:1 AND b:2 OR (c:3 AND (d:4 OR e:5))) OR d:6', 'imbalanced parentheses, not opened')
         ]
 
         for filter_string, msg in test_cases:
             with self.subTest(msg):
                 with self.assertRaises(FilterStringParsingError,
                                        msg=f"Did not raise error on malformed filter string '{filter_string}'"):
-                    MarqoFilterStringParser.parse(filter_string)
+                    parser = MarqoFilterStringParser()
+                    parser.parse(filter_string)
 
     def test_equality(self):
         """
@@ -123,34 +138,34 @@ class TestMarqoFilterStringParser(MarqoTestCase):
         """
         tree1 = Or(
             left=And(
-                left=Term('a'),
-                right=Term('b')
+                left=EqualityTerm('a', '1', 'a:1'),
+                right=EqualityTerm('b', '2', 'b:2')
             ),
-            right=Term('c')
+            right=EqualityTerm('c', '3', 'c:3')
         )
         # Set one left node to None
         tree2 = Or(
             left=And(
-                left=None,
-                right=Term('b')
+                left=EqualityTerm('b', '2', 'b:2'),
+                right=None
             ),
-            right=Term('c')
+            right=EqualityTerm('c', '3', 'c:3')
         )
         # Change value of one term from tree1
         tree3 = Or(
             left=And(
-                left=Term('a'),
-                right=Term('b')
+                left=EqualityTerm('a', '1', 'a:1'),
+                right=EqualityTerm('b', '2', 'b:2')
             ),
-            right=Term('e')
+            right=EqualityTerm('e', '5', 'e:5')
         )
         # Only change operator types from tree1
         tree4 = And(
             left=Or(
-                left=Term('a'),
-                right=Term('b')
+                left=EqualityTerm('a', '1', 'a:1'),
+                right=EqualityTerm('b', '2', 'b:2')
             ),
-            right=Term('c')
+            right=EqualityTerm('c', '3', 'c:3')
         )
 
         trees = [tree1, tree2, tree3, tree4]
