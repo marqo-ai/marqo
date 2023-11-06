@@ -66,9 +66,9 @@ class Field(StrictBaseModel):
     name: str
     type: FieldType
     features: List[FieldFeature] = []
-    dependent_fields: Optional[Dict[str, float]]
     lexical_field_name: Optional[str]
     filter_field_name: Optional[str]
+    dependent_fields: Optional[Dict[str, float]]
 
 
 class TensorField(StrictBaseModel):
@@ -162,14 +162,21 @@ class MarqoIndex(StrictBaseModel):
 
     @property
     def lexical_fields_names(self) -> Set[str]:
-        return self._cache_or_get('lexical_fields',
+        return self._cache_or_get('lexical_fields_names',
                                   lambda: {field.lexical_field_name for field in self.fields if
                                            field.lexical_field_name is not None}
                                   )
 
     @property
+    def lexically_searchable_fields_names(self) -> Set[str]:
+        return self._cache_or_get('lexically_searchable_fields_names',
+                                  lambda: {field.name for field in self.fields if
+                                           FieldFeature.LexicalSearch in field.features}
+                                  )
+
+    @property
     def score_modifier_fields_names(self) -> Set[str]:
-        return self._cache_or_get('score_modifier_fields',
+        return self._cache_or_get('score_modifier_fields_names',
                                   lambda: {field.name for field in self.fields if
                                            FieldFeature.ScoreModifier in field.features}
                                   )
