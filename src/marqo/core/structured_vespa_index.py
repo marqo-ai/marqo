@@ -391,6 +391,8 @@ class StructuredVespaIndex(VespaIndex):
                         return lower
                     elif upper:
                         return upper
+                    else:
+                        raise InternalError('RangeTerm has no lower or upper bound')
 
             raise InternalError(f'Unknown node type {type(node)}')
 
