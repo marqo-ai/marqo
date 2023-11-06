@@ -66,6 +66,21 @@ class TestMarqoFilterStringParser(MarqoTestCase):
                 'or expression'
             ),
             (
+                'a:1 AND NOT (b:2 OR c:3)',
+                SearchFilter(
+                    root=And(
+                        left=EqualityTerm('a', '1', 'a:1'),
+                        right=Not(
+                            Or(
+                                left=EqualityTerm('b', '2', 'b:2'),
+                                right=EqualityTerm('c', '3', 'c:3')
+                            )
+                        )
+                    )
+                ),
+                'not expression'
+            ),
+            (
                 'a:1 AND (b:2 OR (c:3 AND (d:4 OR e:5))) OR d:6',
                 SearchFilter(
                     root=Or(

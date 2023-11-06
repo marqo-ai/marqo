@@ -373,7 +373,7 @@ class StructuredVespaIndex(VespaIndex):
             if isinstance(node, search_filter.Operator):
                 return f' {node.raw} '
             elif isinstance(node, search_filter.Not):
-                return f'!({node_to_string(node.term)})'
+                return f'!({node_to_string(node.modified)})'
             elif isinstance(node, search_filter.Term):
                 if node.field not in marqo_index.filterable_fields_names:
                     raise InvalidFieldNameError(

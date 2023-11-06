@@ -47,15 +47,19 @@ class Operator(Node, ABC):
 
 
 class Modifier(Node, ABC):
-    def __init__(self, term: Term, raw: str):
+    def __init__(self, modified: Union[Term, Operator], raw: str):
         super().__init__(raw)
-        self.term = term
+        self.modified = modified
+
+        if isinstance(modified, Operator) and modified.right is None:
+            raise ValueError(f'A modifier can only be applied to terms and expressions '
+                             f'(operator with both left and right)')
 
     def __eq__(self, other):
-        return type(self) == type(other) and self.term == other.term and self.raw == other.raw
+        return type(self) == type(other) and self.modified == other.modified and self.raw == other.raw
 
     def __str__(self):
-        return f'{self.raw} {str(self.term)}'
+        return f'{self.raw} ({str(self.modified)})'
 
 
 class EqualityTerm(Term):
@@ -132,8 +136,8 @@ class Or(Operator):
 
 
 class Not(Modifier):
-    def __init__(self, term: Term):
-        super().__init__(term, 'NOT')
+    def __init__(self, modified: Union[Term, Operator]):
+        super().__init__(modified, 'NOT')
 
 
 class SearchFilter:
@@ -165,6 +169,16 @@ class MarqoFilterStringParser:
     This class is not thread-safe.
     """
 
+    # Terminology:
+    #  Term: A single term in the form of 'field:value' or 'field:[lower TO upper]'
+    #  Expression:
+    #       * A term or,
+    #       * A combination of terms and operators e.g., 'a:1 AND b:2' or,
+    #       * A modifier and an expression e.g., 'NOT (a:1 AND b:2)', 'NOT a:1'
+    #  Operator: Instance of Operator class (And, Or) with a left but no right (otherwise it's an expression)
+    #  Modifier: Instance of Modifier class (Not) without a modified (otherwise it's an expression)
+    #  Token: A single character or a sequence of characters read from the filter string
+
     class _TermType(Enum):
         Equality = 1
         Range = 2
@@ -184,31 +198,31 @@ class MarqoFilterStringParser:
 
         prev = stack[-1] if len(stack) > 0 else None
         if token == 'AND':
-            # Operator must come after a term or an expression
-            if not (self._is_term(prev) or self._is_expression(prev)):
+            # Operator must come after an expression
+            if not self._is_expression(prev):
                 if not isinstance(prev, Node):
                     # Operator at the beginning of expression
                     self._error('Unexpected AND', filter_string, pos - 3)
                 else:
-                    # Consecutive operators
+                    # Consecutive operators or operator after modifier
                     self._error(f'Expected term or expression, but found AND', filter_string, pos - 3)
 
             stack.append(And(stack.pop(), None))
         elif token == 'OR':
-            # Operator must come after a term or an expression
-            if not (self._is_term(prev) or self._is_expression(prev)):
+            # Operator must come after an expression
+            if not self._is_expression(prev):
                 if not isinstance(prev, Node):
                     # Operator at the beginning of expression
                     self._error('Unexpected OR', filter_string, pos - 2)
                 else:
-                    # Consecutive operators
+                    # Consecutive operators or operator after modifier
                     self._error(f'Expected term or expression, but found OR', filter_string, pos - 2)
 
             stack.append(Or(stack.pop(), None))
         elif token == 'NOT':
             # Modifier must come at the beginning of an expression or after an operator
             if not (self._is_start_of_expression(prev) or self._is_operator(prev)):
-                # Modifier after term or expression
+                # Modifier after modifier or expression
                 self._error(
                     f"Unexpected modifier '{token}'",
                     filter_string, pos - len(token)
@@ -224,7 +238,7 @@ class MarqoFilterStringParser:
 
             # Term must come at the beginning of an expression, after a modifier or after an operator
             if not (self._is_start_of_expression(prev) or self._is_modifier(prev) or self._is_operator(prev)):
-                # Term after term or expression
+                # Term after expression
                 self._error(f"Unexpected term '{token}'. Expected an operator", filter_string, pos - len(token))
 
             node = None
@@ -238,8 +252,8 @@ class MarqoFilterStringParser:
             else:
                 raise InternalError(f'Unexpected term type {term_type}')
 
-            if isinstance(prev, Not):
-                prev.term = node
+            if isinstance(prev, Modifier):
+                prev.modified = node
                 return
             elif isinstance(prev, Operator):
                 operator = prev
@@ -254,7 +268,7 @@ class MarqoFilterStringParser:
     def _merge_expression(self, stack: List[Union[str, Node]], filter_string: str, pos: int):
         # Expression must end with a term or an expression
         last = stack[-1] if len(stack) > 0 else None
-        if not (self._is_term(last) or self._is_expression(last)):
+        if not self._is_expression(last):
             if last is None:
                 self._error('Unexpected )', filter_string, pos)
             elif last == '(':
@@ -281,6 +295,12 @@ class MarqoFilterStringParser:
             if prev == '(':
                 # We've reached the start of the parenthetical expression
                 stack.pop()
+
+                # If there's a modifier for this expression, apply it
+                if len(stack) > 0 and isinstance(stack[-1], Modifier):
+                    modifier = stack.pop()
+                    modifier.modified = node
+                    node = modifier
 
                 # Expression must come at the beginning of an expression or after an operator
                 if not (len(stack) == 0 or stack[-1] == '(' or self._is_operator(stack[-1])):
@@ -314,9 +334,9 @@ class MarqoFilterStringParser:
             # Expected to be unreachable due to earlier checks
             self._error('Empty filter string')
 
-        # The string (expression) must end with a term or an expression
+        # The string (expression) must end with an expression
         last = stack[-1]
-        if not (self._is_term(last) or self._is_expression(last)):
+        if not self._is_expression(last):
             if not isinstance(last, Node):
                 # Expected to be unreachable
                 self._error(f"Unexpected token '{last}'")
@@ -340,7 +360,11 @@ class MarqoFilterStringParser:
             prev.right = node
 
     def _is_expression(self, node: Node):
-        return isinstance(node, Operator) and node.right is not None
+        return (
+                isinstance(node, Term) or
+                isinstance(node, Operator) and node.right is not None or
+                isinstance(node, Modifier) and node.modified is not None
+        )
 
     def _is_start_of_expression(self, node: Node):
         return node is None or node == '('
@@ -348,11 +372,8 @@ class MarqoFilterStringParser:
     def _is_operator(self, node: Node):
         return isinstance(node, Operator) and node.right is None
 
-    def _is_term(self, node: Node):
-        return isinstance(node, Term) or isinstance(node, Modifier) and node.term is not None
-
     def _is_modifier(self, node: Node):
-        return isinstance(node, Modifier) and node.term is None
+        return isinstance(node, Modifier) and node.modified is None
 
     def _error(self, msg, filter_string: Optional[str] = None, pos: Optional[int] = None):
         if pos is not None and filter_string is not None:
@@ -482,3 +503,13 @@ class MarqoFilterStringParser:
         root = stack.pop()
 
         return SearchFilter(root)
+
+
+if __name__ == '__main__':
+    parser = MarqoFilterStringParser()
+    filter_string = 'NOT (a:1 AND NOT (b:2 OR c:3))'
+    parsed = parser.parse(filter_string)
+
+    print(parsed)
+
+    pass
