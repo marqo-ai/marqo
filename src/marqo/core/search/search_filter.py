@@ -137,23 +137,6 @@ class Not(Modifier):
         super().__init__(term, 'NOT')
 
 
-# stack = []
-# current = root
-# while current is not None or stack:
-#     # Reach the leftmost node of the current node
-#     while current:
-#         stack.append(current)
-#         current = current.left
-#
-#     # Current must be None at this point
-#     current = stack.pop()
-#     print(current.value)  # Process the current node's value
-#
-#     # We have visited the node and its left subtree.
-#     # Now, it's right subtree's turn
-#     current = current.right
-
-
 class SearchFilter:
     """
     A search filter as a tree of nodes that can be traversed in-order to translate the filter to another DSL
