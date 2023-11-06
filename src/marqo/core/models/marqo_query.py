@@ -1,6 +1,6 @@
 from abc import ABC
 from enum import Enum
-from typing import List, Optional, Any
+from typing import List, Optional
 
 from pydantic import validator
 
@@ -20,12 +20,15 @@ class ScoreModifier(StrictBaseModel):
 
 
 class MarqoQuery(StrictBaseModel, ABC):
+    class Config(StrictBaseModel.Config):
+        arbitrary_types_allowed = True  # To allow SearchFilter
+
     index_name: str
     limit: int
     offset: Optional[int] = None
     searchable_attributes: Optional[List[str]] = None
     attributes_to_retrieve: Optional[List[str]] = None
-    filter: Optional[Any] = None
+    filter: Optional[SearchFilter] = None
     score_modifiers: Optional[List[ScoreModifier]] = None
     expose_facets: bool = False
 
@@ -33,7 +36,8 @@ class MarqoQuery(StrictBaseModel, ABC):
     def parse_filter(cls, filter):
         if filter is not None:
             if isinstance(filter, str):
-                return MarqoFilterStringParser.parse(filter)
+                parser = MarqoFilterStringParser()
+                return parser.parse(filter)
             elif isinstance(filter, SearchFilter):
                 return filter
             else:

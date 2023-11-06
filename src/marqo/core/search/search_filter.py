@@ -22,7 +22,7 @@ class Term(Node, ABC):
 
 
 class Operator(Node, ABC):
-    def __init__(self, left: Node, right: Optional[Node], raw: str):
+    def __init__(self, left: Node, right: Node, raw: str):
         super().__init__(raw)
         self.left = left
         self.right = right
@@ -48,7 +48,7 @@ class Operator(Node, ABC):
 
 
 class Modifier(Node, ABC):
-    def __init__(self, term: Optional[Term], raw: str):
+    def __init__(self, term: Term, raw: str):
         super().__init__(raw)
         self.term = term
 
@@ -119,22 +119,39 @@ class RangeTerm(Term):
 
 
 class And(Operator):
-    def __init__(self, left: Node, right: Optional[Node]):
+    def __init__(self, left: Node, right: Node):
         super().__init__(left, right, 'AND')
 
     greedy = True
 
 
 class Or(Operator):
-    def __init__(self, left: Node, right: Optional[Node]):
+    def __init__(self, left: Node, right: Node):
         super().__init__(left, right, 'OR')
 
     greedy = False
 
 
 class Not(Modifier):
-    def __init__(self, term: Optional[Term]):
+    def __init__(self, term: Term):
         super().__init__(term, 'NOT')
+
+
+# stack = []
+# current = root
+# while current is not None or stack:
+#     # Reach the leftmost node of the current node
+#     while current:
+#         stack.append(current)
+#         current = current.left
+#
+#     # Current must be None at this point
+#     current = stack.pop()
+#     print(current.value)  # Process the current node's value
+#
+#     # We have visited the node and its left subtree.
+#     # Now, it's right subtree's turn
+#     current = current.right
 
 
 class SearchFilter:

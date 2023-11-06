@@ -1,10 +1,14 @@
+from typing import Union
+
 import marqo.core.constants as constants
+import marqo.core.search.search_filter as search_filter
 from marqo.core.exceptions import InvalidDataTypeError, InvalidFieldNameError, VespaDocumentParsingError
 from marqo.core.models import MarqoQuery
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery, MarqoHybridQuery, ScoreModifierType
 from marqo.core.vespa_index import VespaIndex
 from marqo.exceptions import InternalError
+from tests.marqo_test import MarqoTestCase
 
 
 class StructuredVespaIndex(VespaIndex):
@@ -214,7 +218,7 @@ class StructuredVespaIndex(VespaIndex):
                 if att not in marqo_index.field_map:
                     raise InvalidFieldNameError(
                         f'Index {marqo_index.name} has no field {att}. '
-                        f'Available fields are {", ".join(marqo_index.field_map.keys())}'
+                        f'Available fields are: {", ".join(marqo_index.field_map.keys())}'
                     )
 
         # Verify score modifiers, if defined
@@ -223,7 +227,7 @@ class StructuredVespaIndex(VespaIndex):
                 if modifier.field not in marqo_index.score_modifier_fields_names:
                     raise InvalidFieldNameError(
                         f'Index {marqo_index.name} has no score modifier field {modifier.field}. '
-                        f'Available score modifier fields are {", ".join(marqo_index.score_modifier_fields_names)}'
+                        f'Available score modifier fields are: {", ".join(marqo_index.score_modifier_fields_names)}'
                     )
 
         if isinstance(marqo_query, MarqoTensorQuery):
@@ -242,7 +246,7 @@ class StructuredVespaIndex(VespaIndex):
                 if att not in marqo_index.tensor_field_map:
                     raise InvalidFieldNameError(
                         f'Index {marqo_index.name} has no tensor field {att}. '
-                        f'Available tensor fields are {", ".join(marqo_index.tensor_field_map.keys())}'
+                        f'Available tensor fields are: {", ".join(marqo_index.tensor_field_map.keys())}'
                     )
 
             fields_to_search = marqo_query.searchable_attributes
@@ -250,7 +254,7 @@ class StructuredVespaIndex(VespaIndex):
             fields_to_search = marqo_index.tensor_field_map.keys()
 
         tensor_term = cls._get_tensor_search_term(marqo_query, marqo_index)
-        filter_term = cls._get_filter_term(marqo_query)
+        filter_term = cls._get_filter_term(marqo_query, marqo_index)
         if filter_term:
             filter_term = f' AND {filter_term}'
         else:
@@ -290,7 +294,7 @@ class StructuredVespaIndex(VespaIndex):
                 if att not in marqo_index.lexically_searchable_fields_names:
                     raise InvalidFieldNameError(
                         f'Index {marqo_index.name} has no lexically searchable field {att}. '
-                        f'Available lexically searchable fields are '
+                        f'Available lexically searchable fields are: '
                         f'{", ".join(marqo_index.lexically_searchable_fields_names)}'
                     )
             fields_to_search = marqo_query.searchable_attributes
@@ -298,7 +302,7 @@ class StructuredVespaIndex(VespaIndex):
             fields_to_search = marqo_index.lexical_fields_names
 
         lexical_term = cls._get_lexical_search_term(marqo_query, marqo_index)
-        filter_term = cls._get_filter_term(marqo_query)
+        filter_term = cls._get_filter_term(marqo_query, marqo_index)
         if filter_term:
             filter_term = f' AND {filter_term}'
         else:
@@ -361,9 +365,64 @@ class StructuredVespaIndex(VespaIndex):
             return ''
 
     @classmethod
-    def _get_filter_term(cls, marqo_query: MarqoQuery) -> str:
+    def _get_filter_term(cls, marqo_query: MarqoQuery, marqo_index: MarqoIndex) -> Optional[str]:
+        def escape(s: str) -> str:
+            return s.replace('\\', '\\\\').replace('"', '\\"')
+
+        def node_to_string(node: search_filter.Node) -> str:
+            if isinstance(node, search_filter.Operator):
+                return f' {node.raw} '
+            elif isinstance(node, search_filter.Not):
+                return f'!({node_to_string(node.term)})'
+            elif isinstance(node, search_filter.Term):
+                if node.field not in marqo_index.filterable_fields_names:
+                    raise InvalidFieldNameError(
+                        f'Index {marqo_index.name} has no filterable field {node.field}. '
+                        f'Available filterable fields are: {", ".join(marqo_index.filterable_fields_names)}'
+                    )
+                if isinstance(node, search_filter.EqualityTerm):
+                    return f'{node.field} contains "{escape(node.value)}"'
+                elif isinstance(node, search_filter.RangeTerm):
+                    lower = f'{node.field} >= {node.lower}' if node.lower is not None else None
+                    upper = f'{node.field} <= {node.upper}' if node.upper is not None else None
+                    if lower and upper:
+                        return f'({lower} AND {upper})'
+                    elif lower:
+                        return lower
+                    elif upper:
+                        return upper
+
+            raise InternalError(f'Unknown node type {type(node)}')
+
+        filter_term = []
         if marqo_query.filter is not None:
-            raise NotImplementedError('Filters are not supported yet')
+            # Traverse filter tree in-order to generate Vespa filter string
+            # Node types are: Term, Modifier, Operator where Terms and Modifiers are leaves, but Operators are not
+            stack: List[Union[str, search_filter.Node]] = []
+            current = marqo_query.filter.root
+            while current or stack:
+                # Loop invariant: for current, stack: s1, s2, ..., sn, order of processing is
+                # ..., current, ..., s1, ..., s2, ..., sn, ... where ... is zero or more elements not yet known
+                while current:
+                    stack.append(current)
+                    if isinstance(current, search_filter.Operator):
+                        filter_term.append('(')
+                        current = current.left
+                    else:
+                        current = None
+
+                # Now order of processing is s1, ..., s2, ..., sn, so we will process s1
+                top = stack.pop()
+                if top == ')':
+                    filter_term.append(')')
+                else:
+                    filter_term.append(node_to_string(top))
+
+                if isinstance(top, search_filter.Operator):
+                    current = top.right
+                    stack.append(')')
+
+            return ''.join(filter_term)
 
         return None
 
@@ -753,3 +812,31 @@ class StructuredVespaIndex(VespaIndex):
             return marqo_index.copy_with_caching()
 
         return marqo_index
+
+if __name__ == '__main__':
+    marqo_query = MarqoTensorQuery(
+        index_name='test',
+        limit=10,
+        vector_query=[1, 2, 3],
+        filter='tags:shirt OR tags:jeans AND NOT tags:blue AND price:[* TO 20]',
+    )
+    marqo_index = MarqoTestCase.marqo_index(
+        name='my_index',
+        model=Model(name='ViT-B/32'),
+        distance_metric=DistanceMetric.PrenormalizedAnguar,
+        type=IndexType.Structured,
+        vector_numeric_type=VectorNumericType.Float,
+        hnsw_config=HnswConfig(ef_construction=100, m=16),
+        fields=[
+            Field(name='title', type=FieldType.Text, features=[FieldFeature.LexicalSearch]),
+            Field(name='description', type=FieldType.Text),
+            Field(name='tags', type=FieldType.ArrayText, features=[FieldFeature.Filter]),
+            Field(name='price', type=FieldType.Float, features=[FieldFeature.Filter, FieldFeature.ScoreModifier]),
+        ],
+        tensor_fields=[
+            TensorField(name='title'),
+        ],
+    )
+    vespa_query = StructuredVespaIndex.to_vespa_query(marqo_query, marqo_index)
+    print(vespa_query)
+    pass

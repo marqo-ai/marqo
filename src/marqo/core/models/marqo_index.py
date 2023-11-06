@@ -175,6 +175,13 @@ class MarqoIndex(StrictBaseModel):
                                   )
 
     @property
+    def filterable_fields_names(self) -> Set[str]:
+        return self._cache_or_get('filterable_fields_names',
+                                  lambda: {field.name for field in self.fields if
+                                           FieldFeature.Filter in field.features}
+                                  )
+
+    @property
     def score_modifier_fields_names(self) -> Set[str]:
         return self._cache_or_get('score_modifier_fields_names',
                                   lambda: {field.name for field in self.fields if
