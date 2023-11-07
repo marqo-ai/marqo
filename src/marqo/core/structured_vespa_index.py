@@ -368,9 +368,19 @@ class StructuredVespaIndex(VespaIndex):
 
         def tree_to_filter_string(node: search_filter.Node) -> str:
             if isinstance(node, search_filter.Operator):
-                return f'({tree_to_filter_string(node.left)} {node.raw} {tree_to_filter_string(node.right)})'
+                if isinstance(node, search_filter.And):
+                    operator = 'AND'
+                elif isinstance(node, search_filter.Or):
+                    operator = 'OR'
+                else:
+                    raise InternalError(f'Unknown operator type {type(node)}')
+
+                return f'({tree_to_filter_string(node.left)} {operator} {tree_to_filter_string(node.right)})'
             elif isinstance(node, search_filter.Modifier):
-                return f'!({tree_to_filter_string(node.modified)})'
+                if isinstance(node, search_filter.Not):
+                    return f'!({tree_to_filter_string(node.modified)})'
+                else:
+                    raise InternalError(f'Unknown modifier type {type(node)}')
             elif isinstance(node, search_filter.Term):
                 if node.field not in marqo_index.filterable_fields_names:
                     raise InvalidFieldNameError(
