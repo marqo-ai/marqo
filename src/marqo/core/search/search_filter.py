@@ -142,8 +142,10 @@ class Not(Modifier):
 
 class SearchFilter:
     """
-    A search filter as a tree of nodes that can be traversed in-order to translate the filter to another DSL
-    such as Vespa YQL.
+    A search filter as a tree of Nodes.
+
+    To generate a filter string from a SearchFilter object, traverse the tree in-order for Operators and pre-order
+    for Modifiers. Terms are always leaf nodes.
     """
 
     def __init__(self, root: Node):
@@ -170,7 +172,7 @@ class MarqoFilterStringParser:
     """
 
     # Terminology:
-    #  Term: A single term in the form of 'field:value' or 'field:[lower TO upper]'
+    #  Term: A single term in the form of 'field:value' or 'field:[lower|* TO upper|*]'
     #  Expression:
     #       * A term or,
     #       * A combination of terms and operators e.g., 'a:1 AND b:2' or,
@@ -182,6 +184,116 @@ class MarqoFilterStringParser:
     class _TermType(Enum):
         Equality = 1
         Range = 2
+
+    def parse(self, filter_string: str) -> SearchFilter:
+        self._reset_state()
+
+        if filter_string == '':
+            raise FilterStringParsingError('Cannot parse empty filter string')
+
+        stack: List[Union[str, Operator, Term]] = []
+        parenthesis_count = 0
+        escape = False
+        read_space_until = None  # ignore space until reaching the value of this variable
+
+        for i in range(len(filter_string)):
+            c = filter_string[i]
+
+            # Special processing if we are reading a term value
+            if self._read_term_value and not (c in [' ', ')'] and not escape and read_space_until is None):
+                if self._reached_term_end:
+                    self._error(f"Expected end of term, but found '{c}'", filter_string, i)
+
+                if escape:
+                    self._current_token.append(c)
+                    self._term_value.append(c)
+                    escape = False
+                elif c == '\\':
+                    escape = True
+                else:
+                    if c == read_space_until:
+                        read_space_until = None
+                        self._reached_term_end = True
+                    elif len(self._term_value) == 0 and c == '(' and not read_space_until:  # start of term value
+                        read_space_until = ')'
+                    elif len(self._term_value) == 0 and c == '[' and not read_space_until:  # start of term value
+                        read_space_until = ']'
+                        self._term_type = MarqoFilterStringParser._TermType.Range
+                    else:
+                        self._term_value.append(c)
+
+                    self._current_token.append(c)
+
+                continue
+
+            if escape:
+                self._current_token.append(c)
+                escape = False
+            elif c == ':':
+                self._read_term_value = True
+                self._term_type = MarqoFilterStringParser._TermType.Equality
+                self._term_field = ''.join(self._current_token)
+                self._current_token.append(c)
+            elif c == '(':
+                if len(self._current_token) > 0:
+                    self._error('Unexpected (', filter_string, i)
+
+                stack.append(c)
+                parenthesis_count += 1
+            elif c == ')':
+                self._push_token(
+                    stack,
+                    filter_string,
+                    self._current_token,
+                    self._term_field,
+                    self._term_value,
+                    self._term_type,
+                    i
+                )
+                self._reset_state()
+
+                self._merge_expression(stack, filter_string, i)
+                parenthesis_count -= 1
+            elif c == '\\':
+                escape = True
+            elif c == ' ':
+                self._push_token(
+                    stack,
+                    filter_string,
+                    self._current_token,
+                    self._term_field,
+                    self._term_value,
+                    self._term_type,
+                    i
+                )
+                self._reset_state()
+            else:
+                self._current_token.append(c)
+
+        if len(self._current_token) > 0:
+            self._push_token(
+                stack,
+                filter_string,
+                self._current_token,
+                self._term_field,
+                self._term_value,
+                self._term_type,
+                len(filter_string)
+            )
+
+        if parenthesis_count != 0:
+            # merge_stack will catch this, but this is a more specific error message
+            self._error('Unbalanced parentheses')
+
+        self._merge_stack(stack, filter_string)
+
+        if len(stack) != 1:
+            # This should be unreachable
+            self._error('Failed to parse filter string')
+
+        root = stack.pop()
+
+        return SearchFilter(root)
 
     def _push_token(self,
                     stack: List[Union[str, Node]],
@@ -393,123 +505,3 @@ class MarqoFilterStringParser:
         self._read_term_value: bool = False
         self._reached_term_end: bool = False
         self._term_type: Optional[MarqoFilterStringParser._TermType] = None
-
-    def parse(self, filter_string: str) -> SearchFilter:
-        self._reset_state()
-
-        if filter_string == '':
-            raise FilterStringParsingError('Cannot parse empty filter string')
-
-        stack: List[Union[str, Operator, Term]] = []
-        parenthesis_count = 0
-        escape = False
-        read_space_until = None  # ignore space until reaching the value of this variable
-
-        for i in range(len(filter_string)):
-            c = filter_string[i]
-
-            # Special processing if we are reading a term value
-            if self._read_term_value and not (c in [' ', ')'] and not escape and read_space_until is None):
-                if self._reached_term_end:
-                    self._error(f"Expected end of term, but found '{c}'", filter_string, i)
-
-                if escape:
-                    self._current_token.append(c)
-                    self._term_value.append(c)
-                    escape = False
-                elif c == '\\':
-                    escape = True
-                else:
-                    if c == read_space_until:
-                        read_space_until = None
-                        self._reached_term_end = True
-                    elif len(self._term_value) == 0 and c == '(' and not read_space_until:  # start of term value
-                        read_space_until = ')'
-                    elif len(self._term_value) == 0 and c == '[' and not read_space_until:  # start of term value
-                        read_space_until = ']'
-                        self._term_type = MarqoFilterStringParser._TermType.Range
-                    else:
-                        self._term_value.append(c)
-
-                    self._current_token.append(c)
-
-                continue
-
-            if escape:
-                self._current_token.append(c)
-                escape = False
-            elif c == ':':
-                self._read_term_value = True
-                self._term_type = MarqoFilterStringParser._TermType.Equality
-                self._term_field = ''.join(self._current_token)
-                self._current_token.append(c)
-            elif c == '(':
-                if len(self._current_token) > 0:
-                    self._error('Unexpected (', filter_string, i)
-
-                stack.append(c)
-                parenthesis_count += 1
-            elif c == ')':
-                self._push_token(
-                    stack,
-                    filter_string,
-                    self._current_token,
-                    self._term_field,
-                    self._term_value,
-                    self._term_type,
-                    i
-                )
-                self._reset_state()
-
-                self._merge_expression(stack, filter_string, i)
-                parenthesis_count -= 1
-            elif c == '\\':
-                escape = True
-            elif c == ' ':
-                self._push_token(
-                    stack,
-                    filter_string,
-                    self._current_token,
-                    self._term_field,
-                    self._term_value,
-                    self._term_type,
-                    i
-                )
-                self._reset_state()
-            else:
-                self._current_token.append(c)
-
-        if len(self._current_token) > 0:
-            self._push_token(
-                stack,
-                filter_string,
-                self._current_token,
-                self._term_field,
-                self._term_value,
-                self._term_type,
-                len(filter_string)
-            )
-
-        if parenthesis_count != 0:
-            # merge_stack will catch this, but this is a more specific error message
-            self._error('Unbalanced parentheses')
-
-        self._merge_stack(stack, filter_string)
-
-        if len(stack) != 1:
-            # This should be unreachable
-            self._error('Failed to parse filter string')
-
-        root = stack.pop()
-
-        return SearchFilter(root)
-
-
-if __name__ == '__main__':
-    parser = MarqoFilterStringParser()
-    filter_string = 'NOT (a:1 AND NOT (b:2 OR c:3))'
-    parsed = parser.parse(filter_string)
-
-    print(parsed)
-
-    pass
