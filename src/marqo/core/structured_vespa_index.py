@@ -705,7 +705,12 @@ class StructuredVespaIndex(VespaIndex):
 
             if lexical_fields_names:
                 rank_profiles.append(f'rank-profile {cls._RANK_PROFILE_BM25_MODIFIERS} '
-                                     f'inherits {cls._RANK_PROFILE_MODIFIERS} {{ first-phase {{')
+                                     f'inherits {cls._RANK_PROFILE_MODIFIERS} {{')
+                rank_profiles.append('inputs {')
+                rank_profiles.append(f'query({cls._QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS}) tensor<float>(p{{}})')
+                rank_profiles.append(f'query({cls._QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS}) tensor<float>(p{{}})')
+                rank_profiles.append('}')
+                rank_profiles.append('first-phase {')
                 rank_profiles.append(f'expression: modify({bm25_expression})')
                 rank_profiles.append('}}')
 
@@ -715,6 +720,8 @@ class StructuredVespaIndex(VespaIndex):
                     f'inherits {cls._RANK_PROFILE_MODIFIERS} {{')
 
                 rank_profiles.append('inputs {')
+                rank_profiles.append(f'query({cls._QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS}) tensor<float>(p{{}})')
+                rank_profiles.append(f'query({cls._QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS}) tensor<float>(p{{}})')
                 rank_profiles.append(f'query({cls._QUERY_INPUT_EMBEDDING}) tensor<float>(x[{model_dim}])')
                 for field in tensor_fields_names:
                     rank_profiles.append(f'query({field}): 0')
