@@ -96,6 +96,7 @@ class StructuredVespaIndex(VespaIndex):
 
         vespa_id: Optional[int] = None
         vespa_fields: Dict[str, Any] = dict()
+        score_modifiers: Dict[str, float] = {}
 
         # ID
         if constants.MARQO_DOC_ID in marqo_document:
@@ -120,6 +121,9 @@ class StructuredVespaIndex(VespaIndex):
             if not index_field.lexical_field_name and not index_field.filter_field_name:
                 vespa_fields[index_field.name] = marqo_value
 
+            if FieldFeature.ScoreModifier in index_field.features:
+                score_modifiers[index_field.name] = marqo_value
+
         # Tensors
         if constants.MARQO_DOC_TENSORS in marqo_document:
             for marqo_tensor_field in marqo_document[constants.MARQO_DOC_TENSORS]:
@@ -136,6 +140,9 @@ class StructuredVespaIndex(VespaIndex):
                 vespa_fields[index_tensor_field.chunk_field_name] = chunks
                 vespa_fields[index_tensor_field.embeddings_field_name] = \
                     {f'{i}': embeddings[i] for i in range(len(embeddings))}
+
+        if len(score_modifiers) > 0:
+            vespa_fields[cls._FIELD_SCORE_MODIFIERS] = score_modifiers
 
         vespa_doc = {
             cls._VESPA_DOC_FIELDS: vespa_fields
@@ -258,7 +265,7 @@ class StructuredVespaIndex(VespaIndex):
             filter_term = ''
         select_attributes = cls._get_select_attributes(marqo_query)
         summary = cls._SUMMARY_ALL_VECTOR if marqo_query.expose_facets else cls._SUMMARY_ALL_NON_VECTOR
-        score_modifiers = cls._get_score_modifiers(marqo_query, marqo_index)
+        score_modifiers = cls._get_score_modifiers(marqo_query)
         ranking = cls._RANK_PROFILE_EMBEDDING_SIMILARITY_MODIFIERS if score_modifiers \
             else cls._RANK_PROFILE_EMBEDDING_SIMILARITY
 
@@ -307,7 +314,7 @@ class StructuredVespaIndex(VespaIndex):
 
         select_attributes = cls._get_select_attributes(marqo_query)
         summary = cls._SUMMARY_ALL_VECTOR if marqo_query.expose_facets else cls._SUMMARY_ALL_NON_VECTOR
-        score_modifiers = cls._get_score_modifiers(marqo_query, marqo_index)
+        score_modifiers = cls._get_score_modifiers(marqo_query)
         ranking = cls._RANK_PROFILE_BM25_MODIFIERS if score_modifiers \
             else cls._RANK_PROFILE_BM25
 
@@ -415,18 +422,12 @@ class StructuredVespaIndex(VespaIndex):
             return '*'
 
     @classmethod
-    def _get_score_modifiers(cls, marqo_query: MarqoQuery, marqo_index: MarqoIndex) -> \
+    def _get_score_modifiers(cls, marqo_query: MarqoQuery) -> \
             Optional[Dict[str, Dict[str, float]]]:
         if marqo_query.score_modifiers:
             mult_tensor = {}
             add_tensor = {}
             for modifier in marqo_query.score_modifiers:
-                if modifier.field not in marqo_index.score_modifier_fields_names:
-                    raise InvalidFieldNameError(
-                        f'Index {marqo_index.name} has no score modifier field {modifier.field}. '
-                        f'Available score modifier fields are: {", ".join(marqo_index.score_modifier_fields_names)}'
-                    )
-
                 if modifier.type == ScoreModifierType.Multiply:
                     mult_tensor[modifier.field] = modifier.weight
                 elif modifier.type == ScoreModifierType.Add:
@@ -546,7 +547,9 @@ class StructuredVespaIndex(VespaIndex):
 
         # score modifiers
         if marqo_index.score_modifier_fields_names:
-            document.append(f'field {cls._FIELD_SCORE_MODIFIERS} type tensor<float>(p{{}}) {{ indexing: attribute }}')
+            document.append(
+                f'field {cls._FIELD_SCORE_MODIFIERS} type tensor<float>(p{{}}) {{ indexing: attribute | summary }}'
+            )
 
         # tensor fields
         model_dim = marqo_index.model.get_dimension()

@@ -40,7 +40,7 @@ class IndexSettings(BaseMarqoModel):
         )
     )
 
-    def to_marqo_index(self, index_name: str):
+    def to_marqo_index(self, index_name: str) -> core.MarqoIndex:
         marqo_fields = None
         if self.all_fields is not None:
             marqo_fields = [
