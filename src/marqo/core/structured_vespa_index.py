@@ -635,12 +635,14 @@ class StructuredVespaIndex(VespaIndex):
     def _generate_rank_profiles(cls, marqo_index: MarqoIndex) -> List[str]:
         rank_profiles: List[str] = list()
 
-        lexical_fields = marqo_index.lexical_fields_names
-        score_modifier_fields = marqo_index.score_modifier_fields_names
-        tensor_fields = [field.name for field in marqo_index.tensor_fields]
+        lexical_fields_names = marqo_index.lexical_fields_names
+        score_modifier_fields_names = marqo_index.score_modifier_fields_names
+        tensor_fields_names = marqo_index.tensor_field_map.keys()
         model_dim = marqo_index.model.get_dimension()
 
-        bm25_expression = ' + '.join([f'bm25({field})' for field in lexical_fields])
+        bm25_expression = ' + '.join([
+            f'if (query({field}) > 0, bm25({field}), 0)' for field in lexical_fields_names
+        ])
         embedding_similarity_expression = ' + '.join([
             f'if (query({field.name}) > 0, closeness(field, {field.embeddings_field_name}), 0)' for field in
             marqo_index.tensor_fields
@@ -651,17 +653,24 @@ class StructuredVespaIndex(VespaIndex):
             ' ' + \
             ' '.join([f'distance(field, {field.embeddings_field_name})' for field in marqo_index.tensor_fields])
 
-        if lexical_fields:
-            rank_profiles.append(f'rank-profile {cls._RANK_PROFILE_BM25} inherits default {{ first-phase {{')
+        if lexical_fields_names:
+            rank_profiles.append(f'rank-profile {cls._RANK_PROFILE_BM25} inherits default {{')
+
+            rank_profiles.append('inputs {')
+            for field in lexical_fields_names:
+                rank_profiles.append(f'query({field}): 0')
+            rank_profiles.append('}')
+
+            rank_profiles.append('first-phase {')
             rank_profiles.append(f'expression: {bm25_expression}')
             rank_profiles.append('}}')
 
-        if tensor_fields:
+        if tensor_fields_names:
             rank_profiles.append(f'rank-profile {cls._RANK_PROFILE_EMBEDDING_SIMILARITY} inherits default {{')
 
             rank_profiles.append('inputs {')
             rank_profiles.append(f'query({cls._QUERY_INPUT_EMBEDDING}) tensor<float>(x[{model_dim}])')
-            for field in tensor_fields:
+            for field in tensor_fields_names:
                 rank_profiles.append(f'query({field}): 0')
             rank_profiles.append('}')
 
@@ -671,7 +680,7 @@ class StructuredVespaIndex(VespaIndex):
             rank_profiles.append(embedding_match_features_expression)
             rank_profiles.append('}')
 
-        if score_modifier_fields:
+        if score_modifier_fields_names:
             expression = f'if (count(query({cls._QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS})) == 0, 1, ' \
                          f'reduce(query({cls._QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS}) ' \
                          f'* attribute({cls._FIELD_SCORE_MODIFIERS}), prod)) * score ' \
@@ -679,27 +688,27 @@ class StructuredVespaIndex(VespaIndex):
                          f'* attribute({cls._FIELD_SCORE_MODIFIERS}), sum)'
             rank_profiles.append(f'rank-profile {cls._RANK_PROFILE_MODIFIERS} inherits default {{')
             rank_profiles.append('inputs {')
-            rank_profiles.append(f'query({cls._QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS})  tensor<float>(p{{}})')
-            rank_profiles.append(f'query({cls._QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS})  tensor<float>(p{{}})')
+            rank_profiles.append(f'query({cls._QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS}) tensor<float>(p{{}})')
+            rank_profiles.append(f'query({cls._QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS}) tensor<float>(p{{}})')
             rank_profiles.append('}')
             rank_profiles.append('function modify(score) {')
             rank_profiles.append(f'expression: {expression}')
             rank_profiles.append('}}')
 
-            if lexical_fields:
+            if lexical_fields_names:
                 rank_profiles.append(f'rank-profile {cls._RANK_PROFILE_BM25_MODIFIERS} '
                                      f'inherits {cls._RANK_PROFILE_MODIFIERS} {{ first-phase {{')
                 rank_profiles.append(f'expression: modify({bm25_expression})')
                 rank_profiles.append('}}')
 
-            if tensor_fields:
+            if tensor_fields_names:
                 rank_profiles.append(
                     f'rank-profile {cls._RANK_PROFILE_EMBEDDING_SIMILARITY_MODIFIERS} '
                     f'inherits {cls._RANK_PROFILE_MODIFIERS} {{')
 
                 rank_profiles.append('inputs {')
                 rank_profiles.append(f'query({cls._QUERY_INPUT_EMBEDDING}) tensor<float>(x[{model_dim}])')
-                for field in tensor_fields:
+                for field in tensor_fields_names:
                     rank_profiles.append(f'query({field}): 0')
                 rank_profiles.append('}')
 
