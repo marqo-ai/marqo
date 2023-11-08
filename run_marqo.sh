@@ -32,7 +32,7 @@ function wait_for_process () {
     return 0
 }
 
-OPENSEARCH_IS_INTERNAL=False
+VESPA_IS_INTERNAL=False
 # Start Vespa in the background
 if [[ ! $VESPA_CONFIG_URL ]]; then
   # Start local vespa
@@ -53,6 +53,7 @@ if [[ ! $VESPA_CONFIG_URL ]]; then
   export VESPA_QUERY_URL="http://localhost:8080"
   export VESPA_DOCUMENT_URL="http://localhost:8080"
   export VESPA_CONFIG_URL="http://localhost:19071"
+  VESPA_IS_INTERNAL=True
 
 else
   echo "Found VESPA_CONFIG_URL. Skipping internal Vespa configuration"
