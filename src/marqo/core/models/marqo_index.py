@@ -161,10 +161,17 @@ class MarqoIndex(StrictBaseModel):
         self._cache = dict()
 
     @property
-    def lexical_fields_names(self) -> Set[str]:
-        return self._cache_or_get('lexical_fields_names',
-                                  lambda: {field.lexical_field_name for field in self.fields if
-                                           field.lexical_field_name is not None}
+    def lexical_field_map(self) -> Dict[str, Field]:
+        return self._cache_or_get('lexical_field_map',
+                                  lambda: {field.lexical_field_name: field for field in self.fields if
+                                           FieldFeature.LexicalSearch in field.features}
+                                  )
+
+    @property
+    def filter_field_map(self) -> Dict[str, Field]:
+        return self._cache_or_get('filter_field_map',
+                                  lambda: {field.filter_field_name: field for field in self.fields if
+                                           FieldFeature.Filter in field.features}
                                   )
 
     @property
