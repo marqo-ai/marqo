@@ -1,4 +1,4 @@
-FROM marqo-base-centos:latest as base_image
+FROM 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqo-base-centos:test as base_image
 VOLUME /var/lib/docker
 ARG TARGETPLATFORM
 WORKDIR /app
