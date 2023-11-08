@@ -59,6 +59,8 @@ else
   echo "Found VESPA_CONFIG_URL. Skipping internal Vespa configuration"
 fi
 
+export VESPA_IS_INTERNAL
+
 # Start up redis
 if [ "$MARQO_ENABLE_THROTTLING" != "FALSE" ]; then
     echo "Starting redis-server"
