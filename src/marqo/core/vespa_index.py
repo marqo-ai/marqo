@@ -12,6 +12,12 @@ class VespaIndex(ABC):
     Methods in this class do not talk to Vespa directly, but rather transform data and queries to and from a format
     that can be used by a VespaClient.
     """
+    _HANDLEABLE_INDEX_TYPES = None
+
+    def __init_subclass__(cls, **kwargs):
+        if cls._HANDLEABLE_INDEX_TYPES is None:
+            raise NotImplementedError("VespaIndex._HANDLEABLE_INDEX_TYPES must be defined")
+        super().__init_subclass__()
 
     @classmethod
     @abstractmethod
@@ -76,6 +82,14 @@ class VespaIndex(ABC):
             A dictionary containing the Vespa query
         """
         pass
+
+    @classmethod
+    def _validate_index_type(cls, marqo_index: MarqoIndex) -> None:
+        if marqo_index.type != cls._HANDLEABLE_INDEX_TYPES:
+            raise ValueError(
+                f"Vespa index type must be {cls._HANDLEABLE_INDEX_TYPES}. "
+                f"This module cannot handle index type {marqo_index.type.name}."
+            )
 
 
 def for_marqo_index(marqo_index: MarqoIndex):

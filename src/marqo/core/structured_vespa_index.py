@@ -12,6 +12,9 @@ class StructuredVespaIndex(VespaIndex):
     """
     An implementation of VespaIndex for structured indexes.
     """
+
+    _HANDLEABLE_INDEX_TYPES = IndexType.Structured
+
     _MARQO_TO_VESPA_TYPE_MAP = {
         FieldType.Text: 'string',
         FieldType.Bool: 'bool',
@@ -659,12 +662,6 @@ class StructuredVespaIndex(VespaIndex):
             return cls._DISTANCE_METRIC_MAP[marqo_distance_metric]
         except KeyError:
             raise ValueError(f'Unknown Marqo distance metric: {marqo_distance_metric}')
-
-    @classmethod
-    def _validate_index_type(cls, marqo_index: MarqoIndex) -> None:
-        if marqo_index.type != IndexType.Structured:
-            raise ValueError(f'Vespa index type must be {IndexType.Structured.name}. '
-                             f'This module cannot handle index type {marqo_index.type.name}')
 
     @classmethod
     def _ensure_cache_enabled(cls, marqo_index):

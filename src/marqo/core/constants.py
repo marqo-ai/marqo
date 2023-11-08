@@ -3,3 +3,5 @@ MARQO_DOC_HIGHLIGHTS = '_highlights'  # doc-level so must not clash with index f
 MARQO_DOC_CHUNKS = 'chunks'
 MARQO_DOC_EMBEDDINGS = 'embeddings'
 MARQO_DOC_ID = '_id'
+
+SHORT_STRING_THRESHOLD = 20 # The threshold for a string to be considered short, long in an UnstructuredVespaDocument
