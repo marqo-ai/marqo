@@ -421,10 +421,18 @@ class StructuredVespaIndex(VespaIndex):
             mult_tensor = {}
             add_tensor = {}
             for modifier in marqo_query.score_modifiers:
+                if modifier.field not in marqo_index.score_modifier_fields_names:
+                    raise InvalidFieldNameError(
+                        f'Index {marqo_index.name} has no score modifier field {modifier.field}. '
+                        f'Available score modifier fields are: {", ".join(marqo_index.score_modifier_fields_names)}'
+                    )
+
                 if modifier.type == ScoreModifierType.Multiply:
                     mult_tensor[modifier.field] = modifier.weight
                 elif modifier.type == ScoreModifierType.Add:
                     add_tensor[modifier.field] = modifier.weight
+                else:
+                    raise InternalError(f'Unknown score modifier type {modifier.type}')
 
             # Note one of these could be empty, but not both
             return {
