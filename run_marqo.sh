@@ -32,12 +32,13 @@ function wait_for_process () {
     return 0
 }
 
+
 VESPA_IS_INTERNAL=False
 # Start Vespa in the background
 if [[ ! $VESPA_CONFIG_URL ]]; then
   # Start local vespa
   echo "Running Vespa Locally"
-  tmux new-session -d -s vespa "bash /usr/local/bin/start_vespa.sh"
+  nohup /usr/local/bin/start_vespa.sh > /dev/null 2>&1 &
   # Start opensearch in the background
 
   echo "Waiting for Vespa to start"
