@@ -376,6 +376,9 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
 
     RequestMetricsStore.for_request().start("add_documents.processing_before_opensearch")
 
+    if add_docs_params.tensor_fields is not None:
+        raise errors.InvalidArgError('Cannot specify `tensorFields` for a structured index')
+
     if add_docs_params.mappings is not None:
         validation.validate_mappings_object(mappings_object=add_docs_params.mappings)
 
@@ -457,13 +460,15 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
             processed_tensor_fields = {}
             for field in copied:
                 marqo_field = marqo_index.field_map.get(field)
+                tensor_field = marqo_index.tensor_field_map.get(field)
+                is_tensor_field = tensor_field is not None
                 if not marqo_field:
                     message = (f"Field {field} is not a valid field for structured index {add_docs_params.index_name}. "
                                f"Valid fields are: {', '.join(marqo_index.field_map.keys())}")
                     document_is_valid = False
                     unsuccessful_docs.append(
                         (i, {'_id': doc_id, 'error': message, 'status': int(errors.InvalidArgError.status_code),
-                             'code': int(errors.InvalidArgError.code)})
+                             'code': errors.InvalidArgError.code})
                     )
                     break
                 if marqo_field.type == FieldType.MultimodalCombination:
@@ -471,21 +476,19 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                     document_is_valid = False
                     unsuccessful_docs.append(
                         (i, {'_id': doc_id, 'error': message, 'status': int(errors.InvalidArgError.status_code),
-                             'code': int(errors.InvalidArgError.code)})
+                             'code': errors.InvalidArgError.code})
                     )
                     break
 
                 try:
                     field_content = validation.validate_field_content(
                         field_content=copied[field],
-                        is_non_tensor_field=not utils.is_tensor_field(field, add_docs_params.tensor_fields,
-                                                                      add_docs_params.non_tensor_fields)
+                        is_non_tensor_field=not is_tensor_field
                     )
                     if isinstance(field_content, dict):
                         field_content = validation.validate_dict(
                             field=field, field_content=field_content,
-                            is_non_tensor_field=not utils.is_tensor_field(field, add_docs_params.tensor_fields,
-                                                                          add_docs_params.non_tensor_fields),
+                            is_non_tensor_field=not is_tensor_field,
                             mappings=add_docs_params.mappings)
                 except errors.InvalidArgError as err:
                     document_is_valid = False
@@ -496,7 +499,6 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                     break
 
                 # Proceed from here only for tensor fields
-                tensor_field = marqo_index.tensor_field_map.get(field)
                 if not tensor_field:
                     continue
 
@@ -1279,7 +1281,7 @@ def _lexical_search(
         f"{len(gathered_docs)} results."
     )
 
-    return {"hits": gathered_docs}
+    return gathered_docs
 
 
 def construct_vector_input_batches(query: Union[str, Dict], index_info: MarqoIndex) -> Tuple[List[str], List[str]]:
@@ -1858,7 +1860,7 @@ def _vector_text_search(
         f"{len(gathered_docs)} results from Vespa."
     )
 
-    return {"hits": gathered_docs}
+    return gathered_docs
 
 
 def _format_ordered_docs_simple(ordered_docs_w_chunks: List[dict], result_count: int) -> dict:

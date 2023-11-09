@@ -1,4 +1,5 @@
 import marqo.core.constants as constants
+import marqo.core.search.search_filter as search_filter
 from marqo.core.exceptions import InvalidDataTypeError, InvalidFieldNameError, VespaDocumentParsingError
 from marqo.core.models import MarqoQuery
 from marqo.core.models.marqo_index import *
@@ -214,7 +215,7 @@ class StructuredVespaIndex(VespaIndex):
                 if att not in marqo_index.field_map:
                     raise InvalidFieldNameError(
                         f'Index {marqo_index.name} has no field {att}. '
-                        f'Available fields are {", ".join(marqo_index.field_map.keys())}'
+                        f'Available fields are: {", ".join(marqo_index.field_map.keys())}'
                     )
 
         # Verify score modifiers, if defined
@@ -223,7 +224,7 @@ class StructuredVespaIndex(VespaIndex):
                 if modifier.field not in marqo_index.score_modifier_fields_names:
                     raise InvalidFieldNameError(
                         f'Index {marqo_index.name} has no score modifier field {modifier.field}. '
-                        f'Available score modifier fields are {", ".join(marqo_index.score_modifier_fields_names)}'
+                        f'Available score modifier fields are: {", ".join(marqo_index.score_modifier_fields_names)}'
                     )
 
         if isinstance(marqo_query, MarqoTensorQuery):
@@ -242,7 +243,7 @@ class StructuredVespaIndex(VespaIndex):
                 if att not in marqo_index.tensor_field_map:
                     raise InvalidFieldNameError(
                         f'Index {marqo_index.name} has no tensor field {att}. '
-                        f'Available tensor fields are {", ".join(marqo_index.tensor_field_map.keys())}'
+                        f'Available tensor fields are: {", ".join(marqo_index.tensor_field_map.keys())}'
                     )
 
             fields_to_search = marqo_query.searchable_attributes
@@ -250,7 +251,7 @@ class StructuredVespaIndex(VespaIndex):
             fields_to_search = marqo_index.tensor_field_map.keys()
 
         tensor_term = cls._get_tensor_search_term(marqo_query, marqo_index)
-        filter_term = cls._get_filter_term(marqo_query)
+        filter_term = cls._get_filter_term(marqo_query, marqo_index)
         if filter_term:
             filter_term = f' AND {filter_term}'
         else:
@@ -290,7 +291,7 @@ class StructuredVespaIndex(VespaIndex):
                 if att not in marqo_index.lexically_searchable_fields_names:
                     raise InvalidFieldNameError(
                         f'Index {marqo_index.name} has no lexically searchable field {att}. '
-                        f'Available lexically searchable fields are '
+                        f'Available lexically searchable fields are: '
                         f'{", ".join(marqo_index.lexically_searchable_fields_names)}'
                     )
             fields_to_search = marqo_query.searchable_attributes
@@ -298,7 +299,7 @@ class StructuredVespaIndex(VespaIndex):
             fields_to_search = marqo_index.lexical_fields_names
 
         lexical_term = cls._get_lexical_search_term(marqo_query, marqo_index)
-        filter_term = cls._get_filter_term(marqo_query)
+        filter_term = cls._get_filter_term(marqo_query, marqo_index)
         if filter_term:
             filter_term = f' AND {filter_term}'
         else:
@@ -361,11 +362,50 @@ class StructuredVespaIndex(VespaIndex):
             return ''
 
     @classmethod
-    def _get_filter_term(cls, marqo_query: MarqoQuery) -> str:
-        if marqo_query.filter is not None:
-            raise NotImplementedError('Filters are not supported yet')
+    def _get_filter_term(cls, marqo_query: MarqoQuery, marqo_index: MarqoIndex) -> Optional[str]:
+        def escape(s: str) -> str:
+            return s.replace('\\', '\\\\').replace('"', '\\"')
 
-        return None
+        def tree_to_filter_string(node: search_filter.Node) -> str:
+            if isinstance(node, search_filter.Operator):
+                if isinstance(node, search_filter.And):
+                    operator = 'AND'
+                elif isinstance(node, search_filter.Or):
+                    operator = 'OR'
+                else:
+                    raise InternalError(f'Unknown operator type {type(node)}')
+
+                return f'({tree_to_filter_string(node.left)} {operator} {tree_to_filter_string(node.right)})'
+            elif isinstance(node, search_filter.Modifier):
+                if isinstance(node, search_filter.Not):
+                    return f'!({tree_to_filter_string(node.modified)})'
+                else:
+                    raise InternalError(f'Unknown modifier type {type(node)}')
+            elif isinstance(node, search_filter.Term):
+                if node.field not in marqo_index.filterable_fields_names:
+                    raise InvalidFieldNameError(
+                        f'Index {marqo_index.name} has no filterable field {node.field}. '
+                        f'Available filterable fields are: {", ".join(marqo_index.filterable_fields_names)}'
+                    )
+
+                if isinstance(node, search_filter.EqualityTerm):
+                    return f'{node.field} contains "{escape(node.value)}"'
+                elif isinstance(node, search_filter.RangeTerm):
+                    lower = f'{node.field} >= {node.lower}' if node.lower is not None else None
+                    upper = f'{node.field} <= {node.upper}' if node.upper is not None else None
+                    if lower and upper:
+                        return f'({lower} AND {upper})'
+                    elif lower:
+                        return lower
+                    elif upper:
+                        return upper
+                    else:
+                        raise InternalError('RangeTerm has no lower or upper bound')
+
+            raise InternalError(f'Unknown node type {type(node)}')
+
+        if marqo_query.filter is not None:
+            return tree_to_filter_string(marqo_query.filter.root)
 
     @classmethod
     def _get_select_attributes(cls, marqo_query: MarqoQuery) -> str:
