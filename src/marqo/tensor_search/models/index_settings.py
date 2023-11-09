@@ -126,3 +126,46 @@ class IndexSettings(BaseMarqoModel):
             )
         else:
             raise errors.InternalError(f"Unknown index type: {type}")
+
+    @classmethod
+    def from_marqo_index(cls, marqo_index: core.MarqoIndex) -> "IndexSettings":
+        if isinstance(marqo_index, core.StructuredMarqoIndex):
+            return cls(
+                type=marqo_index.type,
+                all_fields=[
+                    Field(
+                        name=field.name,
+                        type=field.type,
+                        features=field.features,
+                        dependent_fields=field.dependent_fields
+                    ) for field in marqo_index.fields
+                ],
+                tensor_fields=[field.name for field in marqo_index.tensor_fields],
+                model=marqo_index.model.name,
+                model_properties=marqo_index.model.properties,
+                normalize_embeddings=marqo_index.normalize_embeddings,
+                text_preprocessing=marqo_index.text_preprocessing,
+                image_preprocessing=marqo_index.image_preprocessing,
+                vector_numeric_type=marqo_index.vector_numeric_type,
+                ann_parameters=AnnParameters(
+                    space_type=marqo_index.distance_metric,
+                    parameters=marqo_index.hnsw_config
+                )
+            )
+        elif isinstance(marqo_index, core.UnstructuredMarqoIndex):
+            return cls(
+                type=marqo_index.type,
+                treat_urls_and_pointers_as_images=marqo_index.treat_urls_and_pointers_as_images,
+                model=marqo_index.model.name,
+                model_properties=marqo_index.model.properties,
+                normalize_embeddings=marqo_index.normalize_embeddings,
+                text_preprocessing=marqo_index.text_preprocessing,
+                image_preprocessing=marqo_index.image_preprocessing,
+                vector_numeric_type=marqo_index.vector_numeric_type,
+                ann_parameters=AnnParameters(
+                    space_type=marqo_index.distance_metric,
+                    parameters=marqo_index.hnsw_config
+                )
+            )
+        else:
+            raise errors.InternalError(f"Unknown index type: {type}")

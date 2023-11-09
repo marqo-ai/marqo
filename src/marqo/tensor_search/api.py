@@ -11,11 +11,10 @@ from fastapi.responses import JSONResponse
 
 from marqo import config, errors
 from marqo import version
-from marqo.core.exceptions import IndexExistsError
+from marqo.core.exceptions import IndexExistsError, IndexNotFoundError
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.errors import InvalidArgError, MarqoWebError, MarqoError
 from marqo.tensor_search import tensor_search
-from marqo.tensor_search.backend import get_index_info
 from marqo.tensor_search.enums import RequestType, EnvVars
 from marqo.tensor_search.models.add_docs_objects import (AddDocsBodyParams)
 from marqo.tensor_search.models.api_models import BulkSearchQuery, SearchQuery
@@ -241,8 +240,12 @@ def get_indexes(marqo_config: config.Config = Depends(get_config)):
 
 @app.get("/indexes/{index_name}/settings")
 def get_settings(index_name: str, marqo_config: config.Config = Depends(get_config)):
-    index_info = get_index_info(config=marqo_config, index_name=index_name)
-    return index_info.index_settings
+    index_management = IndexManagement(vespa_client=marqo_config.vespa_client)
+    try:
+        marqo_index = index_management.get_index(index_name)
+        return IndexSettings.from_marqo_index(marqo_index).dict(exclude_none=True)
+    except IndexNotFoundError as e:
+        raise errors.IndexNotFoundError(f"Index {index_name} not found") from e
 
 
 @app.get("/models")
