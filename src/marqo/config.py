@@ -1,5 +1,6 @@
 from typing import Optional, Union
 
+from marqo.core.index_management.index_management import IndexManagement
 from marqo.tensor_search import enums
 from marqo.vespa.vespa_client import VespaClient
 
@@ -8,6 +9,7 @@ class Config:
     def __init__(
             self,
             vespa_client: VespaClient,
+            index_management: IndexManagement,
             timeout: Optional[int] = None,
             backend: Optional[Union[enums.SearchDb, str]] = None,
     ) -> None:
@@ -18,6 +20,7 @@ class Config:
             The url to the S2Search API (ex: http://localhost:9200)
         """
         self.vespa_client = vespa_client
+        self.index_management = index_management
         self.set_is_remote(vespa_client)
         self.timeout = timeout
         self.backend = backend if backend is not None else enums.SearchDb.vespa

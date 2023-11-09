@@ -8,6 +8,7 @@ import marqo.logging
 import marqo.vespa.vespa_client
 from marqo.core.exceptions import IndexExistsError, IndexNotFoundError
 from marqo.core.models import MarqoIndex
+from marqo.core.models.marqo_index_stats import MarqoIndexStats
 from marqo.core.vespa_index import for_marqo_index as vespa_index_factory
 from marqo.exceptions import InternalError
 from marqo.vespa.exceptions import VespaStatusError
@@ -189,6 +190,16 @@ class IndexManagement:
             raise e
 
         return MarqoIndex.parse_raw(response.document.fields['settings'])
+
+    def get_index_stats(self, index_name: str) -> MarqoIndexStats:
+        if not self._index_exists(index_name):
+            raise IndexNotFoundError(f"Index {index_name} not found")
+
+        query_result = self.vespa_client.query(yql=f'select * from {index_name} where True limit 0')
+
+        return MarqoIndexStats(
+            number_of_documents=query_result.total_count
+        )
 
     def _index_exists(self, name: str) -> bool:
         """

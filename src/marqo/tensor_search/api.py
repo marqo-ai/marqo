@@ -34,7 +34,8 @@ def generate_config() -> config.Config:
         document_url=os.environ[EnvVars.VESPA_DOCUMENT_URL],
         pool_size=os.environ.get(EnvVars.VESPA_POOL_SIZE, 10),
     )
-    return config.Config(vespa_client)
+    index_management = IndexManagement(vespa_client)
+    return config.Config(vespa_client, index_management)
 
 
 _config = generate_config()
@@ -116,9 +117,8 @@ def root():
 
 @app.post("/indexes/{index_name}")
 def create_index(index_name: str, settings: IndexSettings, marqo_config: config.Config = Depends(get_config)):
-    index_management = IndexManagement(vespa_client=marqo_config.vespa_client)
     try:
-        index_management.create_index(settings.to_marqo_index(index_name))
+        marqo_config.index_management.create_index(settings.to_marqo_index(index_name))
     except IndexExistsError as e:
         raise errors.IndexAlreadyExistsError(f"Index {index_name} already exists") from e
 
@@ -202,8 +202,12 @@ def get_documents_by_ids(
 
 @app.get("/indexes/{index_name}/stats")
 def get_index_stats(index_name: str, marqo_config: config.Config = Depends(get_config)):
-    return tensor_search.get_stats(
-        config=marqo_config, index_name=index_name
+    stats = marqo_config.index_management.get_index_stats(index_name)
+    return JSONResponse(
+        content={
+            'numberOfDocuments': stats.number_of_documents
+        },
+        status_code=200
     )
 
 
@@ -240,9 +244,8 @@ def get_indexes(marqo_config: config.Config = Depends(get_config)):
 
 @app.get("/indexes/{index_name}/settings")
 def get_settings(index_name: str, marqo_config: config.Config = Depends(get_config)):
-    index_management = IndexManagement(vespa_client=marqo_config.vespa_client)
     try:
-        marqo_index = index_management.get_index(index_name)
+        marqo_index = marqo_config.index_management.get_index(index_name)
         return IndexSettings.from_marqo_index(marqo_index).dict(exclude_none=True)
     except IndexNotFoundError as e:
         raise errors.IndexNotFoundError(f"Index {index_name} not found") from e
