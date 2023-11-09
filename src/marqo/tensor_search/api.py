@@ -224,13 +224,6 @@ def delete_docs(index_name: str, documentIds: List[str], refresh: bool = True,
     )
 
 
-@app.post("/indexes/{index_name}/refresh")
-def refresh_index(index_name: str, marqo_config: config.Config = Depends(get_config)):
-    return tensor_search.refresh_index(
-        index_name=index_name, config=marqo_config,
-    )
-
-
 @app.get("/health")
 def check_health(marqo_config: config.Config = Depends(get_config)):
     return tensor_search.check_health(config=marqo_config)
