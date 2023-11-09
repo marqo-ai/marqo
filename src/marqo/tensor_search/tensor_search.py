@@ -1818,7 +1818,7 @@ def _vector_text_search(
         offset=offset,
         searchable_attributes=searchable_attributes,
         attributes_to_retrieve=attributes_to_retrieve,
-        score_modifiers=score_modifiers
+        score_modifiers=score_modifiers.to_marqo_score_modifiers() if score_modifiers is not None else None
     )
 
     vespa_index = vespa_index_factory(marqo_index)

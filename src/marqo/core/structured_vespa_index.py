@@ -96,6 +96,7 @@ class StructuredVespaIndex(VespaIndex):
 
         vespa_id: Optional[int] = None
         vespa_fields: Dict[str, Any] = dict()
+        score_modifiers: Dict[str, float] = {}
 
         # ID
         if constants.MARQO_DOC_ID in marqo_document:
@@ -120,6 +121,9 @@ class StructuredVespaIndex(VespaIndex):
             if not index_field.lexical_field_name and not index_field.filter_field_name:
                 vespa_fields[index_field.name] = marqo_value
 
+            if FieldFeature.ScoreModifier in index_field.features:
+                score_modifiers[index_field.name] = marqo_value
+
         # Tensors
         if constants.MARQO_DOC_TENSORS in marqo_document:
             for marqo_tensor_field in marqo_document[constants.MARQO_DOC_TENSORS]:
@@ -136,6 +140,9 @@ class StructuredVespaIndex(VespaIndex):
                 vespa_fields[index_tensor_field.chunk_field_name] = chunks
                 vespa_fields[index_tensor_field.embeddings_field_name] = \
                     {f'{i}': embeddings[i] for i in range(len(embeddings))}
+
+        if len(score_modifiers) > 0:
+            vespa_fields[cls._FIELD_SCORE_MODIFIERS] = score_modifiers
 
         vespa_doc = {
             cls._VESPA_DOC_FIELDS: vespa_fields
@@ -258,7 +265,7 @@ class StructuredVespaIndex(VespaIndex):
             filter_term = ''
         select_attributes = cls._get_select_attributes(marqo_query)
         summary = cls._SUMMARY_ALL_VECTOR if marqo_query.expose_facets else cls._SUMMARY_ALL_NON_VECTOR
-        score_modifiers = cls._get_score_modifiers(marqo_query, marqo_index)
+        score_modifiers = cls._get_score_modifiers(marqo_query)
         ranking = cls._RANK_PROFILE_EMBEDDING_SIMILARITY_MODIFIERS if score_modifiers \
             else cls._RANK_PROFILE_EMBEDDING_SIMILARITY
 
@@ -296,7 +303,7 @@ class StructuredVespaIndex(VespaIndex):
                     )
             fields_to_search = marqo_query.searchable_attributes
         else:
-            fields_to_search = marqo_index.lexical_fields_names
+            fields_to_search = marqo_index.lexical_field_map.keys()
 
         lexical_term = cls._get_lexical_search_term(marqo_query, marqo_index)
         filter_term = cls._get_filter_term(marqo_query, marqo_index)
@@ -307,7 +314,7 @@ class StructuredVespaIndex(VespaIndex):
 
         select_attributes = cls._get_select_attributes(marqo_query)
         summary = cls._SUMMARY_ALL_VECTOR if marqo_query.expose_facets else cls._SUMMARY_ALL_NON_VECTOR
-        score_modifiers = cls._get_score_modifiers(marqo_query, marqo_index)
+        score_modifiers = cls._get_score_modifiers(marqo_query)
         ranking = cls._RANK_PROFILE_BM25_MODIFIERS if score_modifiers \
             else cls._RANK_PROFILE_BM25
 
@@ -415,7 +422,7 @@ class StructuredVespaIndex(VespaIndex):
             return '*'
 
     @classmethod
-    def _get_score_modifiers(cls, marqo_query: MarqoQuery, marqo_index: MarqoIndex) -> \
+    def _get_score_modifiers(cls, marqo_query: MarqoQuery) -> \
             Optional[Dict[str, Dict[str, float]]]:
         if marqo_query.score_modifiers:
             mult_tensor = {}
@@ -425,6 +432,8 @@ class StructuredVespaIndex(VespaIndex):
                     mult_tensor[modifier.field] = modifier.weight
                 elif modifier.type == ScoreModifierType.Add:
                     add_tensor[modifier.field] = modifier.weight
+                else:
+                    raise InternalError(f'Unknown score modifier type {modifier.type}')
 
             # Note one of these could be empty, but not both
             return {
@@ -538,7 +547,9 @@ class StructuredVespaIndex(VespaIndex):
 
         # score modifiers
         if marqo_index.score_modifier_fields_names:
-            document.append(f'field {cls._FIELD_SCORE_MODIFIERS} type tensor<float>(p{{}}) {{ indexing: attribute }}')
+            document.append(
+                f'field {cls._FIELD_SCORE_MODIFIERS} type tensor<float>(p{{}}) {{ indexing: attribute | summary }}'
+            )
 
         # tensor fields
         model_dim = marqo_index.model.get_dimension()
@@ -621,7 +632,7 @@ class StructuredVespaIndex(VespaIndex):
     def _generate_default_fieldset(cls, marqo_index: MarqoIndex) -> List[str]:
         fieldsets: List[str] = list()
 
-        fieldset_fields = marqo_index.lexical_fields_names
+        fieldset_fields = marqo_index.lexical_field_map.keys()
 
         if fieldset_fields:
             fieldsets.append('fieldset default {')
@@ -635,12 +646,14 @@ class StructuredVespaIndex(VespaIndex):
     def _generate_rank_profiles(cls, marqo_index: MarqoIndex) -> List[str]:
         rank_profiles: List[str] = list()
 
-        lexical_fields = marqo_index.lexical_fields_names
-        score_modifier_fields = marqo_index.score_modifier_fields_names
-        tensor_fields = [field.name for field in marqo_index.tensor_fields]
+        lexical_fields = marqo_index.lexical_field_map.values()
+        tensor_fields = marqo_index.tensor_fields
+        score_modifier_fields_names = marqo_index.score_modifier_fields_names
         model_dim = marqo_index.model.get_dimension()
 
-        bm25_expression = ' + '.join([f'bm25({field})' for field in lexical_fields])
+        bm25_expression = ' + '.join([
+            f'if (query({field.name}) > 0, bm25({field.lexical_field_name}), 0)' for field in lexical_fields
+        ])
         embedding_similarity_expression = ' + '.join([
             f'if (query({field.name}) > 0, closeness(field, {field.embeddings_field_name}), 0)' for field in
             marqo_index.tensor_fields
@@ -652,7 +665,14 @@ class StructuredVespaIndex(VespaIndex):
             ' '.join([f'distance(field, {field.embeddings_field_name})' for field in marqo_index.tensor_fields])
 
         if lexical_fields:
-            rank_profiles.append(f'rank-profile {cls._RANK_PROFILE_BM25} inherits default {{ first-phase {{')
+            rank_profiles.append(f'rank-profile {cls._RANK_PROFILE_BM25} inherits default {{')
+
+            rank_profiles.append('inputs {')
+            for field in lexical_fields:
+                rank_profiles.append(f'query({field.name}): 0')
+            rank_profiles.append('}')
+
+            rank_profiles.append('first-phase {')
             rank_profiles.append(f'expression: {bm25_expression}')
             rank_profiles.append('}}')
 
@@ -662,7 +682,7 @@ class StructuredVespaIndex(VespaIndex):
             rank_profiles.append('inputs {')
             rank_profiles.append(f'query({cls._QUERY_INPUT_EMBEDDING}) tensor<float>(x[{model_dim}])')
             for field in tensor_fields:
-                rank_profiles.append(f'query({field}): 0')
+                rank_profiles.append(f'query({field.name}): 0')
             rank_profiles.append('}')
 
             rank_profiles.append('first-phase {')
@@ -671,7 +691,7 @@ class StructuredVespaIndex(VespaIndex):
             rank_profiles.append(embedding_match_features_expression)
             rank_profiles.append('}')
 
-        if score_modifier_fields:
+        if score_modifier_fields_names:
             expression = f'if (count(query({cls._QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS})) == 0, 1, ' \
                          f'reduce(query({cls._QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS}) ' \
                          f'* attribute({cls._FIELD_SCORE_MODIFIERS}), prod)) * score ' \
@@ -679,8 +699,8 @@ class StructuredVespaIndex(VespaIndex):
                          f'* attribute({cls._FIELD_SCORE_MODIFIERS}), sum)'
             rank_profiles.append(f'rank-profile {cls._RANK_PROFILE_MODIFIERS} inherits default {{')
             rank_profiles.append('inputs {')
-            rank_profiles.append(f'query({cls._QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS})  tensor<float>(p{{}})')
-            rank_profiles.append(f'query({cls._QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS})  tensor<float>(p{{}})')
+            rank_profiles.append(f'query({cls._QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS}) tensor<float>(p{{}})')
+            rank_profiles.append(f'query({cls._QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS}) tensor<float>(p{{}})')
             rank_profiles.append('}')
             rank_profiles.append('function modify(score) {')
             rank_profiles.append(f'expression: {expression}')
@@ -688,7 +708,14 @@ class StructuredVespaIndex(VespaIndex):
 
             if lexical_fields:
                 rank_profiles.append(f'rank-profile {cls._RANK_PROFILE_BM25_MODIFIERS} '
-                                     f'inherits {cls._RANK_PROFILE_MODIFIERS} {{ first-phase {{')
+                                     f'inherits {cls._RANK_PROFILE_MODIFIERS} {{')
+                rank_profiles.append('inputs {')
+                rank_profiles.append(f'query({cls._QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS}) tensor<float>(p{{}})')
+                rank_profiles.append(f'query({cls._QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS}) tensor<float>(p{{}})')
+                for field in lexical_fields:
+                    rank_profiles.append(f'query({field.name}): 0')
+                rank_profiles.append('}')
+                rank_profiles.append('first-phase {')
                 rank_profiles.append(f'expression: modify({bm25_expression})')
                 rank_profiles.append('}}')
 
@@ -698,9 +725,11 @@ class StructuredVespaIndex(VespaIndex):
                     f'inherits {cls._RANK_PROFILE_MODIFIERS} {{')
 
                 rank_profiles.append('inputs {')
+                rank_profiles.append(f'query({cls._QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS}) tensor<float>(p{{}})')
+                rank_profiles.append(f'query({cls._QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS}) tensor<float>(p{{}})')
                 rank_profiles.append(f'query({cls._QUERY_INPUT_EMBEDDING}) tensor<float>(x[{model_dim}])')
                 for field in tensor_fields:
-                    rank_profiles.append(f'query({field}): 0')
+                    rank_profiles.append(f'query({field.name}): 0')
                 rank_profiles.append('}')
 
                 rank_profiles.append('first-phase {')

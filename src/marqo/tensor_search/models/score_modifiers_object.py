@@ -1,17 +1,19 @@
+import json
 from typing import List, Dict, Any, Optional, Literal
-import json 
 
 from pydantic import BaseModel, validator, ValidationError
 
+import marqo.core.models.marqo_query as core
 from marqo.errors import InvalidArgError
+
 
 class ScoreModifierValidationError(InvalidArgError):
     def __init__(self, modifier: Dict[str, Any], message: str, link: str = None):
         super().__init__(
             link=link,
             message=f"Error validating score_modifiers = `{modifier}`. Reason: \n{message} "
-            f"Please revise your score_modifiers based on the provided error."
-            f"\n Check `https://docs.marqo.ai/0.0.17/API-Reference/search/#score-modifiers` for more info."
+                    f"Please revise your score_modifiers based on the provided error."
+                    f"\n Check `https://docs.marqo.ai/0.0.17/API-Reference/search/#score-modifiers` for more info."
         )
 
 
@@ -74,19 +76,39 @@ class ScoreModifier(BaseModel):
     def at_least_one_must_be_provided(cls, v, values, field):
         """Validates that at least one of 'multiply_score_by', 'add_to_score' is non-null."""
         if field.name == 'add_to_score' and v is None and values.get('multiply_score_by') is None:
-            raise ScoreModifierValidationError(modifier=values, message="At least one of multiply_score_by or add_to_score must be provided")
+            raise ScoreModifierValidationError(modifier=values,
+                                               message="At least one of multiply_score_by or add_to_score must be provided")
         return v
 
     @validator('multiply_score_by', 'add_to_score', pre=False, always=True)
     def at_least_one_item(cls, v, values, field):
         """Validate that, if present, the fields must be non-empty."""
         if v is not None and len(v) < 1:
-            raise ScoreModifierValidationError(modifier=values, message=f"At least one ScoreModifierOperator is required in {field.name}")
+            raise ScoreModifierValidationError(modifier=values,
+                                               message=f"At least one ScoreModifierOperator is required in {field.name}")
         return v
+
+    def to_marqo_score_modifiers(self) -> List[core.ScoreModifier]:
+        """
+        Convert this ScoreModifier to a list of marqo.core.models.marqo_query.ScoreModifier.
+        """
+        mult = [core.ScoreModifier(
+            field=x.field_name,
+            weight=x.weight,
+            type=core.ScoreModifierType.Multiply
+        ) for x in self.multiply_score_by] if self.multiply_score_by is not None else []
+        add = [core.ScoreModifier(
+            field=x.field_name,
+            weight=x.weight,
+            type=core.ScoreModifierType.Add
+        ) for x in self.add_to_score] if self.add_to_score is not None else []
+
+        return mult + add
 
     def to_painless_script(self) -> str:
         """Convert this ScoreModifier to a painless script to modify the score."""
-        mult = [x.to_painless_script("multiply_score_by") for x in self.multiply_score_by] if self.multiply_score_by is not None else []
+        mult = [x.to_painless_script("multiply_score_by") for x in
+                self.multiply_score_by] if self.multiply_score_by is not None else []
         add = [x.to_painless_script("add_to_score") for x in self.add_to_score] if self.add_to_score is not None else []
 
         script = "\n".join(
