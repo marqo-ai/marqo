@@ -34,9 +34,6 @@ class IndexManagement:
         }
         '''
     )
-    # Number of retries if settings schema feed fails with 400. This can happen when the settings schema is created as
-    # part of the index creation and is not yet available for feeding.
-    _MARQO_SETTINGS_RETRIES = 30
 
     def __init__(self, vespa_client: VespaClient):
         self.vespa_client = vespa_client
