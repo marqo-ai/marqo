@@ -214,7 +214,7 @@ class MarqoIndex(StrictBaseModel, ABC):
 
 class UnstructuredMarqoIndex(MarqoIndex):
     type = IndexType.Unstructured
-    treat_urls_and_pointers_as_images: Optional[bool]
+    treat_urls_and_pointers_as_images: bool
 
     @classmethod
     def _valid_type(cls) -> IndexType:
@@ -223,8 +223,8 @@ class UnstructuredMarqoIndex(MarqoIndex):
 
 class StructuredMarqoIndex(MarqoIndex):
     type = IndexType.Structured
-    fields: Optional[List[Field]]  # all fields, including tensor fields
-    tensor_fields: Optional[List[TensorField]]
+    fields: List[Field]  # all fields, including tensor fields
+    tensor_fields: List[TensorField]
 
     @classmethod
     def _valid_type(cls) -> IndexType:
