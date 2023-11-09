@@ -1,8 +1,11 @@
+from abc import ABC, abstractmethod
 from enum import Enum
-from typing import List, Optional, Dict, Any, Set
+from typing import List, Optional, Dict, Any, Set, Type, Union
 
-from pydantic import Field as PydanticField
+from pydantic import Field as PydanticField, ValidationError, validator
 from pydantic import PrivateAttr
+from pydantic.error_wrappers import ErrorWrapper
+from pydantic.utils import ROOT_KEY
 
 from marqo.core.models.strict_base_model import StrictBaseModel
 from marqo.exceptions import InvalidArgumentError
@@ -66,9 +69,9 @@ class Field(StrictBaseModel):
     name: str
     type: FieldType
     features: List[FieldFeature] = []
-    dependent_fields: Optional[Dict[str, float]]
     lexical_field_name: Optional[str]
     filter_field_name: Optional[str]
+    dependent_fields: Optional[Dict[str, float]]
 
 
 class TensorField(StrictBaseModel):
@@ -137,39 +140,131 @@ class Model(StrictBaseModel):
                     f'Please provide model_properties if the model is a custom model and is not supported by default')
 
 
-class MarqoIndex(StrictBaseModel):
+class MarqoIndex(StrictBaseModel, ABC):
     name: str
-    type: IndexType
+    type: IndexType  # We need this so that we can deserialize the correct subclass
     model: Model
     normalize_embeddings: bool
     text_preprocessing: TextPreProcessing
     image_preprocessing: ImagePreProcessing
-    treat_urls_and_pointers_as_images: Optional[bool]
     distance_metric: DistanceMetric
     vector_numeric_type: VectorNumericType
     hnsw_config: HnswConfig
-    fields: Optional[List[Field]]  # all fields, including tensor fields
-    tensor_fields: Optional[List[TensorField]]
+    marqo_version: str
+    created_at: int
+    updated_at: int
     model_enable_cache: bool = PydanticField(default=False, allow_mutation=False)
     _cache: Dict[str, Any] = PrivateAttr()
 
     class Config:
         validate_assignment = True
 
+    @classmethod
+    @abstractmethod
+    def _valid_type(cls) -> IndexType:
+        pass
+
+    @validator('type', always=True)
+    def validate_type(cls, type):
+        if type not in [cls._valid_type(), cls._valid_type().value]:
+            raise ValueError(f"Cannot assign a different type to {cls.__name__}")
+        return type
+
+    @classmethod
+    def parse_obj(cls: Type['Model'], obj: Any) -> Union['UnstructuredMarqoIndex', 'StructuredMarqoIndex']:
+        obj = cls._enforce_dict_if_root(obj)
+        if not isinstance(obj, dict):
+            try:
+                obj = dict(obj)
+            except (TypeError, ValueError) as e:
+                exc = TypeError(f'{cls.__name__} expected dict not {obj.__class__.__name__}')
+                raise ValidationError([ErrorWrapper(exc, loc=ROOT_KEY)], cls) from e
+
+        if 'type' in obj:
+            if obj['type'] == IndexType.Structured.value:
+                return StructuredMarqoIndex(**obj)
+            elif obj['type'] == IndexType.Unstructured.value:
+                return UnstructuredMarqoIndex(**obj)
+            else:
+                raise ValidationError(f"Invalid index type {obj['type']}")
+
+        raise ValidationError(f"Index type not found in {obj}")
+
+    def copy_with_caching(self):
+        model_dict = self.dict()
+        del model_dict['model_enable_cache']
+
+        copied = self.__class__(**model_dict, model_enable_cache=True)
+
+        # Retrieve all properties to populate cache
+        for name, value in vars(MarqoIndex).items():
+            if isinstance(value, property):
+                getattr(copied, name)
+
+        return copied
+
+    def _cache_or_get(self, key: str, func):
+        if self.model_enable_cache:
+            if key not in self._cache:
+                self._cache[key] = func()
+            return self._cache[key]
+        else:
+            return func()
+
+
+class UnstructuredMarqoIndex(MarqoIndex):
+    type = IndexType.Unstructured
+    treat_urls_and_pointers_as_images: Optional[bool]
+
+    @classmethod
+    def _valid_type(cls) -> IndexType:
+        return IndexType.Unstructured
+
+
+class StructuredMarqoIndex(MarqoIndex):
+    type = IndexType.Structured
+    fields: Optional[List[Field]]  # all fields, including tensor fields
+    tensor_fields: Optional[List[TensorField]]
+
+    @classmethod
+    def _valid_type(cls) -> IndexType:
+        return IndexType.Structured
+
     def __init__(self, **data):
         super().__init__(**data)
         self._cache = dict()
 
     @property
-    def lexical_fields_names(self) -> Set[str]:
-        return self._cache_or_get('lexical_fields',
-                                  lambda: {field.lexical_field_name for field in self.fields if
-                                           field.lexical_field_name is not None}
+    def lexical_field_map(self) -> Dict[str, Field]:
+        return self._cache_or_get('lexical_field_map',
+                                  lambda: {field.lexical_field_name: field for field in self.fields if
+                                           FieldFeature.LexicalSearch in field.features}
+                                  )
+
+    @property
+    def filter_field_map(self) -> Dict[str, Field]:
+        return self._cache_or_get('filter_field_map',
+                                  lambda: {field.filter_field_name: field for field in self.fields if
+                                           FieldFeature.Filter in field.features}
+                                  )
+
+    @property
+    def lexically_searchable_fields_names(self) -> Set[str]:
+        return self._cache_or_get('lexically_searchable_fields_names',
+                                  lambda: {field.name for field in self.fields if
+                                           FieldFeature.LexicalSearch in field.features}
+                                  )
+
+    @property
+    def filterable_fields_names(self) -> Set[str]:
+        return self._cache_or_get('filterable_fields_names',
+                                  lambda: {field.name for field in self.fields if
+                                           FieldFeature.Filter in field.features}
                                   )
 
     @property
     def score_modifier_fields_names(self) -> Set[str]:
-        return self._cache_or_get('score_modifier_fields',
+        return self._cache_or_get('score_modifier_fields_names',
                                   lambda: {field.name for field in self.fields if
                                            FieldFeature.ScoreModifier in field.features}
                                   )
@@ -238,24 +333,3 @@ class MarqoIndex(StrictBaseModel):
                                   lambda: {field_type: [field for field in self.fields if field.type == field_type]
                                            for field_type in FieldType}
                                   )
-
-    def _cache_or_get(self, key: str, func):
-        if self.model_enable_cache:
-            if key not in self._cache:
-                self._cache[key] = func()
-            return self._cache[key]
-        else:
-            return func()
-
-    def copy_with_caching(self):
-        model_dict = self.dict()
-        del model_dict['model_enable_cache']
-
-        copied = MarqoIndex(**model_dict, model_enable_cache=True)
-
-        # Retrieve all properties to populate cache
-        for name, value in vars(MarqoIndex).items():
-            if isinstance(value, property):
-                getattr(copied, name)
-
-        return copied

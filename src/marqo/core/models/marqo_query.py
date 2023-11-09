@@ -1,6 +1,6 @@
 from abc import ABC
 from enum import Enum
-from typing import List, Optional, Any
+from typing import List, Optional
 
 from pydantic import validator
 
@@ -20,12 +20,15 @@ class ScoreModifier(StrictBaseModel):
 
 
 class MarqoQuery(StrictBaseModel, ABC):
+    class Config(StrictBaseModel.Config):
+        arbitrary_types_allowed = True  # To allow SearchFilter
+
     index_name: str
     limit: int
     offset: Optional[int] = None
     searchable_attributes: Optional[List[str]] = None
     attributes_to_retrieve: Optional[List[str]] = None
-    filter: Optional[Any] = None
+    filter: Optional[SearchFilter] = None
     score_modifiers: Optional[List[ScoreModifier]] = None
     expose_facets: bool = False
 
@@ -33,13 +36,16 @@ class MarqoQuery(StrictBaseModel, ABC):
     def parse_filter(cls, filter):
         if filter is not None:
             if isinstance(filter, str):
-                return MarqoFilterStringParser.parse(filter)
+                parser = MarqoFilterStringParser()
+                return parser.parse(filter)
             elif isinstance(filter, SearchFilter):
                 return filter
             else:
                 raise ValueError(f"filter has to be a string or a SearchFilter, got {type(filter)}")
 
         return None
+
+    # TODO - add validation to make sure searchable_attributes and attributes_to_retrieve are not empty lists
 
 
 class MarqoTensorQuery(MarqoQuery):
@@ -49,7 +55,9 @@ class MarqoTensorQuery(MarqoQuery):
 
 
 class MarqoLexicalQuery(MarqoQuery):
-    lexical_query: str
+    or_phrases: List[str]
+    and_phrases: List[str]
+    # TODO - validate at least one of or_phrases and and_phrases is not empty
 
 
 class MarqoHybridQuery(MarqoTensorQuery, MarqoLexicalQuery):

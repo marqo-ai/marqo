@@ -120,7 +120,6 @@ class IndexManagement:
 
         Args:
             index_name: Name of Marqo index to delete
-
         """
         app = self.vespa_client.download_application()
 
@@ -156,6 +155,12 @@ class IndexManagement:
             self._delete_index_settings(index)
 
     def get_all_indexes(self) -> List[MarqoIndex]:
+        """
+        Get all Marqo indexes.
+
+        Returns:
+            List of Marqo indexes
+        """
         batch_response = self.vespa_client.get_all_documents(self._MARQO_SETTINGS_SCHEMA_NAME, stream=True)
         if batch_response.continuation:
             # TODO - Verify expected behaviour when streaming. Do we need to expect and handle pagination?
@@ -167,6 +172,15 @@ class IndexManagement:
         ]
 
     def get_index(self, index_name) -> MarqoIndex:
+        """
+        Get a Marqo index by name.
+
+        Args:
+            index_name: Name of Marqo index to get
+
+        Returns:
+            Marqo index
+        """
         try:
             response = self.vespa_client.get_document(index_name, self._MARQO_SETTINGS_SCHEMA_NAME)
         except VespaStatusError as e:
@@ -183,10 +197,10 @@ class IndexManagement:
         Note: Do not call this method if settings schema does not exist.
 
         Args:
-            name:
+            name: Name of index to check
 
         Returns:
-
+            True if index exists, False otherwise
         """
         try:
             _ = self.get_index(name)

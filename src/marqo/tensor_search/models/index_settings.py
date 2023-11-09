@@ -1,6 +1,8 @@
+import time
 from typing import Dict, Any, Optional, List
 
 import marqo.core.models.marqo_index as core
+from marqo import version
 from marqo.tensor_search.models.api_models import BaseMarqoModel
 
 
@@ -40,7 +42,7 @@ class IndexSettings(BaseMarqoModel):
         )
     )
 
-    def to_marqo_index(self, index_name: str):
+    def to_marqo_index(self, index_name: str) -> core.MarqoIndex:
         marqo_fields = None
         if self.all_fields is not None:
             marqo_fields = [
@@ -60,7 +62,7 @@ class IndexSettings(BaseMarqoModel):
                 ) for field in self.tensor_fields
             ]
 
-        return core.MarqoIndex(
+        return core.StructuredMarqoIndex(
             name=index_name,
             type=self.type,
             model=core.Model(
@@ -75,5 +77,8 @@ class IndexSettings(BaseMarqoModel):
             vector_numeric_type=self.vector_numeric_type,
             hnsw_config=self.ann_parameters.parameters,
             fields=marqo_fields,
-            tensor_fields=marqo_tensor_fields
+            tensor_fields=marqo_tensor_fields,
+            marqo_version=version.get_version(),
+            created_at=time.time(),
+            updated_at=time.time()
         )
