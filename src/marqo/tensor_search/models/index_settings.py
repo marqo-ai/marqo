@@ -46,7 +46,7 @@ class IndexSettings(BaseMarqoModel):
 
     def to_marqo_index(self, index_name: str) -> core.MarqoIndex:
         marqo_fields = None
-        if type == core.IndexType.Structured:
+        if self.type == core.IndexType.Structured:
             if self.treat_urls_and_pointers_as_images is not None:
                 raise errors.InvalidArgError(
                     "treat_urls_and_pointers_as_images is not a valid parameter for structured indexes"
@@ -90,7 +90,7 @@ class IndexSettings(BaseMarqoModel):
                 created_at=time.time(),
                 updated_at=time.time()
             )
-        elif type == core.IndexType.Unstructured:
+        elif self.type == core.IndexType.Unstructured:
             if self.all_fields is not None:
                 raise errors.InvalidArgError(
                     "all_fields is not a valid parameter for unstructured indexes"
@@ -125,7 +125,7 @@ class IndexSettings(BaseMarqoModel):
                 updated_at=time.time()
             )
         else:
-            raise errors.InternalError(f"Unknown index type: {type}")
+            raise errors.InternalError(f"Unknown index type: {self.type}")
 
     @classmethod
     def from_marqo_index(cls, marqo_index: core.MarqoIndex) -> "IndexSettings":
