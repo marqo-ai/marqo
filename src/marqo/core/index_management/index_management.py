@@ -60,8 +60,7 @@ class IndexManagement:
         self._add_schema(app, marqo_index.name, schema)
         self._add_schema_to_services(app, marqo_index.name)
         self.vespa_client.deploy_application(app)
-        if settings_schema_created:
-            self.vespa_client.wait_for_application_convergence()
+        self.vespa_client.wait_for_application_convergence()
         self._save_index_settings(marqo_index)
 
     def batch_create_indexes(self, marqo_indexes: List[MarqoIndex]) -> None:
