@@ -202,7 +202,7 @@ def get_documents_by_ids(
 
 @app.get("/indexes/{index_name}/stats")
 def get_index_stats(index_name: str, marqo_config: config.Config = Depends(get_config)):
-    stats = marqo_config.index_management.get_index_stats(index_name)
+    stats = marqo_config.monitoring.get_index_stats(index_name)
     return JSONResponse(
         content={
             'numberOfDocuments': stats.number_of_documents
@@ -229,17 +229,23 @@ def delete_docs(index_name: str, documentIds: List[str], refresh: bool = True,
 
 @app.get("/health")
 def check_health(marqo_config: config.Config = Depends(get_config)):
-    return tensor_search.check_health(config=marqo_config)
+    return marqo_config.monitoring.get_health()
 
 
 @app.get("/indexes/{index_name}/health")
 def check_index_health(index_name: str, marqo_config: config.Config = Depends(get_config)):
-    return tensor_search.check_index_health(config=marqo_config, index_name=index_name)
+    return marqo_config.monitoring.get_health(index_name=index_name)
 
 
 @app.get("/indexes")
 def get_indexes(marqo_config: config.Config = Depends(get_config)):
-    return tensor_search.get_indexes(config=marqo_config)
+    indexes = marqo_config.index_management.get_all_indexes()
+
+    return {
+        'results': [
+            {'index_name': index.name for index in indexes}
+        ]
+    }
 
 
 @app.get("/indexes/{index_name}/settings")
