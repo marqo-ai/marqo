@@ -11,11 +11,10 @@ from fastapi.responses import JSONResponse
 
 from marqo import config, errors
 from marqo import version
-from marqo.core.exceptions import IndexExistsError
+from marqo.core.exceptions import IndexExistsError, IndexNotFoundError
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.errors import InvalidArgError, MarqoWebError, MarqoError
 from marqo.tensor_search import tensor_search
-from marqo.tensor_search.backend import get_index_info
 from marqo.tensor_search.enums import RequestType, EnvVars
 from marqo.tensor_search.models.add_docs_objects import (AddDocsBodyParams)
 from marqo.tensor_search.models.api_models import BulkSearchQuery, SearchQuery
@@ -35,7 +34,8 @@ def generate_config() -> config.Config:
         document_url=os.environ[EnvVars.VESPA_DOCUMENT_URL],
         pool_size=os.environ.get(EnvVars.VESPA_POOL_SIZE, 10),
     )
-    return config.Config(vespa_client)
+    index_management = IndexManagement(vespa_client)
+    return config.Config(vespa_client, index_management)
 
 
 _config = generate_config()
@@ -117,9 +117,8 @@ def root():
 
 @app.post("/indexes/{index_name}")
 def create_index(index_name: str, settings: IndexSettings, marqo_config: config.Config = Depends(get_config)):
-    index_management = IndexManagement(vespa_client=marqo_config.vespa_client)
     try:
-        index_management.create_index(settings.to_marqo_index(index_name))
+        marqo_config.index_management.create_index(settings.to_marqo_index(index_name))
     except IndexExistsError as e:
         raise errors.IndexAlreadyExistsError(f"Index {index_name} already exists") from e
 
@@ -203,8 +202,12 @@ def get_documents_by_ids(
 
 @app.get("/indexes/{index_name}/stats")
 def get_index_stats(index_name: str, marqo_config: config.Config = Depends(get_config)):
-    return tensor_search.get_stats(
-        config=marqo_config, index_name=index_name
+    stats = marqo_config.monitoring.get_index_stats(index_name)
+    return JSONResponse(
+        content={
+            'numberOfDocuments': stats.number_of_documents
+        },
+        status_code=200
     )
 
 
@@ -224,32 +227,34 @@ def delete_docs(index_name: str, documentIds: List[str], refresh: bool = True,
     )
 
 
-@app.post("/indexes/{index_name}/refresh")
-def refresh_index(index_name: str, marqo_config: config.Config = Depends(get_config)):
-    return tensor_search.refresh_index(
-        index_name=index_name, config=marqo_config,
-    )
-
-
 @app.get("/health")
 def check_health(marqo_config: config.Config = Depends(get_config)):
-    return tensor_search.check_health(config=marqo_config)
+    return marqo_config.monitoring.get_health()
 
 
 @app.get("/indexes/{index_name}/health")
 def check_index_health(index_name: str, marqo_config: config.Config = Depends(get_config)):
-    return tensor_search.check_index_health(config=marqo_config, index_name=index_name)
+    return marqo_config.monitoring.get_health(index_name=index_name)
 
 
 @app.get("/indexes")
 def get_indexes(marqo_config: config.Config = Depends(get_config)):
-    return tensor_search.get_indexes(config=marqo_config)
+    indexes = marqo_config.index_management.get_all_indexes()
+
+    return {
+        'results': [
+            {'index_name': index.name for index in indexes}
+        ]
+    }
 
 
 @app.get("/indexes/{index_name}/settings")
 def get_settings(index_name: str, marqo_config: config.Config = Depends(get_config)):
-    index_info = get_index_info(config=marqo_config, index_name=index_name)
-    return index_info.index_settings
+    try:
+        marqo_index = marqo_config.index_management.get_index(index_name)
+        return IndexSettings.from_marqo_index(marqo_index).dict(exclude_none=True)
+    except IndexNotFoundError as e:
+        raise errors.IndexNotFoundError(f"Index {index_name} not found") from e
 
 
 @app.get("/models")

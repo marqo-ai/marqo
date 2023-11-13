@@ -33,9 +33,6 @@ class IndexManagement:
         }
         '''
     )
-    # Number of retries if settings schema feed fails with 400. This can happen when the settings schema is created as
-    # part of the index creation and is not yet available for feeding.
-    _MARQO_SETTINGS_RETRIES = 30
 
     def __init__(self, vespa_client: VespaClient):
         self.vespa_client = vespa_client
@@ -53,7 +50,7 @@ class IndexManagement:
         app = self.vespa_client.download_application()
         settings_schema_created = self._create_marqo_settings_schema(app)
 
-        if not settings_schema_created and self._index_exists(marqo_index.name):
+        if not settings_schema_created and self.index_exists(marqo_index.name):
             raise IndexExistsError(f"Index {marqo_index.name} already exists")
 
         vespa_index = vespa_index_factory(marqo_index)
@@ -63,8 +60,7 @@ class IndexManagement:
         self._add_schema(app, marqo_index.name, schema)
         self._add_schema_to_services(app, marqo_index.name)
         self.vespa_client.deploy_application(app)
-        if settings_schema_created:
-            self.vespa_client.wait_for_application_convergence()
+        self.vespa_client.wait_for_application_convergence()
         self._save_index_settings(marqo_index)
 
     def batch_create_indexes(self, marqo_indexes: List[MarqoIndex]) -> None:
@@ -85,7 +81,7 @@ class IndexManagement:
 
         if not settings_schema_created:
             for index in marqo_indexes:
-                if self._index_exists(index.name):
+                if self.index_exists(index.name):
                     raise IndexExistsError(f"Index {index.name} already exists")
 
         schemas = {
@@ -123,7 +119,7 @@ class IndexManagement:
         """
         app = self.vespa_client.download_application()
 
-        if not self._index_exists(index_name):
+        if not self.index_exists(index_name):
             raise IndexNotFoundError(f"Cannot delete index {index_name} as it does not exist")
 
         self._remove_schema(app, index_name)
@@ -143,7 +139,7 @@ class IndexManagement:
         app = self.vespa_client.download_application()
 
         for index in marqo_indexes:
-            if not self._index_exists(index.name):
+            if not self.index_exists(index.name):
                 raise IndexNotFoundError(f"Cannot delete index {index.name} as it does not exist")
 
         for index in marqo_indexes:
@@ -190,20 +186,21 @@ class IndexManagement:
 
         return MarqoIndex.parse_raw(response.document.fields['settings'])
 
-    def _index_exists(self, name: str) -> bool:
+    def index_exists(self, index_name: str) -> bool:
         """
         Check if an index exists.
 
-        Note: Do not call this method if settings schema does not exist.
+        Note: Calling this method when settings schema does not exist will cause a VespaStatusError to be raised
+        with status code 400.
 
         Args:
-            name: Name of index to check
+            index_name: Name of index to check
 
         Returns:
             True if index exists, False otherwise
         """
         try:
-            _ = self.get_index(name)
+            _ = self.get_index(index_name)
             return True
         except IndexNotFoundError:
             return False

@@ -395,11 +395,13 @@ class StructuredVespaIndex(VespaIndex):
                         f'Available filterable fields are: {", ".join(marqo_index.filterable_fields_names)}'
                     )
 
+                marqo_field = marqo_index.all_field_map[node.field]
+
                 if isinstance(node, search_filter.EqualityTerm):
-                    return f'{node.field} contains "{escape(node.value)}"'
+                    return f'{marqo_field.filter_field_name} contains "{escape(node.value)}"'
                 elif isinstance(node, search_filter.RangeTerm):
-                    lower = f'{node.field} >= {node.lower}' if node.lower is not None else None
-                    upper = f'{node.field} <= {node.upper}' if node.upper is not None else None
+                    lower = f'{marqo_field.filter_field_name} >= {node.lower}' if node.lower is not None else None
+                    upper = f'{marqo_field.filter_field_name} <= {node.upper}' if node.upper is not None else None
                     if lower and upper:
                         return f'({lower} AND {upper})'
                     elif lower:
