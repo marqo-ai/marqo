@@ -58,6 +58,7 @@ class AddDocsBodyParams(BaseModel):
     modelAuth: Optional[ModelAuth] = None
     mappings: Optional[dict] = None
     documents: Union[Sequence[Union[dict, Any]], np.ndarray]
+    textChunkPrefix: Optional[str] = None
 
 
 class AddDocsParams(BaseModel):

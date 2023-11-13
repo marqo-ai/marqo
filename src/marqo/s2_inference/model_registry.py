@@ -586,6 +586,8 @@ def _get_hf_properties() -> Dict:
                  "tokens": 512,
                  "type": "hf",
                  "model_size": 1.34,
+                 "text_query_prefix": "query: ",     # Only putting this in 1 model for testing purposes.
+                 "text_chunk_prefix": "passage: ",
                  "notes": ""},
     }
     return HF_MODEL_PROPERTIES

@@ -74,6 +74,21 @@ def _reconstruct_multi_list(segmented_text_list: List[List[str]], seperator: str
     
     return results
 
+def _prefix_text_chunks(text_splits: List[str], text_chunk_prefix: str) -> List[str]:
+    """
+
+    Args:
+        text_splits (List[str]): Chunk list without prefixes
+        text_chunk_prefix (str): Prefix to add before each text chunk
+
+    Returns:
+        List[str]: Chunk list with prefixes affixed
+    """
+    prefixed_text_splits = []
+    for chunk in text_splits:
+        prefixed_text_splits.append(text_chunk_prefix + chunk)
+    return prefixed_text_splits
+
 def check_make_string_valid(text: str, coerce: bool = True) -> str:
     """ does some simple validation and coercsion for empty strings
 
@@ -101,7 +116,7 @@ def check_make_string_valid(text: str, coerce: bool = True) -> str:
     return text
 
 def split_text(text: str, split_by: str = 'sentence', split_length: int = 2, split_overlap: int = 1, 
-               language: str = 'english', custom_seperator: str = None) -> List[str]:
+               language: str = 'english', custom_seperator: str = None, text_chunk_prefix: str = None) -> List[str]:
     """ splits a single piece of text into smaller sub-texts based on splitting method (split_by).
         for example, the text can can be split at the character, word, sentence or passage level.
         optionally it can be split with a custom splitting string
@@ -113,6 +128,7 @@ def split_text(text: str, split_by: str = 'sentence', split_length: int = 2, spl
         split_overlap (int, optional): _description_. Defaults to 16.
         language (str, optional): _description_. Defaults to 'english'.
         seperator (str, optional): _description_. Defaults to " ".
+        text_chunk_prefix (str, optional): The prefix to be put in front of each generated text chunk. Defaults to None.
 
     Raises:
         TypeError: _description_
@@ -150,5 +166,12 @@ def split_text(text: str, split_by: str = 'sentence', split_length: int = 2, spl
     # assume a uniform seperator when reconstructing the sentences
     text_splits = _reconstruct_multi_list(segments, seperator)
 
-    return text_splits
+    # add prefix to each text chunk
+    # If prefix is not given, treat it as empty
+    if text_chunk_prefix is None:
+        text_chunk_prefix = ""
+    
+    prefixed_text_splits = _prefix_text_chunks(text_splits, text_chunk_prefix)
+
+    return prefixed_text_splits
 
