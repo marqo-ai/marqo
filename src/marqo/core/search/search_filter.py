@@ -8,6 +8,13 @@ from marqo.exceptions import InternalError
 
 class Node(ABC):
     def __init__(self, raw: str):
+        """
+        Initialize a Node object.
+
+        Args:
+            raw: The raw user input string that this node was parsed from. This is used for error messages and
+            debugging only and must not be  used when interpreting the semantics of the node.
+        """
         self.raw = raw
 
 
@@ -45,6 +52,9 @@ class Operator(Node, ABC):
         else:
             return f'({str(self.left)} {self.raw} {str(self.right)})'
 
+    def __repr__(self):
+        return f'{self.__class__.__name__}({repr(self.left)}, {repr(self.right)}, {repr(self.raw)})'
+
 
 class Modifier(Node, ABC):
     def __init__(self, modified: Union[Term, Operator], raw: str):
@@ -61,6 +71,9 @@ class Modifier(Node, ABC):
     def __str__(self):
         return f'{self.raw} ({str(self.modified)})'
 
+    def __repr__(self):
+        return f'{self.__class__.__name__}({repr(self.modified)}, {repr(self.raw)})'
+
 
 class EqualityTerm(Term):
     def __init__(self, field: str, value: str, raw: str):
@@ -74,6 +87,9 @@ class EqualityTerm(Term):
                 self.value == other.value and
                 self.raw == other.raw
         )
+
+    def __repr__(self):
+        return f'{self.__class__.__name__}({repr(self.field)}, {repr(self.value)}, {repr(self.raw)})'
 
 
 RangeLimit = Union[int, float]
@@ -96,6 +112,10 @@ class RangeTerm(Term):
                 self.upper == other.upper and
                 self.raw == other.raw
         )
+
+    def __repr__(self):
+        return f'{self.__class__.__name__}({repr(self.field)}, {repr(self.lower)}, {repr(self.upper)}, ' \
+               f'{repr(self.raw)})'
 
     @classmethod
     def parse(cls, field: str, value: str, raw: str) -> "RangeTerm":
@@ -122,22 +142,22 @@ class RangeTerm(Term):
 
 
 class And(Operator):
-    def __init__(self, left: Node, right: Node):
-        super().__init__(left, right, 'AND')
+    def __init__(self, left: Node, right: Node, raw: str = 'AND'):
+        super().__init__(left, right, raw)
 
     greedy = True
 
 
 class Or(Operator):
-    def __init__(self, left: Node, right: Node):
-        super().__init__(left, right, 'OR')
+    def __init__(self, left: Node, right: Node, raw: str = 'OR'):
+        super().__init__(left, right, raw)
 
     greedy = False
 
 
 class Not(Modifier):
-    def __init__(self, modified: Union[Term, Operator]):
-        super().__init__(modified, 'NOT')
+    def __init__(self, modified: Union[Term, Operator], raw: str = 'NOT'):
+        super().__init__(modified, raw)
 
 
 class SearchFilter:
@@ -162,6 +182,9 @@ class SearchFilter:
         if filter_string.startswith('(') and filter_string.endswith(')'):
             return filter_string[1:-1]
         return filter_string
+
+    def __repr__(self):
+        return f'{self.__class__.__name__}({repr(self.root)})'
 
 
 class MarqoFilterStringParser:
@@ -206,9 +229,11 @@ class MarqoFilterStringParser:
 
                 if escape:
                     self._current_token.append(c)
+                    self._current_raw_token.append(c)
                     self._term_value.append(c)
                     escape = False
                 elif c == '\\':
+                    self._current_raw_token.append(c)
                     escape = True
                 else:
                     if c == read_space_until:
@@ -223,17 +248,20 @@ class MarqoFilterStringParser:
                         self._term_value.append(c)
 
                     self._current_token.append(c)
+                    self._current_raw_token.append(c)
 
                 continue
 
             if escape:
                 self._current_token.append(c)
+                self._current_raw_token.append(c)
                 escape = False
             elif c == ':':
                 self._read_term_value = True
                 self._term_type = MarqoFilterStringParser._TermType.Equality
                 self._term_field = ''.join(self._current_token)
                 self._current_token.append(c)
+                self._current_raw_token.append(c)
             elif c == '(':
                 if len(self._current_token) > 0:
                     self._error('Unexpected (', filter_string, i)
@@ -245,6 +273,7 @@ class MarqoFilterStringParser:
                     stack,
                     filter_string,
                     self._current_token,
+                    self._current_raw_token,
                     self._term_field,
                     self._term_value,
                     self._term_type,
@@ -255,12 +284,14 @@ class MarqoFilterStringParser:
                 self._merge_expression(stack, filter_string, i)
                 parenthesis_count -= 1
             elif c == '\\':
+                self._current_raw_token.append(c)
                 escape = True
             elif c == ' ':
                 self._push_token(
                     stack,
                     filter_string,
                     self._current_token,
+                    self._current_raw_token,
                     self._term_field,
                     self._term_value,
                     self._term_type,
@@ -269,12 +300,14 @@ class MarqoFilterStringParser:
                 self._reset_state()
             else:
                 self._current_token.append(c)
+                self._current_raw_token.append(c)
 
         if len(self._current_token) > 0:
             self._push_token(
                 stack,
                 filter_string,
                 self._current_token,
+                self._current_raw_token,
                 self._term_field,
                 self._term_value,
                 self._term_type,
@@ -299,6 +332,7 @@ class MarqoFilterStringParser:
                     stack: List[Union[str, Node]],
                     filter_string: str,
                     current_token: List[str],
+                    current_raw_token: List[str],
                     term_field: Optional[str],
                     term_value: Optional[List[str]],
                     term_type: Optional[_TermType],
@@ -307,6 +341,7 @@ class MarqoFilterStringParser:
             return
 
         token = ''.join(current_token)
+        raw_token = ''.join(current_raw_token)
 
         prev = stack[-1] if len(stack) > 0 else None
         if token == 'AND':
@@ -314,33 +349,33 @@ class MarqoFilterStringParser:
             if not self._is_expression(prev):
                 if not isinstance(prev, Node):
                     # Operator at the beginning of expression
-                    self._error('Unexpected AND', filter_string, pos - 3)
+                    self._error('Unexpected AND', filter_string, pos - len(raw_token))
                 else:
                     # Consecutive operators or operator after modifier
-                    self._error(f'Expected term or expression, but found AND', filter_string, pos - 3)
+                    self._error(f'Expected term or expression, but found AND', filter_string, pos - len(raw_token))
 
-            stack.append(And(stack.pop(), None))
+            stack.append(And(stack.pop(), None, raw_token))
         elif token == 'OR':
             # Operator must come after an expression
             if not self._is_expression(prev):
                 if not isinstance(prev, Node):
                     # Operator at the beginning of expression
-                    self._error('Unexpected OR', filter_string, pos - 2)
+                    self._error('Unexpected OR', filter_string, pos - len(raw_token))
                 else:
                     # Consecutive operators or operator after modifier
-                    self._error(f'Expected term or expression, but found OR', filter_string, pos - 2)
+                    self._error(f'Expected term or expression, but found OR', filter_string, pos - len(raw_token))
 
-            stack.append(Or(stack.pop(), None))
+            stack.append(Or(stack.pop(), None, raw_token))
         elif token == 'NOT':
             # Modifier must come at the beginning of an expression or after an operator
             if not (self._is_start_of_expression(prev) or self._is_operator(prev)):
                 # Modifier after modifier or expression
                 self._error(
                     f"Unexpected modifier '{token}'",
-                    filter_string, pos - len(token)
+                    filter_string, pos - len(raw_token)
                 )
 
-            stack.append(Not(None))
+            stack.append(Not(None, raw_token))
         else:
             # Term
             if not term_field or not term_value:
@@ -351,14 +386,16 @@ class MarqoFilterStringParser:
             # Term must come at the beginning of an expression, after a modifier or after an operator
             if not (self._is_start_of_expression(prev) or self._is_modifier(prev) or self._is_operator(prev)):
                 # Term after expression
-                self._error(f"Unexpected term '{token}'. Expected an operator", filter_string, pos - len(token))
+                self._error(
+                    f"Unexpected term '{token}'. Expected an operator", filter_string, pos - len(raw_token)
+                )
 
             node = None
             if term_type == self._TermType.Equality:
-                node = EqualityTerm(term_field, term_value, token)
+                node = EqualityTerm(term_field, term_value, raw_token)
             elif term_type == self._TermType.Range:
                 try:
-                    node = RangeTerm.parse(term_field, term_value, token)
+                    node = RangeTerm.parse(term_field, term_value, raw_token)
                 except ValueError as e:
                     self._error(f"Cannot parse range term '{token}': {str(e)}", filter_string, pos)
             else:
@@ -500,6 +537,7 @@ class MarqoFilterStringParser:
 
     def _reset_state(self):
         self._current_token: List[str] = []
+        self._current_raw_token: List[str] = []
         self._term_field: Optional[str] = None
         self._term_value: List[str] = []
         self._read_term_value: bool = False

@@ -101,6 +101,13 @@ class TestMarqoFilterStringParser(MarqoTestCase):
                     )
                 ),
                 'nested filter string'
+            ),
+            (
+                "My\\ Field\\-:(How's it going?)",
+                SearchFilter(
+                    EqualityTerm('My Field-', "How's it going?", "My\\ Field\\-:(How's it going?)")
+                ),
+                'escaped field name and value'
             )
         ]
 
