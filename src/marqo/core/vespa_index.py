@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any
 
 from marqo.core.models import MarqoQuery, MarqoIndex
-from marqo.core.models.marqo_index import IndexType
+from marqo.core.models.marqo_index import StructuredMarqoIndex, UnstructuredMarqoIndex
 
 
 class VespaIndex(ABC):
@@ -13,40 +13,21 @@ class VespaIndex(ABC):
     that can be used by a VespaClient.
     """
 
-    @classmethod
     @abstractmethod
-    def generate_schema(cls, marqo_index: MarqoIndex) -> str:
-        """
-        Generate a Vespa schema for the given MarqoIndex.
-
-        Args:
-            marqo_index: The MarqoIndex to generate a schema for
-
-        Returns:
-            A string containing the Vespa schema
-        """
-        pass
-
-    @classmethod
-    @abstractmethod
-    def to_vespa_document(cls, marqo_document: Dict[str, Any], marqo_index: MarqoIndex) -> Dict[str, Any]:
+    def to_vespa_document(self, marqo_document: Dict[str, Any]) -> Dict[str, Any]:
         """
         Convert a MarqoDocument to a Vespa document.
 
         Args:
             marqo_document: The MarqoDocument to convert
-            marqo_index: The MarqoIndex the document belongs to
 
         Returns:
             A dictionary containing the Vespa document
         """
         pass
 
-    @classmethod
     @abstractmethod
-    def to_marqo_document(
-            cls, vespa_document: Dict[str, Any], marqo_index: MarqoIndex, return_highlights: bool = False
-    ) -> Dict[str, Any]:
+    def to_marqo_document(self, vespa_document: Dict[str, Any], return_highlights: bool = False) -> Dict[str, Any]:
         """
         Convert a Vespa document to a MarqoDocument.
 
@@ -54,7 +35,6 @@ class VespaIndex(ABC):
 
         Args:
             vespa_document: The Vespa document to convert
-            marqo_index: The MarqoIndex the document belongs to
             return_highlights: Whether to return highlights
 
         Returns:
@@ -62,15 +42,13 @@ class VespaIndex(ABC):
         """
         pass
 
-    @classmethod
     @abstractmethod
-    def to_vespa_query(cls, marqo_query: MarqoQuery, marqo_index: MarqoIndex) -> Dict[str, Any]:
+    def to_vespa_query(self, marqo_query: MarqoQuery) -> Dict[str, Any]:
         """
         Convert a MarqoQuery to a Vespa query.
 
         Args:
             marqo_query: The MarqoQuery to convert
-            marqo_index: The MarqoIndex the query belongs to
 
         Returns:
             A dictionary containing the Vespa query
@@ -88,11 +66,11 @@ def for_marqo_index(marqo_index: MarqoIndex):
     Returns:
         The VespaIndex implementation for the given MarqoIndex
     """
-    if marqo_index.type == IndexType.Structured:
-        from marqo.core.structured_vespa_index import StructuredVespaIndex
-        return StructuredVespaIndex
-    elif marqo_index.type == IndexType.Unstructured:
-        from marqo.core.unstructured_vespa_index import UnstructuredVespaIndex
-        return UnstructuredVespaIndex
+    if isinstance(marqo_index, StructuredMarqoIndex):
+        from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
+        return StructuredVespaIndex(marqo_index)
+    elif isinstance(marqo_index, UnstructuredMarqoIndex):
+        from marqo.core.unstructured_vespa_index.unstructured_vespa_index import UnstructuredVespaIndex
+        return UnstructuredVespaIndex(marqo_index)
     else:
-        raise ValueError(f"No known implementation for index type {marqo_index.type}")
+        raise ValueError(f"No known implementation for index type {type(marqo_index)}")
