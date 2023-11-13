@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 from enum import Enum
-from functools import lru_cache
 from typing import List, Optional, Dict, Any, Set, Type, Union
 
 from pydantic import PrivateAttr
@@ -165,6 +164,8 @@ class MarqoIndex(StrictBaseModel, ABC):
     def __init__(self, **data: Any):
         super().__init__(**data)
 
+        self._cache = dict()
+
         # Retrieve all properties to populate cached properties
         for name, value in vars(MarqoIndex).items():
             if isinstance(value, property):
@@ -201,6 +202,11 @@ class MarqoIndex(StrictBaseModel, ABC):
 
         raise ValidationError(f"Index type not found in {obj}")
 
+    def _cache_or_get(self, key: str, func):
+        if key not in self._cache:
+            self._cache[key] = func()
+        return self._cache[key]
+
 
 class UnstructuredMarqoIndex(MarqoIndex):
     type = IndexType.Unstructured
@@ -224,89 +230,101 @@ class StructuredMarqoIndex(MarqoIndex):
         super().__init__(**data)
 
     @property
-    @lru_cache(maxsize=None)
     def lexical_field_map(self) -> Dict[str, Field]:
-        return {field.lexical_field_name: field for field in self.fields if
-                FieldFeature.LexicalSearch in field.features}
+        return self._cache_or_get('lexical_field_map',
+                                  lambda: {field.lexical_field_name: field for field in self.fields if
+                                           FieldFeature.LexicalSearch in field.features}
+                                  )
 
     @property
-    @lru_cache(maxsize=None)
     def filter_field_map(self) -> Dict[str, Field]:
-        return {field.filter_field_name: field for field in self.fields if
-                FieldFeature.Filter in field.features}
+        return self._cache_or_get('filter_field_map',
+                                  lambda: {field.filter_field_name: field for field in self.fields if
+                                           FieldFeature.Filter in field.features}
+                                  )
 
     @property
-    @lru_cache(maxsize=None)
     def lexically_searchable_fields_names(self) -> Set[str]:
-        return {field.name for field in self.fields if
-                FieldFeature.LexicalSearch in field.features}
+        return self._cache_or_get('lexically_searchable_fields_names',
+                                  lambda: {field.name for field in self.fields if
+                                           FieldFeature.LexicalSearch in field.features}
+                                  )
 
     @property
-    @lru_cache(maxsize=None)
     def filterable_fields_names(self) -> Set[str]:
-        return {field.name for field in self.fields if
-                FieldFeature.Filter in field.features}
+        return self._cache_or_get('filterable_fields_names',
+                                  lambda: {field.name for field in self.fields if
+                                           FieldFeature.Filter in field.features}
+                                  )
 
     @property
-    @lru_cache(maxsize=None)
     def score_modifier_fields_names(self) -> Set[str]:
-        return {field.name for field in self.fields if
-                FieldFeature.ScoreModifier in field.features}
+        return self._cache_or_get('score_modifier_fields_names',
+                                  lambda: {field.name for field in self.fields if
+                                           FieldFeature.ScoreModifier in field.features}
+                                  )
 
     @property
-    @lru_cache(maxsize=None)
     def field_map(self) -> Dict[str, Field]:
         """
         A map from field name to the field.
         """
-        return {field.name: field for field in self.fields}
+        return self._cache_or_get('field_map',
+                                  lambda: {field.name: field for field in self.fields}
+                                  )
 
     @property
-    @lru_cache(maxsize=None)
     def all_field_map(self) -> Dict[str, Field]:
         """
         A map from field name, lexical name and filter name to the field.
         """
-        return {
-            **{field.name: field for field in self.fields + self.tensor_fields},
-            **{field.lexical_field_name: field for field in self.fields if
-               field.lexical_field_name is not None},
-            **{field.filter_field_name: field for field in self.fields if
-               field.filter_field_name is not None}
-        }
+        return self._cache_or_get('all_field_map',
+                                  lambda: {
+                                      **{field.name: field for field in self.fields + self.tensor_fields},
+                                      **{field.lexical_field_name: field for field in self.fields if
+                                         field.lexical_field_name is not None},
+                                      **{field.filter_field_name: field for field in self.fields if
+                                         field.filter_field_name is not None}
+                                  }
+                                  )
 
     @property
-    @lru_cache(maxsize=None)
     def tensor_field_map(self) -> Dict[str, TensorField]:
-        return {tensor_field.name: tensor_field for tensor_field in self.tensor_fields}
+        return self._cache_or_get('tensor_field_map',
+                                  lambda: {tensor_field.name: tensor_field for tensor_field in self.tensor_fields}
+                                  )
 
     @property
-    @lru_cache(maxsize=None)
     def tensor_subfield_map(self) -> Dict[str, TensorField]:
         """
         A map from tensor chunk and embeddings field name to the tensor field.
         """
-        the_map = dict()
-        for tensor_field in self.tensor_fields:
-            if tensor_field.chunk_field_name is not None:
-                if tensor_field.chunk_field_name in the_map:
-                    raise ValueError(
-                        f"Duplicate chunk field name {tensor_field.chunk_field_name} "
-                        f"for tensor field {tensor_field.name}"
-                    )
-                the_map[tensor_field.chunk_field_name] = tensor_field
-            if tensor_field.embeddings_field_name is not None:
-                if tensor_field.embeddings_field_name in the_map:
-                    raise ValueError(
-                        f"Duplicate embeddings field name {tensor_field.embeddings_field_name} "
-                        f"for tensor field {tensor_field.name}"
-                    )
-                the_map[tensor_field.embeddings_field_name] = tensor_field
 
-        return the_map
+        def generate():
+            the_map = dict()
+            for tensor_field in self.tensor_fields:
+                if tensor_field.chunk_field_name is not None:
+                    if tensor_field.chunk_field_name in the_map:
+                        raise ValueError(
+                            f"Duplicate chunk field name {tensor_field.chunk_field_name} "
+                            f"for tensor field {tensor_field.name}"
+                        )
+                    the_map[tensor_field.chunk_field_name] = tensor_field
+                if tensor_field.embeddings_field_name is not None:
+                    if tensor_field.embeddings_field_name in the_map:
+                        raise ValueError(
+                            f"Duplicate embeddings field name {tensor_field.embeddings_field_name} "
+                            f"for tensor field {tensor_field.name}"
+                        )
+                    the_map[tensor_field.embeddings_field_name] = tensor_field
+
+            return the_map
+
+        return self._cache_or_get('tensor_subfield_map', generate)
 
     @property
-    @lru_cache(maxsize=None)
     def field_map_by_type(self) -> Dict[FieldType, List[Field]]:
-        return {field_type: [field for field in self.fields if field.type == field_type]
-                for field_type in FieldType}
+        return self._cache_or_get('field_map_by_type',
+                                  lambda: {field_type: [field for field in self.fields if field.type == field_type]
+                                           for field_type in FieldType}
+                                  )

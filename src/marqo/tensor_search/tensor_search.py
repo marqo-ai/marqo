@@ -56,9 +56,9 @@ from marqo._httprequests import HttpRequests
 from marqo.config import Config
 from marqo.core import constants
 from marqo.core.index_management.index_management import IndexManagement
-from marqo.core.models.marqo_index import IndexType, MarqoIndex, FieldType
+from marqo.core.models.marqo_index import MarqoIndex, FieldType, UnstructuredMarqoIndex, StructuredMarqoIndex
 from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery
-from marqo.core.structured_vespa_index import StructuredVespaIndex
+from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
 from marqo.core.vespa_index import for_marqo_index as vespa_index_factory
 from marqo.s2_inference import errors as s2_inference_errors
 from marqo.s2_inference import s2_inference
@@ -358,19 +358,19 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
     except errors.IndexNotFoundError:
         raise errors.IndexNotFoundError(f"Cannot add documents to non-existent index {add_docs_params.index_name}")
 
-    if marqo_index.type == IndexType.Unstructured:
+    if isinstance(marqo_index, UnstructuredMarqoIndex):
         return _add_documents_unstructured(config, add_docs_params, marqo_index)
-    elif marqo_index.type == IndexType.Structured:
+    elif isinstance(marqo_index, StructuredMarqoIndex):
         return _add_documents_structured(config, add_docs_params, marqo_index)
     else:
-        raise errors.InternalError(f"Unknown index type {marqo_index.type}")
+        raise errors.InternalError(f"Unknown index type {type(marqo_index)}")
 
 
 def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, marqo_index: MarqoIndex):
     pass
 
 
-def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, marqo_index: MarqoIndex):
+def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, marqo_index: StructuredMarqoIndex):
     # ADD DOCS TIMER-LOGGER (3)
     vespa_client = config.vespa_client
 
@@ -383,7 +383,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
         validation.validate_mappings_object(mappings_object=add_docs_params.mappings)
 
     t0 = timer()
-    bulk_parent_dicts = []
+    bulk_parent_dicts: List[Dict[str, Any]] = []
 
     if len(add_docs_params.docs) == 0:
         raise errors.BadRequestError(message="Received empty add documents request")
@@ -554,12 +554,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                             try:
                                 # in the future, if we have different chunking methods, make sure we catch possible
                                 # errors of different types generated here, too.
-                                if isinstance(field_content, str) and \
-                                        (marqo_index.type == IndexType.Unstructured and
-                                         marqo_index.treat_urls_and_pointers_as_images or
-                                         marqo_index.type == IndexType.Structured and
-                                         field in image_fields):
-
+                                if isinstance(field_content, str) and field in image_fields:
                                     if not isinstance(image_repo[field_content], Exception):
                                         image_data = image_repo[field_content]
                                     else:
@@ -740,8 +735,9 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
         start_time_5 = timer()
         with RequestMetricsStore.for_request().time("add_documents.opensearch._bulk"):
             # serialised_body = utils.dicts_to_jsonl(bulk_parent_dicts)
+            vespa_index = StructuredVespaIndex(marqo_index)
             vespa_docs = [
-                VespaDocument(**StructuredVespaIndex.to_vespa_document(doc, marqo_index))
+                VespaDocument(**vespa_index.to_vespa_document(doc))
                 for doc in bulk_parent_dicts
             ]
             index_responses = vespa_client.feed_batch(vespa_docs, marqo_index.name)
@@ -767,7 +763,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
         def translate_add_doc_response(responses: Optional[FeedBatchResponse], time_diff: float) -> dict:
             """translates OpenSearch response dict into Marqo dict"""
             result_dict = {}
-            new_items = []
+            new_items: List[Dict] = []
 
             if responses is not None:
                 result_dict['errors'] = responses.errors
@@ -811,7 +807,7 @@ def get_document_by_id(
             raise e
 
     vespa_index = vespa_index_factory(marqo_index)
-    marqo_document = vespa_index.to_marqo_document(res.document.dict(), marqo_index)
+    marqo_document = vespa_index.to_marqo_document(res.document.dict())
 
     if not show_vectors:
         del marqo_document[constants.MARQO_DOC_TENSORS]
@@ -846,7 +842,7 @@ def get_documents_by_ids(
 
     for response in batch_get.responses:
         if response.status == 200:
-            marqo_document = vespa_index.to_marqo_document(response.document.dict(), marqo_index)
+            marqo_document = vespa_index.to_marqo_document(response.document.dict())
             if not show_vectors:
                 del marqo_document[constants.MARQO_DOC_TENSORS]
             to_return['results'].append(
@@ -1261,7 +1257,7 @@ def _lexical_search(
     )
 
     vespa_index = vespa_index_factory(marqo_index)
-    vespa_query = vespa_index.to_vespa_query(marqo_query, marqo_index)
+    vespa_query = vespa_index.to_vespa_query(marqo_query)
 
     total_preprocess_time = RequestMetricsStore.for_request().stop("search.lexical.processing_before_vespa")
     logger.debug(f"search (lexical) pre-processing: took {(total_preprocess_time):.3f}ms to process query.")
@@ -1412,7 +1408,7 @@ def gather_documents_from_response(response: QueryResult, marqo_index: MarqoInde
     vespa_index = vespa_index_factory(marqo_index)
     hits = []
     for doc in response.hits:
-        marqo_doc = vespa_index.to_marqo_document(doc.dict(), marqo_index, return_highlights=highlights)
+        marqo_doc = vespa_index.to_marqo_document(doc.dict(), return_highlights=highlights)
         marqo_doc['_score'] = doc.relevance
         # Delete chunk data
         if constants.MARQO_DOC_TENSORS in marqo_doc:
@@ -1822,7 +1818,7 @@ def _vector_text_search(
     )
 
     vespa_index = vespa_index_factory(marqo_index)
-    vespa_query = vespa_index.to_vespa_query(marqo_query, marqo_index)
+    vespa_query = vespa_index.to_vespa_query(marqo_query)
 
     if verbose:
         _vector_text_search_query_verbose(verbose=verbose, body=vespa_query)

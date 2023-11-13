@@ -36,9 +36,6 @@ class StructuredVespaIndex(VespaIndex):
         self._marqo_index = marqo_index
 
     def to_vespa_document(self, marqo_document: Dict[str, Any]) -> Dict[str, Any]:
-        # Ensure index object is caching otherwise this implementation will be computationally expensive
-        self._ensure_cache_enabled()
-
         vespa_id: Optional[int] = None
         vespa_fields: Dict[str, Any] = dict()
         score_modifiers: Dict[str, float] = {}
@@ -494,6 +491,3 @@ class StructuredVespaIndex(VespaIndex):
         except KeyError:
             raise InternalError(f'Unknown Marqo type: {marqo_type}')
 
-    def _ensure_cache_enabled(self):
-        if not self._marqo_index.model_enable_cache:
-            self._marqo_index = self._marqo_index.copy_with_caching()

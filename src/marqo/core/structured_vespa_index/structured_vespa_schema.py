@@ -41,7 +41,7 @@ class StructuredVespaSchema(VespaSchema):
         schema.extend(self._generate_summaries(marqo_index))
         schema.append('}')
 
-        return '\n'.join(schema)
+        return '\n'.join(schema), marqo_index
 
     def _generate_document_section(self) -> (List[str], StructuredMarqoIndex):
         """
@@ -123,9 +123,6 @@ class StructuredVespaSchema(VespaSchema):
             document.append(f'neighbors-to-explore-at-insert: {self._index_request.hnsw_config.ef_construction}')
             document.append('}}')
             document.append('}')
-
-            tensor_field_request.chunk_field_name = chunks_field_name
-            tensor_field_request.embeddings_field_name = embedding_field_name
 
             tensor_fields.append(
                 TensorField(

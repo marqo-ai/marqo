@@ -4,14 +4,9 @@ from typing import Dict, Any, Optional, List
 import marqo.core.models.marqo_index as core
 import marqo.errors as errors
 from marqo import version
+from marqo.core.models.marqo_index_request import FieldRequest, MarqoIndexRequest, StructuredMarqoIndexRequest, \
+    UnstructuredMarqoIndexRequest
 from marqo.tensor_search.models.api_models import BaseMarqoModel
-
-
-class Field(BaseMarqoModel):
-    name: str
-    type: core.FieldType
-    features: List[core.FieldFeature] = []
-    dependent_fields: Optional[Dict[str, float]]
 
 
 class AnnParameters(BaseMarqoModel):
@@ -21,7 +16,7 @@ class AnnParameters(BaseMarqoModel):
 
 class IndexSettings(BaseMarqoModel):
     type: core.IndexType = core.IndexType.Unstructured
-    all_fields: Optional[List[Field]]
+    all_fields: Optional[List[FieldRequest]]
     tensor_fields: Optional[List[str]]
     treat_urls_and_pointers_as_images: Optional[bool]
     model: str = 'hf/all_datasets_v4_MiniLM-L6'
@@ -44,7 +39,7 @@ class IndexSettings(BaseMarqoModel):
         )
     )
 
-    def to_marqo_index(self, index_name: str) -> core.MarqoIndex:
+    def to_marqo_index_request(self, index_name: str) -> MarqoIndexRequest:
         marqo_fields = None
         if self.type == core.IndexType.Structured:
             if self.treat_urls_and_pointers_as_images is not None:
@@ -54,7 +49,7 @@ class IndexSettings(BaseMarqoModel):
 
             if self.all_fields is not None:
                 marqo_fields = [
-                    core.Field(
+                    FieldRequest(
                         name=field.name,
                         type=field.type,
                         features=field.features,
@@ -62,17 +57,8 @@ class IndexSettings(BaseMarqoModel):
                     ) for field in self.all_fields
                 ]
 
-            marqo_tensor_fields = None
-            if self.tensor_fields is not None:
-                marqo_tensor_fields = [
-                    core.TensorField(
-                        name=field,
-                    ) for field in self.tensor_fields
-                ]
-
-            return core.StructuredMarqoIndex(
+            return StructuredMarqoIndexRequest(
                 name=index_name,
-                type=self.type,
                 model=core.Model(
                     name=self.model,
                     properties=self.model_properties,
@@ -85,7 +71,7 @@ class IndexSettings(BaseMarqoModel):
                 vector_numeric_type=self.vector_numeric_type,
                 hnsw_config=self.ann_parameters.parameters,
                 fields=marqo_fields,
-                tensor_fields=marqo_tensor_fields,
+                tensor_fields=self.tensor_fields,
                 marqo_version=version.get_version(),
                 created_at=time.time(),
                 updated_at=time.time()
@@ -105,9 +91,8 @@ class IndexSettings(BaseMarqoModel):
                 # as it is not a valid parameter for structured indexes
                 self.treat_urls_and_pointers_as_images = False
 
-            return core.UnstructuredMarqoIndex(
+            return UnstructuredMarqoIndexRequest(
                 name=index_name,
-                type=self.type,
                 model=core.Model(
                     name=self.model,
                     properties=self.model_properties,
@@ -133,7 +118,7 @@ class IndexSettings(BaseMarqoModel):
             return cls(
                 type=marqo_index.type,
                 all_fields=[
-                    Field(
+                    FieldRequest(
                         name=field.name,
                         type=field.type,
                         features=field.features,
@@ -168,4 +153,4 @@ class IndexSettings(BaseMarqoModel):
                 )
             )
         else:
-            raise errors.InternalError(f"Unknown index type: {type}")
+            raise errors.InternalError(f"Unknown index type: {type(marqo_index)}")

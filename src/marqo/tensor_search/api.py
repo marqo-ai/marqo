@@ -118,7 +118,7 @@ def root():
 @app.post("/indexes/{index_name}")
 def create_index(index_name: str, settings: IndexSettings, marqo_config: config.Config = Depends(get_config)):
     try:
-        marqo_config.index_management.create_index(settings.to_marqo_index(index_name))
+        marqo_config.index_management.create_index(settings.to_marqo_index_request(index_name))
     except IndexExistsError as e:
         raise errors.IndexAlreadyExistsError(f"Index {index_name} already exists") from e
 

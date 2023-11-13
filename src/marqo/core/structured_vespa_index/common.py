@@ -27,8 +27,8 @@ _DISTANCE_METRIC_MAP = {
 }
 
 
-def get_distance_metric(self, marqo_distance_metric: DistanceMetric) -> str:
+def get_distance_metric(marqo_distance_metric: DistanceMetric) -> str:
     try:
-        return self._DISTANCE_METRIC_MAP[marqo_distance_metric]
+        return _DISTANCE_METRIC_MAP[marqo_distance_metric]
     except KeyError:
         raise ValueError(f'Unknown Marqo distance metric: {marqo_distance_metric}')
