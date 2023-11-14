@@ -2,8 +2,8 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from typing import List, Optional, Dict, Any, Set, Type, Union
 
-from pydantic import Field as PydanticField, ValidationError, validator
 from pydantic import PrivateAttr
+from pydantic import ValidationError, validator
 from pydantic.error_wrappers import ErrorWrapper
 from pydantic.utils import ROOT_KEY
 
@@ -81,8 +81,8 @@ class TensorField(StrictBaseModel):
     chunk_field_name and embeddings_field_name must be unique across all tensor fields.
     """
     name: str
-    chunk_field_name: Optional[str]
-    embeddings_field_name: Optional[str]
+    chunk_field_name: str
+    embeddings_field_name: str
 
 
 class HnswConfig(StrictBaseModel):
@@ -141,6 +141,9 @@ class Model(StrictBaseModel):
 
 
 class MarqoIndex(StrictBaseModel, ABC):
+    """
+    Base class for a Marqo index.
+    """
     name: str
     type: IndexType  # We need this so that we can deserialize the correct subclass
     model: Model
@@ -153,18 +156,27 @@ class MarqoIndex(StrictBaseModel, ABC):
     marqo_version: str
     created_at: int
     updated_at: int
-    model_enable_cache: bool = PydanticField(default=False, allow_mutation=False)
     _cache: Dict[str, Any] = PrivateAttr()
 
     class Config:
-        validate_assignment = True
+        allow_mutation = False
+
+    def __init__(self, **data: Any):
+        super().__init__(**data)
+
+        self._cache = dict()
+
+        # Retrieve all properties to populate cached properties
+        for name, value in vars(MarqoIndex).items():
+            if isinstance(value, property):
+                getattr(self, name)
 
     @classmethod
     @abstractmethod
     def _valid_type(cls) -> IndexType:
         pass
 
-    @validator('type', always=True)
+    @validator('type')
     def validate_type(cls, type):
         if type not in [cls._valid_type(), cls._valid_type().value]:
             raise ValueError(f"Cannot assign a different type to {cls.__name__}")
@@ -190,26 +202,10 @@ class MarqoIndex(StrictBaseModel, ABC):
 
         raise ValidationError(f"Index type not found in {obj}")
 
-    def copy_with_caching(self):
-        model_dict = self.dict()
-        del model_dict['model_enable_cache']
-
-        copied = self.__class__(**model_dict, model_enable_cache=True)
-
-        # Retrieve all properties to populate cache
-        for name, value in vars(MarqoIndex).items():
-            if isinstance(value, property):
-                getattr(copied, name)
-
-        return copied
-
     def _cache_or_get(self, key: str, func):
-        if self.model_enable_cache:
-            if key not in self._cache:
-                self._cache[key] = func()
-            return self._cache[key]
-        else:
-            return func()
+        if key not in self._cache:
+            self._cache[key] = func()
+        return self._cache[key]
 
 
 class UnstructuredMarqoIndex(MarqoIndex):
@@ -232,7 +228,6 @@ class StructuredMarqoIndex(MarqoIndex):
 
     def __init__(self, **data):
         super().__init__(**data)
-        self._cache = dict()
 
     @property
     def lexical_field_map(self) -> Dict[str, Field]:

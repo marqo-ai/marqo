@@ -38,8 +38,8 @@ class MarqoTestCase(unittest.TestCase):
         )
         cls.configure_request_metrics()
         cls.vespa_client = vespa_client
-        cls.config = config.Config(vespa_client=vespa_client)
         cls.index_management = IndexManagement(cls.vespa_client)
+        cls.config = config.Config(vespa_client=vespa_client, index_management=cls.index_management)
 
         cls.pyvespa_client = pyvespa.Vespa(url="http://localhost", port=8080)
         cls.CONTENT_CLUSTER = 'content_default'
