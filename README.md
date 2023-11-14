@@ -571,10 +571,4 @@ Marqo is a community project with the goal of making tensor search accessible to
 - Ask questions and share your creations with the community on our [Discourse forum](https://community.marqo.ai).
 - Join our [Slack community](https://bit.ly/marqo-slack) and chat with other community members about ideas.
 
-### Stargazers
 
-[![Stargazers repo roster for @marqo-ai/marqo](https://reporoster.com/stars/marqo-ai/marqo)](https://github.com/marqo-ai/marqo/stargazers).
-
-### Forkers
-
-[![Forkers repo roster for @marqo-ai/marqo](https://reporoster.com/forks/marqo-ai/marqo)](https://github.com/marqo-ai/marqo/network/members).
