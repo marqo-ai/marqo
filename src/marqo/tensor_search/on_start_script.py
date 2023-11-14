@@ -45,22 +45,13 @@ class PopulateCache:
             index_meta_cache.populate_cache(self.config)
         except VespaError as e:
             if isinstance(e, VespaStatusError) and e.status_code == 400:
-                # This happens when settings schema doesn't exist
-                logger.warn('Failed to populate index cache due to 400 error from Vespa. If you have not created an'
-                            ' index yet, this is expected.')
+                # This can happen when settings schema doesn't exist
+                logger.warn('Failed to populate index cache due to 400 error from Vespa. This is expected if you have '
+                            'not created an index yet. Error: {e}')
             else:
-                raise errors.BackendCommunicationError(
-                    message="Can't connect to Vespa Document API. \n"
-                            "    Possible causes: \n"
-                            "        - If this is an arm64 machine, ensure you are using an external Marqo-os instance \n"
-                            "        - If you are using an external Marqo-os instance, check if it is running: "
-                            "`curl <YOUR MARQO-OS URL>` \n"
-                            "        - Ensure that the VESPA_DOCUMENT_URL environment variable defined "
-                            "in the `docker run marqo` command points to the Vespa Document API\n",
-                    link="https://github.com/marqo-ai/marqo/tree/mainline/src/marqo"
-                         "#c-build-and-run-the-marqo-as-a-docker-container-connecting-"
-                         "to-marqo-os-which-is-running-on-the-host"
-                ) from e
+                logger.warn("Failed to connect to Vespa Document API. If you are using an external Vespa instance, "
+                            "ensure that the VESPA_DOCUMENT_URL environment variable is set and your Vespa instance "
+                            f"is running and healthy. Error: {e}")
         # the following lines turns off auto create index
         # connection = HttpRequests(c)
         # connection.put(

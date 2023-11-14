@@ -14,6 +14,12 @@ class VespaStatusError(VespaError):
         except Exception as e:
             raise Exception(f"Could not get status code from {self.cause}") from e
 
+    def __str__(self) -> str:
+        try:
+            return f"{self.status_code}: {self.message}"
+        except:
+            return super().__str__()
+
 
 class InvalidVespaApplicationError(VespaError):
     pass

@@ -16,6 +16,7 @@ import marqo.vespa.concurrency as conc
 from marqo.vespa.exceptions import VespaStatusError, VespaError, InvalidVespaApplicationError
 from marqo.vespa.models import VespaDocument, QueryResult, FeedBatchDocumentResponse, FeedBatchResponse, \
     FeedDocumentResponse
+from marqo.vespa.models.application_metrics import ApplicationMetrics
 from marqo.vespa.models.delete_document_response import DeleteDocumentResponse, DeleteBatchDocumentResponse, \
     DeleteBatchResponse
 from marqo.vespa.models.get_document_response import GetDocumentResponse, VisitDocumentsResponse, GetBatchResponse, \
@@ -351,7 +352,7 @@ class VespaClient:
             timeout: Timeout in seconds per request
 
         Returns:
-            List of GetDocumentResponse objects containing the documents fetched and any missing documents (404).
+            List of GetDocumentResponse objects containing the documents fetched and any missing documents (404)
         """
         if not ids:
             return GetBatchResponse(responses=[], errors=False)
@@ -408,6 +409,24 @@ class VespaClient:
         )
 
         return batch_response
+
+    def get_metrics(self) -> ApplicationMetrics:
+        """
+        Get metrics for every service on all nodes for the application.
+
+        See https://docs.vespa.ai/en/operations-selfhosted/monitoring.html#metrics-v2-values for more information.
+
+        Returns:
+             A selected set of metrics for every service on all nodes for the application
+        """
+        try:
+            resp = self.http_client.get(f'{self.document_url}/metrics/v2/values')
+        except httpx.HTTPError as e:
+            raise VespaError(e) from e
+
+        self._raise_for_status(resp)
+
+        return ApplicationMetrics(**resp.json())
 
     def _add_query_params(self, url: str, query_params: Dict[str, str]) -> str:
         if not query_params:

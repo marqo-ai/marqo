@@ -8,7 +8,8 @@ import marqo.logging
 import marqo.vespa.vespa_client
 from marqo.core.exceptions import IndexExistsError, IndexNotFoundError
 from marqo.core.models import MarqoIndex
-from marqo.core.vespa_index import for_marqo_index as vespa_index_factory
+from marqo.core.models.marqo_index_request import MarqoIndexRequest
+from marqo.core.vespa_schema import for_marqo_index_request as vespa_schema_factory
 from marqo.exceptions import InternalError
 from marqo.vespa.exceptions import VespaStatusError
 from marqo.vespa.models import VespaDocument
@@ -33,18 +34,15 @@ class IndexManagement:
         }
         '''
     )
-    # Number of retries if settings schema feed fails with 400. This can happen when the settings schema is created as
-    # part of the index creation and is not yet available for feeding.
-    _MARQO_SETTINGS_RETRIES = 30
 
     def __init__(self, vespa_client: VespaClient):
         self.vespa_client = vespa_client
 
-    def create_index(self, marqo_index: MarqoIndex) -> None:
+    def create_index(self, marqo_index_request: MarqoIndexRequest) -> None:
         """
         Create a Marqo index.
         Args:
-            marqo_index: Marqo index to create
+            marqo_index_request: Marqo index to create
 
         Raises:
             IndexExistsError: If index already exists
@@ -53,28 +51,26 @@ class IndexManagement:
         app = self.vespa_client.download_application()
         settings_schema_created = self._create_marqo_settings_schema(app)
 
-        if not settings_schema_created and self._index_exists(marqo_index.name):
-            raise IndexExistsError(f"Index {marqo_index.name} already exists")
+        if not settings_schema_created and self.index_exists(marqo_index_request.name):
+            raise IndexExistsError(f"Index {marqo_index_request.name} already exists")
 
-        vespa_index = vespa_index_factory(marqo_index)
-
-        schema = vespa_index.generate_schema(marqo_index)
+        vespa_schema = vespa_schema_factory(marqo_index_request)
+        schema, marqo_index = vespa_schema.generate_schema()
 
         self._add_schema(app, marqo_index.name, schema)
         self._add_schema_to_services(app, marqo_index.name)
         self.vespa_client.deploy_application(app)
-        if settings_schema_created:
-            self.vespa_client.wait_for_application_convergence()
+        self.vespa_client.wait_for_application_convergence()
         self._save_index_settings(marqo_index)
 
-    def batch_create_indexes(self, marqo_indexes: List[MarqoIndex]) -> None:
+    def batch_create_indexes(self, marqo_index_requests: List[MarqoIndexRequest]) -> None:
         """
         Create multiple Marqo indexes as a single Vespa deployment.
 
         This method is intended to facilitate testing and should not be used in production.
 
         Args:
-            marqo_indexes: List of Marqo indexes to create
+            marqo_index_requests: List of Marqo indexes to create
 
         Raises:
             IndexExistsError: If an index already exists
@@ -84,26 +80,25 @@ class IndexManagement:
         settings_schema_created = self._create_marqo_settings_schema(app)
 
         if not settings_schema_created:
-            for index in marqo_indexes:
-                if self._index_exists(index.name):
+            for index in marqo_index_requests:
+                if self.index_exists(index.name):
                     raise IndexExistsError(f"Index {index.name} already exists")
 
-        schemas = {
-            index.name: vespa_index_factory(index).generate_schema(index)
-            for index in marqo_indexes
+        schema_responses = {
+            index.name: vespa_schema_factory(index).generate_schema()  # Tuple (schema, MarqoIndex)
+            for index in marqo_index_requests
         }
 
-        for name, schema in schemas.items():
-            self._add_schema(app, name, schema)
+        for name, schema_resp in schema_responses.items():
+            self._add_schema(app, name, schema_resp[0])
             self._add_schema_to_services(app, name)
 
         self.vespa_client.deploy_application(app)
 
-        if settings_schema_created:
-            self.vespa_client.wait_for_application_convergence()
+        self.vespa_client.wait_for_application_convergence()
 
-        for index in marqo_indexes:
-            self._save_index_settings(index)
+        for _, schema_resp in schema_responses:
+            self._save_index_settings(schema_resp[1])
 
     def delete_index(self, marqo_index: MarqoIndex) -> None:
         """
@@ -123,7 +118,7 @@ class IndexManagement:
         """
         app = self.vespa_client.download_application()
 
-        if not self._index_exists(index_name):
+        if not self.index_exists(index_name):
             raise IndexNotFoundError(f"Cannot delete index {index_name} as it does not exist")
 
         self._remove_schema(app, index_name)
@@ -143,7 +138,7 @@ class IndexManagement:
         app = self.vespa_client.download_application()
 
         for index in marqo_indexes:
-            if not self._index_exists(index.name):
+            if not self.index_exists(index.name):
                 raise IndexNotFoundError(f"Cannot delete index {index.name} as it does not exist")
 
         for index in marqo_indexes:
@@ -190,20 +185,21 @@ class IndexManagement:
 
         return MarqoIndex.parse_raw(response.document.fields['settings'])
 
-    def _index_exists(self, name: str) -> bool:
+    def index_exists(self, index_name: str) -> bool:
         """
         Check if an index exists.
 
-        Note: Do not call this method if settings schema does not exist.
+        Note: Calling this method when settings schema does not exist will cause a VespaStatusError to be raised
+        with status code 400.
 
         Args:
-            name: Name of index to check
+            index_name: Name of index to check
 
         Returns:
             True if index exists, False otherwise
         """
         try:
-            _ = self.get_index(name)
+            _ = self.get_index(index_name)
             return True
         except IndexNotFoundError:
             return False

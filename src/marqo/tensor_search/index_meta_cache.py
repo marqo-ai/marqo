@@ -139,7 +139,7 @@ def _refresh_index(config: Config, index_name: str) -> None:
     except IndexNotFoundError as e:
         raise errors.IndexNotFoundError(f"Index {index_name} not found") from e
 
-    index_info_cache[index_name] = index.copy_with_caching()
+    index_info_cache[index_name] = index
 
 
 def _check_refresh_thread(config: Config):
@@ -185,7 +185,6 @@ def populate_cache(config: Config):
     # Create a map for one-pass cache update
     index_map = dict()
     for index in indexes:
-        index_clone = index.copy_with_caching()
-        index_map[index.name] = index_clone
+        index_map[index.name] = index
 
     index_info_cache = index_map
