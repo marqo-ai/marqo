@@ -553,10 +553,14 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                         split_overlap = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][
                             NsField.split_overlap]
                         
-                        content_chunks = text_processor.split_text(field_content, split_by=split_by,
-                                                                   split_length=split_length, split_overlap=split_overlap,
-                                                                   text_chunk_prefix=text_chunk_prefix)
-                        text_chunks = content_chunks
+                        
+                        # text chunks: WITHOUT prefix, stored in backend chunk list
+                        text_chunks = text_processor.split_text(field_content, split_by=split_by,
+                                                                   split_length=split_length, split_overlap=split_overlap)
+                        
+                        # content chunks: WITH prefix, used to generate vectors (text prefix not actually stored in backend)
+                        content_chunks = text_processor.prefix_text_chunks(content_chunks)
+
                     else:
                         # TODO put the logic for getting field parameters into a function and add per field options
                         image_method = index_info.index_settings[NsField.index_defaults][NsField.image_preprocessing][
@@ -1082,7 +1086,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict]] = N
         context: a dictionary to allow custom vectors in search, for tensor search only
         score_modifiers: a dictionary to modify the score based on field values, for tensor search only
         model_auth: Authorisation details for downloading a model (if required)
-        text_query_prefix: prefix to add to all text queries for TENSOR search.
+        text_query_prefix: prefix to add to all text queries for TENSOR search. Do not use out of the box. Needs to be overridden with model properties.
     Returns:
 
     """
@@ -1145,9 +1149,6 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict]] = N
         logger.debug(f"No device given for search. Defaulting to best available device: {selected_device}")
     else:
         selected_device = device
-    
-    # Determine the query prefix
-    final_text_query_prefix = determine_text_query_prefix(text_query_prefix, index_meta_cache.get_index_info(config, index_name))
 
     if search_method.upper() == SearchMethod.TENSOR:
         search_result = _vector_text_search(
@@ -1156,7 +1157,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict]] = N
             filter_string=filter, device=selected_device, attributes_to_retrieve=attributes_to_retrieve, boost=boost,
             image_download_headers=image_download_headers, context=context, score_modifiers=score_modifiers,
             model_auth=model_auth, max_retry_attempts=max_search_retry_attempts, max_retry_backoff_seconds=max_search_retry_backoff,
-            text_query_prefix=final_text_query_prefix
+            text_query_prefix=text_query_prefix
         )
     elif search_method.upper() == SearchMethod.LEXICAL:
         search_result = _lexical_search(
@@ -1189,9 +1190,6 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict]] = N
             raise errors.BadRequestError(f"reranking failure due to {str(e)}")
 
     search_result["query"] = text
-    # Only return query prefix for tensor search
-    if text_query_prefix is not None and search_method.upper() == SearchMethod.TENSOR:
-        search_result["textQueryPrefix"] = final_text_query_prefix
     search_result["limit"] = result_count
     search_result["offset"] = offset
 
@@ -1341,7 +1339,7 @@ def construct_vector_input_batches(query: Union[str, Dict, None], index_info: In
     Args:
         query: a string query, or a dict of weighted strings.
         index_info: used to determine whether URLs should be treated as images
-        text_query_prefix: prefix to add to all text queries. If None, empty string is added (no prefix)
+        text_query_prefix: prefix to add to all text queries. Will be calculated with the model_properties-level prefix. If None, empty string is added (no prefix)
 
     Returns:
         A tuple of 2 string batches. 
@@ -1351,8 +1349,10 @@ def construct_vector_input_batches(query: Union[str, Dict, None], index_info: In
 
     treat_urls_as_images = index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]
 
-    if text_query_prefix is None:
-        text_query_prefix = ""
+    # Calculate query prefix using model_properties and given.
+    final_text_query_prefix = determine_text_query_prefix(text_query_prefix, index_info)
+    if final_text_query_prefix is None:
+        final_text_query_prefix = ""
     
     if query is None:
         # Nothing should be vectorised.
@@ -1362,18 +1362,18 @@ def construct_vector_input_batches(query: Union[str, Dict, None], index_info: In
             return [], [query, ]
         else:
             # Single text query: Add prefix
-            prefixed_query = f"{text_query_prefix}{query}"
+            prefixed_query = f"{final_text_query_prefix}{query}"
             return [prefixed_query, ], []
     else:  # is dict:
         ordered_queries = list(query.items())
         if treat_urls_as_images:
             # Add prefix to all inner text queries
-            text_queries = [f"{text_query_prefix}{key}" for key, _ in ordered_queries if not _is_image(key)]
+            text_queries = [f"{final_text_query_prefix}{key}" for key, _ in ordered_queries if not _is_image(key)]
             image_queries = [key for key, _ in ordered_queries if _is_image(key)]
             return text_queries, image_queries
         else:
             # Treat all queries as plaintext. Add prefix to all.
-            return [f"{text_query_prefix}{key}" for key, _ in ordered_queries], []
+            return [f"{final_text_query_prefix}{key}" for key, _ in ordered_queries], []
 
 
 def construct_msearch_body_elements(searchableAttributes: List[str], offset: int, filter_string: str,
@@ -1556,11 +1556,11 @@ def assign_query_to_vector_job(
     return ptrs
 
 
-def create_vector_jobs(queries: List[BulkSearchQueryEntity], config: Config, device: str, text_query_prefix: str) -> Tuple[Dict[Qidx, List[VectorisedJobPointer]], Dict[JHash, VectorisedJobs]]:
+def create_vector_jobs(queries: List[BulkSearchQueryEntity], config: Config, device: str) -> Tuple[Dict[Qidx, List[VectorisedJobPointer]], Dict[JHash, VectorisedJobs]]:
     """
         For each query:
             - Find what needs to be vectorised
-            - Add prefix to text queries (that are not images)
+            - Add prefix to text queries (that are not images) for vectorisation only. Will not appear in search response.
             - Group content (across search requests), that could be vectorised together
             - Keep track of the Job related to a search query
 
@@ -1574,7 +1574,7 @@ def create_vector_jobs(queries: List[BulkSearchQueryEntity], config: Config, dev
         q = queries[i]
         index_info = get_index_info(config=config, index_name=q.index)
         # split images from text:
-        to_be_vectorised: Tuple[List[str], List[str]] = construct_vector_input_batches(q.q, index_info, text_query_prefix)
+        to_be_vectorised: Tuple[List[str], List[str]] = construct_vector_input_batches(q.q, index_info, q.textQueryPrefix)
         qidx_to_job[i] = assign_query_to_vector_job(q, jobs, to_be_vectorised, index_info, device)
 
     return qidx_to_job, jobs
@@ -1730,14 +1730,13 @@ def create_empty_query_response(queries: List[BulkSearchQueryEntity]) -> List[Di
         )
     )
 
-def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity], device: Union[Device, str], text_query_prefix: str) -> Dict[Qidx, List[float]]:
+def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity], device: Union[Device, str]) -> Dict[Qidx, List[float]]:
     """
     Run the query vectorisation process
     """
     # 1. Pre-process inputs ready for s2_inference.vectorise
     # we can still use qidx_to_job. But the jobs structure may need to be different
-    # Prefix passed to create_vector_jobs to add to text queries
-    vector_jobs_tuple: Tuple[Dict[Qidx, List[VectorisedJobPointer]], Dict[JHash, VectorisedJobs]] = create_vector_jobs(queries, config, device, text_query_prefix)
+    vector_jobs_tuple: Tuple[Dict[Qidx, List[VectorisedJobPointer]], Dict[JHash, VectorisedJobs]] = create_vector_jobs(queries, config, device)
 
     qidx_to_jobs, jobs = vector_jobs_tuple
 
@@ -1782,7 +1781,11 @@ def _bulk_vector_text_search(
     ):
 
         with RequestMetricsStore.for_request().time(f"bulk_search.vector_inference_full_pipeline"):
-            qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, device)
+            qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(
+                config=config, 
+                queries=queries, 
+                device=device
+            )
 
         ## 4. Create msearch request bodies and combine to aggregate.
         query_to_body_parts: Dict[Qidx, List[Dict]] = dict()
@@ -1866,7 +1869,7 @@ def _vector_text_search(
         model_auth: Authorisation details for downloading a model (if required)
         max_retry_attempts: maximum number of times to retry a backend request
         max_retry_backoff_seconds: maximum number of seconds to wait between retries
-        text_query_prefix: prefix to add to text queries
+        text_query_prefix: prefix to add to text queries. Needs to be overridden by the model_properties-level prefix.
 
     Returns:
 
@@ -1907,14 +1910,24 @@ def _vector_text_search(
 
     # Use bulk_search util, but only 1 item in the list (since it's a single search).
     queries = [BulkSearchQueryEntity(
-        q=query, searchableAttributes=searchable_attributes,searchMethod=SearchMethod.TENSOR, limit=result_count, offset=offset, showHighlights=False, filter=filter_string, attributesToRetrieve=attributes_to_retrieve, boost=boost, image_download_headers=image_download_headers, context=context, scoreModifiers=score_modifiers, index=index_name, modelAuth=model_auth
+        q=query, 
+        searchableAttributes=searchable_attributes,
+        searchMethod=SearchMethod.TENSOR, 
+        limit=result_count, offset=offset, 
+        showHighlights=False, 
+        filter=filter_string, 
+        attributesToRetrieve=attributes_to_retrieve, 
+        boost=boost, image_download_headers=image_download_headers, 
+        context=context, scoreModifiers=score_modifiers, 
+        index=index_name, modelAuth=model_auth,
+        textQueryPrefix=text_query_prefix   
     )]
+
     with RequestMetricsStore.for_request().time(f"search.vector_inference_full_pipeline"):
         qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(
             config=config, 
             queries=queries, 
             device=device, 
-            text_query_prefix=text_query_prefix
         )
     vectorised_text = list(qidx_to_vectors.values())[0]
 
@@ -2126,6 +2139,7 @@ def vectorise_multimodal_combination_field(
         doc_id: the document id
         device: device from main body
         index_info: index_info from main body,
+        text_chunk_prefix: prefix to add to start of text before vectorising. Not to be stored in chunk as text.
         model_auth: Model download authorisation information (if required)
     Returns:
         combo_chunk: the combo_chunk to be appended to the main body
@@ -2253,7 +2267,7 @@ def vectorise_multimodal_combination_field(
 
     combo_chunk = dict({
         TensorField.marqo_knn_field: vector_chunk,
-        TensorField.field_content: json.dumps(multimodal_object),
+        TensorField.field_content: json.dumps(multimodal_object),   # prefixes not included in stored object.
         TensorField.field_name: field,
     })
     return combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add, new_fields_from_multimodal_combination
