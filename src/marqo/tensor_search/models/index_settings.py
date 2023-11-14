@@ -2,6 +2,7 @@ import time
 from typing import Dict, Any, Optional, List
 
 import marqo.core.models.marqo_index as core
+from marqo.exceptions import InvalidArgumentError
 from marqo import version
 from marqo.tensor_search.models.api_models import BaseMarqoModel
 
@@ -43,6 +44,14 @@ class IndexSettings(BaseMarqoModel):
     )
 
     def to_marqo_index(self, index_name: str) -> core.MarqoIndex:
+        if self.type == core.IndexType.Structured:
+            return self._to_structured_marqo_index(index_name)
+        elif self.type == core.IndexType.Unstructured:
+            return self._to_unstructured_marqo_index(index_name)
+        else:
+            raise ValueError(f"Index type {self.type} is not supported")
+
+    def _to_structured_marqo_index(self, index_name: str) -> core.StructuredMarqoIndex:
         marqo_fields = None
         if self.all_fields is not None:
             marqo_fields = [
@@ -78,6 +87,30 @@ class IndexSettings(BaseMarqoModel):
             hnsw_config=self.ann_parameters.parameters,
             fields=marqo_fields,
             tensor_fields=marqo_tensor_fields,
+            marqo_version=version.get_version(),
+            created_at=time.time(),
+            updated_at=time.time()
+        )
+
+    def _to_unstructured_marqo_index(self, index_name: str) -> core. UnstructuredMarqoIndex:
+        if any([self.all_fields, self.tensor_fields]):
+            raise InvalidArgumentError("Marqo does not support fileds and all_fields for an unstructured index. "
+                                       "Please remove them from the index settings or change the index type to structured.")
+
+        return core.UnstructuredMarqoIndex(
+            name=index_name,
+            type=self.type,
+            model=core.Model(
+                name=self.model,
+                properties=self.model_properties,
+                custom=self.model_properties is not None
+            ),
+            normalize_embeddings=self.normalize_embeddings,
+            text_preprocessing=self.text_preprocessing,
+            image_preprocessing=self.image_preprocessing,
+            distance_metric=self.ann_parameters.space_type,
+            vector_numeric_type=self.vector_numeric_type,
+            hnsw_config=self.ann_parameters.parameters,
             marqo_version=version.get_version(),
             created_at=time.time(),
             updated_at=time.time()

@@ -348,15 +348,10 @@ def is_tensor_field(field: str,
                     tensor_fields: Optional[List[str]] = None
                     ) -> bool:
     """Determine whether a field is a tensor field or not for add_documents calls."""
-    if tensor_fields is not None and non_tensor_fields is not None or \
-            tensor_fields is None and non_tensor_fields is None:
-        raise errors.InternalError("Must provide exactly one of tensor_fields or non_tensor_fields.")
-
-    if tensor_fields is not None:
+    if tensor_fields:
         return field in tensor_fields
     else:
-        return field not in non_tensor_fields
-
+        return False
 
 def calculate_health_status(marqo_os_health_check_response: Optional[Dict]) -> dict:
     """Calculate the health status of Marqo based on the response API from Marqo-os ."""
@@ -384,3 +379,16 @@ def calculate_health_status(marqo_os_health_check_response: Optional[Dict]) -> d
 def check_is_zero_vector(vector: List[float]) -> bool:
     """Check if a vector is all zero. We assume the input to this function is of valid type, List[Float]"""
     return all([x == 0 for x in vector])
+
+
+def extract_multimodal_mappings(mappings: Dict) -> Dict:
+    """Extract multimodal mappings from mappings dict"""
+    return {k: v for k, v in mappings.items() if v["type"] == "multimodal_combination"}
+
+def extract_multimodal_content(doc: dict, mapping: Dict) -> Dict:
+    """Extract multimodal content from doc based on multimodal mapping"""
+    multimodal_content = {}
+    for field_name, weight in mapping["weights"].items():
+        if field_name in doc:
+            multimodal_content[field_name] = doc[field_name]
+    return multimodal_content

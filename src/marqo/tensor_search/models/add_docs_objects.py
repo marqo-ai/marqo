@@ -29,6 +29,7 @@ class AddDocsBodyParams(BaseModel):
     documents: Union[Sequence[Union[dict, Any]], np.ndarray]
 
 
+
 class AddDocsParams(BaseModel):
     """Represents the parameters of the tensor_search.add_documents() function
 
@@ -71,3 +72,5 @@ class AddDocsParams(BaseModel):
         if "device" not in data or data["device"] is None:
             data["device"] = get_best_available_device()
         super().__init__(**data)
+
+

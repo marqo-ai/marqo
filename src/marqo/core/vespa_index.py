@@ -106,7 +106,7 @@ def for_marqo_index(marqo_index: MarqoIndex):
         from marqo.core.structured_vespa_index import StructuredVespaIndex
         return StructuredVespaIndex
     elif marqo_index.type == IndexType.Unstructured:
-        from marqo.core.unstructured_vespa_index import UnstructuredVespaIndex
-        return UnstructuredVespaIndex
+        from marqo.core.unstructured_vespa_index import UnStructuredVespaIndex
+        return UnStructuredVespaIndex
     else:
         raise ValueError(f"No known implementation for index type {marqo_index.type}")
