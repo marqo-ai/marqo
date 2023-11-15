@@ -1,4 +1,4 @@
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from copy import deepcopy
 
 from pydantic import Field, BaseModel
@@ -7,25 +7,30 @@ from marqo.core.unstructured_vespa_index import common as unstructured_common
 from marqo.core.unstructured_vespa_index import constants as unstructured_constants
 
 
-class UnStructuredVespaDocumentFields(BaseModel):
+class UnstructuredVespaDocumentFields(BaseModel):
     """A class with fields that are common to all Vespa documents."""
     marqo__id: str = Field(default_factory=str, alias=index_constants.VESPA_FIELD_ID)
     strings: List[str] = Field(default_factory=list, alias=unstructured_common.STRINGS)
-    long_string_fields: Dict[str, str] = Field(default_factory=dict, alias=unstructured_common.LONGS_STRINGS_FIELDS)
+    long_string_fields: Dict[str, str]= Field(default_factory=dict, alias=unstructured_common.LONGS_STRINGS_FIELDS)
     short_string_fields: Dict[str, str] = Field(default_factory=dict, alias=unstructured_common.SHORT_STRINGS_FIELDS)
     string_arrays: List[str] = Field(default_factory=list, alias=unstructured_common.STRING_ARRAY)
     int_fields: Dict[str, int] = Field(default_factory=dict, alias=unstructured_common.INT_FIELDS)
     float_fields: Dict[str, float] = Field(default_factory=dict, alias=unstructured_common.FLOAT_FIELDS)
     marqo_chunks: List[str] = Field(default_factory=list, alias=unstructured_common.VESPA_DOC_CHUNKS)
     marqo_embeddings: Dict = Field(default_factory=dict, alias=unstructured_common.VESPA_DOC_EMBEDDINGS)
+    match_features: Dict[str, Any] = Field(default_factory=dict, alias=index_constants.VESPA_DOC_MATCH_FEATURES)
 
     class Config:
         allow_population_by_field_name = True
 
     def to_vespa_dictionary(self) -> Dict[str, Any]:
-        return self.dict(exclude_none=True, by_alias=True)
+        # Exclude None and empty fields
+        return {
+            key: value for key, value in self.dict(exclude_none=True, by_alias=True).items()
+            if value
+        }
 
-    def to_marqo_dictionary(self) -> Dict[str, Any]:
+    def to_marqo_doc(self, return_highlights: bool = False) -> Dict[str, Any]:
         marqo_document = {}
         # Processing short_string_fields and long_string_fields back into original format
         marqo_document.update(self.short_string_fields)
@@ -40,9 +45,23 @@ class UnStructuredVespaDocumentFields(BaseModel):
         # Add int and float fields back
         marqo_document.update(self.int_fields)
         marqo_document.update(self.float_fields)
-
         marqo_document[index_constants.MARQO_DOC_ID] = self.marqo__id
+
+        if return_highlights and self.match_features:
+            marqo_document[index_constants.MARQO_DOC_HIGHLIGHTS] = self._extract_highlights()
+
         return marqo_document
+
+    def _extract_highlights(self):
+        if not self.match_features:
+            raise ValueError("No match features found in the document")
+        try:
+            chunk_index: int = int(list(self.match_features[f"closest({unstructured_common.VESPA_DOC_EMBEDDINGS})"]\
+                                   ["cells"].keys())[0])
+        except KeyError:
+            raise ValueError("No match features found in the document")
+        field_name, content = self.marqo_chunks[chunk_index].split("::", 2)
+        return {field_name: content}
 
 
 class UnstructuredIndexDocument(BaseModel):
@@ -51,13 +70,19 @@ class UnstructuredIndexDocument(BaseModel):
     The object can be instantiated from a Marqo document using the from_marqo_document method,
     or can be instantiated from a Vespa document using the from_vespa_document method.
     """
-    id: str
-    fields: UnStructuredVespaDocumentFields = Field(default_factory=UnStructuredVespaDocumentFields)
+    id: str = Field(alias=index_constants.VESPA_DOC_ID)
+    fields: UnstructuredVespaDocumentFields = Field(default_factory=UnstructuredVespaDocumentFields,
+                                                    alias=index_constants.VESPA_DOC_FIELDS)
+
+    class Config:
+        allow_population_by_field_name = True
 
     @classmethod
     def from_vespa_document(cls, document: Dict) -> "UnstructuredIndexDocument":
         """Instantiate an UnstructuredIndexDocument from a Vespa document."""
-        return cls(id=document["id"], fields=UnStructuredVespaDocumentFields(**document.get("fields", {})))
+        fields = document.get(index_constants.VESPA_DOC_FIELDS, {})
+        return cls(id=document[index_constants.VESPA_DOC_ID],
+                   fields=UnstructuredVespaDocumentFields(**fields))
 
     @classmethod
     def from_marqo_document(cls, document: Dict) -> "UnstructuredIndexDocument":
@@ -101,8 +126,7 @@ class UnstructuredIndexDocument(BaseModel):
 
     def to_marqo_document(self, return_highlights: bool = False) -> Dict[str, Any]:
         """Convert VespaDocumentObject back to the original document structure."""
-        marqo_document = self.fields.to_marqo_dictionary()
-        marqo_id = marqo_document["marqo__id"]
-        del marqo_document["marqo__id"]
+        return self.fields.to_marqo_doc(return_highlights=return_highlights)
 
-        return {"_id": marqo_id, **marqo_document}
+
+
