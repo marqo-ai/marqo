@@ -121,7 +121,7 @@ def check_make_string_valid(text: str, coerce: bool = True) -> str:
     return text
 
 def split_text(text: str, split_by: str = 'sentence', split_length: int = 2, split_overlap: int = 1, 
-               language: str = 'english', custom_seperator: str = None, text_chunk_prefix: str = None) -> List[str]:
+               language: str = 'english', custom_seperator: str = None) -> List[str]:
     """ splits a single piece of text into smaller sub-texts based on splitting method (split_by).
         for example, the text can can be split at the character, word, sentence or passage level.
         optionally it can be split with a custom splitting string
@@ -133,7 +133,6 @@ def split_text(text: str, split_by: str = 'sentence', split_length: int = 2, spl
         split_overlap (int, optional): _description_. Defaults to 16.
         language (str, optional): _description_. Defaults to 'english'.
         seperator (str, optional): _description_. Defaults to " ".
-        text_chunk_prefix (str, optional): The prefix to be put in front of each generated text chunk. Defaults to None.
 
     Raises:
         TypeError: _description_
