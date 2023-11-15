@@ -77,65 +77,7 @@ class Field(ImmutableStrictBaseModel):
 
     @root_validator
     def check_all_fields(cls, values):
-        name: str = values['name']
-        type: FieldType = values['type']
-        features: List[FieldFeature] = values['features']
-        lexical_field_name: Optional[str] = values['lexical_field_name']
-        filter_field_name: Optional[str] = values['filter_field_name']
-        dependent_fields: Optional[Dict[str, float]] = values['dependent_fields']
-
-        if name.startswith(constants.MARQO_RESERVED_PREFIX):
-            raise ValueError(f'{name}: Field name must not start with "{constants.MARQO_RESERVED_PREFIX}"')
-
-        if type in [FieldType.ImagePointer, FieldType.MultimodalCombination] and features:
-            raise ValueError(f'{name}: Cannot specify features for field of type {type.value}')
-
-        if type == FieldType.MultimodalCombination:
-            if not dependent_fields:
-                raise ValueError(f'{name}: dependent_fields must be defined for a field of type {type.value}')
-        elif dependent_fields:
-            raise ValueError(
-                f'{name}: dependent_fields must only be defined for fields of type '
-                f'{FieldType.MultimodalCombination.value}'
-            )
-
-        if FieldFeature.LexicalSearch in features:
-            if type not in [FieldType.Text, FieldType.ArrayText]:
-                raise ValueError(
-                    f'{name}: Field with {FieldFeature.LexicalSearch.value} feature must be of type '
-                    f'{FieldType.Text.value} or {FieldType.ArrayText.value}'
-                )
-            if not lexical_field_name:
-                raise ValueError(
-                    f'{name}: lexical_field_name must be populated when {FieldFeature.LexicalSearch.value} '
-                    f'feature is present'
-                )
-
-        if FieldFeature.Filter in features and not filter_field_name:
-            # We can filter anything other than ImagePointer and MultimodalCombination, which don't allow features
-            # so no type validation here
-            raise ValueError(
-                f'{name}: filter_field_name must be populated when {FieldFeature.Filter.value} '
-                f'feature is present'
-            )
-
-        if FieldFeature.ScoreModifier in features and type not in [FieldType.Float, FieldType.Int]:
-            raise ValueError(
-                f'{name}: Field with {FieldFeature.ScoreModifier.value} feature must be of type '
-                f'{FieldType.Float.value} or {FieldType.Int.value}'
-            )
-
-        if lexical_field_name and FieldFeature.LexicalSearch not in features:
-            raise ValueError(
-                f'{name}: lexical_field_name must only be populated when '
-                f'{FieldFeature.LexicalSearch.value} feature is present'
-            )
-
-        if filter_field_name and FieldFeature.Filter not in features:
-            raise ValueError(
-                f'{name}: filter_field_name must only be populated when {FieldFeature.Filter.value} '
-                f'feature is present'
-            )
+        validate_field(values, marqo_index=True)
 
         return values
 
@@ -402,3 +344,85 @@ class StructuredMarqoIndex(MarqoIndex):
                                   lambda: {field_type: [field for field in self.fields if field.type == field_type]
                                            for field_type in FieldType}
                                   )
+
+
+def validate_field(values, marqo_index: bool) -> None:
+    """
+    Validate a Field or FieldRequest. Raises ValueError if validation fails.
+
+    Args:
+        marqo_index: Whether the validation is for a MarqoIndex Field (True) or a MarqoIndexRequest FieldRequest (False)
+    """
+    name: str = values['name']
+    type: FieldType = values['type']
+    features: List[FieldFeature] = values['features']
+    dependent_fields: Optional[Dict[str, float]] = values['dependent_fields']
+
+    if name.startswith(constants.MARQO_RESERVED_PREFIX):
+        raise ValueError(f'{name}: Field name must not start with "{constants.MARQO_RESERVED_PREFIX}"')
+
+    if type in [FieldType.ImagePointer, FieldType.MultimodalCombination] and features:
+        raise ValueError(f'{name}: Cannot specify features for field of type {type.value}')
+
+    if type == FieldType.MultimodalCombination:
+        if not dependent_fields:
+            raise ValueError(f'{name}: dependent_fields must be defined for a field of type {type.value}')
+    elif dependent_fields:
+        raise ValueError(
+            f'{name}: dependent_fields must only be defined for fields of type '
+            f'{FieldType.MultimodalCombination.value}'
+        )
+
+    if FieldFeature.LexicalSearch in features and type not in [FieldType.Text, FieldType.ArrayText]:
+        raise ValueError(
+            f'{name}: Field with {FieldFeature.LexicalSearch.value} feature must be of type '
+            f'{FieldType.Text.value} or {FieldType.ArrayText.value}'
+        )
+
+    # These validations are specific to marqo_index.Field
+    if marqo_index:
+        lexical_field_name: Optional[str] = values['lexical_field_name']
+        filter_field_name: Optional[str] = values['filter_field_name']
+
+        if FieldFeature.LexicalSearch in features and not lexical_field_name:
+            raise ValueError(
+                f'{name}: lexical_field_name must be populated when {FieldFeature.LexicalSearch.value} '
+                f'feature is present'
+            )
+
+        if FieldFeature.Filter in features and not filter_field_name:
+            # We can filter anything other than ImagePointer and MultimodalCombination, which don't allow features
+            # so no type validation here
+            raise ValueError(
+                f'{name}: filter_field_name must be populated when {FieldFeature.Filter.value} '
+                f'feature is present'
+            )
+
+        if FieldFeature.ScoreModifier in features and type not in [FieldType.Float, FieldType.Int]:
+            raise ValueError(
+                f'{name}: Field with {FieldFeature.ScoreModifier.value} feature must be of type '
+                f'{FieldType.Float.value} or {FieldType.Int.value}'
+            )
+
+        if lexical_field_name and FieldFeature.LexicalSearch not in features:
+            raise ValueError(
+                f'{name}: lexical_field_name must only be populated when '
+                f'{FieldFeature.LexicalSearch.value} feature is present'
+            )
+
+        if filter_field_name and FieldFeature.Filter not in features:
+            raise ValueError(
+                f'{name}: filter_field_name must only be populated when {FieldFeature.Filter.value} '
+                f'feature is present'
+            )
+
+
+if __name__ == '__main__':
+    f = Field(
+        name='test',
+        type=FieldType.Text,
+        features=[FieldFeature.LexicalSearch],
+        lexical_field_name='test'
+    )
+
+    pass
