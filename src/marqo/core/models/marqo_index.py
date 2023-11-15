@@ -9,7 +9,7 @@ from pydantic.error_wrappers import ErrorWrapper
 from pydantic.utils import ROOT_KEY
 
 from marqo.core import constants
-from marqo.core.models.strict_base_model import ImmutableStrictBaseModel
+from marqo.core.models.strict_base_model import ImmutableStrictBaseModel, StrictBaseModel
 from marqo.exceptions import InvalidArgumentError
 from marqo.logging import get_logger
 from marqo.s2_inference import s2_inference
@@ -108,10 +108,20 @@ class ImagePreProcessing(ImmutableStrictBaseModel):
     patch_method: Optional[PatchMethod]
 
 
-class Model(ImmutableStrictBaseModel):
+class Model(StrictBaseModel):
     name: str
     properties: Optional[Dict[str, Any]]
     custom: bool = False
+
+    def dict(self, *args, **kwargs):
+        """
+        Custom dict method that removes the properties field if the model is not custom. This ensures we don't store
+        non-custom model properties when serializing and saving the index.
+        """
+        d = super().dict(*args, **kwargs)
+        if not self.custom:
+            d.pop('properties', None)
+        return d
 
     def get_dimension(self):
         self._update_model_properties_from_registry()
@@ -122,7 +132,7 @@ class Model(ImmutableStrictBaseModel):
                 "The given model properties does not contain a 'dimensions' key"
             )
 
-    def get_properties(self):
+    def get_properties(self) -> Dict[str, Any]:
         """
         Get model properties. Try to update model properties from the registry first if model properties
         are not populated.
@@ -415,14 +425,3 @@ def validate_field(values, marqo_index: bool) -> None:
                 f'{name}: filter_field_name must only be populated when {FieldFeature.Filter.value} '
                 f'feature is present'
             )
-
-
-if __name__ == '__main__':
-    f = Field(
-        name='test',
-        type=FieldType.Text,
-        features=[FieldFeature.LexicalSearch],
-        lexical_field_name='test'
-    )
-
-    pass
