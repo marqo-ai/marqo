@@ -561,7 +561,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                                                                    split_length=split_length, split_overlap=split_overlap)
                         
                         # content chunks: WITH prefix, used to generate vectors (text prefix not actually stored in backend)
-                        content_chunks = text_processor.prefix_text_chunks(content_chunks)
+                        content_chunks = text_processor.prefix_text_chunks(text_chunks)
 
                     else:
                         # TODO put the logic for getting field parameters into a function and add per field options
