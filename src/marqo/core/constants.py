@@ -1,3 +1,4 @@
+MARQO_RESERVED_PREFIX = 'marqo__'
 MARQO_DOC_TENSORS = 'marqo__tensors'  # doc-level so must not clash with index field names
 MARQO_DOC_HIGHLIGHTS = '_highlights'  # doc-level so must not clash with index field names
 MARQO_DOC_CHUNKS = 'chunks'

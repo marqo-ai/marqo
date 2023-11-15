@@ -2,10 +2,10 @@ from abc import ABC
 from typing import List, Dict, Optional
 
 import marqo.core.models.marqo_index as marqo_index
-from marqo.core.models.strict_base_model import StrictBaseModel
+from marqo.core.models.strict_base_model import StrictBaseModel, ImmutableStrictBaseModel
 
 
-class MarqoIndexRequest(StrictBaseModel, ABC):
+class MarqoIndexRequest(ImmutableStrictBaseModel, ABC):
     """
     Base class for a Marqo index request. Instances of this class represent requests to create or modify a Marqo index,
     while a Marqo index itself is represented by an instance of the MarqoIndex class.
@@ -25,9 +25,6 @@ class MarqoIndexRequest(StrictBaseModel, ABC):
     marqo_version: str
     created_at: int
     updated_at: int
-
-    class Config:
-        allow_mutation = False
 
 
 class UnstructuredMarqoIndexRequest(MarqoIndexRequest):
