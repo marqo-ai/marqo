@@ -257,7 +257,6 @@ def _autofill_index_settings(index_settings: dict):
         copied_settings[NsField.index_defaults][NsField.model] = MlModel.clip
 
     # text preprocessing subfields - fills any missing sub-dict fields if some of the first level are present
-    # TODO: Change autofill for override prefix if needed
     for key in list(default_settings[NsField.index_defaults][NsField.text_preprocessing]):
         if key not in copied_settings[NsField.index_defaults][NsField.text_preprocessing] or \
                 copied_settings[NsField.index_defaults][NsField.text_preprocessing][key] is None:
