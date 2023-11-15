@@ -757,10 +757,10 @@ def validate_model_name_and_properties(index_settings):
 
 
     if search_model_name is not None and model_name is None:
-        raise UnknownModelError(f"`search_model` cannot be specified without also specifying `model`. Received search_model={search_model_name} but found no `model`")
+        raise InvalidArgError(f"`search_model` cannot be specified without also specifying `model`. Received search_model={search_model_name} but found no `model`")
     
     if model_properties is not None and model_name is None:
-        raise UnknownModelError(f"If `model_properties` is set, `model` must also be set. No `model` found for model_properties={model_properties}")
+        raise InvalidArgError(f"If `model_properties` is set, `model` must also be set. No `model` found for model_properties={model_properties}")
     
     if search_model_properties is not None and search_model_name is None:
-        raise UnknownModelError(f"If `search_model_properties` is set, `search_model` must also be set. No `search_model` found for search_model_properties={search_model_properties}")
+        raise InvalidArgError(f"If `search_model_properties` is set, `search_model` must also be set. No `search_model` found for search_model_properties={search_model_properties}")

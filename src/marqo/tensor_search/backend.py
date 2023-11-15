@@ -59,9 +59,7 @@ def get_index_info(
     if "search_model" in res[index_name]["mappings"]["_meta"]:
         search_model_name = res[index_name]["mappings"]["_meta"]["search_model"]
     else:
-        raise errors.NonTensorIndexError(
-            "get_index_info: couldn't identify search model name "
-            F"in index mappings! Mapping: {res}")
+        search_model_name = None    # placeholder for backwards compatibility
 
     if "index_settings" in res[index_name]["mappings"]["_meta"]:
         index_settings = res[index_name]["mappings"]["_meta"]["index_settings"]

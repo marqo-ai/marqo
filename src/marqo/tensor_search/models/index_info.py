@@ -35,11 +35,11 @@ def get_model_properties_from_index_defaults(index_defaults: Dict, model_name: s
     elif model_properties is None:
         try:
             model_properties = s2_inference.get_model_properties_from_registry(model_name)
-        except s2_inference_errors.UnknownModelError:
+        except s2_inference_errors.UnknownModelError as e:
             raise errors.InvalidArgError(
-                f"Could not find {properties_key} for model={model_name}. "
-                f"Please check that the model name is correct. "
-                f"Please provide {properties_key} if the model is a custom model and is not supported by default")
+                f"Could not find properties in registry for model: {model_name}. "
+                f"If this is a registry model, please check that the model name is correct. "
+                f"Please provide {properties_key} if the model is a custom model.")
     
     return model_properties
 
@@ -106,6 +106,13 @@ class IndexInfo(NamedTuple):
         )
     
     def get_search_model_properties(self) -> dict:
+        """
+        Should not be called when search_model_name is None. tensor_search module should have called
+        get_model_properties instead.
+        """
+        if self.search_model_name is None:
+            raise errors.InternalError("Cannot get `search_model_properties` when `search_model` does not exist.")
+        
         index_defaults = self.index_settings["index_defaults"]
         return get_model_properties_from_index_defaults(
             index_defaults=index_defaults, model_name=self.search_model_name, properties_key=NsField.search_model_properties

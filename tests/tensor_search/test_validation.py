@@ -1582,7 +1582,7 @@ class TestValidateModelProperties(unittest.TestCase):
             try:
                 validation.validate_model_name_and_properties(case)
                 raise AssertionError
-            except s2_inference_errors.UnknownModelError as e:
+            except InvalidArgError as e:
                 assert error_message in e.message
 
         # Valid cases

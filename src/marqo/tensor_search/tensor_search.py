@@ -156,10 +156,7 @@ def create_vector_index(
 
     if index_settings is not None:
         if NsField.index_defaults in index_settings:
-            try:
-                validation.validate_model_name_and_properties(index_settings)
-            except s2_inference_errors.UnknownModelError as e:
-                raise errors.InvalidArgError(message=str(e)) from e
+            validation.validate_model_name_and_properties(index_settings)
         the_index_settings = _autofill_index_settings(index_settings=index_settings)
     else:
         the_index_settings = configs.get_default_index_settings()
@@ -1474,6 +1471,18 @@ def gather_documents_from_response(resp: List[List[Dict[str, Any]]]) -> Dict[str
     return gathered_docs
 
 
+def determine_model_for_search_vectorisation(index_info: IndexInfo) -> Tuple[str, Dict[str, Any]]:
+    """
+    Returns search_model_name and search_model_properties for vectorising search queries if they exist.
+    If they don't, returns the model_name and model_properties.
+    This is for backwards compatibility for indexes without search_model.
+    """
+    if index_info.search_model_name is None:
+        return (index_info.model_name, index_info.get_model_properties())
+    
+    return (index_info.search_model_name, index_info.get_search_model_properties())
+
+
 def assign_query_to_vector_job(
         q: BulkSearchQueryEntity, jobs: Dict[JHash, VectorisedJobs], grouped_content: Tuple[List[str], List[str]],
         index_info: IndexInfo, device: str) -> List[VectorisedJobPointer]:
@@ -1499,11 +1508,14 @@ def assign_query_to_vector_job(
             "assign_query_to_vector_job() expects param `grouped_content` with 2 elems. Instead received"
             f" `grouped_content` with {len(grouped_content)} elems")
     ptrs = []
+
+    vectorise_model, vectorise_model_properties = determine_model_for_search_vectorisation(index_info)  # Use search_model if it exists, otherwise use model
+
     for i, grouped_content in enumerate(grouped_content):
         content_type = 'text' if i == 0 else 'image'
         vector_job = VectorisedJobs(
-            model_name=index_info.search_model_name,                      # search_model should be used to vectorise for all search queries.
-            model_properties=index_info.get_search_model_properties(),    # search_model should be used to vectorise for all search queries.
+            model_name=vectorise_model, 
+            model_properties=vectorise_model_properties,    
             content=grouped_content,
             device=device,
             normalize_embeddings=index_info.index_settings['index_defaults']['normalize_embeddings'],
