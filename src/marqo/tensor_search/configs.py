@@ -13,7 +13,9 @@ def get_default_index_settings():
             NsFields.text_preprocessing: {
                 NsFields.split_length: 2,
                 NsFields.split_overlap: 0,
-                NsFields.split_method: ns_enums.SplitMethod.sentence
+                NsFields.split_method: ns_enums.SplitMethod.sentence,
+                NsFields.override_text_chunk_prefix: None,
+                NsFields.override_text_query_prefix: None
             },
             # TODO move these into a processing dict with sub-dicts
             NsFields.image_preprocessing: {

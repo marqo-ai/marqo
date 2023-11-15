@@ -73,6 +73,18 @@ settings_schema = {
                             "examples": [
                                 "sentence"
                             ]
+                        },
+                        NsFields.override_text_chunk_prefix: {  # prefix override is optional
+                            "type": "string",
+                            "examples": [
+                                "passage: "
+                            ]
+                        },
+                        NsFields.override_text_query_prefix: {  # prefix override is optional
+                            "type": "string",
+                            "examples": [
+                                "query: "
+                            ]
                         }
                     },
                     "examples": [{

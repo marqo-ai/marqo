@@ -51,7 +51,7 @@ from marqo.tensor_search.enums import (
     EnvVars, MappingsObjectType, DocumentFieldType, ModelProperties
 )
 from marqo.tensor_search.enums import IndexSettingsField as NsField
-from marqo.tensor_search import utils, backend, validation, configs, add_docs, filtering
+from marqo.tensor_search import utils, backend, validation, configs, add_docs, filtering, create_index
 from marqo.tensor_search.formatting import _clean_doc
 from marqo.tensor_search.index_meta_cache import get_cache, get_index_info
 from marqo.tensor_search import index_meta_cache
@@ -143,6 +143,8 @@ def create_vector_index(
     else:
         the_index_settings = configs.get_default_index_settings()
 
+    # Override prefixes in model_properties and search_model_properties
+    the_index_settings = create_index.override_prefixes_in_model_properties(index_settings=the_index_settings)
     validation.validate_settings_object(settings_object=the_index_settings)
 
     vector_index_settings = {
@@ -255,6 +257,7 @@ def _autofill_index_settings(index_settings: dict):
         copied_settings[NsField.index_defaults][NsField.model] = MlModel.clip
 
     # text preprocessing subfields - fills any missing sub-dict fields if some of the first level are present
+    # TODO: Change autofill for override prefix if needed
     for key in list(default_settings[NsField.index_defaults][NsField.text_preprocessing]):
         if key not in copied_settings[NsField.index_defaults][NsField.text_preprocessing] or \
                 copied_settings[NsField.index_defaults][NsField.text_preprocessing][key] is None:
