@@ -1040,14 +1040,18 @@ def determine_text_query_prefix(request_level_prefix: str, index_info: IndexInfo
 
     Logic:
     1. Prioritize request-level prefix
-    2. If not provided, use model_properties defined prefix
+    2. If not provided, use search_model_properties defined prefix
+    3. If no search_model_properties, try model_properties (for backwards compatibility with v1.4.0 and below)
     3. If not provided, keep as None (will be handled by dict .get() method)
     """
 
     if request_level_prefix is not None:
         return request_level_prefix
     
-    model_prefix = index_info.get_model_properties().get(ModelProperties.text_query_prefix)
+    # TODO: Fix when search_model PR is merged in. Make sure it's backwards compatible.
+    model_prefix = index_info.get_search_model_properties().get(ModelProperties.text_query_prefix)
+
+
     return model_prefix
 
 
