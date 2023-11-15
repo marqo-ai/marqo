@@ -105,7 +105,7 @@ class Model(StrictBaseModel):
     properties: Optional[Dict[str, Any]]
     custom: bool = False
 
-    def get_dimension(self):
+    def get_dimension(self) -> int:
         self._update_model_properties_from_registry()
         try:
             return self.properties['dimensions']
