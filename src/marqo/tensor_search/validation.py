@@ -17,6 +17,7 @@ from marqo.tensor_search.models.search import SearchContext
 
 from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest
 from marqo.tensor_search.models.settings_object import settings_schema
+from marqo.core.unstructured_vespa_index.constants import UNSUPPORTED_FIELD_NAME_LIST
 from marqo.tensor_search.models.mappings_object import mappings_schema, multimodal_combination_schema
 
 
@@ -308,6 +309,26 @@ def validate_doc(doc: Dict) -> dict:
             raise DocTooLargeError(
                 f"Document{maybe_id} with length `{len(serialized)}` exceeds "
                 f"the allowed document size limit of [{max_doc_size}]."
+            )
+    return doc
+
+
+def validate_unstructured_doc_field_name(doc: Dict) -> Dict:
+    """
+    Args:
+        doc: a document indexed by the client
+    Raises:
+        errors.InvalidArgError, if any field consists of a substring in UNSUPPORTED_FIELD_NAME_LIST
+    Returns
+        doc if all validations pass
+    """
+
+    for field_name in doc:
+        if any(unsupported_string in field_name for unsupported_string in UNSUPPORTED_FIELD_NAME_LIST):
+            raise InvalidArgError(
+                f"Field name `{field_name}` contains a substring in"
+                f" UNSUPPORTED_FIELD_NAME_LIST: {UNSUPPORTED_FIELD_NAME_LIST} for an unstructured index. "
+                f"Please change the field name and avoid use these strings"
             )
     return doc
 

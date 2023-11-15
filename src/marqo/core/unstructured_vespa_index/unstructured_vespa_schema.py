@@ -3,23 +3,25 @@ import textwrap
 from marqo.core.models import MarqoIndex, UnstructuredMarqoIndex
 from marqo.core.models.marqo_index_request import UnstructuredMarqoIndexRequest
 from marqo.core.vespa_schema import VespaSchema
+from marqo.core.unstructured_vespa_index import common as unstructured_common
+from marqo.core import constants as index_constants
 
 
 class UnstructuredVespaSchema(VespaSchema):
-    _FIELD_ID = "marqo__id"
+    _FIELD_ID = index_constants.VESPA_FIELD_ID
 
-    _STRINGS = "marqo__strings"
-    _SHORT_STRINGS_FIELDS = "marqo__short_strings_fields"
-    _LONGS_STRINGS_FIELDS = "marqo__long_strings_fields"
-    _STRING_ARRAY = "marqo__string_array"
+    _STRINGS = unstructured_common.STRINGS
+    _SHORT_STRINGS_FIELDS = unstructured_common.SHORT_STRINGS_FIELDS
+    _LONGS_STRINGS_FIELDS = unstructured_common.LONGS_STRINGS_FIELDS
+    _STRING_ARRAY = unstructured_common.STRING_ARRAY
 
-    _INT_FIELDS = "marqo__int_fields"
-    _FLOAT_FIELDS = "marqo__float_fields"
+    _INT_FIELDS = unstructured_common.INT_FIELDS
+    _FLOAT_FIELDS = unstructured_common.FLOAT_FIELDS
 
-    _SCORE_MODIFIERS = "marqo__score_modifiers"
+    _SCORE_MODIFIERS = unstructured_common.SCORE_MODIFIERS
 
-    _CHUNKS = "marqo__chunks"
-    _EMBEDDINGS = "marqo__embeddings"
+    _CHUNKS = unstructured_common.VESPA_DOC_CHUNKS
+    _EMBEDDINGS = unstructured_common.VESPA_DOC_EMBEDDINGS
 
     _RANK_PROFILE_EMBEDDING_SIMILARITY = "embedding_similarity"
     _QUERY_INPUT_EMBEDDING = "embedding_query"

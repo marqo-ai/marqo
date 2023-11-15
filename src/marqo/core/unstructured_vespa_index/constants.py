@@ -2,3 +2,4 @@
 # Users will be able to filter on short strings, but not on long strings.
 SHORT_STRING_THRESHOLD = 20
 
+UNSUPPORTED_FIELD_NAME_LIST = ["::"]
