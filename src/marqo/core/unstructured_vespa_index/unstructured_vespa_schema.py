@@ -169,7 +169,7 @@ class UnstructuredVespaSchema(VespaSchema):
                         query(marqo__add_weights) tensor<float>(p{{}})
                     }}
                     function modify(score) {{
-                        expression: reduce(query(marqo__mult_weights), sum)
+                        expression: if (count(query(marqo__mult_weights)) == 0, 1, reduce(query(marqo__mult_weights) * attribute(marqo__score_modifiers), prod)) * score + reduce(query(marqo__add_weights) * attribute(marqo__score_modifiers), sum)
                    }}
                 }}
                 
