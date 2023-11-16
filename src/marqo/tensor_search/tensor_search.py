@@ -38,6 +38,8 @@ from timeit import default_timer as timer
 import functools
 import pprint
 import typing
+
+from marqo.errors import InvalidArgError
 from marqo.tensor_search.models.private_models import ModelAuth
 import uuid
 from typing import List, Optional, Union, Iterable, Sequence, Dict, Any, Tuple
@@ -52,6 +54,7 @@ from marqo.tensor_search.enums import (
 )
 from marqo.tensor_search.enums import IndexSettingsField as NsField
 from marqo.tensor_search import utils, backend, validation, configs, add_docs, filtering
+
 from marqo.tensor_search.formatting import _clean_doc
 from marqo.tensor_search.index_meta_cache import get_cache, get_index_info
 from marqo.tensor_search import index_meta_cache
@@ -61,7 +64,7 @@ from marqo.tensor_search.models.index_info import IndexInfo, get_model_propertie
 from marqo.tensor_search.models.external_apis.abstract_classes import ExternalAuth
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.tensor_search.health import generate_heath_check_response
-from marqo.tensor_search.utils import add_timing
+from marqo.tensor_search.utils import add_timing, read_env_vars_and_defaults_ints
 from marqo.tensor_search import delete_docs
 from marqo.s2_inference.processing import text as text_processor
 from marqo.s2_inference.processing import image as image_processor
@@ -76,6 +79,10 @@ from marqo._httprequests import HttpRequests
 from marqo.config import Config
 from marqo import errors
 from marqo.s2_inference import errors as s2_inference_errors
+
+from marqo_commons.settings_validation.settings_validation import validate_index_settings
+from marqo_commons.shared_utils.errors import InvalidSettingsArgError
+
 import threading
 from dataclasses import replace
 from marqo.tensor_search.tensor_search_logging import get_logger
@@ -143,7 +150,17 @@ def create_vector_index(
     else:
         the_index_settings = configs.get_default_index_settings()
 
-    validation.validate_settings_object(settings_object=the_index_settings)
+    try:
+        """Validates the index settings using validate_index_settings function from marqo-commons.
+        validate_index_settings on error raises InvalidSettingsArgError from marqo-commons.
+        To propagate native error catches InvalidSettingsArgError and raises InvalidArgError from marqo."""
+        validate_index_settings(
+            settings_to_validate=the_index_settings,
+            MAX_EF_CONSTRUCTION_VALUE=read_env_vars_and_defaults_ints(EnvVars.MARQO_EF_CONSTRUCTION_MAX_VALUE),
+            MAX_NUMBER_OF_REPLICAS=read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_NUMBER_OF_REPLICAS),
+        )
+    except InvalidSettingsArgError as e:
+        raise InvalidArgError(e)
 
     vector_index_settings = {
         "settings": {

@@ -2,12 +2,13 @@
 The functions defined here would have endpoints, later on.
 """
 import numpy as np
+from marqo_commons.model_registry.model_registry import get_model_properties_dict
 from marqo.errors import ModelCacheManagementError, InvalidArgError, ConfigurationError, InternalError, BadRequestError
 from marqo.s2_inference.errors import (
     VectoriseError, InvalidModelPropertiesError, ModelLoadError,
     UnknownModelError, ModelNotInCacheError, ModelDownloadError, IllegalVectoriseError)
 from PIL import UnidentifiedImageError
-from marqo.s2_inference.model_registry import load_model_properties
+from marqo.s2_inference.model_loaders import get_model_loaders
 from marqo.s2_inference.configs import get_default_normalization, get_default_seq_length
 from marqo.s2_inference.types import *
 from marqo.s2_inference.logger import get_logger
@@ -29,7 +30,8 @@ logger = get_logger(__name__)
 available_models = dict()
 # A lock to protect the model loading process
 lock = threading.Lock()
-MODEL_PROPERTIES = load_model_properties()
+MODEL_PROPERTIES = get_model_properties_dict()
+MODEL_LOADERS = get_model_loaders()
 
 
 def vectorise(model_name: str, content: Union[str, List[str]], model_properties: dict = None,
@@ -309,8 +311,8 @@ def get_model_size(model_name: str, model_properties: dict) -> (int, float):
     Return the model size for given model
     Note that the priorities are size_in_properties -> model_name -> model_type -> default size
     '''
-    if "model_size" in model_properties:
-        return model_properties["model_size"]
+    if "memory_size" in model_properties:
+        return model_properties["memory_size"]
 
     name_info = (model_name + model_properties.get("name", "")).lower().replace("/", "-")
     for name, size in constants.MODEL_NAME_SIZE_MAPPING.items():
@@ -384,11 +386,11 @@ def get_model_properties_from_registry(model_name: str) -> dict:
         dict: a dictionary describing properties of the model.
     """
 
-    if model_name not in MODEL_PROPERTIES['models']:
+    if model_name not in MODEL_PROPERTIES:
         raise UnknownModelError(f"Could not find model properties in model registry for model={model_name}. "
                                 f"Model is not supported by default.")
 
-    return MODEL_PROPERTIES['models'][model_name]
+    return MODEL_PROPERTIES[model_name]
 
 
 def _check_output_type(output: List[List[float]]) -> bool:
@@ -520,13 +522,14 @@ def _get_model_loader(model_name: str, model_properties: dict) -> Any:
 
     # `no_model` is a special case, we use the name instead of type.
     if model_name == SpecialModels.no_model:
-        return MODEL_PROPERTIES['loaders'][model_name]
+        return MODEL_LOADERS[model_name]
     
     model_type = model_properties['type']
-    if model_type not in MODEL_PROPERTIES['loaders']:
-        raise KeyError(f"model_name={model_name} for model_type={model_type} not in allowed model types")
 
-    return MODEL_PROPERTIES['loaders'][model_type]
+    if model_type not in MODEL_LOADERS:
+        raise KeyError(f"model_type={model_type} of model_name={model_name} is not in allowed model types")
+
+    return MODEL_LOADERS[model_type]
 
 
 def get_available_models():

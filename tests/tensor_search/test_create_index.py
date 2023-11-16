@@ -11,7 +11,6 @@ from marqo.tensor_search.utils import read_env_vars_and_defaults
 from tests.marqo_test import MarqoTestCase
 from marqo.tensor_search.enums import IndexSettingsField as NsField, TensorField
 from unittest import mock
-from marqo.tensor_search.models.settings_object import settings_schema
 from marqo import errors
 from marqo.errors import InvalidArgError
 
@@ -98,7 +97,7 @@ class TestCreateIndex(MarqoTestCase):
                 except IndexNotFoundError as s:
                     pass
                 
-                with self.assertRaises(errors.InvalidArgError):
+                with self.assertRaises(InvalidArgError):
                     print(f"index settings={idx_defaults}")
                     tensor_search.create_vector_index(
                         config=self.config,
@@ -335,8 +334,7 @@ class TestCreateIndex(MarqoTestCase):
 
     def test_set_number_of_replicas(self):
         intended_replicas_count = 4
-        from marqo.tensor_search.models.settings_object import settings_schema
-        with patch.dict(settings_schema["properties"][NsField.number_of_replicas], maximum=10):
+        with patch.dict(os.environ, {EnvVars.MARQO_MAX_NUMBER_OF_REPLICAS: "10"}):
             res_0 = tensor_search.create_vector_index(
                 index_name=self.index_name_1, config=self.config,
                 index_settings={
@@ -358,9 +356,8 @@ class TestCreateIndex(MarqoTestCase):
         maximum_number_of_replicas = 5
         large_intended_replicas_count = 10
         small_intended_replicas_count = 3
-        from marqo.tensor_search.models.settings_object import settings_schema
 
-        with patch.dict(settings_schema["properties"][NsField.number_of_replicas], maximum=maximum_number_of_replicas):
+        with patch.dict(os.environ, {EnvVars.MARQO_MAX_NUMBER_OF_REPLICAS: str(maximum_number_of_replicas)}):
             # a large value exceeding limits should not work
             try:
                 res_0 = tensor_search.create_vector_index(
@@ -424,6 +421,92 @@ class TestCreateIndex(MarqoTestCase):
             )
             assert maximum_number_of_replicas == int(
                 resp.json()[self.index_name_1]['settings']['index']['number_of_replicas'])
+
+    def test_configurable_ef_construction_value(self):
+        maximum_ef_construction_value = 100
+        large_intended_ef_construction_value = 200
+        small_intended_ef_construction_value = 50
+
+        with patch.dict(os.environ, {EnvVars.MARQO_EF_CONSTRUCTION_MAX_VALUE: str(maximum_ef_construction_value)}):
+            # a large value exceeding limits should not work
+            try:
+                res_0 = tensor_search.create_vector_index(
+                    index_name=self.index_name_1, config=self.config,
+                    index_settings={
+                        "index_defaults": {
+                            "treat_urls_and_pointers_as_images": True,
+                            "model": "ViT-B/32",
+                            "ann_parameters": {
+                                "parameters": {
+                                    "ef_construction": large_intended_ef_construction_value
+                                }
+                            },
+                        },
+                    }
+                )
+                raise AssertionError
+            except InvalidArgError as e:
+                pass
+
+            try:
+                tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+            except IndexNotFoundError:
+                pass
+
+            # a small value should work
+            res_1 = tensor_search.create_vector_index(
+                index_name=self.index_name_1, config=self.config,
+                index_settings={
+                    "index_defaults": {
+                        "treat_urls_and_pointers_as_images": True,
+                        "model": "ViT-B/32",
+                        "ann_parameters": {
+                            "parameters": {
+                                "ef_construction": small_intended_ef_construction_value
+                            }
+                    },
+                }
+                }
+            )
+            resp = requests.get(
+                url=self.authorized_url + f"/{self.index_name_1}",
+                headers=self.generic_header,
+                verify=False
+            )
+            assert small_intended_ef_construction_value == int(
+                resp.json()[self.index_name_1]["mappings"]["_meta"]["index_settings"]
+                ["index_defaults"]["ann_parameters"]["parameters"]["ef_construction"]
+            )
+
+            try:
+                tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+            except IndexNotFoundError:
+                pass
+
+            # the same number should also work
+            res_1 = tensor_search.create_vector_index(
+                index_name=self.index_name_1, config=self.config,
+                index_settings={
+                    "index_defaults": {
+                        "treat_urls_and_pointers_as_images": True,
+                        "model": "ViT-B/32",
+                        "ann_parameters": {
+                            "parameters": {
+                                "ef_construction": maximum_ef_construction_value
+                            }
+                        },
+                    },
+                }
+            )
+            resp = requests.get(
+                url=self.authorized_url + f"/{self.index_name_1}",
+                headers=self.generic_header,
+                verify=False
+            )
+            assert maximum_ef_construction_value == int(
+                resp.json()[self.index_name_1]["mappings"]["_meta"]["index_settings"]
+                ["index_defaults"]["ann_parameters"]["parameters"]["ef_construction"]
+            )
 
     def test_default_max_number_of_replicas(self):
         large_intended_replicas_count = 2
@@ -622,7 +705,7 @@ class TestCreateIndex(MarqoTestCase):
         try:
             tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings=bad_settings)
             raise AssertionError
-        except errors.InvalidArgError as e:
+        except InvalidArgError as e:
             pass
 
     def test_index_validation_good(self):

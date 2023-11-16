@@ -12,9 +12,7 @@ from marqo.errors import (
 from marqo.tensor_search.enums import TensorField, SearchMethod
 from marqo.tensor_search import constants
 from marqo.tensor_search.models.search import SearchContext
-
 from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest
-from marqo.tensor_search.models.settings_object import settings_schema
 from marqo.tensor_search.models.mappings_object import (
     mappings_schema, 
     multimodal_combination_mappings_schema,
@@ -418,24 +416,7 @@ def validate_index_name(name: str) -> str:
     return name
 
 
-def validate_settings_object(settings_object):
-    """validates index settings.
-    Returns
-        The given index settings if validation has passed
-
-    Raises an InvalidArgError if the settings object is badly formatted
-    """
-    try:
-        jsonschema.validate(instance=settings_object, schema=settings_schema)
-        return settings_object
-    except jsonschema.ValidationError as e:
-        raise InvalidArgError(
-            f"Error validating index settings object. Reason: \n{str(e)}"
-            f"\nRead about the index settings object here: https://docs.marqo.ai/0.0.13/API-Reference/indexes/#body"
-        )
-
-
-def validate_dict(field: str, field_content: Dict, is_non_tensor_field: bool, mappings: Dict, index_model_dimensions: int = None):
+def validate_dict(field: str, field_content: Dict, is_non_tensor_field: bool, mappings: Dict, index_model_dimensions: int = None) -> Dict:
     '''
 
     Args:
