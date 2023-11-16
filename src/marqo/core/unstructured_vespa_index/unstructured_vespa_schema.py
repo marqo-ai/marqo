@@ -87,9 +87,8 @@ class UnstructuredVespaSchema(VespaSchema):
                                            attribute: fast-search
                                            rank: filter }}
                         struct-field value {{ indexing : attribute
-                           attribute: fast-search
-                          rank: filter }}
-                        dictionary: hash
+                                              attribute: fast-search
+                                              rank: filter }}
                     }}
 
                     field {cls._STRING_ARRAY} type array<string> {{
@@ -106,7 +105,6 @@ class UnstructuredVespaSchema(VespaSchema):
                         struct-field value {{ indexing : attribute
                                            attribute: fast-search
                                            rank: filter }}
-                        dictionary: hash
                     }}
 
                     field {cls._FLOAT_FIELDS} type map<string, float> {{
@@ -118,7 +116,6 @@ class UnstructuredVespaSchema(VespaSchema):
                         struct-field value {{ indexing : attribute
                                            attribute: fast-search
                                            rank: filter }}
-                        dictionary: hash
                     }}
 
                     field {cls._SCORE_MODIFIERS} type tensor<float>(p{{}}) {{
@@ -126,7 +123,7 @@ class UnstructuredVespaSchema(VespaSchema):
                     }}
 
                     field {cls._CHUNKS} type array<string> {{
-                        indexing: attribute | summary
+                        indexing: summary
                     }}
 
                     field {cls._EMBEDDINGS} type tensor<float>(p{{}}, x[{dimension}]) {{
@@ -214,6 +211,7 @@ class UnstructuredVespaSchema(VespaSchema):
                     summary {cls._STRING_ARRAY} type array<string> {{}}
                     summary {cls._INT_FIELDS} type map<string, int> {{}}
                     summary {cls._FLOAT_FIELDS} type map<string, float> {{}}
+                    summary {cls._CHUNKS} type array<string> {{}}
                     summary {cls._EMBEDDINGS} type tensor<float>(p{{}}, x[{dimension}]) {{}}
                 }}
             }}

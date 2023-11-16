@@ -1,8 +1,8 @@
 # A file to store common variables shared between unstructured_vespa_index,
 # unstructured_vespa_schema, and unstructured_document.
 STRINGS = "marqo__strings"
-SHORT_STRINGS_FIELDS = "marqo__short_strings_fields"
-LONGS_STRINGS_FIELDS = "marqo__long_strings_fields"
+SHORT_STRINGS_FIELDS = "marqo__short_string_fields"
+LONGS_STRINGS_FIELDS = "marqo__long_string_fields"
 STRING_ARRAY = "marqo__string_array"
 
 INT_FIELDS = "marqo__int_fields"
