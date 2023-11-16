@@ -157,7 +157,7 @@ class UnstructuredVespaSchema(VespaSchema):
                     match-features: closest({cls._EMBEDDINGS})
                 }}
 
-                rank-profile bm25 inherits default {{
+                rank-profile {unstructured_common.RANK_PROFILE_BM25} inherits default {{
                     first-phase {{
                     expression: bm25({cls._STRINGS})
                     }}
@@ -171,6 +171,16 @@ class UnstructuredVespaSchema(VespaSchema):
                     function modify(score) {{
                         expression: if (count(query(marqo__mult_weights)) == 0, 1, reduce(query(marqo__mult_weights) * attribute(marqo__score_modifiers), prod)) * score + reduce(query(marqo__add_weights) * attribute(marqo__score_modifiers), sum)
                    }}
+                }}
+                
+                rank-profile {unstructured_common.RANK_PROFILE_BM25_MODIFIERS} inherits modifiers {{
+                    inputs {{
+                        query(marqo__mult_weights) tensor<float>(p{{}})
+                        query(marqo__add_weights) tensor<float>(p{{}})
+                    }}
+                    first-phase {{
+                        expression: modify(bm25({cls._STRINGS}))
+                    }}
                 }}
                 
                 rank-profile {cls._RANK_PROFILE_EMBEDDING_SIMILARITY_MODIFIERS} inherits modifiers {{

@@ -12,6 +12,8 @@ SCORE_MODIFIERS = "marqo__score_modifiers"
 
 RANK_PROFILE_EMBEDDING_SIMILARITY = "embedding_similarity"
 RANK_PROFILE_EMBEDDING_SIMILARITY_MODIFIERS = 'embedding_similarity_modifiers'
+RANK_PROFILE_BM25 = "bm25"
+RANK_PROFILE_BM25_MODIFIERS = "bm25_modifiers"
 
 QUERY_INPUT_EMBEDDING = "embedding_query"
 QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS = 'marqo__mult_weights'

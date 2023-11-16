@@ -13,7 +13,6 @@ import marqo.core.search.search_filter as search_filter
 from marqo.core.exceptions import InvalidDataTypeError, InvalidFieldNameError, VespaDocumentParsingError
 
 
-
 class UnstructuredVespaIndex(VespaIndex):
     def __init__(self, marqo_index: UnstructuredMarqoIndex):
         self._marqo_index = marqo_index
@@ -27,45 +26,14 @@ class UnstructuredVespaIndex(VespaIndex):
         return unstructured_document.to_marqo_document(return_highlights=return_highlights)
 
     def to_vespa_query(self, marqo_query: MarqoQuery) -> Dict[str, Any]:
-        # Verify attributes to retrieve, if defined
-        # TODO Attributes to retrieve 
-        # if marqo_query.attributes_to_retrieve is not None:
-        #     for att in marqo_query.attributes_to_retrieve:
-        #         if att not in marqo_index.field_map:
-        #             raise InvalidFieldNameError(
-        #                 f'Index {marqo_index.name} has no field {att}. '
-        #                 f'Available fields are {", ".join(marqo_index.field_map.keys())}'
-        #             )
-        
-        # TODO Add score modifiers
-        # Verify score modifiers, if defined
-        # if marqo_query.score_modifiers is not None:
-        #     for modifier in marqo_query.score_modifiers:
-        #         if modifier.field not in marqo_index.score_modifier_fields_names:
-        #             raise InvalidFieldNameError(
-        #                 f'Index {marqo_index.name} has no score modifier field {modifier.field}. '
-        #                 f'Available score modifier fields are {", ".join(marqo_index.score_modifier_fields_names)}'
-        #             )
-
         if isinstance(marqo_query, MarqoTensorQuery):
             return self._to_vespa_tensor_query(marqo_query)
-        
-        # TODO Add lexical and hybrid queries
-        # elif isinstance(marqo_query, MarqoLexicalQuery):
-        #     return cls._to_vespa_lexical_query(marqo_query, marqo_index)
-        # elif isinstance(marqo_query, MarqoHybridQuery):
-        #     return cls._to_vespa_hybrid_query(marqo_query, marqo_index)
-        # else:
-        #     raise InternalError(f'Unknown query type {type(marqo_query)}')
-    #
-    # @classmethod
-    # def _to_vespa_lexical_query(cls, marqo_query: MarqoLexicalQuery, marqo_index: MarqoIndex) -> Dict[str, Any]:
-    #     raise NotImplementedError()
-    #
-    # @classmethod
-    # def _to_vespa_hybrid_query(cls, marqo_query: MarqoHybridQuery, marqo_index: MarqoIndex) -> Dict[str, Any]:
-    #     raise NotImplementedError()
-    #
+        elif isinstance(marqo_query, MarqoLexicalQuery):
+            return self._to_vespa_lexical_query(marqo_query)
+        elif isinstance(marqo_query, MarqoHybridQuery):
+            return self._to_vespa_hybrid_query(marqo_query)
+        else:
+            raise InternalError(f'Unknown query type {type(marqo_query)}')
 
     def _to_vespa_tensor_query(self, marqo_query: MarqoTensorQuery) -> Dict[str, Any]:
         if marqo_query.searchable_attributes is not None:
@@ -170,7 +138,8 @@ class UnstructuredVespaIndex(VespaIndex):
         if marqo_query.filter is not None:
             return tree_to_filter_string(marqo_query.filter.root)
 
-    def _get_score_modifiers(self, marqo_query: MarqoQuery) -> \
+    @staticmethod
+    def _get_score_modifiers(marqo_query: MarqoQuery) -> \
             Optional[Dict[str, Dict[str, float]]]:
         if marqo_query.score_modifiers:
             mult_tensor = {}
@@ -191,82 +160,55 @@ class UnstructuredVespaIndex(VespaIndex):
 
         return None
 
+    def _to_vespa_lexical_query(self, marqo_query: MarqoLexicalQuery) -> Dict[str, Any]:
+        def _get_lexical_search_term(marqo_query: MarqoLexicalQuery) -> str:
+            if marqo_query.or_phrases:
+                or_terms = 'weakAnd(%s)' % ', '.join([
+                    f'default contains "{phrase}"' for phrase in marqo_query.or_phrases
+                ])
+            else:
+                or_terms = ''
+            if marqo_query.and_phrases:
+                and_terms = ' AND '.join([
+                    f'default contains "{phrase}"' for phrase in marqo_query.and_phrases
+                ])
+                if or_terms:
+                    and_terms = f' AND ({and_terms})'
+            else:
+                and_terms = ''
 
+            return f'{or_terms}{and_terms}'
 
-    # @classmethod
-    # def _get_select_attributes(cls, marqo_query: MarqoQuery) -> str:
-    #     if marqo_query.attributes_to_retrieve is not None:
-    #         return ', '.join(marqo_query.attributes_to_retrieve)
-    #     else:
-    #         return '*'
+        lexical_term = _get_lexical_search_term(marqo_query)
+        filter_term = self._get_filter_term(marqo_query)
+        if filter_term:
+            filter_term = f' AND {filter_term}'
+        else:
+            filter_term = ''
 
-    # @classmethod
-    # def _get_score_modifiers(cls, marqo_query: MarqoQuery) -> \
-    #         Optional[Dict[str, Dict[str, float]]]:
-    #     if marqo_query.score_modifiers:
-    #         mult_tensor = {}
-    #         add_tensor = {}
-    #         for modifier in marqo_query.score_modifiers:
-    #             if modifier.type == ScoreModifierType.Multiply:
-    #                 mult_tensor[modifier.field] = modifier.weight
-    #             elif modifier.type == ScoreModifierType.Add:
-    #                 add_tensor[modifier.field] = modifier.weight
-    #             else:
-    #                 raise InternalError(f'Unknown score modifier type {modifier.type}')
-    #
-    #         # Note one of these could be empty, but not both
-    #         return {
-    #             cls._QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS: mult_tensor,
-    #             cls._QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS: add_tensor
-    #         }
+        summary = unstructured_common.SUMMARY_ALL_VECTOR if marqo_query.expose_facets \
+            else unstructured_common.SUMMARY_ALL_NON_VECTOR
+        score_modifiers = self._get_score_modifiers(marqo_query)
 
-        return None
+        ranking = unstructured_common.RANK_PROFILE_BM25_MODIFIERS if score_modifiers \
+            else unstructured_common.RANK_PROFILE_BM25
 
-    # @classmethod
-    # def _get_filter_term(cls, marqo_query: MarqoQuery, marqo_index: MarqoIndex) -> Optional[str]:
-    #     def escape(s: str) -> str:
-    #         return s.replace('\\', '\\\\').replace('"', '\\"')
-    # 
-    #     def tree_to_filter_string(node: search_filter.Node) -> str:
-    #         if isinstance(node, search_filter.Operator):
-    #             if isinstance(node, search_filter.And):
-    #                 operator = 'AND'
-    #             elif isinstance(node, search_filter.Or):
-    #                 operator = 'OR'
-    #             else:
-    #                 raise InternalError(f'Unknown operator type {type(node)}')
-    # 
-    #             return f'({tree_to_filter_string(node.left)} {operator} {tree_to_filter_string(node.right)})'
-    #         elif isinstance(node, search_filter.Modifier):
-    #             if isinstance(node, search_filter.Not):
-    #                 return f'!({tree_to_filter_string(node.modified)})'
-    #             else:
-    #                 raise InternalError(f'Unknown modifier type {type(node)}')
-    #         elif isinstance(node, search_filter.Term):
-    #             # if node.field not in marqo_index.filterable_fields_names:
-    #             #     raise InvalidFieldNameError(
-    #             #         f'Index {marqo_index.name} has no filterable field {node.field}. '
-    #             #         f'Available filterable fields are: {", ".join(marqo_index.filterable_fields_names)}'
-    #             #     )
-    # 
-    #             # TODO Remove the validation and just use the base case
-    #             if isinstance(node, search_filter.EqualityTerm):
-    #                 # TODO Instead of using contains, use sameElement to replace this one
-    #                 return f'{node.field} contains "{escape(node.value)}"'
-    #             elif isinstance(node, search_filter.RangeTerm):
-    #                 # TODO Use sameElement to replace the range
-    #                 lower = f'{node.field} >= {node.lower}' if node.lower is not None else None
-    #                 upper = f'{node.field} <= {node.upper}' if node.upper is not None else None
-    #                 if lower and upper:
-    #                     return f'({lower} AND {upper})'
-    #                 elif lower:
-    #                     return lower
-    #                 elif upper:
-    #                     return upper
-    #                 else:
-    #                     raise InternalError('RangeTerm has no lower or upper bound')
-    # 
-    #             raise InternalError(f'Unknown node type {type(node)}')
-    # 
-    #     if marqo_query.filter is not None:
-    #         return tree_to_filter_string(marqo_query.filter.root)
+        query_inputs = {}
+
+        if score_modifiers:
+            query_inputs.update(score_modifiers)
+
+        query = {
+            'yql': f'select * from {marqo_query.index_name} where {lexical_term}{filter_term}',
+            'model_restrict': marqo_query.index_name,
+            'hits': marqo_query.limit,
+            'offset': marqo_query.offset,
+            'query_features': query_inputs,
+            'presentation.summary': summary,
+            'ranking': ranking
+        }
+        query = {k: v for k, v in query.items() if v is not None}
+        return query
+
+    def _to_vespa_hybrid_query(self, marqo_query: MarqoHybridQuery) -> Dict[str, Any]:
+        raise NotImplementedError()
