@@ -1480,6 +1480,7 @@ def determine_model_for_search_vectorisation(index_info: IndexInfo) -> Tuple[str
     if index_info.search_model_name is None:
         return (index_info.model_name, index_info.get_model_properties())
     
+    logger.debug(f"Using search_model for vectorising search queries: {index_info.search_model_name}")
     return (index_info.search_model_name, index_info.get_search_model_properties())
 
 

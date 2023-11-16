@@ -44,11 +44,11 @@ class TestGetQueryVectorsFromJobs(MarqoTestCase):
         ]
         self.index_info = IndexInfo(
             model_name="model_name", 
-            search_model_name="search_model_name",
+            search_model_name=None,
             properties={},  
             index_settings={
                 "index_defaults": {"treat_urls_and_pointers_as_images": False, "normalize_embeddings": False},
-                'model_name': 'test_model',
+                'model': 'test_model',
                 'model_properties': {'test': 'property'},
                 'content_type': 'text',
                 'image_download_headers': None
@@ -57,11 +57,11 @@ class TestGetQueryVectorsFromJobs(MarqoTestCase):
 
         self.index_info_with_normalize = IndexInfo(
             model_name="model_name", 
-            search_model_name="search_model_name",
+            search_model_name=None,
             properties={},  
             index_settings={
                 "index_defaults": {"treat_urls_and_pointers_as_images": False, "normalize_embeddings": True},
-                'model_name': 'test_model',
+                'model': 'test_model',
                 'model_properties': {'test': 'property'},
                 'content_type': 'text',
                 'image_download_headers': None
@@ -215,11 +215,11 @@ class TestCreateVectorJobs(MarqoTestCase):
 
         self.index_info = IndexInfo(
             model_name="model_name", 
-            search_model_name="search_model_name", 
+            search_model_name=None, 
             properties={},  
             index_settings={
                 "index_defaults": {"treat_urls_and_pointers_as_images": False, "normalize_embeddings": False},
-                'model_name': 'test_model',
+                'model': 'test_model',
                 'model_properties': {'test': 'property'},
                 'normalize_embeddings': True,
                 'content_type': 'text',
@@ -229,11 +229,11 @@ class TestCreateVectorJobs(MarqoTestCase):
 
         self.index_info2 = IndexInfo(
             model_name="model_name", 
-            search_model_name="search_model_name", 
+            search_model_name=None, 
             properties={},  
             index_settings={
                 "index_defaults": {"treat_urls_and_pointers_as_images": False, "normalize_embeddings": True},
-                'model_name': 'test_model',
+                'model': 'test_model',
                 'model_properties': {'test': 'property'},
                 'normalize_embeddings': True,
                 'content_type': 'text',

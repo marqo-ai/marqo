@@ -46,6 +46,20 @@ class TestBackend(MarqoTestCase):
         except IndexNotFoundError as s:
             pass
 
+    def test_get_index_info_no_search_model(self):
+        """
+        Indexes created with Marqo v.1.4.0 and earlier do not have search_model or search_model_properties.
+        Thus, backend response will not contain those fields in metadata.
+        For backwards compatibility, this method should populate `IndexInfo.search_model_name` with `None`.
+        """
+        mock_backend_response = {
+
+        }
+
+        index_info = backend.get_index_info(config=self.config, index_name=self.index_name_1)
+        assert index_info.search_model_name is None
+        
+
     def test_get_cluster_indices(self):
         tensor_search.create_vector_index(
             config=self.config, index_name=self.index_name_1)

@@ -378,3 +378,43 @@ class TestIndexWithSearchModel(MarqoTestCase):
         assert loaded_models[0]["model_name"] == "ViT-B/32"     # ViT-B-32 should not be loaded
         assert loaded_models[0]["model_device"] == "cpu"
     
+
+class TestSearchModelUtils(MarqoTestCase):
+    def test_determine_model_for_search_vectorisation(self):
+        """
+        Should use search model when available.
+        Use model otherwise.
+        """
+        info_with_search_model = IndexInfo(
+            model_name="model_that_exists", 
+            search_model_name="search_model_that_exists", properties={},
+            index_settings={
+                "index_defaults": {
+                    "treat_urls_and_pointers_as_images": False, 
+                    "normalize_embeddings": False,
+                    'model': "model_that_exists",
+                    'model_properties': {"dimensions": 12345},
+                    'search_model': "search_model_that_exists",
+                    'search_model_properties': {"dimensions": 6789},
+                }
+            }
+        )
+
+        info_with_no_search_model = IndexInfo(
+            model_name="model_that_exists", 
+            search_model_name=None, properties={},
+            index_settings={
+                "index_defaults": {
+                    "treat_urls_and_pointers_as_images": False, 
+                    "normalize_embeddings": False,
+                    'model': "model_that_exists",
+                    'model_properties': {"dimensions": 12345},
+                },
+            }
+        )
+
+        assert tensor_search.determine_model_for_search_vectorisation(info_with_search_model) == \
+            ("search_model_that_exists", {"dimensions": 6789})
+        
+        assert tensor_search.determine_model_for_search_vectorisation(info_with_no_search_model) == \
+            ("model_that_exists", {"dimensions": 12345})
