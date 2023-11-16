@@ -52,11 +52,84 @@ class TestBackend(MarqoTestCase):
         Thus, backend response will not contain those fields in metadata.
         For backwards compatibility, this method should populate `IndexInfo.search_model_name` with `None`.
         """
-        mock_backend_response = {
 
-        }
+        mock__get = mock.MagicMock()
+        
+        # Sample backend response from OpenSearch (with no search_model)
+        mock__get.return_value = {
+            self.index_name_1: {
+                'mappings': {
+                    '_meta': {
+                        'index_settings': {
+                            'index_defaults': {
+                                'ann_parameters': {
+                                    'engine': 'lucene',
+                                    'name': 'hnsw',
+                                    'parameters': {
+                                        'ef_construction': 128,
+                                        'm': 16
+                                    },
+                                    'space_type': 'cosinesimil'
+                                },
+                                'image_preprocessing': {'patch_method': None},
+                                'model': 'ViT-L/14',
+                                'normalize_embeddings': True,
+                                'text_preprocessing': {'split_length': 2,
+                                                        'split_method': 'sentence',
+                                                        'split_overlap': 0},
+                                'treat_urls_and_pointers_as_images': True
+                            },
+                            'number_of_replicas': 0,
+                            'number_of_shards': 3
+                        },
+                        'media_type': 'text',
+                        'model': 'ViT-L/14'
+                    },
+                    'dynamic_templates': [{'strings': {'mapping': {'type': 'text'}, 'match_mapping_type': 'string'}}],
+                    'properties': {'Title': {'type': 'text'},
+                    '__chunks': {
+                        'properties': {
+                            'Title': {
+                                'ignore_above': 32766,
+                                'type': 'keyword'
+                            },
+                            '__field_content': {'type': 'text'},
+                            '__field_name': {'type': 'keyword'},
+                            '__vector_marqo_knn_field': {
+                                'dimension': 768,
+                                'method': {
+                                    'engine': 'lucene',
+                                    'name': 'hnsw',
+                                    'parameters': {
+                                        'ef_construction': 128,
+                                        'm': 16
+                                    },
+                                    'space_type': 'cosinesimil'
+                                },
+                                'type': 'knn_vector'
+                            },
+                            'captioned_image': {
+                                'properties': {
+                                    'caption': {
+                                        'ignore_above': 32766,
+                                        'type': 'keyword'
+                                    },
+                                    'image': {'ignore_above': 32766, 'type': 'keyword'}
+                                }
+                            }
+                        },
+                        'type': 'nested'
+                    },
+                    'captioned_image': {
+                        'properties': {'caption': {'type': 'text'},
+                                        'image': {'type': 'text'}
+                                    }}}}}}
 
-        index_info = backend.get_index_info(config=self.config, index_name=self.index_name_1)
+        @mock.patch("marqo._httprequests.HttpRequests.get", mock__get)
+        def run():
+            return backend.get_index_info(config=self.config, index_name=self.index_name_1)
+        
+        index_info = run()
         assert index_info.search_model_name is None
         
 
