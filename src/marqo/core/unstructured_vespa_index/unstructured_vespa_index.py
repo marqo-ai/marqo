@@ -1,4 +1,4 @@
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from marqo.core.models import MarqoQuery
 from marqo.core.models.marqo_index import UnstructuredMarqoIndex
@@ -8,6 +8,10 @@ from marqo.core.unstructured_vespa_index import common as unstructured_common
 from marqo.core.unstructured_vespa_index.unstructured_document import UnstructuredIndexDocument
 from marqo.core.models.marqo_query import (MarqoTensorQuery, MarqoLexicalQuery, MarqoHybridQuery,
                                            ScoreModifierType, ScoreModifier)
+from marqo.exceptions import InternalError
+import marqo.core.search.search_filter as search_filter
+from marqo.core.exceptions import InvalidDataTypeError, InvalidFieldNameError, VespaDocumentParsingError
+
 
 
 class UnstructuredVespaIndex(VespaIndex):
@@ -68,12 +72,12 @@ class UnstructuredVespaIndex(VespaIndex):
             raise RuntimeError("searchable_attributes is not supported for an UnStructured Index")
 
         tensor_term = self._get_tensor_search_term(marqo_query)
-        # TODO Add filter term
-        # filter_term = self._get_filter_term(marqo_query)
-        # if filter_term:
-        #     filter_term = f' AND {filter_term}'
-        # else:
-        filter_term = ''
+
+        filter_term = self._get_filter_term(marqo_query)
+        if filter_term:
+            filter_term = f' AND {filter_term}'
+        else:
+            filter_term = ''
 
         select_attributes = "*"
 
@@ -105,12 +109,67 @@ class UnstructuredVespaIndex(VespaIndex):
 
         return query
 
-    @classmethod
     def _get_tensor_search_term(self, marqo_query: MarqoQuery) -> str:
         field_to_search = unstructured_common.VESPA_DOC_EMBEDDINGS
 
         return (f"({{targetHits:{marqo_query.limit}, approximate:{str(marqo_query.approximate)}}}"
                 f"nearestNeighbor({field_to_search}, {unstructured_common.QUERY_INPUT_EMBEDDING}))")
+
+    def _get_filter_term(self, marqo_query: MarqoQuery) -> Optional[str]:
+        def escape(s: str) -> str:
+            return s.replace('\\', '\\\\').replace('"', '\\"')
+
+        def generate_equality_filter_string(node: search_filter.EqualityTerm) -> str:
+
+            short_string_filter_string = f'({unstructured_common.SHORT_STRINGS_FIELDS} ' \
+                                         f'contains sameElement(key contains "{node.field}", ' \
+                                         f'value contains "{escape(node.value)}"))'
+
+            string_array_filter_string = f'({unstructured_common.STRING_ARRAY} contains ' \
+                                         f'"{node.field}::{escape(node.value)}")'
+
+            return f'({short_string_filter_string} OR {string_array_filter_string})'
+
+        def generate_range_filter_string(node: search_filter.RangeTerm) -> str:
+            lower = f'value >= {node.lower}' if node.lower is not None else ""
+            higher = f'value <= {node.upper}' if node.upper is not None else ""
+            bound = f'{lower}, {higher}' if lower and higher else f'{lower}{higher}'
+            if not bound:
+                raise InternalError('RangeTerm has no lower or upper bound')
+
+            float_field_string = (f'({unstructured_common.FLOAT_FIELDS} contains '
+                                  f'sameElement(key contains "{node.field}", {bound}))')
+
+            int_field_string = (f'({unstructured_common.INT_FIELDS} contains '
+                                f'sameElement(key contains "{node.field}", {bound}))')
+
+            return f'{float_field_string} OR {int_field_string}'
+
+        def tree_to_filter_string(node: search_filter.Node) -> str:
+            if isinstance(node, search_filter.Operator):
+                if isinstance(node, search_filter.And):
+                    operator = 'AND'
+                elif isinstance(node, search_filter.Or):
+                    operator = 'OR'
+                else:
+                    raise InternalError(f'Unknown operator type {type(node)}')
+                return f'({tree_to_filter_string(node.left)} {operator} {tree_to_filter_string(node.right)})'
+            elif isinstance(node, search_filter.Modifier):
+                if isinstance(node, search_filter.Not):
+                    return f'!({tree_to_filter_string(node.modified)})'
+                else:
+                    raise InternalError(f'Unknown modifier type {type(node)}')
+            elif isinstance(node, search_filter.Term):
+                if isinstance(node, search_filter.EqualityTerm):
+                    return generate_equality_filter_string(node)
+                elif isinstance(node, search_filter.RangeTerm):
+                    return generate_range_filter_string(node)
+            raise InternalError(f'Unknown node type {type(node)}')
+
+        if marqo_query.filter is not None:
+            return tree_to_filter_string(marqo_query.filter.root)
+
+
 
     # @classmethod
     # def _get_select_attributes(cls, marqo_query: MarqoQuery) -> str:
