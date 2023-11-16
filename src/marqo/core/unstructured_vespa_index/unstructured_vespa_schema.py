@@ -24,6 +24,8 @@ class UnstructuredVespaSchema(VespaSchema):
     _EMBEDDINGS = unstructured_common.VESPA_DOC_EMBEDDINGS
 
     _RANK_PROFILE_EMBEDDING_SIMILARITY = "embedding_similarity"
+    _RANK_PROFILE_EMBEDDING_SIMILARITY_MODIFIERS = unstructured_common.RANK_PROFILE_EMBEDDING_SIMILARITY_MODIFIERS
+
     _QUERY_INPUT_EMBEDDING = "embedding_query"
 
     _SUMMARY_ALL_NON_VECTOR = 'all-non-vector-summary'
@@ -119,9 +121,8 @@ class UnstructuredVespaSchema(VespaSchema):
                         dictionary: hash
                     }}
 
-
                     field {cls._SCORE_MODIFIERS} type tensor<float>(p{{}}) {{
-                        indexing: attribute
+                        indexing: attribute | summary
                     }}
 
                     field {cls._CHUNKS} type array<string> {{
@@ -160,6 +161,28 @@ class UnstructuredVespaSchema(VespaSchema):
                     first-phase {{
                     expression: bm25({cls._STRINGS})
                     }}
+                }}
+                
+                rank-profile modifiers inherits default {{
+                    inputs {{
+                        query(marqo__mult_weights) tensor<float>(p{{}})
+                        query(marqo__add_weights) tensor<float>(p{{}})
+                    }}
+                    function modify(score) {{
+                        expression: reduce(query(marqo__mult_weights), sum)
+                   }}
+                }}
+                
+                rank-profile {cls._RANK_PROFILE_EMBEDDING_SIMILARITY_MODIFIERS} inherits modifiers {{
+                    inputs {{
+                        query(marqo__mult_weights) tensor<float>(p{{}})
+                        query(marqo__add_weights) tensor<float>(p{{}})
+                        query({cls._QUERY_INPUT_EMBEDDING}) tensor<float>(x[{dimension}])
+                    }}
+                    first-phase {{
+                        expression: modify(closeness(field, {cls._EMBEDDINGS}))
+                    }}
+                    match-features: closest({cls._EMBEDDINGS})
                 }}
 
                 document-summary {cls._SUMMARY_ALL_NON_VECTOR} {{

@@ -83,18 +83,17 @@ class UnstructuredVespaIndex(VespaIndex):
 
         summary = unstructured_common.SUMMARY_ALL_VECTOR if marqo_query.expose_facets else unstructured_common.SUMMARY_ALL_NON_VECTOR
 
-        # score_modifiers = self._get_score_modifiers(marqo_query)
+        score_modifiers = self._get_score_modifiers(marqo_query)
 
-        # ranking = self._RANK_PROFILE_EMBEDDING_SIMILARITY_MODIFIERS if score_modifiers \
-        #     else self._RANK_PROFILE_EMBEDDING_SIMILARITY
-        ranking = unstructured_common.RANK_PROFILE_EMBEDDING_SIMILARITY
+        ranking = unstructured_common.RANK_PROFILE_EMBEDDING_SIMILARITY_MODIFIERS if score_modifiers \
+            else unstructured_common.RANK_PROFILE_EMBEDDING_SIMILARITY
 
         query_inputs = {
             unstructured_common.QUERY_INPUT_EMBEDDING: marqo_query.vector_query
         }
-        #
-        # if score_modifiers:
-        #     query_inputs.update(score_modifiers)
+
+        if score_modifiers:
+            query_inputs.update(score_modifiers)
 
         query = {
             'yql': f"select {select_attributes} from {marqo_query.index_name} where {tensor_term}{filter_term}",
@@ -109,13 +108,15 @@ class UnstructuredVespaIndex(VespaIndex):
 
         return query
 
-    def _get_tensor_search_term(self, marqo_query: MarqoQuery) -> str:
+    @staticmethod
+    def _get_tensor_search_term(marqo_query: MarqoQuery) -> str:
         field_to_search = unstructured_common.VESPA_DOC_EMBEDDINGS
 
         return (f"({{targetHits:{marqo_query.limit}, approximate:{str(marqo_query.approximate)}}}"
                 f"nearestNeighbor({field_to_search}, {unstructured_common.QUERY_INPUT_EMBEDDING}))")
 
-    def _get_filter_term(self, marqo_query: MarqoQuery) -> Optional[str]:
+    @staticmethod
+    def _get_filter_term(marqo_query: MarqoQuery) -> Optional[str]:
         def escape(s: str) -> str:
             return s.replace('\\', '\\\\').replace('"', '\\"')
 
@@ -169,6 +170,27 @@ class UnstructuredVespaIndex(VespaIndex):
         if marqo_query.filter is not None:
             return tree_to_filter_string(marqo_query.filter.root)
 
+    def _get_score_modifiers(self, marqo_query: MarqoQuery) -> \
+            Optional[Dict[str, Dict[str, float]]]:
+        if marqo_query.score_modifiers:
+            mult_tensor = {}
+            add_tensor = {}
+            for modifier in marqo_query.score_modifiers:
+                if modifier.type == ScoreModifierType.Multiply:
+                    mult_tensor[modifier.field] = modifier.weight
+                elif modifier.type == ScoreModifierType.Add:
+                    add_tensor[modifier.field] = modifier.weight
+                else:
+                    raise InternalError(f'Unknown score modifier type {modifier.type}')
+
+            # Note one of these could be empty, but not both
+            return {
+                unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS: mult_tensor,
+                unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS: add_tensor
+            }
+
+        return None
+
 
 
     # @classmethod
@@ -191,7 +213,7 @@ class UnstructuredVespaIndex(VespaIndex):
     #                 add_tensor[modifier.field] = modifier.weight
     #             else:
     #                 raise InternalError(f'Unknown score modifier type {modifier.type}')
-    # 
+    #
     #         # Note one of these could be empty, but not both
     #         return {
     #             cls._QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS: mult_tensor,

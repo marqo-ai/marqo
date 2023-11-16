@@ -1,4 +1,4 @@
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Union
 from copy import deepcopy
 
 from pydantic import Field, BaseModel
@@ -11,11 +11,12 @@ class UnstructuredVespaDocumentFields(BaseModel):
     """A class with fields that are common to all Vespa documents."""
     marqo__id: str = Field(default_factory=str, alias=index_constants.VESPA_FIELD_ID)
     strings: List[str] = Field(default_factory=list, alias=unstructured_common.STRINGS)
-    long_string_fields: Dict[str, str]= Field(default_factory=dict, alias=unstructured_common.LONGS_STRINGS_FIELDS)
+    long_string_fields: Dict[str, str] = Field(default_factory=dict, alias=unstructured_common.LONGS_STRINGS_FIELDS)
     short_string_fields: Dict[str, str] = Field(default_factory=dict, alias=unstructured_common.SHORT_STRINGS_FIELDS)
     string_arrays: List[str] = Field(default_factory=list, alias=unstructured_common.STRING_ARRAY)
     int_fields: Dict[str, int] = Field(default_factory=dict, alias=unstructured_common.INT_FIELDS)
     float_fields: Dict[str, float] = Field(default_factory=dict, alias=unstructured_common.FLOAT_FIELDS)
+    score_modifiers_fields: Dict[str, Union[float,int]] = Field(default_factory=dict, alias=unstructured_common.SCORE_MODIFIERS)
     marqo_chunks: List[str] = Field(default_factory=list, alias=unstructured_common.VESPA_DOC_CHUNKS)
     marqo_embeddings: Dict = Field(default_factory=dict, alias=unstructured_common.VESPA_DOC_EMBEDDINGS)
     match_features: Dict[str, Any] = Field(default_factory=dict, alias=index_constants.VESPA_DOC_MATCH_FEATURES)
@@ -110,8 +111,11 @@ class UnstructuredIndexDocument(BaseModel):
                 instance.fields.string_arrays.extend([f"{key}::{element}" for element in value])
             elif isinstance(value, int):
                 instance.fields.int_fields[key] = value
+                instance.fields.score_modifiers_fields[key] = value
             elif isinstance(value, float):
                 instance.fields.float_fields[key] = value
+                instance.fields.score_modifiers_fields[key] = value
+
 
         instance.fields.marqo__id = instance.id
         instance.fields.marqo_embeddings = copied.get(index_constants.MARQO_DOC_EMBEDDINGS, {})
