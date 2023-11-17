@@ -1,4 +1,4 @@
-FROM marqoai/marqo-base:15 as base_image
+FROM marqoai/marqo-base:test-open-clip-upgrade as base_image
 VOLUME /var/lib/docker
 ARG TARGETPLATFORM
 WORKDIR /app
