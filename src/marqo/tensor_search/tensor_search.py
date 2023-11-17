@@ -75,6 +75,7 @@ from marqo.tensor_search.enums import (
     EnvVars
 )
 from marqo.core.models.marqo_index import IndexType
+import marqo.core.unstructured_vespa_index.common as unstructured_common
 from marqo.tensor_search.enums import IndexSettingsField as NsField
 from marqo.tensor_search.formatting import _clean_doc
 from marqo.tensor_search.health import generate_heath_check_response
@@ -495,10 +496,10 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                             constants.MARQO_DOC_TENSORS in existing_docs_dict[doc_id] and
                             field in existing_docs_dict[doc_id][constants.MARQO_DOC_TENSORS]
                     ):
-                        chunks = existing_docs_dict[doc_id][constants.MARQO_DOC_TENSORS][field][
-                            constants.MARQO_DOC_CHUNKS]
-                        embeddings = existing_docs_dict[doc_id][constants.MARQO_DOC_TENSORS][field][
-                            constants.MARQO_DOC_EMBEDDINGS]
+                        chunks: List[str] = [f"{field}::{content}" for content in existing_docs_dict[doc_id][constants.MARQO_DOC_TENSORS][field][
+                            constants.MARQO_DOC_CHUNKS]]
+                        embeddings: List[List[float]] = [existing_docs_dict[doc_id][constants.MARQO_DOC_TENSORS][field][
+                            constants.MARQO_DOC_EMBEDDINGS]]
                         logger.debug(f"Using existing tensors for field {field} for doc {doc_id}")
                     else:
                         # Happens if this wasn't a tensor field last time we indexed this doc
@@ -620,52 +621,62 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
 
                     field_content: Dict[str, str] = utils.extract_multimodal_content(copied, multimodal_params)
 
-                    # # chunk and embeddings generated from this multimodal field
-                    # combo_chunk: List[str] = []
-                    # combo_embeddings: List[List[float]] = []
+                    combo_chunk: Optional[str] = None
 
-                    # if (
-                    #         add_docs_params.use_existing_tensors and
-                    #         doc_id in existing_docs_dict
-                    # ):
-                    #     existing_doc = existing_docs_dict[doc_id]
-                    #     current_field_contents = utils.extract_multimodal_content(existing_doc, multimodal_params)
-                    #
-                    #     current_weights = existing_doc.get(field_name) or marqo_field.dependent_fields
-                    #     if (
-                    #             field_content == current_field_contents and
-                    #             current_weights == mappings['weights'] and
-                    #             field_name in existing_doc[constants.MARQO_DOC_TENSORS]
-                    #     ):
-                    #         chunks = existing_doc[constants.MARQO_DOC_TENSORS][field_name][
-                    #             constants.MARQO_DOC_CHUNKS]
-                    #         embeddings = existing_doc[constants.MARQO_DOC_TENSORS][field_name][
-                    #             constants.MARQO_DOC_EMBEDDINGS]
-                    #         logger.debug(
-                    #             f"Using existing tensors for multimodal combination field {field_name} for doc {doc_id}"
-                    #         )
-                    #     else:
-                    #         logger.debug(
-                    #             f'Not using existing tensors for multimodal combination field {field_name} for '
-                    #             f'doc {doc_id} because field content or config has changed')
+                    if (
+                            add_docs_params.use_existing_tensors and
+                            doc_id in existing_docs_dict
+                    ):
+                        existing_doc = existing_docs_dict[doc_id]
+                        current_field_contents = utils.extract_multimodal_content(existing_doc, multimodal_params)
+                        current_multimodal_params = existing_doc[unstructured_common.MARQO_DOC_MULTIMODAL_PARAMS][field_name]
+                        if (
+                                field_content == current_field_contents and
+                                current_multimodal_params == multimodal_params and
+                                field_name in existing_doc[constants.MARQO_DOC_TENSORS]
+                        ):
+                            combo_chunk = f"{field_name}::{existing_doc[constants.MARQO_DOC_TENSORS][field_name][constants.MARQO_DOC_CHUNKS]}"
+                            combo_embeddings = existing_doc[constants.MARQO_DOC_TENSORS][field_name][
+                                constants.MARQO_DOC_EMBEDDINGS]
 
-                    if field_content: # Check if the subfields are present
-                        (combo_chunk, combo_embeddings, combo_document_is_valid,
-                         unsuccessful_doc_to_append,
-                         combo_vectorise_time_to_add) = vectorise_multimodal_combination_field_unstructured(field_name,
-                            field_content, i, doc_id, add_docs_params.device, marqo_index,
-                            image_repo, add_docs_params.mappings[field_name], model_auth=add_docs_params.model_auth)
+                            if unstructured_common.MARQO_DOC_MULTIMODAL_PARAMS not in copied:
+                                copied[unstructured_common.MARQO_DOC_MULTIMODAL_PARAMS] = {}
+                            copied[unstructured_common.MARQO_DOC_MULTIMODAL_PARAMS][field_name] = json.dumps(multimodal_params)
+                            processed_tensor_fields.append(combo_chunk)
+                            embeddings_list.append(combo_embeddings)
 
-                        total_vectorise_time = total_vectorise_time + combo_vectorise_time_to_add
-                        if combo_document_is_valid is False:
-                            document_is_valid = False
-                            unsuccessful_docs.append(unsuccessful_doc_to_append)
-                            break
+                            logger.debug(
+                                f"Using existing tensors for multimodal combination field {field_name} for doc {doc_id}"
+                            )
                         else:
-                            processed_tensor_fields.extend(combo_chunk)
-                            embeddings_list.extend(combo_embeddings)
-                    else:
-                        continue
+                            logger.debug(
+                                f'Not using existing tensors for multimodal combination field {field_name} for '
+                                f'doc {doc_id} because field content or config has changed')
+
+                    # Use_existing tensor does not apply, or we didn't find it, then we vectorise
+                    if combo_chunk is None:
+                        if field_content: # Check if the subfields are present
+                            (combo_chunk, combo_embeddings, combo_document_is_valid,
+                             unsuccessful_doc_to_append,
+                             combo_vectorise_time_to_add) = vectorise_multimodal_combination_field_unstructured(field_name,
+                                field_content, i, doc_id, add_docs_params.device, marqo_index,
+                                image_repo, multimodal_params, model_auth=add_docs_params.model_auth)
+
+                            total_vectorise_time = total_vectorise_time + combo_vectorise_time_to_add
+                            if combo_document_is_valid is False:
+                                document_is_valid = False
+                                unsuccessful_docs.append(unsuccessful_doc_to_append)
+                                break
+                            else:
+
+                                if unstructured_common.MARQO_DOC_MULTIMODAL_PARAMS not in copied:
+                                    copied[unstructured_common.MARQO_DOC_MULTIMODAL_PARAMS] = {}
+
+                                copied[unstructured_common.MARQO_DOC_MULTIMODAL_PARAMS][field_name] = json.dumps(multimodal_params)
+                                processed_tensor_fields.append(combo_chunk)
+                                embeddings_list.append(combo_embeddings)
+                        else:
+                            continue
 
             if document_is_valid:
                 if processed_tensor_fields:
@@ -2403,7 +2414,7 @@ def get_cuda_info() -> dict:
 
 
 def vectorise_multimodal_combination_field_unstructured(field:str,
-        multimodal_object: Dict[str, str],doc_index: int,
+        field_content: Dict[str, str], doc_index: int,
         doc_id:str, device:str, marqo_index: UnstructuredMarqoIndex, image_repo, field_map:dict,
         model_auth: Optional[ModelAuth] = None
 ):
@@ -2414,7 +2425,7 @@ def vectorise_multimodal_combination_field_unstructured(field:str,
     2. we don't use image repo for concurrent downloading.
     Args:
         field_name: the name of the multimodal
-        multimodal_object: the subfields name and content, e.g.,
+        field_content: the subfields name and content, e.g.,
             {"subfield_one" : "content-1",
              "subfield_two" : "content-2"},
         unsuccessful_docs: a list to store all the unsuccessful documents
@@ -2440,7 +2451,7 @@ def vectorise_multimodal_combination_field_unstructured(field:str,
     new_fields_from_multimodal_combination = set()
 
     # Copy the important mutable objects from main body for safety purpose
-    multimodal_object_copy = copy.deepcopy(multimodal_object)
+    field_content_copy = copy.deepcopy(field_content)
 
     # 4 lists to store the field name and field content to vectorise.
     text_field_names = []
@@ -2453,12 +2464,12 @@ def vectorise_multimodal_combination_field_unstructured(field:str,
     infer_if_image = marqo_index.treat_urls_and_pointers_as_images
 
     if infer_if_image is False:
-        text_field_names = list(multimodal_object.keys())
-        text_content_to_vectorise = list(multimodal_object.values())
+        text_field_names = list(field_content.keys())
+        text_content_to_vectorise = list(field_content.values())
         new_fields_from_multimodal_combination =set([(sub_field_name, _infer_opensearch_data_type(sub_content)) for sub_field_name
-        , sub_content in multimodal_object.items()])
+        , sub_content in field_content.items()])
     else:
-        for sub_field_name, sub_content in multimodal_object.items():
+        for sub_field_name, sub_content in field_content.items():
             if isinstance(sub_content, str) and not _is_image(sub_content):
                 text_field_names.append(sub_field_name)
                 text_content_to_vectorise.append(sub_content)
@@ -2519,7 +2530,7 @@ def vectorise_multimodal_combination_field_unstructured(field:str,
         )
     except s2_inference_errors.S2InferenceError:
         combo_document_is_valid = False
-        image_err = errors.InvalidArgError(message=f'Could not process given image: {multimodal_object_copy}')
+        image_err = errors.InvalidArgError(message=f'Could not process given image: {field_content_copy}')
         unsuccessful_doc_to_append = \
             (doc_index, {'_id': doc_id, 'error': image_err.message, 'status': int(image_err.status_code),
                  'code': image_err.code})
@@ -2538,7 +2549,7 @@ def vectorise_multimodal_combination_field_unstructured(field:str,
         vector_chunk = vector_chunk / np.linalg.norm(vector_chunk)
 
     combo_embeddings: List[float] = vector_chunk.tolist()
-    combo_chunk: str = f"{field}::{json.dumps(multimodal_object)}"
+    combo_chunk: str = f"{field}::{json.dumps(field_content)}"
 
     return combo_chunk, combo_embeddings, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add,
 

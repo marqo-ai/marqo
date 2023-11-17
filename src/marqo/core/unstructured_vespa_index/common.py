@@ -19,6 +19,9 @@ QUERY_INPUT_EMBEDDING = "embedding_query"
 QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS = 'marqo__mult_weights'
 QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS = 'marqo__add_weights'
 
+MARQO_DOC_MULTIMODAL_PARAMS = "multimodal_params"
+VESPA_DOC_MULTIMODAL_PARAMS = "marqo__multimodal_params"
+
 SUMMARY_ALL_NON_VECTOR = 'all-non-vector-summary'
 SUMMARY_ALL_VECTOR = 'all-vector-summary'
 

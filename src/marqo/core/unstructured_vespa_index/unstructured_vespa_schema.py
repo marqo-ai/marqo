@@ -96,6 +96,10 @@ class UnstructuredVespaSchema(VespaSchema):
                         attribute: fast-search
                         rank: filter
                     }}
+                    
+                    field {unstructured_common.VESPA_DOC_MULTIMODAL_PARAMS} type map<string, string> {{
+                        indexing: summary
+                    }}
 
                     field {cls._INT_FIELDS} type map<string, int> {{
                         indexing: summary
