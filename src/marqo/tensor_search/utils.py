@@ -348,10 +348,10 @@ def is_tensor_field(field: str,
                     tensor_fields: Optional[List[str]] = None
                     ) -> bool:
     """Determine whether a field is a tensor field or not for add_documents calls."""
-    if tensor_fields is not None:
-        return field in tensor_fields
-    else:
+    if not tensor_fields:
         return False
+    else:
+        return field in tensor_fields
 
 
 def calculate_health_status(marqo_os_health_check_response: Optional[Dict]) -> dict:
