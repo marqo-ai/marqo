@@ -78,6 +78,7 @@ class MarqoTestCase(unittest.TestCase):
                 ef_construction=128,
                 m=16
             ),
+            marqo_version='1.0.0',
             created_at=time.time(),
             updated_at=time.time()
     ) -> StructuredMarqoIndex:
@@ -95,6 +96,7 @@ class MarqoTestCase(unittest.TestCase):
             hnsw_config=hnsw_config,
             fields=fields,
             tensor_fields=tensor_fields,
+            marqo_version=marqo_version,
             created_at=created_at,
             updated_at=updated_at
         )
