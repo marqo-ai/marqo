@@ -41,7 +41,7 @@ class FieldRequest(StrictBaseModel):
 
     @root_validator
     def check_all_fields(cls, values):
-        marqo_index.validate_field(values, marqo_index=False)
+        marqo_index.validate_structured_field(values, marqo_index=False)
 
         return values
 
@@ -58,3 +58,23 @@ class StructuredMarqoIndexRequest(MarqoIndexRequest):
                 raise ValueError(f'Tensor field {tensor_field.name} is not a defined field. '
                                  f'Field names: {", ".join(field_names)}')
         return tensor_fields
+
+    @root_validator
+    def validate_model(cls, values):
+        # Verify all tensor fields are valid fields
+        field_names = {field.name for field in values.get('fields', [])}
+        tensor_field_names = values.get('tensor_fields', [])
+        for tensor_field in tensor_field_names:
+            if tensor_field not in field_names:
+                raise ValueError(f'Tensor field {tensor_field.name} is not a defined field. '
+                                 f'Field names: {", ".join(field_names)}')
+
+        # Verify all combination fields are tensor fields
+        combination_fields = [field for field in values.get('fields', []) if
+                              field.type == marqo_index.FieldType.MultimodalCombination]
+        tensor_field_names = values.get('tensor_fields', [])
+        for field in combination_fields:
+            if field.name not in tensor_field_names:
+                raise ValueError(f'Field {field.name} has type {field.type.value()} and must be a tensor field')
+
+        return values
