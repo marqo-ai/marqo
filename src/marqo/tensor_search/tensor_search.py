@@ -2034,7 +2034,6 @@ def get_loaded_models() -> dict:
     message = {"models": []}
 
     for ix in available_models:
-        print(f"DEBUG: ix: {ix}")
         if isinstance(ix, str):
             message["models"].append({"model_name": ix.split("||")[0], "model_device": ix.split("||")[-1]})
     return message

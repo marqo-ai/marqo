@@ -132,7 +132,6 @@ class TestBackend(MarqoTestCase):
         index_info = run()
         assert index_info.search_model_name is None
         
-
     def test_get_cluster_indices(self):
         tensor_search.create_vector_index(
             config=self.config, index_name=self.index_name_1)
