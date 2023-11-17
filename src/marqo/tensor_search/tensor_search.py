@@ -1495,7 +1495,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
         search_result = _lexical_search(
             config=config, index_name=index_name, text=text, result_count=result_count, offset=offset,
             searchable_attributes=searchable_attributes, verbose=verbose,
-            filter_string=filter, attributes_to_retrieve=attributes_to_retrieve, score_modifiers=score_modifiers
+            filter_string=filter, attributes_to_retrieve=attributes_to_retrieve
         )
     else:
         raise errors.InvalidArgError(f"Search called with unknown search method: {search_method}")
@@ -1534,8 +1534,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
 def _lexical_search(
         config: Config, index_name: str, text: str, result_count: int = 3, offset: int = 0,
         searchable_attributes: Sequence[str] = None, verbose: int = 0, filter_string: str = None,
-        attributes_to_retrieve: Optional[List[str]] = None,
-        score_modifiers: Optional[ScoreModifier] = None, expose_facets: bool = False):
+        attributes_to_retrieve: Optional[List[str]] = None, expose_facets: bool = False):
     """
 
     Args:
@@ -1578,7 +1577,6 @@ def _lexical_search(
         offset=offset,
         searchable_attributes=searchable_attributes,
         attributes_to_retrieve=attributes_to_retrieve,
-        score_modifiers=score_modifiers.to_marqo_score_modifiers() if score_modifiers is not None else None,
     )
 
     vespa_index = vespa_index_factory(marqo_index)
