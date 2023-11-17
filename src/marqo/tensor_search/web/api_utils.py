@@ -1,31 +1,11 @@
 import json
 import urllib.parse
-from marqo.errors import InvalidArgError, InternalError
-from marqo.tensor_search import enums
-from typing import Optional
-from marqo.tensor_search.utils import construct_authorized_url
-from marqo.tensor_search.models.add_docs_objects import ModelAuth
-from marqo.tensor_search.models.add_docs_objects import AddDocsParams, AddDocsBodyParams
-from marqo.errors import BadRequestError
 from typing import Union, List, Optional, Dict
-from fastapi import Request
 
-
-def upconstruct_authorized_url(opensearch_url: str) -> str:
-    """Generates an authorized URL, if it is not already authorized
-    """
-    http_sep = "://"
-    if http_sep not in opensearch_url:
-        raise InternalError(f"Could not parse backend url: {opensearch_url}")
-    if "@" not in opensearch_url.split("/")[2]:
-        authorized_url = construct_authorized_url(
-            url_base=opensearch_url,
-            username="admin",
-            password="admin"
-        )
-    else:
-        authorized_url = opensearch_url
-    return authorized_url
+from marqo.errors import InvalidArgError
+from marqo.tensor_search import enums
+from marqo.tensor_search.models.add_docs_objects import AddDocsParams, AddDocsBodyParams
+from marqo.tensor_search.models.add_docs_objects import ModelAuth
 
 
 def translate_api_device(device: Optional[str]) -> Optional[str]:
@@ -136,7 +116,7 @@ def decode_mappings(mappings: Optional[str] = None) -> dict:
 
 
 def add_docs_params_orchestrator(index_name: str, body: Union[AddDocsBodyParams, List[Dict]],
-                                device: str, auto_refresh: bool = True) -> AddDocsParams:
+                                 device: str, auto_refresh: bool = True) -> AddDocsParams:
     """An orchestrator for the add_documents API.
     All the arguments are decoded and validated in the API function. This function is only responsible for orchestrating.
 
