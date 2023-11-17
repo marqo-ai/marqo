@@ -44,6 +44,9 @@ class TestStructuredVespaSchema(MarqoTestCase):
         )
 
     def test_generate_schema_noLexicalFields_successful(self):
+        """
+        Test an index that has no lexical fields.
+        """
         marqo_index_request = self.structured_marqo_index_request(
             name='my_index',
             model=Model(name='ViT-B/32'),
@@ -67,6 +70,9 @@ class TestStructuredVespaSchema(MarqoTestCase):
         )
 
     def test_generate_schema_noScoreModifierFields_successful(self):
+        """
+        Test an index that has no score modifier fields.
+        """
         marqo_index_request = self.structured_marqo_index_request(
             name='my_index',
             model=Model(name='ViT-B/32'),
@@ -90,6 +96,9 @@ class TestStructuredVespaSchema(MarqoTestCase):
         )
 
     def test_generate_schema_noTensorFields_successful(self):
+        """
+        Test an index that has no tensor fields.
+        """
         marqo_index_request = self.structured_marqo_index_request(
             name='my_index',
             model=Model(name='ViT-B/32'),

@@ -68,7 +68,7 @@ class VespaClient:
 
         gzip_stream = self._gzip_compress(application)
 
-        response = httpx.post(
+        response = self.http_client.post(
             endpoint,
             headers={'Content-Type': 'application/x-gzip'},
             data=gzip_stream.read()
@@ -246,7 +246,7 @@ class VespaClient:
 
         errors = False
         for response in responses:
-            if response.status != '200':
+            if response.status != 200:
                 errors = True
 
         return FeedBatchResponse(responses=responses, errors=errors)
@@ -276,7 +276,7 @@ class VespaClient:
 
         errors = False
         for response in responses:
-            if response.status != '200':
+            if response.status != 200:
                 errors = True
 
         return FeedBatchResponse(responses=responses, errors=errors)
