@@ -25,10 +25,6 @@ def dicts_to_jsonl(dicts: List[dict]) -> str:
     ) + "\n"
 
 
-def generate_vector_name(field_name: str) -> str:
-    """Generates the name of the vector based on the field name"""
-    return F"{enums.TensorField.vector_prefix}{field_name}"
-
 
 def truncate_dict_vectors(doc: Union[dict, List], new_length: int = 5) -> Union[List, Dict]:
     """Creates a readable version of a dict by truncating identified vectors
