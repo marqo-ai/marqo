@@ -74,6 +74,7 @@ from marqo.tensor_search.enums import (
     Device, MediaType, MlModel, TensorField, SearchMethod, OpenSearchDataType,
     EnvVars
 )
+from marqo.core.models.marqo_index import IndexType
 from marqo.tensor_search.enums import IndexSettingsField as NsField
 from marqo.tensor_search.formatting import _clean_doc
 from marqo.tensor_search.health import generate_heath_check_response
@@ -1592,7 +1593,7 @@ def _lexical_search(
 
     # SEARCH TIMER-LOGGER (post-processing)
     RequestMetricsStore.for_request().start("search.lexical.postprocess")
-    gathered_docs = gather_documents_from_response(responses, marqo_index, False)
+    gathered_docs = gather_documents_from_response(responses, marqo_index, False, attributes_to_retrieve)
 
     total_postprocess_time = RequestMetricsStore.for_request().stop("search.lexical.postprocess")
     logger.debug(
@@ -1724,7 +1725,8 @@ def bulk_msearch(config: Config, body: List[Dict]) -> List[Dict]:
     return responses
 
 
-def gather_documents_from_response(response: QueryResult, marqo_index: MarqoIndex, highlights: bool) -> Dict[str, Any]:
+def gather_documents_from_response(response: QueryResult, marqo_index: MarqoIndex, highlights: bool,
+                                   attributes_to_retrieve: List[str]) -> Dict[str, Any]:
     """
     Convert a VespaQueryResponse to a Marqo search response
     """
@@ -1732,6 +1734,9 @@ def gather_documents_from_response(response: QueryResult, marqo_index: MarqoInde
     hits = []
     for doc in response.hits:
         marqo_doc = vespa_index.to_marqo_document(doc.dict(), return_highlights=highlights)
+        if marqo_index.type == IndexType.Unstructured and attributes_to_retrieve:
+            # For an unstructured index, we do the attributes_to_retrieve after search
+            marqo_doc = unstructured_index_attributes_to_retrieve(marqo_doc, attributes_to_retrieve)
         marqo_doc['_score'] = doc.relevance
         # Delete chunk data
         if constants.MARQO_DOC_TENSORS in marqo_doc:
@@ -1739,6 +1744,12 @@ def gather_documents_from_response(response: QueryResult, marqo_index: MarqoInde
         hits.append(marqo_doc)
 
     return {'hits': hits}
+
+
+def unstructured_index_attributes_to_retrieve(marqo_doc: Dict[str, Any], attributes_to_retrieve: List[str]) -> Dict[str, Any]:
+    if (not isinstance(attributes_to_retrieve, list)) or (len(attributes_to_retrieve) == 0):
+        raise errors.InvalidArgError("attributes_to_retrieve must be a non-empty list!")
+    return {k: v for k, v in marqo_doc.items() if k in attributes_to_retrieve}
 
 
 def assign_query_to_vector_job(
@@ -2158,7 +2169,7 @@ def _vector_text_search(
 
     # SEARCH TIMER-LOGGER (post-processing)
     RequestMetricsStore.for_request().start("search.vector.postprocess")
-    gathered_docs = gather_documents_from_response(responses, marqo_index, highlights)
+    gathered_docs = gather_documents_from_response(responses, marqo_index, highlights, attributes_to_retrieve)
 
     if boost is not None:
         raise errors.MarqoWebError('Boosting is not currently supported with Vespa')
