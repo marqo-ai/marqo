@@ -53,15 +53,11 @@ def get_index(config: Config, index_name: str, force_refresh=False) -> MarqoInde
     # Make sure refresh thread is running
     _check_refresh_thread(config)
 
-    if force_refresh:
+    if force_refresh or index_name not in index_info_cache:
         _refresh_index(config, index_name)
 
     if index_name in index_info_cache:
         return index_info_cache[index_name]
-    elif not force_refresh:
-        _refresh_index(config, index_name)
-        if index_name in index_info_cache:
-            return index_info_cache[index_name]
 
     raise errors.IndexNotFoundError(f"Index {index_name} not found")
 
@@ -96,15 +92,18 @@ def _check_refresh_thread(config: Config):
 
             def refresh():
                 while True:
-                    global cache_refresh_last_logged_time
+                    try:
+                        global cache_refresh_last_logged_time
 
-                    populate_cache(config)
+                        populate_cache(config)
 
-                    if time.time() - cache_refresh_last_logged_time > cache_refresh_log_interval:
-                        cache_refresh_last_logged_time = time.time()
-                        logger.info(f'Last index cache refresh at {cache_refresh_last_logged_time}')
+                        if time.time() - cache_refresh_last_logged_time > cache_refresh_log_interval:
+                            cache_refresh_last_logged_time = time.time()
+                            logger.info(f'Last index cache refresh at {cache_refresh_last_logged_time}')
 
-                    time.sleep(cache_refresh_interval)
+                        time.sleep(cache_refresh_interval)
+                    except Exception as e:
+                        logger.error(f'Error in index cache refresh thread: {e}')
 
             refresh_thread = threading.Thread(target=refresh, daemon=True)
             refresh_thread.start()
