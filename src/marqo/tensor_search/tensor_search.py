@@ -89,7 +89,9 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
         add_docs_params: add_documents()'s parameters
     """
     try:
-        marqo_index = index_meta_cache.get_index(config=config, index_name=add_docs_params.index_name)
+        marqo_index = index_meta_cache.get_index(
+            config=config, index_name=add_docs_params.index_name, force_refresh=True
+        )
     except errors.IndexNotFoundError:
         raise errors.IndexNotFoundError(f"Cannot add documents to non-existent index {add_docs_params.index_name}")
 
