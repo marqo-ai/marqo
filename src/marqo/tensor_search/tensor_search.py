@@ -2265,7 +2265,7 @@ def vectorise_multimodal_combination_field(
         text_vectors = []
 
         # Add prefix to all text content first
-        text_content_to_vectorise = [f"{text_chunk_prefix}{t}" for t in text_content_to_vectorise]
+        text_content_to_vectorise = text_processor.prefix_text_chunks(text_content_to_vectorise, text_chunk_prefix)
 
         if len(text_content_to_vectorise) > 0:
             with RequestMetricsStore.for_request().time(f"create_vectors"):
