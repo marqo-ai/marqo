@@ -395,6 +395,8 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
         request_level_prefix=add_docs_params.text_chunk_prefix,
         index_info=index_info
     )
+    if text_chunk_prefix is None:
+        text_chunk_prefix = ""
 
     existing_fields = set(index_info.properties.keys())
     new_fields = set()
@@ -1065,10 +1067,12 @@ def determine_text_query_prefix(request_level_prefix: str, index_info: IndexInfo
         return request_level_prefix
 
     # Use override in text_preprocessing (if not None)
-    text_preproc = index_info.get_index_settings()[NsField.index_defaults][NsField.text_preprocessing]
-    if NsField.override_text_query_prefix in text_preproc:
-        if text_preproc[NsField.override_text_query_prefix] is not None:
-            return text_preproc[NsField.override_text_query_prefix]
+    index_settings = index_info.get_index_settings()
+    if NsField.text_preprocessing in index_settings[NsField.index_defaults]:
+        text_preproc = index_settings[NsField.index_defaults][NsField.text_preprocessing]
+        if NsField.override_text_query_prefix in text_preproc:
+            if text_preproc[NsField.override_text_query_prefix] is not None:
+                return text_preproc[NsField.override_text_query_prefix]
     
     if index_info.search_model_name is not None:
         model_prefix = index_info.get_search_model_properties().get(ModelProperties.text_query_prefix)
@@ -1361,7 +1365,7 @@ def _lexical_search(
     return {'hits': res_list}
 
 
-def construct_vector_input_batches(query: Union[str, Dict, None], index_info: IndexInfo, text_query_prefix: str) -> Tuple[List[str], List[str]]:
+def construct_vector_input_batches(query: Union[str, Dict, None], index_info: IndexInfo, text_query_prefix: str = None) -> Tuple[List[str], List[str]]:
     """
     Splits images from text in a single query (either a query string, or dict of weighted strings).
     Prefixes are added to text queries.

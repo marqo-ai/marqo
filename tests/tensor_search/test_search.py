@@ -1413,7 +1413,7 @@ class TestVectorSearchUtils(MarqoTestCase):
     
     def test_construct_vector_input_batches(self):
         index_info_with_images = IndexInfo(
-            model_name = "PLACEHOLDER. ViT-B/32",
+            model_name = "ViT-B/32",        # Placeholder
             search_model_name = None,       # should work with no search model set
             properties = {"PLACEHOLDER": "PLACEHOLDER"},
             index_settings = {
@@ -1424,12 +1424,30 @@ class TestVectorSearchUtils(MarqoTestCase):
         )
 
         index_info_without_images = IndexInfo(
-            model_name = "PLACEHOLDER. ViT-B/32",
+            model_name = "ViT-B/32",        # Placeholder
             search_model_name = None,       # should work with no search model set
             properties = {"PLACEHOLDER": "PLACEHOLDER"},
             index_settings = {
                 IndexSettingsField.index_defaults: {
                     IndexSettingsField.treat_urls_and_pointers_as_images: False
+                }
+            }
+        )
+
+        index_info_with_prefix = IndexInfo(
+            model_name = "my-custom-model",        
+            search_model_name = None,       # should work with no search model set
+            properties = {"PLACEHOLDER": "PLACEHOLDER"},
+            index_settings = {
+                IndexSettingsField.index_defaults: {
+                    IndexSettingsField.treat_urls_and_pointers_as_images: True,
+                    IndexSettingsField.model_properties: {
+                        "name": "ViT-B-32-quickgelu",
+                        "dimensions": 512,
+                        "url": "https://github.com/mlfoundations/open_clip/releases/download/v0.2-weights/vit_b_32-quickgelu-laion400m_avg-8a00ab3c.pt",
+                        "type": "open_clip",
+                        "text_query_prefix": "query: "
+                    }
                 }
             }
         )
@@ -1484,3 +1502,18 @@ class TestVectorSearchUtils(MarqoTestCase):
             "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_statue.png": 2},
         index_info_without_images)
         assert res == (["https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png", "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_statue.png"], [])
+
+        # query string, text, with prefix
+        res = tensor_search.construct_vector_input_batches("some text", index_info_with_prefix)
+        assert res == (["query: some text"], [])
+
+        # query string, image, with prefix (SHOULD NOT INCLUDE PREFIX IN VECTORISATION)
+        res = tensor_search.construct_vector_input_batches("https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png", index_info_with_prefix)
+        assert res == ([], ["https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png"])
+
+        # query dict, mixed text and image, with prefix
+        res = tensor_search.construct_vector_input_batches({
+            "some text": 1, 
+            "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png": 2},
+        index_info_with_prefix)
+        assert res == (["query: some text"], ["https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png"])

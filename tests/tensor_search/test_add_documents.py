@@ -1128,6 +1128,8 @@ class TestAddDocuments(MarqoTestCase):
                     non_tensor_fields=["myfield"], device="cpu"
                 )
             )
+            print("DEBUG: res2")
+            pprint.pprint(res2)
             assert not res2['errors']
             assert c == tensor_search.get_stats(self.config,
                                                 index_name=self.index_name_1)['numberOfDocuments']
