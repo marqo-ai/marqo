@@ -7,6 +7,10 @@ def default_env_vars() -> dict:
     default env vars if they aren't defined in the environment.
     """
     return {
+        EnvVars.VESPA_CONFIG_URL: "http://localhost:19071",
+        EnvVars.VESPA_QUERY_URL: "http://localhost:8080",
+        EnvVars.VESPA_DOCUMENT_URL: "http://localhost:8080",
+        EnvVars.VESPA_POOL_SIZE: 10,
         EnvVars.MARQO_MAX_INDEX_FIELDS: None,
         EnvVars.MARQO_MAX_DOC_BYTES: 100000,
         EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: 10000,

@@ -17,6 +17,8 @@ class TensorField:
     vector_prefix = "__vector_"
     marqo_knn_field = "__vector_marqo_knn_field"
     chunks = "__chunks"
+    output_highlights = "_highlights"
+    output_score = "_score"
     # output fields:
     tensor_facets = "_tensor_facets"
     embedding = "_embedding"

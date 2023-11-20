@@ -14,7 +14,7 @@ from marqo import version
 from marqo.core.exceptions import IndexExistsError, IndexNotFoundError
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.errors import InvalidArgError, MarqoWebError, MarqoError
-from marqo.tensor_search import tensor_search
+from marqo.tensor_search import tensor_search, utils
 from marqo.tensor_search.enums import RequestType, EnvVars
 from marqo.tensor_search.models.add_docs_objects import (AddDocsBodyParams)
 from marqo.tensor_search.models.api_models import SearchQuery
@@ -28,10 +28,10 @@ from marqo.vespa.vespa_client import VespaClient
 
 def generate_config() -> config.Config:
     vespa_client = VespaClient(
-        config_url=os.environ[EnvVars.VESPA_CONFIG_URL],
-        query_url=os.environ[EnvVars.VESPA_QUERY_URL],
-        document_url=os.environ[EnvVars.VESPA_DOCUMENT_URL],
-        pool_size=os.environ.get(EnvVars.VESPA_POOL_SIZE, 10),
+        config_url=utils.read_env_vars_and_defaults(EnvVars.VESPA_CONFIG_URL),
+        query_url=utils.read_env_vars_and_defaults(EnvVars.VESPA_QUERY_URL),
+        document_url=utils.read_env_vars_and_defaults(EnvVars.VESPA_DOCUMENT_URL),
+        pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_POOL_SIZE),
     )
     index_management = IndexManagement(vespa_client)
     return config.Config(vespa_client, index_management)

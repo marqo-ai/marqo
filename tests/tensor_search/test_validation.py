@@ -1,18 +1,18 @@
 import os
-from marqo.tensor_search import validation
-from enum import Enum
-from marqo.tensor_search import enums
 import unittest
+from enum import Enum
 from unittest import mock
 from unittest.mock import patch
-from marqo.tensor_search.models.score_modifiers_object import ScoreModifier
-from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest
-from marqo.tensor_search.models.search import SearchContext
+
 from marqo.errors import (
-    InvalidFieldNameError, InternalError,
-    InvalidDocumentIdError, InvalidArgError, DocTooLargeError,
-    InvalidIndexNameError
+    InvalidFieldNameError, InvalidDocumentIdError, InvalidArgError, DocTooLargeError
 )
+from marqo.tensor_search import enums
+from marqo.tensor_search import validation
+from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest
+from marqo.tensor_search.models.score_modifiers_object import ScoreModifier
+from marqo.tensor_search.models.search import SearchContext
+
 
 class TestValidation(unittest.TestCase):
 
@@ -105,71 +105,6 @@ class TestValidation(unittest.TestCase):
         except InvalidArgError as s:
             pass
 
-    def test_validate_vector_name(self):
-        good_name = "__vector_Title 1"
-        assert good_name == validation.validate_vector_name(good_name)
-
-    def test_validate_vector_name_2(self):
-        """should only try removing the first prefix"""
-        good_name = "__vector___vector_1"
-        assert good_name == validation.validate_vector_name(good_name)
-
-    def test_validate_vector_name_only_prefix(self):
-        bad_vec = "__vector_"
-        try:
-            validation.validate_vector_name(bad_vec)
-            raise AssertionError
-        except InternalError as s:
-            assert "empty" in str(s)
-
-    def test_validate_vector_empty(self):
-        bad_vec = ""
-        try:
-            validation.validate_vector_name(bad_vec)
-            raise AssertionError
-        except InternalError as s:
-            assert "empty" in str(s)
-
-    def test_validate_vector_int(self):
-        bad_vec = 123
-        try:
-            validation.validate_vector_name(bad_vec)
-            raise AssertionError
-        except InternalError as s:
-            assert 'must be str' in str(s)
-
-        bad_vec_2 = ["efg"]
-        try:
-            validation.validate_vector_name(bad_vec_2)
-            raise AssertionError
-        except InternalError as s:
-            assert 'must be str' in str(s)
-
-    def test_validate_vector_no_prefix(self):
-        bad_vec = "some bad title"
-        try:
-            validation.validate_vector_name(bad_vec)
-            raise AssertionError
-        except InternalError as s:
-            assert 'vectors must begin' in str(s)
-
-    def test_validate_vector_name_protected_field(self):
-        """the vector name without the prefix can't be the name of a protected field"""
-        bad_vec = "__vector___chunk_ids"
-        try:
-            validation.validate_vector_name(bad_vec)
-            raise AssertionError
-        except InternalError as s:
-            assert 'protected name' in str(s)
-
-    def test_validate_vector_name_id_field(self):
-        bad_vec = "__vector__id"
-        try:
-            validation.validate_vector_name(bad_vec)
-            raise AssertionError
-        except InternalError as s:
-            assert 'protected name' in str(s)
-
     def test_validate_field_name_highlight(self):
         bad_name = "_highlights"
         try:
@@ -180,7 +115,7 @@ class TestValidation(unittest.TestCase):
 
     def test_validate_field_content_bad(self):
         bad_field_content = [
-            {123}, None,['not 100% strings', 134, 1.4, False],
+            {123}, None, ['not 100% strings', 134, 1.4, False],
             ['not 100% strings', True]
         ]
         for non_tensor_field in (True, False):
@@ -197,7 +132,8 @@ class TestValidation(unittest.TestCase):
         ]
         for non_tensor_field in (True, False):
             for good_content in good_field_content:
-                assert good_content == validation.validate_field_content(good_content, is_non_tensor_field=non_tensor_field)
+                assert good_content == validation.validate_field_content(good_content,
+                                                                         is_non_tensor_field=non_tensor_field)
 
     def test_validate_field_content_list(self):
         good_field_content = [
@@ -213,8 +149,6 @@ class TestValidation(unittest.TestCase):
                 raise AssertionError
             except InvalidArgError:
                 pass
-
-
 
     def test_validate_id_good(self):
         bad_ids = [
@@ -253,18 +187,6 @@ class TestValidation(unittest.TestCase):
             return True
 
         assert run()
-
-    def test_index_name_validation(self):
-        assert "my-index-name" == validation.validate_index_name("my-index-name")
-        bad_names = ['.opendistro_security', 'security-auditlog-', 'security-auditlog-100',
-                     '.opendistro_alerting_config', '.opendistro-alerting-config-', '.kibana',
-                     '.kibana-2']
-        for n in bad_names:
-            try:
-                validation.validate_index_name(n)
-                raise AssertionError
-            except InvalidIndexNameError:
-                pass
 
     def test_boost_validation_illegal(self):
         bad_boosts = [
@@ -345,7 +267,6 @@ class TestValidateSearchableAttributes(unittest.TestCase):
                 search_method=enums.SearchMethod.TENSOR
             )
 
-
     @patch.dict('os.environ', {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': '1'}})
     def test_searchable_attributes_set__use_searchable_attributes(self):
         with self.assertRaises(InvalidArgError):
@@ -381,276 +302,12 @@ class TestValidateIndexSettings(unittest.TestCase):
                 }
             },
             "number_of_shards": 5,
-            "number_of_replicas":1
+            "number_of_replicas": 1
         }
-
-    def test_validate_index_settings(self):
-
-        good_settings =[
-            {
-                "index_defaults": {
-                    "treat_urls_and_pointers_as_images": False,
-                    "model": "hf/all_datasets_v4_MiniLM-L6",
-                    "normalize_embeddings": True,
-                    "text_preprocessing": {
-                        "split_length": 2,
-                        "split_overlap": 0,
-                        "split_method": "sentence"
-                    },
-                    "image_preprocessing": {
-                        "patch_method": None
-                    }
-                },
-                "number_of_shards": 5,
-                "number_of_replicas": 1
-            },
-            {   # extra field in text_preprocessing: OK
-                "index_defaults": {
-                    "treat_urls_and_pointers_as_images": False,
-                    "model": "hf/all_datasets_v4_MiniLM-L6",
-                    "normalize_embeddings": True,
-                    "text_preprocessing": {
-                        "split_length": 2,
-                        "split_overlap": 0,
-                        "split_method": "sentence",
-                        "blah blah blah": "woohoo"
-                    },
-                    "image_preprocessing": {
-                        "patch_method": None
-                    }
-                },
-                "number_of_shards": 5,
-                "number_of_replicas": 1
-            },
-            {  # extra field in image_preprocessing: OK
-                "index_defaults": {
-                    "treat_urls_and_pointers_as_images": False,
-                    "model": "hf/all_datasets_v4_MiniLM-L6",
-                    "normalize_embeddings": True,
-                    "text_preprocessing": {
-                        "split_length": 2,
-                        "split_overlap": 0,
-                        "split_method": "sentence",
-                    },
-                    "image_preprocessing": {
-                        "patch_method": None,
-                        "blah blah blah": "woohoo"
-                    }
-                },
-                "number_of_shards": 5,
-                "number_of_replicas": 1
-            }
-        ]
-        for settings in good_settings:
-            assert settings == validation.validate_settings_object(settings)
-
-    def test_validate_index_settings_model_properties(self):
-        good_settings = self.get_good_index_settings()
-        good_settings['index_defaults']['model_properties'] = dict()
-        assert good_settings == validation.validate_settings_object(good_settings)
-
-    def test_validate_index_settings_bad(self):
-        bad_settings = [{
-            "index_defaults": {
-                "treat_urls_and_pointers_as_images": False,
-                "model": "hf/all_datasets_v4_MiniLM-L6",
-                "normalize_embeddings": True,
-                "text_preprocessing": {
-                    "split_length": "2",
-                    "split_overlap": "0",
-                    "split_method": "sentence"
-                },
-                "image_preprocessing": {
-                    "patch_method": None
-                }
-            },
-            "number_of_shards": 5,
-            "number_of_replicas" : -1
-        },
-        {
-            "index_defaults": {
-                "treat_urls_and_pointers_as_images": False,
-                "model": "hf/all_datasets_v4_MiniLM-L6",
-                "normalize_embeddings": True,
-                "text_preprocessing": {
-                    "split_length": "2",
-                    "split_overlap": "0",
-                    "split_method": "sentence"
-                },
-                "image_preprocessing": {
-                    "patch_method": None
-                }
-            },
-            "number_of_shards": 5
-        },
-        ]
-        for bad_setting in bad_settings:
-            try:
-                validation.validate_settings_object(bad_setting)
-                raise AssertionError
-            except InvalidArgError as e:
-                pass
-
-    def test_validate_index_settings_missing_text_preprocessing(self):
-        settings = self.get_good_index_settings()
-        # base good settings should be OK
-        assert settings == validation.validate_settings_object(settings)
-        del settings['index_defaults']['text_preprocessing']
-        try:
-            validation.validate_settings_object(settings)
-            raise AssertionError
-        except InvalidArgError:
-            pass
-
-    def test_validate_index_settings_missing_model(self):
-        settings = self.get_good_index_settings()
-        # base good settings should be OK
-        assert settings == validation.validate_settings_object(settings)
-        del settings['index_defaults']['model']
-        try:
-            validation.validate_settings_object(settings)
-            raise AssertionError
-        except InvalidArgError:
-            pass
-
-    def test_validate_index_settings_missing_index_defaults(self):
-        settings = self.get_good_index_settings()
-        # base good settings should be OK
-        assert settings == validation.validate_settings_object(settings)
-        del settings['index_defaults']
-        try:
-            validation.validate_settings_object(settings)
-            raise AssertionError
-        except InvalidArgError:
-            pass
-
-    def test_validate_index_settings_bad_number_shards(self):
-        settings = self.get_good_index_settings()
-        # base good settings should be OK
-        assert settings == validation.validate_settings_object(settings)
-        settings['number_of_shards'] = -1
-        try:
-            validation.validate_settings_object(settings)
-            raise AssertionError
-        except InvalidArgError as e:
-            pass
-
-    def test_validate_index_settings_bad_number_replicas(self):
-        settings = self.get_good_index_settings()
-        # base good settings should be OK
-        assert settings == validation.validate_settings_object(settings)
-        settings['number_of_replicas'] = -1
-        try:
-            validation.validate_settings_object(settings)
-            raise AssertionError
-        except InvalidArgError as e:
-            pass
-
-    def test_validate_index_settings_img_preprocessing(self):
-        settings = self.get_good_index_settings()
-        # base good settings should be OK
-        assert settings == validation.validate_settings_object(settings)
-        settings['index_defaults']['image_preprocessing']["path_method"] = "frcnn"
-        assert settings == validation.validate_settings_object(settings)
-
-    def test_validate_index_settings_misplaced_fields(self):
-        bad_settings = [
-            {
-                "index_defaults": {
-                    "treat_urls_and_pointers_as_images": False,
-                    "model": "hf/all_datasets_v4_MiniLM-L6",
-                    "normalize_embeddings": True,
-                    "text_preprocessing": {
-                        "split_length": 2,
-                        "split_overlap": 0,
-                        "split_method": "sentence"
-                    },
-                    "image_preprocessing": {
-                        "patch_method": None
-                    }
-                },
-                "number_of_shards": 5,
-                "model": "hf/all_datasets_v4_MiniLM-L6"  # model is also outside, here...
-            },
-            {
-                "index_defaults": {
-                    "image_preprocessing": {
-                        "patch_method": None  # no models here
-                    },
-                    "normalize_embeddings": True,
-                    "text_preprocessing": {
-                        "split_length": 2,
-                        "split_method": "sentence",
-                        "split_overlap": 0
-                    },
-                    "treat_urls_and_pointers_as_images": False
-                },
-                "model": "open_clip/ViT-L-14/laion2b_s32b_b82k", # model here (bad)
-                "number_of_shards": 5,
-                "treat_urls_and_pointers_as_images": True
-            },
-            {
-                "index_defaults": {
-                    "image_preprocessing": {
-                        "patch_method": None,
-                        "model": "open_clip/ViT-L-14/laion2b_s32b_b82k",
-                    },
-                    "normalize_embeddings": True,
-                    "text_preprocessing": {
-                        "split_length": 2,
-                        "split_method": "sentence",
-                        "split_overlap": 0
-                    },
-                    "treat_urls_and_pointers_as_images": False,
-                    "number_of_shards": 5,  # shouldn't be here
-                },
-                "treat_urls_and_pointers_as_images": True
-            },
-            {  # good, BUT extra field in index_defaults
-                "index_defaults": {
-                    "number_of_shards": 5,
-                    "treat_urls_and_pointers_as_images": False,
-                    "model": "hf/all_datasets_v4_MiniLM-L6",
-                    "normalize_embeddings": True,
-                    "text_preprocessing": {
-                        "split_length": 2,
-                        "split_overlap": 0,
-                        "split_method": "sentence"
-                    },
-                    "image_preprocessing": {
-                        "patch_method": None
-                    }
-                },
-                "number_of_shards": 5
-            },
-            {  # good, BUT extra field in root
-                "model": "hf/all_datasets_v4_MiniLM-L6",
-                "index_defaults": {
-                    "treat_urls_and_pointers_as_images": False,
-                    "model": "hf/all_datasets_v4_MiniLM-L6",
-                    "normalize_embeddings": True,
-                    "text_preprocessing": {
-                        "split_length": 2,
-                        "split_overlap": 0,
-                        "split_method": "sentence"
-                    },
-                    "image_preprocessing": {
-                        "patch_method": None
-                    }
-                },
-                "number_of_shards": 5
-            }
-        ]
-        for bad_set in bad_settings:
-            try:
-                validation.validate_settings_object(bad_set)
-                raise AssertionError
-            except InvalidArgError as e:
-                pass
 
     def test_validate_mappings(self):
         mappings = [
-             {
+            {
                 "my_combination_field": {
                     "type": "multimodal_combination",
                     "weights": {
@@ -709,7 +366,6 @@ class TestValidateIndexSettings(unittest.TestCase):
         for d in mappings:
             assert d == validation.validate_mappings_object(d)
 
-
     def test_validate_mappings_invalid(self):
         mappings = [
             {
@@ -767,14 +423,14 @@ class TestValidateIndexSettings(unittest.TestCase):
                     },
                 }
             },
-            { # needs more nesting
+            {  # needs more nesting
                 "type": "multimodal_combination",
                 "weights": {
                     "some_text": 0.5
                 }
             },
             {
-                "my_combination_field": { # this dict is OK
+                "my_combination_field": {  # this dict is OK
                     "type": "multimodal_combination",
                     "weights": {
                         "some_text": 0.5
@@ -834,7 +490,7 @@ class TestValidateIndexSettings(unittest.TestCase):
     def test_validate_multimodal_combination_object_invalid(self):
         mappings = [
             {
-                "my_combination_field": { # valid mappings dir, but not valid multimodal
+                "my_combination_field": {  # valid mappings dir, but not valid multimodal
                     "type": "multimodal_combination",
                     "weights": {
                         "some_text": 0.5
@@ -893,8 +549,8 @@ class TestValidateIndexSettings(unittest.TestCase):
     def test_validate_valid_context_object(self):
         valid_context_list = [
             {
-                "tensor":[
-                    {"vector" : [0.2132] * 512, "weight" : 0.32},
+                "tensor": [
+                    {"vector": [0.2132] * 512, "weight": 0.32},
                     {"vector": [0.2132] * 512, "weight": 0.32},
                     {"vector": [0.2132] * 512, "weight": 0.32},
                 ]
@@ -911,7 +567,7 @@ class TestValidateIndexSettings(unittest.TestCase):
                 # Note we are not validating the vector size here
                 "tensor": [
                     {"vector": [0.2132] * 53, "weight": 1},
-                    {"vector": [23,], "weight": 1},
+                    {"vector": [23, ], "weight": 1},
                     {"vector": [0.2132] * 512, "weight": 1},
                 ],
                 "addition_field": None
@@ -927,8 +583,8 @@ class TestValidateIndexSettings(unittest.TestCase):
             },
             {
                 "tensor": [
-                             {"vector": [0.2132] * 512, "weight": 0.32},
-                         ] * 64
+                              {"vector": [0.2132] * 512, "weight": 0.32},
+                          ] * 64
             },
         ]
 
@@ -957,7 +613,7 @@ class TestValidateIndexSettings(unittest.TestCase):
                 # Typo in weight
                 "tensor": [
                     {"vector": [0.2132] * 53, "weight": 1},
-                    {"vector": [23,], "weight": 1},
+                    {"vector": [23, ], "weight": 1},
                     {"vector": [0.2132] * 512, "weights": 1},
                 ],
                 "addition_field": None
@@ -975,7 +631,7 @@ class TestValidateIndexSettings(unittest.TestCase):
             {
                 # Str instead of list
                 "tensor": [
-                    {"vector" : str([0.2132] * 512), "weight": 0.32},
+                    {"vector": str([0.2132] * 512), "weight": 0.32},
                     {"vector": [0.2132] * 512, "weight": 0.32},
                     {"vector": [0.2132] * 512, "weight": 0.32},
                 ],
@@ -995,8 +651,8 @@ class TestValidateIndexSettings(unittest.TestCase):
             {
                 # too many vectors, maximum 64
                 "tensor": [
-                    {"vector": [0.2132] * 512, "weight": 0.32},
-                    ] * 65
+                              {"vector": [0.2132] * 512, "weight": 0.32},
+                          ] * 65
             },
             {
                 # None
@@ -1090,7 +746,7 @@ class TestValidateIndexSettings(unittest.TestCase):
                       },
                      {
                          "field_name": "reputation-test",
-                     },],
+                     }, ],
                 "add_to_score": [
                     {"field_name": "rate",
                      }]
@@ -1109,7 +765,7 @@ class TestValidateIndexSettings(unittest.TestCase):
                     {"field_name": "rate",
                      }]
             },
-            {}, # empty 
+            {},  # empty
             {  # one part to be empty
                 "multiply_score_by": [],
                 "add_to_score": [
@@ -1173,7 +829,8 @@ class TestValidateDeleteDocsRequest(unittest.TestCase):
         self.max_delete_docs_count = 10
 
     def test_valid_delete_request(self):
-        delete_request = MqDeleteDocsRequest(index_name="my_index", document_ids=["id1", "id2", "id3"], auto_refresh=True)
+        delete_request = MqDeleteDocsRequest(index_name="my_index", document_ids=["id1", "id2", "id3"],
+                                             auto_refresh=True)
         result = validation.validate_delete_docs_request(delete_request, self.max_delete_docs_count)
         self.assertEqual(delete_request, result)
 
@@ -1183,7 +840,8 @@ class TestValidateDeleteDocsRequest(unittest.TestCase):
             validation.validate_delete_docs_request(delete_request, self.max_delete_docs_count)
 
     def test_invalid_max_delete_docs_count(self):
-        delete_request = MqDeleteDocsRequest(index_name="my_index", document_ids=["id1", "id2", "id3"], auto_refresh=True)
+        delete_request = MqDeleteDocsRequest(index_name="my_index", document_ids=["id1", "id2", "id3"],
+                                             auto_refresh=True)
         with self.assertRaises(RuntimeError):
             validation.validate_delete_docs_request(delete_request, "10")
 
@@ -1198,7 +856,8 @@ class TestValidateDeleteDocsRequest(unittest.TestCase):
             validation.validate_delete_docs_request(delete_request, self.max_delete_docs_count)
 
     def test_exceed_max_delete_docs_count(self):
-        delete_request = MqDeleteDocsRequest(index_name="my_index", document_ids=["id{}".format(i) for i in range(1, 12)], auto_refresh=True)
+        delete_request = MqDeleteDocsRequest(index_name="my_index",
+                                             document_ids=["id{}".format(i) for i in range(1, 12)], auto_refresh=True)
         with self.assertRaises(InvalidArgError):
             validation.validate_delete_docs_request(delete_request, self.max_delete_docs_count)
 
@@ -1218,4 +877,3 @@ class TestValidateDeleteDocsRequest(unittest.TestCase):
             index_name="my_index", document_ids=["id{}".format(i) for i in range(1, 20000)], auto_refresh=True)
         with self.assertRaises(RuntimeError):
             validation.validate_delete_docs_request(delete_request, None)
-
