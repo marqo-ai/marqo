@@ -1,4 +1,4 @@
-from marqo.s2_inference.processing.text import split_text
+from marqo.s2_inference.processing.text import split_text, prefix_text_chunks
 import unittest
 import copy
 
@@ -79,3 +79,18 @@ class TestSplitText(unittest.TestCase):
         result = split_text(text, split_by='sentence', split_length=4, split_overlap=1)
         assert result == [text]
 
+
+class TestPrefixTextChunks(unittest.TestCase):
+    def test_prefix_test_chunks(self):
+        text_splits = ["a", "b", "c", ""]
+        assert prefix_text_chunks(text_splits, "prefix_") == \
+            ["prefix_a", "prefix_b", "prefix_c", "prefix_"]
+        # Empty string prefix should do nothing
+        assert prefix_text_chunks(text_splits, "") == \
+            ["a", "b", "c", ""]
+    
+    def test_prefix_test_chunks_none(self):
+        text_splits = ["a", "b", "c", ""]
+        # None prefix should do nothing
+        assert prefix_text_chunks(text_splits, None) == \
+            ["a", "b", "c", ""]

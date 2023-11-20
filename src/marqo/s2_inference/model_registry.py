@@ -674,6 +674,16 @@ def _get_sbert_test_properties() -> Dict:
                 "tokens":128,
                 "type":"test",
                 "notes": ""},
+            "prefix-test-model":
+                {
+                    "name": "sentence-transformers/all-MiniLM-L6-v1",
+                    "dimensions": 16,
+                    "tokens": 128,
+                    "type": "test",
+                    "notes": "",
+                    "text_query_prefix": "test query: ",
+                    "text_chunk_prefix": "test passage: "
+                }
     }
     return TEST_MODEL_PROPERTIES
 
