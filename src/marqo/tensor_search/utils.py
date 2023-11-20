@@ -250,11 +250,11 @@ def parse_lexical_query(text: str) -> Tuple[List[str], List[str]]:
 
             # None of the above: Syntax error. Interpret text literally instead.
             else:
-                return ([], text)
+                return [], text.split()
 
     if opening_quote_idx is not None:
         # string parsing finished with a quote still open: syntax error.
-        return ([], text)
+        return [], text.split()
 
     # Remove double/leading white spaces
     optional_terms = optional_terms.split()
