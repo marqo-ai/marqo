@@ -6,7 +6,7 @@ import os
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.tensor_search.enums import IndexSettingsField, EnvVars
 from marqo.errors import MarqoApiError, MarqoError, IndexNotFoundError
-from marqo.tensor_search import tensor_search, configs, backend
+from marqo.tensor_search import tensor_search, configs, backend, create_index
 from marqo.tensor_search.utils import read_env_vars_and_defaults
 from tests.marqo_test import MarqoTestCase
 from marqo.tensor_search.enums import IndexSettingsField as NsField, TensorField
@@ -53,9 +53,13 @@ class TestCreateIndex(MarqoTestCase):
             url=f"{self.endpoint}/{self.index_name_1}/_mapping",
             verify=False
         ).json()
+
+        default_index_settings = configs.get_default_index_settings()
+        default_index_settings = create_index.autofill_search_model(default_index_settings)
+        assert default_index_settings is not None
         
         assert settings[self.index_name_1]["mappings"]["_meta"][IndexSettingsField.index_settings] \
-            == tensor_search.configs.get_default_index_settings()
+            == default_index_settings
 
     def test_create_vector_index__invalid_settings(self):
         custom_index_defaults = [
@@ -134,6 +138,7 @@ class TestCreateIndex(MarqoTestCase):
         pprint.pprint(settings)
         retrieved_settings = settings[self.index_name_1]["mappings"]["_meta"][IndexSettingsField.index_settings]
         del retrieved_settings[IndexSettingsField.index_defaults][IndexSettingsField.model]
+        del retrieved_settings[IndexSettingsField.index_defaults][IndexSettingsField.search_model]
 
         default_settings = tensor_search.configs.get_default_index_settings()
         default_text_preprocessing = default_settings[IndexSettingsField.index_defaults][IndexSettingsField.text_preprocessing]
@@ -305,13 +310,14 @@ class TestCreateIndex(MarqoTestCase):
             }
         )
         
-        default_index_defaults = configs.get_default_index_settings()[NsField.index_defaults]
-        assert default_index_defaults is not None
+        default_index_settings = configs.get_default_index_settings()
+        default_index_settings = create_index.autofill_search_model(default_index_settings)
+        assert default_index_settings is not None
         
         index_info = backend.get_index_info(config=self.config, index_name=self.index_name_1)
         test_index_defaults = index_info.index_settings[NsField.index_defaults]
 
-        assert default_index_defaults == test_index_defaults
+        assert default_index_settings[NsField.index_defaults] == test_index_defaults
 
     def test_set_number_of_shards(self):
         """ does it work if other params are filled?"""
@@ -776,7 +782,8 @@ class TestCreateIndex(MarqoTestCase):
                         'number_of_shards': 5, 
                         'number_of_replicas': 1
                     }, 
-                    'model': 'hf/all_datasets_v4_MiniLM-L6'
+                    'model': 'hf/all_datasets_v4_MiniLM-L6',
+                    'search_model': 'hf/all_datasets_v4_MiniLM-L6'
                 }, 
                 'dynamic_templates': [{
                     'strings': {
@@ -804,7 +811,10 @@ class TestCreateIndex(MarqoTestCase):
             # format: (model_data, expected_knn_properties)
             # model in registry
             (
-                {"model": "hf/all_datasets_v4_MiniLM-L6"}, 
+                {
+                    "model": "hf/all_datasets_v4_MiniLM-L6",
+                    "search_model": "hf/all_datasets_v4_MiniLM-L6"
+                }, 
                 {
                     'type': 'knn_vector', 
                     'dimension': 384, 
@@ -818,7 +828,12 @@ class TestCreateIndex(MarqoTestCase):
             ),
             # custom model
             (
-                {"model": "my-custom-model", "model_properties": {"url": "https://www.random.com", "type": "open_clip", "dimensions": 512}},
+                {
+                    "model": "my-custom-model", 
+                    "model_properties": {"url": "https://www.random.com", "type": "open_clip", "dimensions": 512},
+                    "search_model": "my-custom-model",
+                    "search_model_properties": {"url": "https://www.random.com", "type": "open_clip", "dimensions": 512}
+                },
                 {
                     'type': 'knn_vector', 
                     'dimension': 512,   # dimension should match custom model properties
@@ -844,10 +859,17 @@ class TestCreateIndex(MarqoTestCase):
     def test_add_knn_field_failures(self):
         test_cases = (
             # custom model with no model properties
-            ({"model": "my-custom-model"}, 
+            ({"model": "my-custom-model", "search_model": "hf/all_datasets_v4_MiniLM-L6"}, 
+             errors.InvalidArgError),
+            # custom search_model with no search_model_properties
+            ({"model": "hf/all_datasets_v4_MiniLM-L6", "search_model": "my_custom_search_model"}, 
              errors.InvalidArgError),
             # custom model with model properties but no dimensions
-            ({"model": "my-custom-model", "model_properties": {"url": "https://www.random.com", "type": "open_clip"}},
+            ({
+                "model": "my-custom-model", 
+                "model_properties": {"url": "https://www.random.com", "type": "open_clip"},
+                "search_model": "hf/all_datasets_v4_MiniLM-L6"
+            },
              errors.InvalidArgError),
         )
 
@@ -920,3 +942,372 @@ class TestCreateIndex(MarqoTestCase):
 
         index_info = backend.get_index_info(config=self.config, index_name=self.index_name_1)
         assert index_info.index_settings[NsField.index_defaults]["model_properties"]["dimensions"] == 123
+    
+    def test_create_index_with_search_model_valid(self):
+        """
+        Ensures that indexes can be created with search_model and search_model_properties
+        Should have correct interactions with model and model_properties.
+        """
+
+        # model only (search model should be set to model)
+        tensor_search.create_vector_index(
+            config=self.config, index_name=self.index_name_1, 
+            index_settings={
+                NsField.index_defaults: {
+                    "model": "ViT-B/32",          # dimension is 512
+                }
+            }
+        )
+        index_info = backend.get_index_info(config=self.config, index_name=self.index_name_1)
+        assert index_info.index_settings[NsField.index_defaults]["model"] == "ViT-B/32"
+        assert index_info.index_settings[NsField.index_defaults]["search_model"] == "ViT-B/32"
+        assert index_info.model_name == "ViT-B/32"
+        assert index_info.search_model_name == "ViT-B/32"
+
+        fetched_model_properties = index_info.get_model_properties()
+        fetched_search_model_properties = index_info.get_search_model_properties()
+        assert fetched_model_properties["dimensions"] == 512
+        assert fetched_model_properties["type"] == "clip"
+        assert fetched_search_model_properties["dimensions"] == 512
+        assert fetched_search_model_properties["type"] == "clip"
+        tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+
+        # model and model_properties (search model should be set to model, search model properties set to model properties)
+        tensor_search.create_vector_index(
+            config=self.config, index_name=self.index_name_1, 
+            index_settings={
+                NsField.index_defaults: {
+                    "model": "my_custom_model",          # dimension is 512
+                    "model_properties": {
+                        "name": "ViT-B/32",
+                        "dimensions": 512,
+                        "url": "https://openaipublic.azureedge.net/clip/models/40d365715913c9da98579312b702a82c18be219cc2a73407c4526f58eba950af/ViT-B-32.pt",
+                        "type": "clip",
+                    },
+                }
+            }
+        )
+        index_info = backend.get_index_info(config=self.config, index_name=self.index_name_1)
+        assert index_info.index_settings[NsField.index_defaults]["model"] == "my_custom_model"
+        assert index_info.index_settings[NsField.index_defaults]["search_model"] == "my_custom_model"
+        assert index_info.model_name == "my_custom_model"
+        assert index_info.search_model_name == "my_custom_model"
+
+        fetched_model_properties = index_info.get_model_properties()
+        fetched_search_model_properties = index_info.get_search_model_properties()
+        assert fetched_model_properties["dimensions"] == 512
+        assert fetched_model_properties["type"] == "clip"
+        assert fetched_search_model_properties["dimensions"] == 512
+        assert fetched_search_model_properties["type"] == "clip"
+        tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+
+        # model and search_model (both in registry)
+        tensor_search.create_vector_index(
+            config=self.config, index_name=self.index_name_1, 
+            index_settings={
+                NsField.index_defaults: {
+                    "model": "ViT-B/32",          # dimension is 512
+                    "search_model": "onnx32/open_clip/ViT-B-32/laion2b_e16"   # dimension is 512
+                }
+            }
+        )
+        index_info = backend.get_index_info(config=self.config, index_name=self.index_name_1)
+        assert index_info.index_settings[NsField.index_defaults]["model"] == "ViT-B/32"
+        assert index_info.index_settings[NsField.index_defaults]["search_model"] == "onnx32/open_clip/ViT-B-32/laion2b_e16"
+        assert index_info.model_name == "ViT-B/32"
+        assert index_info.search_model_name == "onnx32/open_clip/ViT-B-32/laion2b_e16"
+
+        fetched_model_properties = index_info.get_model_properties()
+        fetched_search_model_properties = index_info.get_search_model_properties()
+        assert fetched_model_properties["dimensions"] == 512
+        assert fetched_model_properties["type"] == "clip"
+        assert fetched_search_model_properties["dimensions"] == 512
+        assert fetched_search_model_properties["type"] == "clip_onnx"
+        tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+
+        # model, model_properties, search_model, search_model_properties (both custom)
+        tensor_search.create_vector_index(
+            config=self.config, index_name=self.index_name_1, 
+            index_settings={
+                NsField.index_defaults: {
+                    "model": "my_custom_model",          # dimension is 512
+                    "model_properties": {
+                        "name": "ViT-B/32",
+                        "dimensions": 512,
+                        "url": "https://openaipublic.azureedge.net/clip/models/40d365715913c9da98579312b702a82c18be219cc2a73407c4526f58eba950af/ViT-B-32.pt",
+                        "type": "clip",
+                    },
+                    "search_model": "my_custom_search_model",
+                    "search_model_properties": {
+                        "name": "ViT-B-32-quickgelu",
+                        "dimensions": 512,
+                        "url": "https://github.com/mlfoundations/open_clip/releases/download/v0.2-weights/vit_b_32-quickgelu-laion400m_avg-8a00ab3c.pt",
+                        "type": "open_clip",
+                    }
+                }
+            }
+        )
+        index_info = backend.get_index_info(config=self.config, index_name=self.index_name_1)
+        assert index_info.index_settings[NsField.index_defaults]["model"] == "my_custom_model"
+        assert index_info.index_settings[NsField.index_defaults]["search_model"] == "my_custom_search_model"
+        assert index_info.model_name == "my_custom_model"
+        assert index_info.search_model_name == "my_custom_search_model"
+
+        fetched_model_properties = index_info.get_model_properties()
+        fetched_search_model_properties = index_info.get_search_model_properties()
+        assert fetched_model_properties["dimensions"] == 512
+        assert fetched_model_properties["type"] == "clip"
+        assert fetched_search_model_properties["dimensions"] == 512
+        assert fetched_search_model_properties["type"] == "open_clip"
+        tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+
+        # model, model_properties, search_model (model in registry, search_model is custom)
+        tensor_search.create_vector_index(
+            config=self.config, index_name=self.index_name_1, 
+            index_settings={
+                NsField.index_defaults: {
+                    "model": "ViT-B/32",          # dimension is 512
+                    "search_model": "my_custom_search_model",
+                    "search_model_properties": {
+                        "name": "ViT-B-32-quickgelu",
+                        "dimensions": 512,
+                        "url": "https://github.com/mlfoundations/open_clip/releases/download/v0.2-weights/vit_b_32-quickgelu-laion400m_avg-8a00ab3c.pt",
+                        "type": "open_clip",
+                    }
+                }
+            }
+        )
+        index_info = backend.get_index_info(config=self.config, index_name=self.index_name_1)
+        assert index_info.index_settings[NsField.index_defaults]["model"] == "ViT-B/32"
+        assert index_info.index_settings[NsField.index_defaults]["search_model"] == "my_custom_search_model"
+        assert index_info.model_name == "ViT-B/32"
+        assert index_info.search_model_name == "my_custom_search_model"
+
+        fetched_model_properties = index_info.get_model_properties()
+        fetched_search_model_properties = index_info.get_search_model_properties()
+        assert fetched_model_properties["dimensions"] == 512
+        assert fetched_model_properties["type"] == "clip"
+        assert fetched_search_model_properties["dimensions"] == 512
+        assert fetched_search_model_properties["type"] == "open_clip"
+        tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+
+        # model, search_model is no_model
+        tensor_search.create_vector_index(
+            config=self.config, index_name=self.index_name_1, 
+            index_settings={
+                NsField.index_defaults: {
+                    "model": "ViT-B/32",          # dimension is 512
+                    "search_model": "no_model",
+                    "search_model_properties": {
+                        "dimensions": 512
+                    }
+                }
+            }
+        )
+        index_info = backend.get_index_info(config=self.config, index_name=self.index_name_1)
+        assert index_info.index_settings[NsField.index_defaults]["model"] == "ViT-B/32"
+        assert index_info.index_settings[NsField.index_defaults]["search_model"] == "no_model"
+        assert index_info.model_name == "ViT-B/32"
+        assert index_info.search_model_name == "no_model"
+
+        fetched_model_properties = index_info.get_model_properties()
+        fetched_search_model_properties = index_info.get_search_model_properties()
+        assert fetched_model_properties["dimensions"] == 512
+        assert fetched_model_properties["type"] == "clip"
+        assert fetched_search_model_properties["dimensions"] == 512
+        assert "type" not in fetched_search_model_properties
+        tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+
+        # model is no_model, search_model
+        tensor_search.create_vector_index(
+            config=self.config, index_name=self.index_name_1, 
+            index_settings={
+                NsField.index_defaults: {
+                    "model": "no_model",
+                    "model_properties": {
+                        "dimensions": 512
+                    },                 
+                    "search_model": "ViT-B/32"
+                }
+            }
+        )
+        index_info = backend.get_index_info(config=self.config, index_name=self.index_name_1)
+        assert index_info.index_settings[NsField.index_defaults]["model"] == "no_model"
+        assert index_info.index_settings[NsField.index_defaults]["search_model"] == "ViT-B/32"
+        assert index_info.model_name == "no_model"
+        assert index_info.search_model_name == "ViT-B/32"
+
+        fetched_model_properties = index_info.get_model_properties()
+        fetched_search_model_properties = index_info.get_search_model_properties()
+        assert fetched_model_properties["dimensions"] == 512
+        assert "type" not in fetched_model_properties
+        assert fetched_search_model_properties["dimensions"] == 512
+        assert fetched_search_model_properties["type"] == "clip"
+        tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
+
+    def test_create_index_with_search_model_and_update(self):
+        """
+        Ensures that index settings stay correct with search model even after adding new fields to index.
+        """
+        tensor_search.create_vector_index(
+            config=self.config, index_name=self.index_name_1, 
+            index_settings={
+                NsField.index_defaults: {
+                    "model": "my_custom_model",          # dimension is 512
+                    "model_properties": {
+                        "name": "ViT-B/32",
+                        "dimensions": 512,
+                        "url": "https://openaipublic.azureedge.net/clip/models/40d365715913c9da98579312b702a82c18be219cc2a73407c4526f58eba950af/ViT-B-32.pt",
+                        "type": "clip",
+                    },
+                    "search_model": "my_custom_search_model",
+                    "search_model_properties": {
+                        "name": "ViT-B-32-quickgelu",
+                        "dimensions": 512,
+                        "url": "https://github.com/mlfoundations/open_clip/releases/download/v0.2-weights/vit_b_32-quickgelu-laion400m_avg-8a00ab3c.pt",
+                        "type": "open_clip",
+                    }
+                }
+            }
+        )
+        index_info = backend.get_index_info(config=self.config, index_name=self.index_name_1)
+        assert index_info.index_settings[NsField.index_defaults]["model"] == "my_custom_model"
+        assert index_info.index_settings[NsField.index_defaults]["search_model"] == "my_custom_search_model"
+        assert index_info.model_name == "my_custom_model"
+        assert index_info.search_model_name == "my_custom_search_model"
+
+        fetched_model_properties = index_info.get_model_properties()
+        fetched_search_model_properties = index_info.get_search_model_properties()
+        assert fetched_model_properties["dimensions"] == 512
+        assert fetched_model_properties["type"] == "clip"
+        assert fetched_search_model_properties["dimensions"] == 512
+        assert fetched_search_model_properties["type"] == "open_clip"
+        
+        # Add normal text and multimodal fields to index
+        tensor_search.add_documents(
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1,
+                docs=[{
+                    "_id": "0",
+                    "text_field": "blah",
+                    "my_custom_vector": {
+                        "content": "custom content is here!!",
+                        "vector": [1.0 for _ in range(512)]
+                    },
+                    "my_multimodal": {
+                        "text": "multimodal text",
+                        "image": 'https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png'
+                    }
+                }],
+                auto_refresh=True, device="cpu", 
+                mappings={
+                    "my_custom_vector": {
+                        "type": "custom_vector"
+                    },
+                    "my_multimodal": {
+                        "type": "multimodal_combination",
+                        "weights": {
+                            "text": 0.4,
+                            "image": 0.6
+                        }
+                    }
+                }
+            )
+        )
+
+        # index settings should remain the same
+        index_info = backend.get_index_info(config=self.config, index_name=self.index_name_1)
+        assert index_info.index_settings[NsField.index_defaults]["model"] == "my_custom_model"
+        assert index_info.index_settings[NsField.index_defaults]["search_model"] == "my_custom_search_model"
+        assert index_info.model_name == "my_custom_model"
+        assert index_info.search_model_name == "my_custom_search_model"
+
+        fetched_model_properties = index_info.get_model_properties()
+        fetched_search_model_properties = index_info.get_search_model_properties()
+        assert fetched_model_properties["dimensions"] == 512
+        assert fetched_model_properties["type"] == "clip"
+        assert fetched_search_model_properties["dimensions"] == 512
+        assert fetched_search_model_properties["type"] == "open_clip"
+
+    def test_create_index_with_search_model_invalid(self):
+        """
+        Ensures that creating an index with search_model with improper settings fails with the correct error message.
+        """
+        test_cases = [
+            # Different dimensions for model and search_model (in registry)
+            {
+                "defaults": {
+                    "model": "ViT-B/32",    # dimensions: 512
+                    "search_model": "sentence-transformers/all-MiniLM-L6-v1"    # dimensions: 384
+                },
+                "error": InvalidArgError,
+                "error_message": "must be equal"
+            },
+
+            # Different dimensions for model and search_model (custom)
+            {
+                "defaults": {
+                    "model": "my_custom_model",
+                    "model_properties": {
+                        "name": "ViT-B/32",
+                        "dimensions": 512,
+                        "url": "https://openaipublic.azureedge.net/clip/models/40d365715913c9da98579312b702a82c18be219cc2a73407c4526f58eba950af/ViT-B-32.pt",
+                        "type": "clip",
+                    },
+                    "search_model": "no_model",
+                    "search_model_properties": {
+                        "dimensions": 123
+                    }
+                },
+                "error": InvalidArgError,
+                "error_message": "must be equal"
+            },
+
+            # search_model has no dimensions
+            {
+                "defaults": {
+                    "model": "ViT-B/32",    # dimensions: 512
+                    "search_model": "my_custom_search_model",
+                    "search_model_properties": {
+                        "name": "ViT-B/32",     # no dimensions given
+                        "url": "https://openaipublic.azureedge.net/clip/models/40d365715913c9da98579312b702a82c18be219cc2a73407c4526f58eba950af/ViT-B-32.pt",
+                        "type": "clip"
+                    }
+                },
+                "error": InvalidArgError,
+                "error_message": "must contain a 'dimensions' key"
+            },
+
+            # search_model_properties but no search_model
+            {
+                "defaults": {
+                    "model": "ViT-B/32",    # dimensions: 512
+                    "search_model_properties": {
+                        "dimensions": 123
+                    }
+                },
+                "error": InvalidArgError,
+                "error_message": "No `search_model` found"
+            },
+
+            # search_model but no model
+            {
+                "defaults": {
+                    "search_model": "my_custom_search_model",
+                    "search_model_properties": {
+                        "name": "ViT-B/32",     # no dimensions given
+                        "url": "https://openaipublic.azureedge.net/clip/models/40d365715913c9da98579312b702a82c18be219cc2a73407c4526f58eba950af/ViT-B-32.pt",
+                        "type": "clip"
+                    }
+                },
+                "error": InvalidArgError,
+                "error_message": "found no `model`"
+            },
+        ]
+
+        for case in test_cases:
+            try:
+                tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings={NsField.index_defaults: case["defaults"]})
+                raise AssertionError
+            except case["error"] as e:
+                assert case["error_message"] in e.message
