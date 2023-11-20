@@ -28,6 +28,11 @@ class MarqoIndexRequest(ImmutableStrictBaseModel, ABC):
     created_at: int
     updated_at: int
 
+    @validator('name')
+    def validate_name(cls, name):
+        marqo_index.validate_index_name(name)
+        return name
+
 
 class UnstructuredMarqoIndexRequest(MarqoIndexRequest):
     treat_urls_and_pointers_as_images: bool

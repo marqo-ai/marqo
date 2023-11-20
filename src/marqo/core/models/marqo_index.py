@@ -1,3 +1,4 @@
+import re
 from abc import ABC, abstractmethod
 from enum import Enum
 from typing import List, Optional, Dict, Any, Set, Type, Union
@@ -200,6 +201,11 @@ class MarqoIndex(ImmutableStrictBaseModel, ABC):
             raise ValueError(f"Cannot assign a different type to {cls.__name__}")
         return type
 
+    @validator('name')
+    def validate_name(cls, name):
+        validate_index_name(name)
+        return name
+
     @classmethod
     def parse_obj(cls: Type['Model'], obj: Any) -> Union['UnstructuredMarqoIndex', 'StructuredMarqoIndex']:
         obj = cls._enforce_dict_if_root(obj)
@@ -368,6 +374,31 @@ class StructuredMarqoIndex(MarqoIndex):
                                   )
 
 
+_VESPA_NAME_PATTERN = r'[a-zA-Z_][a-zA-Z0-9_]*'
+_VESPA_NAME_REGEX = re.compile(_VESPA_NAME_PATTERN)
+
+
+def _is_valid_vespa_name(name: str) -> bool:
+    """
+    Validate a Vespa name.
+
+    Returns:
+        True if the name is valid, False otherwise
+    """
+    return _VESPA_NAME_REGEX.fullmatch(name) is not None
+
+
+def validate_index_name(name: str) -> None:
+    """
+    Validate a MarqoIndex name. Raises ValueError if validation fails.
+    """
+    if not _is_valid_vespa_name(name):
+        raise ValueError(f'"{name}" is not a valid index name. Index name must match {_VESPA_NAME_PATTERN} '
+                         f'and must not start with "{constants.MARQO_RESERVED_PREFIX}"')
+    if name.startswith(constants.MARQO_RESERVED_PREFIX):
+        raise ValueError(f'Index name must not start with "{constants.MARQO_RESERVED_PREFIX}"')
+
+
 def validate_structured_field(values, marqo_index: bool) -> None:
     """
     Validate a Field or FieldRequest. Raises ValueError if validation fails.
@@ -380,6 +411,9 @@ def validate_structured_field(values, marqo_index: bool) -> None:
     features: List[FieldFeature] = values['features']
     dependent_fields: Optional[Dict[str, float]] = values['dependent_fields']
 
+    if not _is_valid_vespa_name(name):
+        raise ValueError(f'"{name}": Field name must match {_VESPA_NAME_PATTERN} '
+                         f'and must not start with "{constants.MARQO_RESERVED_PREFIX}"')
     if name.startswith(constants.MARQO_RESERVED_PREFIX):
         raise ValueError(f'{name}: Field name must not start with "{constants.MARQO_RESERVED_PREFIX}"')
 
