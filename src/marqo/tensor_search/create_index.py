@@ -18,6 +18,7 @@ from marqo.tensor_search.enums import IndexSettingsField, ModelProperties
 
 def override_prefixes_in_model_properties(index_settings: dict) -> dict:
     """
+    TODO: remove if unneeded. unused.
     Modifies index settings.
     Use overrides specified in text_preprocessing to override:
     1. text_chunk_prefix in model_properties
@@ -29,7 +30,7 @@ def override_prefixes_in_model_properties(index_settings: dict) -> dict:
 
     needed_settings_keys = [IndexSettingsField.text_preprocessing, IndexSettingsField.model_properties]
     for key in needed_settings_keys:
-        if key not in index_settings:
+        if key not in index_settings[IndexSettingsField.index_defaults]:
             raise errors.InternalError(f"Missing required field {key} in index_settings.")
     
     copied_settings = index_settings.copy()

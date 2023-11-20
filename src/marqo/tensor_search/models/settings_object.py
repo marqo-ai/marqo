@@ -84,13 +84,13 @@ settings_schema = {
                             ]
                         },
                         NsFields.override_text_chunk_prefix: {  # prefix override is optional
-                            "type": "string",
+                            "type": ["null", "string"],
                             "examples": [
                                 "passage: "
                             ]
                         },
                         NsFields.override_text_query_prefix: {  # prefix override is optional
-                            "type": "string",
+                            "type": ["null", "string"],
                             "examples": [
                                 "query: "
                             ]

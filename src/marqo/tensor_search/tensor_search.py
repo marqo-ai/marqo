@@ -163,8 +163,6 @@ def create_vector_index(
 
     # `search_model` is determined by `model` and `model_properties`
     the_index_settings = create_index.autofill_search_model(the_index_settings)
-    # Override prefixes in model_properties and search_model_properties
-    the_index_settings = create_index.override_prefixes_in_model_properties(index_settings=the_index_settings)
 
     validation.validate_settings_object(settings_object=the_index_settings)
 
@@ -578,7 +576,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                                                                    split_length=split_length, split_overlap=split_overlap)
                         
                         # content chunks: WITH prefix, used to generate vectors (text prefix not actually stored in backend)
-                        content_chunks = text_processor.prefix_text_chunks(text_chunks)
+                        content_chunks = text_processor.prefix_text_chunks(text_chunks, text_chunk_prefix)
 
                     else:
                         # TODO put the logic for getting field parameters into a function and add per field options
@@ -1057,17 +1055,26 @@ def determine_text_query_prefix(request_level_prefix: str, index_info: IndexInfo
 
     Logic:
     1. Prioritize request-level prefix
-    2. If not provided, use search_model_properties defined prefix
-    3. If no search_model_properties, try model_properties (for backwards compatibility with v1.4.0 and below)
-    3. If not provided, keep as None (will be handled by dict .get() method)
+    2. If not provided, use override in text_preprocessing
+    3. If not provided, use search_model_properties defined prefix
+    4. If no search_model_properties, try model_properties (for backwards compatibility with v1.4.0 and below)
+    5. If not provided, keep as None (will be handled by dict .get() method)
     """
 
     if request_level_prefix is not None:
         return request_level_prefix
-    
-    # TODO: Fix when search_model PR is merged in. Make sure it's backwards compatible.
-    model_prefix = index_info.get_search_model_properties().get(ModelProperties.text_query_prefix)
 
+    # Use override in text_preprocessing (if not None)
+    text_preproc = index_info.get_index_settings()[NsField.index_defaults][NsField.text_preprocessing]
+    if NsField.override_text_query_prefix in text_preproc:
+        if text_preproc[NsField.override_text_query_prefix] is not None:
+            return text_preproc[NsField.override_text_query_prefix]
+    
+    if index_info.search_model_name is not None:
+        model_prefix = index_info.get_search_model_properties().get(ModelProperties.text_query_prefix)
+    else:
+        # Uses model properties if no search model (for backwards compatibility)
+        model_prefix = index_info.get_model_properties().get(ModelProperties.text_query_prefix)
 
     return model_prefix
 

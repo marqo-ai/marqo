@@ -139,7 +139,8 @@ def add_docs_params_orchestrator(index_name: str, body: Union[AddDocsBodyParams,
                                 device: str, auto_refresh: bool = False, non_tensor_fields: Optional[List[str]] = None,
                                 mappings: Optional[dict] = dict(), model_auth: Optional[ModelAuth] = None,
                                 image_download_headers: Optional[dict] = dict(),
-                                use_existing_tensors: Optional[bool] = False, query_parameters: Optional[Dict] = dict()) -> AddDocsParams:
+                                use_existing_tensors: Optional[bool] = False, query_parameters: Optional[Dict] = dict(),
+                                text_chunk_prefix: str = None) -> AddDocsParams:
     """An orchestrator for the add_documents API to support both old and new versions of the API.
     All the arguments are decoded and validated in the API function. This function is only responsible for orchestrating.
 
@@ -165,6 +166,7 @@ def add_docs_params_orchestrator(index_name: str, body: Union[AddDocsBodyParams,
         use_existing_tensors = body.useExistingTensors
         model_auth = body.modelAuth
         image_download_headers = body.imageDownloadHeaders
+        text_chunk_prefix = body.textChunkPrefix
 
         if tensor_fields is not None and non_tensor_fields is not None:
             raise BadRequestError('Cannot provide `nonTensorFields` when `tensorFields` is defined. '
@@ -179,7 +181,7 @@ def add_docs_params_orchestrator(index_name: str, body: Union[AddDocsBodyParams,
             index_name=index_name, docs=docs, auto_refresh=auto_refresh,
             device=device, non_tensor_fields=non_tensor_fields, tensor_fields=tensor_fields,
             use_existing_tensors=use_existing_tensors, image_download_headers=image_download_headers,
-            mappings=mappings, model_auth=model_auth
+            mappings=mappings, model_auth=model_auth, text_chunk_prefix=text_chunk_prefix
         )
 
     elif isinstance(body, list) and all(isinstance(item, dict) for item in body):
@@ -197,7 +199,7 @@ def add_docs_params_orchestrator(index_name: str, body: Union[AddDocsBodyParams,
             index_name=index_name, docs=docs, auto_refresh=auto_refresh,
             device=device, non_tensor_fields=non_tensor_fields,
             use_existing_tensors=use_existing_tensors, image_download_headers=image_download_headers,
-            mappings=mappings, model_auth=model_auth
+            mappings=mappings, model_auth=model_auth, text_chunk_prefix=text_chunk_prefix
         )
 
     else:

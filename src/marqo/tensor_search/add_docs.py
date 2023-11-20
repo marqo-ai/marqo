@@ -238,12 +238,20 @@ def determine_text_chunk_prefix(request_level_prefix: str, index_info: IndexInfo
 
     Logic:
     1. Prioritize request-level prefix
-    2. If not provided, use model_properties defined prefix
-    3. If not provided, keep as None (will be handled by dict .get() method)
+    2. If not provided, use override in text_preprocessing
+    3. If not provided, use model_properties defined prefix
+    4. If not provided, keep as None (will be handled by dict .get() method)
     """
 
     if request_level_prefix is not None:
         return request_level_prefix
     
+    # Use override in text_preprocessing (if not None)
+    text_preproc = index_info.get_index_settings()[enums.IndexSettingsField.index_defaults][enums.IndexSettingsField.text_preprocessing]
+    if enums.IndexSettingsField.override_text_chunk_prefix in text_preproc:
+        if text_preproc[enums.IndexSettingsField.override_text_chunk_prefix] is not None:
+            return text_preproc[enums.IndexSettingsField.override_text_chunk_prefix]
+    
+    # Use model-defined prefix (None if it does not exist)
     model_prefix = index_info.get_model_properties().get(enums.ModelProperties.text_chunk_prefix)
     return model_prefix
