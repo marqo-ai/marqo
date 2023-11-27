@@ -285,8 +285,9 @@ def delete_batch_indexes(index_names: List[str], marqo_config: config.Config = D
     return JSONResponse(content={"acknowledged": True}, status_code=200)
 
 
-@app.post("/indexes/{index_names}")
-def create_batch_indexes(index_names: List[str], settings_list: List[IndexSettings], marqo_config: config.Config = Depends(get_config)):
+@app.post("/indexes/batch-create")
+def create_batch_indexes(index_names: List[str], settings_list: List[IndexSettings], \
+                         marqo_config: config.Config = Depends(get_config)):
     """An internal API used for testing processes. Not to be used by users."""
     marqo_index_requests = [settings.to_marqo_index_request(index_name) \
                             for index_name, settings in zip(index_names, settings_list)]
