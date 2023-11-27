@@ -278,19 +278,35 @@ def get_cuda_info():
     return tensor_search.get_cuda_info()
 
 
-@app.delete("/indexes/{index_names}")
+@app.post("/indexes/delete-batch")
 def delete_batch_indexes(index_names: List[str], marqo_config: config.Config = Depends(get_config)):
+    """An internal API used for testing processes. Not to be used by users."""
     tensor_search.delete_batch_indexes(index_names=index_names, config=marqo_config)
-    pass
+    return JSONResponse(content={"acknowledged": True}, status_code=200)
 
-
-@app.post("/indexes/")
-def create_batch_indexes:
-    pass
 
 @app.post("/indexes/{index_names}")
-def clear_indexes():
+def create_batch_indexes(index_names: List[str], settings_list: List[IndexSettings], marqo_config: config.Config = Depends(get_config)):
+    """An internal API used for testing processes. Not to be used by users."""
+    marqo_index_requests = [settings.to_marqo_index_request(index_name) \
+                            for index_name, settings in zip(index_names, settings_list)]
 
+    marqo_config.index_management.batch_create_indexes(marqo_index_requests)
+
+    return JSONResponse(
+        content={
+            "acknowledged": True,
+            "index_names": index_names
+        },
+        status_code=200
+    )
+
+
+@app.post("/indexes/documents/delete-batch")
+def clear_indexes(index_names: List[str], marqo_config: config.Config = Depends(get_config)):
+    """An internal API used for testing processes. Not to be used by users."""
+    tensor_search.clear_indexes(index_names=index_names, config=marqo_config)
+    return JSONResponse(content={"acknowledged": True}, status_code=200)
 
 
 

@@ -208,6 +208,7 @@ class IndexManagement:
         except IndexNotFoundError:
             return False
 
+
     def _create_marqo_settings_schema(self, app: str) -> bool:
         """
         Create the Marqo settings schema if it does not exist.

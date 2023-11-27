@@ -2356,6 +2356,12 @@ def delete_batch_indexes(config: Config, index_names: List[str]):
     index_management.batch_delete_indexes(index_names)
 
 
+def clear_indexes(config: Config, index_names: List[str]):
+    import vespa.application as pyvespa
+    pyvespa_client = pyvespa.Vespa(config.vespa_client.document_url)
+    for index_name in index_names:
+        pyvespa_client.delete_all_docs('content_default', index_name)
+
 
 def get_indexes(config: Config):
     res = backend.get_cluster_indices(config=config)
