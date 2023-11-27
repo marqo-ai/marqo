@@ -17,8 +17,7 @@ from marqo.errors import IndexNotFoundError, BadRequestError
 from marqo.s2_inference import types, s2_inference
 from marqo.tensor_search import add_docs
 from marqo.tensor_search import enums
-from marqo.tensor_search import tensor_search, index_meta_cache, backend
-from marqo.tensor_search.enums import IndexSettingsField
+from marqo.tensor_search import tensor_search, index_meta_cache
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from tests.marqo_test import MarqoTestCase
 

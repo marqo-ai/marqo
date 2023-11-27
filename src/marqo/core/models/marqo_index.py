@@ -374,6 +374,7 @@ class StructuredMarqoIndex(MarqoIndex):
                                   )
 
 
+_PROTECTED_FIELD_NAMES = ['_id', '_tensor_facets', '_highlights', '_score', '_found']
 _VESPA_NAME_PATTERN = r'[a-zA-Z_][a-zA-Z0-9_]*'
 _VESPA_NAME_REGEX = re.compile(_VESPA_NAME_PATTERN)
 
@@ -416,6 +417,8 @@ def validate_structured_field(values, marqo_index: bool) -> None:
                          f'and must not start with "{constants.MARQO_RESERVED_PREFIX}"')
     if name.startswith(constants.MARQO_RESERVED_PREFIX):
         raise ValueError(f'{name}: Field name must not start with "{constants.MARQO_RESERVED_PREFIX}"')
+    if name in _PROTECTED_FIELD_NAMES:
+        raise ValueError(f'{name}: Field name must not be one of {", ".join(_PROTECTED_FIELD_NAMES)}')
 
     if type in [FieldType.ImagePointer, FieldType.MultimodalCombination] and features:
         raise ValueError(f'{name}: Cannot specify features for field of type {type.value}')

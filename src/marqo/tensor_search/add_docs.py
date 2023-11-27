@@ -1,22 +1,20 @@
 """Functions used to fulfill the add_documents endpoint"""
 import copy
-from contextlib import contextmanager
-
 import math
-import threading
 import random
+import threading
+from contextlib import contextmanager
+from typing import List, Optional, ContextManager
 
-from typing import List, Optional, Tuple, ContextManager
 import PIL
 from PIL.ImageFile import ImageFile
+
 from marqo.s2_inference import clip_utils
 from marqo.tensor_search.telemetry import RequestMetricsStore, RequestMetrics
-import marqo.errors as errors
-from marqo.tensor_search import utils
 
 
-def threaded_download_images(allocated_docs: List[dict], image_repo: dict, tensor_fields: Optional[List[str]],
-                             non_tensor_fields: Optional[List[str]], image_download_headers: dict,
+def threaded_download_images(allocated_docs: List[dict], image_repo: dict, tensor_fields: List[str],
+                             image_download_headers: dict,
                              metric_obj: Optional[RequestMetrics] = None) -> None:
     """A thread calls this function to download images for its allocated documents
 
@@ -26,10 +24,7 @@ def threaded_download_images(allocated_docs: List[dict], image_repo: dict, tenso
         allocated_docs: docs with images to be downloaded by this thread,
         image_repo: dictionary that will be mutated by this thread. It will add PIL images
             as values and the URLs as keys
-        tensor_fields: A tuple of tensor_fields. Images will be downloaded for these fields only. Cannot be provided
-            at the same time as `non_tensor_fields`.
-        non_tensor_fields: A tuple of non_tensor_fields. No images will be downloaded for
-            these fields. Cannot be provided at the same time as `tensor_fields`.
+        tensor_fields: A tuple of tensor_fields. Images will be downloaded for these fields only.
         image_download_headers: A dict of headers for image download. Can be used
             to authenticate image downloads
     Side Effects:
@@ -43,34 +38,30 @@ def threaded_download_images(allocated_docs: List[dict], image_repo: dict, tenso
         }
     Returns:
         None
-    Raises:
-        - InternalError if both or neither of tensor_fields and non_tensor_fields are provided. This validation should
-        take place at API level and such invalid arguments are not expected to reach this function.
 
     """
-
-    if tensor_fields is not None and non_tensor_fields is not None \
-            or tensor_fields is None and non_tensor_fields is None:
-        raise errors.InternalError("Must provide exactly one of tensor_fields or non_tensor_fields")
-
+    # TODO - We may not be handling errors in threads properly. Test introducing errors (e.g., call a method
+    #  that doesn't exist) in this code and verify
     # Generate pseudo-unique ID for thread metrics.
     _id = hash("".join([d.get("_id", str(random.getrandbits(64))) for d in allocated_docs])) % 1000
     _id = f"image_download.{_id}"
-    TIMEOUT_SECONDS=3
-    if metric_obj is None: # Occurs predominately in testing.
+    TIMEOUT_SECONDS = 3
+    if metric_obj is None:  # Occurs predominately in testing.
         metric_obj = RequestMetricsStore.for_request()
         RequestMetricsStore.set_in_request(metrics=metric_obj)
 
     with metric_obj.time(f"{_id}.thread_time"):
         for doc in allocated_docs:
             for field in list(doc):
-                if not utils.is_tensor_field(field, tensor_fields, non_tensor_fields):
+                if field not in tensor_fields:
                     continue
                 if isinstance(doc[field], str) and clip_utils._is_image(doc[field]):
                     if doc[field] in image_repo:
                         continue
                     try:
-                        image_repo[doc[field]] = clip_utils.load_image_from_path(doc[field], image_download_headers, timeout=TIMEOUT_SECONDS, metrics_obj=metric_obj)
+                        image_repo[doc[field]] = clip_utils.load_image_from_path(doc[field], image_download_headers,
+                                                                                 timeout=TIMEOUT_SECONDS,
+                                                                                 metrics_obj=metric_obj)
                     except PIL.UnidentifiedImageError as e:
                         image_repo[doc[field]] = e
                         metric_obj.increment_counter(f"{doc.get(field, '')}.UnidentifiedImageError")
@@ -95,32 +86,20 @@ def threaded_download_images(allocated_docs: List[dict], image_repo: dict, tenso
 
 
 @contextmanager
-def download_images(docs: List[dict], thread_count: int, tensor_fields: Optional[List[str]],
-                    non_tensor_fields: Optional[List[str]], image_download_headers: dict) -> ContextManager[dict]:
+def download_images(docs: List[dict], thread_count: int, tensor_fields: List[str],
+                    image_download_headers: dict) -> ContextManager[dict]:
     """Concurrently downloads images from each doc, storing them into the image_repo dict
     Args:
         docs: docs with images to be downloaded. These will be allocated to each thread
         thread_count: number of threads to spin up
-        tensor_fields: A tuple of tensor_fields. Images will be downloaded for these fields only. Cannot be provided
-            at the same time as `non_tensor_fields`.
-        non_tensor_fields: A tuple of non_tensor_fields. No images will be downloaded for
-            these fields. Cannot be provided at the same time as `tensor_fields`.
+        tensor_fields: A tuple of tensor_fields. Images will be downloaded for these fields only.
         image_download_headers: A dict of image download headers for authentication.
     This should be called only if treat URLs as images is True
 
     Returns:
          An image repo: a dict <image pointer>:<image data>
-
-    Raises:
-        - InternalError if both or neither of tensor_fields and non_tensor_fields are provided. This validation should
-        take place at API level and such invalid arguments are not expected to reach this function.
     """
-
-    if tensor_fields is not None and non_tensor_fields is not None \
-            or tensor_fields is None and non_tensor_fields is None:
-        raise errors.InternalError("Must provide exactly one of tensor_fields or non_tensor_fields")
-
-    docs_per_thread = math.ceil(len(docs)/thread_count)
+    docs_per_thread = math.ceil(len(docs) / thread_count)
     copied = copy.deepcopy(docs)
     image_repo = dict()
 
@@ -128,7 +107,7 @@ def download_images(docs: List[dict], thread_count: int, tensor_fields: Optional
         m = [RequestMetrics() for i in range(thread_count)]
         thread_allocated_docs = [copied[i: i + docs_per_thread] for i in range(len(copied))[::docs_per_thread]]
         threads = [threading.Thread(target=threaded_download_images, args=(allocation, image_repo,
-                                                                           tensor_fields, non_tensor_fields,
+                                                                           tensor_fields,
                                                                            image_download_headers, m[i]))
                    for i, allocation in enumerate(thread_allocated_docs)]
 

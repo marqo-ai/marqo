@@ -1,5 +1,6 @@
 import time
 import unittest
+import uuid
 from unittest.mock import patch, Mock
 
 import vespa.application as pyvespa
@@ -7,7 +8,7 @@ import vespa.application as pyvespa
 from marqo import config
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models.marqo_index import *
-from marqo.core.models.marqo_index_request import StructuredMarqoIndexRequest, FieldRequest
+from marqo.core.models.marqo_index_request import StructuredMarqoIndexRequest, FieldRequest, MarqoIndexRequest
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.vespa.vespa_client import VespaClient
 
@@ -47,14 +48,18 @@ class MarqoTestCase(unittest.TestCase):
         cls.CONTENT_CLUSTER = 'content_default'
 
     @classmethod
-    def create_indexes(cls, indexes: List[MarqoIndex]):
-        cls.index_management.batch_create_indexes(indexes)
-        cls.vespa_client.wait_for_application_convergence()
+    def create_indexes(cls, index_requests: List[MarqoIndexRequest]) -> List[MarqoIndex]:
+        indexes = cls.index_management.batch_create_indexes(index_requests)
         cls.indexes_to_delete = indexes
+
+        return indexes
 
     def clear_indexes(self, indexes: List[MarqoIndex]):
         for index in indexes:
-            self.pyvespa_client.delete_all_docs(self.CONTENT_CLUSTER, index.name)
+            self.clear_index_by_name(index.name)
+
+    def clear_index_by_name(self, index_name: str):
+        self.pyvespa_client.delete_all_docs(self.CONTENT_CLUSTER, index_name)
 
     @classmethod
     def structured_marqo_index(
@@ -104,9 +109,9 @@ class MarqoTestCase(unittest.TestCase):
     @classmethod
     def structured_marqo_index_request(
             cls,
-            name: str,
-            fields: List[FieldRequest] = None,
-            tensor_fields: List[str] = None,
+            fields: List[FieldRequest],
+            tensor_fields: List[str],
+            name: Optional[str] = None,
             model: Model = Model(name='hf/all_datasets_v4_MiniLM-L6'),
             normalize_embeddings: bool = True,
             text_preprocessing: TextPreProcessing = TextPreProcessing(
@@ -130,6 +135,9 @@ class MarqoTestCase(unittest.TestCase):
         """
         Helper method that provides reasonable defaults for StructuredMarqoIndexRequest.
         """
+        if not name:
+            name = 'a' + str(uuid.uuid4()).replace('-', '')
+
         return StructuredMarqoIndexRequest(
             name=name,
             model=model,
