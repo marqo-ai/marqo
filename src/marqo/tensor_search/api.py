@@ -131,6 +131,7 @@ def create_index(index_name: str, settings: IndexSettings, marqo_config: config.
     )
 
 
+
 @app.post("/indexes/bulk/search")
 @throttle(RequestType.SEARCH)
 @add_timing
@@ -275,6 +276,23 @@ def get_cpu_info():
 @app.get("/device/cuda")
 def get_cuda_info():
     return tensor_search.get_cuda_info()
+
+
+@app.delete("/indexes/{index_names}")
+def delete_batch_indexes(index_names: List[str], marqo_config: config.Config = Depends(get_config)):
+    tensor_search.delete_batch_indexes(index_names=index_names, config=marqo_config)
+    pass
+
+
+@app.post("/indexes/")
+def create_batch_indexes:
+    pass
+
+@app.post("/indexes/{index_names}")
+def clear_indexes():
+
+
+
 
 
 if __name__ == "__main__":

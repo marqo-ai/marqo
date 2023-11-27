@@ -2351,6 +2351,12 @@ def delete_index(config: Config, index_name):
         del get_cache()[index_name]
 
 
+def delete_batch_indexes(config: Config, index_names: List[str]):
+    index_management = IndexManagement(vespa_client=config.vespa_client)
+    index_management.batch_delete_indexes(index_names)
+
+
+
 def get_indexes(config: Config):
     res = backend.get_cluster_indices(config=config)
 

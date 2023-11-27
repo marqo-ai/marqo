@@ -127,7 +127,7 @@ class IndexManagement:
         self.vespa_client.deploy_application(app)
         self._delete_index_settings_by_name(index_name)
 
-    def batch_delete_indexes(self, marqo_indexes: List[MarqoIndex]) -> None:
+    def batch_delete_indexes(self, marqo_indexes: List[Union[MarqoIndex, str]]) -> None:
         """
         Delete multiple Marqo indexes as a single Vespa deployment.
 
@@ -137,17 +137,21 @@ class IndexManagement:
         """
         app = self.vespa_client.download_application()
 
-        for index in marqo_indexes:
-            if not self.index_exists(index.name):
-                raise IndexNotFoundError(f"Cannot delete index {index.name} as it does not exist")
+        index_names_to_delete: List[str] = [
+            index.name if isinstance(index, MarqoIndex) else index for index in marqo_indexes
+        ]
 
-        for index in marqo_indexes:
-            self._remove_schema(app, index.name)
-            self._remove_schema_from_services(app, index.name)
+        for index_name in index_names_to_delete:
+            if not self.index_exists(index_name):
+                raise IndexNotFoundError(f"Cannot delete index {index_name} as it does not exist")
+
+        for index_name in index_names_to_delete:
+            self._remove_schema(app, index_name)
+            self._remove_schema_from_services(app, index_name)
         self._add_schema_removal_override(app)
         self.vespa_client.deploy_application(app)
-        for index in marqo_indexes:
-            self._delete_index_settings(index)
+        for index_name in index_names_to_delete:
+            self._delete_index_settings_by_name(index_name)
 
     def get_all_indexes(self) -> List[MarqoIndex]:
         """
