@@ -598,7 +598,6 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                                         f"Reason: {str(image_repo[field_content])}"
                                     )
                             elif isinstance(field_content, str):
-                                print(f"DEBUG: Field content {field_content} will be treated as a normal string. Adding prefix {text_chunk_prefix}")
                                 image_data = text_chunk_prefix + field_content     # Add prefix to URL if it's to be treated as-is.
                             else:
                                 image_data = field_content      # If it's actual image data, just pass it through.
@@ -1369,15 +1368,13 @@ def _lexical_search(
     return {'hits': res_list}
 
 
-def construct_vector_input_batches(query: Union[str, Dict, None], index_info: IndexInfo, text_query_prefix: str = None) -> Tuple[List[str], List[str]]:
+def construct_vector_input_batches(query: Union[str, Dict, None], index_info: IndexInfo) -> Tuple[List[str], List[str]]:
     """
     Splits images from text in a single query (either a query string, or dict of weighted strings).
-    Prefixes are added to text queries.
 
     Args:
         query: a string query, or a dict of weighted strings.
         index_info: used to determine whether URLs should be treated as images
-        text_query_prefix: prefix to add to all text queries. Will be calculated with the model_properties-level prefix. If None, empty string is added (no prefix)
 
     Returns:
         A tuple of 2 string batches. 
@@ -1386,12 +1383,6 @@ def construct_vector_input_batches(query: Union[str, Dict, None], index_info: In
     """
 
     treat_urls_as_images = index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]
-
-    # Calculate query prefix using model_properties and given.
-    final_text_query_prefix = determine_text_query_prefix(text_query_prefix, index_info)
-    if final_text_query_prefix is None:
-        final_text_query_prefix = ""
-    
     if query is None:
         # Nothing should be vectorised.
         return [], []
@@ -1399,19 +1390,15 @@ def construct_vector_input_batches(query: Union[str, Dict, None], index_info: In
         if treat_urls_as_images and _is_image(query):
             return [], [query, ]
         else:
-            # Single text query: Add prefix
-            prefixed_query = f"{final_text_query_prefix}{query}"
-            return [prefixed_query, ], []
+            return [query, ], []
     else:  # is dict:
         ordered_queries = list(query.items())
         if treat_urls_as_images:
-            # Add prefix to all inner text queries
-            text_queries = [f"{final_text_query_prefix}{key}" for key, _ in ordered_queries if not _is_image(key)]
-            image_queries = [key for key, _ in ordered_queries if _is_image(key)]
+            text_queries = [k for k, _ in ordered_queries if not _is_image(k)]
+            image_queries = [k for k, _ in ordered_queries if _is_image(k)]
             return text_queries, image_queries
         else:
-            # Treat all queries as plaintext. Add prefix to all.
-            return [f"{final_text_query_prefix}{key}" for key, _ in ordered_queries], []
+            return [k for k, _ in ordered_queries], []
 
 
 def construct_msearch_body_elements(searchableAttributes: List[str], offset: int, filter_string: str,
@@ -1628,7 +1615,7 @@ def create_vector_jobs(queries: List[BulkSearchQueryEntity], config: Config, dev
         q = queries[i]
         index_info = get_index_info(config=config, index_name=q.index)
         # split images from text:
-        to_be_vectorised: Tuple[List[str], List[str]] = construct_vector_input_batches(q.q, index_info, q.textQueryPrefix)
+        to_be_vectorised: Tuple[List[str], List[str]] = construct_vector_input_batches(q.q, index_info)
         qidx_to_job[i] = assign_query_to_vector_job(q, jobs, to_be_vectorised, index_info, device)
 
     return qidx_to_job, jobs
@@ -1787,13 +1774,73 @@ def create_empty_query_response(queries: List[BulkSearchQueryEntity]) -> List[Di
         )
     )
 
+
+def add_prefix_to_queries(queries: List[BulkSearchQueryEntity]) -> List[BulkSearchQueryEntity]:
+    """
+    Makes a new list of queries
+    Adds prefix to the q of all BulkSearchQueryEntity objects in the list.
+    Determines prefix with defaults from index_info textQueryPrefix (per query).
+    Only adds prefix to text queries (not images)
+    """
+    prefixed_queries = []
+    for q in queries:
+        # Determine what prefix to use
+        index_info = get_index_info(config=config, index_name=q.index)
+        text_query_prefix = determine_text_query_prefix(q.textQueryPrefix, index_info)
+        if text_query_prefix is None:
+            text_query_prefix = ""
+        
+        treat_urls_as_images = index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]
+        # Add prefix to q if applicable
+        if q.q is None:
+            prefixed_q = q.q
+        elif isinstance(q.q, str):
+            if treat_urls_as_images and _is_image(q.q):
+                # Images get no prefix
+                prefixed_q = q.q
+            else:
+                # Single text query: add prefix
+                prefixed_q = f"{text_query_prefix}{q.q}"
+        else:  # is dict:
+            ordered_queries = list(q.q.items())
+            if treat_urls_as_images:
+                prefixed_q = {}
+                for key, value in ordered_queries:
+                    if _is_image(key):
+                        prefixed_q[key] = value    # Do nothing with images
+                    else:
+                        # Add prefix to all inner text queries
+                        prefixed_q[f"{text_query_prefix}{key}"] = value
+            else:
+                # Treat all queries as plaintext. Add prefix to all.
+                prefixed_q = {f"{text_query_prefix}{key}": value for key, value in ordered_queries}
+        
+        new_query_object = BulkSearchQueryEntity(
+            q=prefixed_q,   # Everything is the same except the query
+            searchableAttributes=q.searchableAttributes,
+            searchMethod=q.searchMethod, 
+            limit=q.limit, offset=q.offset, 
+            showHighlights=q.showHighlights, 
+            filter=q.filter, 
+            attributesToRetrieve=q.attributesToRetrieve, 
+            boost=q.boost, image_download_headers=q.image_download_headers, 
+            context=q.context, scoreModifiers=q.scoreModifiers, 
+            index=q.index, modelAuth=q.modelAuth,
+            textQueryPrefix=q.textQueryPrefix   
+        )
+        prefixed_queries.append(new_query_object)
+
+    return prefixed_queries
+
+
 def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity], device: Union[Device, str]) -> Dict[Qidx, List[float]]:
     """
     Run the query vectorisation process
     """
     # 1. Pre-process inputs ready for s2_inference.vectorise
     # we can still use qidx_to_job. But the jobs structure may need to be different
-    vector_jobs_tuple: Tuple[Dict[Qidx, List[VectorisedJobPointer]], Dict[JHash, VectorisedJobs]] = create_vector_jobs(queries, config, device)
+    prefixed_queries = add_prefix_to_queries(queries)
+    vector_jobs_tuple: Tuple[Dict[Qidx, List[VectorisedJobPointer]], Dict[JHash, VectorisedJobs]] = create_vector_jobs(prefixed_queries, config, device)
 
     qidx_to_jobs, jobs = vector_jobs_tuple
 
@@ -1804,7 +1851,7 @@ def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity],
 
     # 3. For each query, get associated vectors
     qidx_to_vectors: Dict[Qidx, List[float]] = get_query_vectors_from_jobs(
-        queries, qidx_to_jobs, job_ptr_to_vectors, config, jobs
+        prefixed_queries, qidx_to_jobs, job_ptr_to_vectors, config, jobs
     )
     return qidx_to_vectors
 

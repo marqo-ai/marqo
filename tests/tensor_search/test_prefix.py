@@ -12,8 +12,6 @@ from unittest.mock import patch
 from marqo.tensor_search.enums import EnvVars
 from marqo.s2_inference import types, s2_inference
 import PIL
-import requests
-import pytest
 from marqo.s2_inference.s2_inference import vectorise
 from marqo.tensor_search.enums import TensorField, IndexSettingsField, SearchMethod
 from marqo.tensor_search import enums
@@ -24,6 +22,7 @@ from marqo.tensor_search import add_docs
 from marqo.tensor_search.models.index_info import IndexInfo
 import numpy as np
 import unittest
+from marqo.tensor_search.models.api_models import BulkSearchQueryEntity
 
 def pass_through_vectorise(*args, **kwargs):
     """Vectorise will behave as usual, but we will be able to see the call list
@@ -38,9 +37,12 @@ class TestPrefix(MarqoTestCase):
         self.generic_header = {"Content-type": "application/json"}
         self.index_name_1 = "my-test-index-1"  # standard index created by setUp
         self.index_name_2 = "my-test-index-2"  # for tests that need custom index config
+        self.index_name_3 = "my-test-index-3"  # No images
+
         try:
             tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
             tensor_search.delete_index(config=self.config, index_name=self.index_name_2)
+            tensor_search.delete_index(config=self.config, index_name=self.index_name_3)
         except IndexNotFoundError as s:
             pass
 
@@ -67,9 +69,11 @@ class TestPrefix(MarqoTestCase):
     def tearDown(self) -> None:
         self.index_name_1 = "my-test-index-1"
         self.index_name_2 = "my-test-index-2"
+        self.index_name_3 = "my-test-index-3"
         try:
             tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
             tensor_search.delete_index(config=self.config, index_name=self.index_name_2)
+            tensor_search.delete_index(config=self.config, index_name=self.index_name_3)
         except IndexNotFoundError as s:
             pass
 
@@ -398,13 +402,61 @@ class TestPrefix(MarqoTestCase):
 
             res = tensor_search.search(config=self.config, index_name=self.index_name_1, text="searching", device="cpu", text_query_prefix="PREFIX: ")
             assert res["hits"][0]["_id"] == "doc_b"     # Because doc b had the prefix added.
+            assert res["query"] == "searching"  # No prefix in the query itself
         
         run()
 
         assert len(mock_vectorise.call_args_list) == 3
         args, kwargs = mock_vectorise.call_args_list[-1]
         assert kwargs["content"] == ["PREFIX: searching"]
+    
+    def test_prefix_image_search(self):
+        """
+        Ensures that an image search query has prefix added to it for vectorisation.
+        """
+        tensor_search.create_vector_index(
+            config=self.config, index_name=self.index_name_2, 
+            index_settings={
+                "index_defaults": {
+                    "model": "my-custom-model",
+                    "model_properties": {
+                        "name": "ViT-B-32-quickgelu",
+                        "dimensions": 512,
+                        "url": "https://github.com/mlfoundations/open_clip/releases/download/v0.2-weights/vit_b_32-quickgelu-laion400m_avg-8a00ab3c.pt",
+                        "type": "open_clip"
+                    },
+                    "treat_urls_and_pointers_as_images": True
+                }
+            }
+        )
 
+        mock_vectorise = unittest.mock.MagicMock()
+        mock_vectorise.side_effect = pass_through_vectorise
+
+        @mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
+        def run():
+            # Add image with no prefix
+            tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_2, docs=[{"_id": "doc_a", "image": "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png"}], auto_refresh=True,
+                device="cpu"
+                )
+            )
+            # Add doc
+            tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_2, docs=[{"_id": "doc_b", "text": "red herring marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic"}], auto_refresh=True,
+                device="cpu", text_chunk_prefix="PREFIX: "
+                )
+            )
+
+            res = tensor_search.search(config=self.config, index_name=self.index_name_2, text="https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png", device="cpu", text_query_prefix="PREFIX: ")
+            assert res["hits"][0]["_id"] == "doc_a"
+            assert res["query"] == "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png"  # No prefix in the query itself
+        
+        run()
+
+        assert len(mock_vectorise.call_args_list) == 3
+        args, kwargs = mock_vectorise.call_args_list[-1]
+        assert kwargs["content"][0] == "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png"
 
 
     def test_prefix_dict_search(self):
@@ -412,7 +464,147 @@ class TestPrefix(MarqoTestCase):
         Ensures that dict search query has prefix added to each for vectorisation.
         Use pass through vectorise.
         """
-        pass
+        tensor_search.create_vector_index(
+            config=self.config, index_name=self.index_name_2, 
+            index_settings={
+                "index_defaults": {
+                    "model": "my-custom-model",
+                    "model_properties": {
+                        "name": "ViT-B-32-quickgelu",
+                        "dimensions": 512,
+                        "url": "https://github.com/mlfoundations/open_clip/releases/download/v0.2-weights/vit_b_32-quickgelu-laion400m_avg-8a00ab3c.pt",
+                        "type": "open_clip"
+                    },
+                    "treat_urls_and_pointers_as_images": True
+                }
+            }
+        )
 
+        mock_vectorise = unittest.mock.MagicMock()
+        mock_vectorise.side_effect = pass_through_vectorise
+
+        @mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
+        def run():
+            query_dict = {
+                "text query": 0.5,
+                "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png": 0.5,
+            }
+            res = tensor_search.search(config=self.config, index_name=self.index_name_2, 
+                                       text=query_dict, device="cpu", text_query_prefix="PREFIX: ")
+            assert res["query"] == query_dict  # No prefix in the query itself
+        
+        run()
+
+        assert len(mock_vectorise.call_args_list) == 2
+        args, kwargs = mock_vectorise.call_args_list[0]
+        assert kwargs["content"][0] == "PREFIX: text query"
+        args, kwargs = mock_vectorise.call_args_list[1]
+        assert kwargs["content"][0] == "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png"
 
         
+    def test_add_prefix_to_queries(self):
+        """
+        Ensures that prefix gets added to each query.
+        """
+
+        tensor_search.create_vector_index(
+            config=self.config, index_name=self.index_name_2, 
+            index_settings={
+                "index_defaults": {
+                    "model": "my-custom-model",
+                    "model_properties": {
+                        "name": "ViT-B-32-quickgelu",
+                        "dimensions": 512,
+                        "url": "https://github.com/mlfoundations/open_clip/releases/download/v0.2-weights/vit_b_32-quickgelu-laion400m_avg-8a00ab3c.pt",
+                        "type": "open_clip"
+                    },
+                    "treat_urls_and_pointers_as_images": True
+                }
+            }
+        )
+
+        tensor_search.create_vector_index(
+            config=self.config, index_name=self.index_name_3, 
+            index_settings={
+                "index_defaults": {
+                    "model": "my-custom-model",
+                    "model_properties": {
+                        "name": "ViT-B-32-quickgelu",
+                        "dimensions": 512,
+                        "url": "https://github.com/mlfoundations/open_clip/releases/download/v0.2-weights/vit_b_32-quickgelu-laion400m_avg-8a00ab3c.pt",
+                        "type": "open_clip"
+                    },
+                    "treat_urls_and_pointers_as_images": False
+                }
+            }
+        )
+
+        # Single text query (prefix added)
+        queries = [
+            BulkSearchQueryEntity(
+                q="hello",
+                textQueryPrefix="PREFIX: ",
+                index=self.index_name_2
+            )
+        ]
+        prefixed_queries = tensor_search.add_prefix_to_queries(queries)
+        assert prefixed_queries[0].q == "PREFIX: hello"
+
+        # Single image query (no prefix added)
+        queries = [
+            BulkSearchQueryEntity(
+                q="https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png",
+                textQueryPrefix="PREFIX: ",
+                index=self.index_name_2
+            )
+        ]
+        prefixed_queries = tensor_search.add_prefix_to_queries(queries)
+        assert prefixed_queries[0].q == "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png"
+
+        # Dict query (text has prefix, image does not)
+        queries = [
+            BulkSearchQueryEntity(
+                q={
+                    "text query": 0.5,
+                    "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png": 0.5,
+                },
+                textQueryPrefix="PREFIX: ",
+                index=self.index_name_2
+            )
+        ]
+        prefixed_queries = tensor_search.add_prefix_to_queries(queries)
+        assert prefixed_queries[0].q == {
+            "PREFIX: text query": 0.5,
+            "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png": 0.5,
+        }
+
+        # Single image but no image index (prefix added)
+        queries = [
+            BulkSearchQueryEntity(
+                q="https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png",
+                textQueryPrefix="PREFIX: ",
+                index=self.index_name_3
+            )
+        ]
+        prefixed_queries = tensor_search.add_prefix_to_queries(queries)
+        assert prefixed_queries[0].q == "PREFIX: https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png"
+
+        # Dict query but no image index (text and index have prefix)
+        queries = [
+            BulkSearchQueryEntity(
+                q={
+                    "text query": 0.5,
+                    "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png": 0.5,
+                },
+                textQueryPrefix="PREFIX: ",
+                index=self.index_name_3
+            )
+        ]
+        prefixed_queries = tensor_search.add_prefix_to_queries(queries)
+        assert prefixed_queries[0].q == {
+            "PREFIX: text query": 0.5,
+            "PREFIX: https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png": 0.5,
+        }
+    
+
+    
