@@ -828,7 +828,6 @@ class TestHealthCheck(MarqoTestCase):
         tensor_search.create_vector_index(index_name=self.index_name, config=self.config)
         mock_http_get = self.create_mock_http_get()
         with mock.patch("marqo._httprequests.HttpRequests.get", side_effect=mock_http_get) as http_get_tracker:
-            print(f"DEBUG mock_get: {http_get_tracker}, type is {type(http_get_tracker)}")
             tensor_search.check_index_health(index_name=self.index_name, config=self.config)
 
             http_get_calls_list = http_get_tracker.call_args_list

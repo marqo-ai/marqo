@@ -597,8 +597,12 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                                         f"Could not find image found at `{field_content}`. \n"
                                         f"Reason: {str(image_repo[field_content])}"
                                     )
+                            elif isinstance(field_content, str):
+                                print(f"DEBUG: Field content {field_content} will be treated as a normal string. Adding prefix {text_chunk_prefix}")
+                                image_data = text_chunk_prefix + field_content     # Add prefix to URL if it's to be treated as-is.
                             else:
-                                image_data = field_content
+                                image_data = field_content      # If it's actual image data, just pass it through.
+                            
                             if image_method not in [None, 'none', '', "None", ' ']:
                                 content_chunks, text_chunks = image_processor.chunk_image(
                                     image_data, device=add_docs_params.device, method=image_method)
@@ -1762,6 +1766,9 @@ def get_content_vector(possible_jobs: List[VectorisedJobPointer], job_to_vectors
 
     Raises runtime error if is not found
     """
+    # TODO: Either:
+    # 1. Edit queries at the START of vectorise_pipeline
+    # Edit unit tests
     content_type = 'image' if treat_urls_as_images and _is_image(content) else 'text'
     not_found_error = RuntimeError(f"get_content_vector(): could not find corresponding vector for content `{content}`")
     for vec_job_pointer in possible_jobs:
@@ -2244,6 +2251,8 @@ def vectorise_multimodal_combination_field(
                                 f"Could not find image found at `{sub_content}`. \n"
                                 f"Reason: {str(image_repo[sub_content])}"
                             )
+                    elif isinstance(sub_content, str):
+                        image_data = text_chunk_prefix + sub_content    # Add prefix to URL if it's meant to be text
                     else:
                         image_data = sub_content
 
