@@ -1753,9 +1753,6 @@ def get_content_vector(possible_jobs: List[VectorisedJobPointer], job_to_vectors
 
     Raises runtime error if is not found
     """
-    # TODO: Either:
-    # 1. Edit queries at the START of vectorise_pipeline
-    # Edit unit tests
     content_type = 'image' if treat_urls_as_images and _is_image(content) else 'text'
     not_found_error = RuntimeError(f"get_content_vector(): could not find corresponding vector for content `{content}`")
     for vec_job_pointer in possible_jobs:
