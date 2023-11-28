@@ -1772,7 +1772,7 @@ def create_empty_query_response(queries: List[BulkSearchQueryEntity]) -> List[Di
     )
 
 
-def add_prefix_to_queries(queries: List[BulkSearchQueryEntity]) -> List[BulkSearchQueryEntity]:
+def add_prefix_to_queries(config: Config, queries: List[BulkSearchQueryEntity]) -> List[BulkSearchQueryEntity]:
     """
     Makes a new list of queries
     Adds prefix to the q of all BulkSearchQueryEntity objects in the list.
@@ -1836,7 +1836,7 @@ def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity],
     """
     # 1. Pre-process inputs ready for s2_inference.vectorise
     # we can still use qidx_to_job. But the jobs structure may need to be different
-    prefixed_queries = add_prefix_to_queries(queries)
+    prefixed_queries = add_prefix_to_queries(config=config, queries=queries)
     vector_jobs_tuple: Tuple[Dict[Qidx, List[VectorisedJobPointer]], Dict[JHash, VectorisedJobs]] = create_vector_jobs(prefixed_queries, config, device)
 
     qidx_to_jobs, jobs = vector_jobs_tuple

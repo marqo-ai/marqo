@@ -558,7 +558,7 @@ class TestPrefix(MarqoTestCase):
                 index=self.index_name_2
             )
         ]
-        prefixed_queries = tensor_search.add_prefix_to_queries(queries)
+        prefixed_queries = tensor_search.add_prefix_to_queries(self.config, queries)
         assert prefixed_queries[0].q == "PREFIX: hello"
 
         # Single image query (no prefix added)
@@ -569,7 +569,7 @@ class TestPrefix(MarqoTestCase):
                 index=self.index_name_2
             )
         ]
-        prefixed_queries = tensor_search.add_prefix_to_queries(queries)
+        prefixed_queries = tensor_search.add_prefix_to_queries(self.config, queries)
         assert prefixed_queries[0].q == "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png"
 
         # Dict query (text has prefix, image does not)
@@ -583,7 +583,7 @@ class TestPrefix(MarqoTestCase):
                 index=self.index_name_2
             )
         ]
-        prefixed_queries = tensor_search.add_prefix_to_queries(queries)
+        prefixed_queries = tensor_search.add_prefix_to_queries(self.config, queries)
         assert prefixed_queries[0].q == {
             "PREFIX: text query": 0.5,
             "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png": 0.5,
@@ -597,7 +597,7 @@ class TestPrefix(MarqoTestCase):
                 index=self.index_name_3
             )
         ]
-        prefixed_queries = tensor_search.add_prefix_to_queries(queries)
+        prefixed_queries = tensor_search.add_prefix_to_queries(self.config, queries)
         assert prefixed_queries[0].q == "PREFIX: https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png"
 
         # Dict query but no image index (text and index have prefix)
@@ -611,7 +611,7 @@ class TestPrefix(MarqoTestCase):
                 index=self.index_name_3
             )
         ]
-        prefixed_queries = tensor_search.add_prefix_to_queries(queries)
+        prefixed_queries = tensor_search.add_prefix_to_queries(self.config, queries)
         assert prefixed_queries[0].q == {
             "PREFIX: text query": 0.5,
             "PREFIX: https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png": 0.5,

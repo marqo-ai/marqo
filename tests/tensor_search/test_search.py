@@ -1545,23 +1545,3 @@ class TestVectorSearchUtils(MarqoTestCase):
         # Only model default on (model default chosen)
         assert tensor_search.determine_text_query_prefix(None, index_info_with_search_model_default) == "test query: "
         assert tensor_search.determine_text_query_prefix(None, index_info_with_model_default) == "test query: "
-
-
-    def test_add_prefix_to_queries(self):
-        index_info_with_prefix = IndexInfo(
-            model_name = "my-custom-model",        
-            search_model_name = None,       # should work with no search model set
-            properties = {"PLACEHOLDER": "PLACEHOLDER"},
-            index_settings = {
-                IndexSettingsField.index_defaults: {
-                    IndexSettingsField.treat_urls_and_pointers_as_images: True,
-                    IndexSettingsField.model_properties: {
-                        "name": "ViT-B-32-quickgelu",
-                        "dimensions": 512,
-                        "url": "https://github.com/mlfoundations/open_clip/releases/download/v0.2-weights/vit_b_32-quickgelu-laion400m_avg-8a00ab3c.pt",
-                        "type": "open_clip",
-                        "text_query_prefix": "query: "
-                    }
-                }
-            }
-        )
