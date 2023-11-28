@@ -8,7 +8,7 @@ def get_default_index_settings():
         NsFields.index_defaults: {
             NsFields.treat_urls_and_pointers_as_images: False, # only used for models that have text and vision encoders
             NsFields.model: ns_enums.MlModel.bert,
-#            NsFields.model_properties: dict(),
+            # search_model not here, as it is dynamically set based on model
             NsFields.normalize_embeddings: True,
             NsFields.text_preprocessing: {
                 NsFields.split_length: 2,

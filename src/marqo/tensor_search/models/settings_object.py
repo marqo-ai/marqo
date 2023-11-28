@@ -42,6 +42,15 @@ settings_schema = {
                 NsFields.model_properties: {
                     "type": "object",
                 },
+                NsFields.search_model: {
+                    "type": "string",
+                    "examples": [
+                        "hf/all_datasets_v4_MiniLM-L6"
+                    ]
+                },
+                NsFields.search_model_properties: {
+                    "type": "object",
+                },
                 NsFields.normalize_embeddings: {
                     "type": "boolean",
                     "examples": [

@@ -5,7 +5,7 @@ import threading
 import time
 import requests
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
-from marqo.tensor_search import tensor_search
+from marqo.tensor_search import tensor_search, create_index
 from marqo.tensor_search import index_meta_cache
 from marqo.config import Config
 from marqo.errors import MarqoError, MarqoApiError, IndexNotFoundError
@@ -359,12 +359,17 @@ class TestIndexMetaCache(MarqoTestCase):
         tensor_search.create_vector_index(
             config=self.config, index_name=self.index_name_3)
         ix_info = index_meta_cache.get_index_info(config=self.config, index_name=self.index_name_3)
-        assert ix_info.index_settings == configs.get_default_index_settings()
+
+        default_index_settings = configs.get_default_index_settings()
+        default_index_settings = create_index.autofill_search_model(default_index_settings)
+        assert ix_info.index_settings == default_index_settings
 
     def test_index_settings_after_cache_refresh(self):
         expected_index_settings = configs.get_default_index_settings()
         # Create index with some random model
         expected_index_settings[IndexSettingsField.index_defaults][IndexSettingsField.model] = "open_clip/RN50/openai"
+        expected_index_settings = create_index.autofill_search_model(expected_index_settings)
+        
         index_meta_cache.empty_cache()
         assert self.index_name_3 not in index_meta_cache.get_cache()
         tensor_search.create_vector_index(

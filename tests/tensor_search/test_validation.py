@@ -13,6 +13,7 @@ from marqo.errors import (
     InvalidDocumentIdError, InvalidArgError, DocTooLargeError,
     InvalidIndexNameError
 )
+from marqo.s2_inference import errors as s2_inference_errors
 
 class TestValidation(unittest.TestCase):
 
@@ -1537,3 +1538,114 @@ class TestValidateModelProperties(unittest.TestCase):
         validation.validate_model_properties_no_model({
             "dimensions": 123
         })
+    
+    def test_validate_model_name_and_properties(self):
+        # Invalid cases
+        invalid_cases = [
+            # model_properties but no model
+            (
+                {
+                    "index_defaults": {
+                        "model_properties": {
+                            "dimensions": 123,
+                            "url": "http://www.random_model_here.com"
+                        }
+                    }
+                },
+                "No `model` found for model_properties"
+            ),
+            # search_model but no model
+            (
+                {
+                    "index_defaults": {
+                        "search_model": "hf/all_datasets_v4_MiniLM-L6"
+                    }
+                },
+                "`search_model` cannot be specified without also specifying `model`"
+            ),
+            # search_model_properties but no search_model
+            (
+                {
+                    "index_defaults": {
+                        "model": "hf/all_datasets_v4_MiniLM-L6",
+                        "search_model_properties": {
+                            "dimensions": 123,
+                            "url": "http://www.random_model_here.com"
+                        }
+                    }
+                },
+                "No `search_model` found for search_model_properties"
+            ),
+        ]
+
+        for case, error_message in invalid_cases:
+            try:
+                validation.validate_model_name_and_properties(case)
+                raise AssertionError
+            except InvalidArgError as e:
+                assert error_message in e.message
+
+        # Valid cases
+        valid_cases = [
+            # model and model_properties
+            {
+                "index_defaults": {
+                    "model": "hf/all_datasets_v4_MiniLM-L6",
+                    "model_properties": {
+                        "dimensions": 123,
+                        "url": "http://www.random_model_here.com"
+                    }
+                }
+            },
+
+            # model, model_properties, and search_model
+            {
+                "index_defaults": {
+                    "model": "hf/all_datasets_v4_MiniLM-L6",
+                    "model_properties": {
+                        "dimensions": 123,
+                        "url": "http://www.random_model_here.com"
+                    },
+                    "search_model": "hf/all-MiniLM-L6-v2"
+                }
+            },
+
+            # model, model_properties, search_model, search_model_properties
+            {
+                "index_defaults": {
+                    "model": "hf/all_datasets_v4_MiniLM-L6",
+                    "model_properties": {
+                        "dimensions": 123,
+                        "url": "http://www.random_model_here.com"
+                    },
+                    "search_model": "hf/all-MiniLM-L6-v2",
+                    "search_model_properties": {
+                        "dimensions": 456,
+                        "url": "http://www.random_model_here.com"
+                    },
+                }
+            },
+
+            # model, search_model
+            {
+                "index_defaults": {
+                    "model": "hf/all_datasets_v4_MiniLM-L6",
+                    "search_model": "hf/all-MiniLM-L6-v2",
+                }
+            },
+
+            # model, search_model, search_model_properties
+            {
+                "index_defaults": {
+                    "model": "hf/all_datasets_v4_MiniLM-L6",
+                    "search_model": "hf/all-MiniLM-L6-v2",
+                    "search_model_properties": {
+                        "dimensions": 456,
+                        "url": "http://www.random_model_here.com"
+                    },
+                }
+            },
+        ]
+
+        for case in valid_cases:
+            validation.validate_model_name_and_properties(case)
