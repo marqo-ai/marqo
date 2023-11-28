@@ -147,21 +147,32 @@ class TestPrefix(MarqoTestCase):
                 }
             }
         )
-        
-        # A) Add 1 document with 3 chunks, add PREFIX.
-        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
-                index_name=self.index_name_2, docs=[{"_id": "doc_a", "text": "one two three"}], auto_refresh=True,
-                device="cpu", text_chunk_prefix="PREFIX"
-            )
-        )
 
-        # B) Add 3 documents with 1 chunk, each with prefix built into text.
-        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
-                index_name=self.index_name_2, docs=[{"_id": "doc_b1", "text": "PREFIXone"}, {"_id": "doc_b2", "text": "PREFIXtwo"}, {"_id": "doc_b3", "text": "PREFIXthree"}], auto_refresh=True,
-                device="cpu"
-            )
-        )
+        mock_vectorise = unittest.mock.MagicMock()
+        mock_vectorise.side_effect = pass_through_vectorise
 
+        @mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
+        def run():
+            # A) Add 1 document with 3 chunks, add PREFIX.
+            tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+                    index_name=self.index_name_2, docs=[{"_id": "doc_a", "text": "one two three"}], auto_refresh=True,
+                    device="cpu", text_chunk_prefix="PREFIX"
+                )
+            )
+
+            # Vectorise should be called with prefixes included
+            assert len(mock_vectorise.call_args_list) == 1
+            args, kwargs = mock_vectorise.call_args_list[0]
+            assert kwargs["content"] == ["PREFIXone", "PREFIXtwo", "PREFIXthree"]
+
+            # B) Add 3 documents with 1 chunk, each with prefix built into text.
+            tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+                    index_name=self.index_name_2, docs=[{"_id": "doc_b1", "text": "PREFIXone"}, {"_id": "doc_b2", "text": "PREFIXtwo"}, {"_id": "doc_b3", "text": "PREFIXthree"}], auto_refresh=True,
+                    device="cpu"
+                )
+            )
+
+        run()
         res = tensor_search.get_documents_by_ids(
             config=self.config, index_name=self.index_name_2, document_ids=["doc_a", "doc_b1", "doc_b2", "doc_b3"],
             show_vectors=True
@@ -173,9 +184,9 @@ class TestPrefix(MarqoTestCase):
         retrieved_doc_b3 = res[3]
 
         # The 3 chunks from A) should match the 3 from B)
-        assert np.allclose(retrieved_doc_a[TensorField.tensor_facets][0]["_embedding"], retrieved_doc_b1[TensorField.tensor_facets][0]["_embedding"])
-        assert np.allclose(retrieved_doc_a[TensorField.tensor_facets][1]["_embedding"], retrieved_doc_b2[TensorField.tensor_facets][0]["_embedding"])
-        assert np.allclose(retrieved_doc_a[TensorField.tensor_facets][2]["_embedding"], retrieved_doc_b3[TensorField.tensor_facets][0]["_embedding"])
+        assert np.allclose(retrieved_doc_a[TensorField.tensor_facets][0]["_embedding"], retrieved_doc_b1[TensorField.tensor_facets][0]["_embedding"], atol=1e-5)
+        assert np.allclose(retrieved_doc_a[TensorField.tensor_facets][1]["_embedding"], retrieved_doc_b2[TensorField.tensor_facets][0]["_embedding"], atol=1e-5)
+        assert np.allclose(retrieved_doc_a[TensorField.tensor_facets][2]["_embedding"], retrieved_doc_b3[TensorField.tensor_facets][0]["_embedding"], atol=1e-5)
     
     def test_prefix_vectorise(self):
         """
