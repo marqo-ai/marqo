@@ -81,15 +81,18 @@ class TestSplitText(unittest.TestCase):
 
 
 class TestPrefixTextChunks(unittest.TestCase):
-    def test_prefix_test_chunks(self):
+    def test_prefix_text_chunks(self):
         text_splits = ["a", "b", "c", ""]
         assert prefix_text_chunks(text_splits, "prefix_") == \
             ["prefix_a", "prefix_b", "prefix_c", "prefix_"]
+    
+    def test_prefix_text_chunks_empty_prefix(self):
+        text_splits = ["a", "b", "c", ""]
         # Empty string prefix should do nothing
         assert prefix_text_chunks(text_splits, "") == \
             ["a", "b", "c", ""]
     
-    def test_prefix_test_chunks_none(self):
+    def test_prefix_text_chunks_none(self):
         text_splits = ["a", "b", "c", ""]
         # None prefix should do nothing
         assert prefix_text_chunks(text_splits, None) == \

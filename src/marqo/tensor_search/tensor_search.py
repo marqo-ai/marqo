@@ -2282,12 +2282,13 @@ def vectorise_multimodal_combination_field(
     else:
         for sub_field_name, sub_content in multimodal_object.items():
             if isinstance(sub_content, str) and not _is_image(sub_content):
+                # Normal text
                 text_field_names.append(sub_field_name)
                 text_content_to_vectorise.append(sub_content)
             else:
                 try:
-                    if isinstance(sub_content, str) and index_info.index_settings[NsField.index_defaults][
-                            NsField.treat_urls_and_pointers_as_images]:
+                    if isinstance(sub_content, str):
+                        # Image (get from repo)
                         if not isinstance(image_repo[sub_content], Exception):
                             image_data = image_repo[sub_content]
                         else:
@@ -2295,9 +2296,8 @@ def vectorise_multimodal_combination_field(
                                 f"Could not find image found at `{sub_content}`. \n"
                                 f"Reason: {str(image_repo[sub_content])}"
                             )
-                    elif isinstance(sub_content, str):
-                        image_data = text_chunk_prefix + sub_content    # Add prefix to URL if it's meant to be text
                     else:
+                        # sub_content is an actual image (possibly unreachable?)
                         image_data = sub_content
 
                     image_content_to_vectorise.append(image_data)
@@ -2318,13 +2318,13 @@ def vectorise_multimodal_combination_field(
         text_vectors = []
 
         # Add prefix to all text content first
-        text_content_to_vectorise = text_processor.prefix_text_chunks(text_content_to_vectorise, text_chunk_prefix)
+        prefixed_text_content_to_vectorise = text_processor.prefix_text_chunks(text_content_to_vectorise, text_chunk_prefix)
 
-        if len(text_content_to_vectorise) > 0:
+        if len(prefixed_text_content_to_vectorise) > 0:
             with RequestMetricsStore.for_request().time(f"create_vectors"):
                 text_vectors = s2_inference.vectorise(
                     model_name=index_info.model_name,
-                    model_properties=index_info.get_model_properties(), content=text_content_to_vectorise,
+                    model_properties=index_info.get_model_properties(), content=prefixed_text_content_to_vectorise,
                     device=device, normalize_embeddings=normalize_embeddings,
                     infer=infer_if_image, model_auth=model_auth
                 )

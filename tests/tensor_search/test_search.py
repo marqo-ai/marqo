@@ -1535,13 +1535,16 @@ class TestVectorSearchUtils(MarqoTestCase):
             }
         )
 
-        # All prefixes on (request level chosen)
-        assert tensor_search.determine_text_query_prefix("request-level", index_info_with_override) == "request-level"
-        # Request and model default on (request level chosen)
-        assert tensor_search.determine_text_query_prefix("request-level", index_info_with_search_model_default) == "request-level"
-        assert tensor_search.determine_text_query_prefix("request-level", index_info_with_model_default) == "request-level"
-        # Index override and model default on (index override chosen)
-        assert tensor_search.determine_text_query_prefix(None, index_info_with_override) == "index-override"
-        # Only model default on (model default chosen)
-        assert tensor_search.determine_text_query_prefix(None, index_info_with_search_model_default) == "test query: "
-        assert tensor_search.determine_text_query_prefix(None, index_info_with_model_default) == "test query: "
+        with self.subTest("All prefixes on (request level chosen)"):
+            assert tensor_search.determine_text_query_prefix("request-level", index_info_with_override) == "request-level"
+       
+        with self.subTest("Request and model default on (request level chosen)"):
+            assert tensor_search.determine_text_query_prefix("request-level", index_info_with_search_model_default) == "request-level"
+            assert tensor_search.determine_text_query_prefix("request-level", index_info_with_model_default) == "request-level"
+        
+        with self.subTest("Index override and model default on (index override chosen)"):
+            assert tensor_search.determine_text_query_prefix(None, index_info_with_override) == "index-override"
+        
+        with self.subTest("Only model default on (model default chosen)"):
+            assert tensor_search.determine_text_query_prefix(None, index_info_with_search_model_default) == "test query: "
+            assert tensor_search.determine_text_query_prefix(None, index_info_with_model_default) == "test query: "

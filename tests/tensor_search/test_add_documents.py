@@ -1485,11 +1485,14 @@ class TestAddDocumentsUtils(MarqoTestCase):
             }
         )
 
-        # All prefixes on (request level chosen)
-        assert add_docs.determine_text_chunk_prefix("request-level", index_info_with_override) == "request-level"
-        # Request and model default on (request level chosen)
-        assert add_docs.determine_text_chunk_prefix("request-level", index_info_with_model_default) == "request-level"
-        # Index override and model default on (index override chosen)
-        assert add_docs.determine_text_chunk_prefix(None, index_info_with_override) == "index-override"
-        # Only model default on (model default chosen)
-        assert add_docs.determine_text_chunk_prefix(None, index_info_with_model_default) == "test passage: "
+        with self.subTest("All prefixes on (request level chosen)"):
+            assert add_docs.determine_text_chunk_prefix("request-level", index_info_with_override) == "request-level"
+        
+        with self.subTest("Request and model default on (request level chosen)"):
+            assert add_docs.determine_text_chunk_prefix("request-level", index_info_with_model_default) == "request-level"
+        
+        with self.subTest("Index override and model default on (index override chosen)"):
+            assert add_docs.determine_text_chunk_prefix(None, index_info_with_override) == "index-override"
+        
+        with self.subTest("Only model default on (model default chosen)"):
+            assert add_docs.determine_text_chunk_prefix(None, index_info_with_model_default) == "test passage: "
