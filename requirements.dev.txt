@@ -46,3 +46,4 @@ httpx==0.25.0
 
 # test requirements
 pyvespa==0.37.1
+pytest==7.4.3

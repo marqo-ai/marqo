@@ -1,3 +1,4 @@
+import time
 import unittest
 from unittest.mock import patch, Mock
 
@@ -6,6 +7,7 @@ import vespa.application as pyvespa
 from marqo import config
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models.marqo_index import *
+from marqo.core.models.marqo_index_request import StructuredMarqoIndexRequest, FieldRequest
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.vespa.vespa_client import VespaClient
 
@@ -55,45 +57,93 @@ class MarqoTestCase(unittest.TestCase):
             self.pyvespa_client.delete_all_docs(self.CONTENT_CLUSTER, index.name)
 
     @classmethod
-    def marqo_index(cls,
-                    name: str,
-                    type: IndexType,
-                    fields: Optional[List[Field]] = None,
-                    tensor_fields: Optional[List[TensorField]] = None,
-                    model: Model = Model(name='hf/all_datasets_v4_MiniLM-L6'),
-                    normalize_embeddings: bool = True,
-                    text_preprocessing: TextPreProcessing = TextPreProcessing(
-                        split_length=2,
-                        split_overlap=0,
-                        split_method=TextSplitMethod.Sentence
-                    ),
-                    image_preprocessing: ImagePreProcessing = ImagePreProcessing(
-                        patch_method=None
-                    ),
-                    treat_urls_and_pointers_as_images: Optional[bool] = None,
-                    distance_metric: DistanceMetric = DistanceMetric.Angular,
-                    vector_numeric_type: VectorNumericType = VectorNumericType.Float,
-                    hnsw_config: HnswConfig = HnswConfig(
-                        ef_construction=128,
-                        m=16
-                    )
-                    ):
+    def structured_marqo_index(
+            cls,
+            name: str,
+            fields: List[Field] = None,
+            tensor_fields: List[TensorField] = None,
+            model: Model = Model(name='hf/all_datasets_v4_MiniLM-L6'),
+            normalize_embeddings: bool = True,
+            text_preprocessing: TextPreProcessing = TextPreProcessing(
+                split_length=2,
+                split_overlap=0,
+                split_method=TextSplitMethod.Sentence
+            ),
+            image_preprocessing: ImagePreProcessing = ImagePreProcessing(
+                patch_method=None
+            ),
+            distance_metric: DistanceMetric = DistanceMetric.Angular,
+            vector_numeric_type: VectorNumericType = VectorNumericType.Float,
+            hnsw_config: HnswConfig = HnswConfig(
+                ef_construction=128,
+                m=16
+            ),
+            marqo_version='1.0.0',
+            created_at=time.time(),
+            updated_at=time.time()
+    ) -> StructuredMarqoIndex:
         """
-        Helper method that provides reasonable defaults for MarqoIndex.
+        Helper method that provides reasonable defaults for StructuredMarqoIndex.
         """
-        return MarqoIndex(
+        return StructuredMarqoIndex(
             name=name,
-            type=type,
             model=model,
             normalize_embeddings=normalize_embeddings,
             text_preprocessing=text_preprocessing,
             image_preprocessing=image_preprocessing,
-            treat_urls_and_pointers_as_images=treat_urls_and_pointers_as_images,
             distance_metric=distance_metric,
             vector_numeric_type=vector_numeric_type,
             hnsw_config=hnsw_config,
             fields=fields,
-            tensor_fields=tensor_fields
+            tensor_fields=tensor_fields,
+            marqo_version=marqo_version,
+            created_at=created_at,
+            updated_at=updated_at
+        )
+
+    @classmethod
+    def structured_marqo_index_request(
+            cls,
+            name: str,
+            fields: List[FieldRequest] = None,
+            tensor_fields: List[str] = None,
+            model: Model = Model(name='hf/all_datasets_v4_MiniLM-L6'),
+            normalize_embeddings: bool = True,
+            text_preprocessing: TextPreProcessing = TextPreProcessing(
+                split_length=2,
+                split_overlap=0,
+                split_method=TextSplitMethod.Sentence
+            ),
+            image_preprocessing: ImagePreProcessing = ImagePreProcessing(
+                patch_method=None
+            ),
+            distance_metric: DistanceMetric = DistanceMetric.Angular,
+            vector_numeric_type: VectorNumericType = VectorNumericType.Float,
+            hnsw_config: HnswConfig = HnswConfig(
+                ef_construction=128,
+                m=16
+            ),
+            marqo_version='1.0.0',
+            created_at=time.time(),
+            updated_at=time.time()
+    ) -> StructuredMarqoIndexRequest:
+        """
+        Helper method that provides reasonable defaults for StructuredMarqoIndexRequest.
+        """
+        return StructuredMarqoIndexRequest(
+            name=name,
+            model=model,
+            normalize_embeddings=normalize_embeddings,
+            text_preprocessing=text_preprocessing,
+            image_preprocessing=image_preprocessing,
+            distance_metric=distance_metric,
+            vector_numeric_type=vector_numeric_type,
+            hnsw_config=hnsw_config,
+            fields=fields,
+            tensor_fields=tensor_fields,
+            marqo_version=marqo_version,
+            created_at=created_at,
+            updated_at=updated_at
         )
 
 

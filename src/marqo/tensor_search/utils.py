@@ -25,11 +25,6 @@ def dicts_to_jsonl(dicts: List[dict]) -> str:
     ) + "\n"
 
 
-def generate_vector_name(field_name: str) -> str:
-    """Generates the name of the vector based on the field name"""
-    return F"{enums.TensorField.vector_prefix}{field_name}"
-
-
 def truncate_dict_vectors(doc: Union[dict, List], new_length: int = 5) -> Union[List, Dict]:
     """Creates a readable version of a dict by truncating identified vectors
     Looks for field names that contains the keyword "vector"
@@ -255,11 +250,11 @@ def parse_lexical_query(text: str) -> Tuple[List[str], List[str]]:
 
             # None of the above: Syntax error. Interpret text literally instead.
             else:
-                return ([], text)
+                return [], text.split()
 
     if opening_quote_idx is not None:
         # string parsing finished with a quote still open: syntax error.
-        return ([], text)
+        return [], text.split()
 
     # Remove double/leading white spaces
     optional_terms = optional_terms.split()
@@ -342,43 +337,6 @@ def get_best_available_device() -> str:
             f"Marqo encountered an error when loading device from environment variable `MARQO_BEST_AVAILABLE_DEVICE`. "
             f"Invalid device: {device}. Must be either 'cpu' or start with 'cuda'.")
     return device
-
-
-def is_tensor_field(field: str,
-                    tensor_fields: Optional[List[str]] = None
-                    ) -> bool:
-    """Determine whether a field is a tensor field or not for add_documents calls."""
-    if tensor_fields is not None and non_tensor_fields is not None or \
-            tensor_fields is None and non_tensor_fields is None:
-        raise errors.InternalError("Must provide exactly one of tensor_fields or non_tensor_fields.")
-
-    if tensor_fields is not None:
-        return field in tensor_fields
-    else:
-        return field not in non_tensor_fields
-
-
-def calculate_health_status(marqo_os_health_check_response: Optional[Dict]) -> dict:
-    """Calculate the health status of Marqo based on the response API from Marqo-os ."""
-    statuses = {
-        "green": 0,
-        "yellow": 1,
-        "red": 2,
-    }
-
-    marqo_status = "green"
-
-    if marqo_os_health_check_response is not None:
-        if "status" in marqo_os_health_check_response:
-            marqo_os_status = marqo_os_health_check_response['status']
-        else:
-            marqo_os_status = "red"
-    else:
-        marqo_os_status = "red"
-
-    marqo_status = marqo_status if statuses[marqo_status] >= statuses[marqo_os_status] else marqo_os_status
-
-    return marqo_status, marqo_os_status
 
 
 def check_is_zero_vector(vector: List[float]) -> bool:

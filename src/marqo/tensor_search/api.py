@@ -14,25 +14,24 @@ from marqo import version
 from marqo.core.exceptions import IndexExistsError, IndexNotFoundError
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.errors import InvalidArgError, MarqoWebError, MarqoError
-from marqo.tensor_search import tensor_search
+from marqo.tensor_search import tensor_search, utils
 from marqo.tensor_search.enums import RequestType, EnvVars
 from marqo.tensor_search.models.add_docs_objects import (AddDocsBodyParams)
-from marqo.tensor_search.models.api_models import BulkSearchQuery, SearchQuery
+from marqo.tensor_search.models.api_models import SearchQuery
 from marqo.tensor_search.models.index_settings import IndexSettings
 from marqo.tensor_search.on_start_script import on_start
 from marqo.tensor_search.telemetry import RequestMetricsStore, TelemetryMiddleware
 from marqo.tensor_search.throttling.redis_throttle import throttle
-from marqo.tensor_search.utils import add_timing
 from marqo.tensor_search.web import api_validation, api_utils
 from marqo.vespa.vespa_client import VespaClient
 
 
 def generate_config() -> config.Config:
     vespa_client = VespaClient(
-        config_url=os.environ[EnvVars.VESPA_CONFIG_URL],
-        query_url=os.environ[EnvVars.VESPA_QUERY_URL],
-        document_url=os.environ[EnvVars.VESPA_DOCUMENT_URL],
-        pool_size=os.environ.get(EnvVars.VESPA_POOL_SIZE, 10),
+        config_url=utils.read_env_vars_and_defaults(EnvVars.VESPA_CONFIG_URL),
+        query_url=utils.read_env_vars_and_defaults(EnvVars.VESPA_QUERY_URL),
+        document_url=utils.read_env_vars_and_defaults(EnvVars.VESPA_DOCUMENT_URL),
+        pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_POOL_SIZE),
     )
     index_management = IndexManagement(vespa_client)
     return config.Config(vespa_client, index_management)
@@ -129,15 +128,6 @@ def create_index(index_name: str, settings: IndexSettings, marqo_config: config.
         },
         status_code=200
     )
-
-
-@app.post("/indexes/bulk/search")
-@throttle(RequestType.SEARCH)
-@add_timing
-def bulk_search(query: BulkSearchQuery, device: str = Depends(api_validation.validate_device),
-                marqo_config: config.Config = Depends(get_config)):
-    with RequestMetricsStore.for_request().time(f"POST /indexes/bulk/search"):
-        return tensor_search.bulk_search(query, marqo_config, device=device)
 
 
 @app.post("/indexes/{index_name}/search")

@@ -12,7 +12,6 @@ from marqo.config import Config
 from marqo.core.exceptions import IndexNotFoundError
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models import MarqoIndex
-from marqo.tensor_search.models.index_info import IndexInfo
 from marqo.tensor_search.tensor_search_logging import get_logger
 
 logger = get_logger(__name__)
@@ -36,70 +35,8 @@ def empty_cache():
     index_info_cache = dict()
 
 
-def get_index_info(config: Config, index_name: str) -> IndexInfo:
-    """Looks for the index name in the cache.
-
-    If it isn't found there, it will try searching the cluster
-
-    Args:
-        config:
-        index_name: name of the index
-
-    Returns:
-        IndexInfo - information about the index.
-
-    Raises:
-         MarqoError if the index isn't found on the cluster
-    """
-    return
-    # if index_name in index_info_cache:
-    #     return index_info_cache[index_name]
-    # else:
-    #     found_index_info = backend.get_index_info(config=config, index_name=index_name)
-    #     index_info_cache[index_name] = found_index_info
-    #     return index_info_cache[index_name]
-
-
-def get_cache() -> Dict[str, IndexInfo]:
+def get_cache() -> Dict[str, MarqoIndex]:
     return index_info_cache
-
-
-def refresh_index_info_on_interval(config: Config, index_name: str, interval_seconds: int) -> None:
-    pass
-    # """Refreshes an index's index_info if inteval_seconds have elapsed since the last time it was refreshed
-    #
-    # Non-thread safe, so there is a chance two threads both refresh index_info at the same time.
-    # """
-    # try:
-    #     last_refreshed_time = index_last_refreshed_time[index_name]
-    # except KeyError:
-    #     last_refreshed_time = datetime.datetime.min
-    #
-    # now = datetime.datetime.now()
-    #
-    # interval_as_time_delta = datetime.timedelta(seconds=interval_seconds)
-    # if now - last_refreshed_time >= interval_as_time_delta:
-    #     # We assume that we will successfully refresh index info. We set the time to now ()
-    #     # to lower the chance of other threads simultaneously refreshing the cache
-    #     index_last_refreshed_time[index_name] = now
-    #     try:
-    #         backend.get_index_info(config=config, index_name=index_name)
-    #
-    #     # If we get any errors, we set the index's last refreshed time to what we originally found
-    #     # This lets another thread come in and update it. There is a chance that, in the mean time
-    #     except (errors.IndexNotFoundError, errors.NonTensorIndexError):
-    #         # trying to refresh the index, and not finding any tensor index is considered a
-    #         # successful of the index.
-    #         pass
-    #     except Exception as e2:
-    #         # any other exception is problematic. We reset the index to the last_refreshed_time to
-    #         # let another thread refresh the index's index_info
-    #         index_last_refreshed_time[index_name] = last_refreshed_time
-    #         logger.warning("refresh_index_info_on_interval(): error during background index_info refresh. Reason:"
-    #                        f"\n{e2}")
-    #         logger.debug("refresh_index_info_on_interval(): error during background index_info refresh. "
-    #                      f"Traceback: \n{traceback.print_stack()}")
-    #         raise e2
 
 
 def get_index(config: Config, index_name: str, force_refresh=False) -> MarqoIndex:
@@ -116,15 +53,11 @@ def get_index(config: Config, index_name: str, force_refresh=False) -> MarqoInde
     # Make sure refresh thread is running
     _check_refresh_thread(config)
 
-    if force_refresh:
+    if force_refresh or index_name not in index_info_cache:
         _refresh_index(config, index_name)
 
     if index_name in index_info_cache:
         return index_info_cache[index_name]
-    elif not force_refresh:
-        _refresh_index(config, index_name)
-        if index_name in index_info_cache:
-            return index_info_cache[index_name]
 
     raise errors.IndexNotFoundError(f"Index {index_name} not found")
 
@@ -159,15 +92,18 @@ def _check_refresh_thread(config: Config):
 
             def refresh():
                 while True:
-                    global cache_refresh_last_logged_time
+                    try:
+                        global cache_refresh_last_logged_time
 
-                    populate_cache(config)
+                        populate_cache(config)
 
-                    if time.time() - cache_refresh_last_logged_time > cache_refresh_log_interval:
-                        cache_refresh_last_logged_time = time.time()
-                        logger.info(f'Last index cache refresh at {cache_refresh_last_logged_time}')
+                        if time.time() - cache_refresh_last_logged_time > cache_refresh_log_interval:
+                            cache_refresh_last_logged_time = time.time()
+                            logger.info(f'Last index cache refresh at {cache_refresh_last_logged_time}')
 
-                    time.sleep(cache_refresh_interval)
+                        time.sleep(cache_refresh_interval)
+                    except Exception as e:
+                        logger.error(f'Error in index cache refresh thread: {e}')
 
             refresh_thread = threading.Thread(target=refresh, daemon=True)
             refresh_thread.start()
