@@ -154,3 +154,8 @@ class IndexSettings(BaseMarqoModel):
             )
         else:
             raise errors.InternalError(f"Unknown index type: {type(marqo_index)}")
+
+from pydantic import BaseModel
+class IndexNamesAndSettings(BaseModel):
+    index_names: List[str]
+    index_settings_list: List[IndexSettings]

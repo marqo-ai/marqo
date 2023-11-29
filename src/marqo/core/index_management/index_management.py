@@ -97,7 +97,7 @@ class IndexManagement:
 
         self.vespa_client.wait_for_application_convergence()
 
-        for _, schema_resp in schema_responses:
+        for _, schema_resp in schema_responses.items():
             self._save_index_settings(schema_resp[1])
 
     def delete_index(self, marqo_index: MarqoIndex) -> None:

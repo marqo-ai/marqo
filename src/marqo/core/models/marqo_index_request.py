@@ -3,6 +3,8 @@ from typing import List, Dict, Optional
 
 import marqo.core.models.marqo_index as marqo_index
 from marqo.core.models.strict_base_model import StrictBaseModel
+from pydantic import validator
+from marqo import errors
 
 
 class MarqoIndexRequest(StrictBaseModel, ABC):
@@ -28,6 +30,12 @@ class MarqoIndexRequest(StrictBaseModel, ABC):
 
     class Config:
         allow_mutation = False
+
+    @validator('name', pre=True)
+    def validate_index_name(cls, value):
+        if "-" in value:
+            raise errors.InvalidIndexNameError("Index name cannot contain '-'")
+        return value
 
 
 class UnstructuredMarqoIndexRequest(MarqoIndexRequest):

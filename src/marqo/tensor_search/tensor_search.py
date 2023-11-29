@@ -1197,7 +1197,7 @@ def get_document_by_id(
     vespa_index = vespa_index_factory(marqo_index)
     marqo_document = vespa_index.to_marqo_document(res.document.dict())
 
-    if not show_vectors:
+    if not show_vectors and constants.MARQO_DOC_TENSORS in marqo_document:
         del marqo_document[constants.MARQO_DOC_TENSORS]
 
     return marqo_document
@@ -2356,7 +2356,7 @@ def delete_batch_indexes(config: Config, index_names: List[str]):
     index_management.batch_delete_indexes(index_names)
 
 
-def clear_indexes(config: Config, index_names: List[str]):
+def clear_batch_indexes(config: Config, index_names: List[str]):
     import vespa.application as pyvespa
     pyvespa_client = pyvespa.Vespa(config.vespa_client.document_url)
     for index_name in index_names:

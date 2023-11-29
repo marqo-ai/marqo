@@ -89,15 +89,35 @@ class UnstructuredVespaIndex(VespaIndex):
             return s.replace('\\', '\\\\').replace('"', '\\"')
 
         def generate_equality_filter_string(node: search_filter.EqualityTerm) -> str:
+            filter_parts = []
 
-            short_string_filter_string = f'({unstructured_common.SHORT_STRINGS_FIELDS} ' \
-                                         f'contains sameElement(key contains "{node.field}", ' \
-                                         f'value contains "{escape(node.value)}"))'
+            # Short String Filter
+            short_string_filter_string = f'({unstructured_common.SHORT_STRINGS_FIELDS} contains sameElement(key contains "{node.field}", value contains "{escape(node.value)}"))'
+            filter_parts.append(short_string_filter_string)
 
-            string_array_filter_string = f'({unstructured_common.STRING_ARRAY} contains ' \
-                                         f'"{node.field}::{escape(node.value)}")'
+            # String Array Filter
+            string_array_filter_string = f'({unstructured_common.STRING_ARRAY} contains "{node.field}::{escape(node.value)}")'
+            filter_parts.append(string_array_filter_string)
 
-            return f'({short_string_filter_string} OR {string_array_filter_string})'
+            # Numeric Filter
+            numeric_filter_string = ""
+            try:
+                numeric_value = int(node.value)
+                numeric_filter_string = (f'({unstructured_common.INT_FIELDS} contains sameElement(key contains "{node.field}", value = {numeric_value})) ' 
+                                         f'OR ({unstructured_common.FLOAT_FIELDS} contains sameElement(key contains "{node.field}", value = {numeric_value}))')
+            except ValueError:
+                try:
+                    numeric_value = float(node.value)
+                    numeric_filter_string = f'({unstructured_common.FLOAT_FIELDS} contains sameElement(key contains "{node.field}", value = {numeric_value}))'
+                except ValueError:
+                    pass
+
+            if numeric_filter_string:
+                filter_parts.append(numeric_filter_string)
+
+            # Final Filter String
+            final_filter_string = f"({' OR '.join(filter_parts)})"
+            return final_filter_string
 
         def generate_range_filter_string(node: search_filter.RangeTerm) -> str:
             lower = f'value >= {node.lower}' if node.lower is not None else ""
@@ -112,7 +132,7 @@ class UnstructuredVespaIndex(VespaIndex):
             int_field_string = (f'({unstructured_common.INT_FIELDS} contains '
                                 f'sameElement(key contains "{node.field}", {bound}))')
 
-            return f'{float_field_string} OR {int_field_string}'
+            return f'({float_field_string} OR {int_field_string})'
 
         def tree_to_filter_string(node: search_filter.Node) -> str:
             if isinstance(node, search_filter.Operator):
