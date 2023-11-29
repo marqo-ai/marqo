@@ -1087,9 +1087,6 @@ def search(config: Config, index_name: str, text: Union[str, dict],
         [validation.validate_field_name(attribute) for attribute in attributes_to_retrieve]
     if verbose:
         print(f"determined_search_method: {search_method}, text query: {text}")
-    # if we can't see the index name in cache, we request it and wait for the info
-    if index_name not in index_meta_cache.get_cache():
-        backend.get_index_info(config=config, index_name=index_name)
 
     REFRESH_INTERVAL_SECONDS = 2
     # update cache in the background
@@ -1253,7 +1250,8 @@ def construct_vector_input_batches(query: Union[str, Dict], index_info: MarqoInd
             return [k for k, _ in ordered_queries], []
 
 
-def gather_documents_from_response(response: QueryResult, marqo_index: MarqoIndex, highlights: bool) -> Dict[str, Any]:
+def gather_documents_from_response(response: QueryResult, marqo_index: MarqoIndex, highlights: bool,
+                                   attributes_to_retrieve: List[str] = None) -> Dict[str, Any]:
     """
     Convert a VespaQueryResponse to a Marqo search response
     """
@@ -1646,27 +1644,6 @@ def clear_batch_indexes(config: Config, index_names: List[str]):
         pyvespa_client.delete_all_docs('content_default', index_name)
 
 
-def get_indexes(config: Config):
-    res = backend.get_cluster_indices(config=config)
-
-    body = {
-        'results': [
-            {'index_name': ix} for ix in res
-        ]
-    }
-    return body
-
-
-def _select_model_from_media_type(media_type: Union[MediaType, str]) -> Union[MlModel, str]:
-    if media_type == MediaType.text:
-        return MlModel.bert
-    elif media_type == MediaType.image:
-        return MlModel.clip
-    else:
-        raise ValueError("_select_model_from_media_type(): "
-                         "Received unknown media type: {}".format(media_type))
-
-
 def get_loaded_models() -> dict:
     available_models = s2_inference.get_available_models()
     message = {"models": []}
@@ -1742,6 +1719,7 @@ def vectorise_multimodal_combination_field_unstructured(field:str,
     combo_document_is_valid = True
     combo_vectorise_time_to_add = 0
     combo_chunk = {}
+    combo_embeddings = []
     unsuccessful_doc_to_append = tuple()
     new_fields_from_multimodal_combination = set()
 
@@ -1761,8 +1739,6 @@ def vectorise_multimodal_combination_field_unstructured(field:str,
     if infer_if_image is False:
         text_field_names = list(field_content.keys())
         text_content_to_vectorise = list(field_content.values())
-        new_fields_from_multimodal_combination =set([(sub_field_name, _infer_opensearch_data_type(sub_content)) for sub_field_name
-        , sub_content in field_content.items()])
     else:
         for sub_field_name, sub_content in field_content.items():
             if isinstance(sub_content, str) and not _is_image(sub_content):
@@ -1791,8 +1767,7 @@ def vectorise_multimodal_combination_field_unstructured(field:str,
                                      'status': int(errors.InvalidArgError.status_code),
                                      'code': errors.InvalidArgError.code})
 
-                    return combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add, new_fields_from_multimodal_combination
-            new_fields_from_multimodal_combination.add((sub_field_name, _infer_opensearch_data_type(sub_content)))
+                    return combo_chunk, combo_embeddings, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add
 
     try:
         start_time = timer()
@@ -1830,7 +1805,7 @@ def vectorise_multimodal_combination_field_unstructured(field:str,
             (doc_index, {'_id': doc_id, 'error': image_err.message, 'status': int(image_err.status_code),
                  'code': image_err.code})
 
-        return combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add, new_fields_from_multimodal_combination
+        return combo_chunk, combo_embeddings, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add
 
     sub_field_name_list = text_field_names + image_field_names
     vectors_list = text_vectors + image_vectors
@@ -1846,7 +1821,7 @@ def vectorise_multimodal_combination_field_unstructured(field:str,
     combo_embeddings: List[float] = vector_chunk.tolist()
     combo_chunk: str = f"{field}::{json.dumps(field_content)}"
 
-    return combo_chunk, combo_embeddings, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add,
+    return combo_chunk, combo_embeddings, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add
 
 def vectorise_multimodal_combination_field_structured(
         field: str, multimodal_object: Dict[str, dict], doc: dict, doc_index: int,
