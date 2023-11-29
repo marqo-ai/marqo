@@ -239,6 +239,14 @@ class TestCreateIndex(MarqoTestCase):
             [IndexSettingsField.split_method]
         assert IndexSettingsField.split_method not in \
                modified_settings[IndexSettingsField.index_defaults][IndexSettingsField.text_preprocessing]
+        del modified_settings[IndexSettingsField.index_defaults][IndexSettingsField.text_preprocessing]\
+            [IndexSettingsField.override_text_chunk_prefix]
+        assert IndexSettingsField.override_text_chunk_prefix not in \
+               modified_settings[IndexSettingsField.index_defaults][IndexSettingsField.text_preprocessing]
+        del modified_settings[IndexSettingsField.index_defaults][IndexSettingsField.text_preprocessing]\
+            [IndexSettingsField.override_text_query_prefix]
+        assert IndexSettingsField.override_text_query_prefix not in \
+               modified_settings[IndexSettingsField.index_defaults][IndexSettingsField.text_preprocessing]
         assert tensor_search._autofill_index_settings(modified_settings) \
             == tensor_search.configs.get_default_index_settings()
 

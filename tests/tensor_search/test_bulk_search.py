@@ -184,6 +184,13 @@ class TestRunVectorisePipeline(MarqoTestCase):
         ]
         self.selected_device = 'cpu'
 
+        tensor_search.create_vector_index(self.config, "index_name_1")
+        tensor_search.create_vector_index(self.config, "index_name_2")
+    
+    def tearDown(self):
+        tensor_search.delete_index(self.config, "index_name_1")
+        tensor_search.delete_index(self.config, "index_name_2")
+
     @mock.patch("marqo.tensor_search.tensor_search.get_query_vectors_from_jobs")
     @mock.patch("marqo.tensor_search.tensor_search.vectorise_jobs")
     @mock.patch("marqo.tensor_search.tensor_search.create_vector_jobs")

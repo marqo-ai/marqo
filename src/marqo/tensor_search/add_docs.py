@@ -15,6 +15,7 @@ import marqo.errors as errors
 from marqo.tensor_search import utils
 from marqo.tensor_search import enums
 from marqo.tensor_search import constants
+from marqo.tensor_search.models.index_info import IndexInfo
 
 
 def threaded_download_images(allocated_docs: List[dict], image_repo: dict, tensor_fields: Optional[List[str]],
@@ -228,3 +229,31 @@ def determine_document_field_type(field_name: str, field_content, mappings: dict
             raise errors.InternalError(f"Invalid dict field type {field_name} in mappings. Must be one of {[t.value for t in enums.MappingsObjectType]}")
     else:
         return enums.DocumentFieldType.standard
+
+
+def determine_text_chunk_prefix(request_level_prefix: str, index_info: IndexInfo) -> str:
+    """
+    Determines the text chunk prefix to be used for chunking text fields.
+    This prefix will be added before each text chunk to be used for better inference.
+
+    Logic:
+    1. Prioritize request-level prefix
+    2. If not provided, use override in text_preprocessing
+    3. If not provided, use model_properties defined prefix
+    4. If not provided, keep as None (will be handled by dict .get() method)
+    """
+
+    if request_level_prefix is not None:
+        return request_level_prefix
+    
+    # Use override in text_preprocessing (if not None)
+    index_settings = index_info.get_index_settings()
+    if enums.IndexSettingsField.text_preprocessing in index_settings[enums.IndexSettingsField.index_defaults]:
+        text_preproc = index_settings[enums.IndexSettingsField.index_defaults][enums.IndexSettingsField.text_preprocessing]
+        if enums.IndexSettingsField.override_text_chunk_prefix in text_preproc:
+            if text_preproc[enums.IndexSettingsField.override_text_chunk_prefix] is not None:
+                return text_preproc[enums.IndexSettingsField.override_text_chunk_prefix]
+
+    # Use model-defined prefix (None if it does not exist)
+    model_prefix = index_info.get_model_properties().get(enums.ModelProperties.text_chunk_prefix)
+    return model_prefix

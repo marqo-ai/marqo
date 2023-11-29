@@ -43,8 +43,8 @@ class IndexSettingsField:
     index_defaults = "index_defaults"
     treat_urls_and_pointers_as_images = "treat_urls_and_pointers_as_images"
     model = "model"
-    model_properties = "model_properties"
     search_model = "search_model"
+    model_properties = "model_properties"
     search_model_properties = "search_model_properties"
     normalize_embeddings = "normalize_embeddings"
 
@@ -52,6 +52,8 @@ class IndexSettingsField:
     split_length = "split_length"
     split_overlap = "split_overlap"
     split_method = "split_method"
+    override_text_chunk_prefix = "override_text_chunk_prefix"
+    override_text_query_prefix = "override_text_query_prefix"
 
     image_preprocessing = "image_preprocessing"
     patch_method = "patch_method"
@@ -156,6 +158,8 @@ class ObjectStores:
 class ModelProperties:
     auth_required = 'auth_required'
     model_location = 'model_location'
+    text_chunk_prefix = 'text_chunk_prefix'
+    text_query_prefix = 'text_query_prefix'
 
 
 class SpecialModels:

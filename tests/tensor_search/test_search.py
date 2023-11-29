@@ -1413,7 +1413,7 @@ class TestVectorSearchUtils(MarqoTestCase):
     
     def test_construct_vector_input_batches(self):
         index_info_with_images = IndexInfo(
-            model_name = "PLACEHOLDER. ViT-B/32",
+            model_name = "ViT-B/32",        # Placeholder
             search_model_name = None,       # should work with no search model set
             properties = {"PLACEHOLDER": "PLACEHOLDER"},
             index_settings = {
@@ -1424,7 +1424,7 @@ class TestVectorSearchUtils(MarqoTestCase):
         )
 
         index_info_without_images = IndexInfo(
-            model_name = "PLACEHOLDER. ViT-B/32",
+            model_name = "ViT-B/32",        # Placeholder
             search_model_name = None,       # should work with no search model set
             properties = {"PLACEHOLDER": "PLACEHOLDER"},
             index_settings = {
@@ -1484,3 +1484,67 @@ class TestVectorSearchUtils(MarqoTestCase):
             "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_statue.png": 2},
         index_info_without_images)
         assert res == (["https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png", "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_statue.png"], [])
+
+
+    def test_determine_text_query_prefix(self):
+        """
+        Ensures proper priority order is followed when determining the query prefix.
+        search request-level > index override-level > model default level
+        """
+
+        index_info_with_model_default = IndexInfo(
+            model_name="prefix-test-model",
+            search_model_name=None,
+            properties={},
+            index_settings={
+                IndexSettingsField.index_defaults: {
+                    IndexSettingsField.model: "prefix-test-model",
+                    IndexSettingsField.treat_urls_and_pointers_as_images: True,
+                    IndexSettingsField.text_preprocessing: {}
+                }
+            }
+        )
+
+        index_info_with_search_model_default = IndexInfo(
+            model_name="ViT-B/32",  # Shouldn't be used for prefixing
+            search_model_name="prefix-test-model",
+            properties={},
+            index_settings={
+                IndexSettingsField.index_defaults: {
+                    IndexSettingsField.model: "ViT-B/32",
+                    IndexSettingsField.search_model: "prefix-test-model",
+                    IndexSettingsField.treat_urls_and_pointers_as_images: True,
+                    IndexSettingsField.text_preprocessing: {}
+                }
+            }
+        )
+
+        index_info_with_override = IndexInfo(
+            model_name="ViT-B/32",  # Shouldn't be used for prefixing
+            search_model_name="prefix-test-model",
+            properties={},
+            index_settings={
+                IndexSettingsField.index_defaults: {
+                    IndexSettingsField.model: "ViT-B/32",
+                    IndexSettingsField.search_model: "prefix-test-model",
+                    IndexSettingsField.treat_urls_and_pointers_as_images: True,
+                    IndexSettingsField.text_preprocessing: {
+                        IndexSettingsField.override_text_query_prefix: "index-override"
+                    }
+                }
+            }
+        )
+
+        with self.subTest("All prefixes on (request level chosen)"):
+            assert tensor_search.determine_text_query_prefix("request-level", index_info_with_override) == "request-level"
+       
+        with self.subTest("Request and model default on (request level chosen)"):
+            assert tensor_search.determine_text_query_prefix("request-level", index_info_with_search_model_default) == "request-level"
+            assert tensor_search.determine_text_query_prefix("request-level", index_info_with_model_default) == "request-level"
+        
+        with self.subTest("Index override and model default on (index override chosen)"):
+            assert tensor_search.determine_text_query_prefix(None, index_info_with_override) == "index-override"
+        
+        with self.subTest("Only model default on (model default chosen)"):
+            assert tensor_search.determine_text_query_prefix(None, index_info_with_search_model_default) == "test query: "
+            assert tensor_search.determine_text_query_prefix(None, index_info_with_model_default) == "test query: "

@@ -184,7 +184,8 @@ def search(search_query: SearchQuery, index_name: str, device: str = Depends(api
             image_download_headers=search_query.image_download_headers,
             context=search_query.context,
             score_modifiers=search_query.scoreModifiers,
-            model_auth=search_query.modelAuth
+            model_auth=search_query.modelAuth,
+            text_query_prefix=search_query.textQueryPrefix
         )
 
 

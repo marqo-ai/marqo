@@ -48,7 +48,7 @@ import marqo.config as config
 from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest
 from marqo.tensor_search.enums import (
     Device, MediaType, MlModel, TensorField, SearchMethod, OpenSearchDataType,
-    EnvVars, MappingsObjectType, DocumentFieldType
+    EnvVars, MappingsObjectType, DocumentFieldType, ModelProperties
 )
 from marqo.tensor_search.enums import IndexSettingsField as NsField
 from marqo.tensor_search import utils, backend, validation, configs, add_docs, filtering, create_index
@@ -390,6 +390,14 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
     except errors.IndexNotFoundError:
         raise errors.IndexNotFoundError(f"Cannot add documents to non-existent index {add_docs_params.index_name}")
 
+    # Determine chunk prefix at the request level
+    text_chunk_prefix = add_docs.determine_text_chunk_prefix(
+        request_level_prefix=add_docs_params.text_chunk_prefix,
+        index_info=index_info
+    )
+    if text_chunk_prefix is None:
+        text_chunk_prefix = ""
+
     existing_fields = set(index_info.properties.keys())
     new_fields = set()
 
@@ -563,9 +571,15 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                             NsField.split_length]
                         split_overlap = index_info.index_settings[NsField.index_defaults][NsField.text_preprocessing][
                             NsField.split_overlap]
-                        content_chunks = text_processor.split_text(field_content, split_by=split_by,
+                        
+                        
+                        # text chunks: WITHOUT prefix, stored in backend chunk list
+                        text_chunks = text_processor.split_text(field_content, split_by=split_by,
                                                                    split_length=split_length, split_overlap=split_overlap)
-                        text_chunks = content_chunks
+                        
+                        # content chunks: WITH prefix, used to generate vectors (text prefix not actually stored in backend)
+                        content_chunks = text_processor.prefix_text_chunks(text_chunks, text_chunk_prefix)
+
                     else:
                         # TODO put the logic for getting field parameters into a function and add per field options
                         image_method = index_info.index_settings[NsField.index_defaults][NsField.image_preprocessing][
@@ -583,8 +597,11 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                                         f"Could not find image found at `{field_content}`. \n"
                                         f"Reason: {str(image_repo[field_content])}"
                                     )
+                            elif isinstance(field_content, str):
+                                image_data = text_chunk_prefix + field_content     # Add prefix to URL if it's to be treated as-is.
                             else:
-                                image_data = field_content
+                                image_data = field_content      # If it's actual image data, just pass it through.
+                            
                             if image_method not in [None, 'none', '', "None", ' ']:
                                 content_chunks, text_chunks = image_processor.chunk_image(
                                     image_data, device=add_docs_params.device, method=image_method)
@@ -659,7 +676,9 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                         unsuccessful_doc_to_append, combo_vectorise_time_to_add,
                         new_fields_from_multimodal_combination) = vectorise_multimodal_combination_field(
                             field, field_content, copied, i, doc_id, add_docs_params.device, index_info,
-                            image_repo, add_docs_params.mappings[field], model_auth=add_docs_params.model_auth)
+                            image_repo, add_docs_params.mappings[field], 
+                            text_chunk_prefix=text_chunk_prefix,
+                            model_auth=add_docs_params.model_auth)
                     total_vectorise_time = total_vectorise_time + combo_vectorise_time_to_add
                     
                     if combo_document_is_valid is False:
@@ -1034,6 +1053,39 @@ def refresh_indexes_in_background(config: Config, index_names: List[str]) -> Non
         cache_update_thread.start()
 
 
+def determine_text_query_prefix(request_level_prefix: str, index_info: IndexInfo) -> str:
+    """
+    Determines the search text query prefix to be used for chunking text fields.
+    This prefix will be added before each query.
+
+    Logic:
+    1. Prioritize request-level prefix
+    2. If not provided, use override in text_preprocessing
+    3. If not provided, use search_model_properties defined prefix
+    4. If no search_model_properties, try model_properties (for backwards compatibility with v1.4.0 and below)
+    5. If not provided, keep as None (will be handled by dict .get() method)
+    """
+
+    if request_level_prefix is not None:
+        return request_level_prefix
+
+    # Use override in text_preprocessing (if not None)
+    index_settings = index_info.get_index_settings()
+    if NsField.text_preprocessing in index_settings[NsField.index_defaults]:
+        text_preproc = index_settings[NsField.index_defaults][NsField.text_preprocessing]
+        if NsField.override_text_query_prefix in text_preproc:
+            if text_preproc[NsField.override_text_query_prefix] is not None:
+                return text_preproc[NsField.override_text_query_prefix]
+    
+    if index_info.search_model_name is not None:
+        model_prefix = index_info.get_search_model_properties().get(ModelProperties.text_query_prefix)
+    else:
+        # Uses model properties if no search model (for backwards compatibility)
+        model_prefix = index_info.get_model_properties().get(ModelProperties.text_query_prefix)
+
+    return model_prefix
+
+
 def search(config: Config, index_name: str, text: Optional[Union[str, dict]] = None,
            result_count: int = 3, offset: int = 0, highlights=True,
            search_method: Union[str, SearchMethod, None] = SearchMethod.TENSOR,
@@ -1044,7 +1096,8 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict]] = N
            image_download_headers: Optional[Dict] = None,
            context: Optional[SearchContext] = None,
            score_modifiers: Optional[ScoreModifier] = None,
-           model_auth: Optional[ModelAuth] = None) -> Dict:
+           model_auth: Optional[ModelAuth] = None, 
+           text_query_prefix: Optional[str] = None) -> Dict:
     """The root search method. Calls the specific search method
 
     Validation should go here. Validations include:
@@ -1070,6 +1123,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict]] = N
         context: a dictionary to allow custom vectors in search, for tensor search only
         score_modifiers: a dictionary to modify the score based on field values, for tensor search only
         model_auth: Authorisation details for downloading a model (if required)
+        text_query_prefix: prefix to add to all text queries for TENSOR search. Do not use out of the box. Needs to be overridden with model properties.
     Returns:
 
     """
@@ -1139,7 +1193,8 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict]] = N
             searchable_attributes=searchable_attributes, verbose=verbose,
             filter_string=filter, device=selected_device, attributes_to_retrieve=attributes_to_retrieve, boost=boost,
             image_download_headers=image_download_headers, context=context, score_modifiers=score_modifiers,
-            model_auth=model_auth, max_retry_attempts=max_search_retry_attempts, max_retry_backoff_seconds=max_search_retry_backoff
+            model_auth=model_auth, max_retry_attempts=max_search_retry_attempts, max_retry_backoff_seconds=max_search_retry_backoff,
+            text_query_prefix=text_query_prefix
         )
     elif search_method.upper() == SearchMethod.LEXICAL:
         search_result = _lexical_search(
@@ -1314,15 +1369,19 @@ def _lexical_search(
 
 
 def construct_vector_input_batches(query: Union[str, Dict, None], index_info: IndexInfo) -> Tuple[List[str], List[str]]:
-    """Splits images from text in a single query (either a query string, or dict of weighted strings).
+    """
+    Splits images from text in a single query (either a query string, or dict of weighted strings).
 
     Args:
         query: a string query, or a dict of weighted strings.
         index_info: used to determine whether URLs should be treated as images
 
     Returns:
-        A tuple of string batches. The first is text content the second is image content.
+        A tuple of 2 string batches. 
+        The first is text content.
+        The second is image content.
     """
+
     treat_urls_as_images = index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]
     if query is None:
         # Nothing should be vectorised.
@@ -1542,6 +1601,7 @@ def create_vector_jobs(queries: List[BulkSearchQueryEntity], config: Config, dev
     """
         For each query:
             - Find what needs to be vectorised
+            - Add prefix to text queries (that are not images) for vectorisation only. Will not appear in search response.
             - Group content (across search requests), that could be vectorised together
             - Keep track of the Job related to a search query
 
@@ -1711,11 +1771,73 @@ def create_empty_query_response(queries: List[BulkSearchQueryEntity]) -> List[Di
         )
     )
 
+
+def add_prefix_to_queries(config: Config, queries: List[BulkSearchQueryEntity]) -> List[BulkSearchQueryEntity]:
+    """
+    Makes a new list of queries
+    Adds prefix to the q of all BulkSearchQueryEntity objects in the list.
+    Determines prefix with defaults from index_info textQueryPrefix (per query).
+    Only adds prefix to text queries (not images)
+    """
+    prefixed_queries = []
+    for q in queries:
+        # Determine what prefix to use
+        index_info = get_index_info(config=config, index_name=q.index)
+        text_query_prefix = determine_text_query_prefix(q.textQueryPrefix, index_info)
+        if text_query_prefix is None:
+            text_query_prefix = ""
+        
+        treat_urls_as_images = index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]
+        # Add prefix to q if applicable
+        if q.q is None:
+            prefixed_q = q.q
+        elif isinstance(q.q, str):
+            if treat_urls_as_images and _is_image(q.q):
+                # Images get no prefix
+                prefixed_q = q.q
+            else:
+                # Single text query: add prefix
+                prefixed_q = f"{text_query_prefix}{q.q}"
+        else:  # is dict:
+            ordered_queries = list(q.q.items())
+            if treat_urls_as_images:
+                prefixed_q = {}
+                for key, value in ordered_queries:
+                    if _is_image(key):
+                        prefixed_q[key] = value    # Do nothing with images
+                    else:
+                        # Add prefix to all inner text queries
+                        prefixed_q[f"{text_query_prefix}{key}"] = value
+            else:
+                # Treat all queries as plaintext. Add prefix to all.
+                prefixed_q = {f"{text_query_prefix}{key}": value for key, value in ordered_queries}
+        
+        new_query_object = BulkSearchQueryEntity(
+            q=prefixed_q,   # Everything is the same except the query
+            searchableAttributes=q.searchableAttributes,
+            searchMethod=q.searchMethod, 
+            limit=q.limit, offset=q.offset, 
+            showHighlights=q.showHighlights, 
+            filter=q.filter, 
+            attributesToRetrieve=q.attributesToRetrieve, 
+            boost=q.boost, image_download_headers=q.image_download_headers, 
+            context=q.context, scoreModifiers=q.scoreModifiers, 
+            index=q.index, modelAuth=q.modelAuth,
+            textQueryPrefix=q.textQueryPrefix   
+        )
+        prefixed_queries.append(new_query_object)
+
+    return prefixed_queries
+
+
 def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity], device: Union[Device, str]) -> Dict[Qidx, List[float]]:
-    """Run the query vectorisation process"""
+    """
+    Run the query vectorisation process
+    """
     # 1. Pre-process inputs ready for s2_inference.vectorise
     # we can still use qidx_to_job. But the jobs structure may need to be different
-    vector_jobs_tuple: Tuple[Dict[Qidx, List[VectorisedJobPointer]], Dict[JHash, VectorisedJobs]] = create_vector_jobs(queries, config, device)
+    prefixed_queries = add_prefix_to_queries(config=config, queries=queries)
+    vector_jobs_tuple: Tuple[Dict[Qidx, List[VectorisedJobPointer]], Dict[JHash, VectorisedJobs]] = create_vector_jobs(prefixed_queries, config, device)
 
     qidx_to_jobs, jobs = vector_jobs_tuple
 
@@ -1726,7 +1848,7 @@ def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity],
 
     # 3. For each query, get associated vectors
     qidx_to_vectors: Dict[Qidx, List[float]] = get_query_vectors_from_jobs(
-        queries, qidx_to_jobs, job_ptr_to_vectors, config, jobs
+        prefixed_queries, qidx_to_jobs, job_ptr_to_vectors, config, jobs
     )
     return qidx_to_vectors
 
@@ -1760,7 +1882,11 @@ def _bulk_vector_text_search(
     ):
 
         with RequestMetricsStore.for_request().time(f"bulk_search.vector_inference_full_pipeline"):
-            qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, device)
+            qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(
+                config=config, 
+                queries=queries, 
+                device=device
+            )
 
         ## 4. Create msearch request bodies and combine to aggregate.
         query_to_body_parts: Dict[Qidx, List[Dict]] = dict()
@@ -1814,6 +1940,7 @@ def create_bulk_search_response(queries: List[BulkSearchQueryEntity], query_to_b
         )
 
     return results
+    
 
 def _vector_text_search(
         config: Config, index_name: str, query: Union[str, dict, None], result_count: int = 5, offset: int = 0,
@@ -1821,7 +1948,8 @@ def _vector_text_search(
         attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None,
         image_download_headers: Optional[Dict] = None, context: Optional[Dict] = None,
         score_modifiers: Optional[ScoreModifier] = None, model_auth: Optional[ModelAuth] = None,
-        max_retry_attempts: int = None, max_retry_backoff_seconds: int = None):
+        max_retry_attempts: int = None, max_retry_backoff_seconds: int = None,
+        text_query_prefix: Optional[str] = None):
     """
 
     Args:
@@ -1840,6 +1968,10 @@ def _vector_text_search(
         context: a dictionary to allow custom vectors in search
         score_modifiers: a dictionary to modify the score based on field values, for tensor search only
         model_auth: Authorisation details for downloading a model (if required)
+        max_retry_attempts: maximum number of times to retry a backend request
+        max_retry_backoff_seconds: maximum number of seconds to wait between retries
+        text_query_prefix: prefix to add to text queries. Needs to be overridden by the model_properties-level prefix.
+
     Returns:
 
     Note:
@@ -1877,11 +2009,27 @@ def _vector_text_search(
     except KeyError as e:
         raise errors.IndexNotFoundError(message="Tried to search a non-existent index: {}".format(index_name))
 
+    # Use bulk_search util, but only 1 item in the list (since it's a single search).
     queries = [BulkSearchQueryEntity(
-        q=query, searchableAttributes=searchable_attributes,searchMethod=SearchMethod.TENSOR, limit=result_count, offset=offset, showHighlights=False, filter=filter_string, attributesToRetrieve=attributes_to_retrieve, boost=boost, image_download_headers=image_download_headers, context=context, scoreModifiers=score_modifiers, index=index_name, modelAuth=model_auth
+        q=query, 
+        searchableAttributes=searchable_attributes,
+        searchMethod=SearchMethod.TENSOR, 
+        limit=result_count, offset=offset, 
+        showHighlights=False, 
+        filter=filter_string, 
+        attributesToRetrieve=attributes_to_retrieve, 
+        boost=boost, image_download_headers=image_download_headers, 
+        context=context, scoreModifiers=score_modifiers, 
+        index=index_name, modelAuth=model_auth,
+        textQueryPrefix=text_query_prefix   
     )]
+
     with RequestMetricsStore.for_request().time(f"search.vector_inference_full_pipeline"):
-        qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, device)
+        qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(
+            config=config, 
+            queries=queries, 
+            device=device, 
+        )
     vectorised_text = list(qidx_to_vectors.values())[0]
 
     body = construct_msearch_body_elements(
@@ -2072,13 +2220,13 @@ def get_cuda_info() -> dict:
 
 def vectorise_multimodal_combination_field(
         field: str, multimodal_object: Dict[str, dict], doc: dict, doc_index: int,
-        doc_id:str, device:str, index_info, image_repo, field_map:dict,
+        doc_id:str, device:str, index_info, image_repo, field_map:dict, text_chunk_prefix: str,
         model_auth: Optional[ModelAuth] = None
 ):
     '''
     This function is used to vectorise multimodal combination field. The field content should
     have the following structure:
-    field_conent = {"tensor_field_one" : {"weight":0.5, "parameter": "test-paramater-1"},
+    field_content = {"tensor_field_one" : {"weight":0.5, "parameter": "test-paramater-1"},
                     "tensor_field_two" : {"weight": 0.5, parameter": "test-parameter-2"}},
     Over all this is a simplified version of the vectorise pipeline in add_documents. Specifically,
     1. we don't do any chunking here.
@@ -2092,6 +2240,7 @@ def vectorise_multimodal_combination_field(
         doc_id: the document id
         device: device from main body
         index_info: index_info from main body,
+        text_chunk_prefix: prefix to add to start of text before vectorising. Not to be stored in chunk as text.
         model_auth: Model download authorisation information (if required)
     Returns:
         combo_chunk: the combo_chunk to be appended to the main body
@@ -2133,12 +2282,13 @@ def vectorise_multimodal_combination_field(
     else:
         for sub_field_name, sub_content in multimodal_object.items():
             if isinstance(sub_content, str) and not _is_image(sub_content):
+                # Normal text
                 text_field_names.append(sub_field_name)
                 text_content_to_vectorise.append(sub_content)
             else:
                 try:
-                    if isinstance(sub_content, str) and index_info.index_settings[NsField.index_defaults][
-                            NsField.treat_urls_and_pointers_as_images]:
+                    if isinstance(sub_content, str):
+                        # Image (get from repo)
                         if not isinstance(image_repo[sub_content], Exception):
                             image_data = image_repo[sub_content]
                         else:
@@ -2147,6 +2297,7 @@ def vectorise_multimodal_combination_field(
                                 f"Reason: {str(image_repo[sub_content])}"
                             )
                     else:
+                        # sub_content is an actual image (possibly unreachable?)
                         image_data = sub_content
 
                     image_content_to_vectorise.append(image_data)
@@ -2165,11 +2316,15 @@ def vectorise_multimodal_combination_field(
     try:
         start_time = timer()
         text_vectors = []
-        if len(text_content_to_vectorise) > 0:
+
+        # Add prefix to all text content first
+        prefixed_text_content_to_vectorise = text_processor.prefix_text_chunks(text_content_to_vectorise, text_chunk_prefix)
+
+        if len(prefixed_text_content_to_vectorise) > 0:
             with RequestMetricsStore.for_request().time(f"create_vectors"):
                 text_vectors = s2_inference.vectorise(
                     model_name=index_info.model_name,
-                    model_properties=index_info.get_model_properties(), content=text_content_to_vectorise,
+                    model_properties=index_info.get_model_properties(), content=prefixed_text_content_to_vectorise,
                     device=device, normalize_embeddings=normalize_embeddings,
                     infer=infer_if_image, model_auth=model_auth
                 )
@@ -2215,7 +2370,7 @@ def vectorise_multimodal_combination_field(
 
     combo_chunk = dict({
         TensorField.marqo_knn_field: vector_chunk,
-        TensorField.field_content: json.dumps(multimodal_object),
+        TensorField.field_content: json.dumps(multimodal_object),   # prefixes not included in stored object.
         TensorField.field_name: field,
     })
     return combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add, new_fields_from_multimodal_combination

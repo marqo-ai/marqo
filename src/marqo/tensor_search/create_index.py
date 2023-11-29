@@ -1,4 +1,4 @@
-"""Functions used to fulfill the add_documents endpoint"""
+"""Functions used to fulfill the create_vector_index endpoint"""
 import copy
 from contextlib import contextmanager
 
