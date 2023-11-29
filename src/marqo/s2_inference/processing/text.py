@@ -74,6 +74,26 @@ def _reconstruct_multi_list(segmented_text_list: List[List[str]], seperator: str
     
     return results
 
+def prefix_text_chunks(text_splits: List[str], text_chunk_prefix: str) -> List[str]:
+    """
+
+    Args:
+        text_splits (List[str]): Chunk list without prefixes
+        text_chunk_prefix (str): Prefix to add before each text chunk
+
+    Returns:
+        List[str]: Chunk list with prefixes affixed
+    """
+
+    # If prefix is not given, treat it as empty
+    if text_chunk_prefix is None:
+        text_chunk_prefix = ""
+
+    prefixed_text_splits = []
+    for chunk in text_splits:
+        prefixed_text_splits.append(text_chunk_prefix + chunk)
+    return prefixed_text_splits
+
 def check_make_string_valid(text: str, coerce: bool = True) -> str:
     """ does some simple validation and coercsion for empty strings
 
@@ -149,6 +169,5 @@ def split_text(text: str, split_by: str = 'sentence', split_length: int = 2, spl
     # reconstruct the segments. there is potential for a lossy process here as we
     # assume a uniform seperator when reconstructing the sentences
     text_splits = _reconstruct_multi_list(segments, seperator)
-
     return text_splits
 

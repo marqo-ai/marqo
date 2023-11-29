@@ -1,6 +1,6 @@
 import numpy as np
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
-from marqo.errors import IndexNotFoundError
+from marqo.errors import IndexNotFoundError, InvalidArgError
 from marqo.s2_inference.errors import InvalidModelPropertiesError, UnknownModelError, ModelLoadError
 from marqo.tensor_search import tensor_search
 from marqo.s2_inference.s2_inference import clear_loaded_models
@@ -61,7 +61,7 @@ class TestGenericModelSupport(MarqoTestCase):
             }
         }
 
-        self.assertRaises(UnknownModelError, tensor_search.create_vector_index, config=self.config,
+        self.assertRaises(InvalidArgError, tensor_search.create_vector_index, config=self.config,
             index_name=self.index_name_1, index_settings=index_settings)
 
     def test_add_documents(self):

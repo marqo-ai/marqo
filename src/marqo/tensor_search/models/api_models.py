@@ -36,6 +36,7 @@ class SearchQuery(BaseMarqoModel):
     context: Optional[SearchContext] = None
     scoreModifiers: Optional[ScoreModifier] = None
     modelAuth: Optional[ModelAuth] = None
+    textQueryPrefix: Optional[str] = None
 
     @pydantic.validator('searchMethod')
     def validate_search_method(cls, value):
