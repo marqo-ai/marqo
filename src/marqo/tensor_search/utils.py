@@ -25,11 +25,6 @@ def dicts_to_jsonl(dicts: List[dict]) -> str:
     ) + "\n"
 
 
-def generate_vector_name(field_name: str) -> str:
-    """Generates the name of the vector based on the field name"""
-    return F"{enums.TensorField.vector_prefix}{field_name}"
-
-
 def truncate_dict_vectors(doc: Union[dict, List], new_length: int = 5) -> Union[List, Dict]:
     """Creates a readable version of a dict by truncating identified vectors
     Looks for field names that contains the keyword "vector"
@@ -255,11 +250,11 @@ def parse_lexical_query(text: str) -> Tuple[List[str], List[str]]:
 
             # None of the above: Syntax error. Interpret text literally instead.
             else:
-                return ([], text)
+                return [], text.split()
 
     if opening_quote_idx is not None:
         # string parsing finished with a quote still open: syntax error.
-        return ([], text)
+        return [], text.split()
 
     # Remove double/leading white spaces
     optional_terms = optional_terms.split()

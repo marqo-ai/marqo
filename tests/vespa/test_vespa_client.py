@@ -29,12 +29,12 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
         self.assertEqual(batch_response.errors, False)
 
         statuses = [response.status for response in batch_response.responses]
-        pathIds = [response.pathId.split("/")[-1] for response in batch_response.responses]
+        path_ids = [response.path_id.split("/")[-1] for response in batch_response.responses]
         ids = [response.id.split("::")[-1] for response in batch_response.responses]
         messages = [response.message for response in batch_response.responses]
 
-        self.assertEqual(statuses, ["200"] * len(batch))
-        self.assertEqual(pathIds, batch_ids)
+        self.assertEqual(statuses, [200] * len(batch))
+        self.assertEqual(path_ids, batch_ids)
         self.assertEqual(ids, batch_ids)
         self.assertEqual(messages, [None] * len(batch))
 
@@ -62,12 +62,12 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
         self.assertEqual(batch_response.errors, True)
 
         statuses = [response.status for response in batch_response.responses]
-        pathIds = [response.pathId.split("/")[-1] for response in batch_response.responses]
-        ids = [response.id.split("::")[-1] for response in batch_response.responses if response.status == "200"]
+        path_ids = [response.path_id.split("/")[-1] for response in batch_response.responses]
+        ids = [response.id.split("::")[-1] for response in batch_response.responses if response.status == 200]
         messages = [response.message for response in batch_response.responses]
 
-        self.assertEqual(statuses, ["200", "400"])
-        self.assertEqual(pathIds, ["doc1", "doc2"])
+        self.assertEqual(statuses, [200, 400])
+        self.assertEqual(path_ids, ["doc1", "doc2"])
         self.assertEqual(ids, ["doc1"])
         self.assertIsNone(messages[0])
         self.assertIsNotNone(messages[1])
@@ -145,7 +145,7 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
 
         resp = self.client.delete_document("doc1", self.TEST_SCHEMA)
 
-        self.assertEqual(resp.pathId.split("/")[-1], "doc1")
+        self.assertEqual(resp.path_id.split("/")[-1], "doc1")
         self.assertEqual(resp.id.split("::")[-1], "doc1")
 
         # Verify document deleted
@@ -166,7 +166,7 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
         # Note it's still 200 if the document doesn't exist
         resp = self.client.delete_document("docx", self.TEST_SCHEMA)
 
-        self.assertEqual(resp.pathId.split("/")[-1], "docx")
+        self.assertEqual(resp.path_id.split("/")[-1], "docx")
         self.assertEqual(resp.id.split("::")[-1], "docx")
 
         # Verify document deleted
@@ -239,10 +239,10 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
         """
         Test that download_application fails when session creation fails
         """
-        original_post = httpx.post
+        original_post = httpx.Client.post
 
         def modified_post(*args, **kwargs):
-            resp = original_post(*args[1:], **kwargs)
+            resp = original_post(*args, **kwargs)
             resp.status_code = 500
             return resp
 
@@ -251,10 +251,10 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
                 self.client.download_application()
 
     def test_download_application_downloadError_fails(self):
-        original_get = httpx.get
+        original_get = httpx.Client.get
 
         def modified_get(*args, **kwargs):
-            resp = original_get(*args[1:], **kwargs)  # 1:0 to skip self argument
+            resp = original_get(*args, **kwargs)  # 1:0 to skip self argument
             resp.status_code = 500
             return resp
 
@@ -278,7 +278,7 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
 
         app = self.client.download_application()
 
-        with patch.object(httpx, "post", wraps=httpx.post) as mock_post:
+        with patch.object(httpx.Client, "post", wraps=httpx.post) as mock_post:
             generation_before = get_vespa_app_generation()
 
             self.client.deploy_application(app)

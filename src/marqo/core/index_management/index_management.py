@@ -299,10 +299,6 @@ class IndexManagement:
         """
         Create or update index settings in Vespa settings schema.
         """
-        # Don't store model properties if model is not custom
-        if not marqo_index.model.custom:
-            marqo_index.model.properties = None
-
         self.vespa_client.feed_document(
             VespaDocument(
                 id=marqo_index.name,

@@ -1,29 +1,28 @@
 import json
 import os
 import pathlib
-import pprint
 import unittest
-from marqo.tensor_search import utils
-from marqo.tensor_search import enums
-from marqo import errors
 from unittest import mock
-from unittest.mock import patch, MagicMock
+
+from marqo import errors
+from marqo.tensor_search import enums
+from marqo.tensor_search import utils
 
 
 class TestUtils(unittest.TestCase):
- 
+
     def test__reduce_vectors(self):
         assert {
-                "__vector_abc": [1,2,3]
-            } == utils.truncate_dict_vectors({
-                "__vector_abc": [1,2,3,4,5,6,7,8]
-            }, new_length=3)
+                   "__vector_abc": [1, 2, 3]
+               } == utils.truncate_dict_vectors({
+            "__vector_abc": [1, 2, 3, 4, 5, 6, 7, 8]
+        }, new_length=3)
 
     def test__reduce_vectors_nested(self):
         assert {
-                  "vs": [{"otherfield": "jkerhjbrbhj", "__vector_abc": [1, 2, 3]}]
-            } == utils.truncate_dict_vectors({
-                "vs": [{"otherfield": "jkerhjbrbhj", "__vector_abc": [1,2,3,4,5,6,7,8]}]
+                   "vs": [{"otherfield": "jkerhjbrbhj", "__vector_abc": [1, 2, 3]}]
+               } == utils.truncate_dict_vectors({
+            "vs": [{"otherfield": "jkerhjbrbhj", "__vector_abc": [1, 2, 3, 4, 5, 6, 7, 8]}]
         }, new_length=3)
 
     def test_construct_authorized_url(self):
@@ -40,14 +39,14 @@ class TestUtils(unittest.TestCase):
         mock_cuda_is_available = mock.MagicMock()
         mock_cuda_device_count = mock.MagicMock()
         for device_str, num_cuda_devices, expected in [
-                    ("cpu", 0, True),
-                    ("cpu", 3, True),
-                    ("cuda", 1, True),
-                    ("cuda", 0, False),
-                    ("cuda:0", 1, True),
-                    ("cuda:1", 2, True),
-                    ("cuda:2", 2, False),
-                ]:
+            ("cpu", 0, True),
+            ("cpu", 3, True),
+            ("cuda", 1, True),
+            ("cuda", 0, False),
+            ("cuda:0", 1, True),
+            ("cuda:1", 2, True),
+            ("cuda:2", 2, False),
+        ]:
             mock_cuda_is_available.return_value = True if num_cuda_devices > 0 else False
             mock_cuda_device_count.return_value = num_cuda_devices
 
@@ -56,6 +55,7 @@ class TestUtils(unittest.TestCase):
             def run_test():
                 assert expected == utils.check_device_is_available(device_str)
                 return True
+
             assert run_test()
 
     def test_merge_dicts(self):
@@ -149,7 +149,7 @@ class TestUtils(unittest.TestCase):
             ("SOME_VAR", dict(), {"SOME_VAR": "1234"}, "1234"),
             ("SOME_VAR", {"SOME_VAR": "111"}, {"SOME_VAR": "333"}, "111"),
 
-            #OK for default vals to be ints:
+            # OK for default vals to be ints:
             ("SOME_VAR", {"SOME_VAR": "111"}, {"SOME_VAR": 333}, "111"),
             ("SOME_VAR", dict(), {"SOME_VAR": 1234}, 1234),
         ]:
@@ -161,6 +161,7 @@ class TestUtils(unittest.TestCase):
             def run():
                 assert expected == utils.read_env_vars_and_defaults(var=key)
                 return True
+
             assert run()
 
     def test_read_env_vars_and_defaults_ints(self):
@@ -215,48 +216,53 @@ class TestUtils(unittest.TestCase):
     def test_parse_lexical_query(self):
         # 2-tuples of input text, and expected parse_lexical_query() output
         cases = [
-            ('just a string', ([], 'just a string')),
-            ('just a "string"', (["string"], 'just a')),
-            ('just "a" string', (["a"], 'just string')),
-            ('"just" a string', (["just"], 'a string')),
-            ('just "a long long " string', (["a long long "], 'just string')),
-            ('"required 1 " not required " required2" again', (["required 1 ", " required2"], 'not required again')),
-            ('"just" "just" "" a string', (["just", "just", ""], 'a string')),
+            ('just a string', ([], ['just', 'a', 'string'])),
+            ('just a "string"', (["string"], ['just', 'a'])),
+            ('just "a" string', (["a"], ['just', 'string'])),
+            ('"just" a string', (["just"], ['a', 'string'])),
+            ('just "a long long " string', (["a long long "], ['just', 'string'])),
+            ('"required 1 " not required " required2" again',
+             (["required 1 ", " required2"], ['not', 'required', 'again'])),
+            ('"just" "just" "" a string', (["just", "just", ""], ['a', 'string'])),
 
-            ('朋友你好', ([], '朋友你好')),
-            ('朋友 "你好"', (["你好"], '朋友')),
+            ('朋友你好', ([], ['朋友你好'])),
+            ('朋友 "你好"', (["你好"], ['朋友'])),
             # spaces get introduced, even though Chinese doesn't use them:
-            ('你好 "老" 朋友', (["老"], '你好 朋友')),
-            ('"朋友" 你好', (["朋友"], '你好')),
+            ('你好 "老" 朋友', (["老"], ['你好', '朋友'])),
+            ('"朋友" 你好', (["朋友"], ['你好'])),
 
-            ('', ([], '')),
-            ('"cookie"', (["cookie"], '')),
-            ('"朋友"', (["朋友"], '')),
-            ('"', ([], '"')),
-            ('"""hello', ([], '"""hello')),
-            ('""" python docstring appeared"""', ([], '""" python docstring appeared"""')),
-            ('""', ([''], '')),
-            ('what about backticks `?', ([], 'what about backticks `?')),
-            ('\\" escaped quotes\\"  what happens here?', ([], '" escaped quotes" what happens here?')),
-            ('\\"朋友\\"', ([], '"朋友"')),
-            ('double  spaces  get  removed', ([], 'double spaces get removed')),
-            ('"go"od"', ([], '"go"od"')),
-            ('"ter"m1" term2', ([], '"ter"m1" term2')),
-            ('"term1" "term2" "term3', ([], '"term1" "term2" "term3')),
-            ('"good', ([], '"good')),
-            ('"朋友', ([], '"朋友')),
+            ('', ([], [])),
+            ('"cookie"', (["cookie"], [])),
+            ('"朋友"', (["朋友"], [])),
+            ('"', ([], ['"'])),
+            ('"""hello', ([], ['"""hello'])),
+            ('""" python docstring appeared"""', ([], ['"""', 'python', 'docstring', 'appeared"""'])),
+            ('""', ([''], [])),
+            ('what about backticks `?', ([], ['what', 'about', 'backticks', '`?'])),
+            (
+                '\\" escaped quotes\\"  what happens here?',
+                ([], ['"', 'escaped', 'quotes"', 'what', 'happens', 'here?'])
+            ),
+            ('\\"朋友\\"', ([], ['"朋友"'])),
+            ('double  spaces  get  removed', ([], ['double', 'spaces', 'get', 'removed'])),
+            ('"go"od"', ([], ['"go"od"'])),
+            ('"ter"m1" term2', ([], ['"ter"m1"', 'term2'])),
+            ('"term1" "term2" "term3', ([], ['"term1"', '"term2"', '"term3'])),
+            ('"good', ([], ['"good'])),
+            ('"朋友', ([], ['"朋友'])),
 
             # on Lucene, these unusual structures seem to get passed straight through as well.
             # The quotes seem to be completely ignored (with and without quotes yields identical results,
             # including scores):
-            ('"go"od" a"', ([], '"go"od" a"')),
-            ('"sam"a', ([], '"sam"a')),
-            ('"sam"?', ([], '"sam"?')),
-            ('"朋友"你好', ([], '"朋友"你好')),
+            ('"go"od" a"', ([], ['"go"od"', 'a"'])),
+            ('"sam"a', ([], ['"sam"a'])),
+            ('"sam"?', ([], ['"sam"?'])),
+            ('"朋友"你好', ([], ['"朋友"你好'])),
 
         ]
         for input, expected_output in cases:
-            assert utils.parse_lexical_query(input) == expected_output
+            with self.subTest(input):
+                self.assertEqual(expected_output, utils.parse_lexical_query(input))
 
     def test_parse_lexical_query_non_string(self):
         non_strings = [124, None, 1.4, False, dict(), [1, 2]]
@@ -272,7 +278,7 @@ class TestUtils(unittest.TestCase):
         self.assertIsInstance(utils._get_marqo_root(), str)
 
     def test_get_marqo_root_returns_correct_path(self):
-        assert utils._get_marqo_root().endswith('marqo/src/marqo')
+        assert utils._get_marqo_root().endswith('/src/marqo')
 
     def test_get_marqo_root_returns_existing_path(self):
         assert os.path.exists(utils._get_marqo_root())
@@ -294,7 +300,7 @@ class TestUtils(unittest.TestCase):
         self.assertIsInstance(utils.get_marqo_root_from_env(), str)
 
     def test_get_marqo_root_from_env_returns_correct_path(self):
-        assert utils.get_marqo_root_from_env().endswith('marqo/src/marqo')
+        assert utils.get_marqo_root_from_env().endswith('/src/marqo')
 
     def test_get_marqo_root_from_env_returns_existing_path(self):
         assert os.path.exists(utils.get_marqo_root_from_env())
@@ -324,9 +330,10 @@ class TestUtils(unittest.TestCase):
         def run():
             assert enums.EnvVars.MARQO_ROOT_PATH not in os.environ
             marqo_root = utils.get_marqo_root_from_env()
-            assert marqo_root.endswith('marqo/src/marqo')
+            assert marqo_root.endswith('/src/marqo')
             assert os.environ[enums.EnvVars.MARQO_ROOT_PATH] == marqo_root
             return True
+
         assert run()
 
     def test_generate_batches_batch_size(self):
@@ -372,32 +379,6 @@ class TestUtils(unittest.TestCase):
             raise AssertionError
         except ValueError as e:
             assert "must be greater than 0" in str(e)
-
-    def test_is_tensor_field_field_in_tensor_fields(self):
-        tensor_fields = ['field1', 'field2', 'field3']
-        result = utils.is_tensor_field('field1', tensor_fields=tensor_fields)
-        self.assertTrue(result)
-
-    def test_is_tensor_field_field_not_in_non_tensor_fields(self):
-        non_tensor_fields = ['field4', 'field5', 'field6']
-        result = utils.is_tensor_field('field1', non_tensor_fields=non_tensor_fields)
-        self.assertTrue(result)
-
-    def test_is_tensor_field_missing_both_fields(self):
-        with self.assertRaises(errors.InternalError):
-            utils.is_tensor_field('field1')
-
-    def test_is_tensor_field_providing_both_fields(self):
-        tensor_fields = ['field1', 'field2', 'field3']
-        non_tensor_fields = ['field4', 'field5', 'field6']
-        with self.assertRaises(errors.InternalError):
-            utils.is_tensor_field('field1', tensor_fields=tensor_fields, non_tensor_fields=non_tensor_fields)
-
-    def test_is_tensor_field_providing_one_empty(self):
-        tensor_fields = ['field1', 'field2', 'field3']
-        non_tensor_fields = []
-        with self.assertRaises(errors.InternalError):
-            utils.is_tensor_field('field1', tensor_fields=tensor_fields, non_tensor_fields=non_tensor_fields)
 
     def test_check_is_zero_vector_empty_vector(self):
         vector = []

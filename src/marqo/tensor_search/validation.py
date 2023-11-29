@@ -1,24 +1,19 @@
-from enum import Enum
-import jsonschema
 import json
-import typing
-from typing import Any, Container, Dict, Iterable, List, Optional, Tuple, Type, Sequence, Union
+from enum import Enum
+from typing import Any, Dict, List, Optional, Type, Sequence, Union
 
-from marqo.config import Config
+import jsonschema
+
+from marqo.errors import (
+    InvalidFieldNameError, InvalidArgError, InvalidDocumentIdError, DocTooLargeError)
 from marqo.tensor_search import constants
 from marqo.tensor_search import enums, utils
-from marqo.errors import (
-    MarqoError, InvalidFieldNameError, InvalidArgError, InternalError,
-    InvalidDocumentIdError, DocTooLargeError, InvalidIndexNameError,
-    IllegalRequestedDocCount)
-from marqo.tensor_search.enums import TensorField, SearchMethod
-from marqo.tensor_search import constants
-from marqo.tensor_search.models.search import SearchContext
-
+from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest
 from marqo.tensor_search.models.settings_object import settings_schema
 from marqo.core.unstructured_vespa_index.constants import UNSUPPORTED_FIELD_NAME_LIST
 from marqo.tensor_search.models.mappings_object import mappings_schema, multimodal_combination_schema
+from marqo.tensor_search.models.search import SearchContext
 
 
 def validate_query(q: Union[dict, str], search_method: Union[str, SearchMethod]):
@@ -56,42 +51,6 @@ def validate_query(q: Union[dict, str], search_method: Union[str, SearchMethod])
     return q
 
 
-def validate_bulk_query_input(q: 'BulkSearchQueryEntity') -> Optional[MarqoError]:
-    if q.limit <= 0:
-        return IllegalRequestedDocCount("search result limit must be greater than 0!")
-    if q.offset < 0:
-        return IllegalRequestedDocCount("search result offset cannot be less than 0!")
-
-    # validate query
-    validate_query(q=q.q, search_method=q.searchMethod)
-    try:
-        validate_searchable_attributes(searchable_attributes=q.searchableAttributes, search_method=q.searchMethod)
-    except Exception as e:
-        return e
-
-    validate_context(context=q.context, query=q.q, search_method=q.searchMethod)
-    
-    # Validate result_count + offset <= int(max_docs_limit)
-    max_docs_limit = utils.read_env_vars_and_defaults(enums.EnvVars.MARQO_MAX_RETRIEVABLE_DOCS)
-    check_upper = True if max_docs_limit is None else q.limit + q.offset <= int(max_docs_limit)
-    if not check_upper:
-        raise IllegalRequestedDocCount(
-            f"The search result limit + offset must be less than or equal to the MARQO_MAX_RETRIEVABLE_DOCS limit of"
-            f"[{max_docs_limit}]. Marqo received search result limit of `{q.limit}` and offset of `{q.offset}`."
-        )
-
-    validate_boost(boost=q.boost, search_method=q.searchMethod)
-    if q.searchableAttributes is not None:
-        if not isinstance(q.searchableAttributes, (List, Tuple)):
-            raise InvalidArgError("searchableAttributes must be a sequence!")
-        [validate_field_name(attribute) for attribute in q.searchableAttributes]
-    if q.attributesToRetrieve is not None:
-        if not isinstance(q.attributesToRetrieve, (List, Tuple)):
-            raise InvalidArgError("attributesToRetrieve must be a sequence!")
-        [validate_field_name(attribute) for attribute in q.attributesToRetrieve]
-
-    return None
-
 def validate_searchable_attributes(searchable_attributes: Optional[List[str]], search_method: SearchMethod):
     """Validate the searchable_attributes of an operation is not above the maximum number of attributes allowed.
     
@@ -101,9 +60,10 @@ def validate_searchable_attributes(searchable_attributes: Optional[List[str]], s
     if search_method != SearchMethod.TENSOR:
         return
 
-    maximum_searchable_attributes: Optional[str] = utils.read_env_vars_and_defaults(enums.EnvVars.MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES)
+    maximum_searchable_attributes: Optional[str] = utils.read_env_vars_and_defaults(
+        enums.EnvVars.MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES)
     if maximum_searchable_attributes is None:
-        return 
+        return
 
     if searchable_attributes is None:
         raise InvalidArgError(
@@ -114,7 +74,7 @@ def validate_searchable_attributes(searchable_attributes: Optional[List[str]], s
         raise InvalidArgError(
             f"Maximum searchable attributes (set via `MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES`) for tensor search is {maximum_searchable_attributes}, received {len(searchable_attributes)}."
         )
-    
+
 
 def validate_str_against_enum(value: Any, enum_class: Type[Enum], case_sensitive: bool = True):
     """Checks whether a value is found as the value of a str attribute of the
@@ -179,7 +139,8 @@ def validate_field_content(field_content: Any, is_non_tensor_field: bool) -> Any
             f"Allowed content types: {[ty.__name__ for ty in constants.ALLOWED_CUSTOMER_FIELD_TYPES]}"
         )
 
-def validate_context(context: Optional[SearchContext], search_method: SearchMethod, query: Union[str, Dict[str, Any]]): 
+
+def validate_context(context: Optional[SearchContext], search_method: SearchMethod, query: Union[str, Dict[str, Any]]):
     """Validate the SearchContext.
 
     'validate_context' ensures that if the context is provided for a tensor search
@@ -190,7 +151,7 @@ def validate_context(context: Optional[SearchContext], search_method: SearchMeth
     if context is not None and search_method == SearchMethod.TENSOR and isinstance(query, str):
         raise InvalidArgError(
             f"Marqo received a query = `{query}` with type =`{type(query).__name__}` "
-            f"and a parameter `context`.\n" # do not return true {context} here as it might be huge.
+            f"and a parameter `context`.\n"  # do not return true {context} here as it might be huge.
             f"This is not supported as the context only works when the query is a dictionary."
             f"If you aim to search with your custom vectors, reformat the query as a dictionary.\n"
             f"Please check `https://docs.marqo.ai/0.0.16/API-Reference/search/#context` for more information."
@@ -333,65 +294,6 @@ def validate_unstructured_doc_field_name(doc: Dict) -> Dict:
     return doc
 
 
-def validate_vector_name(name: str):
-    """Checks that the vector name is valid.
-    It should have the form __vector_{customer field name}
-
-    Raises:
-        errors.InternalError, as vector names are an internal concern and
-            should be hidden from the end user
-    """
-    if not isinstance(name, str):
-        raise InternalError(F"vector name must be str! Found type {type(name)} for {name}")
-    if not name:
-        raise InternalError("vector name can't be empty! ")
-
-    if not name.startswith(enums.TensorField.vector_prefix):
-        raise InternalError(
-            f"Names of vectors must begin "
-            f"with the vector prefix ({enums.TensorField.vector_prefix})! \n"
-            f"The name of the vector that raised the error: {name}")
-    without_prefix = name.replace(enums.TensorField.vector_prefix, '', 1)
-    if not without_prefix:
-        raise InternalError(
-            f"Vector name without prefix cannot be empty. "
-            f"The name of the vector that raised the error: {name}"
-        )
-    if without_prefix in enums.TensorField.__dict__.values():
-        raise InternalError(
-            f"Vector name without vector prefix can't be a protected name."
-            f"The name of the vector that raised the error: {name}"
-        )
-    if without_prefix == '_id':
-        raise InternalError(
-            f"Vector name without vector prefix can't be a protected name."
-            f"The name of the vector that raised the error: {name}"
-        )
-    return name
-
-
-def validate_searchable_vector_props(existing_vector_properties: Container[str],
-                                     subset_vector_properties: Iterable[str]) -> Iterable[str]:
-    """Validates that the a subset of vector properties is indeed a subset.
-
-    Args:
-        existing_vector_properties: assumes that each name begins with the vector prefix
-        subset_vector_properties: assumes that each name begins with the vector prefix
-
-    Returns:
-        subset_vector_properties if validation has passed
-    Raises
-        S2Search error in case where subset_vector_properties isn't a subset of
-        existing_vector_properties
-
-    """
-    for subset_vec in subset_vector_properties:
-        if subset_vec not in existing_vector_properties:
-            raise MarqoError(f"Searchable attribute '{subset_vec.replace(TensorField.vector_prefix, '')}' "
-                             f"not found in index.")
-    return subset_vector_properties
-
-
 def validate_id(_id: str):
     """Validates that an _id is ok
 
@@ -408,50 +310,6 @@ def validate_id(_id: str):
     if not _id:
         raise InvalidDocumentIdError("Document ID can't be empty")
     return _id
-
-
-def validate_index_name(name: str) -> str:
-    """Validates the index name.
-
-    Args:
-        name: the name of the index
-
-    Returns:
-        name, if no errors have been raised.
-
-    Raises
-        InvalidIndexNameError
-    """
-    if name in constants.INDEX_NAMES_TO_IGNORE:
-        raise InvalidIndexNameError(
-            f"Index name `{name}` conflicts with a protected name. "
-            f"Please chose a different name for your index.")
-    if any([name.startswith(protected_prefix) for protected_prefix in constants.INDEX_NAME_PREFIXES_TO_IGNORE]):
-        raise InvalidIndexNameError(
-            f"Index name `{name}` starts with a protected prefix. "
-            f"Please chose a different name for your index.")
-    if "-" in name:
-        raise InvalidIndexNameError(
-            f"Index name `{name}` contains a hyphen which is not supported in Vespa"
-            f"Please chose a different name for your index.")
-    return name
-
-
-def validate_settings_object(settings_object):
-    """validates index settings.
-    Returns
-        The given index settings if validation has passed
-
-    Raises an InvalidArgError if the settings object is badly formatted
-    """
-    try:
-        jsonschema.validate(instance=settings_object, schema=settings_schema)
-        return settings_object
-    except jsonschema.ValidationError as e:
-        raise InvalidArgError(
-            f"Error validating index settings object. Reason: \n{str(e)}"
-            f"\nRead about the index settings object here: https://docs.marqo.ai/0.0.13/API-Reference/indexes/#body"
-        )
 
 
 def validate_dict(field: str, field_content: Dict, is_non_tensor_field: bool, mappings: Dict):
@@ -530,6 +388,7 @@ def validate_multimodal_combination(field_content, is_non_tensor_field, field_ma
         )
     return True
 
+
 def validate_mappings_object(mappings_object: Dict):
     """validates the mappings object.
     Returns
@@ -570,48 +429,6 @@ def validate_multimodal_combination_object(multimodal_mappings: Dict):
         )
 
 
-def validate_mappings(mappings: Dict):
-    '''
-    Args:
-        mappings:  a dictionary to help handle object content field
-    Returns:
-    '''
-    for field, field_mapping in mappings.items():
-        validate_field_name(field)
-        if field_mapping["type"] not in constants.MARQO_OBJECT_TYPES:
-            raise InvalidArgError(
-                f"The type `{field_mapping['type']}` in mappings for filed `{field}` is not supported."
-                f"Please check the type of your mappings."
-                f"Supported mappings can be found in `https://docs.marqo.ai/0.0.15/API-Reference/mappings/`."
-            )
-        if field_mapping["type"] == "multimodal_combination":
-            validate_multimodal_combination_mapping(field_mapping)
-
-    return True
-
-
-def validate_multimodal_combination_mapping(field_mapping: Dict):
-    if "weights" not in field_mapping:
-        raise InvalidArgError(
-            f"The multimodal_combination mapping `{field_mapping}` does not contain `weights`"
-            f"Please check `https://docs.marqo.ai/0.0.15/Advanced-Usage/document_fields/#multimodal-combination-object` for more info."
-        )
-
-    for child_field, weight in field_mapping["weights"].items():
-        if type(child_field) not in constants.ALLOWED_MULTIMODAL_FIELD_TYPES:
-            raise InvalidArgError(
-                f"The multimodal_combination mapping `{field_mapping}` has an invalid child_field `{child_field}` of type `{type(child_field).__name__}`."
-                f"In multimodal_combination fields, it must be a string."
-                f"Please check `https://docs.marqo.ai/0.0.15/Advanced-Usage/document_fields/#multimodal-combination-object` for more info."
-            )
-
-        if not isinstance(weight, (float, int)):
-            raise InvalidArgError(
-                f"The multimodal_combination mapping `{field_mapping}` has an invalid weight `{weight}` of type `{type(weight).__name__}`."
-                f"In multimodal_combination fields, weight must be an int or float."
-                f"Please check `https://docs.marqo.ai/0.0.15/Advanced-Usage/document_fields/#multimodal-combination-object` for more info."
-            )
-
 def validate_delete_docs_request(delete_request: MqDeleteDocsRequest, max_delete_docs_count: int):
     """Validates a delete docs request from the user.
 
@@ -645,29 +462,3 @@ def validate_delete_docs_request(delete_request: MqDeleteDocsRequest, max_delete
         validate_id(_id)
 
     return delete_request
-
-
-def validate_nonnegative_number(input_string: str, field_description: str = "Input"):
-    """Validates that a string is a non-negative number
-
-    Args:
-        input_string: the string to validate
-        field_description: description of the value being validated, to be used in error messages
-
-    Returns:
-        input_string converted to a float, if it is a non-negative number
-        
-    Raises:
-        InternalError if the string is not a non-negative number,
-        with a message dependent on field_description
-    """
-    try:
-        output_number = float(input_string)
-    except ValueError:
-        raise InternalError(f"`{field_description} must be a valid number! It is currently: {input_string}.`")
-    if output_number < 0:
-        raise InternalError(f"{field_description} cannot be a negative number! It is currently: `{input_string}`.")
-    return output_number
-
-
-

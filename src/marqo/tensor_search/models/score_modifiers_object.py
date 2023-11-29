@@ -1,5 +1,5 @@
 import json
-from typing import List, Dict, Any, Optional, Literal
+from typing import List, Dict, Any, Optional
 
 from pydantic import BaseModel, validator, ValidationError
 
@@ -30,33 +30,6 @@ class ScoreModifierOperator(BaseModel):
         if v == "_id":
             raise InvalidArgError("_id is not allowed as a field_name")
         return v
-
-    def to_painless_script(self, operation: Literal["multiply_score_by", "add_to_score"]) -> str:
-        """Convert a ScoreModifierOperator based on if it's an multiply_score_by', 'add_to_score' operation."""
-        if operation == "multiply_score_by":
-            return f"""
-            if (doc.containsKey('__chunks.{self.field_name}')) {{
-                if (doc['__chunks.{self.field_name}'].size() > 0 &&
-                    (doc['__chunks.{self.field_name}'].value instanceof java.lang.Number)) {{
-                    _score = _score * doc['__chunks.{self.field_name}'].value * {self.weight};
-                }}
-            }}
-            """
-
-        elif operation == "add_to_score":
-            return f""" 
-            if (doc.containsKey('__chunks.{self.field_name}')) {{     
-                if (doc['__chunks.{self.field_name}'].size() > 0 &&
-                    (doc['__chunks.{self.field_name}'].value instanceof java.lang.Number)) {{
-                    additive = additive + doc['__chunks.{self.field_name}'].value * {self.weight};
-                }}
-            }}
-            """
-
-        else:
-            raise ValueError(
-                f"operation must be either 'multiply_score_by' or 'add_to_score', {operation} provided."
-            )
 
 
 class ScoreModifier(BaseModel):
@@ -104,15 +77,3 @@ class ScoreModifier(BaseModel):
         ) for x in self.add_to_score] if self.add_to_score is not None else []
 
         return mult + add
-
-    def to_painless_script(self) -> str:
-        """Convert this ScoreModifier to a painless script to modify the score."""
-        mult = [x.to_painless_script("multiply_score_by") for x in
-                self.multiply_score_by] if self.multiply_score_by is not None else []
-        add = [x.to_painless_script("add_to_score") for x in self.add_to_score] if self.add_to_score is not None else []
-
-        script = "\n".join(
-            ["double additive = 0;"] + \
-            mult + add + ["return Math.max(0.0, (_score + additive));"]
-        )
-        return f"""{script}"""

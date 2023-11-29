@@ -1,13 +1,16 @@
+import re
 from abc import ABC, abstractmethod
 from enum import Enum
 from typing import List, Optional, Dict, Any, Set, Type, Union
 
-from pydantic import PrivateAttr
+import pydantic
+from pydantic import PrivateAttr, root_validator
 from pydantic import ValidationError, validator
 from pydantic.error_wrappers import ErrorWrapper
 from pydantic.utils import ROOT_KEY
 
-from marqo.core.models.strict_base_model import StrictBaseModel
+from marqo.core import constants
+from marqo.core.models.strict_base_model import ImmutableStrictBaseModel, StrictBaseModel
 from marqo.exceptions import InvalidArgumentError
 from marqo.logging import get_logger
 from marqo.s2_inference import s2_inference
@@ -65,7 +68,7 @@ class PatchMethod(Enum):
     Frcnn = 'frcnn'
 
 
-class Field(StrictBaseModel):
+class Field(ImmutableStrictBaseModel):
     name: str
     type: FieldType
     features: List[FieldFeature] = []
@@ -73,8 +76,14 @@ class Field(StrictBaseModel):
     filter_field_name: Optional[str]
     dependent_fields: Optional[Dict[str, float]]
 
+    @root_validator
+    def check_all_fields(cls, values):
+        validate_structured_field(values, marqo_index=True)
 
-class TensorField(StrictBaseModel):
+        return values
+
+
+class TensorField(ImmutableStrictBaseModel):
     """
     A tensor field that has a corresponding field.
 
@@ -85,18 +94,18 @@ class TensorField(StrictBaseModel):
     embeddings_field_name: str
 
 
-class HnswConfig(StrictBaseModel):
-    ef_construction: int
-    m: int
+class HnswConfig(ImmutableStrictBaseModel):
+    ef_construction: int = pydantic.Field(gt=0)
+    m: int = pydantic.Field(gt=0)
 
 
-class TextPreProcessing(StrictBaseModel):
-    split_length: int
-    split_overlap: int
+class TextPreProcessing(ImmutableStrictBaseModel):
+    split_length: int = pydantic.Field(gt=0)
+    split_overlap: int = pydantic.Field(ge=0)
     split_method: TextSplitMethod
 
 
-class ImagePreProcessing(StrictBaseModel):
+class ImagePreProcessing(ImmutableStrictBaseModel):
     patch_method: Optional[PatchMethod]
 
 
@@ -104,6 +113,16 @@ class Model(StrictBaseModel):
     name: str
     properties: Optional[Dict[str, Any]]
     custom: bool = False
+
+    def dict(self, *args, **kwargs):
+        """
+        Custom dict method that removes the properties field if the model is not custom. This ensures we don't store
+        non-custom model properties when serializing and saving the index.
+        """
+        d = super().dict(*args, **kwargs)
+        if not self.custom:
+            d.pop('properties', None)
+        return d
 
     def get_dimension(self) -> int:
         self._update_model_properties_from_registry()
@@ -114,7 +133,7 @@ class Model(StrictBaseModel):
                 "The given model properties does not contain a 'dimensions' key"
             )
 
-    def get_properties(self):
+    def get_properties(self) -> Dict[str, Any]:
         """
         Get model properties. Try to update model properties from the registry first if model properties
         are not populated.
@@ -140,7 +159,7 @@ class Model(StrictBaseModel):
                     f'Please provide model_properties if the model is a custom model and is not supported by default')
 
 
-class MarqoIndex(StrictBaseModel, ABC):
+class MarqoIndex(ImmutableStrictBaseModel, ABC):
     """
     Base class for a Marqo index.
     """
@@ -154,8 +173,8 @@ class MarqoIndex(StrictBaseModel, ABC):
     vector_numeric_type: VectorNumericType
     hnsw_config: HnswConfig
     marqo_version: str
-    created_at: int
-    updated_at: int
+    created_at: int = pydantic.Field(gt=0)
+    updated_at: int = pydantic.Field(gt=0)
     _cache: Dict[str, Any] = PrivateAttr()
 
     class Config:
@@ -181,6 +200,11 @@ class MarqoIndex(StrictBaseModel, ABC):
         if type not in [cls._valid_type(), cls._valid_type().value]:
             raise ValueError(f"Cannot assign a different type to {cls.__name__}")
         return type
+
+    @validator('name')
+    def validate_name(cls, name):
+        validate_index_name(name)
+        return name
 
     @classmethod
     def parse_obj(cls: Type['Model'], obj: Any) -> Union['UnstructuredMarqoIndex', 'StructuredMarqoIndex']:
@@ -222,12 +246,33 @@ class StructuredMarqoIndex(MarqoIndex):
     fields: List[Field]  # all fields, including tensor fields
     tensor_fields: List[TensorField]
 
+    def __init__(self, **data):
+        super().__init__(**data)
+
+    @root_validator
+    def validate_model(cls, values):
+        # Verify all combination fields are tensor fields
+        combination_fields = [field for field in values.get('fields', []) if
+                              field.type == FieldType.MultimodalCombination]
+        tensor_field_names = {tensor_field.name for tensor_field in values.get('tensor_fields', [])}
+        for field in combination_fields:
+            if field.name not in tensor_field_names:
+                raise ValueError(f'Field {field.name} has type {field.type.value()} and must be a tensor field')
+
+        return values
+
     @classmethod
     def _valid_type(cls) -> IndexType:
         return IndexType.Structured
 
-    def __init__(self, **data):
-        super().__init__(**data)
+    @validator('tensor_fields')
+    def validate_tensor_fields(cls, tensor_fields, values):
+        field_names = {field.name for field in values.get('fields', [])}
+        for tensor_field in tensor_fields:
+            if tensor_field.name not in field_names:
+                raise ValueError(f'Tensor field {tensor_field.name} is not a defined field. '
+                                 f'Field names: {", ".join(field_names)}')
+        return tensor_fields
 
     @property
     def lexical_field_map(self) -> Dict[str, Field]:
@@ -303,20 +348,19 @@ class StructuredMarqoIndex(MarqoIndex):
         def generate():
             the_map = dict()
             for tensor_field in self.tensor_fields:
-                if tensor_field.chunk_field_name is not None:
-                    if tensor_field.chunk_field_name in the_map:
-                        raise ValueError(
-                            f"Duplicate chunk field name {tensor_field.chunk_field_name} "
-                            f"for tensor field {tensor_field.name}"
-                        )
-                    the_map[tensor_field.chunk_field_name] = tensor_field
-                if tensor_field.embeddings_field_name is not None:
-                    if tensor_field.embeddings_field_name in the_map:
-                        raise ValueError(
-                            f"Duplicate embeddings field name {tensor_field.embeddings_field_name} "
-                            f"for tensor field {tensor_field.name}"
-                        )
-                    the_map[tensor_field.embeddings_field_name] = tensor_field
+                if tensor_field.chunk_field_name in the_map:
+                    raise ValueError(
+                        f"Duplicate chunk field name {tensor_field.chunk_field_name} "
+                        f"for tensor field {tensor_field.name}"
+                    )
+                the_map[tensor_field.chunk_field_name] = tensor_field
+
+                if tensor_field.embeddings_field_name in the_map:
+                    raise ValueError(
+                        f"Duplicate embeddings field name {tensor_field.embeddings_field_name} "
+                        f"for tensor field {tensor_field.name}"
+                    )
+                the_map[tensor_field.embeddings_field_name] = tensor_field
 
             return the_map
 
@@ -328,3 +372,102 @@ class StructuredMarqoIndex(MarqoIndex):
                                   lambda: {field_type: [field for field in self.fields if field.type == field_type]
                                            for field_type in FieldType}
                                   )
+
+
+_VESPA_NAME_PATTERN = r'[a-zA-Z_][a-zA-Z0-9_]*'
+_VESPA_NAME_REGEX = re.compile(_VESPA_NAME_PATTERN)
+
+
+def _is_valid_vespa_name(name: str) -> bool:
+    """
+    Validate a Vespa name.
+
+    Returns:
+        True if the name is valid, False otherwise
+    """
+    return _VESPA_NAME_REGEX.fullmatch(name) is not None
+
+
+def validate_index_name(name: str) -> None:
+    """
+    Validate a MarqoIndex name. Raises ValueError if validation fails.
+    """
+    if not _is_valid_vespa_name(name):
+        raise ValueError(f'"{name}" is not a valid index name. Index name must match {_VESPA_NAME_PATTERN} '
+                         f'and must not start with "{constants.MARQO_RESERVED_PREFIX}"')
+    if name.startswith(constants.MARQO_RESERVED_PREFIX):
+        raise ValueError(f'Index name must not start with "{constants.MARQO_RESERVED_PREFIX}"')
+
+
+def validate_structured_field(values, marqo_index: bool) -> None:
+    """
+    Validate a Field or FieldRequest. Raises ValueError if validation fails.
+
+    Args:
+        marqo_index: Whether the validation is for a MarqoIndex Field (True) or a MarqoIndexRequest FieldRequest (False)
+    """
+    name: str = values['name']
+    type: FieldType = values['type']
+    features: List[FieldFeature] = values['features']
+    dependent_fields: Optional[Dict[str, float]] = values['dependent_fields']
+
+    if not _is_valid_vespa_name(name):
+        raise ValueError(f'"{name}": Field name must match {_VESPA_NAME_PATTERN} '
+                         f'and must not start with "{constants.MARQO_RESERVED_PREFIX}"')
+    if name.startswith(constants.MARQO_RESERVED_PREFIX):
+        raise ValueError(f'{name}: Field name must not start with "{constants.MARQO_RESERVED_PREFIX}"')
+
+    if type in [FieldType.ImagePointer, FieldType.MultimodalCombination] and features:
+        raise ValueError(f'{name}: Cannot specify features for field of type {type.value}')
+
+    if type == FieldType.MultimodalCombination:
+        if not dependent_fields:
+            raise ValueError(f'{name}: dependent_fields must be defined for a field of type {type.value}')
+    elif dependent_fields:
+        raise ValueError(
+            f'{name}: dependent_fields must only be defined for fields of type '
+            f'{FieldType.MultimodalCombination.value}'
+        )
+
+    if FieldFeature.LexicalSearch in features and type not in [FieldType.Text, FieldType.ArrayText]:
+        raise ValueError(
+            f'{name}: Field with {FieldFeature.LexicalSearch.value} feature must be of type '
+            f'{FieldType.Text.value} or {FieldType.ArrayText.value}'
+        )
+
+    # These validations are specific to marqo_index.Field
+    if marqo_index:
+        lexical_field_name: Optional[str] = values['lexical_field_name']
+        filter_field_name: Optional[str] = values['filter_field_name']
+
+        if FieldFeature.LexicalSearch in features and not lexical_field_name:
+            raise ValueError(
+                f'{name}: lexical_field_name must be populated when {FieldFeature.LexicalSearch.value} '
+                f'feature is present'
+            )
+
+        if FieldFeature.Filter in features and not filter_field_name:
+            # We can filter anything other than ImagePointer and MultimodalCombination, which don't allow features
+            # so no type validation here
+            raise ValueError(
+                f'{name}: filter_field_name must be populated when {FieldFeature.Filter.value} '
+                f'feature is present'
+            )
+
+        if FieldFeature.ScoreModifier in features and type not in [FieldType.Float, FieldType.Int]:
+            raise ValueError(
+                f'{name}: Field with {FieldFeature.ScoreModifier.value} feature must be of type '
+                f'{FieldType.Float.value} or {FieldType.Int.value}'
+            )
+
+        if lexical_field_name and FieldFeature.LexicalSearch not in features:
+            raise ValueError(
+                f'{name}: lexical_field_name must only be populated when '
+                f'{FieldFeature.LexicalSearch.value} feature is present'
+            )
+
+        if filter_field_name and FieldFeature.Filter not in features:
+            raise ValueError(
+                f'{name}: filter_field_name must only be populated when {FieldFeature.Filter.value} '
+                f'feature is present'
+            )
