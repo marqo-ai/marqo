@@ -42,21 +42,31 @@ class TestGetQueryVectorsFromJobs(MarqoTestCase):
             BulkSearchQueryEntity(index="index_name_1", q="a test query", limit=2),
             BulkSearchQueryEntity(index="index_name_2", q="another", limit=2),
         ]
-        self.index_info = IndexInfo("model_name", {},  {
-            "index_defaults": {"treat_urls_and_pointers_as_images": False, "normalize_embeddings": False},
-            'model_name': 'test_model',
-            'model_properties': {'test': 'property'},
-            'content_type': 'text',
-            'image_download_headers': None
-        })
+        self.index_info = IndexInfo(
+            model_name="model_name", 
+            search_model_name=None,
+            properties={},  
+            index_settings={
+                "index_defaults": {"treat_urls_and_pointers_as_images": False, "normalize_embeddings": False},
+                'model': 'test_model',
+                'model_properties': {'test': 'property'},
+                'content_type': 'text',
+                'image_download_headers': None
+            }
+        )
 
-        self.index_info_with_normalize = IndexInfo("model_name", {},  {
-            "index_defaults": {"treat_urls_and_pointers_as_images": False, "normalize_embeddings": True},
-            'model_name': 'test_model',
-            'model_properties': {'test': 'property'},
-            'content_type': 'text',
-            'image_download_headers': None
-        })
+        self.index_info_with_normalize = IndexInfo(
+            model_name="model_name", 
+            search_model_name=None,
+            properties={},  
+            index_settings={
+                "index_defaults": {"treat_urls_and_pointers_as_images": False, "normalize_embeddings": True},
+                'model': 'test_model',
+                'model_properties': {'test': 'property'},
+                'content_type': 'text',
+                'image_download_headers': None
+            }
+        )
 
         self.jobs: Dict[JHash, VectorisedJobs] = {
             123: VectorisedJobs(model_name="model_name", model_auth=None, model_properties={}, content_type="text", content=["a test query"], device="cpu",normalize_embeddings=False),
@@ -174,6 +184,13 @@ class TestRunVectorisePipeline(MarqoTestCase):
         ]
         self.selected_device = 'cpu'
 
+        tensor_search.create_vector_index(self.config, "index_name_1")
+        tensor_search.create_vector_index(self.config, "index_name_2")
+    
+    def tearDown(self):
+        tensor_search.delete_index(self.config, "index_name_1")
+        tensor_search.delete_index(self.config, "index_name_2")
+
     @mock.patch("marqo.tensor_search.tensor_search.get_query_vectors_from_jobs")
     @mock.patch("marqo.tensor_search.tensor_search.vectorise_jobs")
     @mock.patch("marqo.tensor_search.tensor_search.create_vector_jobs")
@@ -203,23 +220,33 @@ class TestCreateVectorJobs(MarqoTestCase):
             BulkSearchQueryEntity(index="index_name_1", q="another test query", limit=4)
         ]
 
-        self.index_info = IndexInfo("model_name", {},  {
-            "index_defaults": {"treat_urls_and_pointers_as_images": False, "normalize_embeddings": False},
-            'model_name': 'test_model',
-            'model_properties': {'test': 'property'},
-            'normalize_embeddings': True,
-            'content_type': 'text',
-            'image_download_headers': None
-        })
+        self.index_info = IndexInfo(
+            model_name="model_name", 
+            search_model_name=None, 
+            properties={},  
+            index_settings={
+                "index_defaults": {"treat_urls_and_pointers_as_images": False, "normalize_embeddings": False},
+                'model': 'test_model',
+                'model_properties': {'test': 'property'},
+                'normalize_embeddings': True,
+                'content_type': 'text',
+                'image_download_headers': None
+            }
+        )
 
-        self.index_info2 = IndexInfo("model_name2", {},  {
-            "index_defaults": {"treat_urls_and_pointers_as_images": False, "normalize_embeddings": True},
-            'model_name': 'test_model',
-            'model_properties': {'test': 'property'},
-            'normalize_embeddings': True,
-            'content_type': 'text',
-            'image_download_headers': None
-        })
+        self.index_info2 = IndexInfo(
+            model_name="model_name", 
+            search_model_name=None, 
+            properties={},  
+            index_settings={
+                "index_defaults": {"treat_urls_and_pointers_as_images": False, "normalize_embeddings": True},
+                'model': 'test_model',
+                'model_properties': {'test': 'property'},
+                'normalize_embeddings': True,
+                'content_type': 'text',
+                'image_download_headers': None
+            }
+        )
 
     @mock.patch('marqo.tensor_search.tensor_search.get_index_info')
     @mock.patch('marqo.s2_inference.s2_inference.get_model_properties_from_registry')

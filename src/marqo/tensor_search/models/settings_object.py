@@ -42,6 +42,15 @@ settings_schema = {
                 NsFields.model_properties: {
                     "type": "object",
                 },
+                NsFields.search_model: {
+                    "type": "string",
+                    "examples": [
+                        "hf/all_datasets_v4_MiniLM-L6"
+                    ]
+                },
+                NsFields.search_model_properties: {
+                    "type": "object",
+                },
                 NsFields.normalize_embeddings: {
                     "type": "boolean",
                     "examples": [
@@ -72,6 +81,18 @@ settings_schema = {
                             "type": "string",
                             "examples": [
                                 "sentence"
+                            ]
+                        },
+                        NsFields.override_text_chunk_prefix: {  # prefix override is optional
+                            "type": ["null", "string"],
+                            "examples": [
+                                "passage: "
+                            ]
+                        },
+                        NsFields.override_text_query_prefix: {  # prefix override is optional
+                            "type": ["null", "string"],
+                            "examples": [
+                                "query: "
                             ]
                         }
                     },

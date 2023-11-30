@@ -20,6 +20,7 @@ from marqo.errors import IndexNotFoundError, InvalidArgError, BadRequestError, I
 from marqo.tensor_search import tensor_search, index_meta_cache, backend
 from tests.marqo_test import MarqoTestCase
 from marqo.tensor_search import add_docs
+from marqo.tensor_search.models.index_info import IndexInfo
 
 
 class TestAddDocuments(MarqoTestCase):
@@ -1450,4 +1451,48 @@ class TestAddDocumentsUtils(MarqoTestCase):
             mappings=mixed_mappings
         ) == enums.DocumentFieldType.standard
             
-    
+    def test_determine_text_chunk_prefix(self):
+        """
+        Ensures proper priority order is followed when determining the chunk prefix.
+        add docs request-level > index override-level > model default level
+        """
+
+        index_info_with_model_default = IndexInfo(
+            model_name="prefix-test-model",
+            search_model_name=None,
+            properties={},
+            index_settings={
+                IndexSettingsField.index_defaults: {
+                    IndexSettingsField.model: "prefix-test-model",
+                    IndexSettingsField.treat_urls_and_pointers_as_images: True,
+                    IndexSettingsField.text_preprocessing: {}
+                }
+            }
+        )
+
+        index_info_with_override = IndexInfo(
+            model_name="prefix-test-model",
+            search_model_name=None,
+            properties={},
+            index_settings={
+                IndexSettingsField.index_defaults: {
+                    IndexSettingsField.model: "prefix-test-model",
+                    IndexSettingsField.treat_urls_and_pointers_as_images: True,
+                    IndexSettingsField.text_preprocessing: {
+                        IndexSettingsField.override_text_chunk_prefix: "index-override"
+                    }
+                }
+            }
+        )
+
+        with self.subTest("All prefixes on (request level chosen)"):
+            assert add_docs.determine_text_chunk_prefix("request-level", index_info_with_override) == "request-level"
+        
+        with self.subTest("Request and model default on (request level chosen)"):
+            assert add_docs.determine_text_chunk_prefix("request-level", index_info_with_model_default) == "request-level"
+        
+        with self.subTest("Index override and model default on (index override chosen)"):
+            assert add_docs.determine_text_chunk_prefix(None, index_info_with_override) == "index-override"
+        
+        with self.subTest("Only model default on (model default chosen)"):
+            assert add_docs.determine_text_chunk_prefix(None, index_info_with_model_default) == "test passage: "

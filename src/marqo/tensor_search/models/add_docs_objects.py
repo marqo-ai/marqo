@@ -58,6 +58,7 @@ class AddDocsBodyParams(BaseModel):
     modelAuth: Optional[ModelAuth] = None
     mappings: Optional[dict] = None
     documents: Union[Sequence[Union[dict, Any]], np.ndarray]
+    textChunkPrefix: Optional[str] = None
 
 
 class AddDocsParams(BaseModel):
@@ -77,6 +78,7 @@ class AddDocsParams(BaseModel):
         mappings: a dictionary used to handle all the object field content in the doc,
             e.g., multimodal_combination field
         model_auth: an object used to authorise downloading an object from a datastore
+        text_chunk_prefix: string added to the front of every generated text chunk for vectorisation. Not actually stored as text in the document.
 
     """
 
@@ -97,6 +99,7 @@ class AddDocsParams(BaseModel):
     use_existing_tensors: bool = False
     mappings: Optional[dict] = None
     model_auth: Optional[ModelAuth] = None
+    text_chunk_prefix: Optional[str] = None
 
     @root_validator
     def validate_fields(cls, values):

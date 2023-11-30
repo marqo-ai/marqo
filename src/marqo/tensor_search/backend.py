@@ -47,12 +47,19 @@ def get_index_info(
         raise errors.NonTensorIndexError(
             f"Error retrieving index info for index {index_name}")
 
+    # Identify index `model` from mapping metadata
     if "model" in res[index_name]["mappings"]["_meta"]:
         model_name = res[index_name]["mappings"]["_meta"]["model"]
     else:
         raise errors.NonTensorIndexError(
             "get_index_info: couldn't identify embedding model name "
             F"in index mappings! Mapping: {res}")
+    
+    # Identify index `search_model` from mapping metadata
+    if "search_model" in res[index_name]["mappings"]["_meta"]:
+        search_model_name = res[index_name]["mappings"]["_meta"]["search_model"]
+    else:
+        search_model_name = None    # placeholder for backwards compatibility
 
     if "index_settings" in res[index_name]["mappings"]["_meta"]:
         index_settings = res[index_name]["mappings"]["_meta"]["index_settings"]
@@ -63,7 +70,7 @@ def get_index_info(
 
     index_properties = res[index_name]["mappings"]["properties"]
 
-    index_info = IndexInfo(model_name=model_name, properties=index_properties,
+    index_info = IndexInfo(model_name=model_name, search_model_name=search_model_name, properties=index_properties,
                            index_settings=index_settings)
     get_cache()[index_name] = index_info
     return index_info
@@ -84,7 +91,6 @@ def add_customer_field_properties(config: Config, index_name: str,
         customer_field_names: list of 2-tuples. The first elem in the tuple is
             the new fieldnames the customers have made. The second elem is the
             inferred OpenSearch data type.
-        model_properties: properties of the machine learning model
 
     Returns:
         HTTP Response
@@ -161,6 +167,7 @@ def add_customer_field_properties(config: Config, index_name: str,
 
     get_cache()[index_name] = IndexInfo(
         model_name=existing_info.model_name,
+        search_model_name=existing_info.search_model_name,
         properties=new_index_properties,
         index_settings=existing_info.index_settings.copy()
     )

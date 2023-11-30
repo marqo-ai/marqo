@@ -509,6 +509,8 @@ def _get_hf_properties() -> Dict:
                  "tokens": 192,
                  "type": "hf",
                  "model_size": 0.1342,
+                 "text_query_prefix": "query: ",
+                 "text_chunk_prefix": "passage: ",
                  "notes": ""},
             "hf/e5-base":
                 {"name": 'intfloat/e5-base',
@@ -516,6 +518,8 @@ def _get_hf_properties() -> Dict:
                  "tokens": 192,
                  "type": "hf",
                  "model_size": 0.438,
+                 "text_query_prefix": "query: ",
+                 "text_chunk_prefix": "passage: ",
                  "notes": ""},
             "hf/e5-large":
                 {"name": 'intfloat/e5-large',
@@ -523,6 +527,8 @@ def _get_hf_properties() -> Dict:
                  "tokens": 192,
                  "type": "hf",
                  "model_size": 1.3,
+                 "text_query_prefix": "query: ",
+                 "text_chunk_prefix": "passage: ",
                  "notes": ""},
             "hf/e5-large-unsupervised":
                 {"name": 'intfloat/e5-large-unsupervised',
@@ -530,6 +536,8 @@ def _get_hf_properties() -> Dict:
                  "tokens": 128,
                  "type": "hf",
                  "model_size": 1.3,
+                 "text_query_prefix": "query: ",
+                 "text_chunk_prefix": "passage: ",
                  "notes": ""},
             "hf/e5-base-unsupervised":
                 {"name": 'intfloat/e5-base-unsupervised',
@@ -537,6 +545,8 @@ def _get_hf_properties() -> Dict:
                  "tokens": 128,
                  "type": "hf",
                  "model_size": 0.438,
+                 "text_query_prefix": "query: ",
+                 "text_chunk_prefix": "passage: ",
                  "notes": ""},
             "hf/e5-small-unsupervised":
                 {"name": 'intfloat/e5-small-unsupervised',
@@ -544,6 +554,8 @@ def _get_hf_properties() -> Dict:
                  "tokens": 128,
                  "type": "hf",
                  "model_size": 0.134,
+                 "text_query_prefix": "query: ",
+                 "text_chunk_prefix": "passage: ",
                  "notes": ""},
             "hf/multilingual-e5-small":
                 {"name": 'intfloat/multilingual-e5-small',
@@ -551,6 +563,8 @@ def _get_hf_properties() -> Dict:
                  "tokens": 512,
                  "type": "hf",
                  "model_size": 0.471,
+                 "text_query_prefix": "query: ",
+                 "text_chunk_prefix": "passage: ",
                  "notes": ""},
             "hf/multilingual-e5-base":
                 {"name": 'intfloat/multilingual-e5-base',
@@ -558,6 +572,8 @@ def _get_hf_properties() -> Dict:
                  "tokens": 512,
                  "type": "hf",
                  "model_size": 1.11,
+                 "text_query_prefix": "query: ",
+                 "text_chunk_prefix": "passage: ",
                  "notes": ""},
             "hf/multilingual-e5-large":
                 {"name": 'intfloat/multilingual-e5-large',
@@ -565,6 +581,8 @@ def _get_hf_properties() -> Dict:
                  "tokens": 512,
                  "type": "hf",
                  "model_size": 2.24,
+                 "text_query_prefix": "query: ",
+                 "text_chunk_prefix": "passage: ",
                  "notes": ""},
             "hf/e5-small-v2":
                 {"name": 'intfloat/e5-small-v2',
@@ -572,6 +590,8 @@ def _get_hf_properties() -> Dict:
                  "tokens": 512,
                  "type": "hf",
                  "model_size": 0.134,
+                 "text_query_prefix": "query: ",
+                 "text_chunk_prefix": "passage: ",
                  "notes": ""},
             "hf/e5-base-v2":
                 {"name": 'intfloat/e5-base-v2',
@@ -579,6 +599,8 @@ def _get_hf_properties() -> Dict:
                  "tokens": 512,
                  "type": "hf",
                  "model_size": 0.438,
+                 "text_query_prefix": "query: ",
+                 "text_chunk_prefix": "passage: ",
                  "notes": ""},
             "hf/e5-large-v2":
                 {"name": 'intfloat/e5-large-v2',
@@ -586,6 +608,8 @@ def _get_hf_properties() -> Dict:
                  "tokens": 512,
                  "type": "hf",
                  "model_size": 1.34,
+                 "text_query_prefix": "query: ",
+                 "text_chunk_prefix": "passage: ",
                  "notes": ""},
     }
     return HF_MODEL_PROPERTIES
@@ -672,6 +696,16 @@ def _get_sbert_test_properties() -> Dict:
                 "tokens":128,
                 "type":"test",
                 "notes": ""},
+            "prefix-test-model":
+                {
+                    "name": "sentence-transformers/all-MiniLM-L6-v1",
+                    "dimensions": 16,
+                    "tokens": 128,
+                    "type": "test",
+                    "notes": "",
+                    "text_query_prefix": "test query: ",
+                    "text_chunk_prefix": "test passage: "
+                }
     }
     return TEST_MODEL_PROPERTIES
 
