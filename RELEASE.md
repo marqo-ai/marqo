@@ -10,7 +10,7 @@
 
 ## Contributor shout-outs
 - A huge thank you to all our 3.7k stargazers!
- Thanks everyone for continuing to participate in our [forum](https://community.marqo.ai/)! Keep all your insights, questions, and feedback coming!
+- Thanks everyone for continuing to participate in our [forum](https://community.marqo.ai/)! Keep all your insights, questions, and feedback coming!
 
 
 # Release 1.4.0
