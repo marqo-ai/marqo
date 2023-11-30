@@ -778,16 +778,6 @@ def search(config: Config, index_name: str, text: Union[str, dict],
         [validation.validate_field_name(attribute) for attribute in attributes_to_retrieve]
     if verbose:
         print(f"determined_search_method: {search_method}, text query: {text}")
-    # if we can't see the index name in cache, we request it and wait for the info
-    if index_name not in index_meta_cache.get_cache():
-        backend.get_index_info(config=config, index_name=index_name)
-
-    REFRESH_INTERVAL_SECONDS = 2
-    # update cache in the background
-    cache_update_thread = threading.Thread(
-        target=index_meta_cache.refresh_index_info_on_interval,
-        args=(config, index_name, REFRESH_INTERVAL_SECONDS))
-    cache_update_thread.start()
 
     if device is None:
         selected_device = utils.read_env_vars_and_defaults("MARQO_BEST_AVAILABLE_DEVICE")
@@ -800,7 +790,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
     if search_method.upper() == SearchMethod.TENSOR:
         search_result = _vector_text_search(
             config=config, index_name=index_name, query=text, result_count=result_count, offset=offset,
-            searchable_attributes=searchable_attributes, verbose=verbose,
+            searchable_attributes=searchable_attributes,
             filter_string=filter, device=selected_device, attributes_to_retrieve=attributes_to_retrieve, boost=boost,
             image_download_headers=image_download_headers, context=context, score_modifiers=score_modifiers,
             model_auth=model_auth, highlights=highlights

@@ -401,11 +401,6 @@ def validate_mappings_object(
         for field_name, config in mappings_object.items():
             if config["type"] == enums.MappingsObjectType.multimodal_combination:
                 validate_multimodal_combination_object(config)
-            # else:
-            #     raise InvalidArgError(
-            #         f'Unsupported mapping type `{config["type"]}`. '
-            #         f'Read about the mappings object here: https://docs.marqo.ai/0.0.15/API-Reference/mappings/'
-            #     )
 
                 if structured_marqo_index is not None:
                     if (
