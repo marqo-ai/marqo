@@ -71,10 +71,6 @@ from marqo.tensor_search.enums import (
 )
 from marqo.core.models.marqo_index import IndexType
 import marqo.core.unstructured_vespa_index.common as unstructured_common
-from marqo.tensor_search.enums import IndexSettingsField as NsField
-from marqo.tensor_search.formatting import _clean_doc
-from marqo.tensor_search.health import generate_heath_check_response
-from marqo.tensor_search.index_meta_cache import get_cache, get_index_info, get_index
 from marqo.tensor_search.index_meta_cache import get_cache, get_index
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.tensor_search.models.api_models import BulkSearchQueryEntity, ScoreModifier
