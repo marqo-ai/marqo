@@ -21,7 +21,7 @@ class AddDocsBodyParams(BaseModel):
         allow_mutation = False
         extra = "forbid"  # Raise error on unknown fields
 
-    tensorFields: List = None
+    tensorFields: Optional[List] = None
     useExistingTensors: bool = False
     imageDownloadHeaders: dict = Field(default_factory=dict)
     modelAuth: Optional[ModelAuth] = None
@@ -57,7 +57,6 @@ class AddDocsParams(BaseModel):
     docs: Union[Sequence[Union[dict, Any]], np.ndarray]
 
     index_name: str
-    auto_refresh: bool
     device: Optional[str]
     tensor_fields: Optional[List] = Field(default_factory=None)
     image_download_thread_count: int = 20

@@ -130,8 +130,28 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
 
     unsuccessful_docs = []
     total_vectorise_time = 0
-    batch_size = len(add_docs_params.docs)
+    batch_size = len(add_docs_params.docs)  # use length before deduplication
     image_repo = {}
+
+    # Deduplicate docs, keep the latest
+    docs = []
+    doc_ids = set()
+    for i in range(len(add_docs_params.docs) - 1, -1, -1):
+        doc = add_docs_params.docs[i]
+
+        if isinstance(doc, dict) and '_id' in doc:
+            doc_id = doc['_id']
+            try:
+                if doc_id is not None and doc_id in doc_ids:
+                    logger.debug(f'Duplicate document ID {doc_id} found, keeping the latest')
+                    continue
+                doc_ids.add(doc_id)
+            except TypeError as e:  # Happens if ID is a non-hashable type -- ID validation will catch this later on
+                logger.debug(f'Could not hash document ID {doc_id}: {e}')
+
+        docs.append(doc)
+    # Reverse to preserve order in request
+    docs.reverse()
 
     with ExitStack() as exit_stack:
         image_fields = [field.name for field in marqo_index.field_map_by_type[FieldType.ImagePointer]]
@@ -149,18 +169,23 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                     raise errors.BadRequestError(message="`_id` field cannot be an image pointer field.")
 
                 image_repo = exit_stack.enter_context(
-                    add_docs.download_images(docs=add_docs_params.docs, thread_count=20,
+                    add_docs.download_images(docs=docs, thread_count=20,
                                              tensor_fields=image_fields,
-                                             non_tensor_fields=None,
                                              image_download_headers=add_docs_params.image_download_headers)
                 )
 
         if add_docs_params.use_existing_tensors:
-            ids = [doc["_id"] for doc in add_docs_params.docs if "_id" in doc]
             existing_docs_dict: Dict[str, dict] = {}
-            if len(ids) > 0:
-                existing_docs = get_documents_by_ids(config, marqo_index.name, ids, show_vectors=True)['results']
+            if len(doc_ids) > 0:
+                existing_docs = get_documents_by_ids(config,
+                                                     marqo_index.name,
+                                                     doc_ids,
+                                                     show_vectors=True,
+                                                     ignore_invalid_ids=True)['results']
                 for doc in existing_docs:
+                    if not isinstance(doc, dict):
+                        continue
+
                     id = doc["_id"]
                     if id in existing_docs_dict:
                         raise errors.InternalError(f"Received duplicate documents for ID {id} from Vespa")
@@ -170,8 +195,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
 
                 logger.debug(f"Found {len(existing_docs_dict)} existing docs")
 
-        for i, doc in enumerate(add_docs_params.docs):
-
+        for i, doc in enumerate(docs):
             copied = copy.deepcopy(doc)
 
             document_is_valid = True
@@ -365,7 +389,14 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                         embeddings = vector_chunks
 
                     else:
-                        raise errors.InvalidArgError(f'Invalid type {type(field_content)} for tensor field {field}')
+                        document_is_valid = False
+                        e = errors.InvalidArgError(f'Invalid type {type(field_content)} for tensor field {field}')
+                        unsuccessful_docs.append(
+                            (i, {'_id': doc_id, 'error': e.message,
+                                 'status': int(errors.InvalidArgError.status_code),
+                                 'code': errors.InvalidArgError.code})
+                        )
+                        break
 
                 # Add chunks_to_append along with doc metadata to total chunks
                 processed_tensor_fields[tensor_field.name] = {}
@@ -373,84 +404,85 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                 processed_tensor_fields[tensor_field.name][constants.MARQO_DOC_EMBEDDINGS] = embeddings
 
             # Multimodal fields haven't been processed yet, so we do that here
-            for tensor_field in marqo_index.tensor_fields:
-                marqo_field = marqo_index.field_map[tensor_field.name]
-                if marqo_field.type == FieldType.MultimodalCombination:
-                    field_name = tensor_field.name
-                    field_content = {
-                        dependent_field: copied[dependent_field]
-                        for dependent_field in marqo_field.dependent_fields if dependent_field in copied
-                    }
-                    if not field_content:
-                        # None of the fields are present in the document, so we skip this multimodal field
-                        continue
-
-                    if (
-                            add_docs_params.mappings is not None and
-                            field_name in add_docs_params.mappings and
-                            add_docs_params.mappings[field_name]["type"] == "multimodal_combination"
-                    ):
-                        mappings = add_docs_params.mappings[field_name]
-                        # Record custom weights in the document
-                        copied[field_name] = mappings['weights']
-                        logger.debug(f'Using custom weights for multimodal combination field {field_name}')
-                    else:
-                        mappings = {
-                            'weights': marqo_field.dependent_fields
-                        }
-                        logger.debug(f'Using default weights for multimodal combination field {field_name}: '
-                                     f'{marqo_field.dependent_fields}')
-
-                    chunks = []
-                    embeddings = []
-
-                    if (
-                            add_docs_params.use_existing_tensors and
-                            doc_id in existing_docs_dict
-                    ):
-                        existing_doc = existing_docs_dict[doc_id]
-                        current_field_contents = {
-                            dependent_field: existing_doc.get(dependent_field)
+            if document_is_valid:  # No need to process multimodal fields if the document is invalid
+                for tensor_field in marqo_index.tensor_fields:
+                    marqo_field = marqo_index.field_map[tensor_field.name]
+                    if marqo_field.type == FieldType.MultimodalCombination:
+                        field_name = tensor_field.name
+                        field_content = {
+                            dependent_field: copied[dependent_field]
                             for dependent_field in marqo_field.dependent_fields if dependent_field in copied
                         }
-                        current_weights = existing_doc.get(field_name) or marqo_field.dependent_fields
+                        if not field_content:
+                            # None of the fields are present in the document, so we skip this multimodal field
+                            continue
+
                         if (
-                                field_content == current_field_contents and
-                                current_weights == mappings['weights'] and
-                                field_name in existing_doc[constants.MARQO_DOC_TENSORS]
+                                add_docs_params.mappings is not None and
+                                field_name in add_docs_params.mappings and
+                                add_docs_params.mappings[field_name]["type"] == "multimodal_combination"
                         ):
-                            chunks = existing_doc[constants.MARQO_DOC_TENSORS][field_name][
-                                constants.MARQO_DOC_CHUNKS]
-                            embeddings = existing_doc[constants.MARQO_DOC_TENSORS][field_name][
-                                constants.MARQO_DOC_EMBEDDINGS]
-                            logger.debug(
-                                f"Using existing tensors for multimodal combination field {field_name} for doc {doc_id}"
-                            )
+                            mappings = add_docs_params.mappings[field_name]
+                            # Record custom weights in the document
+                            copied[field_name] = mappings['weights']
+                            logger.debug(f'Using custom weights for multimodal combination field {field_name}')
                         else:
-                            logger.debug(
-                                f'Not using existing tensors for multimodal combination field {field_name} for '
-                                f'doc {doc_id} because field content or config has changed')
+                            mappings = {
+                                'weights': marqo_field.dependent_fields
+                            }
+                            logger.debug(f'Using default weights for multimodal combination field {field_name}: '
+                                         f'{marqo_field.dependent_fields}')
 
-                    if len(chunks) == 0:  # Not using existing tensors or didn't find it
-                        (combo_chunk, combo_document_is_valid,
-                         unsuccessful_doc_to_append,
-                         combo_vectorise_time_to_add) = vectorise_multimodal_combination_field_structured(
-                            field_name, field_content, copied, i, doc_id, add_docs_params.device, marqo_index,
-                            image_repo, mappings, model_auth=add_docs_params.model_auth)
+                        chunks = []
+                        embeddings = []
 
-                        total_vectorise_time = total_vectorise_time + combo_vectorise_time_to_add
+                        if (
+                                add_docs_params.use_existing_tensors and
+                                doc_id in existing_docs_dict
+                        ):
+                            existing_doc = existing_docs_dict[doc_id]
+                            current_field_contents = {
+                                dependent_field: existing_doc.get(dependent_field)
+                                for dependent_field in marqo_field.dependent_fields if dependent_field in copied
+                            }
+                            current_weights = existing_doc.get(field_name) or marqo_field.dependent_fields
+                            if (
+                                    field_content == current_field_contents and
+                                    current_weights == mappings['weights'] and
+                                    field_name in existing_doc[constants.MARQO_DOC_TENSORS]
+                            ):
+                                chunks = existing_doc[constants.MARQO_DOC_TENSORS][field_name][
+                                    constants.MARQO_DOC_CHUNKS]
+                                embeddings = existing_doc[constants.MARQO_DOC_TENSORS][field_name][
+                                    constants.MARQO_DOC_EMBEDDINGS]
+                                logger.debug(
+                                    f"Using existing tensors for multimodal combination field {field_name} for doc {doc_id}"
+                                )
+                            else:
+                                logger.debug(
+                                    f'Not using existing tensors for multimodal combination field {field_name} for '
+                                    f'doc {doc_id} because field content or config has changed')
 
-                        if combo_document_is_valid is False:
-                            document_is_valid = False
-                            unsuccessful_docs.append(unsuccessful_doc_to_append)
-                            break
-                        else:
-                            chunks = [combo_chunk[TensorField.field_content]]
-                            embeddings = [combo_chunk[TensorField.marqo_knn_field]]
+                        if len(chunks) == 0:  # Not using existing tensors or didn't find it
+                            (combo_chunk, combo_document_is_valid,
+                             unsuccessful_doc_to_append,
+                             combo_vectorise_time_to_add) = vectorise_multimodal_combination_field_structured(
+                                field_name, field_content, copied, i, doc_id, add_docs_params.device, marqo_index,
+                                image_repo, mappings, model_auth=add_docs_params.model_auth)
 
-                    processed_tensor_fields[tensor_field.name] = {}
-                    processed_tensor_fields[tensor_field.name][constants.MARQO_DOC_CHUNKS] = chunks
-                    processed_tensor_fields[tensor_field.name][constants.MARQO_DOC_EMBEDDINGS] = embeddings
+                            total_vectorise_time = total_vectorise_time + combo_vectorise_time_to_add
+
+                            if combo_document_is_valid is False:
+                                document_is_valid = False
+                                unsuccessful_docs.append(unsuccessful_doc_to_append)
+                                break
+                            else:
+                                chunks = [combo_chunk[TensorField.field_content]]
+                                embeddings = [combo_chunk[TensorField.marqo_knn_field]]
+
+                        processed_tensor_fields[tensor_field.name] = {}
+                        processed_tensor_fields[tensor_field.name][constants.MARQO_DOC_CHUNKS] = chunks
+                        processed_tensor_fields[tensor_field.name][constants.MARQO_DOC_EMBEDDINGS] = embeddings
 
             if document_is_valid:
                 if processed_tensor_fields:
@@ -546,30 +578,53 @@ def get_document_by_id(
     vespa_index = vespa_index_factory(marqo_index)
     marqo_document = vespa_index.to_marqo_document(res.document.dict())
 
-    if not show_vectors:
+    if show_vectors:
+        if constants.MARQO_DOC_TENSORS in marqo_document:
+            marqo_document[TensorField.tensor_facets] = _get_tensor_facets(marqo_document[constants.MARQO_DOC_TENSORS])
+        else:
+            marqo_document[TensorField.tensor_facets] = []
+
+    if constants.MARQO_DOC_TENSORS in marqo_document:
         del marqo_document[constants.MARQO_DOC_TENSORS]
 
     return marqo_document
 
 
 def get_documents_by_ids(
-        config: Config, index_name: str, document_ids: List[str],
-        show_vectors: bool = False,
+        config: Config, index_name: str, document_ids: typing.Collection[str],
+        show_vectors: bool = False, ignore_invalid_ids: bool = False
 ) -> Dict[str, Any]:
-    """returns documents by their IDs"""
+    """
+    Returns documents by their IDs.
+
+    Args:
+        ignore_invalid_ids: If True, invalid IDs will be ignored and not returned in the response. If False, an error
+            will be raised if any of the IDs are invalid
+    """
     if not isinstance(document_ids, typing.Collection):
         raise errors.InvalidArgError("Get documents must be passed a collection of IDs!")
     if len(document_ids) <= 0:
         raise errors.InvalidArgError("Can't get empty collection of IDs!")
+
     max_docs_limit = utils.read_env_vars_and_defaults(EnvVars.MARQO_MAX_RETRIEVABLE_DOCS)
     if max_docs_limit is not None and len(document_ids) > int(max_docs_limit):
         raise errors.IllegalRequestedDocCount(
             f"{len(document_ids)} documents were requested, which is more than the allowed limit of [{max_docs_limit}], "
             f"set by the environment variable `{EnvVars.MARQO_MAX_RETRIEVABLE_DOCS}`")
-    for doc_id in document_ids:
-        validation.validate_id(doc_id)
 
-    batch_get = config.vespa_client.get_batch(document_ids, index_name)
+    validated_ids = []
+    for doc_id in document_ids:
+        try:
+            validated_ids.append(validation.validate_id(doc_id))
+        except errors.InvalidDocumentIdError as e:
+            if not ignore_invalid_ids:
+                raise e
+            logger.debug(f'Invalid document ID {doc_id} ignored')
+
+    if len(validated_ids) == 0:  # Can only happen when ignore_invalid_ids is True
+        return {"results": []}
+
+    batch_get = config.vespa_client.get_batch(validated_ids, index_name)
     marqo_index = index_meta_cache.get_index(config=config, index_name=index_name)
     vespa_index = vespa_index_factory(marqo_index)
 
@@ -580,8 +635,12 @@ def get_documents_by_ids(
     for response in batch_get.responses:
         if response.status == 200:
             marqo_document = vespa_index.to_marqo_document(response.document.dict())
-            if not show_vectors:
-                del marqo_document[constants.MARQO_DOC_TENSORS]
+
+            if show_vectors:
+                marqo_document[TensorField.tensor_facets] = _get_tensor_facets(
+                    marqo_document[constants.MARQO_DOC_TENSORS])
+            del marqo_document[constants.MARQO_DOC_TENSORS]
+
             to_return['results'].append(
                 {
                     TensorField.found: True,
@@ -604,6 +663,30 @@ def get_documents_by_ids(
 def _get_id_from_vespa_id(vespa_id: str) -> str:
     """Returns the document ID from a Vespa ID. Vespa IDs are of the form `namespace::document_id`."""
     return vespa_id.split('::')[-1]
+
+
+def _get_tensor_facets(marqo_doc_tensors: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """
+    Reformat Marqo doc tensors field for API response
+    """
+    tensor_facets = []
+    for tensor_field in marqo_doc_tensors:
+        chunks = marqo_doc_tensors[tensor_field][constants.MARQO_DOC_CHUNKS]
+        embeddings = marqo_doc_tensors[tensor_field][constants.MARQO_DOC_EMBEDDINGS]
+        if len(chunks) != len(embeddings):
+            raise errors.InternalError(
+                f"Number of chunks ({len(chunks)}) and number of embeddings ({len(embeddings)}) "
+                f"for field {tensor_field} must be the same.")
+
+        for i in range(len(chunks)):
+            tensor_facets.append(
+                {
+                    tensor_field: chunks[i],
+                    TensorField.embedding: embeddings[i]
+                }
+            )
+
+    return tensor_facets
 
 
 def rerank_query(query: BulkSearchQueryEntity, result: Dict[str, Any], reranker: Union[str, Dict], device: str,

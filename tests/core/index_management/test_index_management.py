@@ -17,7 +17,7 @@ class TestIndexManagement(MarqoTestCase):
 
     def test_create_index_settingsSchemaDoesNotExist_successful(self):
         """
-        Test that a new index is created successfully when the settings schema does not exist
+        A new index is created successfully when the settings schema does not exist
         """
         index_name = 'a' + str(uuid.uuid4()).replace('-', '')
         settings_schema_name = 'a' + str(uuid.uuid4()).replace('-', '')
@@ -62,7 +62,7 @@ class TestIndexManagement(MarqoTestCase):
 
     def test_create_index_settingsSchemaExists_successful(self):
         """
-        Test that a new index is created successfully when the settings schema already exists
+        A new index is created successfully when the settings schema already exists
         """
         index_name_1 = 'a' + str(uuid.uuid4()).replace('-', '')
         index_name_2 = 'a' + str(uuid.uuid4()).replace('-', '')
@@ -110,7 +110,7 @@ class TestIndexManagement(MarqoTestCase):
 
     def test_create_index_indexExists_fails(self):
         """
-        Test that an error is raised when creating an index that already exists
+        An error is raised when creating an index that already exists
         """
         index_name = 'a' + str(uuid.uuid4()).replace('-', '')
         marqo_index_request = self.structured_marqo_index_request(

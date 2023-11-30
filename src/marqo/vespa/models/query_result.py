@@ -42,7 +42,3 @@ class QueryResult(BaseModel):
     @property
     def total_count(self) -> int:
         return self.root.fields.total_count
-
-    @property
-    def total_indexed(self) -> int:
-        return self.root.coverage.documents

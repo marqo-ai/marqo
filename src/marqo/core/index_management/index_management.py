@@ -38,11 +38,15 @@ class IndexManagement:
     def __init__(self, vespa_client: VespaClient):
         self.vespa_client = vespa_client
 
-    def create_index(self, marqo_index_request: MarqoIndexRequest) -> None:
+    def create_index(self, marqo_index_request: MarqoIndexRequest) -> MarqoIndex:
         """
         Create a Marqo index.
+
         Args:
             marqo_index_request: Marqo index to create
+
+        Returns:
+            Created Marqo index
 
         Raises:
             IndexExistsError: If index already exists
@@ -63,7 +67,9 @@ class IndexManagement:
         self.vespa_client.wait_for_application_convergence()
         self._save_index_settings(marqo_index)
 
-    def batch_create_indexes(self, marqo_index_requests: List[MarqoIndexRequest]) -> None:
+        return marqo_index
+
+    def batch_create_indexes(self, marqo_index_requests: List[MarqoIndexRequest]) -> List[MarqoIndex]:
         """
         Create multiple Marqo indexes as a single Vespa deployment.
 
@@ -71,6 +77,9 @@ class IndexManagement:
 
         Args:
             marqo_index_requests: List of Marqo indexes to create
+
+        Returns:
+            List of created Marqo indexes
 
         Raises:
             IndexExistsError: If an index already exists
@@ -84,21 +93,23 @@ class IndexManagement:
                 if self.index_exists(index.name):
                     raise IndexExistsError(f"Index {index.name} already exists")
 
-        schema_responses = {
-            index.name: vespa_schema_factory(index).generate_schema()  # Tuple (schema, MarqoIndex)
+        schema_responses = [
+            vespa_schema_factory(index).generate_schema()  # Tuple (schema, MarqoIndex)
             for index in marqo_index_requests
-        }
+        ]
 
-        for name, schema_resp in schema_responses.items():
-            self._add_schema(app, name, schema_resp[0])
-            self._add_schema_to_services(app, name)
+        for schema, marqo_index in schema_responses:
+            self._add_schema(app, marqo_index.name, schema)
+            self._add_schema_to_services(app, marqo_index.name)
 
         self.vespa_client.deploy_application(app)
 
         self.vespa_client.wait_for_application_convergence()
 
-        for _, schema_resp in schema_responses:
-            self._save_index_settings(schema_resp[1])
+        for _, marqo_index in schema_responses:
+            self._save_index_settings(marqo_index)
+
+        return [schema_resp[1] for schema_resp in schema_responses]
 
     def delete_index(self, marqo_index: MarqoIndex) -> None:
         """
