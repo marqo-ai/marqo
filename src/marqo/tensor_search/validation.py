@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Optional, Type, Sequence, Union
 
 import jsonschema
 
+import marqo.core.models.marqo_index as marqo_index
 from marqo.errors import (
     InvalidFieldNameError, InvalidArgError, InvalidDocumentIdError, DocTooLargeError)
 from marqo.tensor_search import constants
@@ -381,8 +382,15 @@ def validate_multimodal_combination(field_content, is_non_tensor_field, field_ma
     return True
 
 
-def validate_mappings_object(mappings_object: Dict):
+def validate_mappings_object(
+        mappings_object: Dict,
+        structured_marqo_index: Optional[marqo_index.StructuredMarqoIndex] = None
+):
     """validates the mappings object.
+    Args:
+        mappings_object: the mappings object to validate
+        structured_marqo_index: Optional StructuredMarqoIndex object. If provided, the validation ensures the mappings are valid
+        for this index
     Returns
         The given mappings object if validation has passed
 
@@ -393,11 +401,36 @@ def validate_mappings_object(mappings_object: Dict):
         for field_name, config in mappings_object.items():
             if config["type"] == enums.MappingsObjectType.multimodal_combination:
                 validate_multimodal_combination_object(config)
+            # else:
+            #     raise InvalidArgError(
+            #         f'Unsupported mapping type `{config["type"]}`. '
+            #         f'Read about the mappings object here: https://docs.marqo.ai/0.0.15/API-Reference/mappings/'
+            #     )
+
+                if structured_marqo_index is not None:
+                    if (
+                            field_name not in structured_marqo_index.field_map or
+                            structured_marqo_index.field_map[
+                                field_name
+                            ].type != marqo_index.FieldType.MultimodalCombination
+                    ):
+                        raise jsonschema.ValidationError(
+                            f'Invalid mapping {field_name}. Index has no multimodal combination field {field_name}'
+                        )
+                    dependent_fields = structured_marqo_index.field_map[field_name].dependent_fields
+                    weights: dict = config['weights']
+                    for field in weights:
+                        if field not in dependent_fields:
+                            raise jsonschema.ValidationError(
+                                f'Invalid mapping {field_name}. '
+                                f'Field {field} is not a dependent field of {field_name}'
+                            )
+
         return mappings_object
     except jsonschema.ValidationError as e:
         raise InvalidArgError(
-            f"Error validating mappings object. Reason: \n{str(e)}"
-            f"\nRead about the mappings object here: https://docs.marqo.ai/0.0.15/API-Reference/mappings/"
+            f"Error validating mappings object. Reason: {str(e)}. "
+            f"Read about the mappings object here: https://docs.marqo.ai/0.0.15/API-Reference/mappings/"
         )
 
 

@@ -117,16 +117,16 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
         raise errors.InvalidArgError('Cannot specify `tensorFields` for a structured index')
 
     if add_docs_params.mappings is not None:
-        validation.validate_mappings_object(mappings_object=add_docs_params.mappings)
-
+        validation.validate_mappings_object(
+            add_docs_params.mappings,
+            marqo_index
+        )
     t0 = timer()
     bulk_parent_dicts: List[Dict[str, Any]] = []
 
     if len(add_docs_params.docs) == 0:
         raise errors.BadRequestError(message="Received empty add documents request")
 
-    if add_docs_params.mappings is not None:
-        validation.validate_mappings_object(add_docs_params.mappings)
 
     unsuccessful_docs = []
     total_vectorise_time = 0
@@ -1452,7 +1452,7 @@ def vectorise_multimodal_combination_field_structured(
         if len(image_content_to_vectorise) > 0:
             with RequestMetricsStore.for_request().time(f"create_vectors"):
                 image_vectors = s2_inference.vectorise(
-                    model_name=marqo_index.model_name,
+                    model_name=marqo_index.model.name,
                     model_properties=marqo_index.model.get_properties(), content=image_content_to_vectorise,
                     device=device, normalize_embeddings=normalize_embeddings,
                     infer=True, model_auth=model_auth
