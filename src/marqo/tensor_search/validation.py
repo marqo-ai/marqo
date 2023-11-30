@@ -95,23 +95,37 @@ def validate_str_against_enum(value: Any, enum_class: Type[Enum], case_sensitive
     return value
 
 
-def list_contains_only_strings(field_content: List) -> bool:
-    return all(isinstance(s, str) for s in field_content)
+def list_types_valid(field_content: List) -> bool:
+    """
+    Verify all list elements are of the same type and that type is int, float or string.
+
+    Returns:
+        True if all elements are of the same type and that type is int, float or string
+    """
+    if len(field_content) == 0:
+        return True
+    list_type = type(field_content[0])
+    if list_type not in [int, float, str]:
+        return False
+    for element in field_content:
+        if type(element) != list_type:
+            return False
+    return True
 
 
 def validate_list(field_content: List, is_non_tensor_field: bool):
-    if type(field_content) is list and not list_contains_only_strings(field_content):
+    if type(field_content) is list and not list_types_valid(field_content):
         # if the field content is a list, it should only contain strings.
         raise InvalidArgError(
-            f"Field content `{field_content}` \n"
-            f"of type `{type(field_content).__name__}` is not of valid content type!"
-            f"Lists can only contain strings."
+            f"Field content '{field_content}' "
+            f"of type {type(field_content).__name__} is not of valid content type! "
+            f"All list elements must be of the same type and that type must be int, float or string"
         )
     if not is_non_tensor_field:
         raise InvalidArgError(
-            f"Field content `{field_content}` \n"
-            f"of type `{type(field_content).__name__}` is not of valid content."
-            f"Lists can only be non_tensor fields."
+            f"Field content '{field_content}' "
+            f"of type {type(field_content).__name__} is not of valid content."
+            f"Lists cannot be tensor fields"
         )
     return True
 

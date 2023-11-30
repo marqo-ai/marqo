@@ -29,7 +29,7 @@ class Monitoring:
         if not self.index_management.index_exists(index_name):
             raise IndexNotFoundError(f"Index {index_name} not found")
 
-        query_result = self.vespa_client.query(yql=f'select * from {index_name} where True limit 0')
+        query_result = self.vespa_client.query(yql=f'select * from {index_name} where true limit 0')
 
         return MarqoIndexStats(
             number_of_documents=query_result.total_count

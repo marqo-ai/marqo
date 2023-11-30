@@ -74,7 +74,8 @@ class StructuredVespaIndex(VespaIndex):
                 self._verify_marqo_tensor_field_name(marqo_tensor_field)
                 self._verify_marqo_tensor_field(marqo_tensor_field, marqo_tensor_value)
 
-                chunks = marqo_tensor_value[constants.MARQO_DOC_CHUNKS]
+                # If chunking an image, chunks will be a list of tuples, hence the str(c)
+                chunks = [str(c) for c in marqo_tensor_value[constants.MARQO_DOC_CHUNKS]]
                 embeddings = marqo_tensor_value[constants.MARQO_DOC_EMBEDDINGS]
 
                 index_tensor_field = self._marqo_index.tensor_field_map[marqo_tensor_field]

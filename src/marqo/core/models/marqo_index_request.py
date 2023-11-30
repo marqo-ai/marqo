@@ -56,15 +56,6 @@ class StructuredMarqoIndexRequest(MarqoIndexRequest):
     fields: List[FieldRequest]  # all fields, including tensor fields
     tensor_fields: List[str]
 
-    @validator('tensor_fields')
-    def validate_tensor_fields(cls, tensor_fields, values):
-        field_names = {field.name for field in values.get('fields', [])}
-        for tensor_field in tensor_fields:
-            if tensor_field not in field_names:
-                raise ValueError(f'Tensor field {tensor_field.name} is not a defined field. '
-                                 f'Field names: {", ".join(field_names)}')
-        return tensor_fields
-
     @root_validator
     def validate_model(cls, values):
         # Verify all tensor fields are valid fields
@@ -72,7 +63,7 @@ class StructuredMarqoIndexRequest(MarqoIndexRequest):
         tensor_field_names = values.get('tensor_fields', [])
         for tensor_field in tensor_field_names:
             if tensor_field not in field_names:
-                raise ValueError(f'Tensor field {tensor_field.name} is not a defined field. '
+                raise ValueError(f"Tensor field {tensor_field} is not a defined field. "
                                  f'Field names: {", ".join(field_names)}')
 
         # Verify all combination fields are tensor fields
