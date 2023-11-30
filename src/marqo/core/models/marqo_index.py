@@ -207,7 +207,7 @@ class MarqoIndex(ImmutableStrictBaseModel, ABC):
         return name
 
     @classmethod
-    def parse_obj(cls: Type['Model'], obj: Any) -> Union['UnstructuredMarqoIndex', 'StructuredMarqoIndex']:
+    def parse_obj(cls, obj: Any) -> Union['UnstructuredMarqoIndex', 'StructuredMarqoIndex']:
         obj = cls._enforce_dict_if_root(obj)
         if not isinstance(obj, dict):
             try:
@@ -335,6 +335,9 @@ class StructuredMarqoIndex(MarqoIndex):
 
     @property
     def tensor_field_map(self) -> Dict[str, TensorField]:
+        """
+        A map from tensor field name to the TensorField object.
+        """
         return self._cache_or_get('tensor_field_map',
                                   lambda: {tensor_field.name: tensor_field for tensor_field in self.tensor_fields}
                                   )
@@ -342,7 +345,7 @@ class StructuredMarqoIndex(MarqoIndex):
     @property
     def tensor_subfield_map(self) -> Dict[str, TensorField]:
         """
-        A map from tensor chunk and embeddings field name to the tensor field.
+        A map from tensor chunk and embeddings field name to the TensorField object.
         """
 
         def generate():

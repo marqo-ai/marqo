@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi import Request, Depends
 from fastapi.responses import JSONResponse
 
-from marqo import config, errors
+from marqo import config, errors, core
 from marqo import version
 from marqo.core.exceptions import IndexExistsError, IndexNotFoundError
 from marqo.core.index_management.index_management import IndexManagement
@@ -195,7 +195,8 @@ def get_index_stats(index_name: str, marqo_config: config.Config = Depends(get_c
     stats = marqo_config.monitoring.get_index_stats(index_name)
     return JSONResponse(
         content={
-            'numberOfDocuments': stats.number_of_documents
+            'numberOfDocuments': stats.number_of_documents,
+            'numberOfVectors': stats.number_of_vectors
         },
         status_code=200
     )

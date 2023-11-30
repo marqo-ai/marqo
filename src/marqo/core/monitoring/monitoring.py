@@ -5,6 +5,8 @@ from marqo.core.exceptions import IndexNotFoundError
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models.marqo_index_health import MarqoHealthStatus, HealthStatus, VespaHealthStatus
 from marqo.core.models.marqo_index_stats import MarqoIndexStats
+from marqo.core.vespa_index import for_marqo_index as vespa_index_factory
+from marqo.exceptions import InternalError
 from marqo.vespa.exceptions import VespaError
 from marqo.vespa.vespa_client import VespaClient
 
@@ -29,10 +31,30 @@ class Monitoring:
         if not self.index_management.index_exists(index_name):
             raise IndexNotFoundError(f"Index {index_name} not found")
 
-        query_result = self.vespa_client.query(yql=f'select * from {index_name} where true limit 0')
+        marqo_index = self.index_management.get_index(index_name)
+        vespa_index = vespa_index_factory(marqo_index)
+
+        doc_count_query_result = self.vespa_client.query(
+            yql=f'select * from {marqo_index.name} where true limit 0',
+            model_restrict=marqo_index.name
+        )
+        vector_count_query_result = self.vespa_client.query(
+            **vespa_index.get_vector_count_query()
+        )
+
+        try:
+            if vector_count_query_result.root.children[0].children is None:
+                number_of_vectors = 0
+            else:
+                number_of_vectors = list(
+                    vector_count_query_result.root.children[0].children[0].children[0].fields.values()
+                )[0]
+        except (TypeError, AttributeError, IndexError) as e:
+            raise InternalError(f"Failed to get number of vectors for index {index_name}: {e}") from e
 
         return MarqoIndexStats(
-            number_of_documents=query_result.total_count
+            number_of_documents=doc_count_query_result.total_count,
+            number_of_vectors=number_of_vectors
         )
 
     def get_health(self, index_name: Optional[str] = None, hostname_filter: Optional[str] = None) -> MarqoHealthStatus:

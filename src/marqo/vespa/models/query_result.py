@@ -17,10 +17,14 @@ class Coverage(BaseModel):
 
 
 class Child(BaseModel):
+    # label, value, and recursive children occur in aggregation results
     id: str
     relevance: float
-    source: str = None
-    fields: Dict[str, Any]
+    source: Optional[str]
+    label: Optional[str]
+    value: Optional[str]
+    fields: Optional[Dict[str, Any]]
+    children: Optional[List['Child']]
 
 
 class Root(BaseModel):
