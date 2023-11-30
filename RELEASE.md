@@ -1,11 +1,12 @@
 # Release 1.5.0
 ## New Features
 - Separate model for search and add documents (https://github.com/marqo-ai/marqo/pull/633). Using the `search_model` and `search_model_properties` key in `index_defaults` allows you to specify a model specifically to be used for searching. This is useful for updating the model used for search without having to reindex existing documents in an index. Learn how to use `search_model` [here](https://docs.marqo.ai/1.5.0/API-Reference/Indexes/create_index/#search-model).
-- Prefixes for text chunks and queries enabled to improve retrieval for specific models (https://github.com/marqo-ai/marqo/pull/643). For example, e5 models have better performance on asymmetric tasks like information retrieval when text chunks are prefixed with `"passage: "` and queries are prefixed with `"query: "`. These prefixes can be defined at either the `model_properties` level, `index_defaults` level, or the `add_documents`/`search` request level, with the latter levels taking precedence. Learn how to use prefixes for `add_documents` [here](https://docs.marqo.ai/1.5.0/API-Reference/Documents/add_or_replace_documents/#text-chunk-prefix) and `search` [here](https://docs.marqo.ai/1.5.0/API-Reference/Search/search/#text-query-prefix).
+- Prefixes for text chunks and queries enabled to improve retrieval for specific models (https://github.com/marqo-ai/marqo/pull/643). These prefixes are defined at the `model_properties` level, but can be overriden at index creation, add documents, or search time. Learn how to use prefixes for `add_documents` [here](https://docs.marqo.ai/1.5.0/API-Reference/Documents/add_or_replace_documents/#text-chunk-prefix) and `search` [here](https://docs.marqo.ai/1.5.0/API-Reference/Search/search/#text-query-prefix).
+- In the model registry, all `e5` models now have `text_chunk_prefix` and `text_query_prefix` defined as `"passage: "` and `"query: "` respectively.
 
 ## Bug fixes and minor changes
 - Upgraded `open_clip_torch`, `timm`, and `safetensors` for access to new models (https://github.com/marqo-ai/marqo/pull/646). 
-- Documents containing multimodal objects that encounter errors in processing are no longer indexed, and rejected with a 400 error (https://github.com/marqo-ai/marqo/pull/631). 
+- Documents containing multimodal objects that encounter errors in processing are rejected with a 400 error (https://github.com/marqo-ai/marqo/pull/631). 
 - Updated README: More detailed explanations, fixed formatting issues (https://github.com/marqo-ai/marqo/pull/629/files, https://github.com/marqo-ai/marqo/pull/642/files).  
 
 ## Contributor shout-outs
