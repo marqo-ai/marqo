@@ -271,6 +271,12 @@ def _autofill_index_settings(index_settings: dict):
             and copied_settings[NsField.index_defaults][NsField.model] is None:
         copied_settings[NsField.index_defaults][NsField.model] = MlModel.clip
 
+    # Default to CLAP model if we are using treat_urls_and_pointers_as_audio
+    if NsField.treat_urls_and_pointers_as_audio in copied_settings[NsField.index_defaults] and \
+            copied_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_audio] is True \
+            and copied_settings[NsField.index_defaults][NsField.model] is None:
+        copied_settings[NsField.index_defaults][NsField.model] = MlModel.clap
+
     # text preprocessing subfields - fills any missing sub-dict fields if some of the first level are present
     for key in list(default_settings[NsField.index_defaults][NsField.text_preprocessing]):
         if key not in copied_settings[NsField.index_defaults][NsField.text_preprocessing] or \
@@ -411,9 +417,31 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
     total_vectorise_time = 0
     
     image_repo = {}
+    audio_repo = {}
     doc_count = len(add_docs_params.docs)
     
     with ExitStack() as exit_stack:
+        if index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_audio]:
+            with RequestMetricsStore.for_request().time(
+                "audio_download.full_time",
+                lambda t: logger.debug(
+                    f"add_documents audio download: took {t:.3f}ms to concurrently download "
+                    f"audio for {doc_count} docs using {add_docs_params.image_download_thread_count} threads"
+                )
+            ):
+                if add_docs_params.tensor_fields and '_id' in add_docs_params.tensor_fields:
+                    raise errors.BadRequestError(message="`_id` field cannot be a tensor field.")
+
+                audio_repo = exit_stack.enter_context(
+                    add_docs.download_audios(
+                        docs=add_docs_params.docs, 
+                        thread_count=20,
+                        tensor_fields=add_docs_params.tensor_fields if add_docs_params.tensor_fields is not None else None,
+                        non_tensor_fields=add_docs_params.non_tensor_fields + ['_id'] if add_docs_params.non_tensor_fields is not None else None,
+                        image_download_headers=add_docs_params.image_download_headers)
+                )
+                print(audio_repo)
+        
         if index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]:
             with RequestMetricsStore.for_request().time(
                 "image_download.full_time",
@@ -597,6 +625,15 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                                         f"Could not find image found at `{field_content}`. \n"
                                         f"Reason: {str(image_repo[field_content])}"
                                     )
+                            elif isinstance(field_content, str) and index_info.index_settings[NsField.index_defaults][
+                                NsField.treat_urls_and_pointers_as_audio]:
+                                if not isinstance(audio_repo[field_content], Exception):
+                                    image_data = audio_repo[field_content]
+                                else:
+                                    raise s2_inference_errors.S2InferenceError(
+                                        f"Could not find audio found at `{field_content}`. \n"
+                                        f"Reason: {str(audio_repo[field_content])}"
+                                    )
                             elif isinstance(field_content, str):
                                 image_data = text_chunk_prefix + field_content     # Add prefix to URL if it's to be treated as-is.
                             else:
@@ -621,8 +658,9 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
 
                     normalize_embeddings = index_info.index_settings[NsField.index_defaults][
                         NsField.normalize_embeddings]
-                    infer_if_image = index_info.index_settings[NsField.index_defaults][
-                        NsField.treat_urls_and_pointers_as_images]
+                    infer_if_media = index_info.index_settings[NsField.index_defaults][
+                        NsField.treat_urls_and_pointers_as_images] or index_info.index_settings[NsField.index_defaults][
+                        NsField.treat_urls_and_pointers_as_audio]
 
                     try:
                         # in the future, if we have different underlying vectorising methods, make sure we catch possible
@@ -635,7 +673,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                                 model_name=index_info.model_name,
                                 model_properties=index_info.get_model_properties(), content=content_chunks,
                                 device=add_docs_params.device, normalize_embeddings=normalize_embeddings,
-                                infer=infer_if_image, model_auth=add_docs_params.model_auth
+                                infer=infer_if_media, model_auth=add_docs_params.model_auth
                             )
 
                         end_time = timer()
@@ -676,7 +714,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                         unsuccessful_doc_to_append, combo_vectorise_time_to_add,
                         new_fields_from_multimodal_combination) = vectorise_multimodal_combination_field(
                             field, field_content, copied, i, doc_id, add_docs_params.device, index_info,
-                            image_repo, add_docs_params.mappings[field], 
+                            image_repo|audio_repo, add_docs_params.mappings[field], 
                             text_chunk_prefix=text_chunk_prefix,
                             model_auth=add_docs_params.model_auth)
                     total_vectorise_time = total_vectorise_time + combo_vectorise_time_to_add
@@ -2220,7 +2258,7 @@ def get_cuda_info() -> dict:
 
 def vectorise_multimodal_combination_field(
         field: str, multimodal_object: Dict[str, dict], doc: dict, doc_index: int,
-        doc_id:str, device:str, index_info, image_repo, field_map:dict, text_chunk_prefix: str,
+        doc_id:str, device:str, index_info, media_repo, field_map:dict, text_chunk_prefix: str,
         model_auth: Optional[ModelAuth] = None
 ):
     '''
@@ -2266,15 +2304,16 @@ def vectorise_multimodal_combination_field(
     text_field_names = []
     text_content_to_vectorise = []
 
-    image_field_names = []
-    image_content_to_vectorise = []
+    media_field_names = []
+    media_content_to_vectorise = []
 
     normalize_embeddings = index_info.index_settings[NsField.index_defaults][
         NsField.normalize_embeddings]
-    infer_if_image = index_info.index_settings[NsField.index_defaults][
-        NsField.treat_urls_and_pointers_as_images]
+    infer_if_media = index_info.index_settings[NsField.index_defaults][
+        NsField.treat_urls_and_pointers_as_images] or index_info.index_settings[NsField.index_defaults][
+        NsField.treat_urls_and_pointers_as_audio]
 
-    if infer_if_image is False:
+    if infer_if_media is False:
         text_field_names = list(multimodal_object.keys())
         text_content_to_vectorise = list(multimodal_object.values())
         new_fields_from_multimodal_combination =set([(sub_field_name, _infer_opensearch_data_type(sub_content)) for sub_field_name
@@ -2287,21 +2326,22 @@ def vectorise_multimodal_combination_field(
                 text_content_to_vectorise.append(sub_content)
             else:
                 try:
+                    
                     if isinstance(sub_content, str):
                         # Image (get from repo)
-                        if not isinstance(image_repo[sub_content], Exception):
-                            image_data = image_repo[sub_content]
+                        if not isinstance(media_repo[sub_content], Exception):
+                            media_data = media_repo[sub_content]
                         else:
                             raise s2_inference_errors.S2InferenceError(
                                 f"Could not find image found at `{sub_content}`. \n"
-                                f"Reason: {str(image_repo[sub_content])}"
+                                f"Reason: {str(media_repo[sub_content])}"
                             )
                     else:
                         # sub_content is an actual image (possibly unreachable?)
-                        image_data = sub_content
+                        media_data = sub_content
 
-                    image_content_to_vectorise.append(image_data)
-                    image_field_names.append(sub_field_name)
+                    media_content_to_vectorise.append(media_data)
+                    media_field_names.append(sub_field_name)
 
                 except s2_inference_errors.S2InferenceError as e:
                     combo_document_is_valid = False
@@ -2326,16 +2366,16 @@ def vectorise_multimodal_combination_field(
                     model_name=index_info.model_name,
                     model_properties=index_info.get_model_properties(), content=prefixed_text_content_to_vectorise,
                     device=device, normalize_embeddings=normalize_embeddings,
-                    infer=infer_if_image, model_auth=model_auth
+                    infer=infer_if_media, model_auth=model_auth
                 )
         image_vectors = []
-        if len(image_content_to_vectorise) > 0:
+        if len(media_content_to_vectorise) > 0:
             with RequestMetricsStore.for_request().time(f"create_vectors"):
                 image_vectors = s2_inference.vectorise(
                     model_name=index_info.model_name,
                     model_properties=index_info.get_model_properties(), content=image_content_to_vectorise,
                     device=device, normalize_embeddings=normalize_embeddings,
-                    infer=infer_if_image, model_auth=model_auth
+                    infer=infer_if_media, model_auth=model_auth
                 )
         end_time = timer()
         combo_vectorise_time_to_add += (end_time - start_time)
@@ -2355,7 +2395,7 @@ def vectorise_multimodal_combination_field(
 
         return combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add, new_fields_from_multimodal_combination
 
-    sub_field_name_list = text_field_names + image_field_names
+    sub_field_name_list = text_field_names + media_field_names
     vectors_list = text_vectors + image_vectors
 
     if not len(sub_field_name_list) == len(vectors_list):

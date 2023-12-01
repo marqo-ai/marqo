@@ -20,6 +20,7 @@ settings_schema = {
             "type": "object",
             "required": [
                 NsFields.treat_urls_and_pointers_as_images,
+                NsFields.treat_urls_and_pointers_as_audio,
                 NsFields.model,
                 NsFields.normalize_embeddings,
                 NsFields.text_preprocessing,
@@ -28,6 +29,12 @@ settings_schema = {
             "additionalProperties": False,
             "properties": {
                 NsFields.treat_urls_and_pointers_as_images: {
+                    "type": "boolean",
+                    "examples": [
+                        False
+                    ]
+                },
+                NsFields.treat_urls_and_pointers_as_audio: {
                     "type": "boolean",
                     "examples": [
                         False
@@ -186,6 +193,7 @@ settings_schema = {
             },
             "examples": [{
                 NsFields.treat_urls_and_pointers_as_images: False,
+                NsFields.treat_urls_and_pointers_as_audio: False,
                 NsFields.model: "hf/all_datasets_v4_MiniLM-L6",
                 NsFields.normalize_embeddings: True,
                 NsFields.text_preprocessing: {

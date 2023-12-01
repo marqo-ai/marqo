@@ -7,6 +7,7 @@ def get_default_index_settings():
     return {
         NsFields.index_defaults: {
             NsFields.treat_urls_and_pointers_as_images: False, # only used for models that have text and vision encoders
+            NsFields.treat_urls_and_pointers_as_audio: False, # only used for models that have text and audio encoders 
             NsFields.model: ns_enums.MlModel.bert,
             # search_model not here, as it is dynamically set based on model
             NsFields.normalize_embeddings: True,

@@ -3,6 +3,7 @@ from marqo.s2_inference.sbert_onnx_utils import SBERT_ONNX
 from marqo.s2_inference.sbert_utils import SBERT, TEST
 from marqo.s2_inference.random_utils import Random
 from marqo.s2_inference.clip_utils import CLIP, OPEN_CLIP, MULTILINGUAL_CLIP, FP16_CLIP, get_multilingual_clip_properties
+from marqo.s2_inference.clap_utils import CLAP
 from marqo.s2_inference.types import Any, Dict, List, Optional, Union, FloatTensor
 from marqo.s2_inference.onnx_clip_utils import CLIP_ONNX
 from marqo.s2_inference.no_model_utils import NO_MODEL
@@ -69,6 +70,34 @@ def _get_clip_properties() -> Dict:
         }
     return CLIP_MODEL_PROPERTIES
 
+def _get_clap_properties() -> Dict:
+    CLAP_MODEL_PROPERTIES = {
+        "laion/larger_clap_music": {
+            "name": "laion/larger_clap_music",
+            "dimensions": 512,
+            "notes": "CLAP music",
+            "type": "clap",
+        },
+        "laion/larger_clap_general": {
+            "name": "laion/larger_clap_general",
+            "dimensions": 512,
+            "notes": "CLAP general",
+            "type": "clap",
+        },
+        "laion/clap-htsat-unfused": {
+                "name": "laion/clap-htsat-unfused",
+                "dimensions": 512,
+                "notes": "CLAP HTSAT unfused",
+                "type": "clap",
+        },
+        "laion/clap-htsat-fused": {
+                "name": "laion/clap-htsat-fused",
+                "dimensions": 512,
+                "notes": "CLAP HTSAT unfused",
+                "type": "clap",
+        }
+    }
+    return CLAP_MODEL_PROPERTIES
 
 def _get_open_clip_properties() -> Dict:
     # use this link to find all the model_configs
@@ -1770,6 +1799,7 @@ def _get_random_properties() -> Dict:
 def _get_model_load_mappings() -> Dict:
     return {'clip':CLIP,
             'open_clip': OPEN_CLIP,
+            'clap': CLAP,
             'sbert':SBERT,
             'test':TEST,
             'sbert_onnx':SBERT_ONNX,
@@ -1788,6 +1818,7 @@ def load_model_properties() -> Dict:
     sbert_onnx_model_properties = _get_sbert_onnx_properties()
 
     clip_model_properties = _get_clip_properties()
+    clap_model_properties = _get_clap_properties()
     test_model_properties = _get_sbert_test_properties()
     random_model_properties = _get_random_properties()
     hf_model_properties = _get_hf_properties()
@@ -1807,6 +1838,7 @@ def load_model_properties() -> Dict:
     model_properties.update(onnx_clip_model_properties)
     model_properties.update(multilingual_clip_model_properties)
     model_properties.update(fp16_clip_model_properties)
+    model_properties.update(clap_model_properties)
 
     all_properties = dict()
     all_properties['models'] = model_properties

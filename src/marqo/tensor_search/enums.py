@@ -11,6 +11,7 @@ class MediaType:
 class MlModel:
     bert = "hf/all_datasets_v4_MiniLM-L6"
     clip = "ViT-L/14"
+    clap = "laion/larger_clap_general"
 
 
 class SearchMethod(str, Enum):
@@ -42,6 +43,7 @@ class IndexSettingsField:
     index_settings = "index_settings"
     index_defaults = "index_defaults"
     treat_urls_and_pointers_as_images = "treat_urls_and_pointers_as_images"
+    treat_urls_and_pointers_as_audio = "treat_urls_and_pointers_as_audio"
     model = "model"
     search_model = "search_model"
     model_properties = "model_properties"

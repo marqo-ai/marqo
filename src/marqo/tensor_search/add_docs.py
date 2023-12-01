@@ -8,8 +8,9 @@ import random
 
 from typing import List, Optional, Tuple, ContextManager, Union
 import PIL
+import numpy as np
 from PIL.ImageFile import ImageFile
-from marqo.s2_inference import clip_utils
+from marqo.s2_inference import clip_utils, clap_utils
 from marqo.tensor_search.telemetry import RequestMetricsStore, RequestMetrics
 import marqo.errors as errors
 from marqo.tensor_search import utils
@@ -151,6 +152,92 @@ def download_images(docs: List[dict], thread_count: int, tensor_fields: Optional
             if isinstance(p, ImageFile):
                 p.close()
 
+
+def threaded_download_audios(allocated_docs: List[dict], audio_repo: dict, tensor_fields: Optional[List[str]],
+                             non_tensor_fields: Optional[List[str]], image_download_headers: dict,
+                             metric_obj: Optional[RequestMetrics] = None) -> None:
+    if tensor_fields is not None and non_tensor_fields is not None \
+            or tensor_fields is None and non_tensor_fields is None:
+        raise errors.InternalError("Must provide exactly one of tensor_fields or non_tensor_fields")
+
+    # Generate pseudo-unique ID for thread metrics.
+    _id = hash("".join([d.get("_id", str(random.getrandbits(64))) for d in allocated_docs])) % 1000
+    _id = f"audio_download.{_id}"
+    TIMEOUT_SECONDS=3
+    if metric_obj is None: # Occurs predominately in testing.
+        metric_obj = RequestMetricsStore.for_request()
+        RequestMetricsStore.set_in_request(metrics=metric_obj)
+
+    with metric_obj.time(f"{_id}.thread_time"):
+        for doc in allocated_docs:
+            for field in list(doc):
+                if not utils.is_tensor_field(field, tensor_fields, non_tensor_fields):
+                    continue
+                if isinstance(doc[field], str) and clap_utils._is_audio(doc[field]):
+                    if doc[field] in audio_repo:
+                        continue
+                    try:
+                        audio_repo[doc[field]] = clap_utils.load_audio_from_path(doc[field], image_download_headers, timeout=TIMEOUT_SECONDS, metrics_obj=metric_obj)
+                    except Exception as e:
+                        print(e)
+                        audio_repo[doc[field]] = e
+                        metric_obj.increment_counter(f"{doc.get(field, '')}.Exception")
+                        continue
+                # For multimodal tensor combination
+                elif isinstance(doc[field], dict):
+                    for sub_field in list(doc[field].values()):
+                        if isinstance(sub_field, str) and clap_utils._is_audio(sub_field):
+                            if sub_field in audio_repo:
+                                continue
+                            try:
+                                audio_repo[sub_field] = clap_utils.load_audio_from_path(
+                                    sub_field,
+                                    image_download_headers,
+                                    timeout=TIMEOUT_SECONDS,
+                                    metrics_obj=metric_obj
+                                )
+                            except Exception as e:
+                                print(e)
+                                audio_repo[sub_field] = e
+                                metric_obj.increment_counter(f"{doc.get(field, '')}.Exception")
+                                continue
+
+
+@contextmanager
+def download_audios(docs: List[dict], thread_count: int, tensor_fields: Optional[List[str]],
+                    non_tensor_fields: Optional[List[str]], image_download_headers: dict) -> ContextManager[dict]:
+
+    if tensor_fields is not None and non_tensor_fields is not None \
+            or tensor_fields is None and non_tensor_fields is None:
+        raise errors.InternalError("Must provide exactly one of tensor_fields or non_tensor_fields")
+
+    docs_per_thread = math.ceil(len(docs)/thread_count)
+    copied = copy.deepcopy(docs)
+    image_repo = dict()
+
+    try:
+        m = [RequestMetrics() for i in range(thread_count)]
+        thread_allocated_docs = [copied[i: i + docs_per_thread] for i in range(len(copied))[::docs_per_thread]]
+        threads = [threading.Thread(target=threaded_download_audios, args=(allocation, image_repo,
+                                                                           tensor_fields, non_tensor_fields,
+                                                                           image_download_headers, m[i]))
+                   for i, allocation in enumerate(thread_allocated_docs)]
+
+        for th in threads:
+            th.start()
+
+        for th in threads:
+            th.join()
+
+        # Fix up metric_obj to make it not mention thread-ids
+        metric_obj = RequestMetricsStore.for_request()
+        metric_obj = RequestMetrics.reduce_from_list([metric_obj] + m)
+        metric_obj.times = reduce_thread_metrics(metric_obj.times)
+        yield image_repo
+    finally:
+        for p in image_repo.values():
+            if hasattr(p, "close"):
+                p.close()
 
 def reduce_thread_metrics(data):
     """Reduce the metrics from each thread, as if they were run in a single thread.
