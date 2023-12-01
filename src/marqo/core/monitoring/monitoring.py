@@ -3,6 +3,7 @@ from typing import Optional
 import marqo.logging
 from marqo.core.exceptions import IndexNotFoundError
 from marqo.core.index_management.index_management import IndexManagement
+from marqo.core.models import MarqoIndex
 from marqo.core.models.marqo_index_health import MarqoHealthStatus, HealthStatus, VespaHealthStatus
 from marqo.core.models.marqo_index_stats import MarqoIndexStats
 from marqo.core.vespa_index import for_marqo_index as vespa_index_factory
@@ -19,19 +20,15 @@ class Monitoring:
         self.vespa_client = vespa_client
         self.index_management = index_management
 
-    def get_index_stats(self, index_name: str) -> MarqoIndexStats:
+    def get_index_stats(self, marqo_index: MarqoIndex) -> MarqoIndexStats:
         """
         Get statistics for a Marqo index.
         Args:
-            index_name: Name of Marqo index to get statistics for
+            marqo_index: Marqo index to get statistics for
 
         Returns:
             Marqo index statistics
         """
-        if not self.index_management.index_exists(index_name):
-            raise IndexNotFoundError(f"Index {index_name} not found")
-
-        marqo_index = self.index_management.get_index(index_name)
         vespa_index = vespa_index_factory(marqo_index)
 
         doc_count_query_result = self.vespa_client.query(
@@ -43,19 +40,32 @@ class Monitoring:
         )
 
         try:
-            if vector_count_query_result.root.children[0].children is None:
+            if vector_count_query_result.root.children[0].children is None:  # empty index
                 number_of_vectors = 0
             else:
                 number_of_vectors = list(
                     vector_count_query_result.root.children[0].children[0].children[0].fields.values()
                 )[0]
         except (TypeError, AttributeError, IndexError) as e:
-            raise InternalError(f"Failed to get number of vectors for index {index_name}: {e}") from e
+            raise InternalError(f"Failed to get the number of vectors for index {marqo_index.name}: {e}") from e
 
         return MarqoIndexStats(
             number_of_documents=doc_count_query_result.total_count,
             number_of_vectors=number_of_vectors
         )
+
+    def get_index_stats_by_name(self, index_name: str) -> MarqoIndexStats:
+        """
+        Get statistics for a Marqo index.
+
+        Args:
+            index_name: Name of Marqo index to get statistics for
+
+        Returns:
+            Marqo index statistics
+        """
+        marqo_index = self.index_management.get_index(index_name)
+        return self.get_index_stats(marqo_index)
 
     def get_health(self, index_name: Optional[str] = None, hostname_filter: Optional[str] = None) -> MarqoHealthStatus:
         """

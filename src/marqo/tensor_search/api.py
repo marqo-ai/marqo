@@ -191,7 +191,7 @@ def get_documents_by_ids(
 
 @app.get("/indexes/{index_name}/stats")
 def get_index_stats(index_name: str, marqo_config: config.Config = Depends(get_config)):
-    stats = marqo_config.monitoring.get_index_stats(index_name)
+    stats = marqo_config.monitoring.get_index_stats_by_name(index_name)
     return JSONResponse(
         content={
             'numberOfDocuments': stats.number_of_documents,
