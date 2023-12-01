@@ -11,7 +11,6 @@ from marqo.tensor_search import constants
 from marqo.tensor_search import enums, utils
 from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest
-from marqo.tensor_search.models.settings_object import settings_schema
 from marqo.core.unstructured_vespa_index.constants import UNSUPPORTED_FIELD_NAME_LIST
 from marqo.tensor_search.models.mappings_object import mappings_schema, multimodal_combination_schema
 from marqo.tensor_search.models.search import SearchContext
@@ -140,18 +139,15 @@ def validate_field_content(field_content: Any, is_non_tensor_field: bool) -> Any
     Raises:
         InvalidArgError if field_content is not acceptable
     """
-    if type(field_content) in constants.ALLOWED_CUSTOMER_FIELD_TYPES:
+    if type(field_content) in constants.ALLOWED_UNSTRUCTURED_FIELD_TYPES:
         if isinstance(field_content, list):
             validate_list(field_content, is_non_tensor_field)
-        elif isinstance(field_content, dict):
-            # We will be validating the dictionaries in a separate call.
-            return field_content
         return field_content
     else:
         raise InvalidArgError(
             f"Field content `{field_content}` \n"
             f"of type `{type(field_content).__name__}` is not of valid content type!"
-            f"Allowed content types: {[ty.__name__ for ty in constants.ALLOWED_CUSTOMER_FIELD_TYPES]}"
+            f"Allowed content types: {[ty.__name__ for ty in constants.ALLOWED_UNSTRUCTURED_FIELD_TYPES]}"
         )
 
 
@@ -223,7 +219,7 @@ def validate_boost(boost: Dict, search_method: Union[str, SearchMethod]):
     return boost
 
 
-def validate_field_name(field_name) -> str:
+def validate_unstructured_index_field_name(field_name) -> str:
     """TODO:
         - length (remember the vector name will have the vector_prefix added to the front of field_name)
         - consider blanket "no double names starting with double underscore..."
@@ -235,6 +231,8 @@ def validate_field_name(field_name) -> str:
     Raises:
         InvalidFieldNameError
     """
+
+    # TODO-Li Do we still have these restrictions for an unstructured index?
     if not field_name:
         raise InvalidFieldNameError("field name can't be empty! ")
     if not isinstance(field_name, str):
@@ -245,6 +243,14 @@ def validate_field_name(field_name) -> str:
     if field_name.startswith(enums.TensorField.chunks):
         raise InvalidFieldNameError(F"can't name field with protected field name {enums.TensorField.chunks}."
                                     F" Error raised for field name: {field_name}")
+
+    if any(unsupported_string in field_name for unsupported_string in UNSUPPORTED_FIELD_NAME_LIST):
+        raise InvalidArgError(
+            f"Field name `{field_name}` contains a substring in"
+            f" UNSUPPORTED_FIELD_NAME_LIST: {UNSUPPORTED_FIELD_NAME_LIST} for an unstructured index. "
+            f"Please change the field name and avoid use these strings"
+        )
+
     char_validation = [(c, c not in constants.ILLEGAL_CUSTOMER_FIELD_NAME_CHARS)
                        for c in field_name]
     char_validation_failures = [c for c in char_validation if not c[1]]
@@ -285,26 +291,6 @@ def validate_doc(doc: Dict) -> dict:
             raise DocTooLargeError(
                 f"Document{maybe_id} with length `{len(serialized)}` exceeds "
                 f"the allowed document size limit of [{max_doc_size}]."
-            )
-    return doc
-
-
-def validate_unstructured_doc_field_name(doc: Dict) -> Dict:
-    """
-    Args:
-        doc: a document indexed by the client
-    Raises:
-        errors.InvalidArgError, if any field consists of a substring in UNSUPPORTED_FIELD_NAME_LIST
-    Returns
-        doc if all validations pass
-    """
-
-    for field_name in doc:
-        if any(unsupported_string in field_name for unsupported_string in UNSUPPORTED_FIELD_NAME_LIST):
-            raise InvalidArgError(
-                f"Field name `{field_name}` contains a substring in"
-                f" UNSUPPORTED_FIELD_NAME_LIST: {UNSUPPORTED_FIELD_NAME_LIST} for an unstructured index. "
-                f"Please change the field name and avoid use these strings"
             )
     return doc
 

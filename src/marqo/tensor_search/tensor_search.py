@@ -145,8 +145,6 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                     add_docs.download_images(docs=add_docs_params.docs, thread_count=20,
                                              tensor_fields=add_docs_params.tensor_fields
                                              if add_docs_params.tensor_fields is not None else None,
-                                             non_tensor_fields=add_docs_params.non_tensor_fields + ['_id']
-                                             if add_docs_params.non_tensor_fields is not None else None,
                                              image_download_headers=add_docs_params.image_download_headers)
                 )
 
@@ -154,7 +152,8 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
             ids = [doc["_id"] for doc in add_docs_params.docs if "_id" in doc]
             existing_docs_dict: Dict[str, dict] = {}
             if len(ids) > 0:
-                existing_docs = get_documents_by_ids(config, marqo_index.name, ids, show_vectors=True)['results']
+                existing_docs = get_documents_by_ids(config, marqo_index.name, ids, show_vectors=True,
+                                                     ignore_invalid_ids=True)['results']
                 for doc in existing_docs:
                     id = doc["_id"]
                     if id in existing_docs_dict:
@@ -175,14 +174,13 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
             try:
                 validation.validate_doc(doc)
 
-                validation.validate_unstructured_doc_field_name(doc)
-
                 if "_id" in doc:
                     doc_id = validation.validate_id(doc["_id"])
                     del copied["_id"]
                 else:
                     doc_id = str(uuid.uuid4())
-                [validation.validate_field_name(field) for field in copied]
+                [validation.validate_unstructured_index_field_name(field) for field in copied]
+
             except errors.__InvalidRequestError as err:
                 unsuccessful_docs.append(
                     (i, {'_id': doc_id if doc_id is not None else '',
