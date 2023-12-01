@@ -14,7 +14,7 @@ from marqo.vespa.vespa_client import VespaClient
 
 
 class MarqoTestCase(unittest.TestCase):
-    indexes_to_delete = []
+    indexes = []
 
     @classmethod
     def configure_request_metrics(cls):
@@ -29,8 +29,8 @@ class MarqoTestCase(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         cls.patcher.stop()
-        if cls.indexes_to_delete:
-            cls.index_management.batch_delete_indexes(cls.indexes_to_delete)
+        if cls.indexes:
+            cls.index_management.batch_delete_indexes(cls.indexes)
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -50,9 +50,12 @@ class MarqoTestCase(unittest.TestCase):
     @classmethod
     def create_indexes(cls, index_requests: List[MarqoIndexRequest]) -> List[MarqoIndex]:
         indexes = cls.index_management.batch_create_indexes(index_requests)
-        cls.indexes_to_delete = indexes
+        cls.indexes = indexes
 
         return indexes
+
+    def setUp(self) -> None:
+        self.clear_indexes(self.indexes)
 
     def clear_indexes(self, indexes: List[MarqoIndex]):
         for index in indexes:
@@ -112,7 +115,7 @@ class MarqoTestCase(unittest.TestCase):
             fields: List[FieldRequest],
             tensor_fields: List[str],
             name: Optional[str] = None,
-            model: Model = Model(name='hf/all_datasets_v4_MiniLM-L6'),
+            model: Model = Model(name='random/small'),
             normalize_embeddings: bool = True,
             text_preprocessing: TextPreProcessing = TextPreProcessing(
                 split_length=2,

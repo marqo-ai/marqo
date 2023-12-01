@@ -1,6 +1,5 @@
 """The API entrypoint for Tensor Search"""
 import json
-import os
 from typing import List
 
 import pydantic
@@ -9,7 +8,7 @@ from fastapi import FastAPI
 from fastapi import Request, Depends
 from fastapi.responses import JSONResponse
 
-from marqo import config, errors, core
+from marqo import config, errors
 from marqo import version
 from marqo.core.exceptions import IndexExistsError, IndexNotFoundError
 from marqo.core.index_management.index_management import IndexManagement
@@ -210,11 +209,10 @@ def delete_index(index_name: str, marqo_config: config.Config = Depends(get_conf
 
 
 @app.post("/indexes/{index_name}/documents/delete-batch")
-def delete_docs(index_name: str, documentIds: List[str], refresh: bool = True,
+def delete_docs(index_name: str, documentIds: List[str],
                 marqo_config: config.Config = Depends(get_config)):
     return tensor_search.delete_documents(
-        index_name=index_name, config=marqo_config, doc_ids=documentIds,
-        auto_refresh=refresh
+        index_name=index_name, config=marqo_config, doc_ids=documentIds
     )
 
 

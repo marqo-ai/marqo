@@ -146,7 +146,7 @@ class StructuredVespaIndex(VespaIndex):
                 marqo_document[constants.MARQO_DOC_ID] = value
             elif field == self._VESPA_DOC_MATCH_FEATURES:
                 continue
-            elif field in self._VESPA_DOC_FIELDS_TO_IGNORE | {common.FIELD_SCORE_MODIFIERS,
+            elif field in self._VESPA_DOC_FIELDS_TO_IGNORE | {common.FIELD_SCORE_MODIFIERS, common.FIELD_VECTOR_COUNT,
                                                               self._VESPA_DOC_MATCH_FEATURES}:
                 continue
             else:
