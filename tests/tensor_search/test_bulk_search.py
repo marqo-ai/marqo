@@ -2297,3 +2297,5 @@ class TestBulkSearch(MarqoTestCase):
             return True
 
         assert run()
+
+
