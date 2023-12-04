@@ -1,3 +1,18 @@
+# Release 1.5.0
+## New Features
+- Separate model for search and add documents (https://github.com/marqo-ai/marqo/pull/633). Using the `search_model` and `search_model_properties` key in `index_defaults` allows you to specify a model specifically to be used for searching. This is useful for using a different model for search than what is used for add_documents. Learn how to use `search_model` [here](https://docs.marqo.ai/1.5.0/API-Reference/Indexes/create_index/#search-model).
+- Prefixes for text chunks and queries enabled to improve retrieval for specific models (https://github.com/marqo-ai/marqo/pull/643). These prefixes are defined at the `model_properties` level, but can be overriden at index creation, add documents, or search time. Learn how to use prefixes for `add_documents` [here](https://docs.marqo.ai/1.5.0/API-Reference/Documents/add_or_replace_documents/#text-chunk-prefix) and `search` [here](https://docs.marqo.ai/1.5.0/API-Reference/Search/search/#text-query-prefix).
+
+## Bug fixes and minor changes
+- Upgraded `open_clip_torch`, `timm`, and `safetensors` for access to new models (https://github.com/marqo-ai/marqo/pull/646). 
+- Documents containing multimodal objects that encounter errors in processing are rejected with a 400 error (https://github.com/marqo-ai/marqo/pull/631). 
+- Updated README: More detailed explanations, fixed formatting issues (https://github.com/marqo-ai/marqo/pull/629/files, https://github.com/marqo-ai/marqo/pull/642/files).  
+
+## Contributor shout-outs
+- A huge thank you to all our 3.7k stargazers!
+- Thanks everyone for continuing to participate in our [forum](https://community.marqo.ai/)! Keep all your insights, questions, and feedback coming!
+
+
 # Release 1.4.0
 
 ## Breaking Changes
