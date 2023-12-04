@@ -112,7 +112,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
     # construct_vector_input_batches,
     #
     def setUp(self) -> None:
-        self.clear_indexes(self.indexes)
+        super().setUp()
 
         # Any tests that call add_documents, search, bulk_search need this env var
         self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})

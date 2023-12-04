@@ -1,4 +1,3 @@
-import marqo.core.constants as constants
 import marqo.core.search.search_filter as search_filter
 from marqo.core.exceptions import InvalidDataTypeError, InvalidFieldNameError, VespaDocumentParsingError
 from marqo.core.models import MarqoQuery
@@ -67,6 +66,7 @@ class StructuredVespaIndex(VespaIndex):
                 score_modifiers[index_field.name] = marqo_value
 
         # Tensors
+        vector_count = 0
         if constants.MARQO_DOC_TENSORS in marqo_document:
             for marqo_tensor_field in marqo_document[constants.MARQO_DOC_TENSORS]:
                 marqo_tensor_value = marqo_document[constants.MARQO_DOC_TENSORS][marqo_tensor_field]
@@ -77,12 +77,15 @@ class StructuredVespaIndex(VespaIndex):
                 # If chunking an image, chunks will be a list of tuples, hence the str(c)
                 chunks = [str(c) for c in marqo_tensor_value[constants.MARQO_DOC_CHUNKS]]
                 embeddings = marqo_tensor_value[constants.MARQO_DOC_EMBEDDINGS]
+                vector_count += len(embeddings)
 
                 index_tensor_field = self._marqo_index.tensor_field_map[marqo_tensor_field]
 
                 vespa_fields[index_tensor_field.chunk_field_name] = chunks
                 vespa_fields[index_tensor_field.embeddings_field_name] = \
                     {f'{i}': embeddings[i] for i in range(len(embeddings))}
+
+        vespa_fields[common.FIELD_VECTOR_COUNT] = vector_count
 
         if len(score_modifiers) > 0:
             vespa_fields[common.FIELD_SCORE_MODIFIERS] = score_modifiers
@@ -143,7 +146,7 @@ class StructuredVespaIndex(VespaIndex):
                 marqo_document[constants.MARQO_DOC_ID] = value
             elif field == self._VESPA_DOC_MATCH_FEATURES:
                 continue
-            elif field in self._VESPA_DOC_FIELDS_TO_IGNORE | {common.FIELD_SCORE_MODIFIERS,
+            elif field in self._VESPA_DOC_FIELDS_TO_IGNORE | {common.FIELD_SCORE_MODIFIERS, common.FIELD_VECTOR_COUNT,
                                                               self._VESPA_DOC_MATCH_FEATURES}:
                 continue
             else:
@@ -186,6 +189,14 @@ class StructuredVespaIndex(VespaIndex):
             return self._to_vespa_hybrid_query(marqo_query)
         else:
             raise InternalError(f'Unknown query type {type(marqo_query)}')
+
+    def get_vector_count_query(self):
+        return {
+
+            'yql': f'select {common.FIELD_VECTOR_COUNT} from {self._marqo_index.name} '
+                   f'where true limit 0 | all(group(1) each(output(sum({common.FIELD_VECTOR_COUNT}))))',
+            'model_restrict': self._marqo_index.name
+        }
 
     def _to_vespa_tensor_query(self, marqo_query: MarqoTensorQuery) -> Dict[str, Any]:
         if marqo_query.searchable_attributes is not None:
@@ -411,13 +422,13 @@ class StructuredVespaIndex(VespaIndex):
 
     def _verify_marqo_field_name(self, field_name: str):
         field_map = self._marqo_index.field_map
-        if field_name not in self._marqo_index.field_map:
+        if field_name not in field_map:
             raise InvalidFieldNameError(f'Invalid field name {field_name} for index {self._marqo_index.name}. '
                                         f'Valid field names are {", ".join(field_map.keys())}')
 
     def _verify_marqo_tensor_field_name(self, field_name: str):
         tensor_field_map = self._marqo_index.tensor_field_map
-        if field_name not in self._marqo_index.field_map:
+        if field_name not in tensor_field_map:
             raise InvalidFieldNameError(f'Invalid tensor field name {field_name} for index {self._marqo_index.name}. '
                                         f'Valid tensor field names are {", ".join(tensor_field_map.keys())}')
 
@@ -491,4 +502,3 @@ class StructuredVespaIndex(VespaIndex):
             return self._MARQO_TO_PYTHON_TYPE_MAP[marqo_type]
         except KeyError:
             raise InternalError(f'Unknown Marqo type: {marqo_type}')
-

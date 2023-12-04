@@ -35,9 +35,6 @@ class AddDocsParams(BaseModel):
     Params:
         index_name: name of the index
         docs: List of documents
-        auto_refresh: Set to False if indexing lots of docs
-        non_tensor_fields: List of fields, within documents to not create tensors for. Default to
-          make tensors for all fields.
         use_existing_tensors: Whether to use the vectors already in doc (for update docs)
         device: Device used to carry out the document update, if `None` is given, it will be determined by
                 EnvVars.MARQO_BEST_AVAILABLE_DEVICE

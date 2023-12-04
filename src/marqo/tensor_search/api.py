@@ -1,6 +1,5 @@
 """The API entrypoint for Tensor Search"""
 import json
-import os
 from typing import List
 
 import pydantic
@@ -192,10 +191,11 @@ def get_documents_by_ids(
 
 @app.get("/indexes/{index_name}/stats")
 def get_index_stats(index_name: str, marqo_config: config.Config = Depends(get_config)):
-    stats = marqo_config.monitoring.get_index_stats(index_name)
+    stats = marqo_config.monitoring.get_index_stats_by_name(index_name)
     return JSONResponse(
         content={
-            'numberOfDocuments': stats.number_of_documents
+            'numberOfDocuments': stats.number_of_documents,
+            'numberOfVectors': stats.number_of_vectors
         },
         status_code=200
     )
@@ -209,11 +209,10 @@ def delete_index(index_name: str, marqo_config: config.Config = Depends(get_conf
 
 
 @app.post("/indexes/{index_name}/documents/delete-batch")
-def delete_docs(index_name: str, documentIds: List[str], refresh: bool = True,
+def delete_docs(index_name: str, documentIds: List[str],
                 marqo_config: config.Config = Depends(get_config)):
     return tensor_search.delete_documents(
-        index_name=index_name, config=marqo_config, doc_ids=documentIds,
-        auto_refresh=refresh
+        index_name=index_name, config=marqo_config, doc_ids=documentIds
     )
 
 
