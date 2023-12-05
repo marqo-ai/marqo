@@ -524,7 +524,7 @@ class TestVectorSearch(MarqoTestCase):
             ("text_field_3:c", 0, None),
             ("int_field_1:2", 1, "1234"),
             ("text_field_3:b", 1, "5678"),
-            ("int_field_2:5", 0, None),
+            ("int_field_1:5", 0, None),
             ("int_field_1:[5 TO 30]", 0, None),
             ("int_field_1:[0 TO 30]", 1, "1234"),
             ("bool_field_1:true", 1, "1233"),
