@@ -1,12 +1,15 @@
-from typing import List, Dict, Any, Union
-from copy import deepcopy
 import json
+import struct
+import base64
+from copy import deepcopy
+from typing import List, Dict, Any
 
 from pydantic import Field, BaseModel
+
 from marqo.core import constants as index_constants
+from marqo.core.exceptions import VespaDocumentParsingError
 from marqo.core.unstructured_vespa_index import common as unstructured_common
 from marqo.core.unstructured_vespa_index import constants as unstructured_constants
-from marqo.core.exceptions import InvalidDataTypeError, InvalidFieldNameError, VespaDocumentParsingError
 
 
 class UnstructuredVespaDocumentFields(BaseModel):
@@ -17,12 +20,14 @@ class UnstructuredVespaDocumentFields(BaseModel):
     short_string_fields: Dict[str, str] = Field(default_factory=dict, alias=unstructured_common.SHORT_STRINGS_FIELDS)
     string_arrays: List[str] = Field(default_factory=list, alias=unstructured_common.STRING_ARRAY)
     int_fields: Dict[str, int] = Field(default_factory=dict, alias=unstructured_common.INT_FIELDS)
+    bool_fields: Dict[str, bool] = Field(default_factory=dict, alias=unstructured_common.BOOL_FIELDS)
     float_fields: Dict[str, float] = Field(default_factory=dict, alias=unstructured_common.FLOAT_FIELDS)
     score_modifiers_fields: Dict[str, Any] = Field(default_factory=dict, alias=unstructured_common.SCORE_MODIFIERS)
     vespa_chunks: List[str] = Field(default_factory=list, alias=unstructured_common.VESPA_DOC_CHUNKS)
     vespa_embeddings: Dict[str, Any] = Field(default_factory=dict, alias=unstructured_common.VESPA_DOC_EMBEDDINGS)
     match_features: Dict[str, Any] = Field(default_factory=dict, alias=index_constants.VESPA_DOC_MATCH_FEATURES)
-    vespa_multimodal_params: Dict[str, str] = Field(default_factory=str, alias=unstructured_common.VESPA_DOC_MULTIMODAL_PARAMS)
+    vespa_multimodal_params: Dict[str, str] = Field(default_factory=str,
+                                                    alias=unstructured_common.VESPA_DOC_MULTIMODAL_PARAMS)
 
     class Config:
         allow_population_by_field_name = True
@@ -49,6 +54,7 @@ class UnstructuredVespaDocumentFields(BaseModel):
         # Add int and float fields back
         marqo_document.update(self.int_fields)
         marqo_document.update(self.float_fields)
+        marqo_document.update({k: bool(v) for k, v in self.bool_fields.items()})
         marqo_document[index_constants.MARQO_DOC_ID] = self.marqo__id
 
         # vespa_embeddings may not return if it comes from a search result
@@ -70,9 +76,12 @@ class UnstructuredVespaDocumentFields(BaseModel):
                 if field_name not in marqo_document[index_constants.MARQO_DOC_TENSORS]:
                     marqo_document[index_constants.MARQO_DOC_TENSORS][field_name] = dict()
                     marqo_document[index_constants.MARQO_DOC_TENSORS][field_name][index_constants.MARQO_DOC_CHUNKS] = []
-                    marqo_document[index_constants.MARQO_DOC_TENSORS][field_name][index_constants.MARQO_DOC_EMBEDDINGS] = []
-                marqo_document[index_constants.MARQO_DOC_TENSORS][field_name][index_constants.MARQO_DOC_CHUNKS].append(content)
-                marqo_document[index_constants.MARQO_DOC_TENSORS][field_name][index_constants.MARQO_DOC_EMBEDDINGS].append(embedding)
+                    marqo_document[index_constants.MARQO_DOC_TENSORS][field_name][
+                        index_constants.MARQO_DOC_EMBEDDINGS] = []
+                marqo_document[index_constants.MARQO_DOC_TENSORS][field_name][index_constants.MARQO_DOC_CHUNKS].append(
+                    content)
+                marqo_document[index_constants.MARQO_DOC_TENSORS][field_name][
+                    index_constants.MARQO_DOC_EMBEDDINGS].append(embedding)
 
         if self.vespa_multimodal_params:
             marqo_document[unstructured_common.MARQO_DOC_MULTIMODAL_PARAMS] = dict()
@@ -89,8 +98,8 @@ class UnstructuredVespaDocumentFields(BaseModel):
         if not self.match_features:
             raise ValueError("No match features found in the document")
         try:
-            chunk_index: int = int(list(self.match_features[f"closest({unstructured_common.VESPA_DOC_EMBEDDINGS})"]\
-                                   ["cells"].keys())[0])
+            chunk_index: int = int(list(self.match_features[f"closest({unstructured_common.VESPA_DOC_EMBEDDINGS})"] \
+                                            ["cells"].keys())[0])
         except KeyError:
             raise ValueError("No match features found in the document")
         field_name, content = self.vespa_chunks[chunk_index].split("::", 2)
@@ -142,6 +151,8 @@ class UnstructuredIndexDocument(BaseModel):
                 else:
                     instance.fields.long_string_fields[key] = value
                 instance.fields.strings.append(value)
+            elif isinstance(value, bool):
+                instance.fields.bool_fields[key] = int(value)
             elif isinstance(value, list) and all(isinstance(elem, str) for elem in value):
                 instance.fields.string_arrays.extend([f"{key}::{element}" for element in value])
             elif isinstance(value, int):
@@ -165,6 +176,3 @@ class UnstructuredIndexDocument(BaseModel):
     def to_marqo_document(self, return_highlights: bool = False) -> Dict[str, Any]:
         """Convert VespaDocumentObject back to the original document structure."""
         return self.fields.to_marqo_doc(return_highlights=return_highlights)
-
-
-

@@ -7,6 +7,7 @@ STRING_ARRAY = "marqo__string_array"
 
 INT_FIELDS = "marqo__int_fields"
 FLOAT_FIELDS = "marqo__float_fields"
+BOOL_FIELDS = "marqo__bool_fields"
 
 SCORE_MODIFIERS = "marqo__score_modifiers"
 

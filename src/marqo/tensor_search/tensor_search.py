@@ -1092,7 +1092,7 @@ def rerank_query(query: BulkSearchQueryEntity, result: Dict[str, Any], reranker:
 
 
 def search(config: Config, index_name: str, text: Union[str, dict],
-           result_count: int = 3, offset: int = 0, highlights=True,
+           result_count: int = 3, offset: int = 0, highlights: object = True,
            search_method: Union[str, SearchMethod, None] = SearchMethod.TENSOR,
            searchable_attributes: Iterable[str] = None, verbose: int = 0,
            reranker: Union[str, Dict] = None, filter: str = None,
@@ -1133,8 +1133,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
 
     # Validation for: result_count (limit) & offset
     # Validate neither is negative
-    if result_count <= 0:
-        raise errors.IllegalRequestedDocCount("search result limit must be greater than 0!")
+    result_count = validation.validate_result_count(result_count=result_count)
     if offset < 0:
         raise errors.IllegalRequestedDocCount("search result offset cannot be less than 0!")
 
@@ -1185,7 +1184,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
         search_result = _lexical_search(
             config=config, index_name=index_name, text=text, result_count=result_count, offset=offset,
             searchable_attributes=searchable_attributes, verbose=verbose,
-            filter_string=filter, attributes_to_retrieve=attributes_to_retrieve
+            filter_string=filter, attributes_to_retrieve=attributes_to_retrieve, highlights=highlights
         )
     else:
         raise errors.InvalidArgError(f"Search called with unknown search method: {search_method}")
@@ -1224,7 +1223,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
 def _lexical_search(
         config: Config, index_name: str, text: str, result_count: int = 3, offset: int = 0,
         searchable_attributes: Sequence[str] = None, verbose: int = 0, filter_string: str = None,
-        attributes_to_retrieve: Optional[List[str]] = None, expose_facets: bool = False):
+        highlights: bool = True, attributes_to_retrieve: Optional[List[str]] = None, expose_facets: bool = False):
     """
 
     Args:
@@ -1284,6 +1283,11 @@ def _lexical_search(
     RequestMetricsStore.for_request().start("search.lexical.postprocess")
     gathered_docs = gather_documents_from_response(responses, marqo_index, False, attributes_to_retrieve)
 
+    # Set the _highlights for each doc as [] to follow Marqo-V1's convention
+    if highlights:
+        for docs in gathered_docs['hits']:
+            docs['_highlights'] = []
+
     total_postprocess_time = RequestMetricsStore.for_request().stop("search.lexical.postprocess")
     logger.debug(
         f"search (lexical) post-processing: took {(total_postprocess_time):.3f}ms to format "
@@ -1329,10 +1333,12 @@ def gather_documents_from_response(response: QueryResult, marqo_index: MarqoInde
     hits = []
     for doc in response.hits:
         marqo_doc = vespa_index.to_marqo_document(doc.dict(), return_highlights=highlights)
-        if marqo_index.type == IndexType.Unstructured and attributes_to_retrieve:
+        marqo_doc['_score'] = doc.relevance
+
+        if marqo_index.type == IndexType.Unstructured and attributes_to_retrieve is not None:
             # For an unstructured index, we do the attributes_to_retrieve after search
             marqo_doc = unstructured_index_attributes_to_retrieve(marqo_doc, attributes_to_retrieve)
-        marqo_doc['_score'] = doc.relevance
+
         # Delete chunk data
         if constants.MARQO_DOC_TENSORS in marqo_doc:
             del marqo_doc[constants.MARQO_DOC_TENSORS]
@@ -1342,8 +1348,8 @@ def gather_documents_from_response(response: QueryResult, marqo_index: MarqoInde
 
 
 def unstructured_index_attributes_to_retrieve(marqo_doc: Dict[str, Any], attributes_to_retrieve: List[str]) -> Dict[str, Any]:
-    if (not isinstance(attributes_to_retrieve, list)) or (len(attributes_to_retrieve) == 0):
-        raise errors.InvalidArgError("attributes_to_retrieve must be a non-empty list!")
+    # attributes_to_retrieve should already be validated at the start of search
+    attributes_to_retrieve = list(set(attributes_to_retrieve).union({"_id", "_score", "_highlights"}))
     return {k: v for k, v in marqo_doc.items() if k in attributes_to_retrieve}
 
 

@@ -17,6 +17,7 @@ class UnstructuredVespaSchema(VespaSchema):
 
     _INT_FIELDS = unstructured_common.INT_FIELDS
     _FLOAT_FIELDS = unstructured_common.FLOAT_FIELDS
+    _BOOL_FIELDS = unstructured_common.BOOL_FIELDS
 
     _SCORE_MODIFIERS = unstructured_common.SCORE_MODIFIERS
 
@@ -110,7 +111,17 @@ class UnstructuredVespaSchema(VespaSchema):
                                            attribute: fast-search
                                            rank: filter }}
                     }}
-
+                    
+                    field {cls._BOOL_FIELDS} type map<string, byte> {{
+                        indexing: summary
+                        struct-field key {{ indexing : attribute
+                                            attribute: fast-search
+                                            rank: filter }}
+                        struct-field value {{ indexing : attribute
+                                              attribute: fast-search
+                                              rank: filter }}
+                        }}
+                                                    
                     field {cls._FLOAT_FIELDS} type map<string, float> {{
                         indexing: summary
                         struct-field key {{ indexing : attribute
@@ -129,6 +140,7 @@ class UnstructuredVespaSchema(VespaSchema):
                     field {cls._CHUNKS} type array<string> {{
                         indexing: summary
                     }}
+                    
 
                     field {cls._EMBEDDINGS} type tensor<float>(p{{}}, x[{dimension}]) {{
                         indexing: attribute | index | summary

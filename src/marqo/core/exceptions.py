@@ -1,4 +1,4 @@
-from marqo.exceptions import MarqoError
+from marqo.exceptions import MarqoError, InvalidArgumentError
 
 
 class IndexExistsError(MarqoError):
@@ -30,4 +30,8 @@ class InvalidFieldNameError(MarqoDocumentParsingError):
 
 
 class FilterStringParsingError(MarqoError):
+    pass
+
+
+class UnsupportedFeatureError(InvalidArgumentError):
     pass

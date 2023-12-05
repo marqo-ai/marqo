@@ -3,11 +3,12 @@ from typing import Dict, Any, Optional
 from marqo.core.models import MarqoQuery
 from marqo.core.models.marqo_index import UnstructuredMarqoIndex
 from marqo.core.vespa_index import VespaIndex
-from marqo.core import constants as index_constants
+from marqo.core.unstructured_vespa_index import constants as unstructured_constants
 from marqo.core.unstructured_vespa_index import common as unstructured_common
 from marqo.core.unstructured_vespa_index.unstructured_document import UnstructuredIndexDocument
 from marqo.core.models.marqo_query import (MarqoTensorQuery, MarqoLexicalQuery, MarqoHybridQuery,
                                            ScoreModifierType, ScoreModifier)
+from marqo.core.exceptions import UnsupportedFeatureError
 from marqo.exceptions import InternalError
 import marqo.core.search.search_filter as search_filter
 from marqo.core.exceptions import InvalidDataTypeError, InvalidFieldNameError, VespaDocumentParsingError
@@ -37,7 +38,7 @@ class UnstructuredVespaIndex(VespaIndex):
 
     def _to_vespa_tensor_query(self, marqo_query: MarqoTensorQuery) -> Dict[str, Any]:
         if marqo_query.searchable_attributes is not None:
-            raise RuntimeError("searchable_attributes is not supported for an UnStructured Index")
+            raise UnsupportedFeatureError("searchable_attributes is not supported for an Unstructured Index")
 
         tensor_term = self._get_tensor_search_term(marqo_query)
 
@@ -90,6 +91,11 @@ class UnstructuredVespaIndex(VespaIndex):
 
         def generate_equality_filter_string(node: search_filter.EqualityTerm) -> str:
             filter_parts = []
+
+            # Bool Filter
+            if node.value in unstructured_constants.FILTER_STRING_BOOL_VALUE:
+                filter_value = int(True if node.value == "true" else False)
+                return f'({unstructured_common.BOOL_FIELDS} contains sameElement(key contains "{node.field}", value = {filter_value}))'
 
             # Short String Filter
             short_string_filter_string = f'({unstructured_common.SHORT_STRINGS_FIELDS} contains sameElement(key contains "{node.field}", value contains "{escape(node.value)}"))'
