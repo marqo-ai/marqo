@@ -171,6 +171,7 @@ class StructuredVespaIndex(VespaIndex):
                         f'Index {self._marqo_index.name} has no field {att}. '
                         f'Available fields are: {", ".join(self._marqo_index.field_map.keys())}'
                     )
+            marqo_query.attributes_to_retrieve.append(common.FIELD_ID)
 
         # Verify score modifiers, if defined
         if marqo_query.score_modifiers is not None:
