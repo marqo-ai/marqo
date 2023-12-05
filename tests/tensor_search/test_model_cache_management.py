@@ -3,7 +3,7 @@ from tests.marqo_test import MarqoTestCase
 from marqo.s2_inference.s2_inference import _validate_model_properties,\
     _create_model_cache_key, _update_available_models, available_models, clear_loaded_models
 from marqo.tensor_search.tensor_search import eject_model, get_cuda_info, get_loaded_models, get_cpu_info
-from marqo.errors import ModelNotInCacheError, HardwareCompatabilityError
+from marqo.api.exceptions import ModelNotInCacheError, HardwareCompatabilityError
 from marqo.s2_inference.reranking.cross_encoders import ReRankerText, ReRankerOwl
 from marqo.s2_inference.reranking.model_utils import load_owl_vit
 from marqo.s2_inference.reranking import rerank

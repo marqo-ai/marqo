@@ -2,7 +2,7 @@ import functools
 import pprint
 import uuid
 from marqo.tensor_search import enums
-from marqo.errors import (
+from marqo.api.exceptions import (
     IndexNotFoundError, InvalidDocumentIdError, InvalidArgError,
     IllegalRequestedDocCount
 )

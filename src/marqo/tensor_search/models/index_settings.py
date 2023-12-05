@@ -2,7 +2,7 @@ import time
 from typing import Dict, Any, Optional, List
 
 import marqo.core.models.marqo_index as core
-import marqo.errors as errors
+import marqo.api.exceptions as exceptions
 from marqo import version
 from marqo.core.models.marqo_index_request import FieldRequest, MarqoIndexRequest, StructuredMarqoIndexRequest, \
     UnstructuredMarqoIndexRequest
@@ -43,7 +43,7 @@ class IndexSettings(BaseMarqoModel):
         marqo_fields = None
         if self.type == core.IndexType.Structured:
             if self.treat_urls_and_pointers_as_images is not None:
-                raise errors.InvalidArgError(
+                raise exceptions.InvalidArgError(
                     "treat_urls_and_pointers_as_images is not a valid parameter for structured indexes"
                 )
 
@@ -78,11 +78,11 @@ class IndexSettings(BaseMarqoModel):
             )
         elif self.type == core.IndexType.Unstructured:
             if self.all_fields is not None:
-                raise errors.InvalidArgError(
+                raise exceptions.InvalidArgError(
                     "all_fields is not a valid parameter for unstructured indexes"
                 )
             if self.tensor_fields is not None:
-                raise errors.InvalidArgError(
+                raise exceptions.InvalidArgError(
                     "tensor_fields is not a valid parameter for unstructured indexes"
                 )
 
@@ -110,7 +110,7 @@ class IndexSettings(BaseMarqoModel):
                 updated_at=time.time()
             )
         else:
-            raise errors.InternalError(f"Unknown index type: {self.type}")
+            raise exceptions.InternalError(f"Unknown index type: {self.type}")
 
     @classmethod
     def from_marqo_index(cls, marqo_index: core.MarqoIndex) -> "IndexSettings":
@@ -153,4 +153,4 @@ class IndexSettings(BaseMarqoModel):
                 )
             )
         else:
-            raise errors.InternalError(f"Unknown index type: {type(marqo_index)}")
+            raise exceptions.InternalError(f"Unknown index type: {type(marqo_index)}")

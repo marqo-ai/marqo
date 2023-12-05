@@ -1,6 +1,6 @@
 import redis
 import os
-from marqo import errors
+from marqo.api import exceptions
 from marqo.tensor_search.tensor_search_logging import get_logger
 from marqo.tensor_search import utils
 from marqo.tensor_search.enums import EnvVars

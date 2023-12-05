@@ -1,4 +1,4 @@
-from marqo.errors import InvalidArgError, HardwareCompatabilityError
+from marqo.api.exceptions import InvalidArgError, HardwareCompatabilityError
 from marqo.tensor_search import enums, utils
 from marqo.tensor_search.web import api_utils
 import typing

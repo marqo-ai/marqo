@@ -5,11 +5,11 @@ from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest, 
 from marqo.tensor_search import delete_docs
 import marqo.tensor_search.tensor_search
 from marqo.tensor_search import tensor_search
-from marqo.errors import IndexNotFoundError
+from marqo.api.exceptions import IndexNotFoundError
 from tests.marqo_test import MarqoTestCase
 import requests
 from unittest.mock import patch
-from marqo import errors
+from marqo.api import exceptions
 from marqo.tensor_search import enums
 from tests.utils.transition import add_docs_caller
 import os
@@ -103,7 +103,7 @@ class TestDeleteDocuments(MarqoTestCase):
         )
 
         # Try to retrieve the deleted document
-        with self.assertRaises(errors.DocumentNotFoundError):
+        with self.assertRaises(exceptions.DocumentNotFoundError):
             tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="unique_id_1")
 
         # Check if the other documents still exist
@@ -154,7 +154,7 @@ class TestDeleteDocuments(MarqoTestCase):
         )
 
         # Try to retrieve the deleted document
-        with self.assertRaises(errors.DocumentNotFoundError):
+        with self.assertRaises(exceptions.DocumentNotFoundError):
             tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="unique_id")
 
     def test_multiple_documents_are_actually_deleted(self):
@@ -173,10 +173,10 @@ class TestDeleteDocuments(MarqoTestCase):
         )
 
         # Try to retrieve the deleted documents
-        with self.assertRaises(errors.DocumentNotFoundError):
+        with self.assertRaises(exceptions.DocumentNotFoundError):
             tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1,
                                              document_id="unique_id_1")
-        with self.assertRaises(errors.DocumentNotFoundError):
+        with self.assertRaises(exceptions.DocumentNotFoundError):
             tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1,
                                              document_id="unique_id_2")
 
@@ -194,19 +194,19 @@ class TestDeleteDocuments(MarqoTestCase):
     def test_delete_documents_from_non_existent_index(self):
         non_existent_index = "non-existent-index"
 
-        with self.assertRaises(errors.IndexNotFoundError):
+        with self.assertRaises(exceptions.IndexNotFoundError):
             tensor_search.delete_documents(
                 config=self.config, index_name=non_existent_index, doc_ids=["unique_id_1"], auto_refresh=True
             )
 
     def test_delete_documents_with_empty_list(self):
-        with self.assertRaises(errors.InvalidDocumentIdError):
+        with self.assertRaises(exceptions.InvalidDocumentIdError):
             tensor_search.delete_documents(
                 config=self.config, index_name=self.index_name_1, doc_ids=[], auto_refresh=True
             )
 
     def test_delete_documents_with_invalid_ids(self):
-        with self.assertRaises(errors.InvalidDocumentIdError):
+        with self.assertRaises(exceptions.InvalidDocumentIdError):
             tensor_search.delete_documents(
                 config=self.config, index_name=self.index_name_1, doc_ids=[123, {"invalid": "id"}], auto_refresh=True
             )
@@ -334,7 +334,7 @@ class TestDeleteDocumentsEndpoint(MarqoTestCase):
             index_name=self.index_name_1, document_ids=[], auto_refresh=False
         )
 
-        with self.assertRaises(errors.InvalidDocumentIdError):
+        with self.assertRaises(exceptions.InvalidDocumentIdError):
             delete_docs.delete_documents(config_copy, request)
 
     def test_delete_documents_invalid_backend(self):
@@ -405,7 +405,7 @@ class TestDeleteDocumentsEndpoint(MarqoTestCase):
             index_name=self.index_name_1, document_ids=['hello', None, 123], auto_refresh=True
         )
 
-        with self.assertRaises(errors.InvalidDocumentIdError):
+        with self.assertRaises(exceptions.InvalidDocumentIdError):
             delete_docs.delete_documents(config_copy, request)
 
     def test_max_doc_delete_limit(self):
@@ -427,7 +427,7 @@ class TestDeleteDocumentsEndpoint(MarqoTestCase):
             try:
                 tensor_search.delete_documents(config=self.config, index_name=self.index_name_1, doc_ids=doc_ids, auto_refresh=True)
                 raise AssertionError
-            except errors.InvalidArgError as e:
+            except exceptions.InvalidArgError as e:
                 pass
             # under the limit
             update_res = tensor_search.delete_documents(

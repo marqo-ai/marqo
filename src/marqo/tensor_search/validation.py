@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional, Type, Sequence, Union
 import jsonschema
 
 import marqo.core.models.marqo_index as marqo_index
-from marqo.errors import (
+from marqo.api.exceptions import (
     InvalidFieldNameError, InvalidArgError, InvalidDocumentIdError, DocTooLargeError)
 from marqo.tensor_search import constants
 from marqo.tensor_search import enums, utils

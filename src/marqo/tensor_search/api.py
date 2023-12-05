@@ -4,16 +4,17 @@ import os
 from typing import List
 
 import pydantic
+from marqo.api import exceptions
 import uvicorn
 from fastapi import FastAPI
 from fastapi import Request, Depends
 from fastapi.responses import JSONResponse
 
-from marqo import config, errors
+from marqo import config
 from marqo import version
 from marqo.core.exceptions import IndexExistsError, IndexNotFoundError
 from marqo.core.index_management.index_management import IndexManagement
-from marqo.errors import InvalidArgError, MarqoWebError, MarqoError
+from marqo.api.exceptions import InvalidArgError, MarqoWebError, MarqoError
 from marqo.tensor_search import tensor_search, utils
 from marqo.tensor_search.enums import RequestType, EnvVars
 from marqo.tensor_search.models.add_docs_objects import (AddDocsBodyParams)
@@ -119,7 +120,7 @@ def create_index(index_name: str, settings: IndexSettings, marqo_config: config.
     try:
         marqo_config.index_management.create_index(settings.to_marqo_index_request(index_name))
     except IndexExistsError as e:
-        raise errors.IndexAlreadyExistsError(f"Index {index_name} already exists") from e
+        raise exceptions.IndexAlreadyExistsError(f"Index {index_name} already exists") from e
 
     return JSONResponse(
         content={
@@ -244,7 +245,7 @@ def get_settings(index_name: str, marqo_config: config.Config = Depends(get_conf
         marqo_index = marqo_config.index_management.get_index(index_name)
         return IndexSettings.from_marqo_index(marqo_index).dict(exclude_none=True)
     except IndexNotFoundError as e:
-        raise errors.IndexNotFoundError(f"Index {index_name} not found") from e
+        raise exceptions.IndexNotFoundError(f"Index {index_name} not found") from e
 
 
 @app.get("/models")

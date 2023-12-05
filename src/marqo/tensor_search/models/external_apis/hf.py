@@ -4,7 +4,7 @@ from marqo.tensor_search.models.external_apis.abstract_classes import (
     ObjectLocation, ExternalAuth
 )
 from pydantic import BaseModel, Field, validator
-from marqo.errors import InvalidArgError
+from marqo.api.exceptions import InvalidArgError
 
 
 class HfAuth(ExternalAuth):

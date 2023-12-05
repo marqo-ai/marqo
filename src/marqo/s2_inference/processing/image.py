@@ -37,7 +37,7 @@ from marqo.s2_inference.processing.image_utils import (
     generate_boxes
 )
 
-from marqo.errors import InternalError
+from marqo.api.exceptions import InternalError
 
 logger = get_logger(__name__)
 

@@ -1,4 +1,4 @@
-from marqo.errors import IndexNotFoundError, InvalidArgError
+from marqo.api.exceptions import IndexNotFoundError, InvalidArgError
 from marqo.tensor_search import tensor_search
 from tests.utils.transition import add_docs_caller
 from tests.marqo_test import MarqoTestCase

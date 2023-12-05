@@ -2,7 +2,7 @@ import time
 from marqo.tensor_search import enums, backend
 from marqo.tensor_search import tensor_search
 import copy
-from marqo.errors import InvalidArgError, IndexNotFoundError
+from marqo.api.exceptions import InvalidArgError, IndexNotFoundError
 from tests.marqo_test import MarqoTestCase
 import random
 import requests

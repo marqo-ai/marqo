@@ -8,13 +8,13 @@ from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search import index_meta_cache
 from marqo.config import Config
-from marqo.errors import MarqoError, MarqoApiError, IndexNotFoundError
+from marqo.api.exceptions import MarqoError, MarqoApiError, IndexNotFoundError
 from marqo.tensor_search import utils
 from marqo.tensor_search.enums import TensorField, SearchMethod, IndexSettingsField
 from marqo.tensor_search import configs
 from tests.marqo_test import MarqoTestCase
 from unittest import mock
-from marqo import errors
+from marqo.api import exceptions
 
 
 class TestIndexMetaCache(MarqoTestCase):
@@ -478,9 +478,9 @@ class TestIndexMetaCache(MarqoTestCase):
             time.sleep(0.5)  # let remaining thread complete, if needed
             assert mock_get.call_count == N_seconds
             return True
-        assert run(error=errors.NonTensorIndexError)
+        assert run(error=exceptions.NonTensorIndexError)
         mock_get.reset_mock()
-        assert run(error=errors.IndexNotFoundError)
+        assert run(error=exceptions.IndexNotFoundError)
 
     def test_index_refresh_on_interval_multi_threaded_errors(self):
         """ If we encounter any error besides
@@ -681,7 +681,7 @@ class TestIndexMetaCache(MarqoTestCase):
                         })
                 )
                 raise AssertionError
-            except errors.IndexNotFoundError:
+            except exceptions.IndexNotFoundError:
                 pass
             return True
 

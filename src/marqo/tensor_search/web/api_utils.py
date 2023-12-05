@@ -2,7 +2,7 @@ import json
 import urllib.parse
 from typing import Union, List, Optional, Dict
 
-from marqo.errors import InvalidArgError
+from marqo.api.exceptions import InvalidArgError
 from marqo.tensor_search import enums
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams, AddDocsBodyParams
 from marqo.tensor_search.models.add_docs_objects import ModelAuth

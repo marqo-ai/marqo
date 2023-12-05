@@ -9,7 +9,7 @@ import numpy as np
 from marqo.tensor_search import utils
 import typing
 from marqo.tensor_search.enums import TensorField, SearchMethod, EnvVars, IndexSettingsField, MlModel
-from marqo.errors import (
+from marqo.api.exceptions import (
     MarqoApiError, MarqoError, IndexNotFoundError, InvalidArgError,
     InvalidFieldNameError, IllegalRequestedDocCount, BadRequestError, InternalError
 )

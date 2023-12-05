@@ -2,7 +2,7 @@
 The functions defined here would have endpoints, later on.
 """
 import numpy as np
-from marqo.errors import ModelCacheManagementError, InvalidArgError, ConfigurationError, InternalError
+from marqo.api.exceptions import ModelCacheManagementError, InvalidArgError, ConfigurationError, InternalError
 from marqo.s2_inference.errors import (
     VectoriseError, InvalidModelPropertiesError, ModelLoadError,
     UnknownModelError, ModelNotInCacheError, ModelDownloadError, S2InferenceError)

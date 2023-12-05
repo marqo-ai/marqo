@@ -7,7 +7,7 @@ from starlette.datastructures import Headers
 from starlette.types import Scope
 
 
-from marqo.errors import InvalidArgError
+from marqo.api.exceptions import InvalidArgError
 from tests.marqo_test import MarqoTestCase
 from marqo.tensor_search.api import validation_exception_handler
 

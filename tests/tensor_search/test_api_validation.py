@@ -1,5 +1,5 @@
 from marqo.tensor_search.web import api_validation
-from marqo.errors import InvalidArgError
+from marqo.api.exceptions import InvalidArgError
 from tests.marqo_test import MarqoTestCase
 
 

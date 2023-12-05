@@ -1,6 +1,6 @@
 from tests.marqo_test import MarqoTestCase
 from marqo.tensor_search import tensor_search, backend
-from marqo.errors import IndexNotFoundError
+from marqo.api.exceptions import IndexNotFoundError
 
 
 class TestGetSettings(MarqoTestCase):

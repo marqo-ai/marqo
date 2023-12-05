@@ -2,7 +2,7 @@ import json
 from requests import Response
 from http import HTTPStatus
 
-
+# TODO: DELETE
 class MarqoError(Exception):
     """Generic class for Marqo error handling
     Can be used for value errors etc.
@@ -25,7 +25,7 @@ class EnvVarError(MarqoError):
     def __init__(self, message: str):
         self.message = message
 
-
+# TODO: DELETE
 class MarqoApiError(MarqoError):
     """Error sent by Marqo API"""
 

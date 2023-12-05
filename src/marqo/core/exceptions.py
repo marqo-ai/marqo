@@ -1,23 +1,35 @@
-from marqo.exceptions import MarqoError
+from marqo.exceptions import (
+    MarqoError,
+    InternalError,
+    InvalidArgumentError,
+    NotFoundError,
+    AlreadyExistsError,
+)
 
 
-class IndexExistsError(MarqoError):
+class IndexExistsError(AlreadyExistsError):
     pass
 
 
-class IndexNotFoundError(MarqoError):
+class IndexNotFoundError(NotFoundError):
     pass
 
 
 class ParsingError(MarqoError):
+    """
+    Not subclass of any specific exception. Subclasses of this error have different behaviors.
+    """
     pass
 
 
 class VespaDocumentParsingError(ParsingError):
+    """
+    Not subclass of any specific exception. Will be caught by generic handler.
+    """
     pass
 
 
-class MarqoDocumentParsingError(ParsingError):
+class MarqoDocumentParsingError(ParsingError, InvalidArgumentError):
     pass
 
 
@@ -29,5 +41,5 @@ class InvalidFieldNameError(MarqoDocumentParsingError):
     pass
 
 
-class FilterStringParsingError(MarqoError):
+class FilterStringParsingError(ParsingError, InvalidArgumentError):
     pass

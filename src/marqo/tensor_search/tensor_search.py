@@ -46,7 +46,7 @@ import torch.cuda
 from PIL import Image
 
 import marqo.core.exceptions as core_exceptions
-from marqo import errors
+from marqo.api import exceptions
 # We depend on _httprequests.py for now, but this may be replaced in the future, as
 # _httprequests.py is designed for the client
 from marqo.config import Config
@@ -92,15 +92,15 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
         marqo_index = index_meta_cache.get_index(
             config=config, index_name=add_docs_params.index_name, force_refresh=True
         )
-    except errors.IndexNotFoundError:
-        raise errors.IndexNotFoundError(f"Cannot add documents to non-existent index {add_docs_params.index_name}")
+    except exceptions.IndexNotFoundError:
+        raise exceptions.IndexNotFoundError(f"Cannot add documents to non-existent index {add_docs_params.index_name}")
 
     if isinstance(marqo_index, UnstructuredMarqoIndex):
         return _add_documents_unstructured(config, add_docs_params, marqo_index)
     elif isinstance(marqo_index, StructuredMarqoIndex):
         return _add_documents_structured(config, add_docs_params, marqo_index)
     else:
-        raise errors.InternalError(f"Unknown index type {type(marqo_index)}")
+        raise exceptions.InternalError(f"Unknown index type {type(marqo_index)}")
 
 
 def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, marqo_index: MarqoIndex):
@@ -114,7 +114,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
     RequestMetricsStore.for_request().start("add_documents.processing_before_opensearch")
 
     if add_docs_params.tensor_fields is not None:
-        raise errors.InvalidArgError('Cannot specify `tensorFields` for a structured index')
+        raise exceptions.InvalidArgError('Cannot specify `tensorFields` for a structured index')
 
     if add_docs_params.mappings is not None:
         validation.validate_mappings_object(
@@ -125,7 +125,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
     bulk_parent_dicts: List[Dict[str, Any]] = []
 
     if len(add_docs_params.docs) == 0:
-        raise errors.BadRequestError(message="Received empty add documents request")
+        raise exceptions.BadRequestError(message="Received empty add documents request")
 
 
     unsuccessful_docs = []
@@ -166,7 +166,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
             ):
 
                 if '_id' in image_fields:
-                    raise errors.BadRequestError(message="`_id` field cannot be an image pointer field.")
+                    raise exceptions.BadRequestError(message="`_id` field cannot be an image pointer field.")
 
                 image_repo = exit_stack.enter_context(
                     add_docs.download_images(docs=docs, thread_count=20,
@@ -188,7 +188,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
 
                     id = doc["_id"]
                     if id in existing_docs_dict:
-                        raise errors.InternalError(f"Received duplicate documents for ID {id} from Vespa")
+                        raise exceptions.InternalError(f"Received duplicate documents for ID {id} from Vespa")
                     if doc[TensorField.found]:
                         del doc[TensorField.found]
                         existing_docs_dict[id] = doc
@@ -211,7 +211,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                     doc_id = str(uuid.uuid4())
 
                 [validation.validate_field_name(field) for field in copied]
-            except errors.__InvalidRequestError as err:
+            except exceptions.__InvalidRequestError as err:
                 unsuccessful_docs.append(
                     (i, {'_id': doc_id if doc_id is not None else '',
                          'error': err.message, 'status': int(err.status_code), 'code': err.code})
@@ -228,16 +228,16 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                                f"Valid fields are: {', '.join(marqo_index.field_map.keys())}")
                     document_is_valid = False
                     unsuccessful_docs.append(
-                        (i, {'_id': doc_id, 'error': message, 'status': int(errors.InvalidArgError.status_code),
-                             'code': errors.InvalidArgError.code})
+                        (i, {'_id': doc_id, 'error': message, 'status': int(exceptions.InvalidArgError.status_code),
+                             'code': exceptions.InvalidArgError.code})
                     )
                     break
                 if marqo_field.type == FieldType.MultimodalCombination:
                     message = f"Field {field} is a multimodal combination field and cannot be assigned a value."
                     document_is_valid = False
                     unsuccessful_docs.append(
-                        (i, {'_id': doc_id, 'error': message, 'status': int(errors.InvalidArgError.status_code),
-                             'code': errors.InvalidArgError.code})
+                        (i, {'_id': doc_id, 'error': message, 'status': int(exceptions.InvalidArgError.status_code),
+                             'code': exceptions.InvalidArgError.code})
                     )
                     break
 
@@ -251,7 +251,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                             field=field, field_content=field_content,
                             is_non_tensor_field=not is_tensor_field,
                             mappings=add_docs_params.mappings)
-                except errors.InvalidArgError as err:
+                except exceptions.InvalidArgError as err:
                     document_is_valid = False
                     unsuccessful_docs.append(
                         (i, {'_id': doc_id, 'error': err.message, 'status': int(err.status_code),
@@ -337,8 +337,8 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                                 document_is_valid = False
                                 unsuccessful_docs.append(
                                     (i, {'_id': doc_id, 'error': e.message,
-                                         'status': int(errors.InvalidArgError.status_code),
-                                         'code': errors.InvalidArgError.code})
+                                         'status': int(exceptions.InvalidArgError.status_code),
+                                         'code': exceptions.InvalidArgError.code})
                                 )
                                 break
 
@@ -365,13 +365,13 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                                 s2_inference_errors.InvalidModelPropertiesError,
                                 s2_inference_errors.ModelLoadError,
                                 s2_inference.ModelDownloadError) as model_error:
-                            raise errors.BadRequestError(
+                            raise exceptions.BadRequestError(
                                 message=f'Problem vectorising query. Reason: {str(model_error)}',
                                 link="https://marqo.pages.dev/latest/Models-Reference/dense_retrieval/"
                             )
                         except s2_inference_errors.S2InferenceError:
                             document_is_valid = False
-                            image_err = errors.InvalidArgError(
+                            image_err = exceptions.InvalidArgError(
                                 message=f'Could not process given image: {field_content}')
                             unsuccessful_docs.append(
                                 (i, {'_id': doc_id, 'error': image_err.message, 'status': int(image_err.status_code),
@@ -390,11 +390,11 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
 
                     else:
                         document_is_valid = False
-                        e = errors.InvalidArgError(f'Invalid type {type(field_content)} for tensor field {field}')
+                        e = exceptions.InvalidArgError(f'Invalid type {type(field_content)} for tensor field {field}')
                         unsuccessful_docs.append(
                             (i, {'_id': doc_id, 'error': e.message,
-                                 'status': int(errors.InvalidArgError.status_code),
-                                 'code': errors.InvalidArgError.code})
+                                 'status': int(exceptions.InvalidArgError.status_code),
+                                 'code': exceptions.InvalidArgError.code})
                         )
                         break
 
@@ -571,7 +571,7 @@ def get_document_by_id(
         res = config.vespa_client.get_document(document_id, marqo_index.name)
     except VespaStatusError as e:
         if e.status_code == 404:
-            raise errors.DocumentNotFoundError(f"Document with ID {document_id} not found in index {index_name}")
+            raise exceptions.DocumentNotFoundError(f"Document with ID {document_id} not found in index {index_name}")
         else:
             raise e
 
@@ -602,13 +602,13 @@ def get_documents_by_ids(
             will be raised if any of the IDs are invalid
     """
     if not isinstance(document_ids, typing.Collection):
-        raise errors.InvalidArgError("Get documents must be passed a collection of IDs!")
+        raise exceptions.InvalidArgError("Get documents must be passed a collection of IDs!")
     if len(document_ids) <= 0:
-        raise errors.InvalidArgError("Can't get empty collection of IDs!")
+        raise exceptions.InvalidArgError("Can't get empty collection of IDs!")
 
     max_docs_limit = utils.read_env_vars_and_defaults(EnvVars.MARQO_MAX_RETRIEVABLE_DOCS)
     if max_docs_limit is not None and len(document_ids) > int(max_docs_limit):
-        raise errors.IllegalRequestedDocCount(
+        raise exceptions.IllegalRequestedDocCount(
             f"{len(document_ids)} documents were requested, which is more than the allowed limit of [{max_docs_limit}], "
             f"set by the environment variable `{EnvVars.MARQO_MAX_RETRIEVABLE_DOCS}`")
 
@@ -616,7 +616,7 @@ def get_documents_by_ids(
     for doc_id in document_ids:
         try:
             validated_ids.append(validation.validate_id(doc_id))
-        except errors.InvalidDocumentIdError as e:
+        except exceptions.InvalidDocumentIdError as e:
             if not ignore_invalid_ids:
                 raise e
             logger.debug(f'Invalid document ID {doc_id} ignored')
@@ -655,7 +655,7 @@ def get_documents_by_ids(
                 }
             )
         else:  # If not 200 or 404, it should have been raised by the client
-            raise errors.InternalError(f"Unexpected response status code {response.status} for document {response.id}")
+            raise exceptions.InternalError(f"Unexpected response status code {response.status} for document {response.id}")
 
     return to_return
 
@@ -674,7 +674,7 @@ def _get_tensor_facets(marqo_doc_tensors: Dict[str, Any]) -> List[Dict[str, Any]
         chunks = marqo_doc_tensors[tensor_field][constants.MARQO_DOC_CHUNKS]
         embeddings = marqo_doc_tensors[tensor_field][constants.MARQO_DOC_EMBEDDINGS]
         if len(chunks) != len(embeddings):
-            raise errors.InternalError(
+            raise exceptions.InternalError(
                 f"Number of chunks ({len(chunks)}) and number of embeddings ({len(embeddings)}) "
                 f"for field {tensor_field} must be the same.")
 
@@ -692,7 +692,7 @@ def _get_tensor_facets(marqo_doc_tensors: Dict[str, Any]) -> List[Dict[str, Any]
 def rerank_query(query: BulkSearchQueryEntity, result: Dict[str, Any], reranker: Union[str, Dict], device: str,
                  num_highlights: int):
     if query.searchableAttributes is None:
-        raise errors.InvalidArgError(
+        raise exceptions.InvalidArgError(
             f"searchable_attributes cannot be None when re-ranking. Specify which fields to search and rerank over.")
     try:
         start_rerank_time = timer()
@@ -702,7 +702,7 @@ def rerank_query(query: BulkSearchQueryEntity, result: Dict[str, Any], reranker:
         logger.debug(
             f"search ({query.searchMethod.lower()}) reranking using {reranker}: took {(timer() - start_rerank_time):.3f}s to rerank results.")
     except Exception as e:
-        raise errors.BadRequestError(f"reranking failure due to {str(e)}")
+        raise exceptions.BadRequestError(f"reranking failure due to {str(e)}")
 
 
 def search(config: Config, index_name: str, text: Union[str, dict],
@@ -748,9 +748,9 @@ def search(config: Config, index_name: str, text: Union[str, dict],
     # Validation for: result_count (limit) & offset
     # Validate neither is negative
     if result_count <= 0:
-        raise errors.IllegalRequestedDocCount("search result limit must be greater than 0!")
+        raise exceptions.IllegalRequestedDocCount("search result limit must be greater than 0!")
     if offset < 0:
-        raise errors.IllegalRequestedDocCount("search result offset cannot be less than 0!")
+        raise exceptions.IllegalRequestedDocCount("search result offset cannot be less than 0!")
 
         # validate query
     validation.validate_query(q=text, search_method=search_method)
@@ -762,7 +762,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
         upper_bound_explanation = ("The search result limit + offset must be less than or equal to the "
                                    f"MARQO_MAX_RETRIEVABLE_DOCS limit of [{max_docs_limit}]. ")
 
-        raise errors.IllegalRequestedDocCount(
+        raise exceptions.IllegalRequestedDocCount(
             f"{upper_bound_explanation} Marqo received search result limit of `{result_count}` "
             f"and offset of `{offset}`.")
 
@@ -774,7 +774,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
         [validation.validate_field_name(attribute) for attribute in searchable_attributes]
     if attributes_to_retrieve is not None:
         if not isinstance(attributes_to_retrieve, (List, typing.Tuple)):
-            raise errors.InvalidArgError("attributes_to_retrieve must be a sequence!")
+            raise exceptions.InvalidArgError("attributes_to_retrieve must be a sequence!")
         [validation.validate_field_name(attribute) for attribute in attributes_to_retrieve]
     if verbose:
         print(f"determined_search_method: {search_method}, text query: {text}")
@@ -782,7 +782,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
     if device is None:
         selected_device = utils.read_env_vars_and_defaults("MARQO_BEST_AVAILABLE_DEVICE")
         if selected_device is None:
-            raise errors.InternalError("Best available device was not properly determined on Marqo startup.")
+            raise exceptions.InternalError("Best available device was not properly determined on Marqo startup.")
         logger.debug(f"No device given for search. Defaulting to best available device: {selected_device}")
     else:
         selected_device = device
@@ -802,12 +802,12 @@ def search(config: Config, index_name: str, text: Union[str, dict],
             filter_string=filter, attributes_to_retrieve=attributes_to_retrieve
         )
     else:
-        raise errors.InvalidArgError(f"Search called with unknown search method: {search_method}")
+        raise exceptions.InvalidArgError(f"Search called with unknown search method: {search_method}")
 
     if reranker is not None:
         logger.info("reranking using {}".format(reranker))
         if searchable_attributes is None:
-            raise errors.InvalidArgError(
+            raise exceptions.InvalidArgError(
                 f"searchable_attributes cannot be None when re-ranking. Specify which fields to search and rerank over.")
         try:
             # SEARCH TIMER-LOGGER (reranking)
@@ -822,7 +822,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
                 f"search ({search_method.lower()}) reranking using {reranker}: took {(total_rerank_time):.3f}ms to rerank results."
             )
         except Exception as e:
-            raise errors.BadRequestError(f"reranking failure due to {str(e)}")
+            raise exceptions.BadRequestError(f"reranking failure due to {str(e)}")
 
     search_result["query"] = text
     search_result["limit"] = result_count
@@ -860,7 +860,7 @@ def _lexical_search(
         - Test raise_for_searchable_attribute=False
     """
     if not isinstance(text, str):
-        raise errors.InvalidArgError(
+        raise exceptions.InvalidArgError(
             f"Query arg must be of type str! text arg is of type {type(text)}. "
             f"Query arg: {text}")
 
@@ -1049,14 +1049,14 @@ def vectorise_jobs(jobs: List[VectorisedJobs]) -> Dict[JHash, Dict[str, List[flo
                 s2_inference_errors.InvalidModelPropertiesError,
                 s2_inference_errors.ModelLoadError,
                 s2_inference.ModelDownloadError) as model_error:
-            raise errors.BadRequestError(
+            raise exceptions.BadRequestError(
                 message=f'Problem vectorising query. Reason: {str(model_error)}',
                 link="https://marqo.pages.dev/latest/Models-Reference/dense_retrieval/"
             )
 
         except s2_inference_errors.S2InferenceError as e:
             # TODO: differentiate image processing errors from other types of vectorise errors
-            raise errors.InvalidArgError(message=f'Error vectorising content: {v.content}. Message: {e}')
+            raise exceptions.InvalidArgError(message=f'Error vectorising content: {v.content}. Message: {e}')
     return result
 
 
@@ -1109,7 +1109,7 @@ def get_query_vectors_from_jobs(
             try:
                 merged_vector = np.mean(weighted_vectors, axis=0)
             except ValueError as e:
-                raise errors.InvalidArgError(f"The provided vectors are not in the same dimension of the index."
+                raise exceptions.InvalidArgError(f"The provided vectors are not in the same dimension of the index."
                                              f"This causes the error when we do `numpy.mean()` over all the vectors.\n"
                                              f"The original error is `{e}`.\n"
                                              f"Please check `https://docs.marqo.ai/0.0.16/API-Reference/search/#context`.")
@@ -1229,7 +1229,7 @@ def _vector_text_search(
     """
     # # SEARCH TIMER-LOGGER (pre-processing)
     if not device:
-        raise errors.InternalError("_vector_text_search cannot be called without `device`!")
+        raise exceptions.InternalError("_vector_text_search cannot be called without `device`!")
 
     RequestMetricsStore.for_request().start("search.vector.processing_before_vespa")
 
@@ -1274,7 +1274,7 @@ def _vector_text_search(
     gathered_docs = gather_documents_from_response(responses, marqo_index, highlights)
 
     if boost is not None:
-        raise errors.MarqoWebError('Boosting is not currently supported with Vespa')
+        raise exceptions.MarqoWebError('Boosting is not currently supported with Vespa')
         # gathered_docs = boost_score(gathered_docs, boost, searchable_attributes)
 
     # completely_sorted = sort_chunks(gathered_docs)
@@ -1300,7 +1300,7 @@ def delete_index(config: Config, index_name):
     try:
         index_management.delete_index_by_name(index_name)
     except core_exceptions.IndexNotFoundError as e:
-        raise errors.IndexNotFoundError(f"Index {index_name} does not exist") from e
+        raise exceptions.IndexNotFoundError(f"Index {index_name} does not exist") from e
 
     if index_name in get_cache():
         del get_cache()[index_name]
@@ -1320,7 +1320,7 @@ def eject_model(model_name: str, device: str) -> dict:
     try:
         result = s2_inference.eject_model(model_name, device)
     except s2_inference_errors.ModelNotInCacheError as e:
-        raise errors.ModelNotInCacheError(message=str(e))
+        raise exceptions.ModelNotInCacheError(message=str(e))
     return result
 
 
@@ -1342,7 +1342,7 @@ def get_cuda_info() -> dict:
                                  for _device_id in range(torch.cuda.device_count())]}
 
     else:
-        raise errors.HardwareCompatabilityError(message=str(
+        raise exceptions.HardwareCompatabilityError(message=str(
             "ERROR: cuda is not supported in your machine!!"
         ))
 
@@ -1422,8 +1422,8 @@ def vectorise_multimodal_combination_field_structured(
                 combo_document_is_valid = False
                 unsuccessful_doc_to_append = \
                     (doc_index, {'_id': doc_id, 'error': e.message,
-                                 'status': int(errors.InvalidArgError.status_code),
-                                 'code': errors.InvalidArgError.code})
+                                 'status': int(exceptions.InvalidArgError.status_code),
+                                 'code': exceptions.InvalidArgError.code})
 
                 return combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add
 
@@ -1452,13 +1452,13 @@ def vectorise_multimodal_combination_field_structured(
     except (s2_inference_errors.UnknownModelError,
             s2_inference_errors.InvalidModelPropertiesError,
             s2_inference_errors.ModelLoadError) as model_error:
-        raise errors.BadRequestError(
+        raise exceptions.BadRequestError(
             message=f'Problem vectorising query. Reason: {str(model_error)}',
             link="https://marqo.pages.dev/latest/Models-Reference/dense_retrieval/"
         )
     except s2_inference_errors.S2InferenceError:
         combo_document_is_valid = False
-        image_err = errors.InvalidArgError(message=f'Could not process given image: {multimodal_object_copy}')
+        image_err = exceptions.InvalidArgError(message=f'Could not process given image: {multimodal_object_copy}')
         unsuccessful_doc_to_append = \
             (doc_index, {'_id': doc_id, 'error': image_err.message, 'status': int(image_err.status_code),
                          'code': image_err.code})
@@ -1469,7 +1469,7 @@ def vectorise_multimodal_combination_field_structured(
     vectors_list = text_vectors + image_vectors
 
     if not len(sub_field_name_list) == len(vectors_list):
-        raise errors.BatchInferenceSizeError(
+        raise exceptions.BatchInferenceSizeError(
             message=f"Batch inference size does not match content for multimodal field {field}")
 
     vector_chunk = np.squeeze(np.mean(
