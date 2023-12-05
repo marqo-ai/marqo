@@ -69,9 +69,8 @@ class StructuredMarqoIndexRequest(MarqoIndexRequest):
         # Verify all combination fields are tensor fields
         combination_fields = [field for field in values.get('fields', []) if
                               field.type == marqo_index.FieldType.MultimodalCombination]
-        tensor_field_names = values.get('tensor_fields', [])
         for field in combination_fields:
             if field.name not in tensor_field_names:
-                raise ValueError(f'Field {field.name} has type {field.type.value()} and must be a tensor field')
+                raise ValueError(f'Field {field.name} has type {field.type.value} and must be a tensor field')
 
         return values

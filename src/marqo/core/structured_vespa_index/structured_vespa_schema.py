@@ -83,7 +83,10 @@ class StructuredVespaSchema(VespaSchema):
 
                 filter_field_name = field_name
 
-            if FieldFeature.LexicalSearch not in tensor_field_request.features and FieldFeature.Filter not in tensor_field_request.features:
+            if (
+                    FieldFeature.LexicalSearch not in tensor_field_request.features and
+                    FieldFeature.Filter not in tensor_field_request.features
+            ):
                 field_name = tensor_field_request.name
                 document.append(f'field {field_name} type {field_type} {{')
                 document.append('indexing: summary')
@@ -131,6 +134,9 @@ class StructuredVespaSchema(VespaSchema):
                     embeddings_field_name=embedding_field_name
                 )
             )
+
+        # vector count field
+        document.append(f'field {common.FIELD_VECTOR_COUNT} type int {{ indexing: attribute | summary }}')
 
         document.append('}')
 

@@ -3,6 +3,7 @@ from marqo.core.constants import VESPA_FIELD_ID
 
 FIELD_ID = VESPA_FIELD_ID
 FIELD_SCORE_MODIFIERS = 'marqo__score_modifiers'
+FIELD_VECTOR_COUNT = 'marqo__vector_count'
 
 RANK_PROFILE_BM25 = 'bm25'
 RANK_PROFILE_EMBEDDING_SIMILARITY = 'embedding_similarity'

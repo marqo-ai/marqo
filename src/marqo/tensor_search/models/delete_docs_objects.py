@@ -22,4 +22,3 @@ class MqDeleteDocsRequest(NamedTuple):
     """An object that holds the data from users for a delete request"""
     index_name: str
     document_ids: List[str]
-    auto_refresh: bool
