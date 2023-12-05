@@ -50,7 +50,7 @@ from marqo.tensor_search.enums import (
     Device, MediaType, MlModel, TensorField, SearchMethod, OpenSearchDataType,
     EnvVars, MappingsObjectType, DocumentFieldType, ModelProperties
 )
-from marqo.tensor_search.enums import IndexSettingsField as NsField
+from marqo.tensor_search.enums import MediaType, IndexSettingsField as NsField
 from marqo.tensor_search import utils, backend, validation, configs, add_docs, filtering, create_index
 from marqo.tensor_search.formatting import _clean_doc
 from marqo.tensor_search.index_meta_cache import get_cache, get_index_info
@@ -165,7 +165,7 @@ def create_vector_index(
     the_index_settings = create_index.autofill_search_model(the_index_settings)
 
     validation.validate_settings_object(settings_object=the_index_settings)
-
+    
     vector_index_settings = {
         "settings": {
             "index": {
@@ -180,7 +180,7 @@ def create_vector_index(
         },
         "mappings": {
             "_meta": {
-                "media_type": media_type,
+                "media_type": media_type.value,
             },
             "dynamic_templates": [
                 {
@@ -222,7 +222,7 @@ def create_vector_index(
     vector_index_settings["mappings"]["_meta"][NsField.index_settings] = the_index_settings
 
     vector_index_settings_with_knn = _add_knn_field(ix_settings=vector_index_settings)
-
+    print(vector_index_settings_with_knn)
     logger.debug(f"Creating index {index_name} with settings: {vector_index_settings_with_knn}")
     response = HttpRequests(config).put(path=index_name, body=vector_index_settings_with_knn)
 
@@ -416,52 +416,41 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
     unsuccessful_docs = []
     total_vectorise_time = 0
     
-    image_repo = {}
-    audio_repo = {}
+    media_repo = {}
     doc_count = len(add_docs_params.docs)
     
     with ExitStack() as exit_stack:
-        if index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_audio]:
+        is_images = index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]
+        is_audios = index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_audio]
+        media_type = None
+        if is_images:
+            media_type = MediaType.image
+        elif is_audios:
+            media_type = MediaType.audio
+
+        if media_type is not None:
             with RequestMetricsStore.for_request().time(
-                "audio_download.full_time",
+                "media_download.full_time",
                 lambda t: logger.debug(
-                    f"add_documents audio download: took {t:.3f}ms to concurrently download "
-                    f"audio for {doc_count} docs using {add_docs_params.image_download_thread_count} threads"
+                    f"add_documents media download: took {t:.3f}ms to concurrently download "
+                    f"media for {doc_count} docs using {add_docs_params.image_download_thread_count} threads"
                 )
             ):
                 if add_docs_params.tensor_fields and '_id' in add_docs_params.tensor_fields:
                     raise errors.BadRequestError(message="`_id` field cannot be a tensor field.")
 
-                audio_repo = exit_stack.enter_context(
-                    add_docs.download_audios(
-                        docs=add_docs_params.docs, 
+                non_tensor_fields = add_docs_params.non_tensor_fields or []
+
+                media_repo = exit_stack.enter_context(
+                    add_docs.download_media(
+                        docs=add_docs_params.docs,
                         thread_count=20,
-                        tensor_fields=add_docs_params.tensor_fields if add_docs_params.tensor_fields is not None else None,
-                        non_tensor_fields=add_docs_params.non_tensor_fields + ['_id'] if add_docs_params.non_tensor_fields is not None else None,
-                        image_download_headers=add_docs_params.image_download_headers)
+                        media_type=media_type,
+                        tensor_fields=add_docs_params.tensor_fields,
+                        non_tensor_fields=non_tensor_fields,
+                        image_download_headers=add_docs_params.image_download_headers
+                    )
                 )
-                print(audio_repo)
-        
-        if index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]:
-            with RequestMetricsStore.for_request().time(
-                "image_download.full_time",
-                lambda t: logger.debug(
-                    f"add_documents image download: took {t:.3f}ms to concurrently download "
-                    f"images for {doc_count} docs using {add_docs_params.image_download_thread_count} threads"
-                )
-            ):
-                if add_docs_params.tensor_fields and '_id' in add_docs_params.tensor_fields:
-                    raise errors.BadRequestError(message="`_id` field cannot be a tensor field.")
-
-                image_repo = exit_stack.enter_context(
-                    add_docs.download_images(docs=add_docs_params.docs, thread_count=20,
-                                             tensor_fields=add_docs_params.tensor_fields
-                                             if add_docs_params.tensor_fields is not None else None,
-                                             non_tensor_fields=add_docs_params.non_tensor_fields + ['_id']
-                                             if add_docs_params.non_tensor_fields is not None else None,
-                                             image_download_headers=add_docs_params.image_download_headers)
-                )
-
         if add_docs_params.use_existing_tensors:
             doc_ids = []
 
@@ -614,39 +603,27 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                             NsField.patch_method]
                         # the chunk_image contains the no-op logic as of now - method = None will be a no-op
                         try:
-                            # in the future, if we have different chunking methods, make sure we catch possible
-                            # errors of different types generated here, too.
-                            if isinstance(field_content, str) and index_info.index_settings[NsField.index_defaults][
-                                NsField.treat_urls_and_pointers_as_images]:
-                                if not isinstance(image_repo[field_content], Exception):
-                                    image_data = image_repo[field_content]
+                            if isinstance(field_content, str):
+                                if not isinstance(media_repo[field_content], Exception):
+                                    media_data = media_repo[field_content]
                                 else:
                                     raise s2_inference_errors.S2InferenceError(
-                                        f"Could not find image found at `{field_content}`. \n"
-                                        f"Reason: {str(image_repo[field_content])}"
-                                    )
-                            elif isinstance(field_content, str) and index_info.index_settings[NsField.index_defaults][
-                                NsField.treat_urls_and_pointers_as_audio]:
-                                if not isinstance(audio_repo[field_content], Exception):
-                                    image_data = audio_repo[field_content]
-                                else:
-                                    raise s2_inference_errors.S2InferenceError(
-                                        f"Could not find audio found at `{field_content}`. \n"
-                                        f"Reason: {str(audio_repo[field_content])}"
+                                        f"Could not find {media_type.value} found at `{field_content}`. \n"
+                                        f"Reason: {str(media_repo[field_content])}"
                                     )
                             elif isinstance(field_content, str):
-                                image_data = text_chunk_prefix + field_content     # Add prefix to URL if it's to be treated as-is.
+                                media_data = text_chunk_prefix + field_content     # Add prefix to URL if it's to be treated as-is.
                             else:
-                                image_data = field_content      # If it's actual image data, just pass it through.
+                                media_data = field_content      # If it's actual image data, just pass it through.
                             
-                            if image_method not in [None, 'none', '', "None", ' ']:
+                            if is_images and image_method not in [None, 'none', '', "None", ' ']:
                                 content_chunks, text_chunks = image_processor.chunk_image(
-                                    image_data, device=add_docs_params.device, method=image_method)
+                                    media_data, device=add_docs_params.device, method=image_method)
                             else:
                                 # if we are not chunking, then we set the chunks as 1-len lists
-                                # content_chunk is the PIL image
+                                # content_chunk is the media
                                 # text_chunk refers to URL
-                                content_chunks, text_chunks = [image_data], [field_content]
+                                content_chunks, text_chunks = [media_data], [field_content]
                         except s2_inference_errors.S2InferenceError as e:
                             document_is_valid = False
                             unsuccessful_docs.append(
@@ -656,11 +633,8 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                             )
                             break
 
-                    normalize_embeddings = index_info.index_settings[NsField.index_defaults][
-                        NsField.normalize_embeddings]
-                    infer_if_media = index_info.index_settings[NsField.index_defaults][
-                        NsField.treat_urls_and_pointers_as_images] or index_info.index_settings[NsField.index_defaults][
-                        NsField.treat_urls_and_pointers_as_audio]
+                    normalize_embeddings = index_info.index_settings[NsField.index_defaults][NsField.normalize_embeddings]
+                    infer_if_media = is_images or is_audios
 
                     try:
                         # in the future, if we have different underlying vectorising methods, make sure we catch possible
@@ -714,7 +688,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                         unsuccessful_doc_to_append, combo_vectorise_time_to_add,
                         new_fields_from_multimodal_combination) = vectorise_multimodal_combination_field(
                             field, field_content, copied, i, doc_id, add_docs_params.device, index_info,
-                            image_repo|audio_repo, add_docs_params.mappings[field], 
+                            media_repo, add_docs_params.mappings[field], 
                             text_chunk_prefix=text_chunk_prefix,
                             model_auth=add_docs_params.model_auth)
                     total_vectorise_time = total_vectorise_time + combo_vectorise_time_to_add

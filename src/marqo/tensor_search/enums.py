@@ -2,10 +2,14 @@ from enum import Enum
 from fastapi_utils.enums import StrEnum
 
 
-class MediaType:
+class MediaType(Enum):
     text = 'text'
     image = 'image'
+    audio = 'audio'
     default = 'text'
+
+    def __str__(self):
+        return self.value
 
 
 class MlModel:

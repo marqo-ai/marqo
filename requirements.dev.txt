@@ -19,7 +19,7 @@ validators==0.20.0
 sentence-transformers==2.2.2
 open_clip_torch==2.23.0
 clip-marqo==1.0.2
-laion-clap
+# msclap
 librosa
 onnx
 protobuf
