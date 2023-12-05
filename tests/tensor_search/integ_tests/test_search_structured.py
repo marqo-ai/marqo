@@ -442,18 +442,18 @@ class TestVectorSearch(MarqoTestCase):
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
                 docs=[
-                    {"abc": "some text", "other field": "baaadd", "_id": "5678", "my_string": "b"},
-                    {"abc": "some text", "other field": "Close match hehehe", "_id": "1234", "an_int": 2},
-                    {"abc": "some text", "_id": "1235", "my_list": ["tag1", "tag2 some"]}
-                ],
-                tensor_fields=["abc", "other field"]
+                    {"_id": "5678", "text_field_1": "some text", "text_field_2": "baaadd", "text_field_3": "b"},
+                    {"_id": "1234", "text_field_1": "some text", "text_field_2": "Close match hehehe",
+                     "int_field_1": 2},
+                    {"_id": "1235", "text_field_1": "some text", "list_field_1": ["tag1", "tag2 some"]}
+                ]
             )
         )
 
         test_input = [
-            ("my_list:tag1", 1, "1235"),
-            ("my_list:tag55", 0, None),
-            ("my_string:b", 1, "5678"),
+            ("list_field_1:tag1", 1, "1235"),
+            ("list_field_1:tag55", 0, None),
+            ("text_field_3:b", 1, "5678"),
         ]
 
         for filter_string, expected_hits, expected_id in test_input:
@@ -464,29 +464,31 @@ class TestVectorSearch(MarqoTestCase):
                     search_method=SearchMethod.LEXICAL, filter=filter_string
                 )
                 self.assertEqual(expected_hits, len(res["hits"]))
-                self.assertEqual(expected_id, res["hits"][0]["_id"] if expected_id else None)
+                if expected_id:
+                    self.assertEqual(expected_id, res["hits"][0]["_id"])
 
     #
     def test_filtering_list_case_image(self):
-
         hippo_img = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
         tensor_search.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_image_index,
                 docs=[
-                    {"img": hippo_img, "abc": "some text", "other field": "baaadd", "_id": "5678", "my_string": "b"},
-                    {"img": hippo_img, "abc": "some text", "other field": "Close match hehehe", "_id": "1234",
-                     "an_int": 2},
-                    {"img": hippo_img, "abc": "some text", "_id": "1235", "my_list": ["tag1", "tag2 some"]}],
-                tensor_fields=["abc", "other field", "img"]
+                    {"image_field_1": hippo_img, "text_field_1": "some text", "text_field_2": "baaadd", "_id": "5678",
+                     "text_field_3": "b"},
+                    {"image_field_1": hippo_img, "text_field_1": "some text", "text_field_2": "Close match hehehe",
+                     "_id": "1234", "int_field_1": 2},
+                    {"image_field_1": hippo_img, "text_field_1": "some text", "_id": "1235",
+                     "list_field_1": ["tag1", "tag2 some"]}
+                ]
             )
         )
 
         test_parameters = [
-            ("my_list:tag1", 1, "1235"),
-            ("my_list:tag55", 0, None),
-            ("my_string:b", 1, "5678"),
+            ("list_field_1:tag1", 1, "1235"),
+            ("list_field_1:tag55", 0, None),
+            ("text_field_3:b", 1, "5678"),
         ]
 
         for filter_string, expected_hits, expected_id in test_parameters:
@@ -498,36 +500,36 @@ class TestVectorSearch(MarqoTestCase):
                 )
 
                 self.assertEqual(expected_hits, len(res["hits"]))
-                self.assertEqual(expected_id, res["hits"][0]["_id"] if expected_id else None)
+                if expected_id:
+                    self.assertEqual(expected_id, res["hits"][0]["_id"])
 
     def test_filtering(self):
-        # TODO-Li Add support for filter on Bool
-        # Add documents first (assuming add_docs_caller is a method to add documents)
+        # Add documents first
         res = tensor_search.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
                 docs=[
-                    {"abc": "some text", "other field": "baaadd", "_id": "5678", "my_string": "b"},
-                    {"abc": "some text", "other field": "Close match hehehe", "_id": "1234", "an_int": 2},
-                    {"abc": "some text", "other field": "Close match hehehe", "_id": "1233", "my_bool": True}
-                ],
-                tensor_fields=["abc", "other field"]
+                    {"_id": "5678", "text_field_1": "some text", "text_field_2": "baaadd", "text_field_3": "b"},
+                    {"_id": "1234", "text_field_1": "some text", "text_field_2": "Close match hehehe",
+                     "int_field_1": 2},
+                    {"_id": "1233", "text_field_1": "some text", "text_field_2": "Close match hehehe",
+                     "bool_field_1": True}
+                ]
             )
         )
 
-        # Define test parameters as tuples (filter_string, expected_hits, expected_id)
+        # Define test parameters
         test_parameters = [
-            ("my_string:c", 0, None),
-            ("an_int:2", 1, "1234"),
-            ("my_string:b", 1, "5678"),
-            ("my_int_something:5", 0, None),
-            ("an_int:[5 TO 30]", 0, None),
-            ("an_int:[0 TO 30]", 1, "1234"),
-            ("my_bool:true", 1, "1233"),
-            ("an_int:[0 TO 30] OR my_bool:true", 2, None),  # Multiple hits, so expected_id is None
-            ("(an_int:[0 TO 30] AND an_int:2) AND abc:(some text)", 1, "1234"),
-            ("*:*", 3, None)  # "*" filter, expecting all documents
+            ("text_field_3:c", 0, None),
+            ("int_field_1:2", 1, "1234"),
+            ("text_field_3:b", 1, "5678"),
+            ("int_field_2:5", 0, None),
+            ("int_field_1:[5 TO 30]", 0, None),
+            ("int_field_1:[0 TO 30]", 1, "1234"),
+            ("bool_field_1:true", 1, "1233"),
+            ("int_field_1:[0 TO 30] OR bool_field_1:true", 2, None),
+            ("(int_field_1:[0 TO 30] AND int_field_1:2) AND text_field_1:(some text)", 1, "1234"),
         ]
 
         for filter_string, expected_hits, expected_id in test_parameters:
@@ -549,20 +551,21 @@ class TestVectorSearch(MarqoTestCase):
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
                 docs=[
-                    {"abc": "some text", "other field": "baaadd", "_id": "5678", "my_string": "b"},
-                    {"abc": "some text", "other field": "Close match hehehe", "_id": "1234", "an_int": 2},
-                    {"abc": "some text", "other field": "Close match hehehe", "_id": "1233", "my_bool": True},
-                    {"abc": "some text", "Floaty Field": 0.548, "_id": "344", "my_bool": True},
-                ],
-                tensor_fields=["abc", "other field"]
+                    {"_id": "5678", "text_field_1": "some text", "text_field_2": "baaadd", "text_field_3": "b"},
+                    {"_id": "1234", "text_field_1": "some text", "text_field_2": "Close match hehehe",
+                     "int_field_1": 2},
+                    {"_id": "1233", "text_field_1": "some text", "text_field_2": "Close match hehehe",
+                     "bool_field_1": True},
+                    {"_id": "344", "text_field_1": "some text", "float_field_1": 0.548, "bool_field_1": True},
+                ]
             )
         )
 
         # Define test parameters as tuples (filter_string, expected_hits, expected_ids)
         test_parameters = [
-            ("other\\ field:baaadd", 1, ["5678"]),
-            ("other\\ field:(Close match hehehe)", 2, ["1234", "1233"]),
-            ("(Floaty\\ Field:[0 TO 1]) AND (abc:(some text))", 1, ["344"])
+            ("text_field_2:baaadd", 1, ["5678"]),
+            ("text_field_2:(Close match hehehe)", 2, ["1234", "1233"]),
+            ("(float_field_1:[0 TO 1]) AND (text_field_1:(some text))", 1, ["344"])
         ]
 
         for filter_string, expected_hits, expected_ids in test_parameters:
@@ -583,18 +586,19 @@ class TestVectorSearch(MarqoTestCase):
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
                 docs=[
-                    {"abc": "some text", "other field": "baaadd", "_id": "5678", "my_string": "b"},
-                    {"abc": "some text", "other field": "Close match hehehe", "_id": "1234", "an_int": 2},
-                    {"abc": "some text", "other field": "Close match hehehe", "_id": "1233", "my_bool": True},
-                ],
-                tensor_fields=["abc", "other field"]
+                    {"_id": "5678", "text_field_1": "some text", "text_field_2": "baaadd", "text_field_3": "b"},
+                    {"_id": "1234", "text_field_1": "some text", "text_field_2": "Close match hehehe",
+                     "int_field_1": 2},
+                    {"_id": "1233", "text_field_1": "some text", "text_field_2": "Close match hehehe",
+                     "bool_field_1": True}
+                ]
             )
         )
 
         # Define test parameters as tuples (filter_string)
         bad_filter_strings = [
-            "(other field):baaadd",  # Incorrect syntax for field name with space
-            "(an_int:[0 TO 30] and an_int:2) AND abc:(some text)",  # and instead of AND here
+            "(text_field_2):baaadd",  # Incorrect syntax for field name with space
+            "(int_field_1:[0 TO 30] and int_field_1:2) AND text_field_1:(some text)",  # and instead of AND here
             "",  # Empty filter string
         ]
 

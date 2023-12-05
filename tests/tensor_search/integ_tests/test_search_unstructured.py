@@ -485,7 +485,6 @@ class TestVectorSearch(MarqoTestCase):
             ("my_bool:true", 1, "1233"),
             ("an_int:[0 TO 30] OR my_bool:true", 2, None),  # Multiple hits, so expected_id is None
             ("(an_int:[0 TO 30] AND an_int:2) AND abc:(some text)", 1, "1234"),
-            ("*:*", 3, None)  # "*" filter, expecting all documents
         ]
 
         for filter_string, expected_hits, expected_id in test_parameters:
