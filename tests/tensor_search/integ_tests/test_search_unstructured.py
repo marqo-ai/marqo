@@ -68,28 +68,6 @@ class TestVectorSearch(MarqoTestCase):
     def tearDown(self) -> None:
         self.device_patcher.stop()
 
-    # def _delete_test_indices(self, indices=None):
-    #     if indices is None or not indices:
-    #         ix_to_delete = [self.default_text_index, self.index_name_2, self.index_name_3]
-    #     else:
-    #         ix_to_delete = indices
-    #     for ix_name in ix_to_delete:
-    #         try:
-    #             tensor_search.delete_index(config=self.config, index_name=ix_name)
-    #         except IndexNotFoundError as s:
-    #             pass
-    #
-    # def _create_test_indices(self, indices=None):
-    #     if indices is None or not indices:
-    #         ix_to_create = [self.default_text_index, self.index_name_2, self.index_name_3]
-    #     else:
-    #         ix_to_create = indices
-    #     for ix_name in ix_to_create:
-    #         tensor_search.create_vector_index(config=self.config, index_name=ix_name)
-    #
-    # def test_vector_search_searchable_attributes_non_existent(self):
-    #     """TODO: non existent attrib."""
-    #
     def test_each_doc_returned_once(self):
         """Each doc should be returned once, even if it matches multiple times"""
         tensor_search.add_documents(config=self.config,
@@ -973,7 +951,7 @@ class TestVectorSearch(MarqoTestCase):
                            {"https://marqo_not_real.com/image_1.png": 3}, set()]
         for q in invalid_queries:
             with self.subTest(f"query={q}"):
-                with self.assertRaises(errors.InvalidArgError, errors.BadRequestError):
+                with self.assertRaises(errors.InvalidArgError):
                     tensor_search.search(
                         text=q,
                         index_name=self.default_image_index,
@@ -991,11 +969,10 @@ class TestVectorSearch(MarqoTestCase):
                 "_id": 'artefact_hippo'
             }
         ]
-        tensor_search.delete_index(self.config, self.default_text_index)
         tensor_search.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
-                index_name=self.default_text_index,
+                index_name=self.default_image_index,
                 docs=docs,
                 tensor_fields = ["loc", "field_a"]
             )
@@ -1006,7 +983,7 @@ class TestVectorSearch(MarqoTestCase):
             with self.subTest(f"query={alright_queries}"):
                 tensor_search.search(
                     text=q,
-                    index_name=self.default_text_index,
+                    index_name=self.default_image_index,
                     result_count=5,
                     config=self.config,
                     search_method=SearchMethod.TENSOR)
