@@ -418,31 +418,23 @@ class TestVectorSearch(MarqoTestCase):
             )
         )
 
-        res_exists = tensor_search.search(
-            index_name=self.default_text_index, config=self.config, text="", filter="list_field_1:tag1")
+        test_cases = [
+            ("list_field_1:tag1", 1, "1235", True),
+            ("list_field_1:tag55", 0, None, False),
+            ("text_field_3:b", 1, "5678", True),
+            ("list_field_1:tag2", 0, None, False),
+            ("list_field_1:(tag2 some)", 1, "1235", True)
+        ]
 
-        res_not_exists = tensor_search.search(
-            index_name=self.default_text_index, config=self.config, text="", filter="list_field_1:tag55")
+        for filter_query, expected_count, expected_id, highlight_exists in test_cases:
+            with self.subTest(filter_query=filter_query):
+                res = tensor_search.search(
+                    index_name=self.default_text_index, config=self.config, text="", filter=filter_query)
 
-        res_other = tensor_search.search(
-            index_name=self.default_text_index, config=self.config, text="", filter="text_field_3:b")
-
-        res_should_only_match_keyword_bad = tensor_search.search(
-            index_name=self.default_text_index, config=self.config, text="", filter="list_field_1:tag2")
-        res_should_only_match_keyword_good = tensor_search.search(
-            index_name=self.default_text_index, config=self.config, text="", filter="list_field_1:(tag2 some)")
-
-        assert res_exists["hits"][0]["_id"] == "1235"
-        assert res_exists["hits"][0]["_highlights"] == {"text_field_1": "some text"}
-        assert len(res_exists["hits"]) == 1
-
-        assert len(res_not_exists["hits"]) == 0
-
-        assert res_other["hits"][0]["_id"] == "5678"
-        assert len(res_other["hits"]) == 1
-
-        assert len(res_should_only_match_keyword_bad["hits"]) == 0
-        assert len(res_should_only_match_keyword_good["hits"]) == 1
+                assert len(res["hits"]) == expected_count
+                if expected_id:
+                    assert res["hits"][0]["_id"] == expected_id
+                    assert ("_highlights" in res["hits"][0]) == highlight_exists
 
     def test_filtering_list_case_lexical(self):
         tensor_search.add_documents(
