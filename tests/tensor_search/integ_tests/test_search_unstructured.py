@@ -683,6 +683,42 @@ class TestVectorSearch(MarqoTestCase):
                     if expected_id:
                         self.assertEqual(expected_id, res["hits"][0]["_id"])
 
+    def test_filter_on_id_and_more(self):
+        """Test various filtering scenarios including _id and other conditions"""
+        # Adding documents
+        tensor_search.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.default_text_index,
+                docs=[
+                    {"abc": "some text", "other field": "baaadd", "_id": "5678", "status": "active"},
+                    {"abc": "some text", "other field": "Close match hehehe", "_id": "1234", "status": "inactive"},
+                    {"abc": "different text", "other field": "irrelevant", "_id": "9012", "status": "active"}
+                ],
+                tensor_fields=["abc", "other field"]
+            )
+        )
+
+        test_cases = [
+            ("filter on id 5678", "_id:5678", 1, ["5678"]),
+            ("filter on id 1234", "_id:1234", 1, ["1234"]),
+            ("AND filter", "_id:5678 AND status:active", 1, ["5678"]),
+            ("OR filter", "_id:5678 OR _id:1234", 2, ["5678", "1234"]),
+            ("Complex filter", "_id:5678 OR (abc:some\ text AND status:inactive)", 2, ["5678", "1234"]),
+            ("Non-ID field filter", "status:active", 2, ["5678", "9012"]),
+            ("No result filter", "_id:0000", 0, [])
+        ]
+
+        for name, filter_query, expected_count, expected_ids in test_cases:
+            with self.subTest(name=name):
+                res = tensor_search.search(
+                    config=self.config, index_name=self.default_text_index, text="some text",
+                    filter=filter_query
+                )
+                self.assertEqual(expected_count, len(res["hits"]))
+                if expected_ids:
+                    self.assertEqual(expected_ids, [hit["_id"] for hit in res["hits"]])
+
     def test_attributes_to_retrieve(self):
         docs = [
             {

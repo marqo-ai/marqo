@@ -11,6 +11,8 @@ from marqo.core.models.marqo_query import (MarqoTensorQuery, MarqoLexicalQuery, 
 from marqo.core.exceptions import UnsupportedFeatureError
 from marqo.exceptions import InternalError
 import marqo.core.search.search_filter as search_filter
+import copy
+import marqo.core.constants as index_constants
 from marqo.core.exceptions import InvalidDataTypeError, InvalidFieldNameError, VespaDocumentParsingError
 
 
@@ -91,6 +93,10 @@ class UnstructuredVespaIndex(VespaIndex):
 
         def generate_equality_filter_string(node: search_filter.EqualityTerm) -> str:
             filter_parts = []
+
+            # Filter on `_id`
+            if node.field == index_constants.MARQO_DOC_ID:
+                return f'({index_constants.VESPA_FIELD_ID} contains "{escape(node.value)}")'
 
             # Bool Filter
             if node.value in unstructured_constants.FILTER_STRING_BOOL_VALUE:
