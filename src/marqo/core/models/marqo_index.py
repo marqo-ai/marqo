@@ -321,11 +321,11 @@ class StructuredMarqoIndex(MarqoIndex):
     @property
     def all_field_map(self) -> Dict[str, Field]:
         """
-        A map from field name, lexical name and filter name to the field.
+        A map from field name, lexical name and filter name to the Field object.
         """
         return self._cache_or_get('all_field_map',
                                   lambda: {
-                                      **{field.name: field for field in self.fields + self.tensor_fields},
+                                      **{field.name: field for field in self.fields},
                                       **{field.lexical_field_name: field for field in self.fields if
                                          field.lexical_field_name is not None},
                                       **{field.filter_field_name: field for field in self.fields if
