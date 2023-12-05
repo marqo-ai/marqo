@@ -2,30 +2,22 @@ from marqo.exceptions import (
     MarqoError,
     InternalError,
     InvalidArgumentError,
-    NotFoundError,
-    AlreadyExistsError,
 )
 
 
-class IndexExistsError(AlreadyExistsError):
+class IndexExistsError(MarqoError):
     pass
 
 
-class IndexNotFoundError(NotFoundError):
+class IndexNotFoundError(MarqoError):
     pass
 
 
 class ParsingError(MarqoError):
-    """
-    Not subclass of any specific exception. Subclasses of this error have different behaviors.
-    """
     pass
 
 
 class VespaDocumentParsingError(ParsingError):
-    """
-    Not subclass of any specific exception. Will be caught by generic handler.
-    """
     pass
 
 

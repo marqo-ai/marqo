@@ -4,7 +4,10 @@ import os
 from typing import List
 
 import pydantic
-from marqo.api import exceptions
+from marqo import exceptions as base_exceptions
+from marqo.api import exceptions as api_exceptions
+from marqo.core import exceptions as core_exceptions
+
 import uvicorn
 from fastapi import FastAPI
 from fastapi import Request, Depends
@@ -12,9 +15,7 @@ from fastapi.responses import JSONResponse
 
 from marqo import config
 from marqo import version
-from marqo.core.exceptions import IndexExistsError, IndexNotFoundError
 from marqo.core.index_management.index_management import IndexManagement
-from marqo.api.exceptions import InvalidArgError, MarqoWebError, MarqoError
 from marqo.tensor_search import tensor_search, utils
 from marqo.tensor_search.enums import RequestType, EnvVars
 from marqo.tensor_search.models.add_docs_objects import (AddDocsBodyParams)
@@ -54,8 +55,44 @@ def get_config():
     return _config
 
 
-@app.exception_handler(MarqoWebError)
-def marqo_user_exception_handler(request: Request, exc: MarqoWebError) -> JSONResponse:
+@app.exception_handler(base_exceptions.MarqoError)
+def marqo_core_exception_handler(request: Request, exc: base_exceptions.MarqoError):
+    """
+    Catch a base Marqo Error and raise its corresponding API Marqo Error.
+    The API Error will be caught by the `marqo_api_exception_handler` below.
+    This ensures that raw base errors are never returned by the API.
+    
+    Mappings are in an ordered list to allow for hierarchical resolution of errors.
+    Stored as 2-tuples: (Base/Core/Vespa/Inference Error, API Error)
+    """
+
+    api_exception_mappings = [
+        # Core exceptions
+        (core_exceptions.InvalidDataTypeError, api_exceptions.InvalidArgError),         # More specific errors should take precedence
+        (core_exceptions.InvalidFieldNameError, api_exceptions.InvalidFieldNameError),
+
+        (core_exceptions.IndexExistsError, api_exceptions.IndexAlreadyExistsError),
+        (core_exceptions.IndexNotFoundError, api_exceptions.IndexNotFoundError),
+        (core_exceptions.VespaDocumentParsingError, api_exceptions.BackendDataParsingError),
+
+        # Base exceptions
+        (base_exceptions.InternalError, api_exceptions.InternalError),
+        (base_exceptions.InvalidArgumentError, api_exceptions.InvalidArgError),
+
+        # If no mapping is found, raise a generic API error (500)
+        (base_exceptions.MarqoError, api_exceptions.MarqoWebError),
+    ]
+
+    for base_exception, api_exception in api_exception_mappings:
+        if isinstance(exc, base_exception):
+            raise api_exception(exc.message) from exc
+    
+    # Completely unhandled exception (500)
+    raise api_exceptions.MarqoWebError(exc.message) from exc
+
+
+@app.exception_handler(api_exceptions.MarqoWebError)
+def marqo_api_exception_handler(request: Request, exc: api_exceptions.MarqoWebError) -> JSONResponse:
     """ Catch a MarqoWebError and return an appropriate HTTP response.
 
     We can potentially catch any type of Marqo exception. We can do isinstance() calls
@@ -86,15 +123,15 @@ async def validation_exception_handler(request: Request, exc: pydantic.Validatio
 
     body = {
         "message": json.dumps(error_messages),
-        "code": InvalidArgError.code,
-        "type": InvalidArgError.error_type,
-        "link": InvalidArgError.link
+        "code": api_exceptions.InvalidArgError.code,
+        "type": api_exceptions.InvalidArgError.error_type,
+        "link": api_exceptions.InvalidArgError.link
     }
-    return JSONResponse(content=body, status_code=InvalidArgError.status_code)
+    return JSONResponse(content=body, status_code=api_exceptions.InvalidArgError.status_code)
 
 
-@app.exception_handler(MarqoError)
-def marqo_internal_exception_handler(request, exc: MarqoError):
+@app.exception_handler(api_exceptions.MarqoError)
+def marqo_internal_exception_handler(request, exc: api_exceptions.MarqoError):
     """MarqoErrors are treated as internal errors"""
     headers = getattr(exc, "headers", None)
     body = {
@@ -119,8 +156,8 @@ def root():
 def create_index(index_name: str, settings: IndexSettings, marqo_config: config.Config = Depends(get_config)):
     try:
         marqo_config.index_management.create_index(settings.to_marqo_index_request(index_name))
-    except IndexExistsError as e:
-        raise exceptions.IndexAlreadyExistsError(f"Index {index_name} already exists") from e
+    except core_exceptions.IndexExistsError as e:
+        raise api_exceptions.IndexAlreadyExistsError(f"Index {index_name} already exists") from e
 
     return JSONResponse(
         content={
@@ -244,8 +281,8 @@ def get_settings(index_name: str, marqo_config: config.Config = Depends(get_conf
     try:
         marqo_index = marqo_config.index_management.get_index(index_name)
         return IndexSettings.from_marqo_index(marqo_index).dict(exclude_none=True)
-    except IndexNotFoundError as e:
-        raise exceptions.IndexNotFoundError(f"Index {index_name} not found") from e
+    except core_exceptions.IndexNotFoundError as e:
+        raise api_exceptions.IndexNotFoundError(f"Index {index_name} not found") from e
 
 
 @app.get("/models")

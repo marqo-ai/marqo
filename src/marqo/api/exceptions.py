@@ -194,8 +194,15 @@ class InternalError(MarqoWebError):
 
 
 class BackendCommunicationError(InternalError):
-    """Error when connecting to Marqo-os"""
+    """Error when connecting to Vespa"""
     code = "backend_communication_error"
+    status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+
+
+class BackendDataParsingError(InternalError):
+    """Error when parsing data from Vespa"""
+    # TODO: Improve upon this error name
+    code = "backend_data_parsing_error"
     status_code = HTTPStatus.INTERNAL_SERVER_ERROR
 
 

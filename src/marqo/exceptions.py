@@ -50,12 +50,3 @@ class InternalError(MarqoError):
 
 class InvalidArgumentError(MarqoError):
     pass
-
-
-class NotFoundError(MarqoError):
-    pass
-
-
-class AlreadyExistsError(MarqoError):
-    pass
-
