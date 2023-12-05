@@ -65,17 +65,17 @@ class TestVectorSearch(MarqoTestCase):
     def test_each_doc_returned_once(self):
         """Each doc should be returned once, even if it matches multiple times"""
         tensor_search.add_documents(config=self.config,
-            add_docs_params=AddDocsParams(
-                index_name=self.default_text_index,
-                docs=[
-                    {"abc": "Exact match hehehe efgh ", "other field": "baaadd efgh ",
-                     "_id": "5678", "finally": "some field efgh "},
-                    {"abc": "shouldn't really match ", "other field": "Nope.....",
-                     "_id": "1234", "finally": "Random text here efgh "},
-                ],
-                tensor_fields=["abc", "other field", "finally"],
-             )
-        )
+                                    add_docs_params=AddDocsParams(
+                                        index_name=self.default_text_index,
+                                        docs=[
+                                            {"abc": "Exact match hehehe efgh ", "other field": "baaadd efgh ",
+                                             "_id": "5678", "finally": "some field efgh "},
+                                            {"abc": "shouldn't really match ", "other field": "Nope.....",
+                                             "_id": "1234", "finally": "Random text here efgh "},
+                                        ],
+                                        tensor_fields=["abc", "other field", "finally"],
+                                    )
+                                    )
 
         search_res = tensor_search._vector_text_search(
             config=self.config, index_name=self.default_text_index,
@@ -142,9 +142,10 @@ class TestVectorSearch(MarqoTestCase):
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
                 docs=[
-                {"_id": "12345", "Desc": "The Guardian is newspaper, read in the UK and other places around the world"},
-                {"_id": "abc12334", "Title": "Grandma Jo's family recipe. ",
-                 "Steps": "1. Cook meat. 2: Dice Onions. 3: Serve."}],
+                    {"_id": "12345",
+                     "Desc": "The Guardian is newspaper, read in the UK and other places around the world"},
+                    {"_id": "abc12334", "Title": "Grandma Jo's family recipe. ",
+                     "Steps": "1. Cook meat. 2: Dice Onions. 3: Serve."}],
                 tensor_fields=["Desc", "Title", "Steps"],
             )
         )
@@ -193,7 +194,7 @@ class TestVectorSearch(MarqoTestCase):
                 index_name=self.default_text_index,
                 docs=[
                     {"abc": "Exact match hehehe", "other field": "baaadd",
-                    "Cool Field 1": "res res res", "_id": "5678"},
+                     "Cool Field 1": "res res res", "_id": "5678"},
                     {"abc": "random text", "other field": "Close match hehehe", "_id": "1234"},
                     {"Cool Field 1": "somewhat match", "_id": "9000"}
                 ],
@@ -223,7 +224,6 @@ class TestVectorSearch(MarqoTestCase):
             )
         self.assertIn("searchable_attributes is not supported", str(ex.exception))
 
-
     def test_search_format_empty(self):
         """Is the result formatted correctly? - on an emtpy index?"""
         search_res = tensor_search.search(
@@ -249,7 +249,7 @@ class TestVectorSearch(MarqoTestCase):
                      "Cool Field 1": "res res res", "_id": "5678"},
                     {"abc": "random text", "other field": "Close match hehehe", "_id": "1234"},
                     {"Cool Field 1": "somewhat match", "_id": "9000"}],
-                tensor_fields = ["abc", "other field", "Cool Field 1"]
+                tensor_fields=["abc", "other field", "Cool Field 1"]
             )
         )
 
@@ -303,7 +303,7 @@ class TestVectorSearch(MarqoTestCase):
             assert "_highlights" in hit
 
         tensor_no_highlights = tensor_search.search(
-            config=self.config, index_name=self.default_text_index, text="some text",highlights=False)
+            config=self.config, index_name=self.default_text_index, text="some text", highlights=False)
         self.assertEqual(2, len(tensor_highlights["hits"]))
         for hit in tensor_no_highlights["hits"]:
             assert "_highlights" not in hit
@@ -313,8 +313,8 @@ class TestVectorSearch(MarqoTestCase):
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index, docs=[
-                {"abc": "some text", "other field": "baaadd", "_id": "5678"},
-                {"abc": "some text", "other field": "Close match hehehe", "_id": "1234"}],
+                    {"abc": "some text", "other field": "baaadd", "_id": "5678"},
+                    {"abc": "some text", "other field": "Close match hehehe", "_id": "1234"}],
             )
         )
 
@@ -342,7 +342,7 @@ class TestVectorSearch(MarqoTestCase):
                     {"abc": "some text", "other field": "baaadd", "_id": "5678", "my_int": 144},
                     {"abc": "some text", "other field": "Close match hehehe", "_id": "1234", "my_int": 88},
                 ],
-                tensor_fields = ["abc", "other field"]
+                tensor_fields=["abc", "other field"]
             )
         )
         for search_method in [SearchMethod.LEXICAL, SearchMethod.TENSOR]:
@@ -415,10 +415,11 @@ class TestVectorSearch(MarqoTestCase):
         ]
 
         for filter_string, expected_hits, expected_id in test_input:
-            with self.subTest(f"filter_string={filter_string}, expected_hits={expected_hits}, expected_id={expected_id}"):
+            with self.subTest(
+                    f"filter_string={filter_string}, expected_hits={expected_hits}, expected_id={expected_id}"):
                 res = tensor_search.search(
-                   index_name=self.default_text_index, config=self.config, text="some",
-                   search_method=SearchMethod.LEXICAL, filter=filter_string
+                    index_name=self.default_text_index, config=self.config, text="some",
+                    search_method=SearchMethod.LEXICAL, filter=filter_string
                 )
                 self.assertEqual(expected_hits, len(res["hits"]))
                 self.assertEqual(expected_id, res["hits"][0]["_id"] if expected_id else None)
@@ -433,8 +434,9 @@ class TestVectorSearch(MarqoTestCase):
                 index_name=self.default_image_index,
                 docs=[
                     {"img": hippo_img, "abc": "some text", "other field": "baaadd", "_id": "5678", "my_string": "b"},
-                    {"img": hippo_img, "abc": "some text", "other field": "Close match hehehe", "_id": "1234", "an_int": 2},
-                    {"img": hippo_img, "abc": "some text", "_id": "1235", "my_list": ["tag1", "tag2 some"]}] ,
+                    {"img": hippo_img, "abc": "some text", "other field": "Close match hehehe", "_id": "1234",
+                     "an_int": 2},
+                    {"img": hippo_img, "abc": "some text", "_id": "1235", "my_list": ["tag1", "tag2 some"]}],
                 tensor_fields=["abc", "other field", "img"]
             )
         )
@@ -446,7 +448,8 @@ class TestVectorSearch(MarqoTestCase):
         ]
 
         for filter_string, expected_hits, expected_id in test_parameters:
-            with self.subTest(f"filter_string={filter_string}, expected_hits={expected_hits}, expected_id={expected_id}"):
+            with self.subTest(
+                    f"filter_string={filter_string}, expected_hits={expected_hits}, expected_id={expected_id}"):
                 res = tensor_search.search(
                     index_name=self.default_image_index, config=self.config, text="some",
                     search_method=SearchMethod.TENSOR, filter=filter_string
@@ -561,7 +564,6 @@ class TestVectorSearch(MarqoTestCase):
                         result_count=3, filter=filter_string, verbose=0
                     )
 
-
     def test_set_device(self):
         """calling search with a specified device overrides MARQO_BEST_AVAILABLE_DEVICE"""
 
@@ -569,7 +571,7 @@ class TestVectorSearch(MarqoTestCase):
 
         # Get vector dimension of the default BERT model
         DEFAULT_MODEL_DIMENSION = get_model_properties_from_registry("hf/all_datasets_v4_MiniLM-L6")["dimensions"]
-        mock_vectorise.return_value = [[0,] * DEFAULT_MODEL_DIMENSION]
+        mock_vectorise.return_value = [[0, ] * DEFAULT_MODEL_DIMENSION]
 
         @mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
         def run():
@@ -619,7 +621,7 @@ class TestVectorSearch(MarqoTestCase):
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
                 docs=docs,
-                tensor_fields = ["some_str"]
+                tensor_fields=["some_str"]
             )
         )
 
@@ -653,7 +655,7 @@ class TestVectorSearch(MarqoTestCase):
                         "fake_int": "234", "fake_float": "1.23", "gapped field_name": "gap"
                     }
                 ],
-                tensor_fields = ["doc title", "field X", "field1"])
+                tensor_fields=["doc title", "field X", "field1"])
         )
 
         # Define test parameters as tuples (filter_string, expected_hits, expected_id)
@@ -736,12 +738,14 @@ class TestVectorSearch(MarqoTestCase):
             (["field_1"], {"field_1", "_id", "_score", "_highlights"}),
             (["field_1", "field_2"], {"field_1", "field_2", "_id", "_score", "_highlights"}),
             (["field_1", "random_field"], {"field_1", "random_field", "_id", "_score", "_highlights"}),
-            (["field_1", "random_field", "random_lala"], {"field_1", "random_field", "random_lala", "_id", "_score", "_highlights"}),
-            (["field_1", "random_field", "random_lala", "marqomarqo"], {"field_1", "random_field", "random_lala", "marqomarqo", "_id", "_score", "_highlights"}),
-            (["field_1", "field_2", "random_field", "random_lala", "marqomarqo"], {"field_1", "field_2", "random_field", "random_lala", "marqomarqo", "_id", "_score", "_highlights"}),
+            (["field_1", "random_field", "random_lala"],
+             {"field_1", "random_field", "random_lala", "_id", "_score", "_highlights"}),
+            (["field_1", "random_field", "random_lala", "marqomarqo"],
+             {"field_1", "random_field", "random_lala", "marqomarqo", "_id", "_score", "_highlights"}),
+            (["field_1", "field_2", "random_field", "random_lala", "marqomarqo"],
+             {"field_1", "field_2", "random_field", "random_lala", "marqomarqo", "_id", "_score", "_highlights"}),
             (None, {"field_1", "field_2", "random_field", "random_lala", "marqomarqo", "_id", "_score", "_highlights"}),
         )
-
 
         tensor_search.add_documents(
             config=self.config,
@@ -754,8 +758,8 @@ class TestVectorSearch(MarqoTestCase):
 
         for search_method in [SearchMethod.LEXICAL, SearchMethod.TENSOR]:
             for searchable_attributes, expected_fields in test_inputs:
-                with self.subTest(f"search_method = {search_method}, searchable_attributes={searchable_attributes}, expected_fields = {expected_fields}"):
-
+                with self.subTest(
+                        f"search_method = {search_method}, searchable_attributes={searchable_attributes}, expected_fields = {expected_fields}"):
                     res = tensor_search.search(
                         config=self.config, index_name=self.default_text_index, text="Exact match hehehe",
                         attributes_to_retrieve=searchable_attributes, search_method=search_method
@@ -774,8 +778,8 @@ class TestVectorSearch(MarqoTestCase):
             add_docs_params=AddDocsParams(
                 index_name=self.image_index_with_random_model,
                 docs=[{"Title": "a test of" + (" ".join(random.choices(population=vocab, k=10)))}
-                  for _ in range(200)],
-                tensor_fields = ["Title"]
+                      for _ in range(200)],
+                tensor_fields=["Title"]
             )
         )
 
@@ -830,6 +834,7 @@ class TestVectorSearch(MarqoTestCase):
                         except errors.IllegalRequestedDocCount:
                             pass
                         return True
+
                     assert run()
 
     def test_invalid_limit_results(self):
@@ -889,7 +894,7 @@ class TestVectorSearch(MarqoTestCase):
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
                 docs=docs,
-                tensor_fields = ["field_a"]
+                tensor_fields=["field_a"]
             )
         )
         queries_expected_ordering = [
@@ -973,7 +978,7 @@ class TestVectorSearch(MarqoTestCase):
             add_docs_params=AddDocsParams(
                 index_name=self.default_image_index,
                 docs=docs,
-                tensor_fields = ["loc", "field_a"]
+                tensor_fields=["loc", "field_a"]
             )
         )
 
@@ -1004,7 +1009,7 @@ class TestVectorSearch(MarqoTestCase):
             add_docs_params=AddDocsParams(
                 index_name=self.default_image_index,
                 docs=docs,
-                tensor_fields = ["loc", "field_a"]
+                tensor_fields=["loc", "field_a"]
             )
         )
 
@@ -1030,7 +1035,7 @@ class TestVectorSearch(MarqoTestCase):
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
                 docs=docs,
-                tensor_fields = ["loc", "field_a"]
+                tensor_fields=["loc", "field_a"]
             )
         )
 
@@ -1065,7 +1070,7 @@ class TestVectorSearch(MarqoTestCase):
             add_docs_params=AddDocsParams(
                 index_name=self.default_image_index,
                 docs=docs,
-                tensor_fields = ["loc", "field_a"]
+                tensor_fields=["loc", "field_a"]
             )
         )
         res = tensor_search.search(
