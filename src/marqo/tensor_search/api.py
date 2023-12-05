@@ -154,10 +154,7 @@ def root():
 
 @app.post("/indexes/{index_name}")
 def create_index(index_name: str, settings: IndexSettings, marqo_config: config.Config = Depends(get_config)):
-    try:
-        marqo_config.index_management.create_index(settings.to_marqo_index_request(index_name))
-    except core_exceptions.IndexExistsError as e:
-        raise api_exceptions.IndexAlreadyExistsError(f"Index {index_name} already exists") from e
+    marqo_config.index_management.create_index(settings.to_marqo_index_request(index_name))
 
     return JSONResponse(
         content={
@@ -278,11 +275,8 @@ def get_indexes(marqo_config: config.Config = Depends(get_config)):
 
 @app.get("/indexes/{index_name}/settings")
 def get_settings(index_name: str, marqo_config: config.Config = Depends(get_config)):
-    try:
-        marqo_index = marqo_config.index_management.get_index(index_name)
-        return IndexSettings.from_marqo_index(marqo_index).dict(exclude_none=True)
-    except core_exceptions.IndexNotFoundError as e:
-        raise api_exceptions.IndexNotFoundError(f"Index {index_name} not found") from e
+    marqo_index = marqo_config.index_management.get_index(index_name)
+    return IndexSettings.from_marqo_index(marqo_index).dict(exclude_none=True)
 
 
 @app.get("/models")
