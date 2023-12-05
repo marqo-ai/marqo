@@ -69,27 +69,27 @@ def translate_api_device(device: Optional[str]) -> Optional[str]:
                               f"Acceptable device types: {acceptable_devices}")
 
 
-def decode_image_download_headers(image_download_headers: Optional[str] = None) -> dict:
+def decode_download_headers(download_headers: Optional[str] = None) -> dict:
     """Decodes an image download header string into a Python dict
 
     Args:
-        image_download_headers: JSON-serialised, URL encoded header dictionary
+        download_headers: JSON-serialised, URL encoded header dictionary
 
     Returns:
-        image_download_headers as a dict
+        download_headers as a dict
 
     Raises:
         InvalidArgError if there is trouble parsing the dictionary
     """
-    if not image_download_headers:
+    if not download_headers:
         return dict()
     else:
         try:
-            as_str = urllib.parse.unquote_plus(image_download_headers)
+            as_str = urllib.parse.unquote_plus(download_headers)
             as_dict = json.loads(as_str)
             return as_dict
         except json.JSONDecodeError as e:
-            raise InvalidArgError(f"Error parsing image_download_headers. Message: {e}")
+            raise InvalidArgError(f"Error parsing download_headers. Message: {e}")
 
 
 def decode_query_string_model_auth(model_auth: Optional[str] = None) -> Optional[ModelAuth]:
@@ -138,7 +138,7 @@ def decode_mappings(mappings: Optional[str] = None) -> dict:
 def add_docs_params_orchestrator(index_name: str, body: Union[AddDocsBodyParams, List[Dict]],
                                 device: str, auto_refresh: bool = False, non_tensor_fields: Optional[List[str]] = None,
                                 mappings: Optional[dict] = dict(), model_auth: Optional[ModelAuth] = None,
-                                image_download_headers: Optional[dict] = dict(),
+                                download_headers: Optional[dict] = dict(),
                                 use_existing_tensors: Optional[bool] = False, query_parameters: Optional[Dict] = dict(),
                                 text_chunk_prefix: str = None) -> AddDocsParams:
     """An orchestrator for the add_documents API to support both old and new versions of the API.
@@ -152,10 +152,10 @@ def add_docs_params_orchestrator(index_name: str, body: Union[AddDocsBodyParams,
         docs = body.documents
 
         # Check for query parameters that are not supported in the new API
-        deprecated_fields = ["non_tensor_fields", "use_existing_tensors", "image_download_headers", "model_auth", "mappings"]
+        deprecated_fields = ["non_tensor_fields", "use_existing_tensors", "download_headers", "model_auth", "mappings"]
         if any(field in query_parameters for field in deprecated_fields):
             raise BadRequestError("Marqo is not accepting any of the following parameters in the query string: "
-                                  "`non_tensor_fields`, `use_existing_tensors`, `image_download_headers`, `model_auth`, `mappings`. "
+                                  "`non_tensor_fields`, `use_existing_tensors`, `download_headers`, `model_auth`, `mappings`. "
                                   "Please move these parameters to the request body as "
                                   "`nonTensorFields`,` useExistingTensors`, `imageDownloadHeaders`, `modelAuth`, `mappings`. and try again. "
                                   "Please check `https://docs.marqo.ai/latest/API-Reference/documents/` for the correct APIs.")
@@ -165,7 +165,7 @@ def add_docs_params_orchestrator(index_name: str, body: Union[AddDocsBodyParams,
         tensor_fields = body.tensorFields
         use_existing_tensors = body.useExistingTensors
         model_auth = body.modelAuth
-        image_download_headers = body.imageDownloadHeaders
+        download_headers = body.imageDownloadHeaders
         text_chunk_prefix = body.textChunkPrefix
 
         if tensor_fields is not None and non_tensor_fields is not None:
@@ -180,7 +180,7 @@ def add_docs_params_orchestrator(index_name: str, body: Union[AddDocsBodyParams,
         return AddDocsParams(
             index_name=index_name, docs=docs, auto_refresh=auto_refresh,
             device=device, non_tensor_fields=non_tensor_fields, tensor_fields=tensor_fields,
-            use_existing_tensors=use_existing_tensors, image_download_headers=image_download_headers,
+            use_existing_tensors=use_existing_tensors, download_headers=download_headers,
             mappings=mappings, model_auth=model_auth, text_chunk_prefix=text_chunk_prefix
         )
 
@@ -198,7 +198,7 @@ def add_docs_params_orchestrator(index_name: str, body: Union[AddDocsBodyParams,
         return AddDocsParams(
             index_name=index_name, docs=docs, auto_refresh=auto_refresh,
             device=device, non_tensor_fields=non_tensor_fields,
-            use_existing_tensors=use_existing_tensors, image_download_headers=image_download_headers,
+            use_existing_tensors=use_existing_tensors, download_headers=download_headers,
             mappings=mappings, model_auth=model_auth, text_chunk_prefix=text_chunk_prefix
         )
 

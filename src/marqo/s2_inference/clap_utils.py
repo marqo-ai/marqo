@@ -170,7 +170,7 @@ class CLAP:
         self.processor = None
         self.embedding_dimension = embedding_dim
         self.truncate = truncate
-        self.model_properties = kwargs.get("model_properties", dict())
+        self.model_properties: dict = kwargs.get("model_properties", dict())
         self.sample_rate = self.model_properties.get("sample_rate", 48000)
         # model_auth gets passed through add_docs and search requests:
         self.model_auth = kwargs.get(InferenceParams.model_auth, None)
@@ -186,9 +186,6 @@ class CLAP:
             return output.cpu().numpy()
 
     def load(self) -> None:
-        raise NotImplementedError
-
-    def _convert_output(self, output):
         raise NotImplementedError
 
     def encode_text(
@@ -282,6 +279,7 @@ class LAION_CLAP(CLAP):
         truncate: bool = True,
         **kwargs,
     ) -> None:
+        # super().__init__(model_name, device, embedding_dim, truncate, **kwargs)
         super().__init__(model_name, device, embedding_dim, truncate, **kwargs)
 
     def load(self) -> None:
@@ -366,9 +364,9 @@ class LAION_CLAP(CLAP):
 
         if is_image:
             logger.debug("image")
-            image_download_headers = kwargs.get("image_download_headers", dict())
+            download_headers = kwargs.get("download_headers", dict())
             return self.encode_audio(
-                inputs, normalize=normalize, download_headers=image_download_headers
+                inputs, normalize=normalize, download_headers=download_headers
             )
         else:
             logger.debug("text")

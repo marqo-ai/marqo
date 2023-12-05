@@ -32,7 +32,7 @@ class SearchQuery(BaseMarqoModel):
     filter: str = None
     attributesToRetrieve: Union[None, List[str]] = None
     boost: Optional[Dict] = None
-    image_download_headers: Optional[Dict] = None
+    download_headers: Optional[Dict] = None
     context: Optional[SearchContext] = None
     scoreModifiers: Optional[ScoreModifier] = None
     modelAuth: Optional[ModelAuth] = None

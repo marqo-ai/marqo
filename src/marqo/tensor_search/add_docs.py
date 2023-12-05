@@ -129,13 +129,15 @@ def threaded_download_media(
         take place at API level and such invalid arguments are not expected to reach this function.
 
     """
-
-    if tensor_fields is None == non_tensor_fields is None:
+    print(allocated_docs)
+    if tensor_fields is not None and non_tensor_fields is not None \
+            or tensor_fields is None and non_tensor_fields is None:
         raise errors.InternalError("Must provide exactly one of tensor_fields or non_tensor_fields")
+
 
     # Generate pseudo-unique ID for thread metrics.
     _id = uuid.uuid4().hex
-    _id = f"image_download.{_id}"
+    _id = f"media_download.{_id}"
 
     if metric_obj is None: # Occurs predominately in testing.
         metric_obj = RequestMetricsStore.for_request()
@@ -143,12 +145,13 @@ def threaded_download_media(
 
     with metric_obj.time(f"{_id}.thread_time"):
         for doc in allocated_docs:
+            
             for field in list(doc):
                 if not utils.is_tensor_field(field, tensor_fields, non_tensor_fields):
                     continue
 
                 media_pointers: Dict[str, str] = {}
-
+                
                 if isinstance(doc[field], str):
                     media_pointers[field] = doc[field]
                 elif isinstance(doc[field], dict):
@@ -207,7 +210,8 @@ def download_media(
         take place at API level and such invalid arguments are not expected to reach this function.
     """
 
-    if tensor_fields is None == non_tensor_fields is None:
+    if tensor_fields is not None and non_tensor_fields is not None \
+            or tensor_fields is None and non_tensor_fields is None:
         raise errors.InternalError("Must provide exactly one of tensor_fields or non_tensor_fields")
 
     docs_per_thread = math.ceil(len(docs)/thread_count)
@@ -215,7 +219,7 @@ def download_media(
     media_repo = dict()
 
     try:
-        m = [RequestMetrics() for i in range(thread_count)]
+        m = [RequestMetrics() for _ in range(thread_count)]
         thread_allocated_docs = [
             copied[i: i + docs_per_thread] for i in range(len(copied))[::docs_per_thread]
         ]
@@ -235,9 +239,16 @@ def download_media(
             ) for i, allocation in enumerate(thread_allocated_docs)
         ]
 
-        [th.start()for th in threads]
+        # [th.start()for th in threads]
 
-        [th.join()for th in threads]
+        # [th.join()for th in threads]
+
+        for th in threads:
+            th.start()
+        
+        for th in threads:
+            th.join()
+
 
         # Fix up metric_obj to make it not mention thread-ids
         metric_obj = RequestMetricsStore.for_request()

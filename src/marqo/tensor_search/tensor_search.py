@@ -222,7 +222,7 @@ def create_vector_index(
     vector_index_settings["mappings"]["_meta"][NsField.index_settings] = the_index_settings
 
     vector_index_settings_with_knn = _add_knn_field(ix_settings=vector_index_settings)
-    print(vector_index_settings_with_knn)
+
     logger.debug(f"Creating index {index_name} with settings: {vector_index_settings_with_knn}")
     response = HttpRequests(config).put(path=index_name, body=vector_index_settings_with_knn)
 
@@ -439,16 +439,14 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                 if add_docs_params.tensor_fields and '_id' in add_docs_params.tensor_fields:
                     raise errors.BadRequestError(message="`_id` field cannot be a tensor field.")
 
-                non_tensor_fields = add_docs_params.non_tensor_fields or []
-
                 media_repo = exit_stack.enter_context(
                     add_docs.download_media(
                         docs=add_docs_params.docs,
                         thread_count=20,
                         media_type=media_type,
                         tensor_fields=add_docs_params.tensor_fields,
-                        non_tensor_fields=non_tensor_fields,
-                        image_download_headers=add_docs_params.image_download_headers
+                        non_tensor_fields=add_docs_params.non_tensor_fields,
+                        download_headers=add_docs_params.download_headers
                     )
                 )
         if add_docs_params.use_existing_tensors:
@@ -1105,7 +1103,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict]] = N
            reranker: Union[str, Dict] = None, filter: str = None,
            attributes_to_retrieve: Optional[List[str]] = None,
            device: str = None, boost: Optional[Dict] = None,
-           image_download_headers: Optional[Dict] = None,
+           download_headers: Optional[Dict] = None,
            context: Optional[SearchContext] = None,
            score_modifiers: Optional[ScoreModifier] = None,
            model_auth: Optional[ModelAuth] = None, 
@@ -1131,7 +1129,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict]] = N
         device: May be none, we calculate default device here
         num_highlights: number of highlights to return for each doc
         boost: boosters to re-weight the scores of individual fields
-        image_download_headers: headers for downloading images
+        download_headers: headers for downloading images
         context: a dictionary to allow custom vectors in search, for tensor search only
         score_modifiers: a dictionary to modify the score based on field values, for tensor search only
         model_auth: Authorisation details for downloading a model (if required)
@@ -1204,7 +1202,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict]] = N
             config=config, index_name=index_name, query=text, result_count=result_count, offset=offset,
             searchable_attributes=searchable_attributes, verbose=verbose,
             filter_string=filter, device=selected_device, attributes_to_retrieve=attributes_to_retrieve, boost=boost,
-            image_download_headers=image_download_headers, context=context, score_modifiers=score_modifiers,
+            download_headers=download_headers, context=context, score_modifiers=score_modifiers,
             model_auth=model_auth, max_retry_attempts=max_search_retry_attempts, max_retry_backoff_seconds=max_search_retry_backoff,
             text_query_prefix=text_query_prefix
         )
@@ -1591,7 +1589,7 @@ def assign_query_to_vector_job(
             content=grouped_content,
             device=device,
             normalize_embeddings=index_info.index_settings['index_defaults']['normalize_embeddings'],
-            image_download_headers=q.image_download_headers,
+            download_headers=q.download_headers,
             content_type=content_type,
             model_auth=q.modelAuth
         )
@@ -1646,7 +1644,7 @@ def vectorise_jobs(jobs: List[VectorisedJobs]) -> Dict[JHash, Dict[str, List[flo
                     model_name=v.model_name, model_properties=v.model_properties,
                     content=v.content, device=v.device,
                     normalize_embeddings=v.normalize_embeddings,
-                    image_download_headers=v.image_download_headers,
+                    download_headers=v.download_headers,
                     model_auth=v.model_auth
                 )
                 result[v.groupby_key()] = dict(zip(v.content, vectors))
@@ -1832,7 +1830,7 @@ def add_prefix_to_queries(config: Config, queries: List[BulkSearchQueryEntity]) 
             showHighlights=q.showHighlights, 
             filter=q.filter, 
             attributesToRetrieve=q.attributesToRetrieve, 
-            boost=q.boost, image_download_headers=q.image_download_headers, 
+            boost=q.boost, download_headers=q.download_headers, 
             context=q.context, scoreModifiers=q.scoreModifiers, 
             index=q.index, modelAuth=q.modelAuth,
             textQueryPrefix=q.textQueryPrefix   
@@ -1958,7 +1956,7 @@ def _vector_text_search(
         config: Config, index_name: str, query: Union[str, dict, None], result_count: int = 5, offset: int = 0,
         searchable_attributes: Iterable[str] = None, verbose=0, filter_string: str = None, device: str = None,
         attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None,
-        image_download_headers: Optional[Dict] = None, context: Optional[Dict] = None,
+        download_headers: Optional[Dict] = None, context: Optional[Dict] = None,
         score_modifiers: Optional[ScoreModifier] = None, model_auth: Optional[ModelAuth] = None,
         max_retry_attempts: int = None, max_retry_backoff_seconds: int = None,
         text_query_prefix: Optional[str] = None):
@@ -1976,7 +1974,7 @@ def _vector_text_search(
         verbose: if 0 - nothing is printed. if 1 - data is printed without vectors, if 2 - full
             objects are printed out
         attributes_to_retrieve: if set, only returns these fields
-        image_download_headers: headers for downloading images
+        download_headers: headers for downloading images
         context: a dictionary to allow custom vectors in search
         score_modifiers: a dictionary to modify the score based on field values, for tensor search only
         model_auth: Authorisation details for downloading a model (if required)
@@ -2030,7 +2028,7 @@ def _vector_text_search(
         showHighlights=False, 
         filter=filter_string, 
         attributesToRetrieve=attributes_to_retrieve, 
-        boost=boost, image_download_headers=image_download_headers, 
+        boost=boost, download_headers=download_headers, 
         context=context, scoreModifiers=score_modifiers, 
         index=index_name, modelAuth=model_auth,
         textQueryPrefix=text_query_prefix   

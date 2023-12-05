@@ -74,7 +74,7 @@ class AddDocsParams(BaseModel):
         device: Device used to carry out the document update, if `None` is given, it will be determined by
                 EnvVars.MARQO_BEST_AVAILABLE_DEVICE
         image_download_thread_count: number of threads used to concurrently download images
-        image_download_headers: headers to authenticate image download
+        download_headers: headers to authenticate image download
         mappings: a dictionary used to handle all the object field content in the doc,
             e.g., multimodal_combination field
         model_auth: an object used to authorise downloading an object from a datastore
@@ -95,7 +95,7 @@ class AddDocsParams(BaseModel):
     non_tensor_fields: Optional[List] = Field(default_factory=list)
     tensor_fields: Optional[List] = Field(default_factory=None)
     image_download_thread_count: int = 20
-    image_download_headers: dict = Field(default_factory=dict)
+    download_headers: dict = Field(default_factory=dict)
     use_existing_tensors: bool = False
     mappings: Optional[dict] = None
     model_auth: Optional[ModelAuth] = None
