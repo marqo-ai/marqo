@@ -59,6 +59,7 @@ def get_index(config: Config, index_name: str, force_refresh=False) -> MarqoInde
     if index_name in index_info_cache:
         return index_info_cache[index_name]
 
+    # TODO: raise core_exceptions.IndexNotFoundError instead (fix associated tests)
     raise exceptions.IndexNotFoundError(f"Index {index_name} not found")
 
 

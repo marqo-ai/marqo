@@ -56,9 +56,9 @@ def get_config():
 
 
 @app.exception_handler(base_exceptions.MarqoError)
-def marqo_core_exception_handler(request: Request, exc: base_exceptions.MarqoError):
+def marqo_base_exception_handler(request: Request, exc: base_exceptions.MarqoError):
     """
-    Catch a base Marqo Error and raise its corresponding API Marqo Error.
+    Catch a base/core Marqo Error and raise its corresponding API Marqo Error.
     The API Error will be caught by the `marqo_api_exception_handler` below.
     This ensures that raw base errors are never returned by the API.
     

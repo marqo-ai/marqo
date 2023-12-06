@@ -6,10 +6,14 @@ from fastapi import Request
 from starlette.datastructures import Headers
 from starlette.types import Scope
 
-
+from marqo import exceptions as base_exceptions
+from marqo.api import exceptions as api_exceptions
+from marqo.core import exceptions as core_exceptions
+from marqo.vespa import exceptions as vespa_exceptions
 from marqo.api.exceptions import InvalidArgError
+
 from tests.marqo_test import MarqoTestCase
-from marqo.tensor_search.api import validation_exception_handler
+from marqo.tensor_search.api import validation_exception_handler, marqo_base_exception_handler
 
 class BaseMarqoModel(pydantic.BaseModel):
     class Config:
@@ -178,3 +182,97 @@ class TestApiValidation(MarqoTestCase):
         assert response.status_code == InvalidArgError.status_code
 
 
+class TestBaseExceptionHandler(MarqoTestCase):
+    def setUp(self) -> None:
+        super().setUp()
+        self.normal_request = mock.MagicMock()
+        # Create a request instance with headers and a JSON body
+        headers = {'Content-Type': 'application/json'}
+        body = b'{"name": "Alice", "age": 30}'
+
+        # Create a mock request object
+        self.normal_request = mock.MagicMock()
+        self.normal_request.headers = headers
+        self.normal_request.content = body
+        self.generic_error_message = "This is an error!"
+
+    def test_base_exception_handler_base_errors(self):
+        with self.subTest("Base error: Internal Error"):
+            try:
+                marqo_base_exception_handler(self.normal_request, base_exceptions.InternalError(self.generic_error_message))
+                raise AssertionError
+            except api_exceptions.InternalError as e:
+                assert e.message.startswith(self.generic_error_message)     # 500 error
+
+        with self.subTest("Base error: Invalid Argument Error"):
+            try:
+                marqo_base_exception_handler(self.normal_request, base_exceptions.InvalidArgumentError(self.generic_error_message))
+                raise AssertionError
+            except api_exceptions.InvalidArgError as e:
+                assert e.message == self.generic_error_message   # 400 error
+
+
+    def test_base_exception_handler_core_errors(self):
+        with self.subTest("Core error: Index Exists Error"):
+            try:
+                marqo_base_exception_handler(self.normal_request, core_exceptions.IndexExistsError(self.generic_error_message))
+                raise AssertionError
+            except api_exceptions.IndexAlreadyExistsError as e:
+                assert e.message == self.generic_error_message
+
+        with self.subTest("Core error: Index Not Found Error"):
+            try:
+                marqo_base_exception_handler(self.normal_request, core_exceptions.IndexNotFoundError(self.generic_error_message))
+                raise AssertionError
+            except api_exceptions.IndexNotFoundError as e:
+                assert e.message == self.generic_error_message
+
+        with self.subTest("Core error: Parsing Error"):
+            try:
+                marqo_base_exception_handler(self.normal_request, core_exceptions.ParsingError(self.generic_error_message))
+                raise AssertionError
+            except api_exceptions.MarqoWebError as e:
+                assert e.message.startswith(self.generic_error_message)     # Generic 500
+
+        with self.subTest("Core error: Vespa Document Parsing Error"):
+            try:
+                marqo_base_exception_handler(self.normal_request, core_exceptions.VespaDocumentParsingError(self.generic_error_message))
+                raise AssertionError
+            except api_exceptions.BackendDataParsingError as e:
+                assert e.message.startswith(self.generic_error_message)      # 500
+
+        with self.subTest("Core error: Marqo Document Parsing Error"):
+            try:
+                marqo_base_exception_handler(self.normal_request, core_exceptions.MarqoDocumentParsingError(self.generic_error_message))
+                raise AssertionError
+            except api_exceptions.InvalidArgError as e:
+                assert e.message == self.generic_error_message
+
+        with self.subTest("Core error: Invalid Data Type Error"):
+            try:
+                marqo_base_exception_handler(self.normal_request, core_exceptions.InvalidDataTypeError(self.generic_error_message))
+                raise AssertionError
+            except api_exceptions.InvalidArgError as e:
+                assert e.message == self.generic_error_message
+
+        with self.subTest("Core error: Invalid Field Name Error"):
+            try:
+                marqo_base_exception_handler(self.normal_request, core_exceptions.InvalidFieldNameError(self.generic_error_message))
+                raise AssertionError
+            except api_exceptions.InvalidFieldNameError as e:
+                assert e.message == self.generic_error_message
+
+        with self.subTest("Core error: Filter String Parsing Error"):
+            try:
+                marqo_base_exception_handler(self.normal_request, core_exceptions.FilterStringParsingError(self.generic_error_message))
+                raise AssertionError
+            except api_exceptions.InvalidArgError as e:
+                assert e.message == self.generic_error_message
+
+    def test_base_exception_handler_vespa_errors(self):
+        with self.subTest("Vespa error: Vespa Error"):
+            try:
+                marqo_base_exception_handler(self.normal_request, vespa_exceptions.VespaError(self.generic_error_message))
+                raise AssertionError
+            except api_exceptions.MarqoWebError as e:
+                assert e.message.startswith(self.generic_error_message)    # Generic 500
