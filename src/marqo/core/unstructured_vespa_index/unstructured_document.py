@@ -40,7 +40,8 @@ class UnstructuredVespaDocumentFields(BaseModel):
 
     def to_vespa_dictionary(self) -> Dict[str, Any]:
         # Exclude None and empty fields but keep 0 as we need to have vector_counts in docs
-        return {k: v for k, v in self.dict(exclude_none=True, by_alias=True).items() if v or v == 0}
+        return {k: v for k, v in self.dict(exclude_none=True, by_alias=True,
+                                           exclude=self._EXCLUDED_FIELDS).items() if v or v == 0}
 
     def to_marqo_doc(self, return_highlights: bool = False) -> Dict[str, Any]:
         marqo_document = {}
