@@ -1,7 +1,6 @@
 from typing import Optional
 
 import marqo.logging
-from marqo.core.exceptions import IndexNotFoundError
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models import MarqoIndex
 from marqo.core.models.marqo_index_health import MarqoHealthStatus, HealthStatus, VespaHealthStatus
@@ -9,6 +8,7 @@ from marqo.core.models.marqo_index_stats import MarqoIndexStats
 from marqo.core.vespa_index import for_marqo_index as vespa_index_factory
 from marqo.exceptions import InternalError
 from marqo.vespa.exceptions import VespaError
+from marqo.vespa.models.application_metrics import Aggregation
 from marqo.vespa.vespa_client import VespaClient
 
 logger = marqo.logging.get_logger(__name__)
@@ -49,9 +49,24 @@ class Monitoring:
         except (TypeError, AttributeError, IndexError) as e:
             raise InternalError(f"Failed to get the number of vectors for index {marqo_index.name}: {e}") from e
 
+        metrics = self.vespa_client.get_metrics()
+
+        memory_utilization = metrics.aggregate_metric(
+            metric_name='cluster-controller.resource_usage.max_memory_utilization.max',
+            aggregation=Aggregation.Max,
+            service_name='vespa.container-clustercontroller'
+        )
+        disk_utilization = metrics.aggregate_metric(
+            metric_name='cluster-controller.resource_usage.max_disk_utilization.max',
+            aggregation=Aggregation.Max,
+            service_name='vespa.container-clustercontroller'
+        )
+
         return MarqoIndexStats(
             number_of_documents=doc_count_query_result.total_count,
-            number_of_vectors=number_of_vectors
+            number_of_vectors=number_of_vectors,
+            memory_utilization=memory_utilization,
+            disk_utilization=disk_utilization
         )
 
     def get_index_stats_by_name(self, index_name: str) -> MarqoIndexStats:

@@ -195,7 +195,9 @@ def get_index_stats(index_name: str, marqo_config: config.Config = Depends(get_c
     return JSONResponse(
         content={
             'numberOfDocuments': stats.number_of_documents,
-            'numberOfVectors': stats.number_of_vectors
+            'numberOfVectors': stats.number_of_vectors,
+            'memoryUtilization': stats.memory_utilization,
+            'diskUtilization': stats.disk_utilization
         },
         status_code=200
     )
