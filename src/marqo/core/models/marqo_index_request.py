@@ -4,7 +4,7 @@ from typing import List, Dict, Optional
 from pydantic import root_validator, validator
 
 import marqo.core.models.marqo_index as marqo_index
-from marqo.core.models.strict_base_model import StrictBaseModel, ImmutableStrictBaseModel
+from marqo.base_model import StrictBaseModel, ImmutableStrictBaseModel
 
 
 class MarqoIndexRequest(ImmutableStrictBaseModel, ABC):

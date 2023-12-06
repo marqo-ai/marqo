@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 
 from marqo import config, errors
 from marqo import version
+from marqo.api.models.health_response import HealthResponse
 from marqo.core.exceptions import IndexExistsError, IndexNotFoundError
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.errors import InvalidArgError, MarqoWebError, MarqoError
@@ -219,24 +220,16 @@ def delete_docs(index_name: str, documentIds: List[str],
 
 @app.get("/health")
 def check_health(marqo_config: config.Config = Depends(get_config)):
-    health = marqo_config.monitoring.get_health()
+    health_status = marqo_config.monitoring.get_health()
 
-    return {
-        'status': health.status.value,
-        'inference': {
-            'status': health.inference.status,
-        },
-        'backend': {
-            'status': health.backend.status,
-            'memoryIsAvailable': health.backend.memory_is_available,
-            'storageIsAvailable': health.backend.storage_is_available
-        }
-    }
+    return HealthResponse.from_marqo_health_status(health_status)
 
 
 @app.get("/indexes/{index_name}/health")
 def check_index_health(index_name: str, marqo_config: config.Config = Depends(get_config)):
-    return marqo_config.monitoring.get_health(index_name=index_name)
+    health_status = marqo_config.monitoring.get_health(index_name=index_name)
+
+    return HealthResponse.from_marqo_health_status(health_status)
 
 
 @app.get("/indexes")
