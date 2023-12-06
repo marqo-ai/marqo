@@ -32,7 +32,6 @@ Notes on search behaviour with caching and searchable attributes:
 """
 import copy
 import json
-import threading
 import typing
 import uuid
 from collections import defaultdict
@@ -46,12 +45,14 @@ import torch.cuda
 from PIL import Image
 
 import marqo.core.exceptions as core_exceptions
+import marqo.core.unstructured_vespa_index.common as unstructured_common
 from marqo import errors
 # We depend on _httprequests.py for now, but this may be replaced in the future, as
 # _httprequests.py is designed for the client
 from marqo.config import Config
 from marqo.core import constants
 from marqo.core.index_management.index_management import IndexManagement
+from marqo.core.models.marqo_index import IndexType
 from marqo.core.models.marqo_index import MarqoIndex, FieldType, UnstructuredMarqoIndex, StructuredMarqoIndex
 from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery
 from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
@@ -69,8 +70,6 @@ from marqo.tensor_search import utils, validation, add_docs
 from marqo.tensor_search.enums import (
     Device, TensorField, SearchMethod, EnvVars
 )
-from marqo.core.models.marqo_index import IndexType
-import marqo.core.unstructured_vespa_index.common as unstructured_common
 from marqo.tensor_search.index_meta_cache import get_cache, get_index
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.tensor_search.models.api_models import BulkSearchQueryEntity, ScoreModifier
@@ -231,17 +230,18 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                             constants.MARQO_DOC_TENSORS in existing_docs_dict[doc_id] and
                             field in existing_docs_dict[doc_id][constants.MARQO_DOC_TENSORS]
                     ):
-                        chunks: List[str] = [f"{field}::{content}" for content in existing_docs_dict[doc_id][constants.MARQO_DOC_TENSORS][field][
-                            constants.MARQO_DOC_CHUNKS]]
+                        chunks: List[str] = [f"{field}::{content}" for content in
+                                             existing_docs_dict[doc_id][constants.MARQO_DOC_TENSORS][field][
+                                                 constants.MARQO_DOC_CHUNKS]]
                         embeddings: List[List[float]] = [existing_docs_dict[doc_id][constants.MARQO_DOC_TENSORS][field][
-                            constants.MARQO_DOC_EMBEDDINGS]]
+                                                             constants.MARQO_DOC_EMBEDDINGS]]
                         logger.debug(f"Using existing tensors for field {field} for doc {doc_id}")
                     else:
                         # Happens if this wasn't a tensor field last time we indexed this doc
                         logger.debug(f"Found document but not tensors for field {field} for doc {doc_id}. "
                                      f"Is this a new tensor field?")
 
-                if len(chunks) == 0: # Not using existing tensors or didn't find it
+                if len(chunks) == 0:  # Not using existing tensors or didn't find it
                     if isinstance(field_content, (str, Image.Image)):
                         # 1. check if urls should be downloaded -> "treat_pointers_and_urls_as_images":True
                         # 2. check if it is a url or pointer
@@ -255,9 +255,9 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                             split_by = marqo_index.text_preprocessing.split_method.value
                             split_length = marqo_index.text_preprocessing.split_length
                             split_overlap = marqo_index.text_preprocessing.split_overlap
-                            content_chunks:List[str] = text_processor.split_text(field_content, split_by=split_by,
-                                                                       split_length=split_length,
-                                                                       split_overlap=split_overlap)
+                            content_chunks: List[str] = text_processor.split_text(field_content, split_by=split_by,
+                                                                                  split_length=split_length,
+                                                                                  split_overlap=split_overlap)
                             text_chunks = content_chunks
                         else:
                             # TODO put the logic for getting field parameters into a function and add per field options
@@ -364,7 +364,8 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                     ):
                         existing_doc = existing_docs_dict[doc_id]
                         current_field_contents = utils.extract_multimodal_content(existing_doc, multimodal_params)
-                        current_multimodal_params = existing_doc[unstructured_common.MARQO_DOC_MULTIMODAL_PARAMS][field_name]
+                        current_multimodal_params = existing_doc[unstructured_common.MARQO_DOC_MULTIMODAL_PARAMS][
+                            field_name]
                         if (
                                 field_content == current_field_contents and
                                 current_multimodal_params == multimodal_params and
@@ -376,7 +377,8 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
 
                             if unstructured_common.MARQO_DOC_MULTIMODAL_PARAMS not in copied:
                                 copied[unstructured_common.MARQO_DOC_MULTIMODAL_PARAMS] = {}
-                            copied[unstructured_common.MARQO_DOC_MULTIMODAL_PARAMS][field_name] = json.dumps(multimodal_params)
+                            copied[unstructured_common.MARQO_DOC_MULTIMODAL_PARAMS][field_name] = json.dumps(
+                                multimodal_params)
                             processed_tensor_fields.append(combo_chunk)
                             embeddings_list.append(combo_embeddings)
 
@@ -390,10 +392,11 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
 
                     # Use_existing tensor does not apply, or we didn't find it, then we vectorise
                     if combo_chunk is None:
-                        if field_content: # Check if the subfields are present
+                        if field_content:  # Check if the subfields are present
                             (combo_chunk, combo_embeddings, combo_document_is_valid,
                              unsuccessful_doc_to_append,
-                             combo_vectorise_time_to_add) = vectorise_multimodal_combination_field_unstructured(field_name,
+                             combo_vectorise_time_to_add) = vectorise_multimodal_combination_field_unstructured(
+                                field_name,
                                 field_content, i, doc_id, add_docs_params.device, marqo_index,
                                 image_repo, multimodal_params, model_auth=add_docs_params.model_auth)
 
@@ -407,7 +410,8 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                                 if unstructured_common.MARQO_DOC_MULTIMODAL_PARAMS not in copied:
                                     copied[unstructured_common.MARQO_DOC_MULTIMODAL_PARAMS] = {}
 
-                                copied[unstructured_common.MARQO_DOC_MULTIMODAL_PARAMS][field_name] = json.dumps(multimodal_params)
+                                copied[unstructured_common.MARQO_DOC_MULTIMODAL_PARAMS][field_name] = json.dumps(
+                                    multimodal_params)
                                 processed_tensor_fields.append(combo_chunk)
                                 embeddings_list.append(combo_embeddings)
                         else:
@@ -512,7 +516,6 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
 
     if len(add_docs_params.docs) == 0:
         raise errors.BadRequestError(message="Received empty add documents request")
-
 
     unsuccessful_docs = []
     total_vectorise_time = 0
@@ -1286,7 +1289,7 @@ def _lexical_search(
     # Set the _highlights for each doc as [] to follow Marqo-V1's convention
     if highlights:
         for docs in gathered_docs['hits']:
-            docs['_highlights'] = []
+            docs['_highlights'] = {}
 
     total_postprocess_time = RequestMetricsStore.for_request().stop("search.lexical.postprocess")
     logger.debug(
@@ -1347,7 +1350,8 @@ def gather_documents_from_response(response: QueryResult, marqo_index: MarqoInde
     return {'hits': hits}
 
 
-def unstructured_index_attributes_to_retrieve(marqo_doc: Dict[str, Any], attributes_to_retrieve: List[str]) -> Dict[str, Any]:
+def unstructured_index_attributes_to_retrieve(marqo_doc: Dict[str, Any], attributes_to_retrieve: List[str]) -> Dict[
+    str, Any]:
     # attributes_to_retrieve should already be validated at the start of search
     attributes_to_retrieve = list(set(attributes_to_retrieve).union({"_id", "_score", "_highlights"}))
     return {k: v for k, v in marqo_doc.items() if k in attributes_to_retrieve}
@@ -1761,11 +1765,12 @@ def get_cuda_info() -> dict:
         ))
 
 
-def vectorise_multimodal_combination_field_unstructured(field:str,
-        field_content: Dict[str, str], doc_index: int,
-        doc_id:str, device:str, marqo_index: UnstructuredMarqoIndex, image_repo, field_map:dict,
-        model_auth: Optional[ModelAuth] = None
-):
+def vectorise_multimodal_combination_field_unstructured(field: str,
+                                                        field_content: Dict[str, str], doc_index: int,
+                                                        doc_id: str, device: str, marqo_index: UnstructuredMarqoIndex,
+                                                        image_repo, field_map: dict,
+                                                        model_auth: Optional[ModelAuth] = None
+                                                        ):
     '''
     This function is used to vectorise multimodal combination field.
     Over all this is a simplified version of the vectorise pipeline in add_documents. Specifically,
@@ -1879,7 +1884,7 @@ def vectorise_multimodal_combination_field_unstructured(field:str,
         image_err = errors.InvalidArgError(message=f'Could not process given image: {field_content_copy}')
         unsuccessful_doc_to_append = \
             (doc_index, {'_id': doc_id, 'error': image_err.message, 'status': int(image_err.status_code),
-                 'code': image_err.code})
+                         'code': image_err.code})
 
         return combo_chunk, combo_embeddings, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add
 
@@ -1887,9 +1892,12 @@ def vectorise_multimodal_combination_field_unstructured(field:str,
     vectors_list = text_vectors + image_vectors
 
     if not len(sub_field_name_list) == len(vectors_list):
-        raise errors.BatchInferenceSizeError(message=f"Batch inference size does not match content for multimodal field {field}")
+        raise errors.BatchInferenceSizeError(
+            message=f"Batch inference size does not match content for multimodal field {field}")
 
-    vector_chunk = np.squeeze(np.mean([np.array(vector) * field_map["weights"][sub_field_name] for sub_field_name, vector in zip(sub_field_name_list, vectors_list)], axis=0))
+    vector_chunk = np.squeeze(np.mean(
+        [np.array(vector) * field_map["weights"][sub_field_name] for sub_field_name, vector in
+         zip(sub_field_name_list, vectors_list)], axis=0))
 
     if normalize_embeddings is True:
         vector_chunk = vector_chunk / np.linalg.norm(vector_chunk)
@@ -1898,6 +1906,7 @@ def vectorise_multimodal_combination_field_unstructured(field:str,
     combo_chunk: str = f"{field}::{json.dumps(field_content)}"
 
     return combo_chunk, combo_embeddings, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add
+
 
 def vectorise_multimodal_combination_field_structured(
         field: str, multimodal_object: Dict[str, dict], doc: dict, doc_index: int,
