@@ -141,7 +141,7 @@ class UnstructuredVespaSchema(VespaSchema):
                         indexing: summary
                     }}
                     
-                    field {unstructured_common.VESPA_DOC_EMBEDDINGS} type int {{
+                    field {unstructured_common.FIELD_VECTOR_COUNT} type int {{
                         indexing: attribute | summary
                     }}
                     
