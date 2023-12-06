@@ -5,6 +5,8 @@ SHORT_STRINGS_FIELDS = "marqo__short_string_fields"
 LONGS_STRINGS_FIELDS = "marqo__long_string_fields"
 STRING_ARRAY = "marqo__string_array"
 
+FIELD_VECTOR_COUNT = 'marqo__vector_count'
+
 INT_FIELDS = "marqo__int_fields"
 FLOAT_FIELDS = "marqo__float_fields"
 BOOL_FIELDS = "marqo__bool_fields"

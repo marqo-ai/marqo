@@ -244,3 +244,10 @@ class UnstructuredVespaIndex(VespaIndex):
 
     def _to_vespa_hybrid_query(self, marqo_query: MarqoHybridQuery) -> Dict[str, Any]:
         raise NotImplementedError()
+
+    def get_vector_count_query(self) -> Dict[str, Any]:
+        return {
+            'yql': f'select {unstructured_common.FIELD_VECTOR_COUNT} from {self._marqo_index.name} '
+                   f'where true limit 0 | all(group(1) each(output(sum({unstructured_common.FIELD_VECTOR_COUNT}))))',
+            'model_restrict': self._marqo_index.name
+        }

@@ -141,7 +141,10 @@ class UnstructuredVespaSchema(VespaSchema):
                         indexing: summary
                     }}
                     
-
+                    field {unstructured_common.VESPA_DOC_EMBEDDINGS} type int {{
+                        indexing: attribute | summary
+                    }}
+                    
                     field {cls._EMBEDDINGS} type tensor<float>(p{{}}, x[{dimension}]) {{
                         indexing: attribute | index | summary
                         attribute {{
