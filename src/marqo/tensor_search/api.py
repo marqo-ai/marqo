@@ -192,15 +192,14 @@ def get_documents_by_ids(
 @app.get("/indexes/{index_name}/stats")
 def get_index_stats(index_name: str, marqo_config: config.Config = Depends(get_config)):
     stats = marqo_config.monitoring.get_index_stats_by_name(index_name)
-    return JSONResponse(
-        content={
-            'numberOfDocuments': stats.number_of_documents,
-            'numberOfVectors': stats.number_of_vectors,
-            'memoryUtilization': stats.memory_utilization,
-            'diskUtilization': stats.disk_utilization
-        },
-        status_code=200
-    )
+    return {
+        'numberOfDocuments': stats.number_of_documents,
+        'numberOfVectors': stats.number_of_vectors,
+        'backend': {
+            'memoryUsedPercentage': stats.backend.memory_used_percentage,
+            'storageUsedPercentage': stats.backend.storage_used_percentage
+        }
+    }
 
 
 @app.delete("/indexes/{index_name}")
@@ -220,7 +219,19 @@ def delete_docs(index_name: str, documentIds: List[str],
 
 @app.get("/health")
 def check_health(marqo_config: config.Config = Depends(get_config)):
-    return marqo_config.monitoring.get_health()
+    health = marqo_config.monitoring.get_health()
+
+    return {
+        'status': health.status.value,
+        'inference': {
+            'status': health.inference.status,
+        },
+        'backend': {
+            'status': health.backend.status,
+            'memoryIsAvailable': health.backend.memory_is_available,
+            'storageIsAvailable': health.backend.storage_is_available
+        }
+    }
 
 
 @app.get("/indexes/{index_name}/health")

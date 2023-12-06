@@ -36,10 +36,37 @@ class Aggregation(Enum):
     Last = 'last'
 
 
+# noinspection PyPep8Naming
 class ApplicationMetrics(BaseModel):
     nodes: List[Node]
 
-    def aggregate_metric(
+    _SERVICE_CLUSTERCONTROLLER = 'vespa.container-clustercontroller'
+
+    @property
+    def clusterController_resourceUsage_maxMemoryUtilization_max(self) -> Optional[Union[int, float]]:
+        return self._aggregate_metric(
+            metric_name='cluster-controller.resource_usage.max_memory_utilization.max',
+            aggregation=Aggregation.Max,
+            service_name=self._SERVICE_CLUSTERCONTROLLER
+        )
+
+    @property
+    def clusterController_resourceUsage_maxDiskUtilization_max(self) -> Optional[Union[int, float]]:
+        return self._aggregate_metric(
+            metric_name='cluster-controller.resource_usage.max_disk_utilization.max',
+            aggregation=Aggregation.Max,
+            service_name=self._SERVICE_CLUSTERCONTROLLER
+        )
+
+    @property
+    def clusterController_resourceUsage_nodesAboveLimit_max(self) -> Optional[Union[int, float]]:
+        return self._aggregate_metric(
+            metric_name='cluster-controller.resource_usage.nodes_above_limit.max',
+            aggregation=Aggregation.Max,
+            service_name=self._SERVICE_CLUSTERCONTROLLER
+        )
+
+    def _aggregate_metric(
             self,
             metric_name: str,
             aggregation,
