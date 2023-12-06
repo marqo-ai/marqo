@@ -62,6 +62,12 @@ class Monitoring:
             service_name='vespa.container-clustercontroller'
         )
 
+        # Occasionally Vespa returns empty metrics, often for the first call after a restart
+        if memory_utilization is None:
+            logger.warn(f'Vespa did not return a value for memory utilization metrics')
+        if disk_utilization is None:
+            logger.warn(f'Vespa did not return a value for disk utilization metrics')
+
         return MarqoIndexStats(
             number_of_documents=doc_count_query_result.total_count,
             number_of_vectors=number_of_vectors,
@@ -113,16 +119,37 @@ class Monitoring:
         return HealthStatus.Green
 
     def _get_vespa_health(self, hostname_filter: Optional[str]) -> HealthStatus:
-        metrics = self.vespa_client.get_metrics()
+        try:
+            metrics = self.vespa_client.get_metrics()
+        except VespaError as e:
+            logger.error(f"Failed to get Vespa metrics: {e}")
+            return HealthStatus.Red
 
-        status = HealthStatus.Green
+        # Check service status
+        service_status = HealthStatus.Green
         for node in metrics.nodes:
+            if service_status == HealthStatus.Red:
+                break
+
             if hostname_filter is not None and hostname_filter not in node.hostname:
                 continue
 
             for service in node.services:
                 if service.status.code != 'up':
-                    status = HealthStatus.Red
-                    break
+                    service_status = HealthStatus.Red
 
-        return status
+        # Check feed block
+        feed_status = HealthStatus.Green
+        nodes_above_limit = metrics.aggregate_metric(
+            metric_name='cluster-controller.resource_usage.nodes_above_limit.max',
+            aggregation=Aggregation.Max,
+            service_name='vespa.container-clustercontroller'
+        )
+
+        if nodes_above_limit is None:
+            logger.warn(f'Vespa did not return a value for nodes_above_limit metric')
+            feed_status = HealthStatus.Yellow
+        elif nodes_above_limit > 0:
+            feed_status = HealthStatus.Yellow
+
+        return max(service_status, feed_status)
