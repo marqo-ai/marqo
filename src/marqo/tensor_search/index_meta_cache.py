@@ -100,10 +100,10 @@ def _check_refresh_thread(config: Config):
                         if time.time() - cache_refresh_last_logged_time > cache_refresh_log_interval:
                             cache_refresh_last_logged_time = time.time()
                             logger.info(f'Last index cache refresh at {cache_refresh_last_logged_time}')
-
-                        time.sleep(cache_refresh_interval)
                     except Exception as e:
                         logger.error(f'Error in index cache refresh thread: {e}')
+
+                    time.sleep(cache_refresh_interval)
 
             refresh_thread = threading.Thread(target=refresh, daemon=True)
             refresh_thread.start()
