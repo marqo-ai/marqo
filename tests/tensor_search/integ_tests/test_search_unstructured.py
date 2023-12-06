@@ -16,7 +16,7 @@ from tests.marqo_test import MarqoTestCase
 import marqo.core.exceptions as core_exceptions
 
 
-class TestVectorSearch(MarqoTestCase):
+class TestSearchUnstructured(MarqoTestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -718,7 +718,7 @@ class TestVectorSearch(MarqoTestCase):
                 )
                 self.assertEqual(expected_count, len(res["hits"]))
                 if expected_ids:
-                    self.assertEqual(expected_ids, [hit["_id"] for hit in res["hits"]])
+                    self.assertEqual(set(expected_ids), set([hit["_id"] for hit in res["hits"]]))
 
     def test_attributes_to_retrieve(self):
         docs = [

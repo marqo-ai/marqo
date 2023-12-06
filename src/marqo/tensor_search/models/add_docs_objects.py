@@ -50,6 +50,7 @@ class AddDocsParams(BaseModel):
         arbitrary_types_allowed = True
         allow_mutation = False
 
+
     # this should only accept Sequences of dicts, but currently validation lies elsewhere
     docs: Union[Sequence[Union[dict, Any]], np.ndarray]
 

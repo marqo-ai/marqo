@@ -17,7 +17,7 @@ from tests.marqo_test import MarqoTestCase
 import marqo.core.exceptions as core_exceptions
 
 
-class TestVectorSearch(MarqoTestCase):
+class TestSearchStructured(MarqoTestCase):
 
     @classmethod
     def setUpClass(cls) -> None:

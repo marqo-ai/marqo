@@ -18,7 +18,7 @@ from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from tests.marqo_test import MarqoTestCase
 
 
-class TestAddDocumentsStructured(MarqoTestCase):
+class TestAddDocumentsUnstructured(MarqoTestCase):
     @classmethod
     def setUpClass(cls) -> None:
         super().setUpClass()

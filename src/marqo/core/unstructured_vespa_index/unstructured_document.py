@@ -14,7 +14,8 @@ from marqo.core.unstructured_vespa_index import constants as unstructured_consta
 
 class UnstructuredVespaDocumentFields(BaseModel):
     """A class with fields that are common to all Vespa documents."""
-    marqo__id: str = Field(default_factory=str, alias=index_constants.VESPA_FIELD_ID)
+    marqo__id: str = Field(alias=index_constants.VESPA_FIELD_ID)
+
     strings: List[str] = Field(default_factory=list, alias=unstructured_common.STRINGS)
     long_string_fields: Dict[str, str] = Field(default_factory=dict, alias=unstructured_common.LONGS_STRINGS_FIELDS)
     short_string_fields: Dict[str, str] = Field(default_factory=dict, alias=unstructured_common.SHORT_STRINGS_FIELDS)
@@ -25,19 +26,21 @@ class UnstructuredVespaDocumentFields(BaseModel):
     score_modifiers_fields: Dict[str, Any] = Field(default_factory=dict, alias=unstructured_common.SCORE_MODIFIERS)
     vespa_chunks: List[str] = Field(default_factory=list, alias=unstructured_common.VESPA_DOC_CHUNKS)
     vespa_embeddings: Dict[str, Any] = Field(default_factory=dict, alias=unstructured_common.VESPA_DOC_EMBEDDINGS)
-    match_features: Dict[str, Any] = Field(default_factory=dict, alias=index_constants.VESPA_DOC_MATCH_FEATURES)
     vespa_multimodal_params: Dict[str, str] = Field(default_factory=str,
                                                     alias=unstructured_common.VESPA_DOC_MULTIMODAL_PARAMS)
+    vector_counts: int = Field(default=0, alias=unstructured_common.FIELD_VECTOR_COUNT)
+
+    match_features: Dict[str, Any] = Field(default_factory=dict, alias=index_constants.VESPA_DOC_MATCH_FEATURES)
+
+    # Fields that are excluded when generating vespa documents
+    _EXCLUDED_FIELDS = {"match_features"}
 
     class Config:
         allow_population_by_field_name = True
 
     def to_vespa_dictionary(self) -> Dict[str, Any]:
-        # Exclude None and empty fields
-        return {
-            key: value for key, value in self.dict(exclude_none=True, by_alias=True).items()
-            if value
-        }
+        # Exclude None and empty fields but keep 0 as we need to have vector_counts in docs
+        return {k: v for k, v in self.dict(exclude_none=True, by_alias=True).items() if v or v == 0}
 
     def to_marqo_doc(self, return_highlights: bool = False) -> Dict[str, Any]:
         marqo_document = {}
@@ -136,10 +139,9 @@ class UnstructuredIndexDocument(BaseModel):
                              f"This should be assigned for a valid document")
 
         copied = deepcopy(document)
-        instance = cls(id=str(copied[index_constants.MARQO_DOC_ID]))
+        doc_id = copied[index_constants.MARQO_DOC_ID]
+        instance = cls(id=doc_id, fields=UnstructuredVespaDocumentFields(marqo__id=doc_id))
         del copied[index_constants.MARQO_DOC_ID]
-
-        instance.fields.marqo__id = instance.id
 
         for key, value in copied.items():
             if key in [index_constants.MARQO_DOC_EMBEDDINGS, index_constants.MARQO_DOC_CHUNKS,
@@ -165,6 +167,7 @@ class UnstructuredIndexDocument(BaseModel):
         instance.fields.vespa_multimodal_params = copied.get(unstructured_common.MARQO_DOC_MULTIMODAL_PARAMS, {})
         instance.fields.vespa_embeddings = copied.get(index_constants.MARQO_DOC_EMBEDDINGS, {})
         instance.fields.vespa_chunks = copied.get(index_constants.MARQO_DOC_CHUNKS, [])
+        instance.fields.vector_counts = len(instance.fields.vespa_embeddings)
         return instance
 
     def to_vespa_document(self) -> Dict[str, Any]:
