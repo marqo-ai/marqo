@@ -719,7 +719,9 @@ class TestAddDocumentsStructured(MarqoTestCase):
             )
             self.assertEqual(
                 c,
-                self.config.monitoring.get_index_stats(index_name=self.index_name_img_random).number_of_documents,
+                self.config.monitoring.get_index_stats_by_name(
+                    index_name=self.index_name_img_random
+                ).number_of_documents,
             )
             self.assertFalse(res1['errors'])
             self.assertTrue(_check_get_docs(doc_count=c, title_value='blah'))
