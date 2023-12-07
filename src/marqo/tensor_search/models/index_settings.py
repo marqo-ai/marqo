@@ -4,37 +4,37 @@ from typing import Dict, Any, Optional, List
 import marqo.core.models.marqo_index as core
 import marqo.errors as errors
 from marqo import version
+from marqo.base_model import StrictBaseModel
 from marqo.core.models.marqo_index_request import FieldRequest, MarqoIndexRequest, StructuredMarqoIndexRequest, \
     UnstructuredMarqoIndexRequest
-from marqo.tensor_search.models.api_models import BaseMarqoModel
 
 
-class AnnParameters(BaseMarqoModel):
-    space_type: core.DistanceMetric
+class AnnParameters(StrictBaseModel):
+    spaceType: core.DistanceMetric
     parameters: core.HnswConfig
 
 
-class IndexSettings(BaseMarqoModel):
+class IndexSettings(StrictBaseModel):
     type: core.IndexType = core.IndexType.Unstructured
-    all_fields: Optional[List[FieldRequest]]
-    tensor_fields: Optional[List[str]]
-    treat_urls_and_pointers_as_images: Optional[bool]
+    allFields: Optional[List[FieldRequest]]
+    tensorFields: Optional[List[str]]
+    treatUrlsAndPointersAsImages: Optional[bool]
     model: str = 'hf/all_datasets_v4_MiniLM-L6'
-    model_properties: Optional[Dict[str, Any]]
-    normalize_embeddings: bool = True
-    text_preprocessing: core.TextPreProcessing = core.TextPreProcessing(
-        split_length=2,
-        split_overlap=0,
-        split_method=core.TextSplitMethod.Sentence
+    modelProperties: Optional[Dict[str, Any]]
+    normalizeEmbeddings: bool = True
+    textPreprocessing: core.TextPreProcessing = core.TextPreProcessing(
+        splitLength=2,
+        splitOverlap=0,
+        splitMethod=core.TextSplitMethod.Sentence
     )
-    image_preprocessing: core.ImagePreProcessing = core.ImagePreProcessing(
-        patch_method=None
+    imagePreprocessing: core.ImagePreProcessing = core.ImagePreProcessing(
+        patchMethod=None
     )
-    vector_numeric_type: core.VectorNumericType = core.VectorNumericType.Float
-    ann_parameters: AnnParameters = AnnParameters(
-        space_type=core.DistanceMetric.Angular,
+    vectorNumericType: core.VectorNumericType = core.VectorNumericType.Float
+    annParameters: AnnParameters = AnnParameters(
+        spaceType=core.DistanceMetric.Angular,
         parameters=core.HnswConfig(
-            ef_construction=128,
+            efConstruction=128,
             m=16
         )
     )
@@ -42,69 +42,69 @@ class IndexSettings(BaseMarqoModel):
     def to_marqo_index_request(self, index_name: str) -> MarqoIndexRequest:
         marqo_fields = None
         if self.type == core.IndexType.Structured:
-            if self.treat_urls_and_pointers_as_images is not None:
+            if self.treatUrlsAndPointersAsImages is not None:
                 raise errors.InvalidArgError(
                     "treat_urls_and_pointers_as_images is not a valid parameter for structured indexes"
                 )
 
-            if self.all_fields is not None:
+            if self.allFields is not None:
                 marqo_fields = [
                     FieldRequest(
                         name=field.name,
                         type=field.type,
                         features=field.features,
                         dependent_fields=field.dependent_fields
-                    ) for field in self.all_fields
+                    ) for field in self.allFields
                 ]
 
             return StructuredMarqoIndexRequest(
                 name=index_name,
                 model=core.Model(
                     name=self.model,
-                    properties=self.model_properties,
-                    custom=self.model_properties is not None
+                    properties=self.modelProperties,
+                    custom=self.modelProperties is not None
                 ),
-                normalize_embeddings=self.normalize_embeddings,
-                text_preprocessing=self.text_preprocessing,
-                image_preprocessing=self.image_preprocessing,
-                distance_metric=self.ann_parameters.space_type,
-                vector_numeric_type=self.vector_numeric_type,
-                hnsw_config=self.ann_parameters.parameters,
+                normalize_embeddings=self.normalizeEmbeddings,
+                text_preprocessing=self.textPreprocessing,
+                image_preprocessing=self.imagePreprocessing,
+                distance_metric=self.annParameters.spaceType,
+                vector_numeric_type=self.vectorNumericType,
+                hnsw_config=self.annParameters.parameters,
                 fields=marqo_fields,
-                tensor_fields=self.tensor_fields,
+                tensor_fields=self.tensorFields,
                 marqo_version=version.get_version(),
                 created_at=time.time(),
                 updated_at=time.time()
             )
         elif self.type == core.IndexType.Unstructured:
-            if self.all_fields is not None:
+            if self.allFields is not None:
                 raise errors.InvalidArgError(
                     "all_fields is not a valid parameter for unstructured indexes"
                 )
-            if self.tensor_fields is not None:
+            if self.tensorFields is not None:
                 raise errors.InvalidArgError(
                     "tensor_fields is not a valid parameter for unstructured indexes"
                 )
 
-            if self.treat_urls_and_pointers_as_images is None:
+            if self.treatUrlsAndPointersAsImages is None:
                 # Default value for treat_urls_and_pointers_as_images is False, but we can't set it in the model
                 # as it is not a valid parameter for structured indexes
-                self.treat_urls_and_pointers_as_images = False
+                self.treatUrlsAndPointersAsImages = False
 
             return UnstructuredMarqoIndexRequest(
                 name=index_name,
                 model=core.Model(
                     name=self.model,
-                    properties=self.model_properties,
-                    custom=self.model_properties is not None
+                    properties=self.modelProperties,
+                    custom=self.modelProperties is not None
                 ),
-                normalize_embeddings=self.normalize_embeddings,
-                text_preprocessing=self.text_preprocessing,
-                image_preprocessing=self.image_preprocessing,
-                distance_metric=self.ann_parameters.space_type,
-                vector_numeric_type=self.vector_numeric_type,
-                hnsw_config=self.ann_parameters.parameters,
-                treat_urls_and_pointers_as_images=self.treat_urls_and_pointers_as_images,
+                normalize_embeddings=self.normalizeEmbeddings,
+                text_preprocessing=self.textPreprocessing,
+                image_preprocessing=self.imagePreprocessing,
+                distance_metric=self.annParameters.spaceType,
+                vector_numeric_type=self.vectorNumericType,
+                hnsw_config=self.annParameters.parameters,
+                treat_urls_and_pointers_as_images=self.treatUrlsAndPointersAsImages,
                 marqo_version=version.get_version(),
                 created_at=time.time(),
                 updated_at=time.time()

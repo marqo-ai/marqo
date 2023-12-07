@@ -1,11 +1,11 @@
 from abc import ABC
 from typing import List, Dict, Optional
 
+import pydantic
 from pydantic import root_validator, validator
 
 import marqo.core.models.marqo_index as marqo_index
-from marqo.core.models.strict_base_model import StrictBaseModel, ImmutableStrictBaseModel
-from marqo import errors
+from marqo.base_model import StrictBaseModel, ImmutableStrictBaseModel
 
 
 class MarqoIndexRequest(ImmutableStrictBaseModel, ABC):
@@ -43,7 +43,7 @@ class FieldRequest(StrictBaseModel):
     name: str
     type: marqo_index.FieldType
     features: List[marqo_index.FieldFeature] = []
-    dependent_fields: Optional[Dict[str, float]]
+    dependent_fields: Optional[Dict[str, float]] = pydantic.Field(alias='dependentFields')
 
     @root_validator
     def check_all_fields(cls, values):

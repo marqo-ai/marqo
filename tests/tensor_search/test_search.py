@@ -1026,7 +1026,7 @@ class TestVectorSearch(MarqoTestCase):
         image_index_config = {
             IndexSettingsField.index_defaults: {
                 IndexSettingsField.model: "ViT-B/16",
-                IndexSettingsField.treat_urls_and_pointers_as_images: True
+                IndexSettingsField.treatUrlsAndPointersAsImages: True
             }
         }
         tensor_search.delete_index(self.config, self.index_name_1)
@@ -1077,7 +1077,7 @@ class TestVectorSearch(MarqoTestCase):
         image_index_config = {
             IndexSettingsField.index_defaults: {
                 IndexSettingsField.model: "ViT-B/16",
-                IndexSettingsField.treat_urls_and_pointers_as_images: True
+                IndexSettingsField.treatUrlsAndPointersAsImages: True
             }
         }
         tensor_search.delete_index(self.config, self.index_name_1)
@@ -1157,7 +1157,7 @@ class TestVectorSearch(MarqoTestCase):
         image_index_config = {
             IndexSettingsField.index_defaults: {
                 IndexSettingsField.model: "ViT-B/16",
-                IndexSettingsField.treat_urls_and_pointers_as_images: True
+                IndexSettingsField.treatUrlsAndPointersAsImages: True
             }
         }
         tensor_search.delete_index(self.config, self.index_name_1)
@@ -1191,7 +1191,7 @@ class TestVectorSearch(MarqoTestCase):
         image_index_config = {
             IndexSettingsField.index_defaults: {
                 IndexSettingsField.model: "ViT-B/16",
-                IndexSettingsField.treat_urls_and_pointers_as_images: True
+                IndexSettingsField.treatUrlsAndPointersAsImages: True
             }
         }
         tensor_search.delete_index(self.config, self.index_name_1)
@@ -1250,7 +1250,7 @@ class TestVectorSearch(MarqoTestCase):
         image_index_config = {
             IndexSettingsField.index_defaults: {
                 IndexSettingsField.model: "ViT-B/16",
-                IndexSettingsField.treat_urls_and_pointers_as_images: True
+                IndexSettingsField.treatUrlsAndPointersAsImages: True
             }
         }
         tensor_search.delete_index(self.config, self.index_name_1)

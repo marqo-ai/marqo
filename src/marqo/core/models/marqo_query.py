@@ -4,7 +4,7 @@ from typing import List, Optional
 
 from pydantic import validator
 
-from marqo.core.models.strict_base_model import StrictBaseModel
+from marqo.base_model import StrictBaseModel
 from marqo.core.search.search_filter import SearchFilter, MarqoFilterStringParser
 
 
