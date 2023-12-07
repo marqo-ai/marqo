@@ -1,7 +1,6 @@
 from marqo.core.models.marqo_index import DistanceMetric
-from marqo.core.constants import VESPA_FIELD_ID
 
-FIELD_ID = VESPA_FIELD_ID
+FIELD_ID = "marqo__id"
 FIELD_SCORE_MODIFIERS = 'marqo__score_modifiers'
 FIELD_VECTOR_COUNT = 'marqo__vector_count'
 

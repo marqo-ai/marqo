@@ -31,3 +31,4 @@ SUMMARY_ALL_VECTOR = 'all-vector-summary'
 VESPA_DOC_CHUNKS = "marqo__chunks"
 VESPA_DOC_EMBEDDINGS = "marqo__embeddings"
 
+

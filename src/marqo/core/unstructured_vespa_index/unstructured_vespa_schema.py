@@ -4,11 +4,11 @@ from marqo.core.models import MarqoIndex, UnstructuredMarqoIndex
 from marqo.core.models.marqo_index_request import UnstructuredMarqoIndexRequest
 from marqo.core.vespa_schema import VespaSchema
 from marqo.core.unstructured_vespa_index import common as unstructured_common
-from marqo.core import constants as index_constants
+from marqo.core.unstructured_vespa_index import constants as unstructured_constants
 
 
 class UnstructuredVespaSchema(VespaSchema):
-    _FIELD_ID = index_constants.VESPA_FIELD_ID
+    _FIELD_ID = unstructured_constants.VESPA_FIELD_ID
 
     _STRINGS = unstructured_common.STRINGS
     _SHORT_STRINGS_FIELDS = unstructured_common.SHORT_STRINGS_FIELDS

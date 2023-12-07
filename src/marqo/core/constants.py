@@ -7,8 +7,3 @@ MARQO_DOC_ID = '_id'
 
 VESPA_DOC_ID = "id"
 VESPA_DOC_FIELDS = "fields"
-VESPA_DOC_RELEVANCE = 'relevance'
-VESPA_DOC_MATCH_FEATURES = 'matchfeatures'
-VESPA_DOC_FIELDS_TO_IGNORE = {'sddocname'}
-
-VESPA_FIELD_ID = "marqo__id"

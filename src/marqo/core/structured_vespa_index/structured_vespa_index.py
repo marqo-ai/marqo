@@ -25,11 +25,11 @@ class StructuredVespaIndex(VespaIndex):
         FieldType.MultimodalCombination: dict
     }
 
-    _VESPA_DOC_ID = constants.VESPA_DOC_ID
-    _VESPA_DOC_FIELDS = constants.VESPA_DOC_FIELDS
-    _VESPA_DOC_RELEVANCE = constants.VESPA_DOC_RELEVANCE
-    _VESPA_DOC_MATCH_FEATURES = constants.VESPA_DOC_MATCH_FEATURES
-    _VESPA_DOC_FIELDS_TO_IGNORE = constants.VESPA_DOC_FIELDS_TO_IGNORE
+    _VESPA_DOC_ID = 'id'
+    _VESPA_DOC_FIELDS = 'fields'
+    _VESPA_DOC_RELEVANCE = 'relevance'
+    _VESPA_DOC_MATCH_FEATURES = 'matchfeatures'
+    _VESPA_DOC_FIELDS_TO_IGNORE = {'sddocname'}
 
     def __init__(self, marqo_index: StructuredMarqoIndex):
         self._marqo_index = marqo_index

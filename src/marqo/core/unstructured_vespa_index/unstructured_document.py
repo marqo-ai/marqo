@@ -14,7 +14,7 @@ from marqo.core.unstructured_vespa_index import constants as unstructured_consta
 
 class UnstructuredVespaDocumentFields(BaseModel):
     """A class with fields that are common to all Vespa documents."""
-    marqo__id: str = Field(alias=index_constants.VESPA_FIELD_ID)
+    marqo__id: str = Field(alias=unstructured_constants.VESPA_FIELD_ID)
 
     strings: List[str] = Field(default_factory=list, alias=unstructured_common.STRINGS)
     long_string_fields: Dict[str, str] = Field(default_factory=dict, alias=unstructured_common.LONGS_STRINGS_FIELDS)
@@ -30,7 +30,7 @@ class UnstructuredVespaDocumentFields(BaseModel):
                                                     alias=unstructured_common.VESPA_DOC_MULTIMODAL_PARAMS)
     vector_counts: int = Field(default=0, alias=unstructured_common.FIELD_VECTOR_COUNT)
 
-    match_features: Dict[str, Any] = Field(default_factory=dict, alias=index_constants.VESPA_DOC_MATCH_FEATURES)
+    match_features: Dict[str, Any] = Field(default_factory=dict, alias=unstructured_constants.VESPA_DOC_MATCH_FEATURES)
 
     # Fields that are excluded when generating vespa documents
     _EXCLUDED_FIELDS = {"match_features"}
