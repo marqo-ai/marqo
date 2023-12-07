@@ -10,6 +10,7 @@ from typing import (
 )
 
 import torch
+from fastapi import HTTPException
 
 from marqo import errors
 from marqo.marqo_logging import logger
@@ -389,3 +390,14 @@ def extract_multimodal_content(doc: dict, mapping: Dict) -> Dict:
         if field_name in doc:
             multimodal_content[field_name] = doc[field_name]
     return multimodal_content
+
+
+def enable_batch_apis():
+    def decorator_function(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            if read_env_vars_and_defaults(EnvVars.MARQO_ENABLE_BATCH_APIS).lower() != 'true':
+                raise HTTPException(status_code=403, detail="This API endpoint is disabled. Please set MARQO_ENABLE_BATCH_API to true to enable it.")
+            return func(*args, **kwargs)
+        return wrapper
+    return decorator_function

@@ -1,6 +1,4 @@
 import json
-import struct
-import base64
 from copy import deepcopy
 from typing import List, Dict, Any
 
@@ -66,7 +64,7 @@ class UnstructuredVespaDocumentFields(BaseModel):
         if self.vespa_embeddings:
             try:
                 embeddings_list = list(self.vespa_embeddings["blocks"].values())
-            except (KeyError):
+            except (KeyError, AttributeError, TypeError):
                 raise VespaDocumentParsingError(f"No embeddings found in the document _id = {self.marqo__id}")
 
         if self.vespa_chunks and embeddings_list:
