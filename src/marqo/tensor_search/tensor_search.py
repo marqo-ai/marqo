@@ -1395,7 +1395,7 @@ def vectorise_multimodal_combination_field_structured(
     image_field_names = []
     image_content_to_vectorise = []
 
-    normalize_embeddings = marqo_index.normalize_embeddings
+    normalize_embeddings = marqo_index.normalizeEmbeddings
     image_fields = [field.name for field in marqo_index.field_map_by_type[FieldType.ImagePointer]]
 
     for sub_field_name, sub_content in multimodal_object.items():

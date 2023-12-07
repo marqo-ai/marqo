@@ -1,15 +1,20 @@
 from pydantic import BaseModel
 
 
-class StrictBaseModel(BaseModel):
+class MarqoBaseModel(BaseModel):
     class Config:
-        extra: str = "forbid"
-        validate_assignment: bool = True
+        # allow_population_by_field_name = True  # deserialize both real name and alias (if present)
+        validate_assignment = True
 
 
-class ImmutableBaseModel(BaseModel):
-    class Config:
-        allow_mutation: bool = False
+class StrictBaseModel(MarqoBaseModel):
+    class Config(MarqoBaseModel.Config):
+        extra = "forbid"
+
+
+class ImmutableBaseModel(MarqoBaseModel):
+    class Config(MarqoBaseModel.Config):
+        allow_mutation = False
 
 
 class ImmutableStrictBaseModel(StrictBaseModel, ImmutableBaseModel):

@@ -95,18 +95,18 @@ class TensorField(ImmutableStrictBaseModel):
 
 
 class HnswConfig(ImmutableStrictBaseModel):
-    ef_construction: int = pydantic.Field(gt=0)
+    ef_construction: int = pydantic.Field(gt=0, alias='efConstruction')
     m: int = pydantic.Field(gt=0)
 
 
 class TextPreProcessing(ImmutableStrictBaseModel):
-    split_length: int = pydantic.Field(gt=0)
-    split_overlap: int = pydantic.Field(ge=0)
-    split_method: TextSplitMethod
+    split_length: int = pydantic.Field(gt=0, alias='splitLength')
+    split_overlap: int = pydantic.Field(ge=0, alias='splitOverlap')
+    split_method: TextSplitMethod = pydantic.Field(alias='splitMethod')
 
 
 class ImagePreProcessing(ImmutableStrictBaseModel):
-    patch_method: Optional[PatchMethod]
+    patch_method: Optional[PatchMethod] = pydantic.Field(alias='patchMethod')
 
 
 class Model(StrictBaseModel):
