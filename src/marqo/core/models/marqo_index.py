@@ -1,7 +1,7 @@
 import re
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import List, Optional, Dict, Any, Set, Type, Union
+from typing import List, Optional, Dict, Any, Set, Union
 
 import pydantic
 from pydantic import PrivateAttr, root_validator
@@ -10,7 +10,7 @@ from pydantic.error_wrappers import ErrorWrapper
 from pydantic.utils import ROOT_KEY
 
 from marqo.core import constants
-from marqo.core.models.strict_base_model import ImmutableStrictBaseModel, StrictBaseModel
+from marqo.base_model import ImmutableStrictBaseModel, StrictBaseModel
 from marqo.exceptions import InvalidArgumentError
 from marqo.logging import get_logger
 from marqo.s2_inference import s2_inference
@@ -95,18 +95,18 @@ class TensorField(ImmutableStrictBaseModel):
 
 
 class HnswConfig(ImmutableStrictBaseModel):
-    ef_construction: int = pydantic.Field(gt=0)
+    ef_construction: int = pydantic.Field(gt=0, alias='efConstruction')
     m: int = pydantic.Field(gt=0)
 
 
 class TextPreProcessing(ImmutableStrictBaseModel):
-    split_length: int = pydantic.Field(gt=0)
-    split_overlap: int = pydantic.Field(ge=0)
-    split_method: TextSplitMethod
+    split_length: int = pydantic.Field(gt=0, alias='splitLength')
+    split_overlap: int = pydantic.Field(ge=0, alias='splitOverlap')
+    split_method: TextSplitMethod = pydantic.Field(alias='splitMethod')
 
 
 class ImagePreProcessing(ImmutableStrictBaseModel):
-    patch_method: Optional[PatchMethod]
+    patch_method: Optional[PatchMethod] = pydantic.Field(alias='patchMethod')
 
 
 class Model(StrictBaseModel):

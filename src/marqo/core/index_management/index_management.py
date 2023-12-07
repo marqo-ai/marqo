@@ -256,7 +256,7 @@ class IndexManagement:
     def _add_schema_to_services(self, app: str, name: str) -> None:
         services_path = os.path.join(app, 'services.xml')
 
-        tree = ET.parse(services_path)  # Replace 'path_to_file.xml' with the path to your XML file
+        tree = ET.parse(services_path)
         root = tree.getroot()
 
         documents_section = root.find(".//documents")
@@ -273,6 +273,8 @@ class IndexManagement:
         tree = ET.parse(services_path)
         root = tree.getroot()
 
+        # TODO - Verify there is only one documents section (one content cluster)
+        # Error out otherwise as we don't know which one to use
         documents_section = root.find(".//documents")
 
         deleted = False

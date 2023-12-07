@@ -1,7 +1,7 @@
 from marqo.core.exceptions import IndexNotFoundError
 from marqo.core.models.marqo_index import FieldType, FieldFeature, TextPreProcessing, TextSplitMethod
 from marqo.core.models.marqo_index_request import FieldRequest
-from marqo.core.models.marqo_index_stats import MarqoIndexStats
+from marqo.core.models.marqo_index_stats import MarqoIndexStats, VespaStats
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from tests.marqo_test import MarqoTestCase
@@ -85,8 +85,12 @@ class TestMonitoring(MarqoTestCase):
         """
         for marqo_index in self.indexes_to_test:
             with self.subTest(f'{marqo_index.name} - {marqo_index.type.value}'):
-                self.assertEqual(
-                    MarqoIndexStats(number_of_documents=0, number_of_vectors=0),
+                self.assertIndexStatsEqual(
+                    MarqoIndexStats(
+                        number_of_documents=0,
+                        number_of_vectors=0,
+                        backend=VespaStats()
+                    ),
                     self.monitoring.get_index_stats(marqo_index)
                 )
 
@@ -103,8 +107,12 @@ class TestMonitoring(MarqoTestCase):
                         device="cpu"
                     )
                 )
-                self.assertEqual(
-                    MarqoIndexStats(number_of_documents=3, number_of_vectors=3),
+                self.assertIndexStatsEqual(
+                    MarqoIndexStats(
+                        number_of_documents=3,
+                        number_of_vectors=3,
+                        backend=VespaStats()
+                    ),
                     self.monitoring.get_index_stats(marqo_index)
                 )
 
@@ -127,8 +135,12 @@ class TestMonitoring(MarqoTestCase):
                 device="cpu"
             )
         )
-        self.assertEqual(
-            MarqoIndexStats(number_of_documents=3, number_of_vectors=4),
+        self.assertIndexStatsEqual(
+            MarqoIndexStats(
+                number_of_documents=3,
+                number_of_vectors=4,
+                backend=VespaStats()
+            ),
             self.monitoring.get_index_stats(marqo_index)
         )
 
@@ -145,8 +157,12 @@ class TestMonitoring(MarqoTestCase):
                         device="cpu"
                     )
                 )
-                self.assertEqual(
-                    MarqoIndexStats(number_of_documents=3, number_of_vectors=0),
+                self.assertIndexStatsEqual(
+                    MarqoIndexStats(
+                        number_of_documents=3,
+                        number_of_vectors=0,
+                        backend=VespaStats()
+                    ),
                     self.monitoring.get_index_stats(marqo_index)
                 )
 
@@ -163,8 +179,12 @@ class TestMonitoring(MarqoTestCase):
                         device="cpu"
                     )
                 )
-                self.assertEqual(
-                    MarqoIndexStats(number_of_documents=3, number_of_vectors=2),
+                self.assertIndexStatsEqual(
+                    MarqoIndexStats(
+                        number_of_documents=3,
+                        number_of_vectors=2,
+                        backend=VespaStats()
+                    ),
                     self.monitoring.get_index_stats(marqo_index)
                 )
 
@@ -176,27 +196,27 @@ class TestMonitoring(MarqoTestCase):
             (
                 'add',  # add 3 docs, 3 have a vector
                 [{"_id": "1", "title": "2"}, {"_id": "2", "title": "2"}, {"_id": "3", "title": "62"}],
-                MarqoIndexStats(number_of_documents=3, number_of_vectors=3)
+                MarqoIndexStats(number_of_documents=3, number_of_vectors=3, backend=VespaStats())
             ),
             (
                 'add',  # add 3 docs, 1 has a vector
                 [{"_id": "4", "desc": "2"}, {"_id": "5", "title": "2"}, {"_id": "6", "desc": "62"}],
-                MarqoIndexStats(number_of_documents=6, number_of_vectors=4)
+                MarqoIndexStats(number_of_documents=6, number_of_vectors=4, backend=VespaStats())
             ),
             (
                 'delete',  # delete 2 docs, 1 has a vector
                 ["1", "4"],
-                MarqoIndexStats(number_of_documents=4, number_of_vectors=3)
+                MarqoIndexStats(number_of_documents=4, number_of_vectors=3, backend=VespaStats())
             ),
             (
                 'add',  # add 3 docs, 1 has a vector
                 [{"_id": "7", "desc": "2"}, {"_id": "8", "title": "2"}, {"_id": "9", "desc": "62"}],
-                MarqoIndexStats(number_of_documents=7, number_of_vectors=4)
+                MarqoIndexStats(number_of_documents=7, number_of_vectors=4, backend=VespaStats())
             ),
             (
                 'delete',  # delete all docs
                 [f"{i}" for i in range(1, 10)],
-                MarqoIndexStats(number_of_documents=0, number_of_vectors=0)
+                MarqoIndexStats(number_of_documents=0, number_of_vectors=0, backend=VespaStats())
             )
         ]
 
@@ -217,7 +237,7 @@ class TestMonitoring(MarqoTestCase):
                             index_name=marqo_index.name,
                             doc_ids=docs
                         )
-                    self.assertEqual(
+                    self.assertIndexStatsEqual(
                         expected_stats,
                         self.monitoring.get_index_stats(marqo_index)
                     )
@@ -238,8 +258,12 @@ class TestMonitoring(MarqoTestCase):
                         device="cpu"
                     )
                 )
-                self.assertEqual(
-                    MarqoIndexStats(number_of_documents=2, number_of_vectors=4),
+                self.assertIndexStatsEqual(
+                    MarqoIndexStats(
+                        number_of_documents=2,
+                        number_of_vectors=4,
+                        backend=VespaStats()
+                    ),
                     self.monitoring.get_index_stats(marqo_index)
                 )
 
@@ -256,8 +280,12 @@ class TestMonitoring(MarqoTestCase):
                         device="cpu"
                     )
                 )
-                self.assertEqual(
-                    MarqoIndexStats(number_of_documents=3, number_of_vectors=3),
+                self.assertIndexStatsEqual(
+                    MarqoIndexStats(
+                        number_of_documents=3,
+                        number_of_vectors=3,
+                        backend=VespaStats()
+                    ),
                     self.monitoring.get_index_stats_by_name(marqo_index.name)
                 )
 
@@ -267,3 +295,14 @@ class TestMonitoring(MarqoTestCase):
         """
         with self.assertRaises(IndexNotFoundError):
             self.monitoring.get_index_stats_by_name('index_does_not_exist')
+
+    def assertIndexStatsEqual(self, expected: MarqoIndexStats, actual: MarqoIndexStats):
+        """
+        Assert MarqoIndexStats equality, verifying only range validity for storage and memory stats.
+        """
+        self.assertEqual(expected.number_of_documents, actual.number_of_documents)
+        self.assertEqual(expected.number_of_vectors, actual.number_of_vectors)
+        self.assertGreater(actual.backend.memory_used_percentage, 0.0)
+        self.assertLessEqual(actual.backend.memory_used_percentage, 100.0)
+        self.assertGreater(actual.backend.storage_used_percentage, 0.0)
+        self.assertLessEqual(actual.backend.storage_used_percentage, 100.0)

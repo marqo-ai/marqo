@@ -1,11 +1,11 @@
 from typing import Optional
 
 import marqo.logging
-from marqo.core.exceptions import IndexNotFoundError
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models import MarqoIndex
-from marqo.core.models.marqo_index_health import MarqoHealthStatus, HealthStatus, VespaHealthStatus
-from marqo.core.models.marqo_index_stats import MarqoIndexStats
+from marqo.core.models.marqo_index_health import MarqoHealthStatus, HealthStatus, VespaHealthStatus, \
+    InferenceHealthStatus
+from marqo.core.models.marqo_index_stats import MarqoIndexStats, VespaStats
 from marqo.core.vespa_index import for_marqo_index as vespa_index_factory
 from marqo.exceptions import InternalError
 from marqo.vespa.exceptions import VespaError
@@ -49,9 +49,24 @@ class Monitoring:
         except (TypeError, AttributeError, IndexError) as e:
             raise InternalError(f"Failed to get the number of vectors for index {marqo_index.name}: {e}") from e
 
+        metrics = self.vespa_client.get_metrics()
+
+        memory_utilization = metrics.clusterController_resourceUsage_maxMemoryUtilization_max
+        disk_utilization = metrics.clusterController_resourceUsage_maxDiskUtilization_max
+
+        # Occasionally Vespa returns empty metrics, often for the first call after a restart
+        if memory_utilization is None:
+            logger.warn(f'Vespa did not return a value for memory utilization metrics')
+        if disk_utilization is None:
+            logger.warn(f'Vespa did not return a value for disk utilization metrics')
+
         return MarqoIndexStats(
             number_of_documents=doc_count_query_result.total_count,
-            number_of_vectors=number_of_vectors
+            number_of_vectors=number_of_vectors,
+            backend=VespaStats(
+                memory_used_percentage=memory_utilization * 100 if memory_utilization is not None else None,
+                storage_used_percentage=disk_utilization * 100 if disk_utilization is not None else None
+            )
         )
 
     def get_index_stats_by_name(self, index_name: str) -> MarqoIndexStats:
@@ -80,34 +95,56 @@ class Monitoring:
             Marqo index health status
         """
         # TODO - Check index specific metrics such as memory and disk usage
-        marqo_status = self._get_marqo_health()
-        try:
-            vespa_status = self._get_vespa_health(hostname_filter=hostname_filter)
-        except VespaError as e:
-            logger.warning(f"Failed to get Vespa health: {e}")
-            vespa_status = HealthStatus.Red
+        inference_status = self._get_inference_health()
+        vespa_status = self._get_vespa_health(hostname_filter=hostname_filter)
 
-        aggregated_status = max(marqo_status, vespa_status)
+        aggregated_status = max(inference_status.status, vespa_status.status)
 
         return MarqoHealthStatus(
             status=aggregated_status,
-            backend=VespaHealthStatus(status=vespa_status)
+            inference=inference_status,
+            backend=vespa_status
         )
 
-    def _get_marqo_health(self) -> HealthStatus:
-        return HealthStatus.Green
+    def _get_inference_health(self) -> InferenceHealthStatus:
+        return InferenceHealthStatus(status=HealthStatus.Green)
 
-    def _get_vespa_health(self, hostname_filter: Optional[str]) -> HealthStatus:
-        metrics = self.vespa_client.get_metrics()
+    def _get_vespa_health(self, hostname_filter: Optional[str]) -> VespaHealthStatus:
+        try:
+            metrics = self.vespa_client.get_metrics()
+        except VespaError as e:
+            logger.error(f"Failed to get Vespa metrics: {e}")
+            return VespaHealthStatus(status=HealthStatus.Red)
 
-        status = HealthStatus.Green
+        # Check service status
+        service_status = HealthStatus.Green
         for node in metrics.nodes:
+            if service_status == HealthStatus.Red:
+                break
+
             if hostname_filter is not None and hostname_filter not in node.hostname:
                 continue
 
             for service in node.services:
                 if service.status.code != 'up':
-                    status = HealthStatus.Red
-                    break
+                    service_status = HealthStatus.Red
 
-        return status
+        # Check feed block
+        feed_status = HealthStatus.Green
+        nodes_above_limit = metrics.clusterController_resourceUsage_nodesAboveLimit_max
+        memory_utilization = metrics.clusterController_resourceUsage_maxMemoryUtilization_max
+        disk_utilization = metrics.clusterController_resourceUsage_maxDiskUtilization_max
+
+        if nodes_above_limit is None:
+            logger.warn(f'Vespa did not return a value for nodes_above_limit metric')
+            feed_status = HealthStatus.Yellow
+        elif nodes_above_limit > 0:
+            feed_status = HealthStatus.Yellow
+
+        status = max(service_status, feed_status)
+
+        return VespaHealthStatus(
+            status=status,
+            memory_is_available=memory_utilization is not None and memory_utilization < 1.0,
+            storage_is_available=disk_utilization is not None and disk_utilization < 1.0
+        )
