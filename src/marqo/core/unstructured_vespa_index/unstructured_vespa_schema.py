@@ -8,7 +8,7 @@ from marqo.core.unstructured_vespa_index import constants as unstructured_consta
 
 
 class UnstructuredVespaSchema(VespaSchema):
-    _FIELD_ID = unstructured_constants.VESPA_FIELD_ID
+    _FIELD_ID = unstructured_common.VESPA_FIELD_ID
 
     _STRINGS = unstructured_common.STRINGS
     _SHORT_STRINGS_FIELDS = unstructured_common.SHORT_STRINGS_FIELDS

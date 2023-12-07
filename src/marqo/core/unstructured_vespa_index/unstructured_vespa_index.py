@@ -96,7 +96,7 @@ class UnstructuredVespaIndex(VespaIndex):
 
             # Filter on `_id`
             if node.field == index_constants.MARQO_DOC_ID:
-                return f'({unstructured_constants.VESPA_FIELD_ID} contains "{escape(node.value)}")'
+                return f'({unstructured_common.VESPA_FIELD_ID} contains "{escape(node.value)}")'
 
             # Bool Filter
             if node.value in unstructured_constants.FILTER_STRING_BOOL_VALUE:
