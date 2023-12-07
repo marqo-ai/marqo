@@ -3,7 +3,7 @@ from pydantic import BaseModel
 
 class MarqoBaseModel(BaseModel):
     class Config:
-        # allow_population_by_field_name = True  # deserialize both real name and alias (if present)
+        allow_population_by_field_name = True  # accept both real name and alias (if present)
         validate_assignment = True
 
 
