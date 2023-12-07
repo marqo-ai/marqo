@@ -145,7 +145,6 @@ def threaded_download_media(
 
     with metric_obj.time(f"{_id}.thread_time"):
         for doc in allocated_docs:
-            
             for field in list(doc):
                 if not utils.is_tensor_field(field, tensor_fields, non_tensor_fields):
                     continue

@@ -22,6 +22,9 @@ def get_default_index_settings():
             NsFields.image_preprocessing: {
                 NsFields.patch_method: None
             },
+            NsFields.audio_preprocessing: {
+                NsFields.audio_chunking_method: "simple",
+            },
             NsFields.ann_parameters: get_default_ann_parameters()
         },
         NsFields.number_of_shards: 3,

@@ -24,7 +24,8 @@ settings_schema = {
                 NsFields.model,
                 NsFields.normalize_embeddings,
                 NsFields.text_preprocessing,
-                NsFields.image_preprocessing
+                NsFields.image_preprocessing,
+                NsFields.audio_preprocessing,
             ],
             "additionalProperties": False,
             "properties": {
@@ -126,6 +127,23 @@ settings_schema = {
                         NsFields.patch_method: None
                     }]
                 },
+                NsFields.audio_preprocessing: {
+                    "type": "object",
+                    "required": [
+                        NsFields.audio_chunking_method
+                    ],
+                    "properties": {
+                        NsFields.audio_chunking_method: {
+                            "type": ["string", "null"],
+                            "examples": [
+                                "simple"
+                            ]
+                        }
+                    },
+                    "examples": [{
+                        NsFields.audio_chunking_method: "simple"
+                    }]
+                },
                 NsFields.ann_parameters: {
                     "type": "object",
                     "required": [
@@ -203,6 +221,9 @@ settings_schema = {
                 },
                 NsFields.image_preprocessing: {
                     NsFields.patch_method: None
+                },
+                NsFields.audio_preprocessing: {
+                    NsFields.audio_chunking_method: "simple",
                 },
                 NsFields.ann_parameters: {
                     NsFields.ann_method: "hnsw",

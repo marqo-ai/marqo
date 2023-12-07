@@ -65,6 +65,7 @@ from marqo.tensor_search.utils import add_timing
 from marqo.tensor_search import delete_docs
 from marqo.s2_inference.processing import text as text_processor
 from marqo.s2_inference.processing import image as image_processor
+from marqo.s2_inference.processing import audio as audio_processor
 from marqo.s2_inference.clip_utils import _is_image
 from marqo.s2_inference.reranking import rerank
 from marqo.s2_inference import s2_inference
@@ -290,6 +291,13 @@ def _autofill_index_settings(index_settings: dict):
                 copied_settings[NsField.index_defaults][NsField.image_preprocessing][key] is None:
             copied_settings[NsField.index_defaults][NsField.image_preprocessing][key] \
                 = default_settings[NsField.index_defaults][NsField.image_preprocessing][key]
+
+    # audio preprocessing sub fields - fills any missing sub-dict fields
+    for key in list(default_settings[NsField.index_defaults][NsField.audio_preprocessing]):
+        if key not in copied_settings[NsField.index_defaults][NsField.audio_preprocessing] or \
+                copied_settings[NsField.index_defaults][NsField.audio_preprocessing][key] is None:
+            copied_settings[NsField.index_defaults][NsField.audio_preprocessing][key] \
+                = default_settings[NsField.index_defaults][NsField.audio_preprocessing][key]
 
     return copied_settings
 
@@ -599,6 +607,10 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                         # TODO put the logic for getting field parameters into a function and add per field options
                         image_method = index_info.index_settings[NsField.index_defaults][NsField.image_preprocessing][
                             NsField.patch_method]
+                        
+                        audio_method = index_info.index_settings[NsField.index_defaults][NsField.audio_preprocessing][
+                            NsField.audio_chunking_method]
+
                         # the chunk_image contains the no-op logic as of now - method = None will be a no-op
                         try:
                             if isinstance(field_content, str):
@@ -617,6 +629,9 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                             if is_images and image_method not in [None, 'none', '', "None", ' ']:
                                 content_chunks, text_chunks = image_processor.chunk_image(
                                     media_data, device=add_docs_params.device, method=image_method)
+                            elif is_audios and audio_method not in [None, 'none', '', "None", ' ']:
+                                content_chunks, text_chunks = audio_processor.chunk_audio(
+                                    media_data, device=add_docs_params.device, method=audio_method)
                             else:
                                 # if we are not chunking, then we set the chunks as 1-len lists
                                 # content_chunk is the media
