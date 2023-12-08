@@ -183,6 +183,10 @@ class TestApiValidation(MarqoTestCase):
 
 
 class TestBaseExceptionHandler(MarqoTestCase):
+    """
+    Ensure that calling the base exception handler with a base/core exception calls the API exception handler
+    with the correct converted api exception.
+    """
     def setUp(self) -> None:
         super().setUp()
         self.normal_request = mock.MagicMock()
@@ -195,84 +199,54 @@ class TestBaseExceptionHandler(MarqoTestCase):
         self.normal_request.headers = headers
         self.normal_request.content = body
         self.generic_error_message = "This is an error!"
+        self.mock_api_exception_handler = mock.MagicMock()
 
-    def test_base_exception_handler_base_errors(self):
+    @mock.patch("marqo.tensor_search.api.marqo_api_exception_handler")
+    def test_base_exception_handler_base_errors(self, mock_api_exception_handler):
         with self.subTest("Base error: Internal Error"):
-            try:
-                marqo_base_exception_handler(self.normal_request, base_exceptions.InternalError(self.generic_error_message))
-                raise AssertionError
-            except api_exceptions.InternalError as e:
-                assert e.message.startswith(self.generic_error_message)     # 500 error
+            marqo_base_exception_handler(self.normal_request, base_exceptions.InternalError(self.generic_error_message))
+            assert isinstance(mock_api_exception_handler.call_args_list[-1][0][1], api_exceptions.InternalError)    # 500
 
         with self.subTest("Base error: Invalid Argument Error"):
-            try:
-                marqo_base_exception_handler(self.normal_request, base_exceptions.InvalidArgumentError(self.generic_error_message))
-                raise AssertionError
-            except api_exceptions.InvalidArgError as e:
-                assert e.message == self.generic_error_message   # 400 error
+            marqo_base_exception_handler(self.normal_request, base_exceptions.InvalidArgumentError(self.generic_error_message))
+            assert isinstance(mock_api_exception_handler.call_args_list[-1][0][1], api_exceptions.InvalidArgError)  # 400
 
-
-    def test_base_exception_handler_core_errors(self):
+    @mock.patch("marqo.tensor_search.api.marqo_api_exception_handler")
+    def test_base_exception_handler_core_errors(self, mock_api_exception_handler):
         with self.subTest("Core error: Index Exists Error"):
-            try:
-                marqo_base_exception_handler(self.normal_request, core_exceptions.IndexExistsError(self.generic_error_message))
-                raise AssertionError
-            except api_exceptions.IndexAlreadyExistsError as e:
-                assert e.message == self.generic_error_message
+            marqo_base_exception_handler(self.normal_request, core_exceptions.IndexExistsError(self.generic_error_message))
+            assert isinstance(mock_api_exception_handler.call_args_list[-1][0][1], api_exceptions.IndexAlreadyExistsError)  # 409
 
         with self.subTest("Core error: Index Not Found Error"):
-            try:
-                marqo_base_exception_handler(self.normal_request, core_exceptions.IndexNotFoundError(self.generic_error_message))
-                raise AssertionError
-            except api_exceptions.IndexNotFoundError as e:
-                assert e.message == self.generic_error_message
+            marqo_base_exception_handler(self.normal_request, core_exceptions.IndexNotFoundError(self.generic_error_message))
+            assert isinstance(mock_api_exception_handler.call_args_list[-1][0][1], api_exceptions.IndexNotFoundError)   # 404
 
         with self.subTest("Core error: Parsing Error"):
-            try:
-                marqo_base_exception_handler(self.normal_request, core_exceptions.ParsingError(self.generic_error_message))
-                raise AssertionError
-            except api_exceptions.MarqoWebError as e:
-                assert e.message.startswith(self.generic_error_message)     # Generic 500
+            marqo_base_exception_handler(self.normal_request, core_exceptions.ParsingError(self.generic_error_message))
+            assert isinstance(mock_api_exception_handler.call_args_list[-1][0][1], api_exceptions.MarqoWebError)  # 500
 
         with self.subTest("Core error: Vespa Document Parsing Error"):
-            try:
-                marqo_base_exception_handler(self.normal_request, core_exceptions.VespaDocumentParsingError(self.generic_error_message))
-                raise AssertionError
-            except api_exceptions.BackendDataParsingError as e:
-                assert e.message.startswith(self.generic_error_message)      # 500
+            marqo_base_exception_handler(self.normal_request, core_exceptions.VespaDocumentParsingError(self.generic_error_message))
+            assert isinstance(mock_api_exception_handler.call_args_list[-1][0][1], api_exceptions.BackendDataParsingError)
 
         with self.subTest("Core error: Marqo Document Parsing Error"):
-            try:
-                marqo_base_exception_handler(self.normal_request, core_exceptions.MarqoDocumentParsingError(self.generic_error_message))
-                raise AssertionError
-            except api_exceptions.InvalidArgError as e:
-                assert e.message == self.generic_error_message
+            marqo_base_exception_handler(self.normal_request, core_exceptions.MarqoDocumentParsingError(self.generic_error_message))
+            assert isinstance(mock_api_exception_handler.call_args_list[-1][0][1], api_exceptions.InvalidArgError)
 
         with self.subTest("Core error: Invalid Data Type Error"):
-            try:
-                marqo_base_exception_handler(self.normal_request, core_exceptions.InvalidDataTypeError(self.generic_error_message))
-                raise AssertionError
-            except api_exceptions.InvalidArgError as e:
-                assert e.message == self.generic_error_message
+            marqo_base_exception_handler(self.normal_request, core_exceptions.InvalidDataTypeError(self.generic_error_message))
+            assert isinstance(mock_api_exception_handler.call_args_list[-1][0][1], api_exceptions.InvalidArgError)
 
         with self.subTest("Core error: Invalid Field Name Error"):
-            try:
-                marqo_base_exception_handler(self.normal_request, core_exceptions.InvalidFieldNameError(self.generic_error_message))
-                raise AssertionError
-            except api_exceptions.InvalidFieldNameError as e:
-                assert e.message == self.generic_error_message
+            marqo_base_exception_handler(self.normal_request, core_exceptions.InvalidFieldNameError(self.generic_error_message))
+            assert isinstance(mock_api_exception_handler.call_args_list[-1][0][1], api_exceptions.InvalidFieldNameError)
 
         with self.subTest("Core error: Filter String Parsing Error"):
-            try:
-                marqo_base_exception_handler(self.normal_request, core_exceptions.FilterStringParsingError(self.generic_error_message))
-                raise AssertionError
-            except api_exceptions.InvalidArgError as e:
-                assert e.message == self.generic_error_message
+            marqo_base_exception_handler(self.normal_request, core_exceptions.FilterStringParsingError(self.generic_error_message))
+            assert isinstance(mock_api_exception_handler.call_args_list[-1][0][1], api_exceptions.InvalidArgError)
 
-    def test_base_exception_handler_vespa_errors(self):
+    @mock.patch("marqo.tensor_search.api.marqo_api_exception_handler")
+    def test_base_exception_handler_vespa_errors(self, mock_api_exception_handler):
         with self.subTest("Vespa error: Vespa Error"):
-            try:
-                marqo_base_exception_handler(self.normal_request, vespa_exceptions.VespaError(self.generic_error_message))
-                raise AssertionError
-            except api_exceptions.MarqoWebError as e:
-                assert e.message.startswith(self.generic_error_message)    # Generic 500
+            marqo_base_exception_handler(self.normal_request, vespa_exceptions.VespaError(self.generic_error_message))
+            assert isinstance(mock_api_exception_handler.call_args_list[-1][0][1], api_exceptions.MarqoWebError)

@@ -80,7 +80,7 @@ class TestApiErrors(MarqoTestCase):
             "tensor_fields": []
         })
 
-        # use attributes_to_retrieve on a non-existent field
+        # use attributesToRetrieve on a non-existent field
         response = self.client.post("/indexes/" + self.index_name_1 + "/search?device=cpu", json={
             "q": "test",
             "attributesToRetrieve": ["non_existent_field"]
