@@ -1,5 +1,5 @@
 FROM marqoai/marqo-base:poc as base_image
-VOLUME /var/lib/docker
+VOLUME /opt/vespa/
 ARG TARGETPLATFORM
 WORKDIR /app
 

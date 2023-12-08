@@ -46,9 +46,28 @@ if [[ ! $VESPA_CONFIG_URL ]]; then
       sleep 1
   done
   echo -e "\nDone waiting."
+
+
   # Deploy a dummy application to Vespa
-  echo "Deploying dummy application to Vespa for local run"
-  vespa deploy /app/scripts/vespa_dummy_app --wait 300
+
+  curl -X GET http://localhost:8080
+
+  if [ $? -eq 0]; then
+    echo "Vespa document API is working without the dummy application package."
+    echo "You might be loading Vespa with a transferred state."
+  else
+    echo "Vespa document API is not working."
+    echo "Deploying dummy application to Vespa for local run"
+    vespa deploy /app/scripts/vespa_dummy_app --wait 300
+  fi
+
+  until curl -f -X GET http://localhost:8080; do
+    echo "Waiting for Vespa document API to be available..."
+    sleep 5 # Wait for 5 seconds before retrying
+  done
+
+  echo "Vespa document API is available."
+
   echo "Done. Local Vespa configuration is finished"
   export VESPA_QUERY_URL="http://localhost:8080"
   export VESPA_DOCUMENT_URL="http://localhost:8080"
