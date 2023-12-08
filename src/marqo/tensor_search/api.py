@@ -274,7 +274,7 @@ def get_cuda_info():
     return tensor_search.get_cuda_info()
 
 
-@app.post("/batch/indexes/delete-batch")
+@app.post("/batch/indexes/delete")
 @utils.enable_batch_apis()
 def batch_delete_indexes(index_names: List[str], marqo_config: config.Config = Depends(get_config)):
     """An internal API used for testing processes. Not to be used by users."""
@@ -282,7 +282,7 @@ def batch_delete_indexes(index_names: List[str], marqo_config: config.Config = D
     return JSONResponse(content={"acknowledged": True}, status_code=200)
 
 
-@app.post("/batch/indexes/create-batch")
+@app.post("/batch/indexes/create")
 @utils.enable_batch_apis()
 def batch_create_indexes(index_settings_with_name_list: List[IndexSettingsWithName], \
                          marqo_config: config.Config = Depends(get_config)):
@@ -302,7 +302,7 @@ def batch_create_indexes(index_settings_with_name_list: List[IndexSettingsWithNa
     )
 
 
-@app.post("/batch/indexes/documents/delete-batch")
+@app.post("/batch/indexes/clear")
 @utils.enable_batch_apis()
 def batch_clear_indexes(index_names: List[str], marqo_config: config.Config = Depends(get_config)):
     """An internal API used for testing processes. Not to be used by users.

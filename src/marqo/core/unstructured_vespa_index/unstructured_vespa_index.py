@@ -36,6 +36,9 @@ class UnstructuredVespaIndex(VespaIndex):
         return unstructured_document.to_marqo_document(return_highlights=return_highlights)
 
     def to_vespa_query(self, marqo_query: MarqoQuery) -> Dict[str, Any]:
+        if marqo_query.searchable_attributes is not None:
+            raise errors.InvalidArgError("searchable_attributes is not supported for an unstructured index")
+
         if isinstance(marqo_query, MarqoTensorQuery):
             return self._to_vespa_tensor_query(marqo_query)
         elif isinstance(marqo_query, MarqoLexicalQuery):
@@ -46,9 +49,6 @@ class UnstructuredVespaIndex(VespaIndex):
             raise InternalError(f'Unknown query type {type(marqo_query)}')
 
     def _to_vespa_tensor_query(self, marqo_query: MarqoTensorQuery) -> Dict[str, Any]:
-        if marqo_query.searchable_attributes is not None:
-            raise UnsupportedFeatureError("searchable_attributes is not supported for an Unstructured Index")
-
         tensor_term = self._get_tensor_search_term(marqo_query)
 
         filter_term = self._get_filter_term(marqo_query)
