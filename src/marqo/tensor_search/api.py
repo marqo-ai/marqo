@@ -20,7 +20,7 @@ from marqo.tensor_search.models.add_docs_objects import (AddDocsBodyParams)
 from marqo.tensor_search.models.api_models import SearchQuery
 from marqo.tensor_search.models.index_settings import IndexSettings
 from marqo.tensor_search.models.api_models import BulkSearchQuery, SearchQuery
-from marqo.tensor_search.models.index_settings import IndexSettings, IndexNamesAndSettings
+from marqo.tensor_search.models.index_settings import IndexSettings, IndexSettingsWithName
 from marqo.tensor_search.on_start_script import on_start
 from marqo.tensor_search.telemetry import RequestMetricsStore, TelemetryMiddleware
 from marqo.tensor_search.throttling.redis_throttle import throttle
@@ -284,19 +284,19 @@ def batch_delete_indexes(index_names: List[str], marqo_config: config.Config = D
 
 @app.post("/batch/indexes/create-batch")
 @utils.enable_batch_apis()
-def batch_create_indexes(index_names_and_settings: IndexNamesAndSettings, \
+def batch_create_indexes(index_settings_with_name_list: List[IndexSettingsWithName], \
                          marqo_config: config.Config = Depends(get_config)):
     """An internal API used for testing processes. Not to be used by users."""
-    marqo_index_requests = [settings.to_marqo_index_request(index_name) \
-                            for index_name, settings in zip(index_names_and_settings.index_names, \
-                                                            index_names_and_settings.index_settings_list)]
+
+    marqo_index_requests = [settings.to_marqo_index_request(settings.indexName) for \
+                            settings in index_settings_with_name_list]
 
     marqo_config.index_management.batch_create_indexes(marqo_index_requests)
 
     return JSONResponse(
         content={
             "acknowledged": True,
-            "index_names": [index_name for index_name in index_names_and_settings.index_names]
+            "index_names": [settings.indexName for settings in index_settings_with_name_list]
         },
         status_code=200
     )
@@ -309,8 +309,6 @@ def batch_clear_indexes(index_names: List[str], marqo_config: config.Config = De
     This API delete all the documents in the indexes specified in the index_names list."""
     tensor_search.batch_clear_indexes(index_names=index_names, config=marqo_config)
     return JSONResponse(content={"acknowledged": True}, status_code=200)
-
-
 
 
 if __name__ == "__main__":

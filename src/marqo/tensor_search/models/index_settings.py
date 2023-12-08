@@ -105,7 +105,7 @@ class IndexSettings(StrictBaseModel):
                 vector_numeric_type=self.vectorNumericType,
                 hnsw_config=self.annParameters.parameters,
                 treat_urls_and_pointers_as_images=self.treatUrlsAndPointersAsImages,
-                short_string_threshold=20,  # Hardcoded here as it should be updated by the user
+                short_string_length_threshold=20,  # Hardcoded here as it should be updated by the user
                 marqo_version=version.get_version(),
                 created_at=time.time(),
                 updated_at=time.time()
@@ -158,9 +158,5 @@ class IndexSettings(StrictBaseModel):
             raise errors.InternalError(f"Unknown index type: {type(marqo_index)}")
 
 
-from pydantic import BaseModel
-
-
-class IndexNamesAndSettings(BaseModel):
-    index_names: List[str]
-    index_settings_list: List[IndexSettings]
+class IndexSettingsWithName(IndexSettings):
+    indexName: str
