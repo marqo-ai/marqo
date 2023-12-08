@@ -1301,10 +1301,7 @@ def _vector_text_search(
 
 def delete_index(config: Config, index_name):
     index_management = IndexManagement(vespa_client=config.vespa_client)
-    try:
-        index_management.delete_index_by_name(index_name)
-    except core_exceptions.IndexNotFoundError as e:
-        raise api_exceptions.IndexNotFoundError(f"Index {index_name} does not exist") from e
+    index_management.delete_index_by_name(index_name)
 
     if index_name in get_cache():
         del get_cache()[index_name]

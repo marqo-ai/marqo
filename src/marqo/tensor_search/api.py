@@ -56,10 +56,10 @@ def get_config():
 
 
 @app.exception_handler(base_exceptions.MarqoError)
-def marqo_base_exception_handler(request: Request, exc: base_exceptions.MarqoError):
+def marqo_base_exception_handler(request: Request, exc: base_exceptions.MarqoError) -> JSONResponse:
     """
-    Catch a base/core Marqo Error and raise its corresponding API Marqo Error.
-    The API Error will be caught by the `marqo_api_exception_handler` below.
+    Catch a base/core Marqo Error and convert to its corresponding API Marqo Error.
+    The API Error will be passed to the `marqo_api_exception_handler` below.
     This ensures that raw base errors are never returned by the API.
     
     Mappings are in an ordered list to allow for hierarchical resolution of errors.
@@ -68,9 +68,7 @@ def marqo_base_exception_handler(request: Request, exc: base_exceptions.MarqoErr
 
     api_exception_mappings = [
         # Core exceptions
-        (core_exceptions.InvalidDataTypeError, api_exceptions.InvalidArgError),         # More specific errors should take precedence
-        (core_exceptions.InvalidFieldNameError, api_exceptions.InvalidFieldNameError),
-
+        (core_exceptions.InvalidFieldNameError, api_exceptions.InvalidFieldNameError),      # More specific errors should take precedence
         (core_exceptions.IndexExistsError, api_exceptions.IndexAlreadyExistsError),
         (core_exceptions.IndexNotFoundError, api_exceptions.IndexNotFoundError),
         (core_exceptions.VespaDocumentParsingError, api_exceptions.BackendDataParsingError),
@@ -83,12 +81,17 @@ def marqo_base_exception_handler(request: Request, exc: base_exceptions.MarqoErr
         (base_exceptions.MarqoError, api_exceptions.MarqoWebError),
     ]
 
+    converted_error = None
     for base_exception, api_exception in api_exception_mappings:
         if isinstance(exc, base_exception):
-            raise api_exception(exc.message) from exc
+            converted_error = api_exception(exc.message)
+            break
     
     # Completely unhandled exception (500)
-    raise api_exceptions.MarqoWebError(exc.message) from exc
+    if not converted_error:
+        converted_error = api_exceptions.MarqoWebError(exc.message)
+
+    return marqo_api_exception_handler(request, converted_error)
 
 
 @app.exception_handler(api_exceptions.MarqoWebError)
