@@ -1,6 +1,5 @@
 """The API entrypoint for Tensor Search"""
 import json
-import os
 from typing import List
 
 import pydantic
@@ -15,6 +14,7 @@ from fastapi.responses import JSONResponse
 
 from marqo import config
 from marqo import version
+from marqo.api.models.health_response import HealthResponse
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.tensor_search import tensor_search, utils
 from marqo.tensor_search.enums import RequestType, EnvVars
@@ -230,13 +230,15 @@ def get_documents_by_ids(
 
 @app.get("/indexes/{index_name}/stats")
 def get_index_stats(index_name: str, marqo_config: config.Config = Depends(get_config)):
-    stats = marqo_config.monitoring.get_index_stats(index_name)
-    return JSONResponse(
-        content={
-            'numberOfDocuments': stats.number_of_documents
-        },
-        status_code=200
-    )
+    stats = marqo_config.monitoring.get_index_stats_by_name(index_name)
+    return {
+        'numberOfDocuments': stats.number_of_documents,
+        'numberOfVectors': stats.number_of_vectors,
+        'backend': {
+            'memoryUsedPercentage': stats.backend.memory_used_percentage,
+            'storageUsedPercentage': stats.backend.storage_used_percentage
+        }
+    }
 
 
 @app.delete("/indexes/{index_name}")
@@ -247,22 +249,23 @@ def delete_index(index_name: str, marqo_config: config.Config = Depends(get_conf
 
 
 @app.post("/indexes/{index_name}/documents/delete-batch")
-def delete_docs(index_name: str, documentIds: List[str], refresh: bool = True,
+def delete_docs(index_name: str, documentIds: List[str],
                 marqo_config: config.Config = Depends(get_config)):
     return tensor_search.delete_documents(
-        index_name=index_name, config=marqo_config, doc_ids=documentIds,
-        auto_refresh=refresh
+        index_name=index_name, config=marqo_config, doc_ids=documentIds
     )
 
 
 @app.get("/health")
 def check_health(marqo_config: config.Config = Depends(get_config)):
-    return marqo_config.monitoring.get_health()
+    health_status = marqo_config.monitoring.get_health()
+    return HealthResponse.from_marqo_health_status(health_status)
 
 
 @app.get("/indexes/{index_name}/health")
 def check_index_health(index_name: str, marqo_config: config.Config = Depends(get_config)):
-    return marqo_config.monitoring.get_health(index_name=index_name)
+    health_status = marqo_config.monitoring.get_health(index_name=index_name)
+    return HealthResponse.from_marqo_health_status(health_status)
 
 
 @app.get("/indexes")
