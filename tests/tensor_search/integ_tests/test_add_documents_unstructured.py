@@ -473,13 +473,13 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
                         device="cpu"
                     )
                 )
-                assert len(add_res['items']) == len(expected_results)
+                self.assertEqual(len(expected_results),len(expected_results))
                 for i, res_dict in enumerate(add_res['items']):
                     # if the expected id is None, then it assumed the id is
                     # generated and can't be asserted against
                     if expected_results[i][0] is not None:
-                        assert res_dict["_id"] == expected_results[i][0]
-                    assert res_dict['status'] == expected_results[i][1]
+                        self.assertEqual(expected_results[i][0], res_dict["_id"])
+                    self.assertEqual(expected_results[i][1], res_dict['status'])
 
     def test_add_document_with_tensor_fields(self):
         """Ensure tensor_fields only works for title but not desc"""

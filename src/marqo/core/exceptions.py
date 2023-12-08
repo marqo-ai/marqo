@@ -29,9 +29,14 @@ class InvalidFieldNameError(MarqoDocumentParsingError):
     pass
 
 
+class InvalidTensorFieldError(MarqoDocumentParsingError):
+    pass
+
+
 class FilterStringParsingError(MarqoError):
     pass
 
 
 class UnsupportedFeatureError(InvalidArgumentError):
     pass
+

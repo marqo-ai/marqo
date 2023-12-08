@@ -276,15 +276,15 @@ def get_cuda_info():
 
 @app.post("/batch/indexes/delete-batch")
 @utils.enable_batch_apis()
-def delete_batch_indexes(index_names: List[str], marqo_config: config.Config = Depends(get_config)):
+def batch_delete_indexes(index_names: List[str], marqo_config: config.Config = Depends(get_config)):
     """An internal API used for testing processes. Not to be used by users."""
-    tensor_search.delete_batch_indexes(index_names=index_names, config=marqo_config)
+    tensor_search.batch_delete_indexes(index_names=index_names, config=marqo_config)
     return JSONResponse(content={"acknowledged": True}, status_code=200)
 
 
 @app.post("/batch/indexes/create-batch")
 @utils.enable_batch_apis()
-def create_batch_indexes(index_names_and_settings: IndexNamesAndSettings, \
+def batch_create_indexes(index_names_and_settings: IndexNamesAndSettings, \
                          marqo_config: config.Config = Depends(get_config)):
     """An internal API used for testing processes. Not to be used by users."""
     marqo_index_requests = [settings.to_marqo_index_request(index_name) \
@@ -304,10 +304,10 @@ def create_batch_indexes(index_names_and_settings: IndexNamesAndSettings, \
 
 @app.post("/batch/indexes/documents/delete-batch")
 @utils.enable_batch_apis()
-def clear_batch_indexes(index_names: List[str], marqo_config: config.Config = Depends(get_config)):
+def batch_clear_indexes(index_names: List[str], marqo_config: config.Config = Depends(get_config)):
     """An internal API used for testing processes. Not to be used by users.
     This API delete all the documents in the indexes specified in the index_names list."""
-    tensor_search.clear_batch_indexes(index_names=index_names, config=marqo_config)
+    tensor_search.batch_clear_indexes(index_names=index_names, config=marqo_config)
     return JSONResponse(content={"acknowledged": True}, status_code=200)
 
 

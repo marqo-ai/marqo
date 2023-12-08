@@ -108,6 +108,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
 def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, marqo_index: UnstructuredMarqoIndex):
     # ADD DOCS TIMER-LOGGER (3)
     vespa_client = config.vespa_client
+    unstructured_vespa_index = UnstructuredVespaIndex(marqo_index)
 
     RequestMetricsStore.for_request().start("add_documents.processing_before_vespa")
 
@@ -178,7 +179,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                     del copied["_id"]
                 else:
                     doc_id = str(uuid.uuid4())
-                [validation.validate_unstructured_index_field_name(field) for field in copied]
+                [unstructured_vespa_index.validate_field_name(field) for field in copied]
 
             except errors.__InvalidRequestError as err:
                 unsuccessful_docs.append(
@@ -195,17 +196,11 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                 is_tensor_field = utils.is_tensor_field(field, add_docs_params.tensor_fields)
 
                 try:
-                    field_content = validation.validate_field_content(
+                    field_content = unstructured_vespa_index.validate_field_content(
                         field_content=copied[field],
-                        is_non_tensor_field=not is_tensor_field
+                        is_tensor_field=is_tensor_field
                     )
-                    if isinstance(field_content, dict):
-                        field_content = validation.validate_dict(
-                            field=field, field_content=field_content,
-                            is_non_tensor_field=not is_tensor_field,
-                            mappings=add_docs_params.mappings)
-
-                except errors.InvalidArgError as err:
+                except (errors.InvalidArgError, core_exceptions.MarqoDocumentParsingError) as err:
                     document_is_valid = False
                     unsuccessful_docs.append(
                         (i, {'_id': doc_id, 'error': err.message, 'status': int(err.status_code),
@@ -441,7 +436,6 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
         start_time_5 = timer()
         with RequestMetricsStore.for_request().time("add_documents.opensearch._bulk"):
             # serialised_body = utils.dicts_to_jsonl(bulk_parent_dicts)
-            unstructured_vespa_index = UnstructuredVespaIndex(marqo_index)
             vespa_docs = [
                 VespaDocument(**unstructured_vespa_index.to_vespa_document(marqo_document=doc))
                 for doc in bulk_parent_dicts
@@ -1136,7 +1130,9 @@ def search(config: Config, index_name: str, text: Union[str, dict],
 
     # Validation for: result_count (limit) & offset
     # Validate neither is negative
-    result_count = validation.validate_result_count(result_count=result_count)
+    if result_count <= 0 or (not isinstance(result_count, int)):
+        raise errors.IllegalRequestedDocCount(f"result_count must be an integer greater than 0! Received {result_count}")
+
     if offset < 0:
         raise errors.IllegalRequestedDocCount("search result offset cannot be less than 0!")
 
@@ -1712,12 +1708,12 @@ def delete_index(config: Config, index_name):
         del get_cache()[index_name]
 
 
-def delete_batch_indexes(config: Config, index_names: List[str]):
+def batch_delete_indexes(config: Config, index_names: List[str]):
     index_management = IndexManagement(vespa_client=config.vespa_client)
-    index_management.batch_delete_indexes(index_names)
+    index_management.batch_delete_indexes_by_name(index_names)
 
 
-def clear_batch_indexes(config: Config, index_names: List[str]):
+def batch_clear_indexes(config: Config, index_names: List[str]):
     import vespa.application as pyvespa
     pyvespa_client = pyvespa.Vespa(config.vespa_client.document_url)
     for index_name in index_names:

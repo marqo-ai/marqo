@@ -341,36 +341,13 @@ def get_best_available_device() -> str:
 
 
 def is_tensor_field(field: str,
-                    tensor_fields: Optional[List[str]] = None
+                    tensor_fields: List[str]
                     ) -> bool:
     """Determine whether a field is a tensor field or not for add_documents calls."""
     if not tensor_fields:
         return False
     else:
         return field in tensor_fields
-
-
-def calculate_health_status(marqo_os_health_check_response: Optional[Dict]) -> dict:
-    """Calculate the health status of Marqo based on the response API from Marqo-os ."""
-    statuses = {
-        "green": 0,
-        "yellow": 1,
-        "red": 2,
-    }
-
-    marqo_status = "green"
-
-    if marqo_os_health_check_response is not None:
-        if "status" in marqo_os_health_check_response:
-            marqo_os_status = marqo_os_health_check_response['status']
-        else:
-            marqo_os_status = "red"
-    else:
-        marqo_os_status = "red"
-
-    marqo_status = marqo_status if statuses[marqo_status] >= statuses[marqo_os_status] else marqo_os_status
-
-    return marqo_status, marqo_os_status
 
 
 def check_is_zero_vector(vector: List[float]) -> bool:

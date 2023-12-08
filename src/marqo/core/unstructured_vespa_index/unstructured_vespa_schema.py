@@ -4,7 +4,6 @@ from marqo.core.models import MarqoIndex, UnstructuredMarqoIndex
 from marqo.core.models.marqo_index_request import UnstructuredMarqoIndexRequest
 from marqo.core.vespa_schema import VespaSchema
 from marqo.core.unstructured_vespa_index import common as unstructured_common
-from marqo.core.unstructured_vespa_index import constants as unstructured_constants
 
 
 class UnstructuredVespaSchema(VespaSchema):
@@ -58,6 +57,7 @@ class UnstructuredVespaSchema(VespaSchema):
             created_at=self._index_request.created_at,
             updated_at=self._index_request.updated_at,
             treat_urls_and_pointers_as_images=self._index_request.treat_urls_and_pointers_as_images,
+            short_string_length_threshold=self._index_request.short_string_length_threshold,
         )
 
     @classmethod

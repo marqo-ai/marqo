@@ -11,7 +11,6 @@ from marqo.tensor_search import constants
 from marqo.tensor_search import enums, utils
 from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest
-from marqo.core.unstructured_vespa_index.constants import UNSUPPORTED_FIELD_NAME_LIST
 from marqo.tensor_search.models.mappings_object import mappings_schema, multimodal_combination_schema
 from marqo.tensor_search.models.search import SearchContext
 from marqo.errors import IllegalRequestedDocCount
@@ -281,13 +280,6 @@ def validate_unstructured_index_field_name(field_name) -> str:
         raise InvalidFieldNameError(F"can't name field with protected field name {enums.TensorField.chunks}."
                                     F" Error raised for field name: {field_name}")
 
-    if any(unsupported_string in field_name for unsupported_string in UNSUPPORTED_FIELD_NAME_LIST):
-        raise InvalidArgError(
-            f"Field name `{field_name}` contains a substring in"
-            f" UNSUPPORTED_FIELD_NAME_LIST: {UNSUPPORTED_FIELD_NAME_LIST} for an unstructured index. "
-            f"Please change the field name and avoid use these strings"
-        )
-
     char_validation = [(c, c not in constants.ILLEGAL_CUSTOMER_FIELD_NAME_CHARS)
                        for c in field_name]
     char_validation_failures = [c for c in char_validation if not c[1]]
@@ -527,20 +519,3 @@ def validate_delete_docs_request(delete_request: MqDeleteDocsRequest, max_delete
         validate_id(_id)
 
     return delete_request
-
-
-def validate_result_count(result_count: int):
-    """Validates the result count (limit) for a search operation.
-
-    Args:
-        result_count: the result count to validate
-    Returns:
-        result_count, if nothing is raised
-    """
-    if not isinstance(result_count, int):
-        raise IllegalRequestedDocCount(f"result_count must be an int! Received {result_count} of type {type(result_count)}")
-
-    if result_count <= 0:
-        raise IllegalRequestedDocCount(f"result_count must be positive! Received {result_count}")
-
-    return result_count
