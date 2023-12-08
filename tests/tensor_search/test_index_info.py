@@ -109,7 +109,7 @@ class TestIndexInfo(unittest.TestCase):
 
     def test_get_ann_parameters__without_default_ann_parameters__use_defaults(self):
         index_settings = configs.get_default_index_settings()
-        del index_settings[NsFields.index_defaults][NsFields.ann_parameters]
+        del index_settings[NsFields.index_defaults][NsFields.annParameters]
 
         ii = IndexInfo(
             model_name='some model',
@@ -120,7 +120,7 @@ class TestIndexInfo(unittest.TestCase):
 
     def test_get_ann_parameters__use_specified_index_settings__overide_defaults(self):
         index_settings = configs.get_default_index_settings()
-        index_settings[NsFields.index_defaults][NsFields.ann_parameters][NsFields.ann_method_name] = "not-hnsw"
+        index_settings[NsFields.index_defaults][NsFields.annParameters][NsFields.ann_method_name] = "not-hnsw"
 
         ii = IndexInfo(
             model_name='some model',
@@ -138,7 +138,7 @@ class TestIndexInfo(unittest.TestCase):
 
     def test_get_ann_parameters__use_specified_ann_method_parameters__default_unspecified_values(self):
         index_settings = configs.get_default_index_settings()
-        index_settings[NsFields.index_defaults][NsFields.ann_parameters][NsFields.ann_method_parameters] = {
+        index_settings[NsFields.index_defaults][NsFields.annParameters][NsFields.ann_method_parameters] = {
             NsFields.hnsw_ef_construction: 1,
             NsFields.hnsw_m: 2
         }

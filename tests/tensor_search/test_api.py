@@ -59,13 +59,13 @@ class TestApiErrors(MarqoTestCase):
         # create index if it does not already exist
         self.client.post("/indexes/" + self.index_name_1, json={
             "type": "structured",
-            "all_fields": [],
-            "tensor_fields": []
+            "allFields": [],
+            "tensorFields": []
         })
         response = self.client.post("/indexes/" + self.index_name_1, json={
             "type": "structured",
-            "all_fields": [],
-            "tensor_fields": []
+            "allFields": [],
+            "tensorFields": []
         })
 
         self.assertEqual(response.status_code, 409)
@@ -76,8 +76,8 @@ class TestApiErrors(MarqoTestCase):
     def test_invalid_field_name(self):
         self.client.post("/indexes/" + self.index_name_1, json={
             "type": "structured",
-            "all_fields": [],
-            "tensor_fields": []
+            "allFields": [],
+            "tensorFields": []
         })
 
         # use attributesToRetrieve on a non-existent field
@@ -94,8 +94,8 @@ class TestApiErrors(MarqoTestCase):
     def test_invalid_data_type(self):
         self.client.post("/indexes/" + self.index_name_1, json={
             "type": "structured",
-            "all_fields": [{"name": "field1", "type": "text"}],
-            "tensor_fields": []
+            "allFields": [{"name": "field1", "type": "text"}],
+            "tensorFields": []
         })
 
         # Add a document to field1 of the wrong type
@@ -115,8 +115,8 @@ class TestApiErrors(MarqoTestCase):
     def test_filter_string_parsing_error(self):
         self.client.post("/indexes/" + self.index_name_1, json={
             "type": "structured",
-            "all_fields": [{"name": "field1", "type": "text"}],
-            "tensor_fields": []
+            "allFields": [{"name": "field1", "type": "text"}],
+            "tensorFields": []
         })
 
         response = self.client.post("/indexes/" + self.index_name_1 + "/search?device=cpu", json={
@@ -133,8 +133,8 @@ class TestApiErrors(MarqoTestCase):
         # Try to create index with invalid model (should raise 400)
         response = self.client.post("/indexes/" + self.index_name_1, json={
             "type": "structured",
-            "all_fields": [{"name": "field1", "type": "text"}],
-            "tensor_fields": [],
+            "allFields": [{"name": "field1", "type": "text"}],
+            "tensorFields": [],
             "model": "random_nonexistent_model"
         })
 

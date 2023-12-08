@@ -1,7 +1,8 @@
 from enum import Enum
 from types import DynamicClassAttribute
+from typing import Optional
 
-from marqo.core.models.strict_base_model import StrictBaseModel
+from marqo.base_model import StrictBaseModel
 
 
 class HealthStatus(Enum):
@@ -27,10 +28,17 @@ class HealthStatus(Enum):
         return self.priority == other.priority
 
 
+class InferenceHealthStatus(StrictBaseModel):
+    status: HealthStatus
+
+
 class VespaHealthStatus(StrictBaseModel):
     status: HealthStatus
+    memory_is_available: Optional[bool]
+    storage_is_available: Optional[bool]
 
 
 class MarqoHealthStatus(StrictBaseModel):
     status: HealthStatus
+    inference: InferenceHealthStatus
     backend: VespaHealthStatus

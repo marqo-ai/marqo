@@ -13,6 +13,7 @@ from marqo.core.exceptions import IndexNotFoundError
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models import MarqoIndex
 from marqo.tensor_search.tensor_search_logging import get_logger
+from marqo.vespa.exceptions import VespaError, VespaStatusError
 
 logger = get_logger(__name__)
 
@@ -101,13 +102,30 @@ def _check_refresh_thread(config: Config):
                         if time.time() - cache_refresh_last_logged_time > cache_refresh_log_interval:
                             cache_refresh_last_logged_time = time.time()
                             logger.info(f'Last index cache refresh at {cache_refresh_last_logged_time}')
-
-                        time.sleep(cache_refresh_interval)
+                    except VespaError as e:
+                        if isinstance(e, VespaStatusError) and e.status_code == 400:
+                            # This can happen when settings schema doesn't exist
+                            logger.warn(
+                                'Failed to populate index cache due to 400 error from Vespa. This is expected if you '
+                                f'have not created an index yet. Error: {e}'
+                            )
+                        else:
+                            logger.warn(
+                                "Failed to connect to Vespa Document API. If you are using an external Vespa instance, "
+                                "ensure that the VESPA_DOCUMENT_URL environment variable is set and your Vespa "
+                                f"instance is running and healthy. Error: {e}"
+                            )
                     except Exception as e:
-                        logger.error(f'Error in index cache refresh thread: {e}')
+                        logger.error(f'Unexpected error in index cache refresh thread: {e}')
+
+                    time.sleep(cache_refresh_interval)
 
             refresh_thread = threading.Thread(target=refresh, daemon=True)
             refresh_thread.start()
+
+
+def start_refresh_thread(config: Config):
+    _check_refresh_thread(config)
 
 
 def populate_cache(config: Config):

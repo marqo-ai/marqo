@@ -55,6 +55,21 @@ class VespaIndex(ABC):
         """
         pass
 
+    @abstractmethod
+    def get_vector_count_query(self) -> Dict[str, Any]:
+        """
+        Get a query that returns the number of vectors in the index.
+
+        Returns:
+            A query that aggregates over a single field across all documents in the index. For a non-empty index,
+            the following expression over a Vespa client QueryResult query_result will extract the number of vectors:
+            ```
+            list(query_result.root.children[0].children[0].children[0].fields.values())[0]
+            ```
+            while for an empty index, `query_result.root.children[0].children is None` will hold true.
+        """
+        pass
+
 
 def for_marqo_index(marqo_index: MarqoIndex):
     """

@@ -12,7 +12,6 @@ from marqo.s2_inference.s2_inference import vectorise
 from marqo.tensor_search import index_meta_cache, utils
 from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.tensor_search_logging import get_logger
-from marqo.vespa.exceptions import VespaError, VespaStatusError
 
 logger = get_logger(__name__)
 
@@ -41,24 +40,7 @@ class PopulateCache:
         self.config = config
 
     def run(self):
-        try:
-            index_meta_cache.populate_cache(self.config)
-        except VespaError as e:
-            if isinstance(e, VespaStatusError) and e.status_code == 400:
-                # This can happen when settings schema doesn't exist
-                logger.warn('Failed to populate index cache due to 400 error from Vespa. This is expected if you have '
-                            'not created an index yet. Error: {e}')
-            else:
-                logger.warn("Failed to connect to Vespa Document API. If you are using an external Vespa instance, "
-                            "ensure that the VESPA_DOCUMENT_URL environment variable is set and your Vespa instance "
-                            f"is running and healthy. Error: {e}")
-        # the following lines turns off auto create index
-        # connection = HttpRequests(c)
-        # connection.put(
-        #     path="_cluster/settings",
-        #     body={
-        #         "persistent": {"action.auto_create_index": "false"}
-        #     })
+        index_meta_cache.start_refresh_thread(self.config)
 
 
 class CUDAAvailable:

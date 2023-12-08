@@ -1396,7 +1396,7 @@ def vectorise_multimodal_combination_field_structured(
     image_field_names = []
     image_content_to_vectorise = []
 
-    normalize_embeddings = marqo_index.normalize_embeddings
+    normalize_embeddings = marqo_index.normalizeEmbeddings
     image_fields = [field.name for field in marqo_index.field_map_by_type[FieldType.ImagePointer]]
 
     for sub_field_name, sub_content in multimodal_object.items():
@@ -1490,7 +1490,7 @@ def vectorise_multimodal_combination_field_structured(
     return combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add
 
 
-def delete_documents(config: Config, index_name: str, doc_ids: List[str], auto_refresh):
+def delete_documents(config: Config, index_name: str, doc_ids: List[str]):
     """Delete documents from the Marqo index with the given doc_ids """
     # Make sure the index exists
     _ = index_meta_cache.get_index(config=config, index_name=index_name)
@@ -1500,5 +1500,5 @@ def delete_documents(config: Config, index_name: str, doc_ids: List[str], auto_r
         del_request=MqDeleteDocsRequest(
             index_name=index_name,
             document_ids=doc_ids,
-            auto_refresh=auto_refresh)
+        )
     )
