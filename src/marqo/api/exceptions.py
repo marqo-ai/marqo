@@ -201,6 +201,7 @@ class BackendCommunicationError(InternalError):
 
 class BackendDataParsingError(InternalError):
     """Error when parsing data from Vespa"""
+    # TODO: Improve upon this error name
     code = "backend_data_parsing_error"
     status_code = HTTPStatus.INTERNAL_SERVER_ERROR
 
