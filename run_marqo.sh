@@ -61,7 +61,7 @@ fi
 # Start up redis
 if [ "$MARQO_ENABLE_THROTTLING" != "FALSE" ]; then
     echo "Starting redis-server"
-    redis-server /etc/redis/redis.conf
+    redis-server /etc/redis/redis.conf &
     echo "Called redis-server command"
 
     start_time=$(($(date +%s%N)/1000000))
