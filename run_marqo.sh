@@ -48,23 +48,40 @@ if [[ ! $VESPA_CONFIG_URL ]]; then
   echo -e "\nDone waiting."
 
 
-  # Deploy a dummy application to Vespa
+  # Try to deploy the application and branch on the output
+  CMD="vespa deploy /app/scripts/vespa_dummy_app --wait 300"
 
-  curl -X GET http://localhost:8080
+  # Run the command and capture the output
+  OUTPUT=$($CMD 2>&1)
 
-  if [ $? -eq 0 ]; then
-    echo "Vespa document API is working without the dummy application package."
-    echo "You might be loading Vespa with a transferred state."
+  # This is likely there is an existing index with transferred state
+  if [[ $OUTPUT == *"Uploading application package... failed"* ]] && \
+     [[ $OUTPUT == *"Error: invalid application package (400 Bad Request)"* ]] && \
+     [[ $OUTPUT == *"Invalid application:"* ]] && \
+     [[ $OUTPUT == *"schema-removal:"* ]]; then
+      echo "Marqo detected an existing index..."
+      echo "Waiting for the response from document API to start Marqo..."
+
+      until curl -f -X GET http://localhost:8080; do
+        echo "Waiting for Vespa document API to be available..."
+        sleep 10 # Wait for 5 seconds before retrying
+      done
+  # This is mean we successfully deployed the application
+  elif [[ $OUTPUT == *"Uploading application package... done"* ]] && \
+       [[ $OUTPUT == *"Success: Deployed"* ]]; then
+      echo "Deployment succeeded. Handling the success case."
+
+      until curl -f -X GET http://localhost:8080; do
+        echo "Waiting for Vespa document API to be available..."
+        sleep 10 # Wait for 5 seconds before retrying
+      done
+      # Handle the success case here
+  # Unexpected error
   else
-    echo "Vespa document API is not working."
-    echo "Deploying dummy application to Vespa for local run"
-    vespa deploy /app/scripts/vespa_dummy_app --wait 300
+      echo "Warning: Unexpected output from vespa deploy command: $OUTPUT"
+      echo "Marqo will still start, but may not work as expected."
+      # Handle unexpected output or error case here
   fi
-
-  until curl -f -X GET http://localhost:8080; do
-    echo "Waiting for Vespa document API to be available..."
-    sleep 5 # Wait for 5 seconds before retrying
-  done
 
   echo "Vespa document API is available."
 
