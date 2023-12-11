@@ -52,7 +52,7 @@ if [[ ! $VESPA_CONFIG_URL ]]; then
 
   curl -X GET http://localhost:8080
 
-  if [ $? -eq 0]; then
+  if [ $? -eq 0 ]; then
     echo "Vespa document API is working without the dummy application package."
     echo "You might be loading Vespa with a transferred state."
   else
