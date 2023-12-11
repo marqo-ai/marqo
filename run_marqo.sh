@@ -53,21 +53,7 @@ if [[ ! $VESPA_CONFIG_URL ]]; then
   CMD="vespa deploy /app/scripts/vespa_dummy_app --wait 300"
 
   # Run the command and capture the output
-  OUTPUT=""
-
-  # Run the command and capture the output incrementally
-  {
-      while IFS= read -r line; do
-          OUTPUT+="$line\n"
-          echo "$line"  # Optional: Echo the line for real-time feedback
-
-          # Check for a specific final line to break the loop, if applicable
-          if [[ "$line" == *"Uploading application package..."* ]]; then
-              break
-          fi
-      done
-  } < <($CMD 2>&1)
-
+  OUTPUT="$($CMD 2>&1)"
 
   # This is likely there is an existing index with transferred state
   if echo "$OUTPUT" | grep -q "Error: invalid application package (400 Bad Request)" && \
