@@ -81,8 +81,8 @@ if [[ ! $VESPA_CONFIG_URL ]]; then
       echo "  Vespa document API is available. Local Vespa setup complete."
       break
     fi
-
     ((RETRY_COUNT++))
+    sleep 5
   done
 
   if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
