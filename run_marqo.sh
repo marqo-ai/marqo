@@ -61,6 +61,8 @@ if [[ ! $VESPA_CONFIG_URL ]]; then
     if echo "$RESPONSE" | grep -q '"error-code":"NOT_FOUND"'; then
       echo "Marqo does not find an existing index"
       echo "Marqo is deploying the application and waiting for the response from document API to start..."
+      # Deploy a dummy application package
+      vespa deploy /app/scripts/vespa_dummy_app --wait 300 >/dev/null 2>&1
 
       until curl -f -X GET http://localhost:8080 >/dev/null 2>&1; do
         echo "  Waiting for Vespa document API to be available..."
@@ -72,7 +74,6 @@ if [[ ! $VESPA_CONFIG_URL ]]; then
     # Check for the "generation" success response
     elif echo "$RESPONSE" | grep -q '"generation":'; then
       echo "Marqo found an existing index. Waiting for the response from document API to start Marqo..."
-      vespa deploy /app/scripts/vespa_dummy_app --wait 300 >/dev/null 2>&1
 
       until curl -f -X GET http://localhost:8080 >/dev/null 2>&1; do
         echo "  Waiting for Vespa document API to be available..."
