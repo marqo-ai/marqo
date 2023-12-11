@@ -34,8 +34,13 @@ function wait_for_process () {
 
 
 VESPA_IS_INTERNAL=False
-# Start Vespa in the background
-if [[ ! $VESPA_CONFIG_URL ]]; then
+# Vespa local run
+if ([ -n "$VESPA_QUERY_URL" ] || [ -n "$VESPA_DOCUMENT_URL" ] || [ -n "$VESPA_CONFIG_URL" ]) && \
+   ([ -z "$VESPA_QUERY_URL" ] || [ -z "$VESPA_DOCUMENT_URL" ] || [ -z "$VESPA_CONFIG_URL" ]); then
+  echo "Error: Partial VESPA environment variables set. Please provide all or none of the VESPA_QUERY_URL, VESPA_DOCUMENT_URL, VESPA_CONFIG_URL."
+  exit 1
+
+elif [ -z "$VESPA_QUERY_URL" ] && [ -z "$VESPA_DOCUMENT_URL" ] && [ -z "$VESPA_CONFIG_URL" ]; then
   # Start local vespa
   echo "Running Vespa Locally"
   tmux new-session -d -s vespa "bash /usr/local/bin/start_vespa.sh"
@@ -96,7 +101,7 @@ if [[ ! $VESPA_CONFIG_URL ]]; then
   export VESPA_IS_INTERNAL=True
 
 else
-  echo "Found VESPA_CONFIG_URL. Skipping internal Vespa configuration"
+  echo "All VESPA environment variables provided. Skipping local Vespa setup."
 fi
 
 # Start up redis
