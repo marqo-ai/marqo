@@ -50,39 +50,46 @@ if [[ ! $VESPA_CONFIG_URL ]]; then
 
   # Try to deploy the application and branch on the output
   echo "Setting up Marqo local vector search application..."
-  CMD="vespa deploy /app/scripts/vespa_dummy_app --wait 300"
+  END_POINT="http://localhost:19071/application/v2/tenant/default/application/default"
+  MAX_RETRIES=10
+  RETRY_COUNT=0
 
-  # Run the command and capture the output
-  OUTPUT="$($CMD 2>&1)"
+  while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+    # Make the curl request and capture the output
+    RESPONSE=$(curl -s -X GET "$URL")
 
-  # This is likely there is an existing index with transferred state
-  if echo "$OUTPUT" | grep -q "Error: invalid application package (400 Bad Request)" && \
-     echo "$OUTPUT" | grep -q "schema-removal:"; then
-      echo "  Marqo detected an existing index..."
-      echo "  Waiting for the response from document API to start Marqo..."
+    # Check for the specific "not found" error response
+    if echo "$RESPONSE" | grep -q '"error-code":"NOT_FOUND"'; then
+      echo "Marqo does not find an existing index"
+      echo "Marqo is deploying the application and waiting for the response from document API to start..."
 
-      until curl -f -X GET http://localhost:8080; do
+      until curl -f -X GET http://localhost:8080 >/dev/null 2>&1; do
         echo "  Waiting for Vespa document API to be available..."
         sleep 10 # Wait for 5 seconds before retrying
       done
-      echo "  Vespa document API is available."
-  # This is mean we successfully deployed the application
-  elif echo "$OUTPUT" | grep -q "Success: Deployed '/app/scripts/vespa_dummy_app' with"; then
-    echo "  Deployment succeeded. Handling the success case."
+      echo "  Vespa document API is available. Local Vespa setup complete."
+      break
 
-    until curl -f -X GET http://localhost:8080; do
-      echo "  Waiting for Vespa document API to be available..."
-      sleep 10 # Wait for 5 seconds before retrying
-    done
-    echo "  Vespa document API is available."
-  # Unexpected error
-  else
-    echo "  Warning: Unexpected output from vespa deploy command: $OUTPUT"
-    echo "  Marqo will still start, but may not work as expected."
-    # Handle unexpected output or error case here
-  fi
+    # Check for the "generation" success response
+    elif echo "$RESPONSE" | grep -q '"generation":'; then
+      echo "Marqo find existing index. Waiting for the response from document API to start Marqo..."
+      vespa deploy /app/scripts/vespa_dummy_app --wait 300 >/dev/null 2>&1
 
-  echo "Done. Local vector search application is successfully configured."
+      until curl -f -X GET http://localhost:8080 >/dev/null 2>&1; do
+        echo "  Waiting for Vespa document API to be available..."
+        sleep 10 # Wait for 5 seconds before retrying
+      done
+      echo "  Vespa document API is available. Local Vespa setup complete."
+      break
+    else
+      ((RETRY_COUNT++))
+      if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+        echo "Warning: Marqo didn't configure local vespa. Marqo is still starting but unexpected error may happen."
+        break
+      fi
+    fi
+  done
+
   export VESPA_QUERY_URL="http://localhost:8080"
   export VESPA_DOCUMENT_URL="http://localhost:8080"
   export VESPA_CONFIG_URL="http://localhost:19071"
