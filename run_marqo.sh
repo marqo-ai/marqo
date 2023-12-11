@@ -32,13 +32,13 @@ function wait_for_process () {
     return 0
 }
 
+
 VESPA_IS_INTERNAL=False
 # Start Vespa in the background
 if [[ ! $VESPA_CONFIG_URL ]]; then
   # Start local vespa
   echo "Running Vespa Locally"
   tmux new-session -d -s vespa "bash /usr/local/bin/start_vespa.sh"
-  # Start vespa in the background
 
   echo "Waiting for Vespa to start"
   for i in {1..5}; do
@@ -46,7 +46,6 @@ if [[ ! $VESPA_CONFIG_URL ]]; then
       sleep 1
   done
   echo -e "\nDone waiting."
-
 
   # Try to deploy the application and branch on the output
   echo "Setting up Marqo local vector search application..."
@@ -56,7 +55,7 @@ if [[ ! $VESPA_CONFIG_URL ]]; then
 
   while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
     # Make the curl request and capture the output
-    RESPONSE=$(curl -s -X GET "$URL")
+    RESPONSE=$(curl -s -X GET "$END_POINT")
 
     # Check for the specific "not found" error response
     if echo "$RESPONSE" | grep -q '"error-code":"NOT_FOUND"'; then
@@ -65,30 +64,30 @@ if [[ ! $VESPA_CONFIG_URL ]]; then
 
       until curl -f -X GET http://localhost:8080 >/dev/null 2>&1; do
         echo "  Waiting for Vespa document API to be available..."
-        sleep 10 # Wait for 5 seconds before retrying
+        sleep 10
       done
       echo "  Vespa document API is available. Local Vespa setup complete."
       break
 
     # Check for the "generation" success response
     elif echo "$RESPONSE" | grep -q '"generation":'; then
-      echo "Marqo find existing index. Waiting for the response from document API to start Marqo..."
+      echo "Marqo found an existing index. Waiting for the response from document API to start Marqo..."
       vespa deploy /app/scripts/vespa_dummy_app --wait 300 >/dev/null 2>&1
 
       until curl -f -X GET http://localhost:8080 >/dev/null 2>&1; do
         echo "  Waiting for Vespa document API to be available..."
-        sleep 10 # Wait for 5 seconds before retrying
+        sleep 10
       done
       echo "  Vespa document API is available. Local Vespa setup complete."
       break
-    else
-      ((RETRY_COUNT++))
-      if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
-        echo "Warning: Marqo didn't configure local vespa. Marqo is still starting but unexpected error may happen."
-        break
-      fi
     fi
+
+    ((RETRY_COUNT++))
   done
+
+  if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+    echo "Warning: Marqo didn't configure local vespa. Marqo is still starting but unexpected error may happen."
+  fi
 
   export VESPA_QUERY_URL="http://localhost:8080"
   export VESPA_DOCUMENT_URL="http://localhost:8080"
