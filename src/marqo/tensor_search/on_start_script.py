@@ -157,7 +157,13 @@ class ModelsForCacheing:
             if isinstance(model, str):
                 model_name = model
             elif isinstance(model, dict):
-                model_name = model["model"]
+                try:
+                    model_name = model["model"]
+                except KeyError as e:
+                    raise errors.EnvVarError(
+                        f"Your custom model {model} is missing `model` key."
+                        f"""To add a custom model, it must be a dict with keys `model` and `model_properties` as defined in `https://marqo.pages.dev/0.0.20/Advanced-Usage/configuration/#configuring-preloaded-models`"""
+                    ) from e
             if model_name in constants.MODELS_TO_SKIP_PRELOADING:
                 self.logger.info(f"Skipping preloading of `{model_name}`.")
                 continue
