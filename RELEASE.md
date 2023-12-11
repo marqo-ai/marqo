@@ -1,3 +1,8 @@
+# Release 1.5.1
+## Bug fixes and minor changes
+- Adding `no_model` to `MARQO_MODELS_TO_PRELOAD` no longer causes an error on startup. Preloading process is simply skipped for this model [#657](https://github.com/marqo-ai/marqo/pull/657).
+
+
 # Release 1.5.0
 ## New Features
 - Separate model for search and add documents (https://github.com/marqo-ai/marqo/pull/633). Using the `search_model` and `search_model_properties` key in `index_defaults` allows you to specify a model specifically to be used for searching. This is useful for using a different model for search than what is used for add_documents. Learn how to use `search_model` [here](https://docs.marqo.ai/1.5.0/API-Reference/Indexes/create_index/#search-model).
