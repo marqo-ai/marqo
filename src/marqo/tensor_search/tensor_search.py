@@ -32,7 +32,6 @@ Notes on search behaviour with caching and searchable attributes:
 """
 import copy
 import json
-import threading
 import typing
 import uuid
 from collections import defaultdict
@@ -46,15 +45,18 @@ import torch.cuda
 from PIL import Image
 
 import marqo.core.exceptions as core_exceptions
+import marqo.core.unstructured_vespa_index.common as unstructured_common
 from marqo import errors
 # We depend on _httprequests.py for now, but this may be replaced in the future, as
 # _httprequests.py is designed for the client
 from marqo.config import Config
 from marqo.core import constants
 from marqo.core.index_management.index_management import IndexManagement
+from marqo.core.models.marqo_index import IndexType
 from marqo.core.models.marqo_index import MarqoIndex, FieldType, UnstructuredMarqoIndex, StructuredMarqoIndex
 from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery
 from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
+from marqo.core.unstructured_vespa_index.unstructured_vespa_index import UnstructuredVespaIndex
 from marqo.core.vespa_index import for_marqo_index as vespa_index_factory
 from marqo.s2_inference import errors as s2_inference_errors
 from marqo.s2_inference import s2_inference
@@ -103,8 +105,390 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
         raise errors.InternalError(f"Unknown index type {type(marqo_index)}")
 
 
-def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, marqo_index: MarqoIndex):
-    pass
+def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, marqo_index: UnstructuredMarqoIndex):
+    # ADD DOCS TIMER-LOGGER (3)
+    vespa_client = config.vespa_client
+    unstructured_vespa_index = UnstructuredVespaIndex(marqo_index)
+
+    RequestMetricsStore.for_request().start("add_documents.processing_before_vespa")
+
+    if add_docs_params.mappings is not None:
+        validation.validate_mappings_object(mappings_object=add_docs_params.mappings)
+
+    t0 = timer()
+    bulk_parent_dicts = []
+
+    if len(add_docs_params.docs) == 0:
+        raise errors.BadRequestError(message="Received empty add documents request")
+
+    if add_docs_params.mappings is not None:
+        validation.validate_mappings_object(add_docs_params.mappings)
+
+    unsuccessful_docs = []
+    total_vectorise_time = 0
+    batch_size = len(add_docs_params.docs)
+    image_repo = {}
+
+    if add_docs_params.tensor_fields and "_id" in add_docs_params.tensor_fields:
+        raise errors.BadRequestError(message="`_id` field cannot be a tensor field.")
+
+    with ExitStack() as exit_stack:
+        if marqo_index.treat_urls_and_pointers_as_images:
+            with RequestMetricsStore.for_request().time(
+                    "image_download.full_time",
+                    lambda t: logger.debug(
+                        f"add_documents image download: took {t:.3f}ms to concurrently download "
+                        f"images for {batch_size} docs using {add_docs_params.image_download_thread_count} threads"
+                    )
+            ):
+                image_repo = exit_stack.enter_context(
+                    add_docs.download_images(docs=add_docs_params.docs, thread_count=20,
+                                             tensor_fields=add_docs_params.tensor_fields
+                                             if add_docs_params.tensor_fields is not None else None,
+                                             image_download_headers=add_docs_params.image_download_headers)
+                )
+
+        if add_docs_params.use_existing_tensors:
+            ids = [doc["_id"] for doc in add_docs_params.docs if "_id" in doc]
+            existing_docs_dict: Dict[str, dict] = {}
+            if len(ids) > 0:
+                existing_docs = get_documents_by_ids(config, marqo_index.name, ids, show_vectors=True,
+                                                     ignore_invalid_ids=True)['results']
+                for doc in existing_docs:
+                    id = doc["_id"]
+                    if id in existing_docs_dict:
+                        raise errors.InternalError(f"Received duplicate documents for ID {id} from Vespa")
+                    if doc[TensorField.found]:
+                        del doc[TensorField.found]
+                        existing_docs_dict[id] = doc
+
+                logger.debug(f"Found {len(existing_docs_dict)} existing docs")
+
+        for i, doc in enumerate(add_docs_params.docs):
+
+            copied = copy.deepcopy(doc)
+
+            document_is_valid = True
+
+            doc_id = None
+            try:
+                validation.validate_doc(doc)
+
+                if "_id" in doc:
+                    doc_id = validation.validate_id(doc["_id"])
+                    del copied["_id"]
+                else:
+                    doc_id = str(uuid.uuid4())
+                [unstructured_vespa_index.validate_field_name(field) for field in copied]
+
+            except errors.__InvalidRequestError as err:
+                unsuccessful_docs.append(
+                    (i, {'_id': doc_id if doc_id is not None else '',
+                         'error': err.message, 'status': int(err.status_code), 'code': err.code})
+                )
+                continue
+
+            processed_tensor_fields: List[str] = []
+            embeddings_list: List[str] = []
+
+            for field in copied:
+
+                is_tensor_field = utils.is_tensor_field(field, add_docs_params.tensor_fields)
+
+                try:
+                    field_content = unstructured_vespa_index.validate_field_content(
+                        field_content=copied[field],
+                        is_tensor_field=is_tensor_field
+                    )
+                except (errors.InvalidArgError, core_exceptions.MarqoDocumentParsingError) as err:
+                    document_is_valid = False
+                    unsuccessful_docs.append(
+                        (i, {'_id': doc_id, 'error': err.message, 'status': int(err.status_code),
+                             'code': err.code})
+                    )
+                    break
+
+                # Proceed from here only for tensor fields
+                if not is_tensor_field:
+                    continue
+
+                # chunks generated by processing this field for this doc:
+                chunks: List[str] = []
+                embeddings: List[List[float]] = []
+
+                if (
+                        add_docs_params.use_existing_tensors and
+                        doc_id in existing_docs_dict and
+                        existing_docs_dict[doc_id][field] == field_content
+                ):
+                    if (
+                            constants.MARQO_DOC_TENSORS in existing_docs_dict[doc_id] and
+                            field in existing_docs_dict[doc_id][constants.MARQO_DOC_TENSORS]
+                    ):
+                        chunks: List[str] = [f"{field}::{content}" for content in
+                                             existing_docs_dict[doc_id][constants.MARQO_DOC_TENSORS][field][
+                                                 constants.MARQO_DOC_CHUNKS]]
+                        embeddings: List[List[float]] = [existing_docs_dict[doc_id][constants.MARQO_DOC_TENSORS][field][
+                                                             constants.MARQO_DOC_EMBEDDINGS]]
+                        logger.debug(f"Using existing tensors for field {field} for doc {doc_id}")
+                    else:
+                        # Happens if this wasn't a tensor field last time we indexed this doc
+                        logger.debug(f"Found document but not tensors for field {field} for doc {doc_id}. "
+                                     f"Is this a new tensor field?")
+
+                if len(chunks) == 0:  # Not using existing tensors or didn't find it
+                    if isinstance(field_content, (str, Image.Image)):
+                        # 1. check if urls should be downloaded -> "treat_pointers_and_urls_as_images":True
+                        # 2. check if it is a url or pointer
+                        # 3. If yes in 1 and 2, download blindly (without type)
+                        # 4. Determine media type of downloaded
+                        # 5. load correct media type into memory -> PIL (images), videos (), audio (torchaudio)
+                        # 6. if chunking -> then add the extra chunker
+
+                        if isinstance(field_content, str) and not _is_image(field_content):
+                            # text processing pipeline:
+                            split_by = marqo_index.text_preprocessing.split_method.value
+                            split_length = marqo_index.text_preprocessing.split_length
+                            split_overlap = marqo_index.text_preprocessing.split_overlap
+                            content_chunks: List[str] = text_processor.split_text(field_content, split_by=split_by,
+                                                                                  split_length=split_length,
+                                                                                  split_overlap=split_overlap)
+                            text_chunks = content_chunks
+                        else:
+                            # TODO put the logic for getting field parameters into a function and add per field options
+                            image_method = marqo_index.image_preprocessing.patch_method
+
+                            # the chunk_image contains the no-op logic as of now - method = None will be a no-op
+                            try:
+                                # in the future, if we have different chunking methods, make sure we catch possible
+                                # errors of different types generated here, too.
+                                if isinstance(field_content, str) and marqo_index.treat_urls_and_pointers_as_images:
+                                    if not isinstance(image_repo[field_content], Exception):
+                                        image_data = image_repo[field_content]
+                                    else:
+                                        raise s2_inference_errors.S2InferenceError(
+                                            f"Could not find image found at `{field_content}`. \n"
+                                            f"Reason: {str(image_repo[field_content])}"
+                                        )
+                                else:
+                                    image_data = field_content
+                                if image_method is not None:
+                                    content_chunks, text_chunks = image_processor.chunk_image(
+                                        image_data, device=add_docs_params.device, method=image_method.value)
+                                else:
+                                    # if we are not chunking, then we set the chunks as 1-len lists
+                                    # content_chunk is the PIL image
+                                    # text_chunk refers to URL
+                                    content_chunks, text_chunks = [image_data], [field_content]
+                            except s2_inference_errors.S2InferenceError as e:
+                                document_is_valid = False
+                                unsuccessful_docs.append(
+                                    (i, {'_id': doc_id, 'error': e.message,
+                                         'status': int(errors.InvalidArgError.status_code),
+                                         'code': errors.InvalidArgError.code})
+                                )
+                                break
+
+                        normalize_embeddings = marqo_index.normalize_embeddings
+
+                        try:
+                            # in the future, if we have different underlying vectorising methods, make sure we catch possible
+                            # errors of different types generated here, too.
+
+                            # ADD DOCS TIMER-LOGGER (4)
+                            start_time = timer()
+                            with RequestMetricsStore.for_request().time(f"add_documents.create_vectors"):
+                                vector_chunks = s2_inference.vectorise(
+                                    model_name=marqo_index.model.name,
+                                    model_properties=marqo_index.model.get_properties(), content=content_chunks,
+                                    device=add_docs_params.device, normalize_embeddings=normalize_embeddings,
+                                    infer=marqo_index.treat_urls_and_pointers_as_images,
+                                    model_auth=add_docs_params.model_auth
+                                )
+
+                            end_time = timer()
+                            total_vectorise_time += (end_time - start_time)
+                        except (s2_inference_errors.UnknownModelError,
+                                s2_inference_errors.InvalidModelPropertiesError,
+                                s2_inference_errors.ModelLoadError,
+                                s2_inference.ModelDownloadError) as model_error:
+                            raise errors.BadRequestError(
+                                message=f'Problem vectorising query. Reason: {str(model_error)}',
+                                link="https://marqo.pages.dev/latest/Models-Reference/dense_retrieval/"
+                            )
+                        except s2_inference_errors.S2InferenceError:
+                            document_is_valid = False
+                            image_err = errors.InvalidArgError(
+                                message=f'Could not process given image: {field_content}')
+                            unsuccessful_docs.append(
+                                (i, {'_id': doc_id, 'error': image_err.message, 'status': int(image_err.status_code),
+                                     'code': image_err.code})
+                            )
+                            break
+
+                        if len(vector_chunks) != len(text_chunks):
+                            raise RuntimeError(
+                                f"the input content after preprocessing and its vectorized counterparts must be the same length."
+                                f"recevied text_chunks={len(text_chunks)} and vector_chunks={len(vector_chunks)}. "
+                                f"check the preprocessing functions and try again. ")
+
+                        chunks: List[str] = [f"{field}::{text_chunk}" for text_chunk in text_chunks]
+                        embeddings: List[List[float]] = vector_chunks
+
+                        assert len(chunks) == len(embeddings), "Chunks and embeddings must be the same length"
+                    else:
+                        raise errors.InvalidArgError(f'Invalid type {type(field_content)} for tensor field {field}')
+
+                processed_tensor_fields.extend(chunks)
+                embeddings_list.extend(embeddings)
+
+            # All the plain tensor/non-tensor fields are processed, now we process the multimodal fields
+            if document_is_valid and add_docs_params.mappings:
+                multimodal_mappings: Dict[str, Dict] = utils.extract_multimodal_mappings(add_docs_params.mappings)
+                for field_name, multimodal_params in multimodal_mappings.items():
+                    if not utils.is_tensor_field(field_name, add_docs_params.tensor_fields):
+                        raise errors.InvalidArgError(f"Multimodal field {field_name} must be a tensor field")
+
+                    field_content: Dict[str, str] = utils.extract_multimodal_content(copied, multimodal_params)
+
+                    combo_chunk: Optional[str] = None
+
+                    if (
+                            add_docs_params.use_existing_tensors and
+                            doc_id in existing_docs_dict
+                    ):
+                        existing_doc = existing_docs_dict[doc_id]
+                        current_field_contents = utils.extract_multimodal_content(existing_doc, multimodal_params)
+                        current_multimodal_params = existing_doc[unstructured_common.MARQO_DOC_MULTIMODAL_PARAMS][
+                            field_name]
+                        if (
+                                field_content == current_field_contents and
+                                current_multimodal_params == multimodal_params and
+                                field_name in existing_doc[constants.MARQO_DOC_TENSORS]
+                        ):
+                            combo_chunk = f"{field_name}::{existing_doc[constants.MARQO_DOC_TENSORS][field_name][constants.MARQO_DOC_CHUNKS]}"
+                            combo_embeddings = existing_doc[constants.MARQO_DOC_TENSORS][field_name][
+                                constants.MARQO_DOC_EMBEDDINGS]
+
+                            if unstructured_common.MARQO_DOC_MULTIMODAL_PARAMS not in copied:
+                                copied[unstructured_common.MARQO_DOC_MULTIMODAL_PARAMS] = {}
+                            copied[unstructured_common.MARQO_DOC_MULTIMODAL_PARAMS][field_name] = json.dumps(
+                                multimodal_params)
+                            processed_tensor_fields.append(combo_chunk)
+                            embeddings_list.append(combo_embeddings)
+
+                            logger.debug(
+                                f"Using existing tensors for multimodal combination field {field_name} for doc {doc_id}"
+                            )
+                        else:
+                            logger.debug(
+                                f'Not using existing tensors for multimodal combination field {field_name} for '
+                                f'doc {doc_id} because field content or config has changed')
+
+                    # Use_existing tensor does not apply, or we didn't find it, then we vectorise
+                    if combo_chunk is None:
+                        if field_content:  # Check if the subfields are present
+                            (combo_chunk, combo_embeddings, combo_document_is_valid,
+                             unsuccessful_doc_to_append,
+                             combo_vectorise_time_to_add) = vectorise_multimodal_combination_field_unstructured(
+                                field_name,
+                                field_content, i, doc_id, add_docs_params.device, marqo_index,
+                                image_repo, multimodal_params, model_auth=add_docs_params.model_auth)
+
+                            total_vectorise_time = total_vectorise_time + combo_vectorise_time_to_add
+                            if combo_document_is_valid is False:
+                                document_is_valid = False
+                                unsuccessful_docs.append(unsuccessful_doc_to_append)
+                                break
+                            else:
+
+                                if unstructured_common.MARQO_DOC_MULTIMODAL_PARAMS not in copied:
+                                    copied[unstructured_common.MARQO_DOC_MULTIMODAL_PARAMS] = {}
+
+                                copied[unstructured_common.MARQO_DOC_MULTIMODAL_PARAMS][field_name] = json.dumps(
+                                    multimodal_params)
+                                processed_tensor_fields.append(combo_chunk)
+                                embeddings_list.append(combo_embeddings)
+                        else:
+                            continue
+
+            if document_is_valid:
+                if processed_tensor_fields:
+                    processed_marqo_embeddings = {k: v for k, v in enumerate(embeddings_list)}
+                    assert len(processed_tensor_fields) == len(
+                        processed_marqo_embeddings), "Chunks and embeddings must be the same length"
+                    copied[constants.MARQO_DOC_CHUNKS] = processed_tensor_fields
+                    copied[constants.MARQO_DOC_EMBEDDINGS] = processed_marqo_embeddings
+                copied[constants.MARQO_DOC_ID] = doc_id
+                bulk_parent_dicts.append(copied)
+
+    total_preproc_time = 0.001 * RequestMetricsStore.for_request().stop(
+        "add_documents.processing_before_vespa")
+    logger.debug(
+        f"      add_documents pre-processing: took {(total_preproc_time):.3f}s total for {batch_size} docs, "
+        f"for an average of {(total_preproc_time / batch_size):.3f}s per doc.")
+
+    logger.debug(f"          add_documents vectorise: took {(total_vectorise_time):.3f}s for {batch_size} docs, "
+                 f"for an average of {(total_vectorise_time / batch_size):.3f}s per doc.")
+
+    if bulk_parent_dicts:
+        # ADD DOCS TIMER-LOGGER (5)
+        start_time_5 = timer()
+        with RequestMetricsStore.for_request().time("add_documents.opensearch._bulk"):
+            # serialised_body = utils.dicts_to_jsonl(bulk_parent_dicts)
+            vespa_docs = [
+                VespaDocument(**unstructured_vespa_index.to_vespa_document(marqo_document=doc))
+                for doc in bulk_parent_dicts
+            ]
+            index_responses = vespa_client.feed_batch(vespa_docs, marqo_index.name)
+        # RequestMetricsStore.for_request().add_time("add_documents.opensearch._bulk.internal",
+        #                                            float(index_parent_response["took"]))
+
+        end_time_5 = timer()
+        total_http_time = end_time_5 - start_time_5
+        # total_index_time = index_parent_response["took"] * 0.001
+        logger.debug(
+            f"      add_documents roundtrip: took {(total_http_time):.3f}s to send {batch_size} docs (roundtrip) to Marqo-os, "
+            f"for an average of {(total_http_time / batch_size):.3f}s per doc.")
+
+        # logger.debug(
+        #     f"          add_documents Marqo-os index: took {(total_index_time):.3f}s for Marqo-os to index {batch_size} docs, "
+        #     f"for an average of {(total_index_time / batch_size):.3f}s per doc.")
+    else:
+        index_responses = None
+
+    with RequestMetricsStore.for_request().time("add_documents.postprocess"):
+        t1 = timer()
+
+        def translate_add_doc_response(responses: Optional[FeedBatchResponse], time_diff: float) -> dict:
+            """translates OpenSearch response dict into Marqo dict"""
+            result_dict = {}
+            new_items = []
+
+            if responses is not None:
+                result_dict['errors'] = responses.errors
+
+                for resp in responses.responses:
+                    id = resp.id.split('::')[-1] if resp.id else None
+                    new_items.append({'status': resp.status})
+                    if id:
+                        new_items[-1].update({'_id': id})
+                    if resp.message:
+                        new_items[-1].update({'message': resp.message})
+
+            if unsuccessful_docs:
+                result_dict['errors'] = True
+
+            for loc, error_info in unsuccessful_docs:
+                new_items.insert(loc, error_info)
+
+            result_dict["processingTimeMs"] = time_diff * 1000
+            result_dict["index_name"] = add_docs_params.index_name
+            result_dict["items"] = new_items
+
+            return result_dict
+
+        return translate_add_doc_response(index_responses, time_diff=t1 - t0)
 
 
 def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, marqo_index: StructuredMarqoIndex):
@@ -126,7 +510,6 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
 
     if len(add_docs_params.docs) == 0:
         raise errors.BadRequestError(message="Received empty add documents request")
-
 
     unsuccessful_docs = []
     total_vectorise_time = 0
@@ -706,7 +1089,7 @@ def rerank_query(query: BulkSearchQueryEntity, result: Dict[str, Any], reranker:
 
 
 def search(config: Config, index_name: str, text: Union[str, dict],
-           result_count: int = 3, offset: int = 0, highlights=True,
+           result_count: int = 3, offset: int = 0, highlights: object = True,
            search_method: Union[str, SearchMethod, None] = SearchMethod.TENSOR,
            searchable_attributes: Iterable[str] = None, verbose: int = 0,
            reranker: Union[str, Dict] = None, filter: str = None,
@@ -747,8 +1130,9 @@ def search(config: Config, index_name: str, text: Union[str, dict],
 
     # Validation for: result_count (limit) & offset
     # Validate neither is negative
-    if result_count <= 0:
-        raise errors.IllegalRequestedDocCount("search result limit must be greater than 0!")
+    if result_count <= 0 or (not isinstance(result_count, int)):
+        raise errors.IllegalRequestedDocCount(f"result_count must be an integer greater than 0! Received {result_count}")
+
     if offset < 0:
         raise errors.IllegalRequestedDocCount("search result offset cannot be less than 0!")
 
@@ -799,7 +1183,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
         search_result = _lexical_search(
             config=config, index_name=index_name, text=text, result_count=result_count, offset=offset,
             searchable_attributes=searchable_attributes, verbose=verbose,
-            filter_string=filter, attributes_to_retrieve=attributes_to_retrieve
+            filter_string=filter, attributes_to_retrieve=attributes_to_retrieve, highlights=highlights
         )
     else:
         raise errors.InvalidArgError(f"Search called with unknown search method: {search_method}")
@@ -838,7 +1222,7 @@ def search(config: Config, index_name: str, text: Union[str, dict],
 def _lexical_search(
         config: Config, index_name: str, text: str, result_count: int = 3, offset: int = 0,
         searchable_attributes: Sequence[str] = None, verbose: int = 0, filter_string: str = None,
-        attributes_to_retrieve: Optional[List[str]] = None, expose_facets: bool = False):
+        highlights: bool = True, attributes_to_retrieve: Optional[List[str]] = None, expose_facets: bool = False):
     """
 
     Args:
@@ -880,7 +1264,7 @@ def _lexical_search(
         limit=result_count,
         offset=offset,
         searchable_attributes=searchable_attributes,
-        attributes_to_retrieve=attributes_to_retrieve
+        attributes_to_retrieve=attributes_to_retrieve,
     )
 
     vespa_index = vespa_index_factory(marqo_index)
@@ -896,7 +1280,12 @@ def _lexical_search(
 
     # SEARCH TIMER-LOGGER (post-processing)
     RequestMetricsStore.for_request().start("search.lexical.postprocess")
-    gathered_docs = gather_documents_from_response(responses, marqo_index, False)
+    gathered_docs = gather_documents_from_response(responses, marqo_index, False, attributes_to_retrieve)
+
+    # Set the _highlights for each doc as [] to follow Marqo-V1's convention
+    if highlights:
+        for docs in gathered_docs['hits']:
+            docs['_highlights'] = {}
 
     total_postprocess_time = RequestMetricsStore.for_request().stop("search.lexical.postprocess")
     logger.debug(
@@ -934,7 +1323,8 @@ def construct_vector_input_batches(query: Union[str, Dict], index_info: MarqoInd
             return [k for k, _ in ordered_queries], []
 
 
-def gather_documents_from_response(response: QueryResult, marqo_index: MarqoIndex, highlights: bool) -> Dict[str, Any]:
+def gather_documents_from_response(response: QueryResult, marqo_index: MarqoIndex, highlights: bool,
+                                   attributes_to_retrieve: List[str] = None) -> Dict[str, Any]:
     """
     Convert a VespaQueryResponse to a Marqo search response
     """
@@ -943,12 +1333,24 @@ def gather_documents_from_response(response: QueryResult, marqo_index: MarqoInde
     for doc in response.hits:
         marqo_doc = vespa_index.to_marqo_document(doc.dict(), return_highlights=highlights)
         marqo_doc['_score'] = doc.relevance
+
+        if marqo_index.type == IndexType.Unstructured and attributes_to_retrieve is not None:
+            # For an unstructured index, we do the attributes_to_retrieve after search
+            marqo_doc = unstructured_index_attributes_to_retrieve(marqo_doc, attributes_to_retrieve)
+
         # Delete chunk data
         if constants.MARQO_DOC_TENSORS in marqo_doc:
             del marqo_doc[constants.MARQO_DOC_TENSORS]
         hits.append(marqo_doc)
 
     return {'hits': hits}
+
+
+def unstructured_index_attributes_to_retrieve(marqo_doc: Dict[str, Any], attributes_to_retrieve: List[str]) -> Dict[
+    str, Any]:
+    # attributes_to_retrieve should already be validated at the start of search
+    attributes_to_retrieve = list(set(attributes_to_retrieve).union({"_id", "_score", "_highlights"}))
+    return {k: v for k, v in marqo_doc.items() if k in attributes_to_retrieve}
 
 
 def assign_query_to_vector_job(
@@ -1271,7 +1673,7 @@ def _vector_text_search(
 
     # SEARCH TIMER-LOGGER (post-processing)
     RequestMetricsStore.for_request().start("search.vector.postprocess")
-    gathered_docs = gather_documents_from_response(responses, marqo_index, highlights)
+    gathered_docs = gather_documents_from_response(responses, marqo_index, highlights, attributes_to_retrieve)
 
     if boost is not None:
         raise errors.MarqoWebError('Boosting is not currently supported with Vespa')
@@ -1304,6 +1706,18 @@ def delete_index(config: Config, index_name):
 
     if index_name in get_cache():
         del get_cache()[index_name]
+
+
+def batch_delete_indexes(config: Config, index_names: List[str]):
+    index_management = IndexManagement(vespa_client=config.vespa_client)
+    index_management.batch_delete_indexes_by_name(index_names)
+
+
+def batch_clear_indexes(config: Config, index_names: List[str]):
+    import vespa.application as pyvespa
+    pyvespa_client = pyvespa.Vespa(config.vespa_client.document_url)
+    for index_name in index_names:
+        pyvespa_client.delete_all_docs('content_default', index_name)
 
 
 def get_loaded_models() -> dict:
@@ -1345,6 +1759,149 @@ def get_cuda_info() -> dict:
         raise errors.HardwareCompatabilityError(message=str(
             "ERROR: cuda is not supported in your machine!!"
         ))
+
+
+def vectorise_multimodal_combination_field_unstructured(field: str,
+                                                        field_content: Dict[str, str], doc_index: int,
+                                                        doc_id: str, device: str, marqo_index: UnstructuredMarqoIndex,
+                                                        image_repo, field_map: dict,
+                                                        model_auth: Optional[ModelAuth] = None
+                                                        ):
+    '''
+    This function is used to vectorise multimodal combination field.
+    Over all this is a simplified version of the vectorise pipeline in add_documents. Specifically,
+    1. we don't do any chunking here.
+    2. we don't use image repo for concurrent downloading.
+    Args:
+        field_name: the name of the multimodal
+        field_content: the subfields name and content, e.g.,
+            {"subfield_one" : "content-1",
+             "subfield_two" : "content-2"},
+        unsuccessful_docs: a list to store all the unsuccessful documents
+        total_vectorise_time: total vectorise time in the main body
+        doc_index: the index of the document. This is an interator variable `i` in the main body to iterator throught the docs
+        doc_id: the document id
+        device: device from main body
+        index_info: index_info from main body,
+        model_auth: Model download authorisation information (if required)
+    Returns:
+        combo_chunk: the combo_chunk to be appended to the main body
+        combo_document_is_valid:  if the document is a valid
+        unsuccessful_docs: appended unsucessful_docs
+        combo_total_vectorise_time: the vectorise time spent in combo field
+        new_fields_from_multimodal_combination: the new fields from multimodal combination field that will be added to
+            index properties
+
+    '''
+    combo_document_is_valid = True
+    combo_vectorise_time_to_add = 0
+    combo_chunk = {}
+    combo_embeddings = []
+    unsuccessful_doc_to_append = tuple()
+    new_fields_from_multimodal_combination = set()
+
+    # Copy the important mutable objects from main body for safety purpose
+    field_content_copy = copy.deepcopy(field_content)
+
+    # 4 lists to store the field name and field content to vectorise.
+    text_field_names = []
+    text_content_to_vectorise = []
+
+    image_field_names = []
+    image_content_to_vectorise = []
+
+    normalize_embeddings = marqo_index.normalize_embeddings
+    infer_if_image = marqo_index.treat_urls_and_pointers_as_images
+
+    if infer_if_image is False:
+        text_field_names = list(field_content.keys())
+        text_content_to_vectorise = list(field_content.values())
+    else:
+        for sub_field_name, sub_content in field_content.items():
+            if isinstance(sub_content, str) and not _is_image(sub_content):
+                text_field_names.append(sub_field_name)
+                text_content_to_vectorise.append(sub_content)
+            else:
+                try:
+                    if isinstance(sub_content, str) and marqo_index.treat_urls_and_pointers_as_images:
+                        if not isinstance(image_repo[sub_content], Exception):
+                            image_data = image_repo[sub_content]
+                        else:
+                            raise s2_inference_errors.S2InferenceError(
+                                f"Could not find image found at `{sub_content}`. \n"
+                                f"Reason: {str(image_repo[sub_content])}"
+                            )
+                    else:
+                        image_data = sub_content
+
+                    image_content_to_vectorise.append(image_data)
+                    image_field_names.append(sub_field_name)
+
+                except s2_inference_errors.S2InferenceError as e:
+                    combo_document_is_valid = False
+                    unsuccessful_doc_to_append = \
+                        (doc_index, {'_id': doc_id, 'error': e.message,
+                                     'status': int(errors.InvalidArgError.status_code),
+                                     'code': errors.InvalidArgError.code})
+
+                    return combo_chunk, combo_embeddings, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add
+
+    try:
+        start_time = timer()
+        text_vectors = []
+        if len(text_content_to_vectorise) > 0:
+            with RequestMetricsStore.for_request().time(f"create_vectors"):
+                text_vectors = s2_inference.vectorise(
+                    model_name=marqo_index.model.name,
+                    model_properties=marqo_index.model.properties, content=text_content_to_vectorise,
+                    device=device, normalize_embeddings=normalize_embeddings,
+                    infer=infer_if_image, model_auth=model_auth
+                )
+        image_vectors = []
+        if len(image_content_to_vectorise) > 0:
+            with RequestMetricsStore.for_request().time(f"create_vectors"):
+                image_vectors = s2_inference.vectorise(
+                    model_name=marqo_index.model.name,
+                    model_properties=marqo_index.model.properties, content=image_content_to_vectorise,
+                    device=device, normalize_embeddings=normalize_embeddings,
+                    infer=infer_if_image, model_auth=model_auth
+                )
+        end_time = timer()
+        combo_vectorise_time_to_add += (end_time - start_time)
+    except (s2_inference_errors.UnknownModelError,
+            s2_inference_errors.InvalidModelPropertiesError,
+            s2_inference_errors.ModelLoadError) as model_error:
+        raise errors.BadRequestError(
+            message=f'Problem vectorising query. Reason: {str(model_error)}',
+            link="https://marqo.pages.dev/1.4.0/Models-Reference/dense_retrieval/"
+        )
+    except s2_inference_errors.S2InferenceError:
+        combo_document_is_valid = False
+        image_err = errors.InvalidArgError(message=f'Could not process given image: {field_content_copy}')
+        unsuccessful_doc_to_append = \
+            (doc_index, {'_id': doc_id, 'error': image_err.message, 'status': int(image_err.status_code),
+                         'code': image_err.code})
+
+        return combo_chunk, combo_embeddings, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add
+
+    sub_field_name_list = text_field_names + image_field_names
+    vectors_list = text_vectors + image_vectors
+
+    if not len(sub_field_name_list) == len(vectors_list):
+        raise errors.BatchInferenceSizeError(
+            message=f"Batch inference size does not match content for multimodal field {field}")
+
+    vector_chunk = np.squeeze(np.mean(
+        [np.array(vector) * field_map["weights"][sub_field_name] for sub_field_name, vector in
+         zip(sub_field_name_list, vectors_list)], axis=0))
+
+    if normalize_embeddings is True:
+        vector_chunk = vector_chunk / np.linalg.norm(vector_chunk)
+
+    combo_embeddings: List[float] = vector_chunk.tolist()
+    combo_chunk: str = f"{field}::{json.dumps(field_content)}"
+
+    return combo_chunk, combo_embeddings, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add
 
 
 def vectorise_multimodal_combination_field_structured(

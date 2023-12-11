@@ -10,6 +10,7 @@ from typing import (
 )
 
 import torch
+from fastapi import HTTPException
 
 from marqo import errors
 from marqo.marqo_logging import logger
@@ -339,6 +340,41 @@ def get_best_available_device() -> str:
     return device
 
 
+def is_tensor_field(field: str,
+                    tensor_fields: List[str]
+                    ) -> bool:
+    """Determine whether a field is a tensor field or not for add_documents calls."""
+    if not tensor_fields:
+        return False
+    else:
+        return field in tensor_fields
+
+
 def check_is_zero_vector(vector: List[float]) -> bool:
     """Check if a vector is all zero. We assume the input to this function is of valid type, List[Float]"""
     return all([x == 0 for x in vector])
+
+
+def extract_multimodal_mappings(mappings: Dict) -> Dict:
+    """Extract multimodal mappings from mappings dict"""
+    return {k: v for k, v in mappings.items() if v["type"] == "multimodal_combination"}
+
+
+def extract_multimodal_content(doc: dict, mapping: Dict) -> Dict:
+    """Extract multimodal content from doc based on multimodal mapping"""
+    multimodal_content = {}
+    for field_name, weight in mapping["weights"].items():
+        if field_name in doc:
+            multimodal_content[field_name] = doc[field_name]
+    return multimodal_content
+
+
+def enable_batch_apis():
+    def decorator_function(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            if read_env_vars_and_defaults(EnvVars.MARQO_ENABLE_BATCH_APIS).lower() != 'true':
+                raise HTTPException(status_code=403, detail="This API endpoint is disabled. Please set MARQO_ENABLE_BATCH_API to true to enable it.")
+            return func(*args, **kwargs)
+        return wrapper
+    return decorator_function
