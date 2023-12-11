@@ -217,7 +217,7 @@ class TestSearchUnstructured(MarqoTestCase):
         assert search_res["limit"] == 50
 
     def test_searchable_attributes_not_supported_in_unstructured_index(self):
-        with self.assertRaises(core_exceptions.InvalidArgumentError) as ex:
+        with self.assertRaises(errors.InvalidArgError) as ex:
             search_res = tensor_search.search(
                 config=self.config, index_name=self.default_text_index, text="",
                 searchable_attributes=["None"], result_count=50
