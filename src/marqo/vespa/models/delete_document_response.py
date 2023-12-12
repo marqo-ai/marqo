@@ -20,6 +20,6 @@ class DeleteBatchResponse(BaseModel):
     errors: bool
 
 
-class DeleteAllDocumentResponse(BaseModel):
+class DeleteAllDocumentsResponse(BaseModel):
     path_id: str = Field(alias='pathId')
     document_count: int = Field(alias='documentCount')
