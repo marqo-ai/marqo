@@ -1906,7 +1906,7 @@ def vectorise_multimodal_combination_field_unstructured(field: str,
 
 def vectorise_multimodal_combination_field_structured(
         field: str, multimodal_object: Dict[str, dict], doc: dict, doc_index: int,
-        doc_id: str, device: str, marqo_index, image_repo, field_map: dict,
+        doc_id: str, device: str, marqo_index: StructuredMarqoIndex, image_repo, field_map: dict,
         model_auth: Optional[ModelAuth] = None
 ):
     """
@@ -1952,7 +1952,7 @@ def vectorise_multimodal_combination_field_structured(
     image_field_names = []
     image_content_to_vectorise = []
 
-    normalize_embeddings = marqo_index.normalizeEmbeddings
+    normalize_embeddings = marqo_index.normalize_embeddings
     image_fields = [field.name for field in marqo_index.field_map_by_type[FieldType.ImagePointer]]
 
     for sub_field_name, sub_content in multimodal_object.items():
