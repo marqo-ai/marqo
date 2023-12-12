@@ -7,7 +7,6 @@ import numpy as np
 from transformers import ClapModel, ClapProcessor
 # from msclap import CLAP as MSCLAP
 import librosa
-import soundfile as sf
 import torch
 import io
 from marqo.s2_inference.types import *
@@ -19,21 +18,23 @@ from marqo.s2_inference.configs import ModelCache
 from marqo.errors import InternalError
 from marqo.tensor_search.telemetry import RequestMetrics, RequestMetricsStore
 
+from typing import Set
+
 logger = get_logger(__name__)
 
 SR = 48000
 
 
-def get_allowed_image_types():
-    return set(".wav")
+def get_allowed_audio_types() -> Set[str]:
+    return {".wav", ".mp3", ".flac"}
 
 
-def _is_audio(inputs: Union[str, List[Union[str, ImageType, ndarray]]]) -> bool:
+def _is_audio(inputs: Union[str, List[Union[str, ndarray]]]) -> bool:
     # some logic to determine if something is an image or not
     # assume the batch is the same type
     # maybe we use something like this https://github.com/ahupp/python-magic
 
-    _allowed = get_allowed_image_types()
+    _allowed = get_allowed_audio_types()
 
     # we assume the batch is this way if a list
     # otherwise apply over each element
@@ -67,8 +68,8 @@ def _is_audio(inputs: Union[str, List[Union[str, ImageType, ndarray]]]) -> bool:
             else:
                 False
 
-    # if it is an array, then it is an image
-    elif isinstance(thing, (ImageType, ndarray)):
+    # if it is an array, then it is an audio
+    elif isinstance(thing, (ndarray)):
         return True
     else:
         raise ValueError(
@@ -111,9 +112,9 @@ def load_audio_from_path(
     download_headers: dict,
     timeout=15,
     metrics_obj: Optional[RequestMetrics] = None,
-) -> ImageType:
+) -> np.ndarray:
     if os.path.isfile(audio_path):
-        audio = librosa.load(audio_path, sr=SR)
+        audio, _ = librosa.load(audio_path, sr=SR)
     elif validators.url(audio_path):
         try:
             if metrics_obj is not None:
@@ -195,7 +196,7 @@ class CLAP:
 
     def encode_audio(
         self,
-        audios: Union[str, np.ndarray, List[Union[str, ImageType]]],
+        audios: Union[str, np.ndarray, List[Union[str, np.ndarray]]],
         normalize=True,
         download_headers: Optional[Dict] = None,
     ) -> FloatTensor:
@@ -203,7 +204,7 @@ class CLAP:
 
     def encode(
         self,
-        inputs: Union[str, ImageType, List[Union[str, ImageType]]],
+        inputs: Union[str, np.ndarray, List[Union[str, np.ndarray]]],
         default: str = "text",
         normalize=True,
         **kwargs,
@@ -249,7 +250,7 @@ class CLAP:
 
 #     def encode_audio(
 #         self,
-#         audios: Union[str, np.ndarray, List[Union[str, ImageType]]],
+#         audios: Union[str, np.ndarray, List[Union[str, np.ndarray]]],
 #         normalize=True,
 #         download_headers: Optional[Dict] = None,
 #     ) -> FloatTensor:
@@ -257,7 +258,7 @@ class CLAP:
 
 #     def encode(
 #         self,
-#         inputs: Union[str, ImageType, List[Union[str, ImageType]]],
+#         inputs: Union[str, np.ndarray, List[Union[str, np.ndarray]]],
 #         default: str = "text",
 #         normalize=True,
 #         **kwargs,
@@ -315,7 +316,7 @@ class LAION_CLAP(CLAP):
 
     def encode_audio(
         self,
-        audios: Union[str, np.ndarray, List[Union[str, ImageType]]],
+        audios: Union[str, np.ndarray, List[Union[str, np.ndarray]]],
         normalize=True,
         download_headers: Optional[Dict] = None,
     ) -> FloatTensor:
@@ -331,7 +332,11 @@ class LAION_CLAP(CLAP):
             audio_input = [format_and_load_CLAP_audios(audios, download_headers)]
 
         with torch.no_grad():
-            inputs = self.processor(audios=audio_input, return_tensors="pt")
+            inputs = self.processor(
+                audios=audio_input, 
+                return_tensors="pt", 
+                sampling_rate=self.sample_rate
+            )
             outputs = self.model.get_audio_features(**inputs)
 
         if normalize:
@@ -342,7 +347,7 @@ class LAION_CLAP(CLAP):
 
     def encode(
         self,
-        inputs: Union[str, ImageType, List[Union[str, ImageType]]],
+        inputs: Union[str, np.ndarray, List[Union[str, np.ndarray]]],
         default: str = "text",
         normalize=True,
         **kwargs,

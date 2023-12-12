@@ -431,7 +431,7 @@ def validate_settings_object(settings_object):
     except jsonschema.ValidationError as e:
         raise InvalidArgError(
             f"Error validating index settings object. Reason: \n{str(e)}"
-            f"\nRead about the index settings object here: https://docs.marqo.ai/0.0.13/API-Reference/indexes/#body"
+            f"\nRead about the index settings object here: https://docs.marqo.ai/latest/API-Reference/indexes/#body"
         )
 
 

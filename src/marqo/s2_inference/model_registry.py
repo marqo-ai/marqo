@@ -79,13 +79,14 @@ def _get_clip_properties() -> Dict:
 
 def _get_laion_clap_properties() -> Dict:
     LAION_CLAP_MODEL_PROPERTIES = {
-        "laion/larger_clap_music": {
-            "name": "laion/larger_clap_music",
-            "dimensions": 512,
-            "sample_rate": 48000,
-            "notes": "CLAP music",
-            "type": "laion_clap",
-        },
+        # this model is broken somehow
+        # "laion/larger_clap_music": {
+        #     "name": "laion/larger_clap_music",
+        #     "dimensions": 512,
+        #     "sample_rate": 48000,
+        #     "notes": "CLAP music",
+        #     "type": "laion_clap",
+        # },
         "laion/larger_clap_general": {
             "name": "laion/larger_clap_general",
             "dimensions": 512,
@@ -110,6 +111,7 @@ def _get_laion_clap_properties() -> Dict:
     }
     return LAION_CLAP_MODEL_PROPERTIES
 
+# these required torch 2.0 so we can add them later
 # def _get_ms_clap_properties() -> Dict:
 #     MS_CLAP_MODEL_PROPERTIES = {
 #         "microsoft/clap-2023": {

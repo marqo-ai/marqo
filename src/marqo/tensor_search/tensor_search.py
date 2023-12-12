@@ -611,6 +611,10 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                         audio_method = index_info.index_settings[NsField.index_defaults][NsField.audio_preprocessing][
                             NsField.audio_chunking_method]
 
+                        if audio_method in [None, 'none', '', "None", ' ']:
+                            audio_method = "average"
+
+                        print("AUDIO METHOD:", audio_method)
                         # the chunk_image contains the no-op logic as of now - method = None will be a no-op
                         try:
                             if isinstance(field_content, str):
@@ -631,7 +635,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                                     media_data, device=add_docs_params.device, method=image_method)
                             elif is_audios and audio_method not in [None, 'none', '', "None", ' ']:
                                 content_chunks, text_chunks = audio_processor.chunk_audio(
-                                    media_data, device=add_docs_params.device, method=audio_method)
+                                    audio=media_data, method=audio_method)
                             else:
                                 # if we are not chunking, then we set the chunks as 1-len lists
                                 # content_chunk is the media
@@ -662,6 +666,11 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                                 device=add_docs_params.device, normalize_embeddings=normalize_embeddings,
                                 infer=infer_if_media, model_auth=add_docs_params.model_auth
                             )
+
+                            if is_audios and audio_method == "average":
+                                # average the chunks numpy and return to being a singlton list of lists of floats
+                                vector_chunks = [np.mean(vector_chunks, axis=0).tolist()]
+                                text_chunks = [field_content]
 
                         end_time = timer()
                         total_vectorise_time += (end_time - start_time)

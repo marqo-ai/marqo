@@ -63,6 +63,7 @@ class IndexSettingsField:
 
     image_preprocessing = "image_preprocessing"
     patch_method = "patch_method"
+    
     audio_preprocessing = "audio_preprocessing"
     audio_chunking_method = "audio_chunking_method"
 

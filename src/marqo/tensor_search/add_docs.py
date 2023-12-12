@@ -76,6 +76,7 @@ def load_media_from_path(
             metrics_obj=metrics_obj
         )
     elif media_type == enums.MediaType.audio:
+        print("MEDIA PATH", media_path)
         if not clap_utils._is_audio(media_path):
             raise errors.InternalError(f"Invalid audio path {media_path}")
         media_repo[media_path] = clap_utils.load_audio_from_path(
@@ -84,6 +85,8 @@ def load_media_from_path(
             timeout=timeout, 
             metrics_obj=metrics_obj
         )
+
+        print("MEDIA REPO", media_repo)
     else:
         raise errors.InternalError(f"Invalid media type {media_type}")
 
@@ -173,7 +176,7 @@ def threaded_download_media(
                             timeout=timeout_seconds, 
                             metrics_obj=metric_obj
                         ) # media_repo is passed by reference
-                    except PIL.UnidentifiedImageError as e:
+                    except Exception as e:
                         media_repo[doc[field]] = e
                         metric_obj.increment_counter(f"{doc.get(field, '')}.UnidentifiedImageError")
                         continue

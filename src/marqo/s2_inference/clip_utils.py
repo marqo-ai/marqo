@@ -19,6 +19,7 @@ from torchvision.transforms import InterpolationMode
 from marqo.s2_inference.configs import ModelCache
 from marqo.errors import InternalError
 from marqo.tensor_search.telemetry import RequestMetrics, RequestMetricsStore
+from typing import Set
 
 logger = get_logger(__name__)
 
@@ -27,8 +28,8 @@ OPENAI_DATASET_STD = (0.26862954, 0.26130258, 0.27577711)
 BICUBIC = InterpolationMode.BICUBIC
 
 
-def get_allowed_image_types():
-    return set(('.jpg', '.png', '.bmp', '.jpeg'))
+def get_allowed_image_types() -> Set[str]:
+    return {'.jpg', '.png', '.bmp', '.jpeg'}
 
 
 def _convert_image_to_rgb(image: ImageType) -> ImageType:

@@ -265,6 +265,9 @@ settings_schema = {
             NsFields.image_preprocessing: {
                 NsFields.patch_method: None
             },
+            NsFields.audio_preprocessing: {
+                NsFields.audio_chunking_method: "simple",
+            },
             NsFields.ann_parameters: {
                 NsFields.ann_method: "hnsw",
                 NsFields.ann_engine: "lucene",
