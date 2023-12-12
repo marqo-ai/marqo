@@ -92,7 +92,7 @@ elif [ -z "$VESPA_QUERY_URL" ] && [ -z "$VESPA_DOCUMENT_URL" ] && [ -z "$VESPA_C
   done
 
   if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
-    echo "Warning: Marqo didn't configure local vespa. Marqo is still starting but unexpected error may happen."
+    echo "Warning: Marqo didn't configure local vector . Marqo is still starting but unexpected error may happen."
   fi
 
   export VESPA_QUERY_URL="http://localhost:8080"
