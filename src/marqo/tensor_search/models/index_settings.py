@@ -19,6 +19,7 @@ class IndexSettings(StrictBaseModel):
     allFields: Optional[List[FieldRequest]]
     tensorFields: Optional[List[str]]
     treatUrlsAndPointersAsImages: Optional[bool]
+    shortStringLengthThreshold: Optional[int]
     model: str = 'hf/all_datasets_v4_MiniLM-L6'
     modelProperties: Optional[Dict[str, Any]]
     normalizeEmbeddings: bool = True
@@ -45,6 +46,10 @@ class IndexSettings(StrictBaseModel):
             if self.treatUrlsAndPointersAsImages is not None:
                 raise errors.InvalidArgError(
                     "treat_urls_and_pointers_as_images is not a valid parameter for structured indexes"
+                )
+            if self.shortStringLengthThreshold is not None:
+                raise errors.InvalidArgError(
+                    "shortStringLengthThreshold is not a valid parameter for structured indexes"
                 )
 
             if self.allFields is not None:
@@ -91,6 +96,11 @@ class IndexSettings(StrictBaseModel):
                 # as it is not a valid parameter for structured indexes
                 self.treatUrlsAndPointersAsImages = False
 
+            if self.shortStringLengthThreshold is None:
+                # Default value for short_string_length_threshold is 20, but we can't set it in the model
+                # as it is not a valid parameter for structured indexes
+                self.shortStringLengthThreshold = 20
+
             return UnstructuredMarqoIndexRequest(
                 name=index_name,
                 model=core.Model(
@@ -105,7 +115,7 @@ class IndexSettings(StrictBaseModel):
                 vector_numeric_type=self.vectorNumericType,
                 hnsw_config=self.annParameters.parameters,
                 treat_urls_and_pointers_as_images=self.treatUrlsAndPointersAsImages,
-                short_string_length_threshold=20,  # Hardcoded here as it should be updated by the user
+                short_string_length_threshold=self.shortStringLengthThreshold,
                 marqo_version=version.get_version(),
                 created_at=time.time(),
                 updated_at=time.time()
@@ -118,7 +128,7 @@ class IndexSettings(StrictBaseModel):
         if isinstance(marqo_index, core.StructuredMarqoIndex):
             return cls(
                 type=marqo_index.type,
-                all_fields=[
+                allFields=[
                     FieldRequest(
                         name=field.name,
                         type=field.type,
@@ -126,31 +136,31 @@ class IndexSettings(StrictBaseModel):
                         dependent_fields=field.dependent_fields
                     ) for field in marqo_index.fields
                 ],
-                tensor_fields=[field.name for field in marqo_index.tensor_fields],
+                tensorFields=[field.name for field in marqo_index.tensor_fields],
                 model=marqo_index.model.name,
-                model_properties=marqo_index.model.properties,
-                normalize_embeddings=marqo_index.normalize_embeddings,
-                text_preprocessing=marqo_index.text_preprocessing,
-                image_preprocessing=marqo_index.image_preprocessing,
-                vector_numeric_type=marqo_index.vector_numeric_type,
-                ann_parameters=AnnParameters(
-                    space_type=marqo_index.distance_metric,
+                modelProperties=marqo_index.model.properties,
+                normalizeEmbeddings=marqo_index.normalize_embeddings,
+                textPreprocessing=marqo_index.text_preprocessing,
+                imagePreprocessing=marqo_index.image_preprocessing,
+                vectorNumericType=marqo_index.vector_numeric_type,
+                annParameters=AnnParameters(
+                    spaceType=marqo_index.distance_metric,
                     parameters=marqo_index.hnsw_config
                 )
             )
         elif isinstance(marqo_index, core.UnstructuredMarqoIndex):
             return cls(
                 type=marqo_index.type,
-                treat_urls_and_pointers_as_images=marqo_index.treat_urls_and_pointers_as_images,
-                short_string_threshold=marqo_index.short_string_threshold,
+                treatUrlsAndPointersAsImages=marqo_index.treat_urls_and_pointers_as_images,
+                shortStringLengthThreshold=marqo_index.short_string_length_threshold,
                 model=marqo_index.model.name,
-                model_properties=marqo_index.model.properties,
-                normalize_embeddings=marqo_index.normalize_embeddings,
-                text_preprocessing=marqo_index.text_preprocessing,
-                image_preprocessing=marqo_index.image_preprocessing,
-                vector_numeric_type=marqo_index.vector_numeric_type,
-                ann_parameters=AnnParameters(
-                    space_type=marqo_index.distance_metric,
+                modelProperties=marqo_index.model.properties,
+                normalizeEmbeddings=marqo_index.normalize_embeddings,
+                textPreprocessing=marqo_index.text_preprocessing,
+                imagePreprocessing=marqo_index.image_preprocessing,
+                vectorNumericType=marqo_index.vector_numeric_type,
+                annParameters=AnnParameters(
+                    spaceType=marqo_index.distance_metric,
                     parameters=marqo_index.hnsw_config
                 )
             )
