@@ -6,8 +6,6 @@ export LD_LIBRARY_PATH=${CUDA_HOME}/lib64
 export PATH=${CUDA_HOME}/bin:${PATH}
 
 trap "bash /app/scripts/shutdown.sh; exit" SIGTERM SIGINT
-echo "Python packages:"
-pip freeze
 
 function wait_for_process () {
     local max_retries=30
