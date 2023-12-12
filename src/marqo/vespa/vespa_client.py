@@ -18,7 +18,7 @@ from marqo.vespa.models import VespaDocument, QueryResult, FeedBatchDocumentResp
     FeedDocumentResponse
 from marqo.vespa.models.application_metrics import ApplicationMetrics
 from marqo.vespa.models.delete_document_response import DeleteDocumentResponse, DeleteBatchDocumentResponse, \
-    DeleteBatchResponse
+    DeleteBatchResponse, DeleteAllDocumentResponse
 from marqo.vespa.models.get_document_response import GetDocumentResponse, VisitDocumentsResponse, GetBatchResponse, \
     GetBatchDocumentResponse
 
@@ -36,7 +36,8 @@ class VespaClient:
             self.wanted_generation = wanted_generation
             self.converged = converged
 
-    def __init__(self, config_url: str, document_url: str, query_url: str, pool_size: int = 10):
+    def __init__(self, config_url: str, document_url: str, query_url: str, pool_size: int = 10,
+                 content_cluster_name: str = "content_default"):
         """
         Create a VespaClient object.
         Args:
@@ -51,6 +52,7 @@ class VespaClient:
         self.http_client = httpx.Client(
             limits=httpx.Limits(max_keepalive_connections=pool_size, max_connections=pool_size)
         )
+        self.content_cluster_name = content_cluster_name
 
     def close(self):
         """
@@ -381,6 +383,17 @@ class VespaClient:
         self._raise_for_status(resp)
 
         return DeleteDocumentResponse(**resp.json())
+
+    def delete_all_docs(self, schema: str) -> DeleteAllDocumentResponse:
+        """Deletes all documents in the given index"""
+        try:
+            resp = self.http_client.delete(f'{self.document_url}/document/v1/{schema}'
+                                           f'/{schema}/docid/?cluster={self.content_cluster_name}&selection=true')
+        except httpx.HTTPError as e:
+            raise VespaError(e) from e
+
+        self._raise_for_status(resp)
+        return DeleteAllDocumentResponse(**resp.json())
 
     def delete_batch(self,
                      ids: List[str],
