@@ -149,11 +149,12 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                 # TODO - Refactor this part to make it more readable
                 # We need to pass the subfields to the image downloader, so that it can download the images in the
                 # multimodal subfields even if the subfield is not a tensor_field
-                potential_image_fields = copy.deepcopy(add_docs_params.tensor_fields) if add_docs_params.tensor_fields else []
-                potential_image_fields.extend(multimodal_sub_fields)
+                tensor_fields_and_multimodal_subfields = copy.deepcopy(add_docs_params.tensor_fields) \
+                    if add_docs_params.tensor_fields else []
+                tensor_fields_and_multimodal_subfields.extend(multimodal_sub_fields)
                 image_repo = exit_stack.enter_context(
                     add_docs.download_images(docs=add_docs_params.docs, thread_count=20,
-                                             tensor_fields=potential_image_fields,
+                                             tensor_fields=tensor_fields_and_multimodal_subfields,
                                              image_download_headers=add_docs_params.image_download_headers)
                 )
 

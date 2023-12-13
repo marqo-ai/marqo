@@ -1,26 +1,20 @@
 import json
 import os
 from unittest import mock
-from unittest.mock import patch
 
 import numpy as np
-import requests
 
 from marqo.core.models.marqo_index import *
-from marqo.errors import DocumentNotFoundError
-from marqo.errors import IndexNotFoundError, InvalidArgError
-from marqo.errors import MarqoWebError
 from marqo.s2_inference.clip_utils import load_image_from_path
 from marqo.s2_inference.s2_inference import vectorise
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import TensorField
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.tensor_search.tensor_search import vectorise_multimodal_combination_field_unstructured
-from marqo.tensor_search.validation import validate_dict
 from tests.marqo_test import MarqoTestCase
 
 
-class TestMultimodalTensorCombination(MarqoTestCase):
+class TestMultimodalTensorCombinationUnstructured(MarqoTestCase):
 
     @classmethod
     def setUpClass(cls):
