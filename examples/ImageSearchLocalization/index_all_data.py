@@ -31,7 +31,7 @@ locators = download_data(data=data, download_dir=local_dir, use_remote=use_remot
 documents = [{"image_location":s3_uri, '_id':os.path.basename(s3_uri)} for s3_uri in locators]
 
 # if you have the images locally, see the instructions 
-# here https://marqo.pages.dev/Advanced-Usage/images/ for the best ways to index 
+# here https://docs.marqo.ai/Advanced-Usage/images/ for the best ways to index 
 
 
 #####################################################

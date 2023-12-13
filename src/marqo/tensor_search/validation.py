@@ -493,7 +493,7 @@ def validate_multimodal_combination(field_content, is_non_tensor_field, field_ma
             f"The multimodal_combination field `{field_content}` is an empty dictionary. "
             f"This is not a valid format of field content."
             f"If you aim to use multimodal_combination, it must contain at least 1 field. "
-            f"please check `https://docs.marqo.ai/1.4.0/Advanced-Usage/document_fields/#multimodal-combination-object` for more info.")
+            f"please check `https://docs.marqo.ai/1.4.0/Guides/Advanced-Usage/document_fields/#multimodal-combination-object` for more info.")
 
     for key, value in field_content.items():
         if not ((type(key) in constants.ALLOWED_MULTIMODAL_FIELD_TYPES) and (
@@ -508,7 +508,7 @@ def validate_multimodal_combination(field_content, is_non_tensor_field, field_ma
                 f"Multimodal-combination field content `{key}:{value}` \n  "
                 f"is not in the multimodal_field mappings weights `{field_mapping['weights']}`. Each sub_field requires a weight."
                 f"Please add `{key}` to the mappings."
-                f"Please check `https://docs.marqo.ai/1.4.0/Advanced-Usage/document_fields/#multimodal-combination-object` for more info.")
+                f"Please check `https://docs.marqo.ai/1.4.0/Guides/Advanced-Usage/document_fields/#multimodal-combination-object` for more info.")
 
     if is_non_tensor_field:
         raise InvalidArgError(
@@ -550,7 +550,7 @@ def validate_custom_vector(field_content: dict, is_non_tensor_field: bool, index
     except jsonschema.ValidationError as e:
         raise InvalidArgError(
             f"Invalid custom_vector field format. Reason: \n{str(e)}"
-            f"\n For info on how to use custom_vector, please see: `https://docs.marqo.ai/1.4.0/Advanced-Usage/document_fields/#custom-vectors`"
+            f"\n For info on how to use custom_vector, please see: `https://docs.marqo.ai/1.4.0/Guides/Advanced-Usage/document_fields/#custom-vectors`"
         )
 
     # Fill in default content as empty string if not provided.
@@ -608,14 +608,14 @@ def validate_multimodal_combination_mappings_object(mappings_object: Dict):
             raise InvalidArgError(
                 f"The multimodal_combination mapping `{mappings_object}` has an invalid child_field `{child_field}` of type `{type(child_field).__name__}`."
                 f"In multimodal_combination fields, it must be a string."
-                f"Please check `https://docs.marqo.ai/1.4.0/Advanced-Usage/document_fields/#multimodal-combination-object` for more info."
+                f"Please check `https://docs.marqo.ai/1.4.0/Guides/Advanced-Usage/document_fields/#multimodal-combination-object` for more info."
             )
 
         if not isinstance(weight, (float, int)):
             raise InvalidArgError(
                 f"The multimodal_combination mapping `{mappings_object}` has an invalid weight `{weight}` of type `{type(weight).__name__}`."
                 f"In multimodal_combination fields, weight must be an int or float."
-                f"Please check `https://docs.marqo.ai/1.4.0/Advanced-Usage/document_fields/#multimodal-combination-object` for more info."
+                f"Please check `https://docs.marqo.ai/1.4.0/Guides/Advanced-Usage/document_fields/#multimodal-combination-object` for more info."
             )
         
     return mappings_object

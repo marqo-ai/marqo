@@ -35,7 +35,7 @@ Python 3.8
     python3 simple_marqo_demo.py
     ```
 
-For more information on Marqo's functions and features, please visit the [Marqo Documentation Page](https://marqo.pages.dev/).
+For more information on Marqo's functions and features, please visit the [Marqo Documentation Page](https://docs.marqo.ai/).
 
 ## Usage
 Feel free to checkout the code in order to have a better understanding on how Marqo functions are used :).

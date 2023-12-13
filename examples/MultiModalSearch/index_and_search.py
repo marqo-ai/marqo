@@ -11,7 +11,7 @@ if __name__ == "__main__":
     #######################################################################
     
     # run the following from the terminal
-    # see https://marqo.pages.dev/0.0.21/
+    # see https://docs.marqo.ai/0.0.21/
     
     """
     docker pull marqoai/marqo:latest
@@ -38,10 +38,10 @@ if __name__ == "__main__":
     ############        Create the index                       ############
     #######################################################################
     
-    # https://marqo.pages.dev/0.0.21/
+    # https://docs.marqo.ai/0.0.21/
     client = Client()
     
-    # https://marqo.pages.dev/0.0.21/API-Reference/indexes/
+    # https://docs.marqo.ai/0.0.21/API-Reference/indexes/
     index_name = 'multimodal'
     settings = {
             "index_defaults": {
@@ -59,7 +59,7 @@ if __name__ == "__main__":
     ############        Index the data (image only)            ############
     #######################################################################
     
-    # https://marqo.pages.dev/0.0.21/API-Reference/documents/
+    # https://docs.marqo.ai/0.0.21/API-Reference/documents/
     device = 'cpu' # change to 'cuda' if GPU is available 
     res = client.index(index_name).add_documents(documents, client_batch_size=64, tensor_fields=["s3_http"], device=device)
 
@@ -69,7 +69,7 @@ if __name__ == "__main__":
     ############        Search                                 ############
     #######################################################################
     
-    # https://marqo.pages.dev/0.0.21/API-Reference/search/
+    # https://docs.marqo.ai/0.0.21/API-Reference/search/
     query = "green shirt"
     res = client.index(index_name).search(query, searchable_attributes=['s3_http'], device=device, limit=10)
     
@@ -85,7 +85,7 @@ if __name__ == "__main__":
     ############        Searching with semantic filters        ############
     #######################################################################
     
-    # https://marqo.pages.dev/0.0.21/API-Reference/search/#query-q
+    # https://docs.marqo.ai/0.0.21/API-Reference/search/#query-q
     query = {"green shirt":1.0, "short sleeves":1.0}
     res = client.index(index_name).search(query, searchable_attributes=['s3_http'], device=device, limit=10)
 
@@ -127,7 +127,7 @@ if __name__ == "__main__":
 
     query = {"yellow handbag":1.0}
     
-    # https://marqo.pages.dev/0.0.21/API-Reference/search/#score-modifiers
+    # https://docs.marqo.ai/0.0.21/API-Reference/search/#score-modifiers
     # we define the extra document specific data to use for ranking
     # multiple fields can be used to multiply or add to the vector similairty score
     score_modifiers = { 
@@ -165,7 +165,7 @@ if __name__ == "__main__":
 
     res = client.create_index(index_name_context, settings_dict=settings)
 
-    # https://marqo.pages.dev/0.0.21/Advanced-Usage/document_fields/#multimodal-combination-object
+    # https://docs.marqo.ai/0.0.21/Advanced-Usage/document_fields/#multimodal-combination-object
     # create the document that will be created from multiple images
     document1 = {"_id":"1",
                 "multimodal": 
@@ -188,7 +188,7 @@ if __name__ == "__main__":
                     }
                }
 
-    # https://marqo.pages.dev/0.0.21/API-Reference/mappings/
+    # https://docs.marqo.ai/0.0.21/API-Reference/mappings/
     # define how we want to comnbined
     mappings1 = {"multimodal": {"type": "multimodal_combination",
                                "weights": {"top_1": 0.40,

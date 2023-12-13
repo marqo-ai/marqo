@@ -138,7 +138,7 @@ class ModelsForCacheing:
                     f"Could not parse environment variable `{EnvVars.MARQO_MODELS_TO_PRELOAD}`. "
                     f"Please ensure that this a JSON-encoded array of strings or dicts. For example:\n"
                     f"""export {EnvVars.MARQO_MODELS_TO_PRELOAD}='["ViT-L/14", "onnx/all_datasets_v4_MiniLM-L6"]'"""
-                    f"""To add a custom model, it must be a dict with keys `model` and `model_properties` as defined in `https://marqo.pages.dev/0.0.20/Models-Reference/bring_your_own_model/`"""
+                    f"""To add a custom model, it must be a dict with keys `model` and `model_properties` as defined in `https://docs.marqo.ai/0.0.20/Models-Reference/bring_your_own_model/`"""
                 ) from e
         else:
             self.models = warmed_models
@@ -216,7 +216,7 @@ def _preload_model(model, content, device):
         except KeyError as e:
             raise errors.EnvVarError(
                 f"Your custom model {model} is missing either `model` or `model_properties`."
-                f"""To add a custom model, it must be a dict with keys `model` and `model_properties` as defined in `https://marqo.pages.dev/0.0.20/Advanced-Usage/configuration/#configuring-preloaded-models`"""
+                f"""To add a custom model, it must be a dict with keys `model` and `model_properties` as defined in `https://docs.marqo.ai/0.0.20/Advanced-Usage/configuration/#configuring-preloaded-models`"""
             ) from e
 
 
