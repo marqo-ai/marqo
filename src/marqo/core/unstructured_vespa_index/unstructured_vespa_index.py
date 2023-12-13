@@ -301,6 +301,14 @@ class UnstructuredVespaIndex(VespaIndex):
         return
 
     @classmethod
+    def validate_multimodal_field_name(cls, multimodal_field_name:str) -> None:
+        cls.validate_field_name(multimodal_field_name)
+        # This error will never be raised because _id can't be a tensor_fields
+        # TODO check if there are other validations needed for multimodal_field_name
+        if multimodal_field_name == "_id":
+            raise errors.InvalidArgError("multimodal field name can not be _id")
+
+    @classmethod
     def validate_field_name(cls, field_name: str) -> None:
         if not field_name:
             raise errors.InvalidFieldNameError("field name can't be empty! ")

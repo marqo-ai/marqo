@@ -354,9 +354,31 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
             # All the plain tensor/non-tensor fields are processed, now we process the multimodal fields
             if document_is_valid and add_docs_params.mappings:
                 multimodal_mappings: Dict[str, Dict] = utils.extract_multimodal_mappings(add_docs_params.mappings)
+
                 for field_name, multimodal_params in multimodal_mappings.items():
                     if not utils.is_tensor_field(field_name, add_docs_params.tensor_fields):
                         raise errors.InvalidArgError(f"Multimodal field {field_name} must be a tensor field")
+
+                    try:
+                        unstructured_vespa_index.validate_multimodal_field_name(field_name)
+                    except errors.InvalidFieldNameError as error:
+                        document_is_valid = False
+                        unsuccessful_docs.append(
+                            (i, {'_id': doc_id, 'error': error.message, 'status': int(error.status_code),
+                                 'code': error.code})
+                        )
+                        break
+
+                    if field_name in copied:
+                        document_is_valid = False
+                        error = errors.InvalidArgError(
+                            message=f'This document has a field {field_name} that is also a multimodal field. '
+                                    f'This is not allowed')
+                        unsuccessful_docs.append(
+                            (i, {'_id': doc_id, 'error': error.message, 'status': int(error.status_code),
+                                 'code': error.code})
+                        )
+                        break
 
                     field_content: Dict[str, str] = utils.extract_multimodal_content(copied, multimodal_params)
 
