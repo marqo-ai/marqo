@@ -38,7 +38,9 @@ class MarqoTestCase(unittest.TestCase):
         vespa_client = VespaClient(
             "http://localhost:19071",
             "http://localhost:8080",
-            "http://localhost:8080"
+            "http://localhost:8080",
+            content_cluster_name="content_default",
+
         )
         cls.configure_request_metrics()
         cls.vespa_client = vespa_client
