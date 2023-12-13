@@ -278,7 +278,7 @@ class UnstructuredVespaIndex(VespaIndex):
         else:
             raise errors.InvalidArgError(
                 f"Field content `{field_content}` \n"
-                f"of type `{type(field_content).__name__}` is not of valid content type!"
+                f"of type `{type(field_content).__name__}` is not of valid content type! "
                 f"Allowed content types: {[ty.__name__ for ty in cls._SUPPORTED_FIELD_CONTENT_TYPES]}"
             )
 

@@ -80,6 +80,7 @@ from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.tensor_search.tensor_search_logging import get_logger
 from marqo.vespa.exceptions import VespaStatusError
 from marqo.vespa.models import VespaDocument, FeedBatchResponse, QueryResult
+from marqo.tensor_search import enums
 
 logger = get_logger(__name__)
 
@@ -112,8 +113,12 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
 
     RequestMetricsStore.for_request().start("add_documents.processing_before_vespa")
 
+    multimodal_sub_fields = []
     if add_docs_params.mappings is not None:
         validation.validate_mappings_object(mappings_object=add_docs_params.mappings)
+        for field_name, mapping in add_docs_params.mappings.items():
+            if mapping.get("type", None) == enums.MappingsObjectType.multimodal_combination:
+                multimodal_sub_fields.extend(mapping["weights"].keys())
 
     t0 = timer()
     bulk_parent_dicts = []
@@ -141,10 +146,14 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                         f"images for {batch_size} docs using {add_docs_params.image_download_thread_count} threads"
                     )
             ):
+                # TODO - Refactor this part to make it more readable
+                # We need to pass the subfields to the image downloader, so that it can download the images in the
+                # multimodal subfields even if the subfield is not a tensor_field
+                potential_image_fields = copy.deepcopy(add_docs_params.tensor_fields) if add_docs_params.tensor_fields else []
+                potential_image_fields.extend(multimodal_sub_fields)
                 image_repo = exit_stack.enter_context(
                     add_docs.download_images(docs=add_docs_params.docs, thread_count=20,
-                                             tensor_fields=add_docs_params.tensor_fields
-                                             if add_docs_params.tensor_fields is not None else None,
+                                             tensor_fields=potential_image_fields,
                                              image_download_headers=add_docs_params.image_download_headers)
                 )
 
@@ -967,6 +976,10 @@ def get_document_by_id(
         else:
             marqo_document[TensorField.tensor_facets] = []
 
+    if not show_vectors:
+        if unstructured_common.MARQO_DOC_MULTIMODAL_PARAMS in marqo_document:
+            del marqo_document[unstructured_common.MARQO_DOC_MULTIMODAL_PARAMS]
+
     if constants.MARQO_DOC_TENSORS in marqo_document:
         del marqo_document[constants.MARQO_DOC_TENSORS]
 
@@ -1131,7 +1144,8 @@ def search(config: Config, index_name: str, text: Union[str, dict],
     # Validation for: result_count (limit) & offset
     # Validate neither is negative
     if result_count <= 0 or (not isinstance(result_count, int)):
-        raise errors.IllegalRequestedDocCount(f"result_count must be an integer greater than 0! Received {result_count}")
+        raise errors.IllegalRequestedDocCount(
+            f"result_count must be an integer greater than 0! Received {result_count}")
 
     if offset < 0:
         raise errors.IllegalRequestedDocCount("search result offset cannot be less than 0!")
@@ -1806,6 +1820,17 @@ def vectorise_multimodal_combination_field_unstructured(field: str,
         text_content_to_vectorise = list(field_content.values())
     else:
         for sub_field_name, sub_content in field_content.items():
+            if not isinstance(sub_content, str):
+                combo_document_is_valid = False
+                unsuccessful_doc_to_append = \
+                    (doc_index, {'_id': doc_id,
+                                 'error': f"Multimodal subfields must be strings representing text or image pointer, "
+                                          f"received {sub_field_name}:{sub_content}, which is of type {type(sub_content).__name__}",
+                                 'status': int(errors.InvalidArgError.status_code),
+                                 'code': errors.InvalidArgError.code})
+
+                return combo_chunk, combo_embeddings, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add
+
             if isinstance(sub_content, str) and not _is_image(sub_content):
                 text_field_names.append(sub_field_name)
                 text_content_to_vectorise.append(sub_content)
