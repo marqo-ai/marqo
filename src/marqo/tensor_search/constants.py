@@ -9,6 +9,8 @@ INDEX_NAME_PREFIXES_TO_IGNORE = {
 
 MARQO_OBJECT_TYPES = {MappingsObjectType.multimodal_combination, MappingsObjectType.custom_vector}
 
+MODELS_TO_SKIP_PRELOADING = {"no_model"}
+
 ILLEGAL_CUSTOMER_FIELD_NAME_CHARS = {'.', '/', '\n'}
 
 ALLOWED_CUSTOMER_FIELD_TYPES = [str, int, float, bool, list, dict]
