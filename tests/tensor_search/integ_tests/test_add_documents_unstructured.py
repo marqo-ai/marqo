@@ -799,14 +799,15 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
 
     def test_bad_tensor_fields(self):
         test_cases = [
-            ({"tensor_fields": None}, "None as tensor fields"),
-            ({}, "No tensor fields"),
+            ({"tensor_fields": None}, "tensor_fields must be explicitly provided",  "None as tensor fields"),
+            ({}, "tensor_fields must be explicitly provided", "No tensor fields"),
+            ({"tensor_fields": ["_id", "some"]}, "`_id` field cannot be a tensor field", "_id can't be a tensor field")
         ]
-        for tensor_fields, msg in test_cases:
+        for tensor_fields, error_message, msg in test_cases:
             with self.subTest(msg):
                 with self.assertRaises(BadRequestError) as e:
                     tensor_search.add_documents(
                         config=self.config,
                         add_docs_params=AddDocsParams(index_name=self.default_text_index,
                                                       docs=[{"some": "data"}], **tensor_fields))
-                assert "tensor_fields" in str(e.exception.message)
+                self.assertIn(error_message, e.exception.message)
