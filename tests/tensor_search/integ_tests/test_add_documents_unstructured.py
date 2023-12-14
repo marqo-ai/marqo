@@ -250,14 +250,13 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
                         config=self.config, add_docs_params=AddDocsParams(
                             index_name=self.default_text_index, docs=bad_doc_arg,
                             use_existing_tensors=use_existing_tensors_flag, device="cpu",
-                            tensor_fields = ["title"]
+                            tensor_fields=["title"]
                         )
                     )
                     assert add_res['errors'] is True
                     assert all(['error' in item for item in add_res['items'] if item['_id'].startswith('to_fail')])
                     assert all([item['status'] == 200
                                 for item in add_res['items'] if item['_id'].startswith('to_pass')])
-
 
     def test_add_documents_id_validation(self):
         """
@@ -286,7 +285,8 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
                             use_existing_tensors=use_existing_tensors_flag, device="cpu"
                         )
                     )
-                    assert add_res['errors'] is True, f'{bad_doc_arg} - use_existing_tensors={use_existing_tensors_flag}'
+                    assert add_res[
+                               'errors'] is True, f'{bad_doc_arg} - use_existing_tensors={use_existing_tensors_flag}'
                     succeeded_count = 0
                     for item in add_res['items']:
                         if item['status'] == 200:
@@ -473,7 +473,7 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
                         device="cpu"
                     )
                 )
-                self.assertEqual(len(expected_results),len(expected_results))
+                self.assertEqual(len(expected_results), len(expected_results))
                 for i, res_dict in enumerate(add_res['items']):
                     # if the expected id is None, then it assumed the id is
                     # generated and can't be asserted against
@@ -582,7 +582,7 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
                 docs=[{"_id": "123", "desc": "mydata"}],
                 index_name=self.default_text_index,
                 device="cpu",
-                tensor_fields = []
+                tensor_fields=[]
             )
         )
         doc_w_facets = tensor_search.get_document_by_id(
@@ -613,7 +613,7 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
         tensor_search.add_documents(
             self.config, add_docs_params=AddDocsParams(
                 docs=[{"_id": "123", "title": "mydata", "desc": "mydata"}],
-                index_name=self.default_text_index, tensor_fields = ["title"],
+                index_name=self.default_text_index, tensor_fields=["title"],
                 device="cpu"
             )
         )
@@ -796,3 +796,17 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
 
             # Context manager must have closed all valid images
             assert mock_close.call_count == 2
+
+    def test_bad_tensor_fields(self):
+        test_cases = [
+            ({"tensor_fields": None}, "None as tensor fields"),
+            ({}, "No tensor fields"),
+        ]
+        for tensor_fields, msg in test_cases:
+            with self.subTest(msg):
+                with self.assertRaises(BadRequestError) as e:
+                    tensor_search.add_documents(
+                        config=self.config,
+                        add_docs_params=AddDocsParams(index_name=self.default_text_index,
+                                                      docs=[{"some": "data"}], **tensor_fields))
+                assert "tensor_fields" in str(e.exception.message)

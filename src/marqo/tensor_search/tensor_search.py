@@ -114,6 +114,8 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
 
     RequestMetricsStore.for_request().start("add_documents.processing_before_vespa")
 
+    unstructured_index_add_doc_validation.validate_tensor_fields(add_docs_params.tensor_fields)
+
     multimodal_sub_fields = []
     if add_docs_params.mappings is not None:
         unstructured_index_add_doc_validation.validate_mappings_object_format(add_docs_params.mappings)
@@ -131,9 +133,6 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
     total_vectorise_time = 0
     batch_size = len(add_docs_params.docs)
     image_repo = {}
-
-    if add_docs_params.tensor_fields and "_id" in add_docs_params.tensor_fields:
-        raise errors.BadRequestError(message="`_id` field cannot be a tensor field.")
 
     with ExitStack() as exit_stack:
         if marqo_index.treat_urls_and_pointers_as_images:

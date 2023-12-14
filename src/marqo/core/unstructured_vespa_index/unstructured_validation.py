@@ -111,3 +111,17 @@ def _validate_conflicts_fields(multimodal_fields: List[str], doc: Dict):
     if mappings_fields.intersection(doc_fields):
         raise InvalidArgError(
             f"Document and mappings object have conflicting fields: {mappings_fields.intersection(doc_fields)}")
+
+
+def validate_tensor_fields(tensor_fields: Optional[List[str]]) -> None:
+    """Validate the tensor fields
+    Args:
+        tensor_fields: the tensor fields
+    Raises InvalidArgError if the tensor fields are invalid, and this should terminate the add_document process
+    """
+    if tensor_fields is None:
+        raise errors.BadRequestError("tensor_fields must be explicitly provided as a list for unstructured index. "
+                                     "If you don't want to vectorise any field, please provide an empty list [].")
+    if "_id" in tensor_fields:
+        raise errors.BadRequestError(message="`_id` field cannot be a tensor field.")
+
