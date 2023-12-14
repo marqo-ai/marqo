@@ -1,5 +1,6 @@
 import json
 import os
+import unittest
 from unittest import mock
 
 import numpy as np
@@ -249,7 +250,7 @@ class TestMultimodalTensorCombinationUnstructured(MarqoTestCase):
             ({"text_field": "test", "bad_field": True}, "received bad_field:True"),
             ({"text_field": "test", "bad_field": ["123", "23"]}, f'received bad_field:{["123", "23"]}'),
             ({"text_field": "test", "bad_field": "https://a-void-image.jpg"}, "Could not find image"),
-            ({"my_multimodal_field": "test"}, "that is also a multimodal field")
+            ({"my_multimodal_field": "test"}, "Document and mappings object have conflicting fields")
         ]
 
         mappings = {
@@ -264,17 +265,19 @@ class TestMultimodalTensorCombinationUnstructured(MarqoTestCase):
 
         for document, error_msg in test_cases:
             with self.subTest(error_msg):
-                res = tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
-                    index_name=self.random_multimodal_index_name, docs=[document, ],
-                    mappings=mappings,
-                    device="cpu",
-                    tensor_fields=["my_multimodal_field"]),
-                )
-                self.assertIn(error_msg, str(res))
-                self.assertEqual(0, self.monitoring.get_index_stats_by_name(
-                    self.random_multimodal_index_name).number_of_documents)
-                self.assertEqual(0, self.monitoring.get_index_stats_by_name(
-                    self.random_multimodal_index_name).number_of_vectors)
+                with mock.patch("marqo.s2_inference.s2_inference.vectorise") as mock_vectorise:
+                    res = tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+                        index_name=self.random_multimodal_index_name, docs=[document, ],
+                        mappings=mappings,
+                        device="cpu",
+                        tensor_fields=["my_multimodal_field"]),
+                    )
+                    self.assertIn(error_msg, str(res))
+                    self.assertEqual(0, self.monitoring.get_index_stats_by_name(
+                        self.random_multimodal_index_name).number_of_documents)
+                    self.assertEqual(0, self.monitoring.get_index_stats_by_name(
+                        self.random_multimodal_index_name).number_of_vectors)
+                    mock_vectorise.assert_not_called()
 
     def test_multimodal_tensor_combination_score(self):
         def get_score(document):

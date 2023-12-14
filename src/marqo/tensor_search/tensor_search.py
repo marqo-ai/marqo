@@ -81,6 +81,7 @@ from marqo.tensor_search.tensor_search_logging import get_logger
 from marqo.vespa.exceptions import VespaStatusError
 from marqo.vespa.models import VespaDocument, FeedBatchResponse, QueryResult
 from marqo.tensor_search import enums
+from marqo.core.unstructured_vespa_index import unstructured_validation as unstructured_index_add_doc_validation
 
 logger = get_logger(__name__)
 
@@ -115,7 +116,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
 
     multimodal_sub_fields = []
     if add_docs_params.mappings is not None:
-        validation.validate_mappings_object(mappings_object=add_docs_params.mappings)
+        unstructured_index_add_doc_validation.validate_mappings_object_format(add_docs_params.mappings)
         for field_name, mapping in add_docs_params.mappings.items():
             if mapping.get("type", None) == enums.MappingsObjectType.multimodal_combination:
                 multimodal_sub_fields.extend(mapping["weights"].keys())
@@ -125,9 +126,6 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
 
     if len(add_docs_params.docs) == 0:
         raise errors.BadRequestError(message="Received empty add documents request")
-
-    if add_docs_params.mappings is not None:
-        validation.validate_mappings_object(add_docs_params.mappings)
 
     unsuccessful_docs = []
     total_vectorise_time = 0
@@ -184,12 +182,18 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
             try:
                 validation.validate_doc(doc)
 
+                if add_docs_params.mappings and multimodal_sub_fields:
+                    unstructured_index_add_doc_validation.validate_coupling_of_mappings_and_doc(
+                        doc, add_docs_params.mappings, multimodal_sub_fields
+                    )
+
                 if "_id" in doc:
                     doc_id = validation.validate_id(doc["_id"])
                     del copied["_id"]
                 else:
                     doc_id = str(uuid.uuid4())
-                [unstructured_vespa_index.validate_field_name(field) for field in copied]
+
+                [unstructured_index_add_doc_validation.validate_field_name(field) for field in copied]
 
             except errors.__InvalidRequestError as err:
                 unsuccessful_docs.append(
@@ -359,27 +363,6 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                 for field_name, multimodal_params in multimodal_mappings.items():
                     if not utils.is_tensor_field(field_name, add_docs_params.tensor_fields):
                         raise errors.InvalidArgError(f"Multimodal field {field_name} must be a tensor field")
-
-                    try:
-                        unstructured_vespa_index.validate_multimodal_field_name(field_name)
-                    except errors.InvalidFieldNameError as error:
-                        document_is_valid = False
-                        unsuccessful_docs.append(
-                            (i, {'_id': doc_id, 'error': error.message, 'status': int(error.status_code),
-                                 'code': error.code})
-                        )
-                        break
-
-                    if field_name in copied:
-                        document_is_valid = False
-                        error = errors.InvalidArgError(
-                            message=f'This document has a field {field_name} that is also a multimodal field. '
-                                    f'This is not allowed')
-                        unsuccessful_docs.append(
-                            (i, {'_id': doc_id, 'error': error.message, 'status': int(error.status_code),
-                                 'code': error.code})
-                        )
-                        break
 
                     field_content: Dict[str, str] = utils.extract_multimodal_content(copied, multimodal_params)
 
@@ -1843,17 +1826,6 @@ def vectorise_multimodal_combination_field_unstructured(field: str,
         text_content_to_vectorise = list(field_content.values())
     else:
         for sub_field_name, sub_content in field_content.items():
-            if not isinstance(sub_content, str):
-                combo_document_is_valid = False
-                unsuccessful_doc_to_append = \
-                    (doc_index, {'_id': doc_id,
-                                 'error': f"Multimodal subfields must be strings representing text or image pointer, "
-                                          f"received {sub_field_name}:{sub_content}, which is of type {type(sub_content).__name__}",
-                                 'status': int(errors.InvalidArgError.status_code),
-                                 'code': errors.InvalidArgError.code})
-
-                return combo_chunk, combo_embeddings, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add
-
             if isinstance(sub_content, str) and not _is_image(sub_content):
                 text_field_names.append(sub_field_name)
                 text_content_to_vectorise.append(sub_content)
