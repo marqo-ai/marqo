@@ -7,6 +7,7 @@ from marqo.tensor_search.enums import EnvVars
 # we need to import backend before index_meta_cache to prevent circular import error:
 from marqo.tensor_search import backend, index_meta_cache, utils
 from marqo import config
+from marqo.tensor_search import constants
 from marqo.tensor_search.web import api_utils
 from marqo import errors
 from marqo.tensor_search.throttling.redis_throttle import throttle
@@ -152,6 +153,21 @@ class ModelsForCacheing:
         N = 10
         messages = []
         for model in self.models:
+            # Skip preloading of models that can't be preloaded (eg. no_model)
+            if isinstance(model, str):
+                model_name = model
+            elif isinstance(model, dict):
+                try:
+                    model_name = model["model"]
+                except KeyError as e:
+                    raise errors.EnvVarError(
+                        f"Your custom model {model} is missing `model` key."
+                        f"""To add a custom model, it must be a dict with keys `model` and `model_properties` as defined in `https://marqo.pages.dev/0.0.20/Advanced-Usage/configuration/#configuring-preloaded-models`"""
+                    ) from e
+            if model_name in constants.MODELS_TO_SKIP_PRELOADING:
+                self.logger.info(f"Skipping preloading of `{model_name}`.")
+                continue
+
             for device in self.default_devices:
                 self.logger.debug(f"Beginning loading for model: {model} on device: {device}")
                 
