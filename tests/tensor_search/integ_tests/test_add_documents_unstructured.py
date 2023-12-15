@@ -75,7 +75,7 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
                     "title": "content 1",
                     "desc": "content 2. blah blah blah"
                 }],
-                device="cpu"
+                device="cpu", tensor_fields =["title"]
             )
         )
         self.assertEqual(
@@ -103,7 +103,7 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
                     "_id": "1",
                     "title": "doc 123"
                 }],
-                device="cpu"
+                device="cpu", tensor_fields =["title"]
             )
         )
         tensor_facets = tensor_search.get_document_by_id(
@@ -119,7 +119,7 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
                         "title": "doc 000"
                     }
                 ],
-                device="cpu"
+                device="cpu", tensor_fields =["title"]
             )
         )
         tensor_search.add_documents(
@@ -131,7 +131,7 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
                         "title": "doc 123"
                     }
                 ],
-                device="cpu"
+                device="cpu", tensor_fields =["title"]
             )
         )
 
@@ -171,7 +171,7 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
         ]
         tensor_search.add_documents(
             config=self.config, add_docs_params=AddDocsParams(
-                index_name=self.default_text_index, docs=docs, device="cpu"
+                index_name=self.default_text_index, docs=docs, device="cpu", tensor_fields =[]
             )
         )
         count = self.pyvespa_client.query(
@@ -200,7 +200,7 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
                         "tags": [1, 'str']  # mixed types, error
                     }
                 ],
-                device="cpu"
+                device="cpu", tensor_fields = []
             )
         )
         assert "errors" in add_res
@@ -282,7 +282,7 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
                     add_res = tensor_search.add_documents(
                         config=self.config, add_docs_params=AddDocsParams(
                             index_name=self.default_text_index, docs=bad_doc_arg[0],
-                            use_existing_tensors=use_existing_tensors_flag, device="cpu"
+                            use_existing_tensors=use_existing_tensors_flag, device="cpu", tensor_fields =["title"]
                         )
                     )
                     assert add_res[
@@ -305,7 +305,8 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
                 config=self.config, add_docs_params=AddDocsParams(
                     index_name=self.default_text_index,
                     docs=bad_doc_arg,
-                    device="cpu"
+                    device="cpu",
+                    tensor_fields = [],
                 )
             )
             assert add_res['errors'] is False
@@ -324,7 +325,8 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
                     config=self.config, add_docs_params=AddDocsParams(
                         index_name=self.default_text_index,
                         docs=bad_doc_arg,
-                        device="cpu"
+                        device="cpu",
+                        tensor_fields = [],
                     )
                 )
                 assert add_res['errors'] is True
@@ -470,7 +472,7 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
                 add_res = tensor_search.add_documents(
                     config=self.config, add_docs_params=AddDocsParams(
                         index_name=self.default_text_index, docs=docs,
-                        device="cpu"
+                        device="cpu", tensor_fields =[]
                     )
                 )
                 self.assertEqual(len(expected_results), len(expected_results))
@@ -509,7 +511,7 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
                         {"_id": "789", "desc": "abc " * ((max_size // 4) - 500)},
                         {"_id": "456", "desc": "exc " * (max_size // 4)},
                     ],
-                    device="cpu"
+                    device="cpu", tensor_fields =["desc"]
                 ))
             items = update_res['items']
             assert update_res['errors']
@@ -532,7 +534,7 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
                     index_name=self.default_text_index, docs=[
                         {"_id": "123", 'desc': "edf " * (max_size // 4)},
                     ],
-                    use_existing_tensors=True, device="cpu")
+                    use_existing_tensors=True, device="cpu", tensor_fields =[])
             )
             items = update_res['items']
             assert update_res['errors']
@@ -555,7 +557,7 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
                         index_name=self.default_text_index, docs=[
                             {"_id": "123", 'desc': "Some content"},
                         ],
-                        use_existing_tensors=True, device="cpu"
+                        use_existing_tensors=True, device="cpu", tensor_fields =["desc"]
                     ))
                 items = update_res['items']
                 assert not update_res['errors']
