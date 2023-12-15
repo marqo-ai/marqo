@@ -169,10 +169,22 @@ class StructuredVespaSchema(VespaSchema):
         bm25_expression = ' + '.join([
             f'if (query({field.name}) > 0, bm25({field.lexical_field_name}), 0)' for field in lexical_fields
         ])
-        embedding_similarity_expression = ' + '.join([
-            f'if (query({field.name}) > 0, closeness(field, {field.embeddings_field_name}), 0)' for field in
-            marqo_index.tensor_fields
-        ])
+        # TODO: Fix this line, the + makes it sum
+        embedding_similarity_expression = \
+            'max(' + \
+            ' , '.join([
+                f'if (query({field.name}) > 0, closeness(field, {field.embeddings_field_name}), 0)' for field in
+                marqo_index.tensor_fields
+            ]) + \
+            ')'
+
+        # OLD
+        #embedding_similarity_expression = \
+        #    ' + '.join([
+        #        f'if (query({field.name}) > 0, closeness(field, {field.embeddings_field_name}), 0)' for field in
+        #        marqo_index.tensor_fields
+        #    ])
+
         embedding_match_features_expression = \
             'match-features: ' + \
             ' '.join([f'closest({field.embeddings_field_name})' for field in marqo_index.tensor_fields]) + \
