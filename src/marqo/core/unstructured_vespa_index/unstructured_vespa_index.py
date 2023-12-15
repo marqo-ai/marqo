@@ -37,7 +37,10 @@ class UnstructuredVespaIndex(VespaIndex):
 
     def to_vespa_query(self, marqo_query: MarqoQuery) -> Dict[str, Any]:
         if marqo_query.searchable_attributes is not None:
-            raise errors.InvalidArgError("searchable_attributes is not supported for an unstructured index")
+            # TODO Add a marqo doc link here on how to create a structured index
+            raise errors.InvalidArgError('searchable_attributes is not supported for an unstructured index. '
+                                         'You can create a structured index '
+                                         'by `mq.create_index("your_index_name", type="structured")`')
 
         if isinstance(marqo_query, MarqoTensorQuery):
             return self._to_vespa_tensor_query(marqo_query)
