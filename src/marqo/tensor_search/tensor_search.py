@@ -80,6 +80,8 @@ from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.tensor_search.tensor_search_logging import get_logger
 from marqo.vespa.exceptions import VespaStatusError
 from marqo.vespa.models import VespaDocument, FeedBatchResponse, QueryResult
+from marqo.tensor_search import enums
+from marqo.core.unstructured_vespa_index import unstructured_validation as unstructured_index_add_doc_validation
 
 logger = get_logger(__name__)
 
@@ -112,8 +114,14 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
 
     RequestMetricsStore.for_request().start("add_documents.processing_before_vespa")
 
+    unstructured_index_add_doc_validation.validate_tensor_fields(add_docs_params.tensor_fields)
+
+    multimodal_sub_fields = []
     if add_docs_params.mappings is not None:
-        validation.validate_mappings_object(mappings_object=add_docs_params.mappings)
+        unstructured_index_add_doc_validation.validate_mappings_object_format(add_docs_params.mappings)
+        for field_name, mapping in add_docs_params.mappings.items():
+            if mapping.get("type", None) == enums.MappingsObjectType.multimodal_combination:
+                multimodal_sub_fields.extend(mapping["weights"].keys())
 
     t0 = timer()
     bulk_parent_dicts = []
@@ -121,16 +129,10 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
     if len(add_docs_params.docs) == 0:
         raise errors.BadRequestError(message="Received empty add documents request")
 
-    if add_docs_params.mappings is not None:
-        validation.validate_mappings_object(add_docs_params.mappings)
-
     unsuccessful_docs = []
     total_vectorise_time = 0
     batch_size = len(add_docs_params.docs)
     image_repo = {}
-
-    if add_docs_params.tensor_fields and "_id" in add_docs_params.tensor_fields:
-        raise errors.BadRequestError(message="`_id` field cannot be a tensor field.")
 
     with ExitStack() as exit_stack:
         if marqo_index.treat_urls_and_pointers_as_images:
@@ -141,10 +143,15 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                         f"images for {batch_size} docs using {add_docs_params.image_download_thread_count} threads"
                     )
             ):
+                # TODO - Refactor this part to make it more readable
+                # We need to pass the subfields to the image downloader, so that it can download the images in the
+                # multimodal subfields even if the subfield is not a tensor_field
+                tensor_fields_and_multimodal_subfields = copy.deepcopy(add_docs_params.tensor_fields) \
+                    if add_docs_params.tensor_fields else []
+                tensor_fields_and_multimodal_subfields.extend(multimodal_sub_fields)
                 image_repo = exit_stack.enter_context(
                     add_docs.download_images(docs=add_docs_params.docs, thread_count=20,
-                                             tensor_fields=add_docs_params.tensor_fields
-                                             if add_docs_params.tensor_fields is not None else None,
+                                             tensor_fields=tensor_fields_and_multimodal_subfields,
                                              image_download_headers=add_docs_params.image_download_headers)
                 )
 
@@ -174,12 +181,18 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
             try:
                 validation.validate_doc(doc)
 
+                if add_docs_params.mappings and multimodal_sub_fields:
+                    unstructured_index_add_doc_validation.validate_coupling_of_mappings_and_doc(
+                        doc, add_docs_params.mappings, multimodal_sub_fields
+                    )
+
                 if "_id" in doc:
                     doc_id = validation.validate_id(doc["_id"])
                     del copied["_id"]
                 else:
                     doc_id = str(uuid.uuid4())
-                [unstructured_vespa_index.validate_field_name(field) for field in copied]
+
+                [unstructured_index_add_doc_validation.validate_field_name(field) for field in copied]
 
             except errors.__InvalidRequestError as err:
                 unsuccessful_docs.append(
@@ -345,6 +358,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
             # All the plain tensor/non-tensor fields are processed, now we process the multimodal fields
             if document_is_valid and add_docs_params.mappings:
                 multimodal_mappings: Dict[str, Dict] = utils.extract_multimodal_mappings(add_docs_params.mappings)
+
                 for field_name, multimodal_params in multimodal_mappings.items():
                     if not utils.is_tensor_field(field_name, add_docs_params.tensor_fields):
                         raise errors.InvalidArgError(f"Multimodal field {field_name} must be a tensor field")
@@ -967,6 +981,10 @@ def get_document_by_id(
         else:
             marqo_document[TensorField.tensor_facets] = []
 
+    if not show_vectors:
+        if unstructured_common.MARQO_DOC_MULTIMODAL_PARAMS in marqo_document:
+            del marqo_document[unstructured_common.MARQO_DOC_MULTIMODAL_PARAMS]
+
     if constants.MARQO_DOC_TENSORS in marqo_document:
         del marqo_document[constants.MARQO_DOC_TENSORS]
 
@@ -1131,7 +1149,8 @@ def search(config: Config, index_name: str, text: Union[str, dict],
     # Validation for: result_count (limit) & offset
     # Validate neither is negative
     if result_count <= 0 or (not isinstance(result_count, int)):
-        raise errors.IllegalRequestedDocCount(f"result_count must be an integer greater than 0! Received {result_count}")
+        raise errors.IllegalRequestedDocCount(
+            f"result_count must be an integer greater than 0! Received {result_count}")
 
     if offset < 0:
         raise errors.IllegalRequestedDocCount("search result offset cannot be less than 0!")

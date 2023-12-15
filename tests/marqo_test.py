@@ -7,6 +7,7 @@ import vespa.application as pyvespa
 
 from marqo import config
 from marqo.core.index_management.index_management import IndexManagement
+from marqo.core.monitoring.monitoring import Monitoring
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import (StructuredMarqoIndexRequest, UnstructuredMarqoIndexRequest,
                                                    FieldRequest, MarqoIndexRequest)
@@ -45,6 +46,7 @@ class MarqoTestCase(unittest.TestCase):
         cls.configure_request_metrics()
         cls.vespa_client = vespa_client
         cls.index_management = IndexManagement(cls.vespa_client)
+        cls.monitoring = Monitoring(cls.vespa_client, cls.index_management)
         cls.config = config.Config(vespa_client=vespa_client, index_management=cls.index_management)
 
         cls.pyvespa_client = pyvespa.Vespa(url="http://localhost", port=8080)
