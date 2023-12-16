@@ -56,6 +56,7 @@ from marqo.core.models.marqo_index import IndexType
 from marqo.core.models.marqo_index import MarqoIndex, FieldType, UnstructuredMarqoIndex, StructuredMarqoIndex
 from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery
 from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
+from marqo.core.unstructured_vespa_index import unstructured_validation as unstructured_index_add_doc_validation
 from marqo.core.unstructured_vespa_index.unstructured_vespa_index import UnstructuredVespaIndex
 from marqo.core.vespa_index import for_marqo_index as vespa_index_factory
 from marqo.s2_inference import errors as s2_inference_errors
@@ -65,6 +66,7 @@ from marqo.s2_inference.processing import image as image_processor
 from marqo.s2_inference.processing import text as text_processor
 from marqo.s2_inference.reranking import rerank
 from marqo.tensor_search import delete_docs
+from marqo.tensor_search import enums
 from marqo.tensor_search import index_meta_cache
 from marqo.tensor_search import utils, validation, add_docs
 from marqo.tensor_search.enums import (
@@ -80,8 +82,6 @@ from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.tensor_search.tensor_search_logging import get_logger
 from marqo.vespa.exceptions import VespaStatusError
 from marqo.vespa.models import VespaDocument, FeedBatchResponse, QueryResult
-from marqo.tensor_search import enums
-from marqo.core.unstructured_vespa_index import unstructured_validation as unstructured_index_add_doc_validation
 
 logger = get_logger(__name__)
 
@@ -446,28 +446,21 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                  f"for an average of {(total_vectorise_time / batch_size):.3f}s per doc.")
 
     if bulk_parent_dicts:
+        vespa_docs = [
+            VespaDocument(**unstructured_vespa_index.to_vespa_document(marqo_document=doc))
+            for doc in bulk_parent_dicts
+        ]
         # ADD DOCS TIMER-LOGGER (5)
         start_time_5 = timer()
-        with RequestMetricsStore.for_request().time("add_documents.opensearch._bulk"):
-            # serialised_body = utils.dicts_to_jsonl(bulk_parent_dicts)
-            vespa_docs = [
-                VespaDocument(**unstructured_vespa_index.to_vespa_document(marqo_document=doc))
-                for doc in bulk_parent_dicts
-            ]
+        with RequestMetricsStore.for_request().time("add_documents.vespa._bulk"):
             index_responses = vespa_client.feed_batch(vespa_docs, marqo_index.name)
-        # RequestMetricsStore.for_request().add_time("add_documents.opensearch._bulk.internal",
-        #                                            float(index_parent_response["took"]))
 
         end_time_5 = timer()
         total_http_time = end_time_5 - start_time_5
-        # total_index_time = index_parent_response["took"] * 0.001
         logger.debug(
-            f"      add_documents roundtrip: took {(total_http_time):.3f}s to send {batch_size} docs (roundtrip) to Marqo-os, "
+            f"      add_documents roundtrip: took {(total_http_time):.3f}s to send {batch_size} "
+            f"docs (roundtrip) to vector store, "
             f"for an average of {(total_http_time / batch_size):.3f}s per doc.")
-
-        # logger.debug(
-        #     f"          add_documents Marqo-os index: took {(total_index_time):.3f}s for Marqo-os to index {batch_size} docs, "
-        #     f"for an average of {(total_index_time / batch_size):.3f}s per doc.")
     else:
         index_responses = None
 
@@ -475,7 +468,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
         t1 = timer()
 
         def translate_add_doc_response(responses: Optional[FeedBatchResponse], time_diff: float) -> dict:
-            """translates OpenSearch response dict into Marqo dict"""
+            """translates Vespa response dict into Marqo dict"""
             result_dict = {}
             new_items = []
 
@@ -509,7 +502,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
     # ADD DOCS TIMER-LOGGER (3)
     vespa_client = config.vespa_client
 
-    RequestMetricsStore.for_request().start("add_documents.processing_before_opensearch")
+    RequestMetricsStore.for_request().start("add_documents.processing_before_vespa")
 
     if add_docs_params.tensor_fields is not None:
         raise errors.InvalidArgError('Cannot specify `tensorFields` for a structured index')
@@ -888,7 +881,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                 bulk_parent_dicts.append(copied)
 
     total_preproc_time = 0.001 * RequestMetricsStore.for_request().stop(
-        "add_documents.processing_before_opensearch")
+        "add_documents.processing_before_vespa")
     logger.debug(
         f"      add_documents pre-processing: took {(total_preproc_time):.3f}s total for {batch_size} docs, "
         f"for an average of {(total_preproc_time / batch_size):.3f}s per doc.")
@@ -897,29 +890,22 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                  f"for an average of {(total_vectorise_time / batch_size):.3f}s per doc.")
 
     if bulk_parent_dicts:
+        vespa_index = StructuredVespaIndex(marqo_index)
+        vespa_docs = [
+            VespaDocument(**vespa_index.to_vespa_document(doc))
+            for doc in bulk_parent_dicts
+        ]
         # ADD DOCS TIMER-LOGGER (5)
         start_time_5 = timer()
-        with RequestMetricsStore.for_request().time("add_documents.opensearch._bulk"):
-            # serialised_body = utils.dicts_to_jsonl(bulk_parent_dicts)
-            vespa_index = StructuredVespaIndex(marqo_index)
-            vespa_docs = [
-                VespaDocument(**vespa_index.to_vespa_document(doc))
-                for doc in bulk_parent_dicts
-            ]
+        with RequestMetricsStore.for_request().time("add_documents.vespa._bulk"):
             index_responses = vespa_client.feed_batch(vespa_docs, marqo_index.name)
-        # RequestMetricsStore.for_request().add_time("add_documents.opensearch._bulk.internal",
-        #                                            float(index_parent_response["took"]))
 
         end_time_5 = timer()
         total_http_time = end_time_5 - start_time_5
-        # total_index_time = index_parent_response["took"] * 0.001
+
         logger.debug(
             f"      add_documents roundtrip: took {(total_http_time):.3f}s to send {batch_size} docs (roundtrip) to Marqo-os, "
             f"for an average of {(total_http_time / batch_size):.3f}s per doc.")
-
-        # logger.debug(
-        #     f"          add_documents Marqo-os index: took {(total_index_time):.3f}s for Marqo-os to index {batch_size} docs, "
-        #     f"for an average of {(total_index_time / batch_size):.3f}s per doc.")
     else:
         index_responses = None
 
@@ -927,7 +913,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
         t1 = timer()
 
         def translate_add_doc_response(responses: Optional[FeedBatchResponse], time_diff: float) -> dict:
-            """translates OpenSearch response dict into Marqo dict"""
+            """translates Vespa response dict into Marqo dict"""
             result_dict = {}
             new_items: List[Dict] = []
 
