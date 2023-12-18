@@ -85,7 +85,7 @@
             query(description): 0
         }
             first-phase {
-            expression: if (query(title) > 0, closeness(field, marqo__embeddings_title), 0) + if (query(description) > 0, closeness(field, marqo__embeddings_description), 0)
+            expression: max(if(query(title) > 0, closeness(field, marqo__embeddings_title), 0), if(query(description) > 0, closeness(field, marqo__embeddings_description), 0))
         }
         match-features: closest(marqo__embeddings_title) closest(marqo__embeddings_description) distance(field, marqo__embeddings_title) distance(field, marqo__embeddings_description)
     }
@@ -116,7 +116,7 @@
             query(description): 0
         }
             first-phase {
-            expression: modify(if (query(title) > 0, closeness(field, marqo__embeddings_title), 0) + if (query(description) > 0, closeness(field, marqo__embeddings_description), 0))
+            expression: modify(max(if(query(title) > 0, closeness(field, marqo__embeddings_title), 0), if(query(description) > 0, closeness(field, marqo__embeddings_description), 0)))
         }
         match-features: closest(marqo__embeddings_title) closest(marqo__embeddings_description) distance(field, marqo__embeddings_title) distance(field, marqo__embeddings_description)
     }
