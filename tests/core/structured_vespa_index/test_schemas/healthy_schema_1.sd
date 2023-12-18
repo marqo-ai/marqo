@@ -69,6 +69,10 @@
                     neighbors-to-explore-at-insert: 100
             }}
         }
+            field marqo__vector_count type int{
+            indexing: attribute | summary
+        }
+
     }
         rank-profile bm25 inherits default {
             inputs {

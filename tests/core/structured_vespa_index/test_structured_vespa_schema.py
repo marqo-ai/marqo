@@ -149,3 +149,66 @@ class TestStructuredVespaSchema(MarqoTestCase):
         schema = re.sub(r'^\s+', '', schema, flags=re.MULTILINE)
 
         return schema
+
+
+class TestStructuredVespaSchemaMethods(MarqoTestCase):
+    """
+    Tests for the individual methods in StructuredVespaSchema.
+    """
+    def setUp(self):
+        tester_marqo_index_request = self.structured_marqo_index_request(
+            name='my_index',
+            model=Model(name='ViT-B/32'),
+            distance_metric=DistanceMetric.PrenormalizedAnguar,
+            vector_numeric_type=VectorNumericType.Float,
+            hnsw_config=HnswConfig(ef_construction=100, m=16),
+            fields=[],
+            tensor_fields=[]
+        )
+
+        self.tester_schema = StructuredVespaSchema(tester_marqo_index_request)
+
+    def test__generate_max_similarity_expression(self):
+        test_fields = [TensorField(
+            name=f"field_{i}",
+            chunk_field_name=f"chunk_field_{i}",
+            embeddings_field_name=f"embeddings_field_{i}",
+        ) for i in range(4)]
+
+        with self.subTest("No tensor fields"):
+            assert self.tester_schema._generate_max_similarity_expression(tensor_fields=[]) == ''
+
+        with self.subTest("1 tensor field"): # (should only get that field's closeness)
+            assert self.tester_schema._generate_max_similarity_expression(tensor_fields=[test_fields[0]]) == \
+                   ('if(query(field_0) > 0, '
+                    'closeness(field, embeddings_field_0), 0)')
+
+        with self.subTest("2 tensor fields"):  # (should get max of 2 fields' closeness)
+            assert self.tester_schema._generate_max_similarity_expression(tensor_fields=test_fields[:2]) == \
+                   ('max('
+                    'if(query(field_0) > 0, '
+                    'closeness(field, embeddings_field_0), 0), '
+                    'if(query(field_1) > 0, '
+                    'closeness(field, embeddings_field_1), 0))')
+
+        with self.subTest("3 tensor fields"):  # (should get max of 3 fields' closeness)
+            assert self.tester_schema._generate_max_similarity_expression(tensor_fields=test_fields[:3]) == \
+                   ('max('
+                    'if(query(field_0) > 0, '
+                    'closeness(field, embeddings_field_0), 0), '
+                    'max(if(query(field_1) > 0, '
+                    'closeness(field, embeddings_field_1), 0), '
+                    'if(query(field_2) > 0, '
+                    'closeness(field, embeddings_field_2), 0)))')
+
+        with self.subTest("4 tensor fields"):  # (should get max of 4 fields' closeness)
+            assert self.tester_schema._generate_max_similarity_expression(tensor_fields=test_fields) == \
+                   ('max('
+                    'if(query(field_0) > 0, '
+                    'closeness(field, embeddings_field_0), 0), '
+                    'max(if(query(field_1) > 0, '
+                    'closeness(field, embeddings_field_1), 0), '
+                    'max(if(query(field_2) > 0, '
+                    'closeness(field, embeddings_field_2), 0), '
+                    'if(query(field_3) > 0, '
+                    'closeness(field, embeddings_field_3), 0))))')
