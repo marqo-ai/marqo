@@ -158,6 +158,34 @@ class StructuredVespaSchema(VespaSchema):
 
         return document, marqo_index
 
+    def _generate_max_similarity_expression(self, tensor_fields: List[TensorField]) -> str:
+        """
+        Recursively generate max closeness expression for all tensor fields.
+        Because max
+        If more than 2, get max of first and (max of the rest).
+        """
+
+        # Base cases
+        # If no tensor fields, return empty string.
+        # If only 1 or 2 tensor fields, get max of one/both.
+        if len(tensor_fields) == 0:
+            return ""
+        elif len(tensor_fields) == 1:
+            return (f'if(query({tensor_fields[0].name}) > 0, '
+                    f'closeness(field, {tensor_fields[0].embeddings_field_name}), 0)')
+        elif len(tensor_fields) == 2:
+            return (f'max(' 
+                    f'if(query({tensor_fields[0].name}) > 0, '
+                    f'closeness(field, {tensor_fields[0].embeddings_field_name}), 0), '
+                    f'if(query({tensor_fields[1].name}) > 0, '
+                    f'closeness(field, {tensor_fields[1].embeddings_field_name}), 0))')
+        # Recursive step
+        else:
+            return (f'max('
+                    f'if(query({tensor_fields[0].name}) > 0, '
+                    f'closeness(field, {tensor_fields[0].embeddings_field_name}), 0), '
+                    f'{self._generate_max_similarity_expression(tensor_fields[1:])})')
+
     def _generate_rank_profiles(self, marqo_index: StructuredMarqoIndex) -> List[str]:
         rank_profiles: List[str] = list()
 
@@ -169,21 +197,8 @@ class StructuredVespaSchema(VespaSchema):
         bm25_expression = ' + '.join([
             f'if (query({field.name}) > 0, bm25({field.lexical_field_name}), 0)' for field in lexical_fields
         ])
-        # TODO: Fix this line, the + makes it sum
-        embedding_similarity_expression = \
-            'max(' + \
-            ' , '.join([
-                f'if (query({field.name}) > 0, closeness(field, {field.embeddings_field_name}), 0)' for field in
-                marqo_index.tensor_fields
-            ]) + \
-            ')'
 
-        # OLD
-        #embedding_similarity_expression = \
-        #    ' + '.join([
-        #        f'if (query({field.name}) > 0, closeness(field, {field.embeddings_field_name}), 0)' for field in
-        #        marqo_index.tensor_fields
-        #    ])
+        embedding_similarity_expression = self._generate_max_similarity_expression(tensor_fields)
 
         embedding_match_features_expression = \
             'match-features: ' + \
