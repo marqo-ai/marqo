@@ -143,6 +143,7 @@ class TestCreateIndex(MarqoTestCase):
         default_settings = tensor_search.configs.get_default_index_settings()
         default_text_preprocessing = default_settings[IndexSettingsField.index_defaults][IndexSettingsField.text_preprocessing]
         default_image_preprocessing = default_settings[IndexSettingsField.index_defaults][IndexSettingsField.image_preprocessing]
+        default_audio_preprocessing = default_settings[IndexSettingsField.index_defaults][IndexSettingsField.audio_preprocessing]
 
         assert retrieved_settings == {
             IndexSettingsField.index_defaults: {
@@ -150,6 +151,7 @@ class TestCreateIndex(MarqoTestCase):
                 IndexSettingsField.normalize_embeddings: False,
                 IndexSettingsField.text_preprocessing: default_text_preprocessing,
                 IndexSettingsField.image_preprocessing: default_image_preprocessing,
+                IndexSettingsField.audio_preprocessing: default_audio_preprocessing,
                 IndexSettingsField.ann_parameters: {
                     IndexSettingsField.ann_engine: 'lucene',
                     IndexSettingsField.ann_method_name: 'hnsw',

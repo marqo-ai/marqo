@@ -132,11 +132,10 @@ def threaded_download_media(
         take place at API level and such invalid arguments are not expected to reach this function.
 
     """
-    print(allocated_docs)
+    
     if tensor_fields is not None and non_tensor_fields is not None \
             or tensor_fields is None and non_tensor_fields is None:
         raise errors.InternalError("Must provide exactly one of tensor_fields or non_tensor_fields")
-
 
     # Generate pseudo-unique ID for thread metrics.
     _id = uuid.uuid4().hex
@@ -215,6 +214,12 @@ def download_media(
     if tensor_fields is not None and non_tensor_fields is not None \
             or tensor_fields is None and non_tensor_fields is None:
         raise errors.InternalError("Must provide exactly one of tensor_fields or non_tensor_fields")
+
+    # id is always non-tensor
+    if non_tensor_fields is None:
+        non_tensor_fields = ['_id']
+    else:
+        non_tensor_fields.append('_id')
 
     docs_per_thread = math.ceil(len(docs)/thread_count)
     copied = copy.deepcopy(docs)
