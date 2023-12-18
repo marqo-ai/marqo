@@ -315,6 +315,7 @@ class TestSearchUnstructured(MarqoTestCase):
                 index_name=self.default_text_index, docs=[
                     {"abc": "some text", "other field": "baaadd", "_id": "5678"},
                     {"abc": "some text", "other field": "Close match hehehe", "_id": "1234"}],
+                    tensor_fields=[]
             )
         )
 

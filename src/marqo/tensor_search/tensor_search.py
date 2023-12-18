@@ -56,6 +56,7 @@ from marqo.core.models.marqo_index import IndexType
 from marqo.core.models.marqo_index import MarqoIndex, FieldType, UnstructuredMarqoIndex, StructuredMarqoIndex
 from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery
 from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
+from marqo.core.unstructured_vespa_index import unstructured_validation as unstructured_index_add_doc_validation
 from marqo.core.unstructured_vespa_index.unstructured_vespa_index import UnstructuredVespaIndex
 from marqo.core.vespa_index import for_marqo_index as vespa_index_factory
 from marqo.s2_inference import errors as s2_inference_errors
@@ -65,6 +66,7 @@ from marqo.s2_inference.processing import image as image_processor
 from marqo.s2_inference.processing import text as text_processor
 from marqo.s2_inference.reranking import rerank
 from marqo.tensor_search import delete_docs
+from marqo.tensor_search import enums
 from marqo.tensor_search import index_meta_cache
 from marqo.tensor_search import utils, validation, add_docs
 from marqo.tensor_search.enums import (
@@ -112,8 +114,14 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
 
     RequestMetricsStore.for_request().start("add_documents.processing_before_vespa")
 
+    unstructured_index_add_doc_validation.validate_tensor_fields(add_docs_params.tensor_fields)
+
+    multimodal_sub_fields = []
     if add_docs_params.mappings is not None:
-        validation.validate_mappings_object(mappings_object=add_docs_params.mappings)
+        unstructured_index_add_doc_validation.validate_mappings_object_format(add_docs_params.mappings)
+        for field_name, mapping in add_docs_params.mappings.items():
+            if mapping.get("type", None) == enums.MappingsObjectType.multimodal_combination:
+                multimodal_sub_fields.extend(mapping["weights"].keys())
 
     t0 = timer()
     bulk_parent_dicts = []
@@ -121,16 +129,10 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
     if len(add_docs_params.docs) == 0:
         raise errors.BadRequestError(message="Received empty add documents request")
 
-    if add_docs_params.mappings is not None:
-        validation.validate_mappings_object(add_docs_params.mappings)
-
     unsuccessful_docs = []
     total_vectorise_time = 0
     batch_size = len(add_docs_params.docs)
     image_repo = {}
-
-    if add_docs_params.tensor_fields and "_id" in add_docs_params.tensor_fields:
-        raise errors.BadRequestError(message="`_id` field cannot be a tensor field.")
 
     with ExitStack() as exit_stack:
         if marqo_index.treat_urls_and_pointers_as_images:
@@ -141,10 +143,15 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                         f"images for {batch_size} docs using {add_docs_params.image_download_thread_count} threads"
                     )
             ):
+                # TODO - Refactor this part to make it more readable
+                # We need to pass the subfields to the image downloader, so that it can download the images in the
+                # multimodal subfields even if the subfield is not a tensor_field
+                tensor_fields_and_multimodal_subfields = copy.deepcopy(add_docs_params.tensor_fields) \
+                    if add_docs_params.tensor_fields else []
+                tensor_fields_and_multimodal_subfields.extend(multimodal_sub_fields)
                 image_repo = exit_stack.enter_context(
                     add_docs.download_images(docs=add_docs_params.docs, thread_count=20,
-                                             tensor_fields=add_docs_params.tensor_fields
-                                             if add_docs_params.tensor_fields is not None else None,
+                                             tensor_fields=tensor_fields_and_multimodal_subfields,
                                              image_download_headers=add_docs_params.image_download_headers)
                 )
 
@@ -174,12 +181,18 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
             try:
                 validation.validate_doc(doc)
 
+                if add_docs_params.mappings and multimodal_sub_fields:
+                    unstructured_index_add_doc_validation.validate_coupling_of_mappings_and_doc(
+                        doc, add_docs_params.mappings, multimodal_sub_fields
+                    )
+
                 if "_id" in doc:
                     doc_id = validation.validate_id(doc["_id"])
                     del copied["_id"]
                 else:
                     doc_id = str(uuid.uuid4())
-                [unstructured_vespa_index.validate_field_name(field) for field in copied]
+
+                [unstructured_index_add_doc_validation.validate_field_name(field) for field in copied]
 
             except errors.__InvalidRequestError as err:
                 unsuccessful_docs.append(
@@ -345,6 +358,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
             # All the plain tensor/non-tensor fields are processed, now we process the multimodal fields
             if document_is_valid and add_docs_params.mappings:
                 multimodal_mappings: Dict[str, Dict] = utils.extract_multimodal_mappings(add_docs_params.mappings)
+
                 for field_name, multimodal_params in multimodal_mappings.items():
                     if not utils.is_tensor_field(field_name, add_docs_params.tensor_fields):
                         raise errors.InvalidArgError(f"Multimodal field {field_name} must be a tensor field")
@@ -432,28 +446,21 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                  f"for an average of {(total_vectorise_time / batch_size):.3f}s per doc.")
 
     if bulk_parent_dicts:
+        vespa_docs = [
+            VespaDocument(**unstructured_vespa_index.to_vespa_document(marqo_document=doc))
+            for doc in bulk_parent_dicts
+        ]
         # ADD DOCS TIMER-LOGGER (5)
         start_time_5 = timer()
-        with RequestMetricsStore.for_request().time("add_documents.opensearch._bulk"):
-            # serialised_body = utils.dicts_to_jsonl(bulk_parent_dicts)
-            vespa_docs = [
-                VespaDocument(**unstructured_vespa_index.to_vespa_document(marqo_document=doc))
-                for doc in bulk_parent_dicts
-            ]
+        with RequestMetricsStore.for_request().time("add_documents.vespa._bulk"):
             index_responses = vespa_client.feed_batch(vespa_docs, marqo_index.name)
-        # RequestMetricsStore.for_request().add_time("add_documents.opensearch._bulk.internal",
-        #                                            float(index_parent_response["took"]))
 
         end_time_5 = timer()
         total_http_time = end_time_5 - start_time_5
-        # total_index_time = index_parent_response["took"] * 0.001
         logger.debug(
-            f"      add_documents roundtrip: took {(total_http_time):.3f}s to send {batch_size} docs (roundtrip) to Marqo-os, "
+            f"      add_documents roundtrip: took {(total_http_time):.3f}s to send {batch_size} "
+            f"docs (roundtrip) to vector store, "
             f"for an average of {(total_http_time / batch_size):.3f}s per doc.")
-
-        # logger.debug(
-        #     f"          add_documents Marqo-os index: took {(total_index_time):.3f}s for Marqo-os to index {batch_size} docs, "
-        #     f"for an average of {(total_index_time / batch_size):.3f}s per doc.")
     else:
         index_responses = None
 
@@ -461,7 +468,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
         t1 = timer()
 
         def translate_add_doc_response(responses: Optional[FeedBatchResponse], time_diff: float) -> dict:
-            """translates OpenSearch response dict into Marqo dict"""
+            """translates Vespa response dict into Marqo dict"""
             result_dict = {}
             new_items = []
 
@@ -495,7 +502,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
     # ADD DOCS TIMER-LOGGER (3)
     vespa_client = config.vespa_client
 
-    RequestMetricsStore.for_request().start("add_documents.processing_before_opensearch")
+    RequestMetricsStore.for_request().start("add_documents.processing_before_vespa")
 
     if add_docs_params.tensor_fields is not None:
         raise errors.InvalidArgError('Cannot specify `tensorFields` for a structured index')
@@ -874,7 +881,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                 bulk_parent_dicts.append(copied)
 
     total_preproc_time = 0.001 * RequestMetricsStore.for_request().stop(
-        "add_documents.processing_before_opensearch")
+        "add_documents.processing_before_vespa")
     logger.debug(
         f"      add_documents pre-processing: took {(total_preproc_time):.3f}s total for {batch_size} docs, "
         f"for an average of {(total_preproc_time / batch_size):.3f}s per doc.")
@@ -883,29 +890,22 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                  f"for an average of {(total_vectorise_time / batch_size):.3f}s per doc.")
 
     if bulk_parent_dicts:
+        vespa_index = StructuredVespaIndex(marqo_index)
+        vespa_docs = [
+            VespaDocument(**vespa_index.to_vespa_document(doc))
+            for doc in bulk_parent_dicts
+        ]
         # ADD DOCS TIMER-LOGGER (5)
         start_time_5 = timer()
-        with RequestMetricsStore.for_request().time("add_documents.opensearch._bulk"):
-            # serialised_body = utils.dicts_to_jsonl(bulk_parent_dicts)
-            vespa_index = StructuredVespaIndex(marqo_index)
-            vespa_docs = [
-                VespaDocument(**vespa_index.to_vespa_document(doc))
-                for doc in bulk_parent_dicts
-            ]
+        with RequestMetricsStore.for_request().time("add_documents.vespa._bulk"):
             index_responses = vespa_client.feed_batch(vespa_docs, marqo_index.name)
-        # RequestMetricsStore.for_request().add_time("add_documents.opensearch._bulk.internal",
-        #                                            float(index_parent_response["took"]))
 
         end_time_5 = timer()
         total_http_time = end_time_5 - start_time_5
-        # total_index_time = index_parent_response["took"] * 0.001
+
         logger.debug(
             f"      add_documents roundtrip: took {(total_http_time):.3f}s to send {batch_size} docs (roundtrip) to Marqo-os, "
             f"for an average of {(total_http_time / batch_size):.3f}s per doc.")
-
-        # logger.debug(
-        #     f"          add_documents Marqo-os index: took {(total_index_time):.3f}s for Marqo-os to index {batch_size} docs, "
-        #     f"for an average of {(total_index_time / batch_size):.3f}s per doc.")
     else:
         index_responses = None
 
@@ -913,7 +913,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
         t1 = timer()
 
         def translate_add_doc_response(responses: Optional[FeedBatchResponse], time_diff: float) -> dict:
-            """translates OpenSearch response dict into Marqo dict"""
+            """translates Vespa response dict into Marqo dict"""
             result_dict = {}
             new_items: List[Dict] = []
 
@@ -966,6 +966,10 @@ def get_document_by_id(
             marqo_document[TensorField.tensor_facets] = _get_tensor_facets(marqo_document[constants.MARQO_DOC_TENSORS])
         else:
             marqo_document[TensorField.tensor_facets] = []
+
+    if not show_vectors:
+        if unstructured_common.MARQO_DOC_MULTIMODAL_PARAMS in marqo_document:
+            del marqo_document[unstructured_common.MARQO_DOC_MULTIMODAL_PARAMS]
 
     if constants.MARQO_DOC_TENSORS in marqo_document:
         del marqo_document[constants.MARQO_DOC_TENSORS]
@@ -1131,7 +1135,8 @@ def search(config: Config, index_name: str, text: Union[str, dict],
     # Validation for: result_count (limit) & offset
     # Validate neither is negative
     if result_count <= 0 or (not isinstance(result_count, int)):
-        raise errors.IllegalRequestedDocCount(f"result_count must be an integer greater than 0! Received {result_count}")
+        raise errors.IllegalRequestedDocCount(
+            f"result_count must be an integer greater than 0! Received {result_count}")
 
     if offset < 0:
         raise errors.IllegalRequestedDocCount("search result offset cannot be less than 0!")
