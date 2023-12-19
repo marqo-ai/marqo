@@ -227,84 +227,48 @@ def download_media(
     docs_per_thread = math.ceil(len(docs)/thread_count)
     copied = copy.deepcopy(docs)
     media_repo = dict()
-    m = [RequestMetrics() for _ in range(thread_count)]
-    thread_allocated_docs = [
-        copied[i: i + docs_per_thread] for i in range(len(copied))[::docs_per_thread]
-    ]
-    threads = [
-        threading.Thread(
-            target=threaded_download_media, 
-            args=(
-                allocation, 
-                media_repo,
-                media_type,
-                tensor_fields, 
-                non_tensor_fields, 
-                download_headers, 
-                m[i],
-                timeout_seconds
-            )
-        ) for i, allocation in enumerate(thread_allocated_docs)
-    ]
-
-    # [th.start()for th in threads]
-
-    # [th.join()for th in threads]
-
-    for th in threads:
-        th.start()
     
-    for th in threads:
-        th.join()
+    try:
+        m = [RequestMetrics() for _ in range(thread_count)]
+        thread_allocated_docs = [
+            copied[i: i + docs_per_thread] for i in range(len(copied))[::docs_per_thread]
+        ]
+        threads = [
+            threading.Thread(
+                target=threaded_download_media, 
+                args=(
+                    allocation, 
+                    media_repo,
+                    media_type,
+                    tensor_fields, 
+                    non_tensor_fields, 
+                    download_headers, 
+                    m[i],
+                    timeout_seconds
+                )
+            ) for i, allocation in enumerate(thread_allocated_docs)
+        ]
 
+        # [th.start()for th in threads]
 
-    # Fix up metric_obj to make it not mention thread-ids
-    metric_obj = RequestMetricsStore.for_request()
-    metric_obj = RequestMetrics.reduce_from_list([metric_obj] + m)
-    metric_obj.times = reduce_thread_metrics(metric_obj.times)
+        # [th.join()for th in threads]
 
-    yield media_repo
-    # try:
-    #     m = [RequestMetrics() for _ in range(thread_count)]
-    #     thread_allocated_docs = [
-    #         copied[i: i + docs_per_thread] for i in range(len(copied))[::docs_per_thread]
-    #     ]
-    #     threads = [
-    #         threading.Thread(
-    #             target=threaded_download_media, 
-    #             args=(
-    #                 allocation, 
-    #                 media_repo,
-    #                 media_type,
-    #                 tensor_fields, 
-    #                 non_tensor_fields, 
-    #                 download_headers, 
-    #                 m[i],
-    #                 timeout_seconds
-    #             )
-    #         ) for i, allocation in enumerate(thread_allocated_docs)
-    #     ]
-
-    #     # [th.start()for th in threads]
-
-    #     # [th.join()for th in threads]
-
-    #     for th in threads:
-    #         th.start()
+        for th in threads:
+            th.start()
         
-    #     for th in threads:
-    #         th.join()
+        for th in threads:
+            th.join()
 
 
-    #     # Fix up metric_obj to make it not mention thread-ids
-    #     metric_obj = RequestMetricsStore.for_request()
-    #     metric_obj = RequestMetrics.reduce_from_list([metric_obj] + m)
-    #     metric_obj.times = reduce_thread_metrics(metric_obj.times)
-    #     yield media_repo
-    # finally:
-    #     for p in media_repo.values():
-    #         if isinstance(p, ImageFile):
-    #             p.close()
+        # Fix up metric_obj to make it not mention thread-ids
+        metric_obj = RequestMetricsStore.for_request()
+        metric_obj = RequestMetrics.reduce_from_list([metric_obj] + m)
+        metric_obj.times = reduce_thread_metrics(metric_obj.times)
+        yield media_repo
+    finally:
+        for p in media_repo.values():
+            if isinstance(p, ImageFile):
+                p.close()
 
 def reduce_thread_metrics(data):
     """Reduce the metrics from each thread, as if they were run in a single thread.
