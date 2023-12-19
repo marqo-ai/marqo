@@ -142,6 +142,7 @@ def load_audio_from_path(
                 f"audio url `{audio_path}` is unreachable, perhaps due to timeout. "
                 f"Timeout threshold is set to {timeout} seconds."
                 f"\nConnection error type: `{e.__class__.__name__}`"
+                f"\nConnection error message: `{e}`"
             )
     else:
         raise ValueError(
@@ -305,6 +306,9 @@ class LAION_CLAP(CLAP):
     ) -> FloatTensor:
         with torch.no_grad():
             inputs = self.processor(text=sentence, return_tensors="pt")
+            for k in inputs.keys():
+                if isinstance(inputs[k], torch.Tensor):
+                    inputs[k] = inputs[k].to(self.device)
             outputs = self.model.get_text_features(**inputs)
 
         if normalize:
@@ -337,6 +341,9 @@ class LAION_CLAP(CLAP):
                 return_tensors="pt", 
                 sampling_rate=self.sample_rate
             )
+            for k in inputs.keys():
+                if isinstance(inputs[k], torch.Tensor):
+                    inputs[k] = inputs[k].to(self.device)
             outputs = self.model.get_audio_features(**inputs)
 
         if normalize:

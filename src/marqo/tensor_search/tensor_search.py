@@ -430,6 +430,9 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
     with ExitStack() as exit_stack:
         is_images = index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_images]
         is_audios = index_info.index_settings[NsField.index_defaults][NsField.treat_urls_and_pointers_as_audio]
+
+        print("IS IMAGES:", is_images)
+        print("IS AUDIOS:", is_audios)
         media_type = None
         if is_images:
             media_type = MediaType.image
@@ -457,6 +460,8 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                         download_headers=add_docs_params.download_headers
                     )
                 )
+                print("MEDIA REPO:", media_repo)
+
         if add_docs_params.use_existing_tensors:
             doc_ids = []
 
@@ -575,7 +580,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
 
                 # Chunking and vectorising phase (only if content changed).
                 # C) Standard document field type
-                elif isinstance(field_content, (str, Image.Image)):
+                elif isinstance(field_content, (str, Image.Image, np.ndarray)):
 
                     # TODO: better/consistent handling of a no-op for processing (but still vectorize)
 
@@ -583,7 +588,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                     # 2. check if it is a url or pointer
                     # 3. If yes in 1 and 2, download blindly (without type)
                     # 4. Determine media type of downloaded
-                    # 5. load correct media type into memory -> PIL (images), videos (), audio (torchaudio)
+                    # 5. load correct media type into memory -> PIL (images), videos (), audio (librosa)
                     # 6. if chunking -> then add the extra chunker
 
                     if isinstance(field_content, str) and not _is_image(field_content):
@@ -617,7 +622,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
                         print("AUDIO METHOD:", audio_method)
                         # the chunk_image contains the no-op logic as of now - method = None will be a no-op
                         try:
-                            if isinstance(field_content, str):
+                            if isinstance(field_content, str) and (is_images or is_audios):
                                 if not isinstance(media_repo[field_content], Exception):
                                     media_data = media_repo[field_content]
                                 else:
@@ -2369,7 +2374,7 @@ def vectorise_multimodal_combination_field(
             with RequestMetricsStore.for_request().time(f"create_vectors"):
                 image_vectors = s2_inference.vectorise(
                     model_name=index_info.model_name,
-                    model_properties=index_info.get_model_properties(), content=image_content_to_vectorise,
+                    model_properties=index_info.get_model_properties(), content=media_content_to_vectorise,
                     device=device, normalize_embeddings=normalize_embeddings,
                     infer=infer_if_media, model_auth=model_auth
                 )
