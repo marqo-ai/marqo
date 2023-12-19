@@ -161,8 +161,9 @@ class StructuredVespaSchema(VespaSchema):
     def _generate_max_similarity_expression(self, tensor_fields: List[TensorField]) -> str:
         """
         Recursively generate max closeness expression for all tensor fields.
-        Because max
-        If more than 2, get max of first and (max of the rest).
+        Max is a binary operator, so for more than 2 fields this method gets max of:
+        1) first field
+        2) max of the rest of the fields.
         """
 
         # Base cases
