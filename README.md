@@ -295,7 +295,7 @@ response = mq.index("my-multimodal-index").add_documents([{
     "My Image": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
     "Description": "The hippopotamus, also called the common hippopotamus or river hippopotamus, is a large semiaquatic mammal native to sub-Saharan Africa",
     "_id": "hippo-facts"
-}], tensor_fields=["Description"])
+}], tensor_fields=["My Image"])
 
 ```
 
