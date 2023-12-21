@@ -428,7 +428,7 @@ mq.index("my-first-multimodal-index").add_documents(
     },
     # We specify which fields to create vectors for. 
     # Note that captioned_image is treated as a single field.
-    tensor_fields=["caption"]
+    tensor_fields=["captioned_image"]
 )
 
 # Search this index with a simple text query
