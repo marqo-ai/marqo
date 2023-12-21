@@ -26,6 +26,8 @@ class SearchQuery(BaseMarqoModel):
     searchMethod: Union[None, str] = "TENSOR"
     limit: int = 10
     offset: int = 0
+    efSearch: Optional[int] = None
+    approximate: Optional[bool] = None
     showHighlights: bool = True
     reRanker: str = None
     filter: str = None

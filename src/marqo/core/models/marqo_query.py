@@ -53,6 +53,8 @@ class MarqoTensorQuery(MarqoQuery):
     ef_search: Optional[int] = None
     approximate: bool = True
 
+    # TODO - validate that ef_search >= offset+limit if provided
+
 
 class MarqoLexicalQuery(MarqoQuery):
     or_phrases: List[str]

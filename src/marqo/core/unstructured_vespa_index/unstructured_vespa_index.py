@@ -1,20 +1,16 @@
 from typing import Dict, Any, Optional
-import copy
 
-from marqo.core.models import MarqoQuery
-from marqo.core.models.marqo_index import UnstructuredMarqoIndex
-from marqo.core.vespa_index import VespaIndex
-from marqo.core.unstructured_vespa_index import common as unstructured_common
-from marqo.core.unstructured_vespa_index.unstructured_document import UnstructuredVespaDocument
-from marqo.core.models.marqo_query import (MarqoTensorQuery, MarqoLexicalQuery, MarqoHybridQuery,
-                                           ScoreModifierType, ScoreModifier)
-from marqo.core.exceptions import UnsupportedFeatureError
-from marqo.exceptions import InternalError
+import marqo.core.constants as index_constants
 import marqo.core.search.search_filter as search_filter
 from marqo import errors
-import marqo.core.constants as index_constants
-from marqo.tensor_search import constants as tensor_search_constants
-from marqo.tensor_search import enums
+from marqo.core.models import MarqoQuery
+from marqo.core.models.marqo_index import UnstructuredMarqoIndex
+from marqo.core.models.marqo_query import (MarqoTensorQuery, MarqoLexicalQuery, MarqoHybridQuery,
+                                           ScoreModifierType)
+from marqo.core.unstructured_vespa_index import common as unstructured_common
+from marqo.core.unstructured_vespa_index.unstructured_document import UnstructuredVespaDocument
+from marqo.core.vespa_index import VespaIndex
+from marqo.exceptions import InternalError
 
 
 class UnstructuredVespaIndex(VespaIndex):
@@ -90,10 +86,15 @@ class UnstructuredVespaIndex(VespaIndex):
         return query
 
     @staticmethod
-    def _get_tensor_search_term(marqo_query: MarqoQuery) -> str:
+    def _get_tensor_search_term(marqo_query: MarqoTensorQuery) -> str:
         field_to_search = unstructured_common.VESPA_DOC_EMBEDDINGS
 
-        return (f"({{targetHits:{marqo_query.limit}, approximate:{str(marqo_query.approximate)}}}"
+        if marqo_query.ef_search is not None:
+            additional_hits = f' hnsw.exploreAdditionalHits:{marqo_query.ef_search - marqo_query.limit}'
+        else:
+            additional_hits = ''
+
+        return (f"({{targetHits:{marqo_query.limit}, approximate:{str(marqo_query.approximate)}{additional_hits}}}"
                 f"nearestNeighbor({field_to_search}, {unstructured_common.QUERY_INPUT_EMBEDDING}))")
 
     @classmethod

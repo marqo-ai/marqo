@@ -1094,7 +1094,9 @@ def rerank_query(query: BulkSearchQueryEntity, result: Dict[str, Any], reranker:
 
 
 def search(config: Config, index_name: str, text: Union[str, dict],
-           result_count: int = 3, offset: int = 0, highlights: object = True,
+           result_count: int = 3, offset: int = 0,
+           highlights: bool = True, ef_search: Optional[int] = None,
+           approximate: Optional[bool] = None,
            search_method: Union[str, SearchMethod, None] = SearchMethod.TENSOR,
            searchable_attributes: Iterable[str] = None, verbose: int = 0,
            reranker: Union[str, Dict] = None, filter: str = None,
@@ -1178,14 +1180,25 @@ def search(config: Config, index_name: str, text: Union[str, dict],
         selected_device = device
 
     if search_method.upper() == SearchMethod.TENSOR:
+        # Default to approximate, but we can't set it at API since it's not a valid arg for lexical search
+        if approximate is None:
+            approximate = True
+
         search_result = _vector_text_search(
             config=config, index_name=index_name, query=text, result_count=result_count, offset=offset,
-            searchable_attributes=searchable_attributes,
+            ef_search=ef_search, approximate=approximate, searchable_attributes=searchable_attributes,
             filter_string=filter, device=selected_device, attributes_to_retrieve=attributes_to_retrieve, boost=boost,
             image_download_headers=image_download_headers, context=context, score_modifiers=score_modifiers,
             model_auth=model_auth, highlights=highlights
         )
     elif search_method.upper() == SearchMethod.LEXICAL:
+        if ef_search is not None:
+            raise errors.InvalidArgError(
+                f"efSearch is not a valid argument for lexical search")
+        if approximate is not None:
+            raise errors.InvalidArgError(
+                f"approximate is not a valid argument for lexical search")
+
         search_result = _lexical_search(
             config=config, index_name=index_name, text=text, result_count=result_count, offset=offset,
             searchable_attributes=searchable_attributes, verbose=verbose,
@@ -1590,6 +1603,7 @@ def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity],
 
 def _vector_text_search(
         config: Config, index_name: str, query: Union[str, dict], result_count: int = 5, offset: int = 0,
+        ef_search: Optional[int] = None, approximate: bool = True,
         searchable_attributes: Iterable[str] = None, filter_string: str = None, device: str = None,
         attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None,
         image_download_headers: Optional[Dict] = None, context: Optional[Dict] = None,
@@ -1658,6 +1672,8 @@ def _vector_text_search(
         vector_query=vectorised_text,
         filter=filter_string,
         limit=result_count,
+        ef_search=ef_search,
+        approximate=approximate,
         offset=offset,
         searchable_attributes=searchable_attributes,
         attributes_to_retrieve=attributes_to_retrieve,
