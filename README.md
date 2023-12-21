@@ -67,7 +67,7 @@ mq.index("my-first-index").add_documents([
                        "mobility, life support, and communications for astronauts",
         "_id": "article_591"
     }],
-    tensor_fields=["Title", "Description"]
+    tensor_fields=["Description"]
 )
 
 results = mq.index("my-first-index").search(
@@ -186,7 +186,7 @@ mq.index("my-first-index").add_documents([
                        "mobility, life support, and communications for astronauts",
         "_id": "article_591"
     }],
-    tensor_fields=["Title", "Description"]
+    tensor_fields=["Description"]
 )
 
 results = mq.index("my-first-index").search(
@@ -295,7 +295,7 @@ response = mq.index("my-multimodal-index").add_documents([{
     "My Image": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
     "Description": "The hippopotamus, also called the common hippopotamus or river hippopotamus, is a large semiaquatic mammal native to sub-Saharan Africa",
     "_id": "hippo-facts"
-}], tensor_fields=["My Image", "Description"])
+}], tensor_fields=["Description"])
 
 ```
 
@@ -349,7 +349,7 @@ mq.index("my-weighted-query-index").add_documents(
             "The last known of its species died in 1936.",
         },
     ],
-    tensor_fields=["Title", "Description"]
+    tensor_fields=["Description"]
 )
 
 # initially we ask for a type of communications device which is popular in the 21st century
@@ -428,7 +428,7 @@ mq.index("my-first-multimodal-index").add_documents(
     },
     # We specify which fields to create vectors for. 
     # Note that captioned_image is treated as a single field.
-    tensor_fields=["Title", "captioned_image"]
+    tensor_fields=["caption"]
 )
 
 # Search this index with a simple text query
