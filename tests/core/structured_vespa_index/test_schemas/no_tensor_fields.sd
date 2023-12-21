@@ -12,6 +12,9 @@
             indexing: summary
         }
         field marqo__score_modifiers type tensor<float>(p {}) { indexing: attribute | summary}
+        field marqo__vector_count type int{
+            indexing: attribute | summary
+        }
     }
         rank-profile bm25 inherits default {
             inputs {
