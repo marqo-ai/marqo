@@ -299,7 +299,7 @@ response = mq.index("my-multimodal-index").add_documents([{
 
 ```
 
-You can then search using text as usual. Both text and image fields will be searched:
+You can then search using text as usual.
 
 ```python
 
