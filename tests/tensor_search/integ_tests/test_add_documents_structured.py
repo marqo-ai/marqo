@@ -1,8 +1,10 @@
 import functools
 import math
 import os
+import threading
 import uuid
 from unittest import mock
+from unittest.mock import patch
 
 import PIL
 import pytest
@@ -848,3 +850,27 @@ class TestAddDocumentsStructured(MarqoTestCase):
 
             # Context manager must have closed all valid images
             assert mock_close.call_count == 2
+
+    def test_download_images_thread_count(self):
+        """
+        Test that image download thread count is respected
+        """
+        docs = [
+            {"_id": str(i),
+             "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/"
+                            "assets/ai_hippo_realistic.png"
+             } for i in range(10)
+        ]
+
+        for thread_count in [2, 5]:
+            with patch.object(
+                    add_docs, 'threaded_download_images', wraps=add_docs.threaded_download_images
+            ) as mock_download_images:
+                tensor_search.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=self.index_name_img_no_chunking, docs=docs, device="cpu",
+                        image_download_thread_count=thread_count
+                    )
+                )
+
+                self.assertEqual(thread_count, mock_download_images.call_count)
