@@ -90,7 +90,7 @@ class UnstructuredVespaIndex(VespaIndex):
         field_to_search = unstructured_common.VESPA_DOC_EMBEDDINGS
 
         if marqo_query.ef_search is not None:
-            additional_hits = f' hnsw.exploreAdditionalHits:{marqo_query.ef_search - marqo_query.limit}'
+            additional_hits = f', hnsw.exploreAdditionalHits:{marqo_query.ef_search - marqo_query.limit}'
         else:
             additional_hits = ''
 

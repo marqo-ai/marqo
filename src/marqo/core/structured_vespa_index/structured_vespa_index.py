@@ -310,7 +310,7 @@ class StructuredVespaIndex(VespaIndex):
             fields_to_search = self._marqo_index.tensor_field_map.keys()
 
         if marqo_query.ef_search is not None:
-            additional_hits = f' hnsw.exploreAdditionalHits:{marqo_query.ef_search - marqo_query.limit}'
+            additional_hits = f', hnsw.exploreAdditionalHits:{marqo_query.ef_search - marqo_query.limit}'
         else:
             additional_hits = ''
 
