@@ -144,6 +144,7 @@ def search(search_query: SearchQuery, index_name: str, device: str = Depends(api
             searchable_attributes=search_query.searchableAttributes,
             search_method=search_query.searchMethod,
             result_count=search_query.limit, offset=search_query.offset,
+            ef_search=search_query.efSearch, approximate=search_query.approximate,
             reranker=search_query.reRanker,
             filter=search_query.filter, device=device,
             attributes_to_retrieve=search_query.attributesToRetrieve, boost=search_query.boost,
