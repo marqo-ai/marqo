@@ -1693,6 +1693,13 @@ def _vector_text_search(
                                                 ):
         responses = config.vespa_client.query(**vespa_query)
 
+    if not approximate and (responses.root.coverage.coverage < 100 or responses.root.coverage.degraded is not None):
+        raise errors.InternalError(
+            f'Graceful degradation detected for non-approximate search. '
+            f'Coverage is not 100%: {responses.root.coverage}'
+            f'Degraded: {str(responses.root.coverage.degraded)}'
+        )
+
     # SEARCH TIMER-LOGGER (post-processing)
     RequestMetricsStore.for_request().start("search.vector.postprocess")
     gathered_docs = gather_documents_from_response(responses, marqo_index, highlights, attributes_to_retrieve)
