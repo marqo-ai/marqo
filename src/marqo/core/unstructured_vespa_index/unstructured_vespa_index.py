@@ -265,7 +265,8 @@ class UnstructuredVespaIndex(VespaIndex):
         return {
             'yql': f'select {unstructured_common.FIELD_VECTOR_COUNT} from {self._marqo_index.name} '
                    f'where true limit 0 | all(group(1) each(output(sum({unstructured_common.FIELD_VECTOR_COUNT}))))',
-            'model_restrict': self._marqo_index.name
+            'model_restrict': self._marqo_index.name,
+            'timeout': 0
         }
 
     @classmethod
