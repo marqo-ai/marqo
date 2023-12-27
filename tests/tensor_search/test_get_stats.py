@@ -14,16 +14,10 @@ class TestGetStats(MarqoTestCase):
     def setUp(self) -> None:
         self.generic_header = {"Content-type": "application/json"}
         self.index_name_1 = "my-test-index-1"
-        try:
-            tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
-        except IndexNotFoundError as s:
-            pass
+        self.clear_index_by_name(self.index_name_1)
 
     def tearDown(self) -> None:
-        try:
-            tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
-        except IndexNotFoundError as s:
-            pass
+        self.clear_index_by_name(self.index_name_1)
 
     def test_get_stats_empty(self):
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
