@@ -83,6 +83,10 @@ class UnstructuredVespaIndex(VespaIndex):
         }
         query = {k: v for k, v in query.items() if v is not None}
 
+        if not marqo_query.approximate:
+            query['ranking.softtimeout.enable'] = False
+            query['timeout'] = 0
+
         return query
 
     @staticmethod
