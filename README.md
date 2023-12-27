@@ -299,7 +299,7 @@ response = mq.index("my-multimodal-index").add_documents([{
 
 ```
 
-You can then search using text as usual.
+You can then search the image field using text.
 
 ```python
 
@@ -347,7 +347,7 @@ mq.index("my-weighted-query-index").add_documents(
             "Description": "The thylacine, also commonly known as the Tasmanian tiger or Tasmanian wolf, "
             "is an extinct carnivorous marsupial."
             "The last known of its species died in 1936.",
-        },
+        }
     ],
     tensor_fields=["Description"]
 )
@@ -357,7 +357,7 @@ query = {
     # a weighting of 1.1 gives this query slightly more importance
     "I need to buy a communications device, what should I get?": 1.1,
     # a weighting of 1 gives this query a neutral importance
-    "Technology that became prevelant in the 21st century": 1.0,
+    "Technology that became prevelant in the 21st century": 1.0
 }
 
 results = mq.index("my-weighted-query-index").search(q=query)
@@ -370,7 +370,7 @@ query = {
     # a weighting of 1 gives this query a neutral importance
     "I need to buy a communications device, what should I get?": 1.0,
     # a weighting of -1 gives this query a negation effect
-    "Technology that became prevelant in the 21st century": -1.0,
+    "Technology that became prevelant in the 21st century": -1.0
 }
 
 results = mq.index("my-weighted-query-index").search(q=query)
@@ -422,8 +422,8 @@ mq.index("my-first-multimodal-index").add_documents(
             "type": "multimodal_combination",
             "weights": {
                 "caption": 0.3,
-                "image": 0.7,
-            },
+                "image": 0.7
+            }
         }
     },
     # We specify which fields to create vectors for. 
@@ -433,7 +433,7 @@ mq.index("my-first-multimodal-index").add_documents(
 
 # Search this index with a simple text query
 results = mq.index("my-first-multimodal-index").search(
-    q="Give me some images of vehicles and modes of transport. I am especially interested in air travel and commercial aeroplanes.",
+    q="Give me some images of vehicles and modes of transport. I am especially interested in air travel and commercial aeroplanes."
 )
 
 print("Query 1:")
@@ -443,14 +443,14 @@ pprint.pprint(results)
 results = mq.index("my-first-multimodal-index").search(
     q={
         "What are some vehicles and modes of transport?": 1.0,
-        "Aeroplanes and other things that fly": -1.0,
+        "Aeroplanes and other things that fly": -1.0
     },
 )
 print("\nQuery 2:")
 pprint.pprint(results)
 
 results = mq.index("my-first-multimodal-index").search(
-    q={"Animals of the Perissodactyla order": -1.0},
+    q={"Animals of the Perissodactyla order": -1.0}
 )
 print("\nQuery 3:")
 pprint.pprint(results)
