@@ -85,7 +85,7 @@ class UnstructuredVespaIndex(VespaIndex):
 
         if not marqo_query.approximate:
             query['ranking.softtimeout.enable'] = False
-            query['timeout'] = 0
+            query['timeout'] = '300s'
 
         return query
 
@@ -266,7 +266,7 @@ class UnstructuredVespaIndex(VespaIndex):
             'yql': f'select {unstructured_common.FIELD_VECTOR_COUNT} from {self._marqo_index.name} '
                    f'where true limit 0 | all(group(1) each(output(sum({unstructured_common.FIELD_VECTOR_COUNT}))))',
             'model_restrict': self._marqo_index.name,
-            'timeout': 0
+            'timeout': '5s'
         }
 
     @classmethod
