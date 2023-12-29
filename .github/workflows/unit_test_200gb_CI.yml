@@ -73,15 +73,19 @@ jobs:
           # override base requirements with marqo requirements, if needed: 
           pip install -r marqo/requirements.txt
           pip install pytest==7.4.0
-      
-      - name: start Marqo-os
+
+      - name: Start Vespa (needs testing)
         run: |
-          export LOCAL_OPENSEARCH_URL="https://localhost:9200"
-          docker run --name marqo-os -d -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" marqoai/marqo-os:0.0.3 || exit
+          export VESPA_CONFIG_URL=http://localhost:19071
+          export VESPA_DOCUMENT_URL=http://localhost:8080
+          export VESPA_QUERY_URL=http://localhost:8080
+          python marqo/scripts/vespa_local.py start
+          python marqo/scripts/vespa_local.py deploy-config
           
-          # wait for marqo-os to start:
-          timeout 10m bash -c 'until [[ $(curl -v --silent --insecure $LOCAL_OPENSEARCH_URL 2>&1 | grep Unauthorized) ]]; do sleep 0.1; done;' || \
-            (echo "Marqo-os did not start in time" && exit 1)
+          # wait vespa to start:
+          timeout 10m bash -c 'until [[ $(curl -v --silent --insecure $VESPA_DOCUMENT_URL 2>&1 | grep Unauthorized) ]]; do sleep 0.1; done;' || \
+            (echo "Vespa did not start in time" && exit 1)
+          
           
       - name: Run Unit Tests
         run: |
