@@ -238,10 +238,9 @@ def check_index_health(index_name: str, marqo_config: config.Config = Depends(ge
 @app.get("/indexes")
 def get_indexes(marqo_config: config.Config = Depends(get_config)):
     indexes = marqo_config.index_management.get_all_indexes()
-
     return {
         'results': [
-            {'index_name': index.name for index in indexes}
+            {'indexName': index.name} for index in indexes
         ]
     }
 
