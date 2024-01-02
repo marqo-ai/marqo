@@ -1400,7 +1400,7 @@ def assign_query_to_vector_job(
     for i, grouped_content in enumerate(grouped_content):
         content_type = 'text' if i == 0 else 'image'
         vector_job = VectorisedJobs(
-            model_name=index_info.name,
+            model_name=index_info.model.name,
             model_properties=index_info.model.get_properties(),
             content=grouped_content,
             device=device,
