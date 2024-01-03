@@ -130,10 +130,12 @@ def add_docs_params_orchestrator(index_name: str, body: Union[AddDocsBodyParams,
     use_existing_tensors = body.useExistingTensors
     model_auth = body.modelAuth
     image_download_headers = body.imageDownloadHeaders
+    image_download_thread_count = body.imageDownloadThreadCount
 
     return AddDocsParams(
         index_name=index_name, docs=docs, auto_refresh=auto_refresh,
         device=device, tensor_fields=tensor_fields,
         use_existing_tensors=use_existing_tensors, image_download_headers=image_download_headers,
+        image_download_thread_count=image_download_thread_count,
         mappings=mappings, model_auth=model_auth
     )

@@ -27,6 +27,7 @@ class AddDocsBodyParams(BaseModel):
     modelAuth: Optional[ModelAuth] = None
     mappings: Optional[dict] = None
     documents: Union[Sequence[Union[dict, Any]], np.ndarray]
+    imageDownloadThreadCount: int = 20
 
 
 class AddDocsParams(BaseModel):
