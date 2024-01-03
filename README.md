@@ -67,7 +67,7 @@ mq.index("my-first-index").add_documents([
                        "mobility, life support, and communications for astronauts",
         "_id": "article_591"
     }],
-    tensor_fields=["Title", "Description"]
+    tensor_fields=["Description"]
 )
 
 results = mq.index("my-first-index").search(
@@ -148,7 +148,7 @@ This integration lets you leverage open source or custom fine tuned models throu
 
 1. Marqo requires docker. To install Docker go to the [Docker Official website](https://docs.docker.com/get-docker/). Ensure that docker has at least 8GB memory and 50GB storage.
 
-2. Use docker to run Marqo (Mac users with M-series chips will need to [go here](#m-series-mac-users)):
+2. Use docker to run Marqo:
 
 ```bash
 
@@ -186,7 +186,7 @@ mq.index("my-first-index").add_documents([
                        "mobility, life support, and communications for astronauts",
         "_id": "article_591"
     }],
-    tensor_fields=["Title", "Description"]
+    tensor_fields=["Description"]
 )
 
 results = mq.index("my-first-index").search(
@@ -295,11 +295,11 @@ response = mq.index("my-multimodal-index").add_documents([{
     "My Image": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
     "Description": "The hippopotamus, also called the common hippopotamus or river hippopotamus, is a large semiaquatic mammal native to sub-Saharan Africa",
     "_id": "hippo-facts"
-}], tensor_fields=["My Image", "Description"])
+}], tensor_fields=["My Image"])
 
 ```
 
-You can then search using text as usual. Both text and image fields will be searched:
+You can then search the image field using text.
 
 ```python
 
@@ -347,9 +347,9 @@ mq.index("my-weighted-query-index").add_documents(
             "Description": "The thylacine, also commonly known as the Tasmanian tiger or Tasmanian wolf, "
             "is an extinct carnivorous marsupial."
             "The last known of its species died in 1936.",
-        },
+        }
     ],
-    tensor_fields=["Title", "Description"]
+    tensor_fields=["Description"]
 )
 
 # initially we ask for a type of communications device which is popular in the 21st century
@@ -357,7 +357,7 @@ query = {
     # a weighting of 1.1 gives this query slightly more importance
     "I need to buy a communications device, what should I get?": 1.1,
     # a weighting of 1 gives this query a neutral importance
-    "Technology that became prevelant in the 21st century": 1.0,
+    "Technology that became prevelant in the 21st century": 1.0
 }
 
 results = mq.index("my-weighted-query-index").search(q=query)
@@ -370,7 +370,7 @@ query = {
     # a weighting of 1 gives this query a neutral importance
     "I need to buy a communications device, what should I get?": 1.0,
     # a weighting of -1 gives this query a negation effect
-    "Technology that became prevelant in the 21st century": -1.0,
+    "Technology that became prevelant in the 21st century": -1.0
 }
 
 results = mq.index("my-weighted-query-index").search(q=query)
@@ -422,18 +422,18 @@ mq.index("my-first-multimodal-index").add_documents(
             "type": "multimodal_combination",
             "weights": {
                 "caption": 0.3,
-                "image": 0.7,
-            },
+                "image": 0.7
+            }
         }
     },
     # We specify which fields to create vectors for. 
     # Note that captioned_image is treated as a single field.
-    tensor_fields=["Title", "captioned_image"]
+    tensor_fields=["captioned_image"]
 )
 
 # Search this index with a simple text query
 results = mq.index("my-first-multimodal-index").search(
-    q="Give me some images of vehicles and modes of transport. I am especially interested in air travel and commercial aeroplanes.",
+    q="Give me some images of vehicles and modes of transport. I am especially interested in air travel and commercial aeroplanes."
 )
 
 print("Query 1:")
@@ -443,14 +443,14 @@ pprint.pprint(results)
 results = mq.index("my-first-multimodal-index").search(
     q={
         "What are some vehicles and modes of transport?": 1.0,
-        "Aeroplanes and other things that fly": -1.0,
+        "Aeroplanes and other things that fly": -1.0
     },
 )
 print("\nQuery 2:")
 pprint.pprint(results)
 
 results = mq.index("my-first-multimodal-index").search(
-    q={"Animals of the Perissodactyla order": -1.0},
+    q={"Animals of the Perissodactyla order": -1.0}
 )
 print("\nQuery 3:")
 pprint.pprint(results)
