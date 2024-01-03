@@ -18,8 +18,6 @@ from marqo.tensor_search import tensor_search, utils
 from marqo.tensor_search.enums import RequestType, EnvVars
 from marqo.tensor_search.models.add_docs_objects import (AddDocsBodyParams)
 from marqo.tensor_search.models.api_models import SearchQuery
-from marqo.tensor_search.models.index_settings import IndexSettings
-from marqo.tensor_search.models.api_models import BulkSearchQuery, SearchQuery
 from marqo.tensor_search.models.index_settings import IndexSettings, IndexSettingsWithName
 from marqo.tensor_search.on_start_script import on_start
 from marqo.tensor_search.telemetry import RequestMetricsStore, TelemetryMiddleware
@@ -312,9 +310,6 @@ def delete_all_documents(index_name: str, marqo_config: config.Config = Depends(
     document_count: int = marqo_config.document.delete_all_docs(index_name=index_name)
 
     return {"documentCount": document_count}
-
-
-
 
 
 if __name__ == "__main__":
