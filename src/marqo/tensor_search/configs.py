@@ -10,6 +10,7 @@ def default_env_vars() -> dict:
         EnvVars.VESPA_CONFIG_URL: "http://localhost:19071",
         EnvVars.VESPA_QUERY_URL: "http://localhost:8080",
         EnvVars.VESPA_DOCUMENT_URL: "http://localhost:8080",
+        EnvVars.VESPA_CONTENT_CLUSTER_NAME: "content_default",
         EnvVars.VESPA_POOL_SIZE: 10,
         EnvVars.MARQO_MAX_INDEX_FIELDS: None,
         EnvVars.MARQO_MAX_DOC_BYTES: 100000,

@@ -37,7 +37,10 @@ class UnstructuredVespaIndex(VespaIndex):
 
     def to_vespa_query(self, marqo_query: MarqoQuery) -> Dict[str, Any]:
         if marqo_query.searchable_attributes is not None:
-            raise errors.InvalidArgError("searchable_attributes is not supported for an unstructured index")
+            # TODO Add a marqo doc link here on how to create a structured index
+            raise errors.InvalidArgError('searchable_attributes is not supported for an unstructured index. '
+                                         'You can create a structured index '
+                                         'by `mq.create_index("your_index_name", type="structured")`')
 
         if isinstance(marqo_query, MarqoTensorQuery):
             return self._to_vespa_tensor_query(marqo_query)
@@ -278,7 +281,7 @@ class UnstructuredVespaIndex(VespaIndex):
         else:
             raise errors.InvalidArgError(
                 f"Field content `{field_content}` \n"
-                f"of type `{type(field_content).__name__}` is not of valid content type!"
+                f"of type `{type(field_content).__name__}` is not of valid content type! "
                 f"Allowed content types: {[ty.__name__ for ty in cls._SUPPORTED_FIELD_CONTENT_TYPES]}"
             )
 
@@ -298,33 +301,4 @@ class UnstructuredVespaIndex(VespaIndex):
                 f"Lists cannot be tensor fields"
             )
 
-        return
-
-    @classmethod
-    def validate_field_name(cls, field_name: str) -> None:
-        if not field_name:
-            raise errors.InvalidFieldNameError("field name can't be empty! ")
-        if not isinstance(field_name, str):
-            raise errors.InvalidFieldNameError("field name must be str!")
-        if field_name.startswith(enums.TensorField.vector_prefix):
-            raise errors.InvalidFieldNameError(
-                f"can't start field name with protected prefix {enums.TensorField.vector_prefix}."
-                f" Error raised for field name: {field_name}")
-        if field_name.startswith(enums.TensorField.chunks):
-            raise errors.InvalidFieldNameError(f"can't name field with protected field name {enums.TensorField.chunks}."
-                                               f" Error raised for field name: {field_name}")
-        char_validation = [(c, c not in tensor_search_constants.ILLEGAL_CUSTOMER_FIELD_NAME_CHARS)
-                           for c in field_name]
-        char_validation_failures = [c for c in char_validation if not c[1]]
-        if char_validation_failures:
-            raise errors.InvalidFieldNameError(F"Illegal character '{char_validation_failures[0][0]}' "
-                                               F"detected in field name {field_name}")
-        if field_name in enums.TensorField.__dict__.values():
-            raise errors.InvalidFieldNameError(
-                f"field name can't be a protected field. Please rename this field: {field_name}")
-        if cls._RESERVED_FIELD_SUBSTRING in field_name:
-            raise errors.InvalidFieldNameError(
-                f"Field name {field_name} contains the reserved substring {cls._RESERVED_FIELD_SUBSTRING}. This is a "
-                f"reserved substring and cannot be used in field names for unstructured marqo index."
-            )
         return

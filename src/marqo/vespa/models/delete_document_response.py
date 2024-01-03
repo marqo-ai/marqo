@@ -18,3 +18,8 @@ class DeleteBatchDocumentResponse(BaseModel):
 class DeleteBatchResponse(BaseModel):
     responses: List[DeleteBatchDocumentResponse]
     errors: bool
+
+
+class DeleteAllDocumentsResponse(BaseModel):
+    path_id: str = Field(alias='pathId')
+    document_count: int = Field(alias='documentCount')

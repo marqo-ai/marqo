@@ -34,6 +34,7 @@ def generate_config() -> config.Config:
         query_url=utils.read_env_vars_and_defaults(EnvVars.VESPA_QUERY_URL),
         document_url=utils.read_env_vars_and_defaults(EnvVars.VESPA_DOCUMENT_URL),
         pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_POOL_SIZE),
+        content_cluster_name=utils.read_env_vars_and_defaults(EnvVars.VESPA_CONTENT_CLUSTER_NAME),
     )
     index_management = IndexManagement(vespa_client)
     return config.Config(vespa_client, index_management)
@@ -237,10 +238,9 @@ def check_index_health(index_name: str, marqo_config: config.Config = Depends(ge
 @app.get("/indexes")
 def get_indexes(marqo_config: config.Config = Depends(get_config)):
     indexes = marqo_config.index_management.get_all_indexes()
-
     return {
         'results': [
-            {'index_name': index.name for index in indexes}
+            {'indexName': index.name} for index in indexes
         ]
     }
 
@@ -278,8 +278,9 @@ def get_cuda_info():
 @utils.enable_batch_apis()
 def batch_delete_indexes(index_names: List[str], marqo_config: config.Config = Depends(get_config)):
     """An internal API used for testing processes. Not to be used by users."""
-    tensor_search.batch_delete_indexes(index_names=index_names, config=marqo_config)
-    return JSONResponse(content={"acknowledged": True}, status_code=200)
+    marqo_config.index_management.batch_delete_indexes_by_name(index_names=index_names)
+    return JSONResponse(content={"acknowledged": True,
+                                 "index_names": index_names}, status_code=200)
 
 
 @app.post("/batch/indexes/create")
@@ -302,13 +303,17 @@ def batch_create_indexes(index_settings_with_name_list: List[IndexSettingsWithNa
     )
 
 
-@app.post("/batch/indexes/clear")
+@app.delete("/indexes/{index_name}/documents/delete-all")
 @utils.enable_batch_apis()
-def batch_clear_indexes(index_names: List[str], marqo_config: config.Config = Depends(get_config)):
+def delete_all_documents(index_name: str, marqo_config: config.Config = Depends(get_config)):
     """An internal API used for testing processes. Not to be used by users.
     This API delete all the documents in the indexes specified in the index_names list."""
-    tensor_search.batch_clear_indexes(index_names=index_names, config=marqo_config)
-    return JSONResponse(content={"acknowledged": True}, status_code=200)
+    document_count: int = marqo_config.document.delete_all_docs(index_name=index_name)
+
+    return {"documentCount": document_count}
+
+
+
 
 
 if __name__ == "__main__":
