@@ -201,7 +201,6 @@ class StructuredVespaIndex(VespaIndex):
 
     def get_vector_count_query(self):
         return {
-
             'yql': f'select {common.FIELD_VECTOR_COUNT} from {self._marqo_index.name} '
                    f'where true limit 0 | all(group(1) each(output(sum({common.FIELD_VECTOR_COUNT}))))',
             'model_restrict': self._marqo_index.name,
