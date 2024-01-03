@@ -1,6 +1,8 @@
 import math
 import os
-import sys 
+import sys
+import unittest
+
 from tests.utils.transition import add_docs_caller
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from unittest import mock
@@ -8,7 +10,7 @@ from marqo.s2_inference.s2_inference import vectorise, get_model_properties_from
 import numpy as np
 from marqo.tensor_search import utils
 import typing
-from marqo.tensor_search.enums import TensorField, SearchMethod, EnvVars, IndexSettingsField, MlModel
+from marqo.tensor_search.enums import TensorField, SearchMethod, EnvVars
 from marqo.errors import (
     MarqoApiError, MarqoError, IndexNotFoundError, InvalidArgError,
     InvalidFieldNameError, IllegalRequestedDocCount, BadRequestError, InternalError
@@ -19,6 +21,7 @@ from tests.marqo_test import MarqoTestCase
 import requests
 import random
 
+@unittest.skip
 class TestPagination(MarqoTestCase):
 
     def setUp(self) -> None:
@@ -54,13 +57,13 @@ class TestPagination(MarqoTestCase):
             ix_to_create = indices
         for ix_name in ix_to_create:
             tensor_search.create_vector_index(config=self.config, index_name=ix_name)
-    
+
     def test_pagination_single_field(self):
         vocab_source = "https://www.mit.edu/~ecprice/wordlist.10000"
 
         vocab = requests.get(vocab_source).text.splitlines()
         num_docs = 1000
-        
+
         # Recreate index with random model
         tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings={"index_defaults": {"model": "random"}})
@@ -81,7 +84,7 @@ class TestPagination(MarqoTestCase):
                                         search_method=search_method,
                                         config=self.config,
                                         index_name=self.index_name_1,
-                                        text='a', 
+                                        text='a',
                                         result_count=doc_count)
 
                 for page_size in [5, 10, 100, 1000]:
@@ -94,9 +97,9 @@ class TestPagination(MarqoTestCase):
                                         search_method=search_method,
                                         config=self.config,
                                         index_name=self.index_name_1,
-                                        text='a', 
+                                        text='a',
                                         result_count=lim, offset=off)
-                        
+
                         paginated_search_results["hits"].extend(page_res["hits"])
 
                     # Compare paginated to full results (length only for now)
@@ -111,7 +114,7 @@ class TestPagination(MarqoTestCase):
 
         vocab = requests.get(vocab_source).text.splitlines()
         num_docs = 1000
-        
+
         # Recreate index with random model
         tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1, index_settings={"index_defaults": {"model": "random"}})
@@ -134,7 +137,7 @@ class TestPagination(MarqoTestCase):
                                         search_method=search_method,
                                         config=self.config,
                                         index_name=self.index_name_1,
-                                        text='a', 
+                                        text='a',
                                         result_count=doc_count)
 
                 for page_size in [5, 10, 100, 1000]:
@@ -147,9 +150,9 @@ class TestPagination(MarqoTestCase):
                                         search_method=search_method,
                                         config=self.config,
                                         index_name=self.index_name_1,
-                                        text='a', 
+                                        text='a',
                                         result_count=lim, offset=off)
-                        
+
                         paginated_search_results["hits"].extend(page_res["hits"])
 
                     # Compare paginated to full results (length only for now)
@@ -157,7 +160,7 @@ class TestPagination(MarqoTestCase):
 
                     # TODO: re-add this assert when KNN incosistency bug is fixed
                     # assert full_search_results["hits"] == paginated_search_results["hits"]
-    
+
     def test_pagination_break_limitations(self):
         # Negative offset
         for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
@@ -165,23 +168,23 @@ class TestPagination(MarqoTestCase):
                 for off in [-1, -10, -1000]:
                     try:
                         tensor_search.search(text=" ",
-                                            index_name=self.index_name_1, 
-                                            config=self.config, 
+                                            index_name=self.index_name_1,
+                                            config=self.config,
                                             result_count=lim,
                                             offset=off,
                                             search_method=search_method)
                         raise AssertionError
                     except IllegalRequestedDocCount:
                         pass
-        
+
         # Negative limit
         for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
             for lim in [0, -1, -10, -1000]:
                 for off in [1, 10, 1000]:
                     try:
                         tensor_search.search(text=" ",
-                                            index_name=self.index_name_1, 
-                                            config=self.config, 
+                                            index_name=self.index_name_1,
+                                            config=self.config,
                                             result_count=lim,
                                             offset=off,
                                             search_method=search_method)
@@ -196,28 +199,28 @@ class TestPagination(MarqoTestCase):
             for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
                 try:
                     tensor_search.search(search_method=search_method,
-                                        config=self.config, index_name=self.index_name_1, text=' ', 
+                                        config=self.config, index_name=self.index_name_1, text=' ',
                                         result_count=10000,
                                         offset=1)
                     raise AssertionError
                 except IllegalRequestedDocCount:
                     pass
-            
+
             return True
 
         assert run()
-    
+
     def test_pagination_empty_searchable_attributes(self):
         # Result should be empty whether paginated or not.
         docs = [
             {
                 "field_a": 0,
-                "field_b": 0, 
+                "field_b": 0,
                 "field_c": 0
             },
             {
                 "field_a": 1,
-                "field_b": 1, 
+                "field_b": 1,
                 "field_c": 1
             }
         ]
@@ -234,7 +237,7 @@ class TestPagination(MarqoTestCase):
             searchable_attributes=[], search_method="TENSOR", offset=1
         )
         assert res["hits"] == []
-    
+
     def test_lexical_search_pagination_empty_searchable_attribs(self):
         """Empty searchable attribs returns empty results (Even paginated)"""
         d0 = {

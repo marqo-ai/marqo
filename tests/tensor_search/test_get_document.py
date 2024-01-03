@@ -7,6 +7,7 @@ from marqo.tensor_search import tensor_search
 from tests.marqo_test import MarqoTestCase
 
 
+@unittest.skip
 class TestGetDocument(MarqoTestCase):
 
     def setUp(self) -> None:

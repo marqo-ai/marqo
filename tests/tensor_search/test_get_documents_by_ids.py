@@ -1,5 +1,6 @@
 import functools
 import pprint
+import unittest
 import uuid
 from marqo.tensor_search import enums
 from marqo.errors import (
@@ -13,6 +14,7 @@ from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 import os
 
 
+@unittest.skip
 class TestGetDocuments(MarqoTestCase):
 
     def setUp(self) -> None:

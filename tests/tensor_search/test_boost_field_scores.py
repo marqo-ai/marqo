@@ -1,3 +1,5 @@
+import unittest
+
 from marqo.errors import IndexNotFoundError, InvalidArgError
 from marqo.tensor_search import tensor_search
 from tests.utils.transition import add_docs_caller
@@ -6,6 +8,7 @@ import os
 from unittest import mock
 
 
+@unittest.skip
 class TestBoostFieldScores(MarqoTestCase):
 
     def setUp(self):

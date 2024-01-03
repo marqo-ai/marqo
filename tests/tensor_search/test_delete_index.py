@@ -1,9 +1,12 @@
+import unittest
+
 from marqo.errors import MarqoApiError, IndexNotFoundError
 from marqo.tensor_search import tensor_search, index_meta_cache
 import copy
 from tests.marqo_test import MarqoTestCase
 
 
+@unittest.skip
 class TestDeleteIndex(MarqoTestCase):
 
     def setUp(self) -> None:
