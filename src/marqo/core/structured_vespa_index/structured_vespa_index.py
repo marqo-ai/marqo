@@ -326,7 +326,7 @@ class StructuredVespaIndex(VespaIndex):
         if terms:
             return f'({" OR ".join(terms)})'
         else:
-            return ""
+            return ''
 
     def _get_filter_term(self, marqo_query: MarqoQuery) -> Optional[str]:
         def escape(s: str) -> str:
