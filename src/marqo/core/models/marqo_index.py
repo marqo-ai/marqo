@@ -66,6 +66,9 @@ class TextSplitMethod(Enum):
 class PatchMethod(Enum):
     Simple = 'simple'
     Frcnn = 'frcnn'
+    DinoV1 = 'dino-v1'
+    DinoV2 = 'dino-v2'
+    MarqoYolo = 'marqo-yolo'
 
 
 class Field(ImmutableStrictBaseModel):
