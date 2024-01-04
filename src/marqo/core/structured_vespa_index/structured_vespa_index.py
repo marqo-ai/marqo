@@ -417,7 +417,6 @@ class StructuredVespaIndex(VespaIndex):
                 and_terms = f' AND ({and_terms})'
         else:
             and_terms = ''
-        lexical_term = f'{or_terms}{and_terms}'
 
         return f'{or_terms}{and_terms}'
 
