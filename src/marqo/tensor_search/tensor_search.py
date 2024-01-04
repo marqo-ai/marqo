@@ -1196,9 +1196,9 @@ def search(config: Config, index_name: str, text: Union[str, dict],
 
     if reranker is not None:
         logger.info("reranking using {}".format(reranker))
-        if searchable_attributes is None:
+        if searchable_attributes is None or searchable_attributes == []:
             raise errors.InvalidArgError(
-                f"searchable_attributes cannot be None when re-ranking. Specify which fields to search and rerank over.")
+                f"searchable_attributes cannot be None or [] when re-ranking. Specify which fields to search and rerank over.")
         try:
             # SEARCH TIMER-LOGGER (reranking)
             RequestMetricsStore.for_request().start(f"search.rerank")
