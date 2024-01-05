@@ -201,10 +201,10 @@ class StructuredVespaIndex(VespaIndex):
 
     def get_vector_count_query(self):
         return {
-
             'yql': f'select {common.FIELD_VECTOR_COUNT} from {self._marqo_index.name} '
                    f'where true limit 0 | all(group(1) each(output(sum({common.FIELD_VECTOR_COUNT}))))',
-            'model_restrict': self._marqo_index.name
+            'model_restrict': self._marqo_index.name,
+            'timeout': '5s'
         }
 
     def _to_vespa_tensor_query(self, marqo_query: MarqoTensorQuery) -> Dict[str, Any]:
@@ -251,6 +251,10 @@ class StructuredVespaIndex(VespaIndex):
             'ranking': ranking
         }
         query = {k: v for k, v in query.items() if v is not None}
+
+        if not marqo_query.approximate:
+            query['ranking.softtimeout.enable'] = False
+            query['timeout'] = '300s'
 
         return query
 
@@ -310,7 +314,7 @@ class StructuredVespaIndex(VespaIndex):
             fields_to_search = self._marqo_index.tensor_field_map.keys()
 
         if marqo_query.ef_search is not None:
-            additional_hits = f' hnsw.exploreAdditionalHits:{marqo_query.ef_search - marqo_query.limit}'
+            additional_hits = f', hnsw.exploreAdditionalHits:{marqo_query.ef_search - marqo_query.limit}'
         else:
             additional_hits = ''
 

@@ -164,7 +164,7 @@ class VespaClient:
             **query_features_list,
             **kwargs
         }
-        query = {key: value for key, value in query.items() if value}
+        query = {key: value for key, value in query.items() if value is not None}
 
         logger.debug(f'Query: {query}')
 

@@ -62,6 +62,10 @@ class TestSearchUnstructured(MarqoTestCase):
     def tearDown(self) -> None:
         self.device_patcher.stop()
 
+    # TODO - Test efSearch parameter
+    # TODO - Test approximate parameter
+    # TODO - Test graceful degradation detection with approximate=False
+    # TODO - Test timeout parameter
     def test_each_doc_returned_once(self):
         """Each doc should be returned once, even if it matches multiple times"""
         tensor_search.add_documents(config=self.config,
