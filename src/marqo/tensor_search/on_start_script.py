@@ -163,7 +163,7 @@ def _preload_model(model, content, device):
         try:
             _ = vectorise(
                 model_name=model["model"],
-                model_properties=model["model_properties"],
+                model_properties=model["modelProperties"],
                 content=content,
                 device=device
             )
