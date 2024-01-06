@@ -41,8 +41,9 @@ class VespaSchema(ABC):
             encoding (using _ instead of %) to ensure that the schema name is valid. This encoding is a bijection, i.e.
             the encoded string is unique and reversible.
 
-            Index names that are already valid Vespa schema names are not encoded. Encoded names are prefixed with
-            MARQO_RESERVED_PREFIX for easy identification, even though this prefix is not required for uniqueness.
+            Index names that are already valid Vespa schema names and do not contain underscores are not encoded.
+            Encoded names are prefixed with MARQO_RESERVED_PREFIX for easy identification, even though this prefix is
+            not required for uniqueness.
         """
         encoded_name_chars = []
         for char in index_name:
