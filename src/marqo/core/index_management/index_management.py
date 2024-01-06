@@ -2,7 +2,7 @@ import os
 import textwrap
 import xml.etree.ElementTree as ET
 from datetime import datetime
-from typing import List, Union
+from typing import List
 
 import marqo.logging
 import marqo.vespa.vespa_client
@@ -61,8 +61,10 @@ class IndexManagement:
         vespa_schema = vespa_schema_factory(marqo_index_request)
         schema, marqo_index = vespa_schema.generate_schema()
 
-        self._add_schema(app, marqo_index.name, schema)
-        self._add_schema_to_services(app, marqo_index.name)
+        logger.debug(f'Creating index {str(marqo_index)} with schema:\n{schema}')
+
+        self._add_schema(app, marqo_index.schema_name, schema)
+        self._add_schema_to_services(app, marqo_index.schema_name)
         self.vespa_client.deploy_application(app)
         self.vespa_client.wait_for_application_convergence()
         self._save_index_settings(marqo_index)
@@ -99,8 +101,9 @@ class IndexManagement:
         ]
 
         for schema, marqo_index in schema_responses:
-            self._add_schema(app, marqo_index.name, schema)
-            self._add_schema_to_services(app, marqo_index.name)
+            logger.debug(f'Creating index {str(marqo_index)} with schema:\n{schema}')
+            self._add_schema(app, marqo_index.schema_name, schema)
+            self._add_schema_to_services(app, marqo_index.schema_name)
 
         self.vespa_client.deploy_application(app)
 
@@ -227,7 +230,6 @@ class IndexManagement:
             return True
         except IndexNotFoundError:
             return False
-
 
     def _create_marqo_settings_schema(self, app: str) -> bool:
         """
