@@ -1,6 +1,5 @@
 from marqo.exceptions import (
     MarqoError,
-    InternalError,
     InvalidArgumentError,
 )
 
@@ -34,4 +33,12 @@ class InvalidFieldNameError(MarqoDocumentParsingError):
 
 
 class FilterStringParsingError(ParsingError, InvalidArgumentError):
+    pass
+
+
+class InvalidTensorFieldError(MarqoDocumentParsingError):
+    pass
+
+
+class UnsupportedFeatureError(InvalidArgumentError):
     pass

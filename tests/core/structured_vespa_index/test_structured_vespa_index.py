@@ -1,3 +1,5 @@
+import pytest
+
 from marqo.core.models.marqo_index import *
 from marqo.core.structured_vespa_index import common
 from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
@@ -99,6 +101,7 @@ class TestStructuredVespaIndex(MarqoTestCase):
             'fields': {
                 common.FIELD_ID: 'my_id',
                 common.FIELD_SCORE_MODIFIERS: {'price': 100.0, 'rank': 1},
+                common.FIELD_VECTOR_COUNT: 2,
                 marqo_index.field_map['title'].lexical_field_name: 'my title',
                 'description': 'my description',
                 marqo_index.field_map['category'].lexical_field_name: 'my category',
@@ -118,12 +121,14 @@ class TestStructuredVespaIndex(MarqoTestCase):
 
         self.assertEqual(expected_vespa_doc, actual_vespa_doc)
 
+    @pytest.skip
     def test_to_vespa_document_invalidDataType_fails(self):
         """
         Test that an error is raised when a field has an invalid data type e.g., a string for a float field.
         """
         pass
 
+    @pytest.skip
     def test_to_vespa_document_fieldNotInIndex_fails(self):
         """
         Test that an error is raised when a field is not in the index.

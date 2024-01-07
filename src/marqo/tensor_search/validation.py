@@ -13,6 +13,7 @@ from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest
 from marqo.tensor_search.models.mappings_object import mappings_schema, multimodal_combination_schema
 from marqo.tensor_search.models.search import SearchContext
+from marqo.errors import IllegalRequestedDocCount
 
 
 def validate_query(q: Union[dict, str], search_method: Union[str, SearchMethod]):
@@ -138,18 +139,15 @@ def validate_field_content(field_content: Any, is_non_tensor_field: bool) -> Any
     Raises:
         InvalidArgError if field_content is not acceptable
     """
-    if type(field_content) in constants.ALLOWED_CUSTOMER_FIELD_TYPES:
+    if type(field_content) in constants.ALLOWED_UNSTRUCTURED_FIELD_TYPES:
         if isinstance(field_content, list):
             validate_list(field_content, is_non_tensor_field)
-        elif isinstance(field_content, dict):
-            # We will be validating the dictionaries in a separate call.
-            return field_content
         return field_content
     else:
         raise InvalidArgError(
             f"Field content `{field_content}` \n"
             f"of type `{type(field_content).__name__}` is not of valid content type!"
-            f"Allowed content types: {[ty.__name__ for ty in constants.ALLOWED_CUSTOMER_FIELD_TYPES]}"
+            f"Allowed content types: {[ty.__name__ for ty in constants.ALLOWED_UNSTRUCTURED_FIELD_TYPES]}"
         )
 
 
@@ -233,6 +231,8 @@ def validate_field_name(field_name) -> str:
     Raises:
         InvalidFieldNameError
     """
+
+    # TODO-Li Do we still have these restrictions for an unstructured index?
     if not field_name:
         raise InvalidFieldNameError("field name can't be empty! ")
     if not isinstance(field_name, str):
@@ -243,6 +243,43 @@ def validate_field_name(field_name) -> str:
     if field_name.startswith(enums.TensorField.chunks):
         raise InvalidFieldNameError(F"can't name field with protected field name {enums.TensorField.chunks}."
                                     F" Error raised for field name: {field_name}")
+    char_validation = [(c, c not in constants.ILLEGAL_CUSTOMER_FIELD_NAME_CHARS)
+                       for c in field_name]
+    char_validation_failures = [c for c in char_validation if not c[1]]
+    if char_validation_failures:
+        raise InvalidFieldNameError(F"Illegal character '{char_validation_failures[0][0]}' "
+                                    F"detected in field name {field_name}")
+    if field_name not in enums.TensorField.__dict__.values():
+        return field_name
+    else:
+        raise InvalidFieldNameError(f"field name can't be a protected field. Please rename this field: {field_name}")
+
+
+def validate_unstructured_index_field_name(field_name) -> str:
+    """TODO:
+        - length (remember the vector name will have the vector_prefix added to the front of field_name)
+        - consider blanket "no double names starting with double underscore..."
+    Args:
+        field_name:
+
+    returns field_name, if all validations pass
+
+    Raises:
+        InvalidFieldNameError
+    """
+
+    # TODO-Li Do we still have these restrictions for an unstructured index?
+    if not field_name:
+        raise InvalidFieldNameError("field name can't be empty! ")
+    if not isinstance(field_name, str):
+        raise InvalidFieldNameError("field name must be str!")
+    if field_name.startswith(enums.TensorField.vector_prefix):
+        raise InvalidFieldNameError(F"can't start field name with protected prefix {enums.TensorField.vector_prefix}."
+                                    F" Error raised for field name: {field_name}")
+    if field_name.startswith(enums.TensorField.chunks):
+        raise InvalidFieldNameError(F"can't name field with protected field name {enums.TensorField.chunks}."
+                                    F" Error raised for field name: {field_name}")
+
     char_validation = [(c, c not in constants.ILLEGAL_CUSTOMER_FIELD_NAME_CHARS)
                        for c in field_name]
     char_validation_failures = [c for c in char_validation if not c[1]]

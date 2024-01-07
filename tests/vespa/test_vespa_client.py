@@ -16,7 +16,8 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
     TEST_CLUSTER = "content_default"
 
     def setUp(self):
-        self.client = VespaClient("http://localhost:19071", "http://localhost:8080", "http://localhost:8080")
+        self.client = VespaClient("http://localhost:19071", "http://localhost:8080",
+                                  "http://localhost:8080", "content_default")
         self.pyvespa_client = pyvespa.Vespa(url="http://localhost", port=8080)
 
         self.pyvespa_client.delete_all_docs(self.TEST_CLUSTER, self.TEST_SCHEMA)
@@ -73,7 +74,8 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
         self.assertIsNotNone(messages[1])
 
     def test_feed_batch_invalidFeedUrl_fails(self):
-        feed_client = VespaClient("http://localhost:8080", "http://localhost:8000", "http://localhost:8080")
+        feed_client = VespaClient("http://localhost:8080", "http://localhost:8000",
+                                  "http://localhost:8080", "content_default")
         documents = [
             VespaDocument(id="doc1", fields={"title": "Title 1", "contents": "Content 1"}),
             VespaDocument(id="doc2", fields={"title": "Title 2"}),
@@ -216,7 +218,8 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
         self.assertEqual(len(result.root.children), 0)
 
     def test_query_invalidQueryUrl_fails(self):
-        query_client = VespaClient("http://localhost:8080", "http://localhost:8080", "http://localhost:8000")
+        query_client = VespaClient("http://localhost:8080", "http://localhost:8080",
+                                   "http://localhost:8000", "content_default")
 
         with self.assertRaises(VespaError):
             query_client.query(

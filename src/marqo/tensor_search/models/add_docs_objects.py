@@ -27,6 +27,7 @@ class AddDocsBodyParams(BaseModel):
     modelAuth: Optional[ModelAuth] = None
     mappings: Optional[dict] = None
     documents: Union[Sequence[Union[dict, Any]], np.ndarray]
+    imageDownloadThreadCount: int = 20
 
 
 class AddDocsParams(BaseModel):
@@ -49,6 +50,7 @@ class AddDocsParams(BaseModel):
     class Config:
         arbitrary_types_allowed = True
         allow_mutation = False
+
 
     # this should only accept Sequences of dicts, but currently validation lies elsewhere
     docs: Union[Sequence[Union[dict, Any]], np.ndarray]

@@ -20,7 +20,7 @@ from marqo.tensor_search import tensor_search, utils
 from marqo.tensor_search.enums import RequestType, EnvVars
 from marqo.tensor_search.models.add_docs_objects import (AddDocsBodyParams)
 from marqo.tensor_search.models.api_models import SearchQuery
-from marqo.tensor_search.models.index_settings import IndexSettings
+from marqo.tensor_search.models.index_settings import IndexSettings, IndexSettingsWithName
 from marqo.tensor_search.on_start_script import on_start
 from marqo.tensor_search.telemetry import RequestMetricsStore, TelemetryMiddleware
 from marqo.tensor_search.throttling.redis_throttle import throttle
@@ -34,6 +34,7 @@ def generate_config() -> config.Config:
         query_url=utils.read_env_vars_and_defaults(EnvVars.VESPA_QUERY_URL),
         document_url=utils.read_env_vars_and_defaults(EnvVars.VESPA_DOCUMENT_URL),
         pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_POOL_SIZE),
+        content_cluster_name=utils.read_env_vars_and_defaults(EnvVars.VESPA_CONTENT_CLUSTER_NAME),
     )
     index_management = IndexManagement(vespa_client)
     return config.Config(vespa_client, index_management)
@@ -179,6 +180,7 @@ def search(search_query: SearchQuery, index_name: str, device: str = Depends(api
             searchable_attributes=search_query.searchableAttributes,
             search_method=search_query.searchMethod,
             result_count=search_query.limit, offset=search_query.offset,
+            ef_search=search_query.efSearch, approximate=search_query.approximate,
             reranker=search_query.reRanker,
             filter=search_query.filter, device=device,
             attributes_to_retrieve=search_query.attributesToRetrieve, boost=search_query.boost,
@@ -271,10 +273,9 @@ def check_index_health(index_name: str, marqo_config: config.Config = Depends(ge
 @app.get("/indexes")
 def get_indexes(marqo_config: config.Config = Depends(get_config)):
     indexes = marqo_config.index_management.get_all_indexes()
-
     return {
         'results': [
-            {'index_name': index.name for index in indexes}
+            {'indexName': index.name} for index in indexes
         ]
     }
 
@@ -303,6 +304,45 @@ def get_cpu_info():
 @app.get("/device/cuda")
 def get_cuda_info():
     return tensor_search.get_cuda_info()
+
+
+@app.post("/batch/indexes/delete")
+@utils.enable_batch_apis()
+def batch_delete_indexes(index_names: List[str], marqo_config: config.Config = Depends(get_config)):
+    """An internal API used for testing processes. Not to be used by users."""
+    marqo_config.index_management.batch_delete_indexes_by_name(index_names=index_names)
+    return JSONResponse(content={"acknowledged": True,
+                                 "index_names": index_names}, status_code=200)
+
+
+@app.post("/batch/indexes/create")
+@utils.enable_batch_apis()
+def batch_create_indexes(index_settings_with_name_list: List[IndexSettingsWithName], \
+                         marqo_config: config.Config = Depends(get_config)):
+    """An internal API used for testing processes. Not to be used by users."""
+
+    marqo_index_requests = [settings.to_marqo_index_request(settings.indexName) for \
+                            settings in index_settings_with_name_list]
+
+    marqo_config.index_management.batch_create_indexes(marqo_index_requests)
+
+    return JSONResponse(
+        content={
+            "acknowledged": True,
+            "index_names": [settings.indexName for settings in index_settings_with_name_list]
+        },
+        status_code=200
+    )
+
+
+@app.delete("/indexes/{index_name}/documents/delete-all")
+@utils.enable_batch_apis()
+def delete_all_documents(index_name: str, marqo_config: config.Config = Depends(get_config)):
+    """An internal API used for testing processes. Not to be used by users.
+    This API delete all the documents in the indexes specified in the index_names list."""
+    document_count: int = marqo_config.document.delete_all_docs(index_name=index_name)
+
+    return {"documentCount": document_count}
 
 
 if __name__ == "__main__":

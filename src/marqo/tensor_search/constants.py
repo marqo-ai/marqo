@@ -4,7 +4,7 @@ MARQO_OBJECT_TYPES = {MappingsObjectType.multimodal_combination}
 
 ILLEGAL_CUSTOMER_FIELD_NAME_CHARS = {'.', '/', '\n'}
 
-ALLOWED_CUSTOMER_FIELD_TYPES = [str, int, float, bool, list, dict]
+ALLOWED_UNSTRUCTURED_FIELD_TYPES = [str, int, float, bool, list]
 
 NON_TENSORISABLE_FIELD_TYPES = [int, float, bool, list]
 
