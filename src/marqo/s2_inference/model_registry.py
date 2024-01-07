@@ -1,10 +1,12 @@
+from marqo.s2_inference.clip_utils import CLIP, OPEN_CLIP, MULTILINGUAL_CLIP, FP16_CLIP, \
+    get_multilingual_clip_properties
 from marqo.s2_inference.hf_utils import HF_MODEL
+from marqo.s2_inference.onnx_clip_utils import CLIP_ONNX
+from marqo.s2_inference.random_utils import Random
 from marqo.s2_inference.sbert_onnx_utils import SBERT_ONNX
 from marqo.s2_inference.sbert_utils import SBERT, TEST
-from marqo.s2_inference.random_utils import Random
-from marqo.s2_inference.clip_utils import CLIP, OPEN_CLIP, MULTILINGUAL_CLIP, FP16_CLIP, get_multilingual_clip_properties
-from marqo.s2_inference.types import Any, Dict, List, Optional, Union, FloatTensor
-from marqo.s2_inference.onnx_clip_utils import CLIP_ONNX
+from marqo.s2_inference.types import Dict
+
 
 # we need to keep track of the embed dim and model load functions/classes
 # we can use this as a registry
@@ -543,6 +545,48 @@ def _get_hf_properties() -> Dict:
                  "tokens": 128,
                  "type": "hf",
                  "model_size": 0.134,
+                 "notes": ""},
+            "hf/multilingual-e5-small":
+                {"name": 'intfloat/multilingual-e5-small',
+                 "dimensions": 384,
+                 "tokens": 512,
+                 "type": "hf",
+                 "model_size": 0.471,
+                 "notes": ""},
+            "hf/multilingual-e5-base":
+                {"name": 'intfloat/multilingual-e5-base',
+                 "dimensions": 768,
+                 "tokens": 512,
+                 "type": "hf",
+                 "model_size": 1.11,
+                 "notes": ""},
+            "hf/multilingual-e5-large":
+                {"name": 'intfloat/multilingual-e5-large',
+                 "dimensions": 1024,
+                 "tokens": 512,
+                 "type": "hf",
+                 "model_size": 2.24,
+                 "notes": ""},
+            "hf/e5-small-v2":
+                {"name": 'intfloat/e5-small-v2',
+                 "dimensions": 384,
+                 "tokens": 512,
+                 "type": "hf",
+                 "model_size": 0.134,
+                 "notes": ""},
+            "hf/e5-base-v2":
+                {"name": 'intfloat/e5-base-v2',
+                 "dimensions": 768,
+                 "tokens": 512,
+                 "type": "hf",
+                 "model_size": 0.438,
+                 "notes": ""},
+            "hf/e5-large-v2":
+                {"name": 'intfloat/e5-large-v2',
+                 "dimensions": 1024,
+                 "tokens": 512,
+                 "type": "hf",
+                 "model_size": 1.34,
                  "notes": ""},
     }
     return HF_MODEL_PROPERTIES

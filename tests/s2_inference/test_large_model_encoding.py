@@ -149,34 +149,24 @@ class TestLargeModelEncoding(unittest.TestCase):
             del model
             clear_loaded_models()
 
-    # This block is commented out due to its memory issue.
-    # The visual part can be loaded into the target device, but the textual part is always loaded into the cpu device.
-    # def test_multilingual_clip_performance(self):
-    #
-    #     clear_loaded_models()
-    #
-    #     names = self.multilingual_models
-    #     device = "cuda"
-    #     texts = [
-    #         "skiing person",
-    #         "滑雪的人",
-    #         "лыжник",
-    #         "persona che scia",
-    #     ]
-    #     image = "https://raw.githubusercontent.com/marqo-ai/marqo-clip-onnx/main/examples/coco.jpg"
-    #     e = 0.1
-    #     with patch.dict(os.environ, {"MARQO_MAX_CUDA_MODEL_MEMORY": "10"}):
-    #         for name in names:
-    #             text_feature = np.array(vectorise(model_name=name, content=texts, normalize_embeddings=True, device=device))
-    #             image_feature = np.array(vectorise(model_name=name, content=image, normalize_embeddings=True, device=device))
-    #
-    #             clear_loaded_models()
-    #             similarity_score = (text_feature @ image_feature.T).flatten()
-    #
-    #             assert np.abs(np.max(similarity_score) - np.min(similarity_score)) < e
-    #
-    #             del similarity_score
-    #             clear_loaded_models()
+    def test_multilingual_e5_model_performance(self):
+        clear_loaded_models()
+        device = "cuda"
+        english_text = "skiing person"
+        other_language_texts = [
+            "滑雪的人",
+            "лыжник",
+            "persona che scia",
+        ]
+        e = 1
+        with patch.dict(os.environ, {"MARQO_MAX_CUDA_MODEL_MEMORY": "10"}):
+            for model_name in self.multilingual_models:
+                english_feature = np.array(
+                    vectorise(model_name=model_name, content=english_text, normalize_embeddings=True, device=device))
+                for other_language_text in other_language_texts:
+                    other_language_feature = np.array(vectorise(model_name=model_name, content=other_language_text,
+                                                                normalize_embeddings=True, device=device))
+                    assert np.allclose(english_feature, other_language_feature, atol=e)
 
     def test_cuda_encode_type(self):
         names = self.large_clip_models + self.e5_models
