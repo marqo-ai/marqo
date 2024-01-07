@@ -42,7 +42,7 @@ class TestLargeModelEncoding(unittest.TestCase):
                                    'open_clip/convnext_large_d_320/laion2b_s29b_b131k_ft_soup',
                                    'open_clip/convnext_large_d/laion2b_s26b_b102k_augreg']
 
-        self.multilingual_models = ["multilingual-clip/XLM-Roberta-Large-Vit-L-14"]
+        self.multilingual_models = ["hf/multilingual-e5-small", "hf/multilingual-e5-base", "hf/multilingual-e5-large"]
 
         self.e5_models = ["hf/e5-large", "hf/e5-large-unsupervised"]
 
