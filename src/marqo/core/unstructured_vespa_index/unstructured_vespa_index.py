@@ -24,7 +24,7 @@ class UnstructuredVespaIndex(VespaIndex):
     def to_vespa_document(self, marqo_document: Dict[str, Any]) -> Dict[str, Any]:
         unstructured_document: UnstructuredVespaDocument = \
             (UnstructuredVespaDocument.from_marqo_document(marqo_document,
-                                                           self._marqo_index.short_string_length_threshold))
+                                                           self._marqo_index.filter_string_max_length))
         return unstructured_document.to_vespa_document()
 
     def to_marqo_document(self, vespa_document: Dict[str, Any], return_highlights: bool = False) -> Dict[str, Any]:
