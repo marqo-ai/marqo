@@ -9,8 +9,8 @@ from pydantic import ValidationError, validator
 from pydantic.error_wrappers import ErrorWrapper
 from pydantic.utils import ROOT_KEY
 
-from marqo.core import constants
 from marqo.base_model import ImmutableStrictBaseModel, StrictBaseModel
+from marqo.core import constants
 from marqo.exceptions import InvalidArgumentError
 from marqo.logging import get_logger
 from marqo.s2_inference import s2_inference
