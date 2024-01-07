@@ -2,7 +2,7 @@ import os
 import textwrap
 import xml.etree.ElementTree as ET
 from datetime import datetime
-from typing import List, Union
+from typing import List
 
 import marqo.logging
 import marqo.vespa.vespa_client
@@ -227,7 +227,6 @@ class IndexManagement:
             return True
         except IndexNotFoundError:
             return False
-
 
     def _create_marqo_settings_schema(self, app: str) -> bool:
         """

@@ -3,19 +3,19 @@ import json
 from typing import List
 
 import pydantic
-from marqo import exceptions as base_exceptions
-from marqo.api import exceptions as api_exceptions
-from marqo.core import exceptions as core_exceptions
-
 import uvicorn
 from fastapi import FastAPI
 from fastapi import Request, Depends
 from fastapi.responses import JSONResponse
 
 from marqo import config
+from marqo import exceptions as base_exceptions
 from marqo import version
+from marqo.api import exceptions as api_exceptions
 from marqo.api.models.health_response import HealthResponse
+from marqo.core import exceptions as core_exceptions
 from marqo.core.index_management.index_management import IndexManagement
+from marqo.logging import get_logger
 from marqo.tensor_search import tensor_search, utils
 from marqo.tensor_search.enums import RequestType, EnvVars
 from marqo.tensor_search.models.add_docs_objects import (AddDocsBodyParams)
@@ -26,6 +26,8 @@ from marqo.tensor_search.telemetry import RequestMetricsStore, TelemetryMiddlewa
 from marqo.tensor_search.throttling.redis_throttle import throttle
 from marqo.tensor_search.web import api_validation, api_utils
 from marqo.vespa.vespa_client import VespaClient
+
+logger = get_logger(__name__)
 
 
 def generate_config() -> config.Config:
@@ -66,10 +68,11 @@ def marqo_base_exception_handler(request: Request, exc: base_exceptions.MarqoErr
     Mappings are in an ordered list to allow for hierarchical resolution of errors.
     Stored as 2-tuples: (Base/Core/Vespa/Inference Error, API Error)
     """
-
     api_exception_mappings = [
+        # More specific errors should take precedence
+
         # Core exceptions
-        (core_exceptions.InvalidFieldNameError, api_exceptions.InvalidFieldNameError),      # More specific errors should take precedence
+        (core_exceptions.InvalidFieldNameError, api_exceptions.InvalidFieldNameError),
         (core_exceptions.IndexExistsError, api_exceptions.IndexAlreadyExistsError),
         (core_exceptions.IndexNotFoundError, api_exceptions.IndexNotFoundError),
         (core_exceptions.VespaDocumentParsingError, api_exceptions.BackendDataParsingError),
@@ -87,7 +90,7 @@ def marqo_base_exception_handler(request: Request, exc: base_exceptions.MarqoErr
         if isinstance(exc, base_exception):
             converted_error = api_exception(exc.message)
             break
-    
+
     # Completely unhandled exception (500)
     if not converted_error:
         converted_error = api_exceptions.MarqoWebError(exc.message)
@@ -101,6 +104,8 @@ def marqo_api_exception_handler(request: Request, exc: api_exceptions.MarqoWebEr
 
     We can potentially catch any type of Marqo exception. We can do isinstance() calls
     to handle WebErrors vs Regular errors"""
+    logger.error(str(exc), exc_info=True)
+
     headers = getattr(exc, "headers", None)
     body = {
         "message": exc.message,
@@ -119,6 +124,8 @@ def marqo_api_exception_handler(request: Request, exc: api_exceptions.MarqoWebEr
 @app.exception_handler(pydantic.ValidationError)
 async def validation_exception_handler(request: Request, exc: pydantic.ValidationError) -> JSONResponse:
     """Catch pydantic validation errors and rewrite as an InvalidArgError whilst keeping error messages from the ValidationError."""
+    logger.error(str(exc), exc_info=True)
+
     error_messages = [{
         'loc': error.get('loc', ''),
         'msg': error.get('msg', ''),
@@ -131,12 +138,15 @@ async def validation_exception_handler(request: Request, exc: pydantic.Validatio
         "type": api_exceptions.InvalidArgError.error_type,
         "link": api_exceptions.InvalidArgError.link
     }
+
     return JSONResponse(content=body, status_code=api_exceptions.InvalidArgError.status_code)
 
 
 @app.exception_handler(api_exceptions.MarqoError)
 def marqo_internal_exception_handler(request, exc: api_exceptions.MarqoError):
     """MarqoErrors are treated as internal errors"""
+    logger.error(str(exc), exc_info=True)
+
     headers = getattr(exc, "headers", None)
     body = {
         "message": exc.message,

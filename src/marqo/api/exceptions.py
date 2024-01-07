@@ -1,6 +1,8 @@
 import json
-from requests import Response
 from http import HTTPStatus
+
+from requests import Response
+
 
 # TODO: DELETE
 class MarqoError(Exception):
@@ -10,6 +12,7 @@ class MarqoError(Exception):
 
     """
     code = None
+
     def __init__(self, message: str) -> None:
         self.message = message
         super().__init__(self.message)
@@ -19,11 +22,11 @@ class MarqoError(Exception):
 
 
 class EnvVarError(MarqoError):
-
     code = "env_var_error"
 
     def __init__(self, message: str):
         self.message = message
+
 
 # TODO: DELETE
 class MarqoApiError(MarqoError):
@@ -41,7 +44,7 @@ class MarqoApiError(MarqoError):
             self.code = json_data.get('status')
             self.link = ''
             self.type = ''
-            if 'error' in json_data and 'root_cause' in json_data["error"]\
+            if 'error' in json_data and 'root_cause' in json_data["error"] \
                     and len(json_data.get('error').get('root_cause')) > 0:
                 self.type = json_data.get('error').get('root_cause')[0].get('type')
         else:
@@ -58,7 +61,6 @@ class MarqoApiError(MarqoError):
 # MARQO WEB ERROR
 
 class MarqoWebError(Exception):
-
     status_code: int = 500
     error_type: str = None
     message: str = None
@@ -67,6 +69,7 @@ class MarqoWebError(Exception):
     base_message = ("Please create an issue on Marqo's GitHub repo"
                     " (https://github.com/marqo-ai/marqo/issues) "
                     "if this problem persists.")
+
     def __init__(self, message: str, status_code: int = None,
                  error_type: str = None, code: str = None,
                  link: str = None) -> None:
@@ -87,6 +90,7 @@ class MarqoWebError(Exception):
 
     def __str__(self) -> str:
         return f'{self.__class__.__name__}: {self.message}'
+
 
 # ---MARQO USER ERRORS---
 
@@ -110,9 +114,11 @@ class IndexAlreadyExistsError(__InvalidRequestError):
     code = "index_already_exists"
     status_code = HTTPStatus.CONFLICT
 
+
 class ModelCacheManagementError(__InvalidRequestError):
     code = "model_cache_management_error"
     status_code = HTTPStatus.CONFLICT
+
 
 class IndexNotFoundError(__InvalidRequestError):
     code = "index_not_found"

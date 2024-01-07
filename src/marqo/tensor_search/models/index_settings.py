@@ -48,7 +48,7 @@ class IndexSettings(StrictBaseModel):
                     "treat_urls_and_pointers_as_images is not a valid parameter for structured indexes"
                 )
             if self.shortStringLengthThreshold is not None:
-                raise errors.InvalidArgError(
+                raise api_exceptions.InvalidArgError(
                     "shortStringLengthThreshold is not a valid parameter for structured indexes"
                 )
 
