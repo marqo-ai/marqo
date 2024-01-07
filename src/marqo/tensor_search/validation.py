@@ -13,7 +13,6 @@ from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest
 from marqo.tensor_search.models.mappings_object import mappings_schema, multimodal_combination_schema
 from marqo.tensor_search.models.search import SearchContext
-from marqo.errors import IllegalRequestedDocCount
 
 
 def validate_query(q: Union[dict, str], search_method: Union[str, SearchMethod]):
