@@ -10,15 +10,13 @@ from unittest import mock
 import numpy as np
 import requests
 
-from marqo.errors import (
-    IndexNotFoundError, InvalidArgError,
-    InvalidFieldNameError, IllegalRequestedDocCount, BadRequestError, InternalError
-)
+from marqo.api.exceptions import (
+    IndexNotFoundError, InvalidArgError, InvalidFieldNameError, IllegalRequestedDocCount,
+    BadRequestError, InternalError)
 from marqo.s2_inference.s2_inference import vectorise, get_model_properties_from_registry
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import TensorField, SearchMethod, EnvVars
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
-
 from tests.marqo_test import MarqoTestCase
 from tests.utils.transition import add_docs_caller
 

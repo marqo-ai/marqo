@@ -3,7 +3,7 @@ import unittest
 
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from unittest import mock
-from marqo.errors import IndexNotFoundError, InternalError
+from marqo.api.exceptions import IndexNotFoundError, InternalError
 from marqo.tensor_search import tensor_search
 from tests.marqo_test import MarqoTestCase
 from unittest.mock import patch, ANY

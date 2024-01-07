@@ -2,7 +2,7 @@ from typing import Dict, Any, Optional
 
 import marqo.core.constants as index_constants
 import marqo.core.search.search_filter as search_filter
-from marqo import errors
+from marqo.api import exceptions as errors
 from marqo.core.models import MarqoQuery
 from marqo.core.models.marqo_index import UnstructuredMarqoIndex
 from marqo.core.models.marqo_query import (MarqoTensorQuery, MarqoLexicalQuery, MarqoHybridQuery,

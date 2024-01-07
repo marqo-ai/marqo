@@ -4,7 +4,7 @@ from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, validator, ValidationError
 
 import marqo.core.models.marqo_query as core
-from marqo.errors import InvalidArgError
+from marqo.api.exceptions import InvalidArgError
 
 
 class ScoreModifierValidationError(InvalidArgError):

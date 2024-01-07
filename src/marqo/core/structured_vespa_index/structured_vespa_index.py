@@ -459,7 +459,7 @@ class StructuredVespaIndex(VespaIndex):
                 not isinstance(python_type, list) and not isinstance(value, python_type)
         ):
             raise InvalidDataTypeError(f'Invalid value {value} for field {field_name} with Marqo type '
-                                       f'{marqo_type.name}. Expected a value of type {python_type}, but found '
+                                       f'{marqo_type.value}. Expected a value of type {python_type}, but found '
                                        f'{type(value)}')
 
     def _extract_highlights(self, vespa_document_fields: Dict[str, Any]) -> Dict[str, Any]:

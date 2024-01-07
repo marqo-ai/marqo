@@ -4,7 +4,7 @@ from enum import Enum
 from unittest import mock
 from unittest.mock import patch
 
-from marqo.errors import (
+from marqo.api.exceptions import (
     InvalidFieldNameError, InvalidDocumentIdError, InvalidArgError, DocTooLargeError
 )
 from marqo.tensor_search import enums

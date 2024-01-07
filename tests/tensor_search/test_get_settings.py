@@ -1,8 +1,9 @@
 import unittest
 
-from tests.marqo_test import MarqoTestCase
+from marqo.api.exceptions import IndexNotFoundError
 from marqo.tensor_search import tensor_search
-from marqo.errors import IndexNotFoundError
+from tests.marqo_test import MarqoTestCase
+
 
 @unittest.skip
 class TestGetSettings(MarqoTestCase):

@@ -4,7 +4,7 @@ from marqo.tensor_search.web.api_utils import add_docs_params_orchestrator
 from marqo.tensor_search.models.private_models import S3Auth
 import urllib.parse
 from marqo.tensor_search.web import api_utils
-from marqo.errors import InvalidArgError, InternalError, BadRequestError
+from marqo.api.exceptions import InvalidArgError, InternalError, BadRequestError
 from tests.marqo_test import MarqoTestCase
 import unittest
 

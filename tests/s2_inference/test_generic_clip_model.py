@@ -1,7 +1,7 @@
 import numpy as np
 import os
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
-from marqo.errors import IndexNotFoundError
+from marqo.api.exceptions import IndexNotFoundError
 from marqo.s2_inference.errors import UnknownModelError, ModelLoadError
 from marqo.tensor_search import tensor_search
 from marqo.s2_inference.processing.custom_clip_utils import download_pretrained_from_url

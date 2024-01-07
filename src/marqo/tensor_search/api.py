@@ -8,12 +8,14 @@ from fastapi import FastAPI
 from fastapi import Request, Depends
 from fastapi.responses import JSONResponse
 
-from marqo import config, errors
+from marqo import config
+from marqo import exceptions as base_exceptions
 from marqo import version
+from marqo.api import exceptions as api_exceptions
 from marqo.api.models.health_response import HealthResponse
-from marqo.core.exceptions import IndexExistsError, IndexNotFoundError
+from marqo.core import exceptions as core_exceptions
 from marqo.core.index_management.index_management import IndexManagement
-from marqo.errors import InvalidArgError, MarqoWebError, MarqoError
+from marqo.logging import get_logger
 from marqo.tensor_search import tensor_search, utils
 from marqo.tensor_search.enums import RequestType, EnvVars
 from marqo.tensor_search.models.add_docs_objects import (AddDocsBodyParams)
@@ -24,6 +26,8 @@ from marqo.tensor_search.telemetry import RequestMetricsStore, TelemetryMiddlewa
 from marqo.tensor_search.throttling.redis_throttle import throttle
 from marqo.tensor_search.web import api_validation, api_utils
 from marqo.vespa.vespa_client import VespaClient
+
+logger = get_logger(__name__)
 
 
 def generate_config() -> config.Config:
@@ -54,12 +58,54 @@ def get_config():
     return _config
 
 
-@app.exception_handler(MarqoWebError)
-def marqo_user_exception_handler(request: Request, exc: MarqoWebError) -> JSONResponse:
+@app.exception_handler(base_exceptions.MarqoError)
+def marqo_base_exception_handler(request: Request, exc: base_exceptions.MarqoError) -> JSONResponse:
+    """
+    Catch a base/core Marqo Error and convert to its corresponding API Marqo Error.
+    The API Error will be passed to the `marqo_api_exception_handler` below.
+    This ensures that raw base errors are never returned by the API.
+    
+    Mappings are in an ordered list to allow for hierarchical resolution of errors.
+    Stored as 2-tuples: (Base/Core/Vespa/Inference Error, API Error)
+    """
+    api_exception_mappings = [
+        # More specific errors should take precedence
+
+        # Core exceptions
+        (core_exceptions.InvalidFieldNameError, api_exceptions.InvalidFieldNameError),
+        (core_exceptions.IndexExistsError, api_exceptions.IndexAlreadyExistsError),
+        (core_exceptions.IndexNotFoundError, api_exceptions.IndexNotFoundError),
+        (core_exceptions.VespaDocumentParsingError, api_exceptions.BackendDataParsingError),
+
+        # Base exceptions
+        (base_exceptions.InternalError, api_exceptions.InternalError),
+        (base_exceptions.InvalidArgumentError, api_exceptions.InvalidArgError),
+
+        # If no mapping is found, raise a generic API error (500)
+        (base_exceptions.MarqoError, api_exceptions.MarqoWebError),
+    ]
+
+    converted_error = None
+    for base_exception, api_exception in api_exception_mappings:
+        if isinstance(exc, base_exception):
+            converted_error = api_exception(exc.message)
+            break
+
+    # Completely unhandled exception (500)
+    if not converted_error:
+        converted_error = api_exceptions.MarqoWebError(exc.message)
+
+    return marqo_api_exception_handler(request, converted_error)
+
+
+@app.exception_handler(api_exceptions.MarqoWebError)
+def marqo_api_exception_handler(request: Request, exc: api_exceptions.MarqoWebError) -> JSONResponse:
     """ Catch a MarqoWebError and return an appropriate HTTP response.
 
     We can potentially catch any type of Marqo exception. We can do isinstance() calls
     to handle WebErrors vs Regular errors"""
+    logger.error(str(exc), exc_info=True)
+
     headers = getattr(exc, "headers", None)
     body = {
         "message": exc.message,
@@ -78,6 +124,8 @@ def marqo_user_exception_handler(request: Request, exc: MarqoWebError) -> JSONRe
 @app.exception_handler(pydantic.ValidationError)
 async def validation_exception_handler(request: Request, exc: pydantic.ValidationError) -> JSONResponse:
     """Catch pydantic validation errors and rewrite as an InvalidArgError whilst keeping error messages from the ValidationError."""
+    logger.error(str(exc), exc_info=True)
+
     error_messages = [{
         'loc': error.get('loc', ''),
         'msg': error.get('msg', ''),
@@ -86,16 +134,19 @@ async def validation_exception_handler(request: Request, exc: pydantic.Validatio
 
     body = {
         "message": json.dumps(error_messages),
-        "code": InvalidArgError.code,
-        "type": InvalidArgError.error_type,
-        "link": InvalidArgError.link
+        "code": api_exceptions.InvalidArgError.code,
+        "type": api_exceptions.InvalidArgError.error_type,
+        "link": api_exceptions.InvalidArgError.link
     }
-    return JSONResponse(content=body, status_code=InvalidArgError.status_code)
+
+    return JSONResponse(content=body, status_code=api_exceptions.InvalidArgError.status_code)
 
 
-@app.exception_handler(MarqoError)
-def marqo_internal_exception_handler(request, exc: MarqoError):
+@app.exception_handler(api_exceptions.MarqoError)
+def marqo_internal_exception_handler(request, exc: api_exceptions.MarqoError):
     """MarqoErrors are treated as internal errors"""
+    logger.error(str(exc), exc_info=True)
+
     headers = getattr(exc, "headers", None)
     body = {
         "message": exc.message,
@@ -117,10 +168,7 @@ def root():
 
 @app.post("/indexes/{index_name}")
 def create_index(index_name: str, settings: IndexSettings, marqo_config: config.Config = Depends(get_config)):
-    try:
-        marqo_config.index_management.create_index(settings.to_marqo_index_request(index_name))
-    except IndexExistsError as e:
-        raise errors.IndexAlreadyExistsError(f"Index {index_name} already exists") from e
+    marqo_config.index_management.create_index(settings.to_marqo_index_request(index_name))
 
     return JSONResponse(
         content={
@@ -223,14 +271,12 @@ def delete_docs(index_name: str, documentIds: List[str],
 @app.get("/health")
 def check_health(marqo_config: config.Config = Depends(get_config)):
     health_status = marqo_config.monitoring.get_health()
-
     return HealthResponse.from_marqo_health_status(health_status)
 
 
 @app.get("/indexes/{index_name}/health")
 def check_index_health(index_name: str, marqo_config: config.Config = Depends(get_config)):
     health_status = marqo_config.monitoring.get_health(index_name=index_name)
-
     return HealthResponse.from_marqo_health_status(health_status)
 
 
@@ -246,11 +292,8 @@ def get_indexes(marqo_config: config.Config = Depends(get_config)):
 
 @app.get("/indexes/{index_name}/settings")
 def get_settings(index_name: str, marqo_config: config.Config = Depends(get_config)):
-    try:
-        marqo_index = marqo_config.index_management.get_index(index_name)
-        return IndexSettings.from_marqo_index(marqo_index).dict(exclude_none=True)
-    except IndexNotFoundError as e:
-        raise errors.IndexNotFoundError(f"Index {index_name} not found") from e
+    marqo_index = marqo_config.index_management.get_index(index_name)
+    return IndexSettings.from_marqo_index(marqo_index).dict(exclude_none=True)
 
 
 @app.get("/models")

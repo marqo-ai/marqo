@@ -11,7 +11,7 @@ import requests
 
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
-from marqo.errors import IndexNotFoundError, BadRequestError
+from marqo.api.exceptions import IndexNotFoundError, BadRequestError
 from marqo.s2_inference import types
 from marqo.tensor_search import add_docs
 from marqo.tensor_search import enums

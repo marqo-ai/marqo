@@ -38,7 +38,16 @@ class MarqoError(Exception, metaclass=MarqoErrorMeta):
         self.cause = cause
 
 
+"""
+Each error here should have a mapping to an API exception. The API exceptions will contain the status codes.
+Most core errors should be subclasses of these errors.
+"""
+
+
 class InternalError(MarqoError):
+    """
+    For unexpected behavior happening inside Marqo. Should be raised directly.
+    """
     pass
 
 

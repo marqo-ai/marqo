@@ -1,6 +1,6 @@
 import logging
 
-from marqo.errors import EnvVarError
+from marqo.api.exceptions import EnvVarError
 from marqo.tensor_search.utils import read_env_vars_and_defaults
 
 
