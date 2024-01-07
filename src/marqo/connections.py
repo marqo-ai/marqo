@@ -1,21 +1,16 @@
-import redis
-import os
-from marqo.api import exceptions
-from marqo.tensor_search.tensor_search_logging import get_logger
-from marqo.tensor_search import utils
-from marqo.tensor_search.enums import EnvVars
-
 # for logging
-import datetime
 import time
-import os
-import logging
+
+import redis
+
+from marqo.tensor_search.tensor_search_logging import get_logger
 
 """
 Drivers for connecting to other applications should be put here.
 """
 
 logger = get_logger(__name__)
+
 
 def generate_redis_warning(skipped_operation: str, exc: Exception):
     """
@@ -42,7 +37,7 @@ class RedisDriver:
                 "name": "check_and_increment",
                 "path": "throttling/check_and_increment.lua"
             },
-        ]  
+        ]
 
     def init_from_app(self, host, port):
         t0 = time.time()
@@ -59,7 +54,7 @@ class RedisDriver:
             self.faulty = False
 
             t1 = time.time()
-            logger.info(f"Took {((t1-t0)*1000):.3f}ms to connect to redis and load scripts.")
+            logger.info(f"Took {((t1 - t0) * 1000):.3f}ms to connect to redis and load scripts.")
 
         except Exception as e:
             logger.warn(generate_redis_warning(skipped_operation="loading throttling scripts", exc=e))
@@ -72,7 +67,7 @@ class RedisDriver:
             port=self.port,
         )
         return self.driver
-        
+
     def load_lua_scripts(self) -> dict:
         self.lua_shas = dict()
         for script in self.scripts:
@@ -88,12 +83,13 @@ class RedisDriver:
         if not self.driver or self.faulty:
             self.init_from_app(self.host, self.port)
         return self.driver
-    
+
     def set_faulty(self, value):
         self.faulty = value
-    
+
     def get_lua_shas(self):
         return self.lua_shas
+
 
 # Starts up redis driver
 redis_driver = RedisDriver()
