@@ -1,20 +1,22 @@
 import math
 import os
-import requests
-from unittest import mock
 import random
+import uuid
+from unittest import mock
 
-from marqo.core.models.marqo_index import *
-from marqo.s2_inference.s2_inference import get_model_properties_from_registry
-from marqo.errors import IndexNotFoundError
-from marqo.core.models.marqo_index_request import FieldRequest
-from marqo.tensor_search.enums import SearchMethod
-from marqo.tensor_search import tensor_search
+import requests
+
+import marqo.core.exceptions as core_exceptions
 from marqo import errors
+from marqo.core.models.marqo_index import *
+from marqo.core.models.marqo_index_request import FieldRequest
+from marqo.errors import IndexNotFoundError
+from marqo.s2_inference.s2_inference import get_model_properties_from_registry
+from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import EnvVars
+from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from tests.marqo_test import MarqoTestCase
-import marqo.core.exceptions as core_exceptions
 
 
 class TestSearchStructured(MarqoTestCase):
@@ -24,7 +26,7 @@ class TestSearchStructured(MarqoTestCase):
         super().setUpClass()
 
         default_text_index = cls.structured_marqo_index_request(
-            model = Model(name="hf/all_datasets_v4_MiniLM-L6"),
+            model=Model(name="hf/all_datasets_v4_MiniLM-L6"),
             fields=[
                 FieldRequest(name="text_field_1", type=FieldType.Text,
                              features=[FieldFeature.LexicalSearch, FieldFeature.Filter]),
@@ -54,6 +56,20 @@ class TestSearchStructured(MarqoTestCase):
 
             tensor_fields=["text_field_1", "text_field_2", "text_field_3",
                            "text_field_4", "text_field_5", "text_field_6"]
+        )
+        default_text_index_encoded_name = cls.structured_marqo_index_request(
+            name='a-b_' + str(uuid.uuid4()).replace('-', ''),
+            model=Model(name="hf/all_datasets_v4_MiniLM-L6"),
+            fields=[
+                FieldRequest(name="text_field_1", type=FieldType.Text,
+                             features=[FieldFeature.LexicalSearch, FieldFeature.Filter]),
+                FieldRequest(name="text_field_2", type=FieldType.Text,
+                             features=[FieldFeature.LexicalSearch, FieldFeature.Filter]),
+                FieldRequest(name="text_field_3", type=FieldType.Text,
+                             features=[FieldFeature.LexicalSearch, FieldFeature.Filter])
+            ],
+
+            tensor_fields=["text_field_1", "text_field_2", "text_field_3"]
         )
 
         default_image_index = cls.structured_marqo_index_request(
@@ -87,11 +103,13 @@ class TestSearchStructured(MarqoTestCase):
 
         cls.indexes = cls.create_indexes([
             default_text_index,
+            default_text_index_encoded_name,
             default_image_index,
             image_index_with_random_model
         ])
 
         cls.default_text_index = default_text_index.name
+        cls.default_text_index_encoded_name = default_text_index_encoded_name.name
         cls.default_image_index = default_image_index.name
         cls.image_index_with_random_model = image_index_with_random_model.name
 
@@ -111,28 +129,34 @@ class TestSearchStructured(MarqoTestCase):
     # TODO - Test timeout parameter
     def test_each_doc_returned_once(self):
         """Each doc should be returned once, even if it matches multiple times"""
-        tensor_search.add_documents(
-            config=self.config,
-            add_docs_params=AddDocsParams(
-            index_name=self.default_text_index,
-            docs=[
-                {"text_field_1": "Exact match hehehe efgh ",
-                 "text_field_2": "baaadd efgh ",
-                 "text_field_3": "some field efgh ",
-                 "_id": "5678"},
-                {"text_field_1": "shouldn't really match ",
-                 "text_field_2": "Nope.....",
-                 "text_field_3": "Random text here efgh ",
-                 "_id": "1234"},
-            ]
-            )
-        )
+        tests = [
+            (self.default_text_index, 'Standard index name'),
+            (self.default_text_index_encoded_name, 'Index name requiring encoding'),
+        ]
+        for index_name, desc in tests:
+            with self.subTest(desc):
+                tensor_search.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index_name,
+                        docs=[
+                            {"text_field_1": "Exact match hehehe efgh ",
+                             "text_field_2": "baaadd efgh ",
+                             "text_field_3": "some field efgh ",
+                             "_id": "5678"},
+                            {"text_field_1": "shouldn't really match ",
+                             "text_field_2": "Nope.....",
+                             "text_field_3": "Random text here efgh ",
+                             "_id": "1234"},
+                        ]
+                    )
+                )
 
-        search_res = tensor_search._vector_text_search(
-            config=self.config, index_name=self.default_text_index,
-            query=" efgh ", result_count=10, device="cpu"
-        )
-        assert len(search_res['hits']) == 2
+                search_res = tensor_search._vector_text_search(
+                    config=self.config, index_name=index_name,
+                    query=" efgh ", result_count=10, device="cpu"
+                )
+                assert len(search_res['hits']) == 2
 
     #
     # def test_search_with_searchable_attributes_max_attributes_is_none(self):
@@ -194,7 +218,7 @@ class TestSearchStructured(MarqoTestCase):
                 index_name=self.default_text_index,
                 docs=[
                     {"_id": "12345",
-                     "text_field_1": "The Guardian is a newspaper, read in the UK and other places around the world",},
+                     "text_field_1": "The Guardian is a newspaper, read in the UK and other places around the world", },
                     {"_id": "abc12334",
                      "text_field_1": "Grandma Jo's family recipe.",
                      "text_field_2": "1. Cook meat. 2: Dice Onions. 3: Serve."}
@@ -1144,4 +1168,3 @@ class TestSearchStructured(MarqoTestCase):
             highlight_field = list(hit['_highlights'].keys())[0]
             assert highlight_field in original_doc
             assert hit[highlight_field] == original_doc[highlight_field]
-

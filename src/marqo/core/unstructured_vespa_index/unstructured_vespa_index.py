@@ -73,8 +73,8 @@ class UnstructuredVespaIndex(VespaIndex):
             query_inputs.update(score_modifiers)
 
         query = {
-            'yql': f"select {select_attributes} from {marqo_query.index_name} where {tensor_term}{filter_term}",
-            'model_restrict': marqo_query.index_name,
+            'yql': f"select {select_attributes} from {self._marqo_index.schema_name} where {tensor_term}{filter_term}",
+            'model_restrict': self._marqo_index.schema_name,
             'hits': marqo_query.limit,
             'offset': marqo_query.offset,
             'query_features': query_inputs,
@@ -247,8 +247,8 @@ class UnstructuredVespaIndex(VespaIndex):
             query_inputs.update(score_modifiers)
 
         query = {
-            'yql': f'select * from {marqo_query.index_name} where {lexical_term}{filter_term}',
-            'model_restrict': marqo_query.index_name,
+            'yql': f'select * from {self._marqo_index.schema_name} where {lexical_term}{filter_term}',
+            'model_restrict': self._marqo_index.schema_name,
             'hits': marqo_query.limit,
             'offset': marqo_query.offset,
             'query_features': query_inputs,
@@ -263,9 +263,9 @@ class UnstructuredVespaIndex(VespaIndex):
 
     def get_vector_count_query(self) -> Dict[str, Any]:
         return {
-            'yql': f'select {unstructured_common.FIELD_VECTOR_COUNT} from {self._marqo_index.name} '
+            'yql': f'select {unstructured_common.FIELD_VECTOR_COUNT} from {self._marqo_index.schema_name} '
                    f'where true limit 0 | all(group(1) each(output(sum({unstructured_common.FIELD_VECTOR_COUNT}))))',
-            'model_restrict': self._marqo_index.name,
+            'model_restrict': self._marqo_index.schema_name,
             'timeout': '5s'
         }
 

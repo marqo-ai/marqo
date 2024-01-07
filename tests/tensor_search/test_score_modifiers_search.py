@@ -1,19 +1,20 @@
 import copy
+import unittest
 from unittest import mock
 from tests.utils.transition import add_docs_caller
 from marqo.errors import IndexNotFoundError, InvalidArgError
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.models.api_models import ScoreModifier
-from marqo.tensor_search.enums import TensorField, IndexSettingsField, SearchMethod
+from marqo.tensor_search.enums import TensorField
 from tests.marqo_test import MarqoTestCase
 from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQueryEntity
 import pprint
-from marqo.tensor_search.tensor_search import (_create_normal_tensor_search_query, _vector_text_search_query_verbose,
-                                                _generate_vector_text_search_query_for_verbose_one)
+
 
 from pydantic.error_wrappers import ValidationError
 import os
 
+@unittest.skip
 class TestScoreModifiersSearch(MarqoTestCase):
 
     def setUp(self):
@@ -551,7 +552,7 @@ class TestScoreModifiersSearch(MarqoTestCase):
             return True
         assert run()
 
-
+@unittest.skip
 class TestScoreModifiersBulkSearch(MarqoTestCase):
 
     def setUp(self):

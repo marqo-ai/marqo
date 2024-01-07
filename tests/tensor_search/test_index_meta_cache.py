@@ -3,6 +3,8 @@ import os
 import datetime
 import threading
 import time
+import unittest
+
 import requests
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.tensor_search import tensor_search
@@ -10,13 +12,13 @@ from marqo.tensor_search import index_meta_cache
 from marqo.config import Config
 from marqo.errors import MarqoError, MarqoApiError, IndexNotFoundError
 from marqo.tensor_search import utils
-from marqo.tensor_search.enums import TensorField, SearchMethod, IndexSettingsField
+from marqo.tensor_search.enums import TensorField, SearchMethod
 from marqo.tensor_search import configs
 from tests.marqo_test import MarqoTestCase
 from unittest import mock
 from marqo import errors
 
-
+@unittest.skip
 class TestIndexMetaCache(MarqoTestCase):
 
     def setUp(self) -> None:

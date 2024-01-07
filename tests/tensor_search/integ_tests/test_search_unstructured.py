@@ -1,19 +1,21 @@
 import math
 import os
-import requests
-from unittest import mock
 import random
+import uuid
+from unittest import mock
 
-from marqo.core.models.marqo_index import *
-from marqo.s2_inference.s2_inference import get_model_properties_from_registry
-from marqo.errors import IndexNotFoundError
-from marqo.tensor_search.enums import SearchMethod
-from marqo.tensor_search import tensor_search
+import requests
+
+import marqo.core.exceptions as core_exceptions
 from marqo import errors
+from marqo.core.models.marqo_index import *
+from marqo.errors import IndexNotFoundError
+from marqo.s2_inference.s2_inference import get_model_properties_from_registry
+from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import EnvVars
+from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from tests.marqo_test import MarqoTestCase
-import marqo.core.exceptions as core_exceptions
 
 
 class TestSearchUnstructured(MarqoTestCase):
@@ -23,6 +25,9 @@ class TestSearchUnstructured(MarqoTestCase):
         super().setUpClass()
 
         default_text_index = cls.unstructured_marqo_index_request()
+        default_text_index_encoded_name = cls.unstructured_marqo_index_request(
+            name='a-b_' + str(uuid.uuid4()).replace('-', '')
+        )
 
         default_image_index = cls.unstructured_marqo_index_request(
             model=Model(name='ViT-B/32'),
@@ -42,12 +47,14 @@ class TestSearchUnstructured(MarqoTestCase):
 
         cls.indexes = cls.create_indexes([
             default_text_index,
+            default_text_index_encoded_name,
             default_image_index,
             image_index_with_chunking,
             image_index_with_random_model
         ])
 
         cls.default_text_index = default_text_index.name
+        cls.default_text_index_encoded_name = default_text_index_encoded_name.name
         cls.default_image_index = default_image_index.name
         cls.image_index_with_chunking = image_index_with_chunking.name
         cls.image_index_with_random_model = image_index_with_random_model.name
@@ -68,24 +75,30 @@ class TestSearchUnstructured(MarqoTestCase):
     # TODO - Test timeout parameter
     def test_each_doc_returned_once(self):
         """Each doc should be returned once, even if it matches multiple times"""
-        tensor_search.add_documents(config=self.config,
-                                    add_docs_params=AddDocsParams(
-                                        index_name=self.default_text_index,
-                                        docs=[
-                                            {"abc": "Exact match hehehe efgh ", "other field": "baaadd efgh ",
-                                             "_id": "5678", "finally": "some field efgh "},
-                                            {"abc": "shouldn't really match ", "other field": "Nope.....",
-                                             "_id": "1234", "finally": "Random text here efgh "},
-                                        ],
-                                        tensor_fields=["abc", "other field", "finally"],
-                                    )
-                                    )
+        tests = [
+            (self.default_text_index, 'Standard index name'),
+            (self.default_text_index_encoded_name, 'Index name requiring encoding'),
+        ]
+        for index_name, desc in tests:
+            with self.subTest(desc):
+                tensor_search.add_documents(config=self.config,
+                                            add_docs_params=AddDocsParams(
+                                                index_name=index_name,
+                                                docs=[
+                                                    {"abc": "Exact match hehehe efgh ", "other field": "baaadd efgh ",
+                                                     "_id": "5678", "finally": "some field efgh "},
+                                                    {"abc": "shouldn't really match ", "other field": "Nope.....",
+                                                     "_id": "1234", "finally": "Random text here efgh "},
+                                                ],
+                                                tensor_fields=["abc", "other field", "finally"],
+                                            )
+                                            )
 
-        search_res = tensor_search._vector_text_search(
-            config=self.config, index_name=self.default_text_index,
-            query=" efgh ", result_count=10, device="cpu"
-        )
-        assert len(search_res['hits']) == 2
+                search_res = tensor_search._vector_text_search(
+                    config=self.config, index_name=index_name,
+                    query=" efgh ", result_count=10, device="cpu"
+                )
+                assert len(search_res['hits']) == 2
 
     #
     # def test_search_with_searchable_attributes_max_attributes_is_none(self):
@@ -319,7 +332,7 @@ class TestSearchUnstructured(MarqoTestCase):
                 index_name=self.default_text_index, docs=[
                     {"abc": "some text", "other field": "baaadd", "_id": "5678"},
                     {"abc": "some text", "other field": "Close match hehehe", "_id": "1234"}],
-                    tensor_fields=[]
+                tensor_fields=[]
             )
         )
 
