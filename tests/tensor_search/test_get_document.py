@@ -1,5 +1,6 @@
 import functools
-import pprint
+import unittest
+
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.tensor_search import enums
 from marqo.api.exceptions import IndexNotFoundError, InvalidDocumentIdError

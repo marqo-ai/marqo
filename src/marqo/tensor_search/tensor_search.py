@@ -44,7 +44,9 @@ import psutil
 import torch.cuda
 from PIL import Image
 
+import marqo.core.unstructured_vespa_index.common as unstructured_common
 from marqo.api import exceptions as api_exceptions
+from marqo.api import exceptions as errors
 # We depend on _httprequests.py for now, but this may be replaced in the future, as
 # _httprequests.py is designed for the client
 from marqo.config import Config

@@ -9,8 +9,8 @@ import PIL
 import pytest
 import requests
 
+from marqo.api.exceptions import IndexNotFoundError, BadRequestError
 from marqo.core.models.marqo_index import *
-from marqo.errors import IndexNotFoundError, BadRequestError
 from marqo.s2_inference import types
 from marqo.tensor_search import add_docs
 from marqo.tensor_search import enums
