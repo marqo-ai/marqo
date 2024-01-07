@@ -136,6 +136,7 @@ class IndexManagement:
         self._remove_schema_from_services(app, index_name)
         self._add_schema_removal_override(app)
         self.vespa_client.deploy_application(app)
+        self.vespa_client.wait_for_application_convergence()
         self._delete_index_settings_by_name(index_name)
 
     def batch_delete_indexes_by_name(self, index_names: List[str]) -> None:
