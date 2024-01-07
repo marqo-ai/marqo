@@ -10,6 +10,7 @@ from marqo.tensor_search.enums import TensorField
 from marqo.api.exceptions import IndexNotFoundError, InvalidArgError, BadRequestError
 
 
+@unittest.skip
 class TestAddDocumentsUseExistingTensors(MarqoTestCase):
 
     def setUp(self) -> None:

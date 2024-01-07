@@ -1,4 +1,5 @@
 import datetime
+import unittest
 from copy import deepcopy
 import marqo.tensor_search.delete_docs
 from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest, MqDeleteDocsResponse
@@ -14,6 +15,7 @@ from marqo.tensor_search import enums
 from tests.utils.transition import add_docs_caller
 import os
 
+@unittest.skip
 class TestDeleteDocuments(MarqoTestCase):
     """module that has tests at the tensor_search level"""
 

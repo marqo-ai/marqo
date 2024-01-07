@@ -339,4 +339,3 @@ class TestTelemetryMiddleware(unittest.TestCase):
         self.scope = {'type': 'http', 'query_string': b'telemetry=false'}
         self.request = Request(self.scope)
         self.assertFalse(TelemetryMiddleware(self.app).telemetry_enabled_for_request(self.request))
-        

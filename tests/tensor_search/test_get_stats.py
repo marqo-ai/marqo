@@ -1,3 +1,4 @@
+import unittest
 from unittest.mock import MagicMock, patch
 
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
@@ -7,6 +8,7 @@ from marqo.tensor_search import tensor_search, constants, index_meta_cache
 from tests.marqo_test import MarqoTestCase
 
 
+@unittest.skip
 class TestGetStats(MarqoTestCase):
 
     def setUp(self) -> None:

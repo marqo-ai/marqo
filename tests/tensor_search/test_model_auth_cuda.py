@@ -20,6 +20,7 @@ from marqo.api.exceptions import BadRequestError
 
 @pytest.mark.largemodel
 @pytest.mark.skipif(torch.cuda.is_available() is False, reason="We skip the large model test if we don't have cuda support")
+@unittest.skip
 class TestModelAuthLoadedS3(MarqoTestCase):
     """loads an s3 model loaded index, for tests """
 

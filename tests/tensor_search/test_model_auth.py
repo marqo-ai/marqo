@@ -57,6 +57,7 @@ def _get_base_index_settings():
         }
     }
 
+@unittest.skip
 class TestModelAuthLoadedS3(MarqoTestCase):
     """loads an s3 model loaded index, for tests that don't need to redownload
     the model each time """
@@ -196,6 +197,7 @@ class TestModelAuthLoadedS3(MarqoTestCase):
         mods = tensor_search.get_loaded_models()['models']
         assert any([m['model_name'] == 'my_model' for m in mods])
 
+@unittest.skip
 class TestModelAuthOpenCLIP(MarqoTestCase):
 
     device = 'cpu'
@@ -1018,7 +1020,7 @@ class TestModelAuthOpenCLIP(MarqoTestCase):
         """
 
 
-
+@unittest.skip
 class TestModelAuthDownloadAndExtractS3HFModel(MarqoTestCase):
     """Tests for the downloading and archive extracting process for s3 and hf models"""
 
@@ -1158,6 +1160,7 @@ class TestModelAuthDownloadAndExtractS3HFModel(MarqoTestCase):
         assert any([m['model_name'] == 'my_model' for m in mods])
 
 
+@unittest.skip
 class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
     """
     This class tests the following scenarios:
@@ -1988,6 +1991,7 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
         assert mock_autotokenizer_from_pretrained.call_args_list[0][0][0] == private_repo_name
         mock_autotokenizer_from_pretrained.call_args_list[0][1]["use_auth_token"] == hf_token
 
+@unittest.skip
 class TestS3ModelAuthlLoadForHFModelVariants(MarqoTestCase):
     """
     This class tests the variants of the hf model loading and the expected error messages

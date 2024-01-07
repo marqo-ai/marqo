@@ -52,7 +52,7 @@ class TestOnStartScript(MarqoTestCase):
     def test_preload_url_models(self):
         clip_model_object = {
             "model": "generic-clip-test-model-2",
-            "model_properties": {
+            "modelProperties": {
                 "name": "ViT-B/32",
                 "dimensions": 512,
                 "type": "clip",
@@ -70,7 +70,7 @@ class TestOnStartScript(MarqoTestCase):
 
         open_clip_model_object = {
             "model": "random-open-clip-1",
-            "model_properties": {
+            "modelProperties": {
                 "name": "ViT-B-32-quickgelu",
                 "dimensions": 512,
                 "type": "open_clip",

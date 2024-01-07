@@ -164,6 +164,7 @@ class MarqoIndex(ImmutableStrictBaseModel, ABC):
     Base class for a Marqo index.
     """
     name: str
+    schema_name: str
     type: IndexType  # We need this so that we can deserialize the correct subclass
     model: Model
     normalize_embeddings: bool
@@ -380,7 +381,10 @@ class StructuredMarqoIndex(MarqoIndex):
 
 _PROTECTED_FIELD_NAMES = ['_id', '_tensor_facets', '_highlights', '_score', '_found']
 _VESPA_NAME_PATTERN = r'[a-zA-Z_][a-zA-Z0-9_]*'
+_INDEX_NAME_PATTERN = r'[a-zA-Z_-][a-zA-Z0-9_-]*'
+
 _VESPA_NAME_REGEX = re.compile(_VESPA_NAME_PATTERN)
+_INDEX_NAME_REGEX = re.compile(_INDEX_NAME_PATTERN)
 
 
 def _is_valid_vespa_name(name: str) -> bool:
@@ -397,8 +401,8 @@ def validate_index_name(name: str) -> None:
     """
     Validate a MarqoIndex name. Raises ValueError if validation fails.
     """
-    if not _is_valid_vespa_name(name):
-        raise ValueError(f'"{name}" is not a valid index name. Index name must match {_VESPA_NAME_PATTERN} '
+    if _INDEX_NAME_REGEX.fullmatch(name) is None:
+        raise ValueError(f'"{name}" is not a valid index name. Index name must match {_INDEX_NAME_PATTERN} '
                          f'and must not start with "{constants.MARQO_RESERVED_PREFIX}"')
     if name.startswith(constants.MARQO_RESERVED_PREFIX):
         raise ValueError(f'Index name must not start with "{constants.MARQO_RESERVED_PREFIX}"')

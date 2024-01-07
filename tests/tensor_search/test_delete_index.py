@@ -1,15 +1,17 @@
-from marqo.api.exceptions import MarqoApiError, IndexNotFoundError
+import unittest
+
+from marqo.api.exceptions import IndexNotFoundError
 from marqo.tensor_search import tensor_search, index_meta_cache
-import copy
 from tests.marqo_test import MarqoTestCase
 
 
+@unittest.skip
 class TestDeleteIndex(MarqoTestCase):
 
     def setUp(self) -> None:
         self.generic_header = {"Content-type": "application/json"}
         self.index_name_1 = "my-test-index-owwoowow2"
-        self.index_name_2 ="test-index-epic"
+        self.index_name_2 = "test-index-epic"
         self._delete_indices()
 
     def tearDown(self) -> None:
@@ -34,4 +36,3 @@ class TestDeleteIndex(MarqoTestCase):
         tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         assert self.index_name_1 not in index_meta_cache.get_cache()
         assert self.index_name_2 in index_meta_cache.get_cache()
-

@@ -1,7 +1,6 @@
 import functools
 import math
 import os
-import threading
 import uuid
 from unittest import mock
 from unittest.mock import patch
@@ -27,6 +26,29 @@ class TestAddDocumentsStructured(MarqoTestCase):
         super().setUpClass()
 
         index_request_1 = cls.structured_marqo_index_request(
+            fields=[
+                FieldRequest(name='title', type=FieldType.Text),
+                FieldRequest(
+                    name='desc',
+                    type=FieldType.Text,
+                    features=[FieldFeature.LexicalSearch]
+                ),
+                FieldRequest(
+                    name='tags',
+                    type=FieldType.ArrayText,
+                    features=[FieldFeature.Filter, FieldFeature.LexicalSearch]
+                ),
+                FieldRequest(
+                    name='price',
+                    type=FieldType.Float,
+                    features=[FieldFeature.ScoreModifier]
+                ),
+            ],
+            tensor_fields=['title']
+        )
+        index_request_2 = cls.structured_marqo_index_request(
+            # name with - and _
+            name='a-b_' + str(uuid.uuid4()).replace('-', ''),
             fields=[
                 FieldRequest(name='title', type=FieldType.Text),
                 FieldRequest(
@@ -100,19 +122,18 @@ class TestAddDocumentsStructured(MarqoTestCase):
 
         cls.indexes = cls.create_indexes([
             index_request_1,
+            index_request_2,
             index_request_img_no_chunking,
             index_request_img_chunking,
             index_request_img_random
         ])
 
         cls.index_name_1 = index_request_1.name
+        cls.index_name_2 = index_request_2.name
         cls.index_name_img_no_chunking = index_request_img_no_chunking.name
         cls.index_name_img_chunking = index_request_img_chunking.name
         cls.index_name_img_random = index_request_img_random.name
 
-    # ,
-    # construct_vector_input_batches,
-    #
     def setUp(self) -> None:
         super().setUp()
 
@@ -127,28 +148,34 @@ class TestAddDocumentsStructured(MarqoTestCase):
         """
         Plain id field works
         """
-        tensor_search.add_documents(
-            config=self.config, add_docs_params=AddDocsParams(
-                index_name=self.index_name_1,
-                docs=[{
-                    "_id": "123",
-                    "title": "content 1",
-                    "desc": "content 2. blah blah blah"
-                }],
-                device="cpu"
-            )
-        )
-        self.assertEqual(
-            {
-                "_id": "123",
-                "title": "content 1",
-                "desc": "content 2. blah blah blah"
-            },
-            tensor_search.get_document_by_id(
-                config=self.config, index_name=self.index_name_1,
-                document_id="123"
-            )
-        )
+        tests = [
+            (self.index_name_1, 'Standard index name'),
+            (self.index_name_2, 'Index name requiring encoding'),
+        ]
+        for index_name, desc in tests:
+            with self.subTest(desc):
+                tensor_search.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=index_name,
+                        docs=[{
+                            "_id": "123",
+                            "title": "content 1",
+                            "desc": "content 2. blah blah blah"
+                        }],
+                        device="cpu"
+                    )
+                )
+                self.assertEqual(
+                    {
+                        "_id": "123",
+                        "title": "content 1",
+                        "desc": "content 2. blah blah blah"
+                    },
+                    tensor_search.get_document_by_id(
+                        config=self.config, index_name=index_name,
+                        document_id="123"
+                    )
+                )
 
     def test_add_documents_dupe_ids(self):
         """

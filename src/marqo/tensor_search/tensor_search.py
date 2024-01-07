@@ -456,7 +456,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
         # ADD DOCS TIMER-LOGGER (5)
         start_time_5 = timer()
         with RequestMetricsStore.for_request().time("add_documents.vespa._bulk"):
-            index_responses = vespa_client.feed_batch(vespa_docs, marqo_index.name)
+            index_responses = vespa_client.feed_batch(vespa_docs, marqo_index.schema_name)
 
         end_time_5 = timer()
         total_http_time = end_time_5 - start_time_5
@@ -902,7 +902,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
         # ADD DOCS TIMER-LOGGER (5)
         start_time_5 = timer()
         with RequestMetricsStore.for_request().time("add_documents.vespa._bulk"):
-            index_responses = vespa_client.feed_batch(vespa_docs, marqo_index.name)
+            index_responses = vespa_client.feed_batch(vespa_docs, marqo_index.schema_name)
 
         end_time_5 = timer()
         total_http_time = end_time_5 - start_time_5
@@ -955,7 +955,7 @@ def get_document_by_id(
     marqo_index = index_meta_cache.get_index(config=config, index_name=index_name)
 
     try:
-        res = config.vespa_client.get_document(document_id, marqo_index.name)
+        res = config.vespa_client.get_document(document_id, marqo_index.schema_name)
     except VespaStatusError as e:
         if e.status_code == 404:
             raise api_exceptions.DocumentNotFoundError(
@@ -1016,8 +1016,8 @@ def get_documents_by_ids(
     if len(validated_ids) == 0:  # Can only happen when ignore_invalid_ids is True
         return {"results": []}
 
-    batch_get = config.vespa_client.get_batch(validated_ids, index_name)
     marqo_index = index_meta_cache.get_index(config=config, index_name=index_name)
+    batch_get = config.vespa_client.get_batch(validated_ids, marqo_index.schema_name)
     vespa_index = vespa_index_factory(marqo_index)
 
     to_return = {

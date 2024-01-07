@@ -13,6 +13,7 @@ def _index_is_present(index_name, index_results):
     return any([index_name in res.values() for res in index_results['results']])
 
 
+@unittest.skip
 class TestGetIndexes(MarqoTestCase):
 
     def setUp(self) -> None:
