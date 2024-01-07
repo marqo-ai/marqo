@@ -56,7 +56,7 @@ def validate_field_name(field_name: str) -> None:
     try:
         common_validate_name(field_name)
     except ValueError as e:
-        raise errors.InvalidFieldNameError(e)
+        raise errors.InvalidFieldNameError(str(e))
     # Some extra validations for unstructured index
     if _RESERVED_FIELD_SUBSTRING in field_name:
         raise errors.InvalidFieldNameError(

@@ -116,18 +116,18 @@ class UnstructuredVespaIndex(VespaIndex):
             # Bool Filter
             if node.value in cls._FILTER_STRING_BOOL_VALUES:
                 filter_value = int(True if node.value == "true" else False)
-                return (f'({unstructured_common.BOOL_FIELDS} contains sameElement(key contains "{escape(node.field)}", '
+                return (f'({unstructured_common.BOOL_FIELDS} contains sameElement(key contains "{node.field}", '
                         f'value = {filter_value}))')
 
             # Short String Filter
             short_string_filter_string = (f'({unstructured_common.SHORT_STRINGS_FIELDS} '
-                                          f'contains sameElement(key contains "{escape(node.field)}", '
+                                          f'contains sameElement(key contains "{node.field}", '
                                           f'value contains "{escape(node.value)}"))')
             filter_parts.append(short_string_filter_string)
 
             # String Array Filter
             string_array_filter_string = (f'({unstructured_common.STRING_ARRAY} contains '
-                                          f'"{escape(node.field)}::{escape(node.value)}")')
+                                          f'"{node.field}::{escape(node.value)}")')
             filter_parts.append(string_array_filter_string)
 
             # Numeric Filter
