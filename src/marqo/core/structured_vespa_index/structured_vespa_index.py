@@ -201,9 +201,9 @@ class StructuredVespaIndex(VespaIndex):
 
     def get_vector_count_query(self):
         return {
-            'yql': f'select {common.FIELD_VECTOR_COUNT} from {self._marqo_index.name} '
+            'yql': f'select {common.FIELD_VECTOR_COUNT} from {self._marqo_index.schema_name} '
                    f'where true limit 0 | all(group(1) each(output(sum({common.FIELD_VECTOR_COUNT}))))',
-            'model_restrict': self._marqo_index.name,
+            'model_restrict': self._marqo_index.schema_name,
             'timeout': '5s'
         }
 
@@ -242,8 +242,8 @@ class StructuredVespaIndex(VespaIndex):
             query_inputs.update(score_modifiers)
 
         query = {
-            'yql': f'select {select_attributes} from {marqo_query.index_name} where {tensor_term}{filter_term}',
-            'model_restrict': marqo_query.index_name,
+            'yql': f'select {select_attributes} from {self._marqo_index.schema_name} where {tensor_term}{filter_term}',
+            'model_restrict': self._marqo_index.schema_name,
             'hits': marqo_query.limit,
             'offset': marqo_query.offset,
             'query_features': query_inputs,
@@ -292,8 +292,8 @@ class StructuredVespaIndex(VespaIndex):
             query_inputs.update(score_modifiers)
 
         query = {
-            'yql': f'select {select_attributes} from {marqo_query.index_name} where {lexical_term}{filter_term}',
-            'model_restrict': marqo_query.index_name,
+            'yql': f'select {select_attributes} from {self._marqo_index.schema_name} where {lexical_term}{filter_term}',
+            'model_restrict': self._marqo_index.schema_name,
             'hits': marqo_query.limit,
             'offset': marqo_query.offset,
             'query_features': query_inputs,
@@ -459,7 +459,7 @@ class StructuredVespaIndex(VespaIndex):
                 not isinstance(python_type, list) and not isinstance(value, python_type)
         ):
             raise InvalidDataTypeError(f'Invalid value {value} for field {field_name} with Marqo type '
-                                       f'{marqo_type.name}. Expected a value of type {python_type}, but found '
+                                       f'{marqo_type.value}. Expected a value of type {python_type}, but found '
                                        f'{type(value)}')
 
     def _extract_highlights(self, vespa_document_fields: Dict[str, Any]) -> Dict[str, Any]:

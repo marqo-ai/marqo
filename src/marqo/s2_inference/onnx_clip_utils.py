@@ -18,7 +18,7 @@ import marqo.s2_inference.model_registry as model_registry
 from zipfile import ZipFile
 from huggingface_hub.utils import RevisionNotFoundError,RepositoryNotFoundError, EntryNotFoundError, LocalEntryNotFoundError
 from marqo.s2_inference.errors import ModelDownloadError
-from marqo.errors import InternalError
+from marqo.api.exceptions import InternalError
 
 # Loading shared functions from clip_utils.py. This part should be decoupled from models in the future
 from marqo.s2_inference.clip_utils import get_allowed_image_types, format_and_load_CLIP_image, \

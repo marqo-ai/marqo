@@ -1,6 +1,6 @@
 import unittest
 from marqo.tensor_search.models.private_models import ModelAuth, ModelLocation
-from marqo.errors import InvalidArgError
+from marqo.api.exceptions import InvalidArgError
 from marqo.tensor_search.models.external_apis.hf import HfAuth, HfModelLocation
 from marqo.tensor_search.models.external_apis.s3 import S3Auth, S3Location
 

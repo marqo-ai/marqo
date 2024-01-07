@@ -30,10 +30,11 @@ class StructuredVespaSchema(VespaSchema):
 
     def generate_schema(self) -> (str, MarqoIndex):
         schema = list()
+        schema_name = self._get_vespa_schema_name(self._index_request.name)
 
-        schema.append(f'schema {self._index_request.name} {{')
+        schema.append(f'schema {schema_name} {{')
 
-        document_section, marqo_index = self._generate_document_section()
+        document_section, marqo_index = self._generate_document_section(schema_name)
 
         schema.extend(document_section)
         schema.extend(self._generate_rank_profiles(marqo_index))
@@ -43,7 +44,7 @@ class StructuredVespaSchema(VespaSchema):
 
         return '\n'.join(schema), marqo_index
 
-    def _generate_document_section(self) -> (List[str], StructuredMarqoIndex):
+    def _generate_document_section(self, schema_name: str) -> (List[str], StructuredMarqoIndex):
         """
         Generate the document (fields) section of the Vespa schema.
 
@@ -54,7 +55,7 @@ class StructuredVespaSchema(VespaSchema):
         fields: List[Field] = []
         tensor_fields: List[TensorField] = []
 
-        document.append(f'document {self._index_request.name} {{')
+        document.append(f'document {{')
 
         # ID field
         document.append(f'field {common.FIELD_ID} type string {{ indexing: summary }}')
@@ -142,6 +143,7 @@ class StructuredVespaSchema(VespaSchema):
 
         marqo_index = StructuredMarqoIndex(
             name=self._index_request.name,
+            schema_name=schema_name,
             model=self._index_request.model,
             normalize_embeddings=self._index_request.normalize_embeddings,
             text_preprocessing=self._index_request.text_preprocessing,
@@ -175,7 +177,7 @@ class StructuredVespaSchema(VespaSchema):
             return (f'if(query({tensor_fields[0].name}) > 0, '
                     f'closeness(field, {tensor_fields[0].embeddings_field_name}), 0)')
         elif len(tensor_fields) == 2:
-            return (f'max(' 
+            return (f'max('
                     f'if(query({tensor_fields[0].name}) > 0, '
                     f'closeness(field, {tensor_fields[0].embeddings_field_name}), 0), '
                     f'if(query({tensor_fields[1].name}) > 0, '

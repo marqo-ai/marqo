@@ -1,9 +1,9 @@
 import textwrap
 
-from marqo.core.models import MarqoIndex, UnstructuredMarqoIndex
+from marqo.core.models import UnstructuredMarqoIndex
 from marqo.core.models.marqo_index_request import UnstructuredMarqoIndexRequest
-from marqo.core.vespa_schema import VespaSchema
 from marqo.core.unstructured_vespa_index import common as unstructured_common
+from marqo.core.vespa_schema import VespaSchema
 
 
 class UnstructuredVespaSchema(VespaSchema):
@@ -35,17 +35,19 @@ class UnstructuredVespaSchema(VespaSchema):
         self._index_request = index_request
 
     def generate_schema(self) -> (str, UnstructuredMarqoIndex):
-        marqo_index = self._generate_unstructured_marqo_index()
+        schema_name = self._get_vespa_schema_name(self._index_request.name)
+        marqo_index = self._generate_unstructured_marqo_index(schema_name)
         unstructured_schema = self._generate_unstructured_schema(marqo_index)
 
         return unstructured_schema, marqo_index
 
-    def _generate_unstructured_marqo_index(self) -> UnstructuredMarqoIndex:
+    def _generate_unstructured_marqo_index(self, schema_name: str) -> UnstructuredMarqoIndex:
         """This function converts the attribute self._index_request: UnstructuredMarqoIndexRequest
         into an instance of UnstructuredMarqoIndex.
         """
         return UnstructuredMarqoIndex(
             name=self._index_request.name,
+            schema_name=schema_name,
             model=self._index_request.model,
             normalize_embeddings=self._index_request.normalize_embeddings,
             text_preprocessing=self._index_request.text_preprocessing,
@@ -67,8 +69,8 @@ class UnstructuredVespaSchema(VespaSchema):
 
         return textwrap.dedent(
             f"""
-            schema {marqo_index.name} {{
-                document {marqo_index.name} {{
+            schema {marqo_index.schema_name} {{
+                document {{
                     field {cls._FIELD_ID} type string {{
                         indexing: attribute | summary
                     }}

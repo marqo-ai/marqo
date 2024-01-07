@@ -1,8 +1,8 @@
 import time
 from typing import Dict, Any, Optional, List
 
+import marqo.api.exceptions as api_exceptions
 import marqo.core.models.marqo_index as core
-import marqo.errors as errors
 from marqo import version
 from marqo.base_model import StrictBaseModel
 from marqo.core.models.marqo_index_request import FieldRequest, MarqoIndexRequest, StructuredMarqoIndexRequest, \
@@ -44,11 +44,11 @@ class IndexSettings(StrictBaseModel):
         marqo_fields = None
         if self.type == core.IndexType.Structured:
             if self.treatUrlsAndPointersAsImages is not None:
-                raise errors.InvalidArgError(
+                raise api_exceptions.InvalidArgError(
                     "treat_urls_and_pointers_as_images is not a valid parameter for structured indexes"
                 )
             if self.filterStringMaxLength is not None:
-                raise errors.InvalidArgError(
+                raise api_exceptions.InvalidArgError(
                     "filterStringMaxLength is not a valid parameter for structured indexes"
                 )
 
@@ -83,11 +83,11 @@ class IndexSettings(StrictBaseModel):
             )
         elif self.type == core.IndexType.Unstructured:
             if self.allFields is not None:
-                raise errors.InvalidArgError(
+                raise api_exceptions.InvalidArgError(
                     "all_fields is not a valid parameter for unstructured indexes"
                 )
             if self.tensorFields is not None:
-                raise errors.InvalidArgError(
+                raise api_exceptions.InvalidArgError(
                     "tensor_fields is not a valid parameter for unstructured indexes"
                 )
 
@@ -121,7 +121,7 @@ class IndexSettings(StrictBaseModel):
                 updated_at=time.time()
             )
         else:
-            raise errors.InternalError(f"Unknown index type: {self.type}")
+            raise api_exceptions.InternalError(f"Unknown index type: {self.type}")
 
     @classmethod
     def from_marqo_index(cls, marqo_index: core.MarqoIndex) -> "IndexSettings":
@@ -165,7 +165,7 @@ class IndexSettings(StrictBaseModel):
                 )
             )
         else:
-            raise errors.InternalError(f"Unknown index type: {type(marqo_index)}")
+            raise api_exceptions.InternalError(f"Unknown index type: {type(marqo_index)}")
 
 
 class IndexSettingsWithName(IndexSettings):

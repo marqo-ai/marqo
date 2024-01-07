@@ -5,7 +5,7 @@ from unittest import mock
 from marqo.tensor_search import enums, configs
 from marqo.tensor_search import on_start_script
 from marqo.s2_inference import s2_inference
-from marqo import errors
+from marqo.api import exceptions
 import os
 
 
@@ -44,7 +44,7 @@ class TestOnStartScript(MarqoTestCase):
             try:
                 model_caching_script = on_start_script.ModelsForCacheing()
                 raise AssertionError
-            except errors.EnvVarError as e:
+            except exceptions.EnvVarError as e:
                 print(str(e))
                 return True
         assert run()
@@ -52,7 +52,7 @@ class TestOnStartScript(MarqoTestCase):
     def test_preload_url_models(self):
         clip_model_object = {
             "model": "generic-clip-test-model-2",
-            "model_properties": {
+            "modelProperties": {
                 "name": "ViT-B/32",
                 "dimensions": 512,
                 "type": "clip",
@@ -70,7 +70,7 @@ class TestOnStartScript(MarqoTestCase):
 
         open_clip_model_object = {
             "model": "random-open-clip-1",
-            "model_properties": {
+            "modelProperties": {
                 "name": "ViT-B-32-quickgelu",
                 "dimensions": 512,
                 "type": "open_clip",
@@ -130,7 +130,7 @@ class TestOnStartScript(MarqoTestCase):
                 # There should be a KeyError -> EnvVarError when attempting to call vectorise
                 model_caching_script.run()
                 raise AssertionError
-            except errors.EnvVarError as e:
+            except exceptions.EnvVarError as e:
                 return True
         assert run()
     
@@ -147,7 +147,7 @@ class TestOnStartScript(MarqoTestCase):
                 # There should be a KeyError -> EnvVarError when attempting to call vectorise
                 model_caching_script.run()
                 raise AssertionError
-            except errors.EnvVarError as e:
+            except exceptions.EnvVarError as e:
                 return True
         assert run()
     

@@ -2,7 +2,7 @@ import PIL
 from marqo.s2_inference import random_utils, s2_inference
 import unittest
 from unittest import mock
-from marqo.errors import ConfigurationError, InternalError
+from marqo.api.exceptions import ConfigurationError, InternalError
 from marqo.tensor_search.enums import AvailableModelsKey
 import datetime
 

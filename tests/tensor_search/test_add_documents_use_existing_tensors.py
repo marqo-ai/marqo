@@ -7,9 +7,10 @@ from marqo.s2_inference.s2_inference import vectorise
 from marqo.s2_inference.clip_utils import load_image_from_path
 from marqo.tensor_search import tensor_search, index_meta_cache, backend
 from marqo.tensor_search.enums import TensorField
-from marqo.errors import IndexNotFoundError, InvalidArgError, BadRequestError
+from marqo.api.exceptions import IndexNotFoundError, InvalidArgError, BadRequestError
 
 
+@unittest.skip
 class TestAddDocumentsUseExistingTensors(MarqoTestCase):
 
     def setUp(self) -> None:

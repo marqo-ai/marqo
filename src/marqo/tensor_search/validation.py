@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional, Type, Sequence, Union
 import jsonschema
 
 import marqo.core.models.marqo_index as marqo_index
-from marqo.errors import (
+from marqo.api.exceptions import (
     InvalidFieldNameError, InvalidArgError, InvalidDocumentIdError, DocTooLargeError)
 from marqo.tensor_search import constants
 from marqo.tensor_search import enums, utils
@@ -13,7 +13,6 @@ from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest
 from marqo.tensor_search.models.mappings_object import mappings_schema, multimodal_combination_schema
 from marqo.tensor_search.models.search import SearchContext
-from marqo.errors import IllegalRequestedDocCount
 
 
 def validate_query(q: Union[dict, str], search_method: Union[str, SearchMethod]):

@@ -3,7 +3,7 @@ import math
 import pprint
 from unittest import mock
 from marqo.tensor_search.enums import TensorField, SearchMethod, EnvVars
-from marqo.errors import (
+from marqo.api.exceptions import (
     MarqoApiError, MarqoError, IndexNotFoundError, InvalidArgError,
     InvalidFieldNameError, IllegalRequestedDocCount
 )

@@ -3,7 +3,7 @@ import json
 from pydantic import BaseModel, validator, ValidationError
 from typing import Any, Union, List, Dict, Optional, NewType, Literal
 
-from marqo.errors import InvalidArgError
+from marqo.api.exceptions import InvalidArgError
 from marqo.tensor_search.models.private_models import ModelAuth
 
 Qidx = NewType('Qidx', int) # Indicates the position of a search query in a bulk search request

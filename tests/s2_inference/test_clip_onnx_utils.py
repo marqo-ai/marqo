@@ -16,7 +16,7 @@ import pytest
 from marqo.tensor_search.models.private_models import ModelLocation, ModelAuth
 from marqo.tensor_search.models.private_models import S3Auth, S3Location, HfModelLocation
 from marqo.s2_inference.configs import ModelCache
-from marqo.errors import InternalError
+from marqo.api.exceptions import InternalError
 
 
 class TestOnnxClipLoad(unittest.TestCase):

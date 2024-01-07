@@ -64,7 +64,7 @@ class MarqoTestCase(unittest.TestCase):
 
     def clear_indexes(self, indexes: List[MarqoIndex]):
         for index in indexes:
-            self.clear_index_by_name(index.name)
+            self.clear_index_by_name(index.schema_name)
 
     def clear_index_by_name(self, index_name: str):
         self.pyvespa_client.delete_all_docs(self.CONTENT_CLUSTER, index_name)

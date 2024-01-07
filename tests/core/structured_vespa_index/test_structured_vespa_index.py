@@ -1,4 +1,4 @@
-import pytest
+import unittest
 
 from marqo.core.models.marqo_index import *
 from marqo.core.structured_vespa_index import common
@@ -121,14 +121,14 @@ class TestStructuredVespaIndex(MarqoTestCase):
 
         self.assertEqual(expected_vespa_doc, actual_vespa_doc)
 
-    @pytest.skip
+    @unittest.skip
     def test_to_vespa_document_invalidDataType_fails(self):
         """
         Test that an error is raised when a field has an invalid data type e.g., a string for a float field.
         """
         pass
 
-    @pytest.skip
+    @unittest.skip
     def test_to_vespa_document_fieldNotInIndex_fails(self):
         """
         Test that an error is raised when a field is not in the index.
