@@ -7,7 +7,7 @@ import threading
 import time
 from typing import Dict
 
-from marqo import errors
+from marqo.api import exceptions
 from marqo.config import Config
 from marqo.core.exceptions import IndexNotFoundError
 from marqo.core.index_management.index_management import IndexManagement
@@ -60,7 +60,8 @@ def get_index(config: Config, index_name: str, force_refresh=False) -> MarqoInde
     if index_name in index_info_cache:
         return index_info_cache[index_name]
 
-    raise errors.IndexNotFoundError(f"Index {index_name} not found")
+    # TODO: raise core_exceptions.IndexNotFoundError instead (fix associated tests)
+    raise exceptions.IndexNotFoundError(f"Index {index_name} not found")
 
 
 def _refresh_index(config: Config, index_name: str) -> None:
@@ -71,7 +72,7 @@ def _refresh_index(config: Config, index_name: str) -> None:
     try:
         index = index_management.get_index(index_name)
     except IndexNotFoundError as e:
-        raise errors.IndexNotFoundError(f"Index {index_name} not found") from e
+        raise exceptions.IndexNotFoundError(f"Index {index_name} not found") from e
 
     index_info_cache[index_name] = index
 

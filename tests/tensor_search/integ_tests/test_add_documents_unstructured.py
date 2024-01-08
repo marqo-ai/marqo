@@ -9,8 +9,8 @@ import PIL
 import pytest
 import requests
 
+from marqo.api.exceptions import IndexNotFoundError, BadRequestError
 from marqo.core.models.marqo_index import *
-from marqo.errors import IndexNotFoundError, BadRequestError
 from marqo.s2_inference import types
 from marqo.tensor_search import add_docs
 from marqo.tensor_search import enums
@@ -25,6 +25,9 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
         super().setUpClass()
 
         default_text_index = cls.unstructured_marqo_index_request()
+        default_text_index_encoded_name = cls.unstructured_marqo_index_request(
+            name='a-b_' + str(uuid.uuid4()).replace('-', '')
+        )
 
         default_image_index = cls.unstructured_marqo_index_request(
             model=Model(name='ViT-B/32'),
@@ -44,12 +47,14 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
 
         cls.indexes = cls.create_indexes([
             default_text_index,
+            default_text_index_encoded_name,
             default_image_index,
             image_index_with_chunking,
             image_index_with_random_model
         ])
 
         cls.default_text_index = default_text_index.name
+        cls.default_text_index_encoded_name = default_text_index_encoded_name.name
         cls.default_image_index = default_image_index.name
         cls.image_index_with_chunking = image_index_with_chunking.name
         cls.image_index_with_random_model = image_index_with_random_model.name
@@ -68,28 +73,34 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
         """
         Plain id field works
         """
-        tensor_search.add_documents(
-            config=self.config, add_docs_params=AddDocsParams(
-                index_name=self.default_text_index,
-                docs=[{
-                    "_id": "123",
-                    "title": "content 1",
-                    "desc": "content 2. blah blah blah"
-                }],
-                device="cpu", tensor_fields=["title"]
-            )
-        )
-        self.assertEqual(
-            {
-                "_id": "123",
-                "title": "content 1",
-                "desc": "content 2. blah blah blah"
-            },
-            tensor_search.get_document_by_id(
-                config=self.config, index_name=self.default_text_index,
-                document_id="123"
-            )
-        )
+        tests = [
+            (self.default_text_index, 'Standard index name'),
+            (self.default_text_index_encoded_name, 'Index name requiring encoding'),
+        ]
+        for index_name, desc in tests:
+            with self.subTest(desc):
+                tensor_search.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=self.default_text_index,
+                        docs=[{
+                            "_id": "123",
+                            "title": "content 1",
+                            "desc": "content 2. blah blah blah"
+                        }],
+                        device="cpu", tensor_fields=["title"]
+                    )
+                )
+                self.assertEqual(
+                    {
+                        "_id": "123",
+                        "title": "content 1",
+                        "desc": "content 2. blah blah blah"
+                    },
+                    tensor_search.get_document_by_id(
+                        config=self.config, index_name=self.default_text_index,
+                        document_id="123"
+                    )
+                )
 
     def test_add_documents_dupe_ids(self):
         """

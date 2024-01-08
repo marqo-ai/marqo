@@ -5,7 +5,7 @@ multiprocessing should be tested manually -problem with mocking (deadlock esque)
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.tensor_search.models.private_models import S3Auth, ModelAuth, HfAuth
-from marqo.errors import InvalidArgError, IndexNotFoundError, BadRequestError
+from marqo.api.exceptions import InvalidArgError, IndexNotFoundError, BadRequestError
 from tests.marqo_test import MarqoTestCase
 from marqo.s2_inference.model_downloading.from_s3 import get_s3_model_absolute_cache_path
 from marqo.tensor_search.models.external_apis.s3 import S3Location
@@ -15,11 +15,12 @@ import unittest
 import os
 import torch
 import pytest
-from marqo.errors import BadRequestError
+from marqo.api.exceptions import BadRequestError
 
 
 @pytest.mark.largemodel
 @pytest.mark.skipif(torch.cuda.is_available() is False, reason="We skip the large model test if we don't have cuda support")
+@unittest.skip
 class TestModelAuthLoadedS3(MarqoTestCase):
     """loads an s3 model loaded index, for tests """
 

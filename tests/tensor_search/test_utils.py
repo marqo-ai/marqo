@@ -4,7 +4,7 @@ import pathlib
 import unittest
 from unittest import mock
 
-from marqo import errors
+from marqo.api import exceptions
 from marqo.tensor_search import enums
 from marqo.tensor_search import utils
 
@@ -207,7 +207,7 @@ class TestUtils(unittest.TestCase):
             @mock.patch("marqo.tensor_search.configs.default_env_vars", mock_default_env_vars)
             @mock.patch.dict(os.environ, mock_real_environ)
             def run():
-                with self.assertRaises(errors.ConfigurationError):
+                with self.assertRaises(exceptions.ConfigurationError):
                     utils.read_env_vars_and_defaults_ints(var=key)
                 return True
 

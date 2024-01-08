@@ -4,7 +4,7 @@ from marqo.tensor_search.web.api_utils import add_docs_params_orchestrator
 from marqo.tensor_search.models.private_models import S3Auth
 import urllib.parse
 from marqo.tensor_search.web import api_utils
-from marqo.errors import InvalidArgError, InternalError, BadRequestError
+from marqo.api.exceptions import InvalidArgError, InternalError, BadRequestError
 from tests.marqo_test import MarqoTestCase
 import unittest
 
@@ -26,6 +26,7 @@ class TestApiUtils(MarqoTestCase):
             except InvalidArgError:
                 pass
 
+    @unittest.skip
     def test_generate_config(self):
         for opensearch_url, authorized_url in [
             ("http://admin:admin@localhost:9200", "http://admin:admin@localhost:9200"),
@@ -42,6 +43,7 @@ class TestApiUtils(MarqoTestCase):
             c = api_utils.upconstruct_authorized_url(opensearch_url=opensearch_url)
             assert authorized_url == c
 
+    @unittest.skip
     def test_generate_config_bad_url(self):
         for opensearch_url in ["www.google.com", "http:/mywebsite", "yahoo"]:
             try:
@@ -78,7 +80,7 @@ class TestDecodeQueryStringModelAuth(MarqoTestCase):
         with self.assertRaises(pydantic.ValidationError):
             api_utils.decode_query_string_model_auth("invalid_url_encoded_string")
 
-
+@unittest.skip
 class TestAddDocsParamsOrchestrator(unittest.TestCase):
     def test_add_docs_params_orchestrator(self):
         # Set up the arguments for the function

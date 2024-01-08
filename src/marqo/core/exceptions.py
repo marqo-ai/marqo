@@ -1,4 +1,7 @@
-from marqo.exceptions import MarqoError, InvalidArgumentError
+from marqo.exceptions import (
+    MarqoError,
+    InvalidArgumentError,
+)
 
 
 class IndexExistsError(MarqoError):
@@ -17,7 +20,7 @@ class VespaDocumentParsingError(ParsingError):
     pass
 
 
-class MarqoDocumentParsingError(ParsingError):
+class MarqoDocumentParsingError(ParsingError, InvalidArgumentError):
     pass
 
 
@@ -29,14 +32,13 @@ class InvalidFieldNameError(MarqoDocumentParsingError):
     pass
 
 
-class InvalidTensorFieldError(MarqoDocumentParsingError):
+class FilterStringParsingError(ParsingError, InvalidArgumentError):
     pass
 
 
-class FilterStringParsingError(MarqoError):
+class InvalidTensorFieldError(MarqoDocumentParsingError):
     pass
 
 
 class UnsupportedFeatureError(InvalidArgumentError):
     pass
-

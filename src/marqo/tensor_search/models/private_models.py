@@ -5,7 +5,7 @@ For example models stored on custom Huggingface repos or on private s3 buckets
 from marqo.tensor_search.models.external_apis.hf import HfAuth, HfModelLocation
 from marqo.tensor_search.models.external_apis.s3 import S3Auth, S3Location
 from pydantic import BaseModel, validator
-from marqo.errors import InvalidArgError
+from marqo.api.exceptions import InvalidArgError
 from typing import Optional
 
 class ModelAuth(BaseModel):

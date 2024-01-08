@@ -7,8 +7,16 @@ class RootFields(BaseModel):
     total_count: int = Field(alias='totalCount')
 
 
+class Degraded(BaseModel):
+    adaptive_timeout: bool = Field(alias='adaptive-timeout')
+    match_phase: bool = Field(alias='match-phase')
+    non_ideal_state: bool = Field(alias='non-ideal-state')
+    timeout: bool
+
+
 class Coverage(BaseModel):
     coverage: int
+    degraded: Optional[Degraded]
     documents: int
     full: bool
     nodes: int
