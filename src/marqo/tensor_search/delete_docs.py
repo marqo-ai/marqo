@@ -56,7 +56,7 @@ def delete_documents(config: Config, del_request: MqDeleteDocsRequest) -> dict:
 def delete_documents_vespa(config: Config, deletion_instruction: MqDeleteDocsRequest) -> MqDeleteDocsResponse:
     """Deletes documents """
     t0 = datetime.datetime.utcnow()
-    responses = config.vespa_client.delete_batch(deletion_instruction.document_ids, deletion_instruction.index_name)
+    responses = config.vespa_client.delete_batch(deletion_instruction.document_ids, deletion_instruction.schema_name)
     t1 = datetime.datetime.utcnow()
 
     deleted_documents_count = 0

@@ -2071,12 +2071,13 @@ def vectorise_multimodal_combination_field_structured(
 def delete_documents(config: Config, index_name: str, doc_ids: List[str]):
     """Delete documents from the Marqo index with the given doc_ids """
     # Make sure the index exists
-    _ = index_meta_cache.get_index(config=config, index_name=index_name)
+    marqo_index = index_meta_cache.get_index(config=config, index_name=index_name)
 
     return delete_docs.delete_documents(
         config=config,
         del_request=MqDeleteDocsRequest(
             index_name=index_name,
+            schema_name=marqo_index.schema_name,
             document_ids=doc_ids,
         )
     )
