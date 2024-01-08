@@ -1,5 +1,7 @@
+import uuid
+
 from marqo.core.exceptions import IndexNotFoundError
-from marqo.core.models.marqo_index import FieldType, FieldFeature, TextPreProcessing, TextSplitMethod
+from marqo.core.models.marqo_index import FieldType, FieldFeature, TextPreProcessing, TextSplitMethod, IndexType
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.core.models.marqo_index_stats import MarqoIndexStats, VespaStats
 from marqo.tensor_search import tensor_search
@@ -15,6 +17,34 @@ class TestMonitoring(MarqoTestCase):
         cls.monitoring = cls.config.monitoring
 
         structured_index_request = cls.structured_marqo_index_request(
+            fields=[
+                FieldRequest(name='title', type=FieldType.Text),
+                FieldRequest(
+                    name='desc',
+                    type=FieldType.Text,
+                    features=[FieldFeature.LexicalSearch]
+                ),
+                FieldRequest(
+                    name='tags',
+                    type=FieldType.ArrayText,
+                    features=[FieldFeature.Filter, FieldFeature.LexicalSearch]
+                ),
+                FieldRequest(
+                    name='price',
+                    type=FieldType.Float,
+                    features=[FieldFeature.ScoreModifier]
+                ),
+            ],
+            tensor_fields=['title'],
+            text_preprocessing=TextPreProcessing(
+                split_length=20,
+                split_overlap=1,
+                split_method=TextSplitMethod.Word
+            )
+        )
+
+        structured_index_request_encoded_name = cls.structured_marqo_index_request(
+            name='a-b_' + str(uuid.uuid4()).replace('-', ''),
             fields=[
                 FieldRequest(name='title', type=FieldType.Text),
                 FieldRequest(
@@ -67,17 +97,32 @@ class TestMonitoring(MarqoTestCase):
             tensor_fields=['title', 'title_img'],
         )
 
+        unstructured_index_request = cls.unstructured_marqo_index_request(
+            text_preprocessing=TextPreProcessing(
+                split_length=20,
+                split_overlap=1,
+                split_method=TextSplitMethod.Word
+            )
+        )
+
         cls.indexes = cls.create_indexes([
             structured_index_request,
-            structured_index_request_multimodal
+            structured_index_request_encoded_name,
+            structured_index_request_multimodal,
+            unstructured_index_request
         ])
 
         cls.structured_index = cls.indexes[0]
-        cls.structured_index_multimodal = cls.indexes[1]
+        cls.structured_index_encoded_name = cls.indexes[1]
+        cls.structured_index_multimodal = cls.indexes[2]
+        cls.unstructured_index = cls.indexes[3]
 
-        # TODO - Add unstructured index to the index list to test against
         # Indexes to run generic tests against
-        cls.indexes_to_test = [cls.structured_index]
+        cls.indexes_to_test = [
+            cls.structured_index,
+            cls.structured_index_encoded_name,
+            cls.unstructured_index
+        ]
 
     def test_get_index_stats_emptyIndex_successful(self):
         """
@@ -104,7 +149,8 @@ class TestMonitoring(MarqoTestCase):
                     config=self.config, add_docs_params=AddDocsParams(
                         docs=[{"title": "2"}, {"title": "2"}, {"title": "62"}],
                         index_name=marqo_index.name,
-                        device="cpu"
+                        device="cpu",
+                        tensor_fields=['title'] if marqo_index.type == IndexType.Unstructured else None
                     )
                 )
                 self.assertIndexStatsEqual(
@@ -154,7 +200,8 @@ class TestMonitoring(MarqoTestCase):
                     config=self.config, add_docs_params=AddDocsParams(
                         docs=[{"desc": "2"}, {"desc": "2"}, {"desc": "62"}],
                         index_name=marqo_index.name,
-                        device="cpu"
+                        device="cpu",
+                        tensor_fields=['title'] if marqo_index.type == IndexType.Unstructured else None
                     )
                 )
                 self.assertIndexStatsEqual(
@@ -176,7 +223,8 @@ class TestMonitoring(MarqoTestCase):
                     config=self.config, add_docs_params=AddDocsParams(
                         docs=[{"title": "2"}, {"title": "2"}, {"desc": "62"}],
                         index_name=marqo_index.name,
-                        device="cpu"
+                        device="cpu",
+                        tensor_fields=['title'] if marqo_index.type == IndexType.Unstructured else None
                     )
                 )
                 self.assertIndexStatsEqual(
@@ -228,7 +276,8 @@ class TestMonitoring(MarqoTestCase):
                             config=self.config, add_docs_params=AddDocsParams(
                                 docs=docs,
                                 index_name=marqo_index.name,
-                                device="cpu"
+                                device="cpu",
+                                tensor_fields=['title'] if marqo_index.type == IndexType.Unstructured else None
                             )
                         )
                     elif operation == 'delete':
@@ -255,7 +304,8 @@ class TestMonitoring(MarqoTestCase):
                     config=self.config, add_docs_params=AddDocsParams(
                         docs=[{"title": "test " * number_of_words}, {"title": "2"}],  # 3 + 1 vectors expected
                         index_name=marqo_index.name,
-                        device="cpu"
+                        device="cpu",
+                        tensor_fields=['title'] if marqo_index.type == IndexType.Unstructured else None
                     )
                 )
                 self.assertIndexStatsEqual(
@@ -277,7 +327,8 @@ class TestMonitoring(MarqoTestCase):
                     config=self.config, add_docs_params=AddDocsParams(
                         docs=[{"title": "2"}, {"title": "2"}, {"title": "62"}],
                         index_name=marqo_index.name,
-                        device="cpu"
+                        device="cpu",
+                        tensor_fields=['title'] if marqo_index.type == IndexType.Unstructured else None
                     )
                 )
                 self.assertIndexStatsEqual(

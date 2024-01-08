@@ -1144,8 +1144,10 @@ def search(config: Config, index_name: str, text: Union[str, dict],
 
     # Validation for: result_count (limit) & offset
     # Validate neither is negative
-    if result_count <= 0:
-        raise api_exceptions.IllegalRequestedDocCount("search result limit must be greater than 0!")
+    if result_count <= 0 or (not isinstance(result_count, int)):
+        raise errors.IllegalRequestedDocCount(
+            f"result_count must be an integer greater than 0! Received {result_count}"
+        )
 
     if offset < 0:
         raise api_exceptions.IllegalRequestedDocCount("search result offset cannot be less than 0!")
@@ -2069,12 +2071,13 @@ def vectorise_multimodal_combination_field_structured(
 def delete_documents(config: Config, index_name: str, doc_ids: List[str]):
     """Delete documents from the Marqo index with the given doc_ids """
     # Make sure the index exists
-    _ = index_meta_cache.get_index(config=config, index_name=index_name)
+    marqo_index = index_meta_cache.get_index(config=config, index_name=index_name)
 
     return delete_docs.delete_documents(
         config=config,
         del_request=MqDeleteDocsRequest(
             index_name=index_name,
+            schema_name=marqo_index.schema_name,
             document_ids=doc_ids,
         )
     )

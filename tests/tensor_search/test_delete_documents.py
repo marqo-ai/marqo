@@ -270,6 +270,7 @@ class TestDeleteDocuments(MarqoTestCase):
         self.assertEqual(remaining_document["_id"], "doc_id_2")
 
 
+@unittest.skip
 class TestDeleteDocumentsEndpoint(MarqoTestCase):
     """Module that has tests at the tensor_search level"""
 

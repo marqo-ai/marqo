@@ -35,7 +35,7 @@ class IndexSettings(StrictBaseModel):
     annParameters: AnnParameters = AnnParameters(
         spaceType=core.DistanceMetric.PrenormalizedAnguar,
         parameters=core.HnswConfig(
-            efConstruction=128,
+            efConstruction=512,
             m=16
         )
     )
