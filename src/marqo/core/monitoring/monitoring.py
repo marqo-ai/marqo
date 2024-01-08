@@ -32,8 +32,8 @@ class Monitoring:
         vespa_index = vespa_index_factory(marqo_index)
 
         doc_count_query_result = self.vespa_client.query(
-            yql=f'select * from {marqo_index.name} where true limit 0',
-            model_restrict=marqo_index.name
+            yql=f'select * from {marqo_index.schema_name} where true limit 0',
+            model_restrict=marqo_index.schema_name
         )
         vector_count_query_result = self.vespa_client.query(
             **vespa_index.get_vector_count_query()
