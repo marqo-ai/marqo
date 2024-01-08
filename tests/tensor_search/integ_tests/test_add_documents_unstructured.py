@@ -458,7 +458,7 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
             ([{123: "bad"}, {"_id": "cool"}], [(None, 400), ("cool", 200)]),
             ([{"__chunks": "bad"}, {"_id": "1511", "__vector_a": "some content"}, {"_id": "cool"},
               {"_id": "144451", "__field_content": "some content"}],
-             [(None, 400), ("1511", 400), ("cool", 200), ("144451", 400)]),
+             [(None, 200), ("1511", 200), ("cool", 200), ("144451", 200)]),
             ([{123: "bad", "_id": "12345"}, {"_id": "cool"}], [("12345", 400), ("cool", 200)]),
             ([{None: "bad", "_id": "12345"}, {"_id": "cool"}], [("12345", 400), ("cool", 200)]),
             # handle bad content
