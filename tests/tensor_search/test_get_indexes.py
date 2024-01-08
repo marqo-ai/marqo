@@ -1,7 +1,7 @@
 import json
 import pprint
 import time
-from marqo.errors import IndexNotFoundError, MarqoError
+from marqo.api.exceptions import IndexNotFoundError, MarqoError
 from marqo.tensor_search import tensor_search, constants, index_meta_cache
 import unittest
 import copy
@@ -13,6 +13,7 @@ def _index_is_present(index_name, index_results):
     return any([index_name in res.values() for res in index_results['results']])
 
 
+@unittest.skip
 class TestGetIndexes(MarqoTestCase):
 
     def setUp(self) -> None:

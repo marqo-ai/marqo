@@ -12,7 +12,7 @@ from typing import (
 import torch
 from fastapi import HTTPException
 
-from marqo import errors
+from marqo.api import exceptions
 from marqo.marqo_logging import logger
 from marqo.tensor_search import enums, configs
 from marqo.tensor_search.enums import EnvVars
@@ -79,10 +79,10 @@ def construct_authorized_url(url_base: str, username: str, password: str) -> str
     """
     http_sep = "://"
     if http_sep not in url_base:
-        raise errors.MarqoError(f"Could not parse url: {url_base}")
+        raise exceptions.MarqoError(f"Could not parse url: {url_base}")
     url_split = url_base.split(http_sep)
     if len(url_split) != 2:
-        raise errors.MarqoError(f"Could not parse url: {url_base}")
+        raise exceptions.MarqoError(f"Could not parse url: {url_base}")
     http_part, domain_part = url_split
     return f"{http_part}{http_sep}{username}:{password}@{domain_part}"
 
@@ -106,7 +106,7 @@ def check_device_is_available(device: str) -> bool:
 
     split = lowered.split(":")
     if split[0] != "cuda":
-        raise errors.MarqoError(f"Invalid device prefix! {device}. Valid prefixes: 'cpu' and 'cuda'")
+        raise exceptions.MarqoError(f"Invalid device prefix! {device}. Valid prefixes: 'cpu' and 'cuda'")
 
     if not torch.cuda.is_available():
         return False
@@ -115,7 +115,7 @@ def check_device_is_available(device: str) -> bool:
         return True
 
     if int(split[1]) < 0:
-        raise errors.MarqoError(f"Invalid cuda device number! {device}. It must not be negative")
+        raise exceptions.MarqoError(f"Invalid cuda device number! {device}. It must not be negative")
 
     if int(split[1]) < torch.cuda.device_count():
         return True
@@ -191,7 +191,7 @@ def read_env_vars_and_defaults_ints(var: str) -> Optional[int]:
     except (ValueError, TypeError) as e:
         value_error_msg = f"`{validation_error_msg} Current value: `{str_val}`. Reason: {e}"
         logger.error(value_error_msg)
-        raise errors.ConfigurationError(value_error_msg)
+        raise exceptions.ConfigurationError(value_error_msg)
     return as_int
 
 
@@ -334,7 +334,7 @@ def get_best_available_device() -> str:
     """Get the best available device for Marqo to use and validate it."""
     device = read_env_vars_and_defaults(EnvVars.MARQO_BEST_AVAILABLE_DEVICE)
     if device is None or not check_device_is_available(device):
-        raise errors.InternalError(
+        raise exceptions.InternalError(
             f"Marqo encountered an error when loading device from environment variable `MARQO_BEST_AVAILABLE_DEVICE`. "
             f"Invalid device: {device}. Must be either 'cpu' or start with 'cuda'.")
     return device

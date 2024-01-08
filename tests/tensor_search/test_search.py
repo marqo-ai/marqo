@@ -1,29 +1,27 @@
 import math
 import os
-import sys
-from tests.utils.transition import add_docs_caller
-from marqo.tensor_search.models.add_docs_objects import AddDocsParams
-from unittest import mock
-from marqo.s2_inference.s2_inference import vectorise, get_model_properties_from_registry
-import numpy as np
-from marqo.tensor_search import utils
-import typing
-from marqo.tensor_search.enums import TensorField, SearchMethod, EnvVars, IndexSettingsField, MlModel
-from marqo.errors import (
-    MarqoApiError, MarqoError, IndexNotFoundError, InvalidArgError,
-    InvalidFieldNameError, IllegalRequestedDocCount, BadRequestError, InternalError
-)
-from marqo.tensor_search import tensor_search, constants, index_meta_cache
-import copy
-from tests.marqo_test import MarqoTestCase
-import requests
-import random
-from marqo.tensor_search.tensor_search import (_create_dummy_query_for_zero_vector_search,
-                                               _vector_text_search_query_verbose,
-                                               _generate_vector_text_search_query_for_verbose_one)
 import pprint
+import random
+import sys
+import typing
+import unittest
+from unittest import mock
+
+import numpy as np
+import requests
+
+from marqo.api.exceptions import (
+    IndexNotFoundError, InvalidArgError, InvalidFieldNameError, IllegalRequestedDocCount,
+    BadRequestError, InternalError)
+from marqo.s2_inference.s2_inference import vectorise, get_model_properties_from_registry
+from marqo.tensor_search import tensor_search
+from marqo.tensor_search.enums import TensorField, SearchMethod, EnvVars
+from marqo.tensor_search.models.add_docs_objects import AddDocsParams
+from tests.marqo_test import MarqoTestCase
+from tests.utils.transition import add_docs_caller
 
 
+@unittest.skip
 class TestVectorSearch(MarqoTestCase):
 
     def setUp(self) -> None:

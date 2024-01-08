@@ -1,7 +1,7 @@
 import unittest
 import unittest.mock
 from unittest.mock import patch
-from marqo.errors import ModelCacheManagementError
+from marqo.api.exceptions import ModelCacheManagementError
 from marqo.tensor_search import tensor_search
 from marqo.s2_inference.s2_inference import clear_loaded_models, vectorise, _validate_model_properties, \
     _validate_model_into_device, _check_memory_threshold_for_model

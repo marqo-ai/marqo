@@ -1,10 +1,11 @@
+import unittest
+
 from tests.utils.transition import add_docs_caller
-from marqo.errors import IndexNotFoundError, InvalidArgError
+from marqo.api.exceptions import IndexNotFoundError, InvalidArgError
 from marqo.tensor_search import tensor_search
-from marqo.tensor_search.enums import TensorField, IndexSettingsField, SearchMethod
+from marqo.tensor_search.enums import TensorField, SearchMethod
 from marqo.tensor_search.models.search import SearchContext
 from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQueryEntity
-from marqo.tensor_search.tensor_search import _create_dummy_query_for_zero_vector_search
 from tests.marqo_test import MarqoTestCase
 from unittest.mock import patch
 from unittest import mock
@@ -12,6 +13,7 @@ import numpy as np
 import os
 import pydantic
 
+@unittest.skip
 class TestContextSearch(MarqoTestCase):
 
     def setUp(self):

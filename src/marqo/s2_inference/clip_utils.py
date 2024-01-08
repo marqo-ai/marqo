@@ -17,7 +17,7 @@ from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normal
 from marqo.s2_inference.processing.custom_clip_utils import HFTokenizer, download_model
 from torchvision.transforms import InterpolationMode
 from marqo.s2_inference.configs import ModelCache
-from marqo.errors import InternalError
+from marqo.api.exceptions import InternalError
 from marqo.tensor_search.telemetry import RequestMetrics, RequestMetricsStore
 
 logger = get_logger(__name__)

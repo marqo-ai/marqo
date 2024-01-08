@@ -1,20 +1,16 @@
 from typing import Dict, Any, Optional
-import copy
 
+import marqo.core.constants as index_constants
+import marqo.core.search.search_filter as search_filter
+from marqo.api import exceptions as errors
 from marqo.core.models import MarqoQuery
 from marqo.core.models.marqo_index import UnstructuredMarqoIndex
-from marqo.core.vespa_index import VespaIndex
+from marqo.core.models.marqo_query import (MarqoTensorQuery, MarqoLexicalQuery, MarqoHybridQuery,
+                                           ScoreModifierType)
 from marqo.core.unstructured_vespa_index import common as unstructured_common
 from marqo.core.unstructured_vespa_index.unstructured_document import UnstructuredVespaDocument
-from marqo.core.models.marqo_query import (MarqoTensorQuery, MarqoLexicalQuery, MarqoHybridQuery,
-                                           ScoreModifierType, ScoreModifier)
-from marqo.core.exceptions import UnsupportedFeatureError
+from marqo.core.vespa_index import VespaIndex
 from marqo.exceptions import InternalError
-import marqo.core.search.search_filter as search_filter
-from marqo import errors
-import marqo.core.constants as index_constants
-from marqo.tensor_search import constants as tensor_search_constants
-from marqo.tensor_search import enums
 
 
 class UnstructuredVespaIndex(VespaIndex):
@@ -77,8 +73,8 @@ class UnstructuredVespaIndex(VespaIndex):
             query_inputs.update(score_modifiers)
 
         query = {
-            'yql': f"select {select_attributes} from {marqo_query.index_name} where {tensor_term}{filter_term}",
-            'model_restrict': marqo_query.index_name,
+            'yql': f"select {select_attributes} from {self._marqo_index.schema_name} where {tensor_term}{filter_term}",
+            'model_restrict': self._marqo_index.schema_name,
             'hits': marqo_query.limit,
             'offset': marqo_query.offset,
             'query_features': query_inputs,
@@ -87,13 +83,22 @@ class UnstructuredVespaIndex(VespaIndex):
         }
         query = {k: v for k, v in query.items() if v is not None}
 
+        if not marqo_query.approximate:
+            query['ranking.softtimeout.enable'] = False
+            query['timeout'] = '300s'
+
         return query
 
     @staticmethod
-    def _get_tensor_search_term(marqo_query: MarqoQuery) -> str:
+    def _get_tensor_search_term(marqo_query: MarqoTensorQuery) -> str:
         field_to_search = unstructured_common.VESPA_DOC_EMBEDDINGS
 
-        return (f"({{targetHits:{marqo_query.limit}, approximate:{str(marqo_query.approximate)}}}"
+        if marqo_query.ef_search is not None:
+            additional_hits = f', hnsw.exploreAdditionalHits:{marqo_query.ef_search - marqo_query.limit}'
+        else:
+            additional_hits = ''
+
+        return (f"({{targetHits:{marqo_query.limit}, approximate:{str(marqo_query.approximate)}{additional_hits}}}"
                 f"nearestNeighbor({field_to_search}, {unstructured_common.QUERY_INPUT_EMBEDDING}))")
 
     @classmethod
@@ -242,8 +247,8 @@ class UnstructuredVespaIndex(VespaIndex):
             query_inputs.update(score_modifiers)
 
         query = {
-            'yql': f'select * from {marqo_query.index_name} where {lexical_term}{filter_term}',
-            'model_restrict': marqo_query.index_name,
+            'yql': f'select * from {self._marqo_index.schema_name} where {lexical_term}{filter_term}',
+            'model_restrict': self._marqo_index.schema_name,
             'hits': marqo_query.limit,
             'offset': marqo_query.offset,
             'query_features': query_inputs,
@@ -258,9 +263,10 @@ class UnstructuredVespaIndex(VespaIndex):
 
     def get_vector_count_query(self) -> Dict[str, Any]:
         return {
-            'yql': f'select {unstructured_common.FIELD_VECTOR_COUNT} from {self._marqo_index.name} '
+            'yql': f'select {unstructured_common.FIELD_VECTOR_COUNT} from {self._marqo_index.schema_name} '
                    f'where true limit 0 | all(group(1) each(output(sum({unstructured_common.FIELD_VECTOR_COUNT}))))',
-            'model_restrict': self._marqo_index.name
+            'model_restrict': self._marqo_index.schema_name,
+            'timeout': '5s'
         }
 
     @classmethod

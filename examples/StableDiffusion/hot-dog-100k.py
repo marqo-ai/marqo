@@ -3,7 +3,7 @@
 #####################################################
 
 from marqo import Client
-from marqo.errors import MarqoApiError
+from marqo.api.exceptions import MarqoApiError
 import torch
 import json
 import pprint

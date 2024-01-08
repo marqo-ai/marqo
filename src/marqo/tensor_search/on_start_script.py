@@ -5,7 +5,7 @@ import time
 import torch
 
 from marqo import config
-from marqo import errors
+from marqo.api import exceptions
 from marqo.connections import redis_driver
 from marqo.s2_inference.s2_inference import vectorise
 # we need to import backend before index_meta_cache to prevent circular import error:
@@ -99,7 +99,7 @@ class ModelsForCacheing:
                 self.models = json.loads(warmed_models)
             except json.JSONDecodeError as e:
                 # TODO: Change error message to match new format
-                raise errors.EnvVarError(
+                raise exceptions.EnvVarError(
                     f"Could not parse environment variable `{EnvVars.MARQO_MODELS_TO_PRELOAD}`. "
                     f"Please ensure that this a JSON-encoded array of strings or dicts. For example:\n"
                     f"""export {EnvVars.MARQO_MODELS_TO_PRELOAD}='["ViT-L/14", "onnx/all_datasets_v4_MiniLM-L6"]'"""
@@ -163,12 +163,12 @@ def _preload_model(model, content, device):
         try:
             _ = vectorise(
                 model_name=model["model"],
-                model_properties=model["model_properties"],
+                model_properties=model["modelProperties"],
                 content=content,
                 device=device
             )
         except KeyError as e:
-            raise errors.EnvVarError(
+            raise exceptions.EnvVarError(
                 f"Your custom model {model} is missing either `model` or `model_properties`."
                 f"""To add a custom model, it must be a dict with keys `model` and `model_properties` as defined in `https://marqo.pages.dev/0.0.20/Advanced-Usage/configuration/#configuring-preloaded-models`"""
             ) from e
