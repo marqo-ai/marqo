@@ -17,7 +17,7 @@ class Document:
         """Deletes all documents in the given index"""
         if not self.index_management.index_exists(index_name):
             raise IndexNotFoundError(f"Index {index_name} does not exist")
-
-        res: DeleteAllDocumentsResponse = self.vespa_client.delete_all_docs(index_name)
+        marqo_index = self.index_management.get_index(index_name)
+        res: DeleteAllDocumentsResponse = self.vespa_client.delete_all_docs(marqo_index.schema_name)
 
         return res.document_count
