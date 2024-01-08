@@ -53,7 +53,7 @@ class TestApiErrors(MarqoTestCase):
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.json()["code"], "index_not_found")
         self.assertEqual(response.json()["type"], "invalid_request")
-        assert "does not exist" in response.json()["message"] and "index1" in response.json()["message"]
+        assert "not found" in response.json()["message"] and "index1" in response.json()["message"]
 
     def test_index_already_exists(self):
         # create index if it does not already exist

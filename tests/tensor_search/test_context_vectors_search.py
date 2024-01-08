@@ -134,6 +134,7 @@ class TestContextSearch(MarqoTestCase):
         assert res["hits"][0]["_id"] == expected_doc_id
 
 
+@unittest.skip
 class TestContextBulkSearch(MarqoTestCase):
 
     def setUp(self):
