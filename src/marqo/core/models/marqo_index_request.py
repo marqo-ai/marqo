@@ -37,7 +37,7 @@ class MarqoIndexRequest(ImmutableStrictBaseModel, ABC):
 
 class UnstructuredMarqoIndexRequest(MarqoIndexRequest):
     treat_urls_and_pointers_as_images: bool
-    short_string_length_threshold: int
+    filter_string_max_length: int
 
 
 class FieldRequest(StrictBaseModel):

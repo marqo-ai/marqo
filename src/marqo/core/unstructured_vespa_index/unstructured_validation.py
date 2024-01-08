@@ -5,11 +5,11 @@ import jsonschema
 from marqo.api import exceptions as errors
 from marqo.tensor_search import enums
 from marqo.tensor_search.models.mappings_object import mappings_schema, multimodal_combination_schema
+from marqo.core.models.marqo_index import validate_field_name as common_validate_field_name
 
 _FILTER_STRING_BOOL_VALUES = ["true", "false"]
 _RESERVED_FIELD_SUBSTRING = "::"
 _SUPPORTED_FIELD_CONTENT_TYPES = [str, int, float, bool, list]
-_ILLEGAL_CUSTOMER_FIELD_NAME_CHARS = {'.', '/', '\n'}
 
 
 def validate_mappings_object_format(mappings: Dict) -> None:
@@ -48,37 +48,20 @@ def _validate_multimodal_combination_configuration_format(configuration: Dict):
         )
 
 
-def _validate_custom_vector_mappings_object(configuration: Dict):
-    pass
+def validate_field_name(field_name: str) -> None:
+    """Validate the field name.
 
-
-def validate_field_name(field_name: str):
-    if not field_name:
-        raise errors.InvalidFieldNameError("field name can't be empty! ")
-    if not isinstance(field_name, str):
-        raise errors.InvalidFieldNameError("field name must be str!")
-    if field_name.startswith(enums.TensorField.vector_prefix):
-        raise errors.InvalidFieldNameError(
-            f"can't start field name with protected prefix {enums.TensorField.vector_prefix}."
-            f" Error raised for field name: {field_name}")
-    if field_name.startswith(enums.TensorField.chunks):
-        raise errors.InvalidFieldNameError(f"can't name field with protected field name {enums.TensorField.chunks}."
-                                           f" Error raised for field name: {field_name}")
-    char_validation = [(c, c not in _ILLEGAL_CUSTOMER_FIELD_NAME_CHARS)
-                       for c in field_name]
-    char_validation_failures = [c for c in char_validation if not c[1]]
-    if char_validation_failures:
-        raise errors.InvalidFieldNameError(F"Illegal character '{char_validation_failures[0][0]}' "
-                                           F"detected in field name {field_name}")
-    if field_name in enums.TensorField.__dict__.values():
-        raise errors.InvalidFieldNameError(
-            f"field name can't be a protected field. Please rename this field: {field_name}")
+    We reuse the validation function from structured index, but add some extra validations for unstructured index."""
+    try:
+        common_validate_field_name(field_name)
+    except ValueError as e:
+        raise errors.InvalidFieldNameError(str(e))
+    # Some extra validations for unstructured index
     if _RESERVED_FIELD_SUBSTRING in field_name:
         raise errors.InvalidFieldNameError(
             f"Field name {field_name} contains the reserved substring {_RESERVED_FIELD_SUBSTRING}. This is a "
             f"reserved substring and cannot be used in field names for unstructured marqo index."
         )
-    return
 
 
 def validate_coupling_of_mappings_and_doc(doc: Dict, mappings: Dict, multimodal_sub_fields: List):

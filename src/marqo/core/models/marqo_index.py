@@ -66,6 +66,9 @@ class TextSplitMethod(Enum):
 class PatchMethod(Enum):
     Simple = 'simple'
     Frcnn = 'frcnn'
+    DinoV1 = 'dino-v1'
+    DinoV2 = 'dino-v2'
+    MarqoYolo = 'marqo-yolo'
 
 
 class Field(ImmutableStrictBaseModel):
@@ -236,7 +239,7 @@ class MarqoIndex(ImmutableStrictBaseModel, ABC):
 class UnstructuredMarqoIndex(MarqoIndex):
     type = IndexType.Unstructured
     treat_urls_and_pointers_as_images: bool
-    short_string_length_threshold: int
+    filter_string_max_length: int
 
     @classmethod
     def _valid_type(cls) -> IndexType:
@@ -408,6 +411,26 @@ def validate_index_name(name: str) -> None:
         raise ValueError(f'Index name must not start with "{constants.MARQO_RESERVED_PREFIX}"')
 
 
+def validate_field_name(name: str) -> None:
+    """
+    Validate a field name. Raises ValueError if validation fails.
+
+    Args:
+        name: Field name to validate
+    Raises:
+        ValueError: If validation fails
+
+    Note: this function will also be called in unstructured_vespa_index/unstructured_validation.py/validate_field_name
+    """
+    if not _is_valid_vespa_name(name):
+        raise ValueError(f'"{name}": Field name must match {_VESPA_NAME_PATTERN} '
+                         f'and must not start with "{constants.MARQO_RESERVED_PREFIX}"')
+    if name.startswith(constants.MARQO_RESERVED_PREFIX):
+        raise ValueError(f'{name}: Field name must not start with "{constants.MARQO_RESERVED_PREFIX}"')
+    if name in _PROTECTED_FIELD_NAMES:
+        raise ValueError(f'{name}: Field name must not be one of {", ".join(_PROTECTED_FIELD_NAMES)}')
+
+
 def validate_structured_field(values, marqo_index: bool) -> None:
     """
     Validate a Field or FieldRequest. Raises ValueError if validation fails.
@@ -420,13 +443,7 @@ def validate_structured_field(values, marqo_index: bool) -> None:
     features: List[FieldFeature] = values['features']
     dependent_fields: Optional[Dict[str, float]] = values['dependent_fields']
 
-    if not _is_valid_vespa_name(name):
-        raise ValueError(f'"{name}": Field name must match {_VESPA_NAME_PATTERN} '
-                         f'and must not start with "{constants.MARQO_RESERVED_PREFIX}"')
-    if name.startswith(constants.MARQO_RESERVED_PREFIX):
-        raise ValueError(f'{name}: Field name must not start with "{constants.MARQO_RESERVED_PREFIX}"')
-    if name in _PROTECTED_FIELD_NAMES:
-        raise ValueError(f'{name}: Field name must not be one of {", ".join(_PROTECTED_FIELD_NAMES)}')
+    validate_field_name(name)
 
     if type in [FieldType.ImagePointer, FieldType.MultimodalCombination] and features:
         raise ValueError(f'{name}: Cannot specify features for field of type {type.value}')

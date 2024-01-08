@@ -24,7 +24,7 @@ class UnstructuredVespaIndex(VespaIndex):
     def to_vespa_document(self, marqo_document: Dict[str, Any]) -> Dict[str, Any]:
         unstructured_document: UnstructuredVespaDocument = \
             (UnstructuredVespaDocument.from_marqo_document(marqo_document,
-                                                           self._marqo_index.short_string_length_threshold))
+                                                           self._marqo_index.filter_string_max_length))
         return unstructured_document.to_vespa_document()
 
     def to_marqo_document(self, vespa_document: Dict[str, Any], return_highlights: bool = False) -> Dict[str, Any]:
@@ -116,14 +116,18 @@ class UnstructuredVespaIndex(VespaIndex):
             # Bool Filter
             if node.value in cls._FILTER_STRING_BOOL_VALUES:
                 filter_value = int(True if node.value == "true" else False)
-                return f'({unstructured_common.BOOL_FIELDS} contains sameElement(key contains "{node.field}", value = {filter_value}))'
+                return (f'({unstructured_common.BOOL_FIELDS} contains sameElement(key contains "{node.field}", '
+                        f'value = {filter_value}))')
 
             # Short String Filter
-            short_string_filter_string = f'({unstructured_common.SHORT_STRINGS_FIELDS} contains sameElement(key contains "{node.field}", value contains "{escape(node.value)}"))'
+            short_string_filter_string = (f'({unstructured_common.SHORT_STRINGS_FIELDS} '
+                                          f'contains sameElement(key contains "{node.field}", '
+                                          f'value contains "{escape(node.value)}"))')
             filter_parts.append(short_string_filter_string)
 
             # String Array Filter
-            string_array_filter_string = f'({unstructured_common.STRING_ARRAY} contains "{node.field}::{escape(node.value)}")'
+            string_array_filter_string = (f'({unstructured_common.STRING_ARRAY} contains '
+                                          f'"{node.field}::{escape(node.value)}")')
             filter_parts.append(string_array_filter_string)
 
             # Numeric Filter

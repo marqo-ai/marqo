@@ -19,7 +19,7 @@ class IndexSettings(StrictBaseModel):
     allFields: Optional[List[FieldRequest]]
     tensorFields: Optional[List[str]]
     treatUrlsAndPointersAsImages: Optional[bool]
-    shortStringLengthThreshold: Optional[int]
+    filterStringMaxLength: Optional[int]
     model: str = 'hf/all_datasets_v4_MiniLM-L6'
     modelProperties: Optional[Dict[str, Any]]
     normalizeEmbeddings: bool = True
@@ -47,9 +47,9 @@ class IndexSettings(StrictBaseModel):
                 raise api_exceptions.InvalidArgError(
                     "treat_urls_and_pointers_as_images is not a valid parameter for structured indexes"
                 )
-            if self.shortStringLengthThreshold is not None:
+            if self.filterStringMaxLength is not None:
                 raise api_exceptions.InvalidArgError(
-                    "shortStringLengthThreshold is not a valid parameter for structured indexes"
+                    "filterStringMaxLength is not a valid parameter for structured indexes"
                 )
 
             if self.allFields is not None:
@@ -96,10 +96,10 @@ class IndexSettings(StrictBaseModel):
                 # as it is not a valid parameter for structured indexes
                 self.treatUrlsAndPointersAsImages = False
 
-            if self.shortStringLengthThreshold is None:
-                # Default value for short_string_length_threshold is 20, but we can't set it in the model
+            if self.filterStringMaxLength is None:
+                # Default value for filter_string_max_length is 20, but we can't set it in the model
                 # as it is not a valid parameter for structured indexes
-                self.shortStringLengthThreshold = 20
+                self.filterStringMaxLength = 20
 
             return UnstructuredMarqoIndexRequest(
                 name=index_name,
@@ -115,7 +115,7 @@ class IndexSettings(StrictBaseModel):
                 vector_numeric_type=self.vectorNumericType,
                 hnsw_config=self.annParameters.parameters,
                 treat_urls_and_pointers_as_images=self.treatUrlsAndPointersAsImages,
-                short_string_length_threshold=self.shortStringLengthThreshold,
+                filter_string_max_length=self.filterStringMaxLength,
                 marqo_version=version.get_version(),
                 created_at=time.time(),
                 updated_at=time.time()
@@ -152,7 +152,7 @@ class IndexSettings(StrictBaseModel):
             return cls(
                 type=marqo_index.type,
                 treatUrlsAndPointersAsImages=marqo_index.treat_urls_and_pointers_as_images,
-                shortStringLengthThreshold=marqo_index.short_string_length_threshold,
+                filterStringMaxLength=marqo_index.filter_string_max_length,
                 model=marqo_index.model.name,
                 modelProperties=marqo_index.model.properties,
                 normalizeEmbeddings=marqo_index.normalize_embeddings,

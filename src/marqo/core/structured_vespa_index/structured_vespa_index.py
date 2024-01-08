@@ -220,7 +220,7 @@ class StructuredVespaIndex(VespaIndex):
         else:
             fields_to_search = self._marqo_index.tensor_field_map.keys()
 
-        tensor_term = self._get_tensor_search_term(marqo_query)
+        tensor_term = self._get_tensor_search_term(marqo_query) if fields_to_search else "False"
         filter_term = self._get_filter_term(marqo_query)
         if filter_term:
             filter_term = f' AND {filter_term}'
@@ -271,7 +271,7 @@ class StructuredVespaIndex(VespaIndex):
         else:
             fields_to_search = self._marqo_index.lexical_field_map.keys()
 
-        lexical_term = self._get_lexical_search_term(marqo_query)
+        lexical_term = self._get_lexical_search_term(marqo_query) if fields_to_search else "False"
         filter_term = self._get_filter_term(marqo_query)
         if filter_term:
             filter_term = f' AND {filter_term}'

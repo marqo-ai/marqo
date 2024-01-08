@@ -62,7 +62,7 @@ class UnstructuredVespaDocument(MarqoBaseModel):
                    fields=UnstructuredVespaDocumentFields(**fields))
 
     @classmethod
-    def from_marqo_document(cls, document: Dict, short_string_length_threshold: int) -> "UnstructuredVespaDocument":
+    def from_marqo_document(cls, document: Dict, filter_string_max_length: int) -> "UnstructuredVespaDocument":
         """Instantiate an UnstructuredVespaDocument from a valid Marqo document from
         add_documents"""
 
@@ -78,7 +78,7 @@ class UnstructuredVespaDocument(MarqoBaseModel):
                        unstructured_common.MARQO_DOC_MULTIMODAL_PARAMS, index_constants.MARQO_DOC_ID]:
                 continue
             if isinstance(value, str):
-                if len(value) <= short_string_length_threshold:
+                if len(value) <= filter_string_max_length:
                     instance.fields.short_string_fields[key] = value
                 else:
                     instance.fields.long_string_fields[key] = value
