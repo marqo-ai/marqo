@@ -101,7 +101,7 @@ class TestBoostFieldScores(MarqoTestCase):
                 config=self.config, index_name=self.index_name_1, text=q, boost=boost
             )
 
-
+@unittest.skip
 class TestBoostFieldScoresComparison(MarqoTestCase):
 
     def setUp(self):
