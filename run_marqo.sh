@@ -6,8 +6,6 @@ export LD_LIBRARY_PATH=${CUDA_HOME}/lib64
 export PATH=${CUDA_HOME}/bin:${PATH}
 
 trap "bash /app/scripts/shutdown.sh; exit" SIGTERM SIGINT
-echo "Python packages:"
-pip freeze
 
 function wait_for_process () {
     local max_retries=30
@@ -32,13 +30,18 @@ function wait_for_process () {
     return 0
 }
 
-OPENSEARCH_IS_INTERNAL=False
-# Start Vespa in the background
-if [[ ! $VESPA_CONFIG_URL ]]; then
+
+VESPA_IS_INTERNAL=False
+# Vespa local run
+if ([ -n "$VESPA_QUERY_URL" ] || [ -n "$VESPA_DOCUMENT_URL" ] || [ -n "$VESPA_CONFIG_URL" ]) && \
+   ([ -z "$VESPA_QUERY_URL" ] || [ -z "$VESPA_DOCUMENT_URL" ] || [ -z "$VESPA_CONFIG_URL" ]); then
+  echo "Error: Partial VESPA environment variables set. Please provide all or none of the VESPA_QUERY_URL, VESPA_DOCUMENT_URL, VESPA_CONFIG_URL."
+  exit 1
+
+elif [ -z "$VESPA_QUERY_URL" ] && [ -z "$VESPA_DOCUMENT_URL" ] && [ -z "$VESPA_CONFIG_URL" ]; then
   # Start local vespa
   echo "Running Vespa Locally"
   tmux new-session -d -s vespa "bash /usr/local/bin/start_vespa.sh"
-  # Start opensearch in the background
 
   echo "Waiting for Vespa to start"
   for i in {1..5}; do
@@ -46,16 +49,57 @@ if [[ ! $VESPA_CONFIG_URL ]]; then
       sleep 1
   done
   echo -e "\nDone waiting."
-  # Deploy a dummy application to Vespa
-  echo "Deploying dummy application to Vespa for local run"
-  vespa deploy /app/scripts/vespa_dummy_app --wait 300
-  echo "Done. Local Vespa configuration is finished"
+
+  # Try to deploy the application and branch on the output
+  echo "Setting up Marqo local vector search application..."
+  END_POINT="http://localhost:19071/application/v2/tenant/default/application/default"
+  MAX_RETRIES=10
+  RETRY_COUNT=0
+
+  while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+    # Make the curl request and capture the output
+    RESPONSE=$(curl -s -X GET "$END_POINT")
+
+    # Check for the specific "not found" error response
+    if echo "$RESPONSE" | grep -q '"error-code":"NOT_FOUND"'; then
+      echo "Marqo does not find an existing index"
+      echo "Marqo is deploying the application and waiting for the response from document API to start..."
+      # Deploy a dummy application package
+      vespa deploy /app/scripts/vespa_dummy_app --wait 300 >/dev/null 2>&1
+
+      until curl -f -X GET http://localhost:8080 >/dev/null 2>&1; do
+        echo "  Waiting for Vespa document API to be available..."
+        sleep 10
+      done
+      echo "  Vespa document API is available. Local Vespa setup complete."
+      break
+
+    # Check for the "generation" success response
+    elif echo "$RESPONSE" | grep -q '"generation":'; then
+      echo "Marqo found an existing index. Waiting for the response from document API to start Marqo..."
+
+      until curl -f -X GET http://localhost:8080 >/dev/null 2>&1; do
+        echo "  Waiting for Vespa document API to be available..."
+        sleep 10
+      done
+      echo "  Vespa document API is available. Local Vespa setup complete."
+      break
+    fi
+    ((RETRY_COUNT++))
+    sleep 5
+  done
+
+  if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+    echo "Warning: Marqo didn't configure local vector . Marqo is still starting but unexpected error may happen."
+  fi
+
   export VESPA_QUERY_URL="http://localhost:8080"
   export VESPA_DOCUMENT_URL="http://localhost:8080"
   export VESPA_CONFIG_URL="http://localhost:19071"
+  export VESPA_IS_INTERNAL=True
 
 else
-  echo "Found VESPA_CONFIG_URL. Skipping internal Vespa configuration"
+  echo "All VESPA environment variables provided. Skipping local Vespa setup."
 fi
 
 # Start up redis
