@@ -7,9 +7,9 @@ from unittest import mock
 import requests
 
 import marqo.core.exceptions as core_exceptions
-from marqo import errors
+from marqo.api import exceptions as errors
+from marqo.api.exceptions import IndexNotFoundError
 from marqo.core.models.marqo_index import *
-from marqo.errors import IndexNotFoundError
 from marqo.s2_inference.s2_inference import get_model_properties_from_registry
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import EnvVars
