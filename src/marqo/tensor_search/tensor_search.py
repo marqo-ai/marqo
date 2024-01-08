@@ -1144,8 +1144,10 @@ def search(config: Config, index_name: str, text: Union[str, dict],
 
     # Validation for: result_count (limit) & offset
     # Validate neither is negative
-    if result_count <= 0:
-        raise api_exceptions.IllegalRequestedDocCount("search result limit must be greater than 0!")
+    if result_count <= 0 or (not isinstance(result_count, int)):
+        raise errors.IllegalRequestedDocCount(
+            f"result_count must be an integer greater than 0! Received {result_count}"
+        )
 
     if offset < 0:
         raise api_exceptions.IllegalRequestedDocCount("search result offset cannot be less than 0!")
