@@ -397,6 +397,9 @@ def _is_valid_vespa_name(name: str) -> bool:
     Returns:
         True if the name is valid, False otherwise
     """
+    if not isinstance(name, str):
+        return False
+
     return _VESPA_NAME_REGEX.fullmatch(name) is not None
 
 
