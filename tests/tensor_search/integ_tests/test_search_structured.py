@@ -877,7 +877,7 @@ class TestSearchStructured(MarqoTestCase):
             add_docs_params=AddDocsParams(
                 index_name=self.image_index_with_random_model,
                 docs=[{"text_field_1": "a test of" + (" ".join(random.choices(population=vocab, k=10)))}
-                      for _ in range(200)],
+                      for _ in range(128)],
                 # Assuming 'Title' is now 'text_field_1'
             )
         )
