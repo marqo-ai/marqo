@@ -55,6 +55,10 @@ class StructuredVespaIndex(VespaIndex):
 
             index_field = self._marqo_index.field_map[marqo_field]
 
+            if index_field.type == FieldType.Bool:
+                # Booleans are stored as bytes in Vespa
+                marqo_value = int(marqo_value)
+
             if index_field.lexical_field_name:
                 vespa_fields[index_field.lexical_field_name] = marqo_value
             if index_field.filter_field_name:
@@ -110,7 +114,18 @@ class StructuredVespaIndex(VespaIndex):
         marqo_document = dict()
         for field, value in fields.items():
             if field in self._marqo_index.all_field_map:
-                marqo_name = self._marqo_index.all_field_map[field].name
+                marqo_field = self._marqo_index.all_field_map[field]
+
+                if marqo_field.type == FieldType.Bool:
+                    # Booleans are stored as bytes in Vespa
+                    if value not in {0, 1}:
+                        raise VespaDocumentParsingError(
+                            f"Vespa document has invalid value '{value}' for boolean field '{marqo_field.name}'. "
+                            f'Expected 0 or 1'
+                        )
+                    value = bool(value)
+
+                marqo_name = marqo_field.name
                 if marqo_name in marqo_document:
                     # If getting all fields from Vespa, there may be a lexical and a filter field for one Marqo field
                     # They must have the same value
@@ -120,6 +135,7 @@ class StructuredVespaIndex(VespaIndex):
                             f'{marqo_document[marqo_name]} and {value}'
                         )
                 else:
+
                     marqo_document[marqo_name] = value
             elif field in self._marqo_index.tensor_subfield_map:
                 tensor_field = self._marqo_index.tensor_subfield_map[field]

@@ -9,9 +9,9 @@ import PIL
 import pytest
 import requests
 
+from marqo.api.exceptions import IndexNotFoundError, BadRequestError
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
-from marqo.api.exceptions import IndexNotFoundError, BadRequestError
 from marqo.s2_inference import types
 from marqo.tensor_search import add_docs
 from marqo.tensor_search import enums
@@ -43,6 +43,11 @@ class TestAddDocumentsStructured(MarqoTestCase):
                     type=FieldType.Float,
                     features=[FieldFeature.ScoreModifier]
                 ),
+                FieldRequest(
+                    name='in_stock',
+                    type=FieldType.Bool,
+                    features=[FieldFeature.Filter]
+                )
             ],
             tensor_fields=['title']
         )
@@ -66,6 +71,11 @@ class TestAddDocumentsStructured(MarqoTestCase):
                     type=FieldType.Float,
                     features=[FieldFeature.ScoreModifier]
                 ),
+                FieldRequest(
+                    name='in_stock',
+                    type=FieldType.Bool,
+                    features=[FieldFeature.Filter]
+                )
             ],
             tensor_fields=['title']
         )
@@ -160,7 +170,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
                         docs=[{
                             "_id": "123",
                             "title": "content 1",
-                            "desc": "content 2. blah blah blah"
+                            "desc": "content 2. blah blah blah",
                         }],
                         device="cpu"
                     )
@@ -169,13 +179,59 @@ class TestAddDocumentsStructured(MarqoTestCase):
                     {
                         "_id": "123",
                         "title": "content 1",
-                        "desc": "content 2. blah blah blah"
+                        "desc": "content 2. blah blah blah",
                     },
                     tensor_search.get_document_by_id(
                         config=self.config, index_name=index_name,
                         document_id="123"
                     )
                 )
+
+    def test_boolean_field(self):
+        test_indexes = [
+            (self.index_name_1, 'Standard index name'),
+            (self.index_name_2, 'Index name requiring encoding'),
+        ]
+        test_cases = [
+            (
+                'True', {
+                    "_id": "123",
+                    "in_stock": True
+                }
+            ),
+            (
+                'False',
+                {
+                    "_id": "124",
+                    "in_stock": False
+                }
+            ),
+            (
+                'Blank',  # Blank boolean should return blank, not a default value
+                {
+                    "_id": "125",
+                }
+            ),
+        ]
+        for index_name, desc in test_indexes:
+            for test_case in test_cases:
+                with self.subTest(test_case[0] + ' - ' + desc):
+                    tensor_search.add_documents(
+                        config=self.config, add_docs_params=AddDocsParams(
+                            index_name=index_name,
+                            docs=[
+                                test_case[1]
+                            ],
+                            device="cpu"
+                        )
+                    )
+                    self.assertEqual(
+                        test_case[1],
+                        tensor_search.get_document_by_id(
+                            config=self.config, index_name=index_name,
+                            document_id=test_case[1]["_id"]
+                        )
+                    )
 
     def test_add_documents_dupe_ids(self):
         """
