@@ -50,6 +50,8 @@ class TestSearchStructured(MarqoTestCase):
                              features=[FieldFeature.Filter]),
                 FieldRequest(name="bool_field_1", type=FieldType.Bool,
                              features=[FieldFeature.Filter]),
+                FieldRequest(name="bool_field_2", type=FieldType.Bool,
+                             features=[FieldFeature.Filter]),
                 FieldRequest(name="list_field_1", type=FieldType.ArrayText,
                              features=[FieldFeature.Filter]),
             ],
@@ -562,7 +564,8 @@ class TestSearchStructured(MarqoTestCase):
                      "int_field_1": 2},
                     {"_id": "1233", "text_field_1": "some text", "text_field_2": "Close match hehehe",
                      "bool_field_1": True},
-                    {"_id": "1232", "text_field_1": "true"}
+                    {"_id": "1232", "text_field_1": "true"},
+                    {"_id": "1231", "text_field_1": "some text", "bool_field_2": False},
                 ]
             )
         )
@@ -578,6 +581,7 @@ class TestSearchStructured(MarqoTestCase):
             ("bool_field_1:true", 1, "1233"),
             ("bool_field_1:True", 1, "1233"),
             ("bool_field_1:tRue", 1, "1233"),
+            ("bool_field_2:false", 1, "1231"),
             ("bool_field_1:false", 0, None),  # no hits for bool_field_1=false
             ("bool_field_1:some_value", 0, None),  # no hits for bool_field_1 not boolean
             ("int_field_1:[0 TO 30] OR bool_field_1:true", 2, None),
@@ -589,7 +593,7 @@ class TestSearchStructured(MarqoTestCase):
             with self.subTest(
                     f"filter_string={filter_string}, expected_hits={expected_hits}, expected_id={expected_id}"):
                 res = tensor_search.search(
-                    config=self.config, index_name=self.default_text_index, text="some text", result_count=3,
+                    config=self.config, index_name=self.default_text_index, text="", result_count=3,
                     filter=filter_string, verbose=0
                 )
 
