@@ -670,6 +670,9 @@ class TestSearchUnstructured(MarqoTestCase):
                     {
                         "_id": "other doc", "a_float": 0.66, "bfield": "some text too", "my_int": 5,
                         "fake_int": "234", "fake_float": "1.23", "gapped_field_name": "gap"
+                    },
+                    {
+                        "_id": "123457",  "bfield": "true"
                     }
                 ],
                 tensor_fields=["doc_title", "field_X", "field1"])
@@ -689,7 +692,8 @@ class TestSearchUnstructured(MarqoTestCase):
             ("field1:(other things)", 1, "123456"),
             ("fake_int:234", 1, "other doc"),
             ("fake_float:1.23", 1, "other doc"),
-            ("gapped_field_name:gap", 1, "other doc")
+            ("gapped_field_name:gap", 1, "other doc"),
+            # ("bfield:true", 1, "123457")  # string field with boolean-like value # TODO - This fails due to a bug
         ]
 
         for filter_string, expected_hits, expected_id in test_parameters:

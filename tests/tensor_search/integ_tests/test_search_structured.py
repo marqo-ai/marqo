@@ -561,7 +561,8 @@ class TestSearchStructured(MarqoTestCase):
                     {"_id": "1234", "text_field_1": "some text", "text_field_2": "Close match hehehe",
                      "int_field_1": 2},
                     {"_id": "1233", "text_field_1": "some text", "text_field_2": "Close match hehehe",
-                     "bool_field_1": True}
+                     "bool_field_1": True},
+                    {"_id": "1232", "text_field_1": "true"}
                 ]
             )
         )
@@ -581,6 +582,7 @@ class TestSearchStructured(MarqoTestCase):
             ("bool_field_1:some_value", 0, None),  # no hits for bool_field_1 not boolean
             ("int_field_1:[0 TO 30] OR bool_field_1:true", 2, None),
             ("(int_field_1:[0 TO 30] AND int_field_1:2) AND text_field_1:(some text)", 1, "1234"),
+            ("text_field_1:true", 1, "1232")  # string field with boolean-like value
         ]
 
         for filter_string, expected_hits, expected_id in test_parameters:
