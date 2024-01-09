@@ -2,9 +2,10 @@ from typing import List
 from typing import Optional, Union, Any, Sequence
 
 import numpy as np
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 from pydantic import Field
 
+from marqo.api.exceptions import BadRequestError
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.utils import get_best_available_device
 
@@ -29,6 +30,9 @@ class AddDocsBodyParams(BaseModel):
     documents: Union[Sequence[Union[dict, Any]], np.ndarray]
     imageDownloadThreadCount: int = 20
 
+# TODO - Make this configurable
+MAX_DOCS = 128
+
 
 class AddDocsParams(BaseModel):
     """Represents the parameters of the tensor_search.add_documents() function
@@ -51,7 +55,6 @@ class AddDocsParams(BaseModel):
         arbitrary_types_allowed = True
         allow_mutation = False
 
-
     # this should only accept Sequences of dicts, but currently validation lies elsewhere
     docs: Union[Sequence[Union[dict, Any]], np.ndarray]
 
@@ -69,3 +72,19 @@ class AddDocsParams(BaseModel):
         if "device" not in data or data["device"] is None:
             data["device"] = get_best_available_device()
         super().__init__(**data)
+
+    @validator('docs')
+    def validate_docs(cls, docs):
+        doc_count = len(docs)
+
+        if doc_count == 0:
+            raise BadRequestError(message="Received empty add documents request")
+        elif doc_count > MAX_DOCS:
+            raise BadRequestError(
+                message=f"Number of docs in add documents request ({doc_count}) exceeds limit of {MAX_DOCS}. "
+                        f"If using the Python client, break up your `add_documents` request into smaller batches using "
+                        f"its `client_batch_size` parameter. "
+                        f"See https://marqo.pages.dev/2.0.0/API-Reference/documents/#body for more details."
+            )
+
+        return docs

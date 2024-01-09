@@ -703,6 +703,44 @@ class TestAddDocumentsStructured(MarqoTestCase):
 
             assert run()
 
+    def test_add_documents_exceeded_max_doc_count(self):
+        max_docs = 128
+
+        test_cases = [  # count, error out=?
+            (max_docs - 10, False),
+            (max_docs - 1, False),
+            (max_docs, False),
+            (max_docs + 1, True),
+            (max_docs + 10, True),
+        ]
+
+        for count, error in test_cases:
+            with self.subTest(f'{count} - {error}'):
+
+                if error:
+                    with self.assertRaises(BadRequestError):
+                        tensor_search.add_documents(
+                            config=self.config, add_docs_params=AddDocsParams(
+                                index_name=self.index_name_1,
+                                docs=[{
+                                    "desc": "some desc"
+                                }] * count,
+                                device="cpu"
+                            )
+                        )
+                else:
+                    self.assertEqual(False,
+                                     tensor_search.add_documents(
+                                         config=self.config, add_docs_params=AddDocsParams(
+                                             index_name=self.index_name_1,
+                                             docs=[{
+                                                 "desc": "some desc"
+                                             }] * count,
+                                             device="cpu"
+                                         )
+                                     )['errors']
+                                     )
+
     def test_remove_tensor_field(self):
         """
         If a document is re-indexed with a tensor field removed, the vectors are removed
