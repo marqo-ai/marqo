@@ -1,6 +1,8 @@
 import time
 from typing import Dict, Any, Optional, List
 
+from pydantic import root_validator
+
 import marqo.api.exceptions as api_exceptions
 import marqo.core.models.marqo_index as core
 from marqo import version
@@ -39,6 +41,20 @@ class IndexSettings(StrictBaseModel):
             m=16
         )
     )
+
+    @root_validator(pre=True)
+    def validate_field_names(cls, values):
+        # Verify no snake case field names (pydantic won't catch these due to allow_population_by_field_name = True)
+        def validate_dict_keys(d: dict):
+            for key in d.keys():
+                if '_' in key:
+                    raise ValueError(f"Invalid field name '{key}'")
+                if isinstance(d[key], dict):
+                    validate_dict_keys(d[key])
+
+        validate_dict_keys(values)
+
+        return values
 
     def to_marqo_index_request(self, index_name: str) -> MarqoIndexRequest:
         marqo_fields = None
