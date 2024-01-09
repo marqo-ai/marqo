@@ -138,7 +138,7 @@ def filter_boxes(bboxes: Union[FloatTensor, ndarray], max_aspect_ratio: int = 4,
     
     return inds
 
-def rescale_box(box: Union[List[float], ndarray, FloatTensor], from_size: Tuple, to_size: Tuple) -> Tuple:
+def rescale_box(box: Union[List[float], ndarray, FloatTensor], from_size: Tuple, to_size: Tuple) -> List[float]:
     """rescales a bounding box between two different image sizes
 
     Args:
@@ -160,7 +160,7 @@ def rescale_box(box: Union[List[float], ndarray, FloatTensor], from_size: Tuple,
     y1_n = y1*Fy
     y2_n = y2*Fy
 
-    return (x1_n, y1_n, x2_n, y2_n)
+    return [x1_n, y1_n, x2_n, y2_n]
 
 def generate_boxes(image_size: Tuple[int, int], hn: int, wn: int, overlap: bool = False) -> List[Tuple]:
     """does a simple bounding box generation based on the desired number in the 
@@ -197,8 +197,6 @@ def generate_boxes(image_size: Tuple[int, int], hn: int, wn: int, overlap: bool 
                 if p3 > img_width or p4 > img_height:
                     continue
                 bboxes.append(box)
-
-
     return bboxes
 
 def str2bool(string: str) -> bool:
