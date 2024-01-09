@@ -163,9 +163,9 @@ class TestGetStats(MarqoTestCase):
                 "normalize_embeddings": True,
                 "model": "random/small",
                 "text_preprocessing": {
-                    "split_length": 20,
-                    "split_overlap": 1,
-                    "split_method": "word"
+                    "splitLength": 20,
+                    "splitOverlap": 1,
+                    "splitMethod": "word"
                 },
             }
         }

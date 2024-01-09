@@ -436,8 +436,8 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
                 "treat_urls_and_pointers_as_images": True,
                 "model": "ViT-B/32",
                 "text_preprocessing": {
-                    "split_method": "sentence",
-                    "split_length": 1,
+                    "splitMethod": "sentence",
+                    "splitLength": 1,
                 }
             }
         }

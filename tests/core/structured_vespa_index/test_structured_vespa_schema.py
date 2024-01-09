@@ -18,7 +18,7 @@ class TestStructuredVespaSchema(MarqoTestCase):
             model=Model(name='ViT-B/32'),
             distance_metric=DistanceMetric.PrenormalizedAnguar,
             vector_numeric_type=VectorNumericType.Float,
-            hnsw_config=HnswConfig(ef_construction=100, m=16),
+            hnsw_config=HnswConfig(efConstruction=100, m=16),
             fields=[
                 FieldRequest(name='title', type=FieldType.Text, features=[FieldFeature.LexicalSearch]),
                 FieldRequest(name='description', type=FieldType.Text),
@@ -53,7 +53,7 @@ class TestStructuredVespaSchema(MarqoTestCase):
             model=Model(name='ViT-B/32'),
             distance_metric=DistanceMetric.PrenormalizedAnguar,
             vector_numeric_type=VectorNumericType.Float,
-            hnsw_config=HnswConfig(ef_construction=100, m=16),
+            hnsw_config=HnswConfig(efConstruction=100, m=16),
             fields=[
                 FieldRequest(name='title', type=FieldType.Text, features=[FieldFeature.LexicalSearch]),
                 FieldRequest(name='description', type=FieldType.Text),
@@ -88,7 +88,7 @@ class TestStructuredVespaSchema(MarqoTestCase):
             model=Model(name='ViT-B/32'),
             distance_metric=DistanceMetric.PrenormalizedAnguar,
             vector_numeric_type=VectorNumericType.Float,
-            hnsw_config=HnswConfig(ef_construction=100, m=16),
+            hnsw_config=HnswConfig(efConstruction=100, m=16),
             fields=[
                 FieldRequest(name='title', type=FieldType.Text, features=[FieldFeature.LexicalSearch]),
                 FieldRequest(name='description', type=FieldType.Text),
@@ -122,7 +122,7 @@ class TestStructuredVespaSchema(MarqoTestCase):
             model=Model(name='ViT-B/32'),
             distance_metric=DistanceMetric.PrenormalizedAnguar,
             vector_numeric_type=VectorNumericType.Float,
-            hnsw_config=HnswConfig(ef_construction=100, m=16),
+            hnsw_config=HnswConfig(efConstruction=100, m=16),
             fields=[
                 FieldRequest(name='title', type=FieldType.Text),
                 FieldRequest(name='description', type=FieldType.Text),
@@ -148,7 +148,7 @@ class TestStructuredVespaSchema(MarqoTestCase):
             model=Model(name='ViT-B/32'),
             distance_metric=DistanceMetric.PrenormalizedAnguar,
             vector_numeric_type=VectorNumericType.Float,
-            hnsw_config=HnswConfig(ef_construction=100, m=16),
+            hnsw_config=HnswConfig(efConstruction=100, m=16),
             fields=[
                 FieldRequest(name='title', type=FieldType.Text, features=[FieldFeature.LexicalSearch]),
                 FieldRequest(name='description', type=FieldType.Text),
@@ -174,7 +174,7 @@ class TestStructuredVespaSchema(MarqoTestCase):
             model=Model(name='ViT-B/32'),
             distance_metric=DistanceMetric.PrenormalizedAnguar,
             vector_numeric_type=VectorNumericType.Float,
-            hnsw_config=HnswConfig(ef_construction=100, m=16),
+            hnsw_config=HnswConfig(efConstruction=100, m=16),
             fields=[
                 FieldRequest(name='title', type=FieldType.Text, features=[FieldFeature.LexicalSearch]),
                 FieldRequest(name='description', type=FieldType.Text),

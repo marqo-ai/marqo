@@ -22,10 +22,10 @@ class TestGetSettings(MarqoTestCase):
     def test_default_settings(self):
         """default fields should be returned if index is created with default settings
             sample structure of output: {'index_defaults': {'treat_urls_and_pointers_as_images': False,
-                                          'text_preprocessing': {'split_method': 'sentence', 'split_length': 2,
-                                                                 'split_overlap': 0},
+                                          'text_preprocessing': {'splitMethod': 'sentence', 'split_length': 2,
+                                                                 'splitOverlap': 0},
                                           'model': 'hf/all_datasets_v4_MiniLM-L6', 'normalize_embeddings': True,
-                                          'image_preprocessing': {'patch_method': None}}, 'number_of_shards': 5
+                                          'image_preprocessing': {'patchMethod': None}}, 'number_of_shards': 5
                                           'number_of_replicas':1}
         """
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name)

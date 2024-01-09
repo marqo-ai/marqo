@@ -101,7 +101,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
             tensor_fields=['image_field'],
             model=Model(name='ViT-B/16'),
             normalize_embeddings=True,
-            image_preprocessing=ImagePreProcessing(patch_method=PatchMethod.Frcnn)
+            image_preprocessing=ImagePreProcessing(patchMethod=PatchMethod.Frcnn)
         )
         index_request_img_random = cls.structured_marqo_index_request(
             fields=[

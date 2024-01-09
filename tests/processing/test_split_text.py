@@ -61,7 +61,7 @@ class TestSplitText(unittest.TestCase):
     def test_split_text_single_word(self):
         
         text = 'short'
-        result = split_text(text, split_by='character', split_length=4, split_overlap=1)
+        result = split_text(split_by='character', split_length=4, split_overlap=1)
         assert result == ['shor', 'rt']
 
         result = split_text(text, split_by='character', split_length=4, split_overlap=2)

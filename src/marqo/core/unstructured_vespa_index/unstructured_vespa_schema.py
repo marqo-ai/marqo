@@ -155,7 +155,7 @@ class UnstructuredVespaSchema(VespaSchema):
                         index {{
                             hnsw {{
                                 max-links-per-node: {marqo_index.hnsw_config.m}
-                                neighbors-to-explore-at-insert: {marqo_index.hnsw_config.ef_construction}
+                                neighbors-to-explore-at-insert: {marqo_index.hnsw_config.efConstruction}
                             }}
                         }}
                     }}

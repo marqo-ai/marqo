@@ -293,12 +293,12 @@ class TestValidateIndexSettings(unittest.TestCase):
                 "model": "hf/all_datasets_v4_MiniLM-L6",
                 "normalize_embeddings": True,
                 "text_preprocessing": {
-                    "split_length": 2,
-                    "split_overlap": 0,
-                    "split_method": "sentence"
+                    "splitLength": 2,
+                    "splitOverlap": 0,
+                    "splitMethod": "sentence"
                 },
                 "image_preprocessing": {
-                    "patch_method": None
+                    "patchMethod": None
                 }
             },
             "number_of_shards": 5,

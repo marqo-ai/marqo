@@ -265,16 +265,16 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
 
                         if isinstance(field_content, str) and not _is_image(field_content):
                             # text processing pipeline:
-                            split_by = marqo_index.text_preprocessing.split_method.value
-                            split_length = marqo_index.text_preprocessing.split_length
-                            split_overlap = marqo_index.text_preprocessing.split_overlap
+                            split_by = marqo_index.text_preprocessing.splitMethod
+                            split_length = marqo_index.text_preprocessing.splitLength
+                            split_overlap = marqo_index.text_preprocessing.splitOverlap
                             content_chunks: List[str] = text_processor.split_text(field_content, split_by=split_by,
                                                                                   split_length=split_length,
                                                                                   split_overlap=split_overlap)
                             text_chunks = content_chunks
                         else:
                             # TODO put the logic for getting field parameters into a function and add per field options
-                            image_method = marqo_index.image_preprocessing.patch_method
+                            image_method = marqo_index.image_preprocessing.patchMethod
 
                             # the chunk_image contains the no-op logic as of now - method = None will be a no-op
                             try:
@@ -695,16 +695,16 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
 
                         if isinstance(field_content, str) and not _is_image(field_content):
                             # text processing pipeline:
-                            split_by = marqo_index.text_preprocessing.split_method.value
-                            split_length = marqo_index.text_preprocessing.split_length
-                            split_overlap = marqo_index.text_preprocessing.split_overlap
+                            split_by = marqo_index.text_preprocessing.splitMethod
+                            split_length = marqo_index.text_preprocessing.splitLength
+                            split_overlap = marqo_index.text_preprocessing.splitOverlap
                             content_chunks = text_processor.split_text(field_content, split_by=split_by,
                                                                        split_length=split_length,
                                                                        split_overlap=split_overlap)
                             text_chunks = content_chunks
                         else:
                             # TODO put the logic for getting field parameters into a function and add per field options
-                            image_method = marqo_index.image_preprocessing.patch_method
+                            image_method = marqo_index.image_preprocessing.patchMethod
 
                             # the chunk_image contains the no-op logic as of now - method = None will be a no-op
                             try:

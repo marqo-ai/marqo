@@ -56,14 +56,14 @@ class DistanceMetric(Enum):
     Hamming = 'hamming'
 
 
-class TextSplitMethod(Enum):
+class TextSplitMethod(str, Enum):
     Character = 'character'
     Word = 'word'
     Sentence = 'sentence'
     Passage = 'passage'
 
 
-class PatchMethod(Enum):
+class PatchMethod(str, Enum):
     Simple = 'simple'
     Frcnn = 'frcnn'
     DinoV1 = 'dino-v1'
@@ -98,18 +98,18 @@ class TensorField(ImmutableStrictBaseModel):
 
 
 class HnswConfig(ImmutableStrictBaseModel):
-    ef_construction: int = pydantic.Field(gt=0, alias='efConstruction')
+    efConstruction: int = pydantic.Field(gt=0, alias='ef_construction')
     m: int = pydantic.Field(gt=0)
 
 
 class TextPreProcessing(ImmutableStrictBaseModel):
-    split_length: int = pydantic.Field(gt=0, alias='splitLength')
-    split_overlap: int = pydantic.Field(ge=0, alias='splitOverlap')
-    split_method: TextSplitMethod = pydantic.Field(alias='splitMethod')
+    splitLength: int = pydantic.Field(gt=0, alias='split_length')
+    splitOverlap: int = pydantic.Field(ge=0, alias='split_overlap')
+    splitMethod: TextSplitMethod = pydantic.Field(alias='split_method')
 
 
 class ImagePreProcessing(ImmutableStrictBaseModel):
-    patch_method: Optional[PatchMethod] = pydantic.Field(alias='patchMethod')
+    patchMethod: Optional[PatchMethod] = pydantic.Field(alias='patch_method')
 
 
 class Model(StrictBaseModel):

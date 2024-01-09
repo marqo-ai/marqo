@@ -226,7 +226,7 @@ class ReRankerText(ReRanker):
     class for reranking with hf based text models
     """
     def __init__(self, model_name: str, device: str, max_length: int = 512, num_highlights: int = 1, 
-                        split_params: Dict = get_default_text_processing_parameters()):
+                        split_params=get_default_text_processing_parameters()):
         super().__init__()
 
         self.model_name = model_name
@@ -245,9 +245,9 @@ class ReRankerText(ReRanker):
             self._extract_text_processing_parameters()
 
     def _extract_text_processing_parameters(self) -> None:
-        self.split_length = self.split_params['split_length']
-        self.split_overlap = self.split_params['split_overlap']
-        self.split_method = self.split_params['split_method']
+        self.split_length = self.split_params.splitLength
+        self.split_overlap = self.split_params.splitOverlap
+        self.split_method = self.split_params.splitMethod
 
     def load_model(self) -> None:
 

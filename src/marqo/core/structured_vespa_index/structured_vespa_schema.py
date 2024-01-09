@@ -124,7 +124,7 @@ class StructuredVespaSchema(VespaSchema):
                 f'attribute {{ distance-metric: {common.get_distance_metric(self._index_request.distance_metric)} }}')
             document.append('index { hnsw {')
             document.append(f'max-links-per-node: {self._index_request.hnsw_config.m}')
-            document.append(f'neighbors-to-explore-at-insert: {self._index_request.hnsw_config.ef_construction}')
+            document.append(f'neighbors-to-explore-at-insert: {self._index_request.hnsw_config.efConstruction}')
             document.append('}}')
             document.append('}')
 

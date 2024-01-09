@@ -37,9 +37,9 @@ class TestMonitoring(MarqoTestCase):
             ],
             tensor_fields=['title'],
             text_preprocessing=TextPreProcessing(
-                split_length=20,
-                split_overlap=1,
-                split_method=TextSplitMethod.Word
+                splitLength=20,
+                splitOverlap=1,
+                splitMethod=TextSplitMethod.Word
             )
         )
 
@@ -65,9 +65,9 @@ class TestMonitoring(MarqoTestCase):
             ],
             tensor_fields=['title'],
             text_preprocessing=TextPreProcessing(
-                split_length=20,
-                split_overlap=1,
-                split_method=TextSplitMethod.Word
+                splitLength=20,
+                splitOverlap=1,
+                splitMethod=TextSplitMethod.Word
             )
         )
 
@@ -99,9 +99,9 @@ class TestMonitoring(MarqoTestCase):
 
         unstructured_index_request = cls.unstructured_marqo_index_request(
             text_preprocessing=TextPreProcessing(
-                split_length=20,
-                split_overlap=1,
-                split_method=TextSplitMethod.Word
+                splitLength=20,
+                splitOverlap=1,
+                splitMethod=TextSplitMethod.Word
             )
         )
 

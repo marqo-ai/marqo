@@ -36,7 +36,7 @@ class TestSearchUnstructured(MarqoTestCase):
 
         image_index_with_chunking = cls.unstructured_marqo_index_request(
             model=Model(name='ViT-B/32'),
-            image_preprocessing=ImagePreProcessing(patch_method=PatchMethod.Frcnn),
+            image_preprocessing=ImagePreProcessing(patchMethod=PatchMethod.Frcnn),
             treat_urls_and_pointers_as_images=True
         )
 

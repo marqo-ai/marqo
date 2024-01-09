@@ -78,17 +78,17 @@ class MarqoTestCase(unittest.TestCase):
             model: Model = Model(name='hf/all_datasets_v4_MiniLM-L6'),
             normalize_embeddings: bool = True,
             text_preprocessing: TextPreProcessing = TextPreProcessing(
-                split_length=2,
-                split_overlap=0,
-                split_method=TextSplitMethod.Sentence
+                splitLength=2,
+                splitOverlap=0,
+                splitMethod=TextSplitMethod.Sentence
             ),
             image_preprocessing: ImagePreProcessing = ImagePreProcessing(
-                patch_method=None
+                patchMethod=None
             ),
             distance_metric: DistanceMetric = DistanceMetric.Angular,
             vector_numeric_type: VectorNumericType = VectorNumericType.Float,
             hnsw_config: HnswConfig = HnswConfig(
-                ef_construction=128,
+                efConstruction=128,
                 m=16
             ),
             marqo_version='1.0.0',
@@ -123,17 +123,17 @@ class MarqoTestCase(unittest.TestCase):
             model: Model = Model(name='random/small'),
             normalize_embeddings: bool = True,
             text_preprocessing: TextPreProcessing = TextPreProcessing(
-                split_length=2,
-                split_overlap=0,
-                split_method=TextSplitMethod.Sentence
+                splitLength=2,
+                splitOverlap=0,
+                splitMethod=TextSplitMethod.Sentence
             ),
             image_preprocessing: ImagePreProcessing = ImagePreProcessing(
-                patch_method=None
+                patchMethod=None
             ),
             distance_metric: DistanceMetric = DistanceMetric.Angular,
             vector_numeric_type: VectorNumericType = VectorNumericType.Float,
             hnsw_config: HnswConfig = HnswConfig(
-                ef_construction=128,
+                efConstruction=128,
                 m=16
             ),
             marqo_version='1.0.0',
@@ -169,17 +169,17 @@ class MarqoTestCase(unittest.TestCase):
             model: Model = Model(name='hf/all_datasets_v4_MiniLM-L6'),
             normalize_embeddings: bool = True,
             text_preprocessing: TextPreProcessing = TextPreProcessing(
-                split_length=2,
-                split_overlap=0,
-                split_method=TextSplitMethod.Sentence
+                splitLength=2,
+                splitOverlap=0,
+                splitMethod=TextSplitMethod.Sentence
             ),
             image_preprocessing: ImagePreProcessing = ImagePreProcessing(
-                patch_method=None
+                patchMethod=None
             ),
             distance_metric: DistanceMetric = DistanceMetric.Angular,
             vector_numeric_type: VectorNumericType = VectorNumericType.Float,
             hnsw_config: HnswConfig = HnswConfig(
-                ef_construction=128,
+                efConstruction=128,
                 m=16
             ),
             treat_urls_and_pointers_as_images: bool = False,
