@@ -122,7 +122,7 @@ class VespaClient:
         """
         return self._get_convergence_status().converged
 
-    def wait_for_application_convergence(self, timeout: int = 60) -> None:
+    def wait_for_application_convergence(self, timeout: int = 120) -> None:
         """
         Wait for Vespa application to converge, checking every second.
 
