@@ -85,12 +85,12 @@ class TestSearchUnstructured(MarqoTestCase):
                                             add_docs_params=AddDocsParams(
                                                 index_name=index_name,
                                                 docs=[
-                                                    {"abc": "Exact match hehehe efgh ", "other field": "baaadd efgh ",
+                                                    {"abc": "Exact match hehehe efgh ", "other_field": "baaadd efgh ",
                                                      "_id": "5678", "finally": "some field efgh "},
-                                                    {"abc": "shouldn't really match ", "other field": "Nope.....",
+                                                    {"abc": "shouldn't really match ", "other_field": "Nope.....",
                                                      "_id": "1234", "finally": "Random text here efgh "},
                                                 ],
-                                                tensor_fields=["abc", "other field", "finally"],
+                                                tensor_fields=["abc", "other_field", "finally"],
                                             )
                                             )
 
@@ -186,11 +186,11 @@ class TestSearchUnstructured(MarqoTestCase):
                     },
                     {
                         "abc": "defgh",
-                        "this cat sat": "on the mat",
+                        "this_cat_sat": "on the mat",
                         "_id": "2"
                     }
                 ],
-                tensor_fields=["text", "combined", "abc", "this cat sat"]
+                tensor_fields=["text", "combined", "abc", "this_cat_sat"]
             )
         )
 
@@ -210,12 +210,12 @@ class TestSearchUnstructured(MarqoTestCase):
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
                 docs=[
-                    {"abc": "Exact match hehehe", "other field": "baaadd",
+                    {"abc": "Exact match hehehe", "other_field": "baaadd",
                      "Cool Field 1": "res res res", "_id": "5678"},
-                    {"abc": "random text", "other field": "Close match hehehe", "_id": "1234"},
+                    {"abc": "random text", "other_field": "Close match hehehe", "_id": "1234"},
                     {"Cool Field 1": "somewhat match", "_id": "9000"}
                 ],
-                tensor_fields=["abc", "other field", "Cool Field 1"]
+                tensor_fields=["abc", "other_field", "Cool Field 1"]
             )
         )
 
@@ -262,11 +262,11 @@ class TestSearchUnstructured(MarqoTestCase):
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
                 docs=[
-                    {"abc": "Exact match hehehe", "other field": "baaadd",
+                    {"abc": "Exact match hehehe", "other_field": "baaadd",
                      "Cool Field 1": "res res res", "_id": "5678"},
-                    {"abc": "random text", "other field": "Close match hehehe", "_id": "1234"},
+                    {"abc": "random text", "other_field": "Close match hehehe", "_id": "1234"},
                     {"Cool Field 1": "somewhat match", "_id": "9000"}],
-                tensor_fields=["abc", "other field", "Cool Field 1"]
+                tensor_fields=["abc", "other_field", "Cool Field 1"]
             )
         )
 
@@ -306,9 +306,9 @@ class TestSearchUnstructured(MarqoTestCase):
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
                 docs=[
-                    {"abc": "some text", "other field": "baaadd", "_id": "5678"},
-                    {"abc": "some text", "other field": "Close match hehehe", "_id": "1234"}],
-                tensor_fields=["abc", "other field"]
+                    {"abc": "some text", "other_field": "baaadd", "_id": "5678"},
+                    {"abc": "some text", "other_field": "Close match hehehe", "_id": "1234"}],
+                tensor_fields=["abc", "other_field"]
             )
         )
 
@@ -330,8 +330,8 @@ class TestSearchUnstructured(MarqoTestCase):
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index, docs=[
-                    {"abc": "some text", "other field": "baaadd", "_id": "5678"},
-                    {"abc": "some text", "other field": "Close match hehehe", "_id": "1234"}],
+                    {"abc": "some text", "other_field": "baaadd", "_id": "5678"},
+                    {"abc": "some text", "other_field": "Close match hehehe", "_id": "1234"}],
                 tensor_fields=[]
             )
         )
@@ -357,10 +357,10 @@ class TestSearchUnstructured(MarqoTestCase):
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
                 docs=[
-                    {"abc": "some text", "other field": "baaadd", "_id": "5678", "my_int": 144},
-                    {"abc": "some text", "other field": "Close match hehehe", "_id": "1234", "my_int": 88},
+                    {"abc": "some text", "other_field": "baaadd", "_id": "5678", "my_int": 144},
+                    {"abc": "some text", "other_field": "Close match hehehe", "_id": "1234", "my_int": 88},
                 ],
-                tensor_fields=["abc", "other field"]
+                tensor_fields=["abc", "other_field"]
             )
         )
         for search_method in [SearchMethod.LEXICAL, SearchMethod.TENSOR]:
@@ -376,10 +376,10 @@ class TestSearchUnstructured(MarqoTestCase):
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
                 docs=[
-                    {"abc": "some text", "other field": "baaadd", "_id": "5678", "my_string": "b"},
-                    {"abc": "some text", "other field": "Close match hehehe", "_id": "1234", "an_int": 2},
+                    {"abc": "some text", "other_field": "baaadd", "_id": "5678", "my_string": "b"},
+                    {"abc": "some text", "other_field": "Close match hehehe", "_id": "1234", "an_int": 2},
                     {"abc": "some text", "_id": "1235", "my_list": ["tag1", "tag2 some"]}],
-                tensor_fields=["abc", "other field"]
+                tensor_fields=["abc", "other_field"]
             )
         )
 
@@ -418,11 +418,11 @@ class TestSearchUnstructured(MarqoTestCase):
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
                 docs=[
-                    {"abc": "some text", "other field": "baaadd", "_id": "5678", "my_string": "b"},
-                    {"abc": "some text", "other field": "Close match hehehe", "_id": "1234", "an_int": 2},
+                    {"abc": "some text", "other_field": "baaadd", "_id": "5678", "my_string": "b"},
+                    {"abc": "some text", "other_field": "Close match hehehe", "_id": "1234", "an_int": 2},
                     {"abc": "some text", "_id": "1235", "my_list": ["tag1", "tag2 some"]}
                 ],
-                tensor_fields=["abc", "other field"]
+                tensor_fields=["abc", "other_field"]
             )
         )
 
@@ -451,11 +451,11 @@ class TestSearchUnstructured(MarqoTestCase):
             add_docs_params=AddDocsParams(
                 index_name=self.default_image_index,
                 docs=[
-                    {"img": hippo_img, "abc": "some text", "other field": "baaadd", "_id": "5678", "my_string": "b"},
-                    {"img": hippo_img, "abc": "some text", "other field": "Close match hehehe", "_id": "1234",
+                    {"img": hippo_img, "abc": "some text", "other_field": "baaadd", "_id": "5678", "my_string": "b"},
+                    {"img": hippo_img, "abc": "some text", "other_field": "Close match hehehe", "_id": "1234",
                      "an_int": 2},
                     {"img": hippo_img, "abc": "some text", "_id": "1235", "my_list": ["tag1", "tag2 some"]}],
-                tensor_fields=["abc", "other field", "img"]
+                tensor_fields=["abc", "other_field", "img"]
             )
         )
 
@@ -484,11 +484,11 @@ class TestSearchUnstructured(MarqoTestCase):
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
                 docs=[
-                    {"abc": "some text", "other field": "baaadd", "_id": "5678", "my_string": "b"},
-                    {"abc": "some text", "other field": "Close match hehehe", "_id": "1234", "an_int": 2},
-                    {"abc": "some text", "other field": "Close match hehehe", "_id": "1233", "my_bool": True}
+                    {"abc": "some text", "other_field": "baaadd", "_id": "5678", "my_string": "b"},
+                    {"abc": "some text", "other_field": "Close match hehehe", "_id": "1234", "an_int": 2},
+                    {"abc": "some text", "other_field": "Close match hehehe", "_id": "1233", "my_bool": True}
                 ],
-                tensor_fields=["abc", "other field"]
+                tensor_fields=["abc", "other_field"]
             )
         )
 
@@ -524,20 +524,20 @@ class TestSearchUnstructured(MarqoTestCase):
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
                 docs=[
-                    {"abc": "some text", "other field": "baaadd", "_id": "5678", "my_string": "b"},
-                    {"abc": "some text", "other field": "Close match hehehe", "_id": "1234", "an_int": 2},
-                    {"abc": "some text", "other field": "Close match hehehe", "_id": "1233", "my_bool": True},
-                    {"abc": "some text", "Floaty Field": 0.548, "_id": "344", "my_bool": True},
+                    {"abc": "some text", "other_field": "baaadd", "_id": "5678", "my_string": "b"},
+                    {"abc": "some text", "other_field": "Close match hehehe", "_id": "1234", "an_int": 2},
+                    {"abc": "some text", "other_field": "Close match hehehe", "_id": "1233", "my_bool": True},
+                    {"abc": "some text", "Floaty_Field": 0.548, "_id": "344", "my_bool": True},
                 ],
-                tensor_fields=["abc", "other field"]
+                tensor_fields=["abc", "other_field"]
             )
         )
 
         # Define test parameters as tuples (filter_string, expected_hits, expected_ids)
         test_parameters = [
-            ("other\\ field:baaadd", 1, ["5678"]),
-            ("other\\ field:(Close match hehehe)", 2, ["1234", "1233"]),
-            ("(Floaty\\ Field:[0 TO 1]) AND (abc:(some text))", 1, ["344"])
+            ("other_field:baaadd", 1, ["5678"]),
+            ("other_field:(Close match hehehe)", 2, ["1234", "1233"]),
+            ("(Floaty_Field:[0 TO 1]) AND (abc:(some text))", 1, ["344"])
         ]
 
         for filter_string, expected_hits, expected_ids in test_parameters:
@@ -558,17 +558,17 @@ class TestSearchUnstructured(MarqoTestCase):
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
                 docs=[
-                    {"abc": "some text", "other field": "baaadd", "_id": "5678", "my_string": "b"},
-                    {"abc": "some text", "other field": "Close match hehehe", "_id": "1234", "an_int": 2},
-                    {"abc": "some text", "other field": "Close match hehehe", "_id": "1233", "my_bool": True},
+                    {"abc": "some text", "other_field": "baaadd", "_id": "5678", "my_string": "b"},
+                    {"abc": "some text", "other_field": "Close match hehehe", "_id": "1234", "an_int": 2},
+                    {"abc": "some text", "other_field": "Close match hehehe", "_id": "1233", "my_bool": True},
                 ],
-                tensor_fields=["abc", "other field"]
+                tensor_fields=["abc", "other_field"]
             )
         )
 
         # Define test parameters as tuples (filter_string)
         bad_filter_strings = [
-            "(other field):baaadd",  # Incorrect syntax for field name with space
+            "(other_field):baaadd",  # Incorrect syntax for field name with space
             "(an_int:[0 TO 30] and an_int:2) AND abc:(some text)",  # and instead of AND here
             "",  # Empty filter string
         ]
@@ -661,18 +661,18 @@ class TestSearchUnstructured(MarqoTestCase):
                 index_name=self.default_text_index,
                 docs=[
                     {
-                        "doc title": "The captain bravely lead her followers into battle."
+                        "doc_title": "The captain bravely lead her followers into battle."
                                      " She directed her soldiers to and fro.",
-                        "field X": "some text",
+                        "field_X": "some text",
                         "field1": "other things", "my_bool": True,
                         "_id": "123456", "a_float": 0.61
                     },
                     {
                         "_id": "other doc", "a_float": 0.66, "bfield": "some text too", "my_int": 5,
-                        "fake_int": "234", "fake_float": "1.23", "gapped field_name": "gap"
+                        "fake_int": "234", "fake_float": "1.23", "gapped_field_name": "gap"
                     }
                 ],
-                tensor_fields=["doc title", "field X", "field1"])
+                tensor_fields=["doc_title", "field_X", "field1"])
         )
 
         # Define test parameters as tuples (filter_string, expected_hits, expected_id)
@@ -685,7 +685,7 @@ class TestSearchUnstructured(MarqoTestCase):
             ("field1:(other things)", 1, "123456"),
             ("fake_int:234", 1, "other doc"),
             ("fake_float:1.23", 1, "other doc"),
-            ("gapped\\ field_name:gap", 1, "other doc")
+            ("gapped_field_name:gap", 1, "other doc")
         ]
 
         for filter_string, expected_hits, expected_id in test_parameters:
@@ -710,11 +710,11 @@ class TestSearchUnstructured(MarqoTestCase):
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
                 docs=[
-                    {"abc": "some text", "other field": "baaadd", "_id": "5678", "status": "active"},
-                    {"abc": "some text", "other field": "Close match hehehe", "_id": "1234", "status": "inactive"},
-                    {"abc": "different text", "other field": "irrelevant", "_id": "9012", "status": "active"}
+                    {"abc": "some text", "other_field": "baaadd", "_id": "5678", "status": "active"},
+                    {"abc": "some text", "other_field": "Close match hehehe", "_id": "1234", "status": "inactive"},
+                    {"abc": "different text", "other_field": "irrelevant", "_id": "9012", "status": "active"}
                 ],
-                tensor_fields=["abc", "other field"]
+                tensor_fields=["abc", "other_field"]
             )
         )
 

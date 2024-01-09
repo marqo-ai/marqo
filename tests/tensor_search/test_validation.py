@@ -829,7 +829,8 @@ class TestValidateDeleteDocsRequest(unittest.TestCase):
         self.max_delete_docs_count = 10
 
     def test_valid_delete_request(self):
-        delete_request = MqDeleteDocsRequest(index_name="my_index", document_ids=["id1", "id2", "id3"])
+        delete_request = MqDeleteDocsRequest(index_name="my_index",
+                                             schema_name='my__00index', document_ids=["id1", "id2", "id3"])
         result = validation.validate_delete_docs_request(delete_request, self.max_delete_docs_count)
         self.assertEqual(delete_request, result)
 
@@ -839,39 +840,44 @@ class TestValidateDeleteDocsRequest(unittest.TestCase):
             validation.validate_delete_docs_request(delete_request, self.max_delete_docs_count)
 
     def test_invalid_max_delete_docs_count(self):
-        delete_request = MqDeleteDocsRequest(index_name="my_index", document_ids=["id1", "id2", "id3"])
+        delete_request = MqDeleteDocsRequest(index_name="my_index",
+                                             schema_name='my__00index',
+                                             document_ids=["id1", "id2", "id3"])
         with self.assertRaises(RuntimeError):
             validation.validate_delete_docs_request(delete_request, "10")
 
     def test_empty_document_ids(self):
-        delete_request = MqDeleteDocsRequest(index_name="my_index", document_ids=[])
+        delete_request = MqDeleteDocsRequest(index_name="my_index", schema_name='my__00index', document_ids=[])
         with self.assertRaises(InvalidDocumentIdError):
             validation.validate_delete_docs_request(delete_request, self.max_delete_docs_count)
 
     def test_document_ids_not_sequence(self):
-        delete_request = MqDeleteDocsRequest(index_name="my_index", document_ids="id1")
+        delete_request = MqDeleteDocsRequest(index_name="my_index", schema_name='my__00index', document_ids="id1")
         with self.assertRaises(InvalidArgError):
             validation.validate_delete_docs_request(delete_request, self.max_delete_docs_count)
 
     def test_exceed_max_delete_docs_count(self):
-        delete_request = MqDeleteDocsRequest(index_name="my_index",
+        delete_request = MqDeleteDocsRequest(index_name="my_index", schema_name='my__00index',
                                              document_ids=["id{}".format(i) for i in range(1, 12)])
         with self.assertRaises(InvalidArgError):
             validation.validate_delete_docs_request(delete_request, self.max_delete_docs_count)
 
     def test_invalid_document_id_type(self):
-        delete_request = MqDeleteDocsRequest(index_name="my_index", document_ids=["id1", 2, "id3"])
+        delete_request = MqDeleteDocsRequest(index_name="my_index", schema_name='my__00index',
+                                             document_ids=["id1", 2, "id3"])
         with self.assertRaises(InvalidDocumentIdError):
             validation.validate_delete_docs_request(delete_request, self.max_delete_docs_count)
 
     def test_empty_document_id(self):
-        delete_request = MqDeleteDocsRequest(index_name="my_index", document_ids=["id1", "", "id3"])
+        delete_request = MqDeleteDocsRequest(index_name="my_index", schema_name='my__00index',
+                                             document_ids=["id1", "", "id3"])
         with self.assertRaises(InvalidDocumentIdError):
             validation.validate_delete_docs_request(delete_request, self.max_delete_docs_count)
 
     def test_no_limit(self):
         # the default limit is 10000,
         delete_request = MqDeleteDocsRequest(
-            index_name="my_index", document_ids=["id{}".format(i) for i in range(1, 20000)])
+            index_name="my_index", schema_name='my__00index',
+            document_ids=["id{}".format(i) for i in range(1, 20000)])
         with self.assertRaises(RuntimeError):
             validation.validate_delete_docs_request(delete_request, None)
