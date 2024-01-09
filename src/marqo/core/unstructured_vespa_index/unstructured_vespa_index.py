@@ -11,6 +11,7 @@ from marqo.core.unstructured_vespa_index import common as unstructured_common
 from marqo.core.unstructured_vespa_index.unstructured_document import UnstructuredVespaDocument
 from marqo.core.vespa_index import VespaIndex
 from marqo.exceptions import InternalError
+import marqo.core.exceptions as core_exceptions
 
 
 class UnstructuredVespaIndex(VespaIndex):
@@ -230,6 +231,11 @@ class UnstructuredVespaIndex(VespaIndex):
                 and_terms = ''
 
             return f'{or_terms}{and_terms}'
+
+        if marqo_query.score_modifiers is not None:
+            raise core_exceptions.UnsupportedFeatureError("Score modifiers are not supported for "
+                                                          "lexical queries for unstructured index.")
+
 
         lexical_term = _get_lexical_search_term(marqo_query)
         filter_term = self._get_filter_term(marqo_query)
