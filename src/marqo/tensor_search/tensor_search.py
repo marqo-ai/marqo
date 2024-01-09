@@ -237,6 +237,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                 if (
                         add_docs_params.use_existing_tensors and
                         doc_id in existing_docs_dict and
+                        field in existing_docs_dict[doc_id] and
                         existing_docs_dict[doc_id][field] == field_content
                 ):
                     if (
@@ -665,6 +666,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                 if (
                         add_docs_params.use_existing_tensors and
                         doc_id in existing_docs_dict and
+                        field in existing_docs_dict[doc_id] and
                         existing_docs_dict[doc_id][field] == field_content
                 ):
                     if (
