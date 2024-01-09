@@ -972,7 +972,7 @@ class TestSearchStructured(MarqoTestCase):
         )
         assert len(res['hits']) == 2
         assert {hit['image_field_1'] for hit in res['hits']} == {url_2, url_1}
-        assert {hit['_highlights']['image_field_1'] for hit in res['hits']} == {url_2, url_1}
+        assert {hit['_highlights'][0]['image_field_1'] for hit in res['hits']} == {url_2, url_1}
 
     def test_multi_search(self):
         docs = [
@@ -1165,6 +1165,6 @@ class TestSearchStructured(MarqoTestCase):
         for hit in res['hits']:
             original_doc = doc_dict[hit['_id']]
             assert len(hit['_highlights']) == 1
-            highlight_field = list(hit['_highlights'].keys())[0]
+            highlight_field = list(hit['_highlights'][0].keys())[0]
             assert highlight_field in original_doc
             assert hit[highlight_field] == original_doc[highlight_field]

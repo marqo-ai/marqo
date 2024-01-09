@@ -401,7 +401,7 @@ class TestSearchUnstructured(MarqoTestCase):
             index_name=self.default_text_index, config=self.config, text="", filter="my_list:(tag2 some)")
 
         assert res_exists["hits"][0]["_id"] == "1235"
-        assert res_exists["hits"][0]["_highlights"] == {"abc": "some text"}
+        assert res_exists["hits"][0]["_highlights"][0] == {"abc": "some text"}
         assert len(res_exists["hits"]) == 1
 
         assert len(res_not_exists["hits"]) == 0
@@ -895,7 +895,7 @@ class TestSearchUnstructured(MarqoTestCase):
         )
         assert len(res['hits']) == 2
         assert {hit['image_field'] for hit in res['hits']} == {url_2, url_1}
-        assert {hit['_highlights']['image_field'] for hit in res['hits']} == {url_2, url_1}
+        assert {hit['_highlights'][0]['image_field'] for hit in res['hits']} == {url_2, url_1}
 
     def test_multi_search(self):
         docs = [
@@ -1101,6 +1101,6 @@ class TestSearchUnstructured(MarqoTestCase):
         for hit in res['hits']:
             original_doc = doc_dict[hit['_id']]
             assert len(hit['_highlights']) == 1
-            highlight_field = list(hit['_highlights'].keys())[0]
+            highlight_field = list(hit['_highlights'][0].keys())[0]
             assert highlight_field in original_doc
             assert hit[highlight_field] == original_doc[highlight_field]
