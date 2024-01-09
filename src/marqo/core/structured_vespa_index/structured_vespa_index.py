@@ -522,7 +522,7 @@ class StructuredVespaIndex(VespaIndex):
         if chunk:
             return [{closest_tensor_field.name: chunk}]
         else:
-            return [{}]
+            return []
 
     def _get_python_type(self, marqo_type: FieldType) -> type:
         try:
