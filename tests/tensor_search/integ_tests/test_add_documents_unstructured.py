@@ -604,6 +604,46 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
         assert doc_w_facets[enums.TensorField.tensor_facets] == []
         assert 'title' not in doc_w_facets
 
+    def test_add_documents_exceeded_max_doc_count(self):
+        max_docs = 128
+
+        test_cases = [  # count, error out=?
+            (max_docs - 10, False),
+            (max_docs - 1, False),
+            (max_docs, False),
+            (max_docs + 1, True),
+            (max_docs + 10, True),
+        ]
+
+        for count, error in test_cases:
+            with self.subTest(f'{count} - {error}'):
+
+                if error:
+                    with self.assertRaises(BadRequestError):
+                        tensor_search.add_documents(
+                            config=self.config, add_docs_params=AddDocsParams(
+                                index_name=self.default_text_index,
+                                docs=[{
+                                    "desc": "some desc"
+                                }] * count,
+                                tensor_fields=[],
+                                device="cpu"
+                            )
+                        )
+                else:
+                    self.assertEqual(False,
+                                     tensor_search.add_documents(
+                                         config=self.config, add_docs_params=AddDocsParams(
+                                             index_name=self.default_text_index,
+                                             docs=[{
+                                                 "desc": "some desc"
+                                             }] * count,
+                                             tensor_fields=[],
+                                             device="cpu"
+                                         )
+                                     )['errors']
+                                     )
+
     def test_no_tensor_field_on_empty_ix(self):
         """
         If a document is indexed with no tensor fields on an empty index, no vectors are added
