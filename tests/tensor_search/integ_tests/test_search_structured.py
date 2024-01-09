@@ -557,9 +557,9 @@ class TestSearchStructured(MarqoTestCase):
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
                 docs=[
-                    # {"_id": "5678", "text_field_1": "some text", "text_field_2": "baaadd", "text_field_3": "b"},
-                    # {"_id": "1234", "text_field_1": "some text", "text_field_2": "Close match hehehe",
-                    #  "int_field_1": 2},
+                    {"_id": "5678", "text_field_1": "some text", "text_field_2": "baaadd", "text_field_3": "b"},
+                    {"_id": "1234", "text_field_1": "some text", "text_field_2": "Close match hehehe",
+                     "int_field_1": 2},
                     {"_id": "1233", "text_field_1": "some text", "text_field_2": "Close match hehehe",
                      "bool_field_1": True}
                 ]
@@ -568,19 +568,19 @@ class TestSearchStructured(MarqoTestCase):
 
         # Define test parameters
         test_parameters = [
-            # ("text_field_3:c", 0, None),
-            # ("int_field_1:2", 1, "1234"),
-            # ("text_field_3:b", 1, "5678"),
-            # ("int_field_1:5", 0, None),
-            # ("int_field_1:[5 TO 30]", 0, None),
-            # ("int_field_1:[0 TO 30]", 1, "1234"),
+            ("text_field_3:c", 0, None),
+            ("int_field_1:2", 1, "1234"),
+            ("text_field_3:b", 1, "5678"),
+            ("int_field_1:5", 0, None),
+            ("int_field_1:[5 TO 30]", 0, None),
+            ("int_field_1:[0 TO 30]", 1, "1234"),
             ("bool_field_1:true", 1, "1233"),
             ("bool_field_1:True", 1, "1233"),
             ("bool_field_1:tRue", 1, "1233"),
             ("bool_field_1:false", 0, None),  # no hits for bool_field_1=false
             ("bool_field_1:some_value", 0, None),  # no hits for bool_field_1 not boolean
-            # ("int_field_1:[0 TO 30] OR bool_field_1:true", 2, None),
-            # ("(int_field_1:[0 TO 30] AND int_field_1:2) AND text_field_1:(some text)", 1, "1234"),
+            ("int_field_1:[0 TO 30] OR bool_field_1:true", 2, None),
+            ("(int_field_1:[0 TO 30] AND int_field_1:2) AND text_field_1:(some text)", 1, "1234"),
         ]
 
         for filter_string, expected_hits, expected_id in test_parameters:
