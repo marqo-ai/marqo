@@ -678,6 +678,10 @@ class TestSearchUnstructured(MarqoTestCase):
         # Define test parameters as tuples (filter_string, expected_hits, expected_id)
         test_parameters = [
             ("(my_bool:true AND a_float:[0.1 TO 0.75]) AND field1:(other things)", 1, "123456"),
+            ("my_bool:True", 1, "123456"),
+            ("my_bool:tRue", 1, "123456"),
+            ("my_bool:false", 0, None),  # no hits for bool_field_1=false
+            ("my_bool:some_value", 0, None),  # no hits for bool_field_1 not boolean
             ("my_looLoo:1", 0, None),
             ("my_int:5", 1, "other doc"),
             ("my_int:[1 TO 10]", 1, "other doc"),

@@ -377,7 +377,14 @@ class StructuredVespaIndex(VespaIndex):
                 marqo_field = self._marqo_index.all_field_map[node.field]
 
                 if isinstance(node, search_filter.EqualityTerm):
-                    return f'{marqo_field.filter_field_name} contains "{escape(node.value)}"'
+                    node_value = node.value
+                    if marqo_field.type == FieldType.Bool:
+                        if node_value.lower() == 'true':
+                            node_value = '1'
+                        elif node_value.lower() == 'false':
+                            node_value = '0'
+
+                    return f'{marqo_field.filter_field_name} contains "{escape(node_value)}"'
                 elif isinstance(node, search_filter.RangeTerm):
                     lower = f'{marqo_field.filter_field_name} >= {node.lower}' if node.lower is not None else None
                     upper = f'{marqo_field.filter_field_name} <= {node.upper}' if node.upper is not None else None
