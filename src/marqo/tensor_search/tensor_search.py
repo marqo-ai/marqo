@@ -1188,7 +1188,14 @@ def search(config: Config, index_name: str, text: Union[str, dict],
         selected_device = device
 
     if search_method.upper() == SearchMethod.TENSOR:
-        # Default to approximate, but we can't set it at API since it's not a valid arg for lexical search
+        # Default approximate and efSearch -- we can't set these at API-level since they're not a valid args
+        # for lexical search
+        if ef_search is None:
+            # efSearch must be min result_count + offset
+            ef_search = max(
+                utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_DEFAULT_EF_SEARCH),
+                result_count + offset
+            )
         if approximate is None:
             approximate = True
 
