@@ -1,39 +1,8 @@
-import math
 import os
-import random
-import uuid
 from unittest import mock
 
-import requests
-
-import marqo.core.exceptions as core_exceptions
-from marqo.api import exceptions as errors
-from marqo.api.exceptions import IndexNotFoundError
-from marqo.core.models.marqo_index import *
-from marqo.s2_inference.s2_inference import get_model_properties_from_registry
-from marqo.tensor_search import tensor_search
-from marqo.tensor_search.enums import EnvVars
-from marqo.tensor_search.enums import SearchMethod
-from marqo.tensor_search.models.add_docs_objects import AddDocsParams
-from tests.marqo_test import MarqoTestCase
-
-import math
-import os
-import random
-import uuid
-from unittest import mock
-
-import requests
-
-import marqo.core.exceptions as core_exceptions
-from marqo.api import exceptions as errors
-from marqo.api.exceptions import IndexNotFoundError
-from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
-from marqo.s2_inference.s2_inference import get_model_properties_from_registry
 from marqo.tensor_search import tensor_search
-from marqo.tensor_search.enums import EnvVars
-from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from tests.marqo_test import MarqoTestCase
 
