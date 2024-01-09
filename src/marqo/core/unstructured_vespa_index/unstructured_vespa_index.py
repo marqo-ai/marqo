@@ -94,12 +94,22 @@ class UnstructuredVespaIndex(VespaIndex):
         field_to_search = unstructured_common.VESPA_DOC_EMBEDDINGS
 
         if marqo_query.ef_search is not None:
-            additional_hits = f', hnsw.exploreAdditionalHits:{marqo_query.ef_search - marqo_query.limit}'
+            target_hits = min(marqo_query.limit + marqo_query.offset, marqo_query.ef_search)
+            additional_hits = max(marqo_query.ef_search - (marqo_query.limit + marqo_query.offset), 0)
         else:
-            additional_hits = ''
+            target_hits = marqo_query.limit + marqo_query.offset
+            additional_hits = 0
 
-        return (f"({{targetHits:{marqo_query.limit}, approximate:{str(marqo_query.approximate)}{additional_hits}}}"
-                f"nearestNeighbor({field_to_search}, {unstructured_common.QUERY_INPUT_EMBEDDING}))")
+        return (
+            f"("
+            f"{{"
+            f"targetHits:{target_hits}, "
+            f"approximate:{str(marqo_query.approximate)}, "
+            f'hnsw.exploreAdditionalHits:{additional_hits}'
+            f"}}"
+            f"nearestNeighbor({field_to_search}, {unstructured_common.QUERY_INPUT_EMBEDDING})"
+            f")"
+        )
 
     @classmethod
     def _get_filter_term(cls, marqo_query: MarqoQuery) -> Optional[str]:
