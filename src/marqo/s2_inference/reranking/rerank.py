@@ -5,12 +5,12 @@ from marqo.s2_inference.errors import RerankerError, RerankerNameError
 from marqo.s2_inference.logger import get_logger
 from marqo.s2_inference.reranking.cross_encoders import ReRankerText, ReRankerOwl
 from marqo.s2_inference.reranking.enums import ResultsFields
-from marqo.s2_inference.types import Dict, List
+from marqo.s2_inference.types import Dict, List, Optional
 
 logger = get_logger(__name__)
 
 def rerank_search_results(search_result: Dict, query: str, model_name: str, device: str, 
-                searchable_attributes: List[str], num_highlights: int = 1,
+                searchable_attributes: Optional[List[str]] = None, num_highlights: int = 1,
                 overwrite_original_scores_highlights: bool = True) -> None:
     """the parent function to handle calling the rerankers. the results are modified in place
 
