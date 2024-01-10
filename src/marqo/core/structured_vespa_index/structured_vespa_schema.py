@@ -10,7 +10,7 @@ from marqo.exceptions import InternalError
 class StructuredVespaSchema(VespaSchema):
     _MARQO_TO_VESPA_TYPE_MAP = {
         FieldType.Text: 'string',
-        FieldType.Bool: 'bool',
+        FieldType.Bool: 'byte',
         FieldType.Int: 'int',
         FieldType.Float: 'float',
         FieldType.ArrayText: 'array<string>',

@@ -1,5 +1,5 @@
-schema my_index {
-document my_index {
+schema marqo__my_00index {
+document {
 field marqo__id type string { indexing: summary }
 field marqo__lexical_title type string {
 indexing: index | summary
@@ -25,7 +25,7 @@ rank: filter
 field image type string {
 indexing: summary
 }
-field marqo__filter_is_active type bool {
+field marqo__filter_is_active type byte {
 indexing: attribute | summary
 attribute: fast-search
 rank: filter
@@ -118,7 +118,7 @@ summary description type string { source: description }
 summary category type string { source: marqo__filter_category }
 summary tags type array<string> { source: marqo__filter_tags }
 summary image type string { source: image }
-summary is_active type bool { source: marqo__filter_is_active }
+summary is_active type byte { source: marqo__filter_is_active }
 summary price type float { source: price }
 summary rank type int { source: rank }
 summary click_per_day type array<int> { source: marqo__filter_click_per_day }
@@ -132,7 +132,7 @@ summary description type string { source: description }
 summary category type string { source: marqo__filter_category }
 summary tags type array<string> { source: marqo__filter_tags }
 summary image type string { source: image }
-summary is_active type bool { source: marqo__filter_is_active }
+summary is_active type byte { source: marqo__filter_is_active }
 summary price type float { source: price }
 summary rank type int { source: rank }
 summary click_per_day type array<int> { source: marqo__filter_click_per_day }
