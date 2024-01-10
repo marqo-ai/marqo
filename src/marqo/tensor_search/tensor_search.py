@@ -237,6 +237,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                 if (
                         add_docs_params.use_existing_tensors and
                         doc_id in existing_docs_dict and
+                        field in existing_docs_dict[doc_id] and
                         existing_docs_dict[doc_id][field] == field_content
                 ):
                     if (
@@ -665,6 +666,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                 if (
                         add_docs_params.use_existing_tensors and
                         doc_id in existing_docs_dict and
+                        field in existing_docs_dict[doc_id] and
                         existing_docs_dict[doc_id][field] == field_content
                 ):
                     if (
@@ -1206,6 +1208,10 @@ def search(config: Config, index_name: str, text: Union[str, dict],
         if approximate is not None:
             raise errors.InvalidArgError(
                 f"approximate is not a valid argument for lexical search")
+        if score_modifiers is not None:
+            raise errors.InvalidArgError(
+                "Score modifiers is not supported for lexical search yet"
+            )
 
         search_result = _lexical_search(
             config=config, index_name=index_name, text=text, result_count=result_count, offset=offset,
