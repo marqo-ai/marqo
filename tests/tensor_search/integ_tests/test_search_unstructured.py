@@ -668,8 +668,18 @@ class TestSearchUnstructured(MarqoTestCase):
                         "_id": "123456", "a_float": 0.61
                     },
                     {
+                        "doc_title": "The captain bravely lead her followers into battle."
+                                     " She directed her soldiers to and fro.",
+                        "field_X": "some text",
+                        "my_bool_2": False,
+                        "_id": "233",
+                    },
+                    {
                         "_id": "other doc", "a_float": 0.66, "bfield": "some text too", "my_int": 5,
                         "fake_int": "234", "fake_float": "1.23", "gapped_field_name": "gap"
+                    },
+                    {
+                        "_id": "123457", "bfield": "true"
                     }
                 ],
                 tensor_fields=["doc_title", "field_X", "field1"])
@@ -678,6 +688,11 @@ class TestSearchUnstructured(MarqoTestCase):
         # Define test parameters as tuples (filter_string, expected_hits, expected_id)
         test_parameters = [
             ("(my_bool:true AND a_float:[0.1 TO 0.75]) AND field1:(other things)", 1, "123456"),
+            ("my_bool:True", 1, "123456"),
+            ("my_bool:tRue", 1, "123456"),
+            ("my_bool_2:false", 1, "233"),
+            ("my_bool:false", 0, None),  # no hits for bool_field_1=false
+            ("my_bool:some_value", 0, None),  # no hits for bool_field_1 not boolean
             ("my_looLoo:1", 0, None),
             ("my_int:5", 1, "other doc"),
             ("my_int:[1 TO 10]", 1, "other doc"),
@@ -685,7 +700,8 @@ class TestSearchUnstructured(MarqoTestCase):
             ("field1:(other things)", 1, "123456"),
             ("fake_int:234", 1, "other doc"),
             ("fake_float:1.23", 1, "other doc"),
-            ("gapped_field_name:gap", 1, "other doc")
+            ("gapped_field_name:gap", 1, "other doc"),
+            # ("bfield:true", 1, "123457")  # string field with boolean-like value # TODO - This fails due to a bug
         ]
 
         for filter_string, expected_hits, expected_id in test_parameters:

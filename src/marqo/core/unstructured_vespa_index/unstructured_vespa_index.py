@@ -124,8 +124,8 @@ class UnstructuredVespaIndex(VespaIndex):
                 return f'({unstructured_common.VESPA_FIELD_ID} contains "{escape(node.value)}")'
 
             # Bool Filter
-            if node.value in cls._FILTER_STRING_BOOL_VALUES:
-                filter_value = int(True if node.value == "true" else False)
+            if node.value.lower() in cls._FILTER_STRING_BOOL_VALUES:
+                filter_value = int(True if node.value.lower() == "true" else False)
                 return (f'({unstructured_common.BOOL_FIELDS} contains sameElement(key contains "{node.field}", '
                         f'value = {filter_value}))')
 
