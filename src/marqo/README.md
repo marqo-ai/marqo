@@ -46,7 +46,8 @@ You can check this by visiting `http://localhost:8080` in your browser.
 Now you can run Marqo locally through your IDE (e.g. PyCharm) by following the steps below.
 
 6. Open the Marqo project in your IDE (e.g. PyCharm) and go to the file `src/marqo/tensor_search/api.py`
-7. Set up your debug configuration to run `api.py` with the following environment variables:
+7. Set up your [debug configuration](https://www.jetbrains.com/help/pycharm/creating-run-debug-configuration-for-tests.html)
+to run `api.py` with the following environment variables:
 ```
 MARQO_ENABLE_BATCH_APIS=true
 MARQO_LOG_LEVEL=debug
