@@ -51,7 +51,7 @@ class Random(Model):
             return np.random.rand(1, self.embedding_dimension)
         else:
             if len(sentence) == 0:
-                raise ValueError('received empty sentence')
+                raise ValueError('recevied empty sentence')
 
             seed = self._get_sentences_hash(sentence)
             np.random.seed(seed)

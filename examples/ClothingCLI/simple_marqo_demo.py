@@ -30,7 +30,7 @@ def load_index(index_name: str, number_data: int) -> None:
             
         mq.create_index(index_name, **settings)
 
-        mq.index(index_name).add_documents(shirt_data, tensor_fields=['image','label','kids'], auto_refresh=True)
+        mq.index(index_name).add_documents(shirt_data, tensor_fields=['image','label','kids'])
 
         print("Index successfully created.")
 

@@ -1,0 +1,68 @@
+# Copyright Yahoo. Licensed under the terms of the Apache 2.0 license. See LICENSE in the project root.
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: vespa-configserver
+spec:
+  # Use three servers for proper ZooKeeper quorum:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: vespa-configserver
+      name: vespa-internal
+  serviceName: vespa-internal
+  template:
+    metadata:
+      labels:
+        app: vespa-configserver
+        name: vespa-internal
+    spec:
+      containers:
+      - name: vespa-configserver
+        image: vespaengine/vespa
+        args: ["configserver,services"]
+        imagePullPolicy: Always
+        securityContext:
+          privileged: true
+          runAsUser: 0
+        volumeMounts:
+        - name: vespa-var
+          mountPath: /opt/vespa/var
+        - name: vespa-logs
+          mountPath: /opt/vespa/logs
+        - name: vespa-workspace
+          mountPath: /workspace
+        envFrom:
+        - configMapRef:
+            name: vespa-config
+        # Note that the below are minimum resources for demo use.
+        # Use 4G or more for real use cases
+        resources:
+          requests:
+            memory: "4G"
+          limits:
+            memory: "4G"
+  volumeClaimTemplates:
+  # The below are tiny volumes for demo purposes.
+  - metadata:
+      name: vespa-var
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 50Gi
+  - metadata:
+      name: vespa-logs
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 50Gi
+  - metadata:
+      name: vespa-workspace
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 50Gi

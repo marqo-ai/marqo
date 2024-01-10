@@ -18,9 +18,10 @@ docker run --name marqo-os -id -p 9200:9200 -p 9600:9600 -e "discovery.type=sing
 ```
 git clone https://github.com/marqo-ai/marqo.git
 ```
-3. Pip install Marqo's dev dependencies.
+3. Install marqo dependencies
 ```
-pip install -r requirements.dev.txt
+cd marqo
+pip install -r requirements.txt
 ```
 4. Run the following command:
 ```bash
@@ -132,16 +133,17 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs/ | sh;
 
 6. Set up redis (follow instructions in Option A)
 
-7. Pip install Marqo's dev dependencies.
+7. Install marqo dependencies,
 ```
-pip install -r requirements.dev.txt
+pip install -r requirements.txt
 ```
+
 8. Change into the tensor search directory,
 ```
 CWD=$(pwd)
 cd src/marqo/tensor_search/
 ```
-9. Run Marqo
+9. Run Marqo,
 ```
 export OPENSEARCH_URL="https://localhost:9200" && 
     export PYTHONPATH="${PYTHONPATH}:${CWD}/src" &&

@@ -17,6 +17,9 @@ Misc functions.
 Mostly copy-paste from torchvision references or other public repos like DETR:
 https://github.com/facebookresearch/detr/blob/master/util/misc.py
 """
+import argparse
+import warnings
+
 """
 Marqo: This is copy-pasted without modification apart from this message 
 from this repo https://github.com/facebookresearch/dino
@@ -807,7 +810,7 @@ def compute_map(ranks, gnd, kappas=[]):
         # compute precision @ k
         pos += 1 # get it to 1-based
         for j in np.arange(len(kappas)):
-            kq = min(max(pos), kappas[j]); 
+            kq = min(max(pos), kappas[j]);
             prs[i, j] = (pos <= kq).sum() / kq
         pr = pr + prs[i, :]
 

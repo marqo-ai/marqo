@@ -196,7 +196,7 @@ class TestLargeModelEncoding(unittest.TestCase):
     def test_autocast_called_in_open_clip(self, mock_autocast):
         names = ["open_clip/ViT-B-32/laion400m_e31"]
         contents = ['this is a test sentence. so is this.',
-                    "https://marqo-assets.s3.amazonaws.com/tests/images/image0.jpg"]
+                    "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image0.jpg"]
         for model_name in names:
             for content in contents:
                 vectorise(model_name=model_name, content=content, device="cuda")

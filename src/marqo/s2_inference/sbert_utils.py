@@ -2,7 +2,7 @@ from sentence_transformers import SentenceTransformer
 import numpy as np
 from torch import nn
 
-from marqo.errors import InternalError
+from marqo.api.exceptions import InternalError
 from marqo.s2_inference.types import *
 from marqo.s2_inference.logger import get_logger
 logger = get_logger(__name__)

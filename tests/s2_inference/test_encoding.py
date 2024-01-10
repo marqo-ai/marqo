@@ -56,8 +56,8 @@ class TestEncoding(unittest.TestCase):
                  "all-MiniLM-L6-v1", "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6",
                  "onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]
 
-        names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised",
-                    "hf/e5-base-v2", "hf/multilingual-e5-small"]
+        names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised", "hf/e5-base-v2",
+                    "hf/multilingual-e5-small"]
         names += names_e5
 
         sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
@@ -109,8 +109,8 @@ class TestEncoding(unittest.TestCase):
     def test_load_hf_text_model(self):
         names = ["hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6"]
 
-        names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised",
-                    "hf/e5-base-v2", "hf/multilingual-e5-small"]
+        names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised", "hf/e5-base-v2",
+                    "hf/multilingual-e5-small"]
         names += names_e5
 
         device = 'cpu'
@@ -323,9 +323,9 @@ class TestOpenClipModelEncoding(unittest.TestCase):
 
         device = 'cpu'
         eps = 1e-9
-        images = ["https://marqo-assets.s3.amazonaws.com/tests/images/image0.jpg",
-                  "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
-                  "https://marqo-assets.s3.amazonaws.com/tests/images/image2.jpg"]
+        images = ["https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image0.jpg",
+                  "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+                  "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg"]
 
         for name in names:
 
@@ -439,7 +439,7 @@ class TestOpenClipModelEncoding(unittest.TestCase):
     @patch("torch.cuda.amp.autocast")
     def test_autocast_called_when_cuda(self, mock_autocast):
         names = self.open_clip_test_model
-        contents = ['this is a test sentence. so is this.', "https://marqo-assets.s3.amazonaws.com/tests/images/image0.jpg"]
+        contents = ['this is a test sentence. so is this.', "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image0.jpg"]
         for model_name in names:
             for content in contents:
                 vectorise(model_name=model_name, content=content, device="cpu")

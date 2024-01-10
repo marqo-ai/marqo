@@ -1,16 +1,4 @@
 from enum import Enum
-from fastapi_utils.enums import StrEnum
-
-
-class MediaType:
-    text = 'text'
-    image = 'image'
-    default = 'text'
-
-
-class MlModel:
-    bert = "hf/all_datasets_v4_MiniLM-L6"
-    clip = "ViT-L/14"
 
 
 class SearchMethod(str, Enum):
@@ -25,8 +13,6 @@ class TensorField:
     Protected document field names"""
     field_name = "__field_name"
     field_content = "__field_content"
-    doc_chunk_relation = "__doc_chunk_relation"
-    chunk_ids = "__chunk_ids"
     # the prefix will have the customer's field name appended to the end of it
     vector_prefix = "__vector_"
     marqo_knn_field = "__vector_marqo_knn_field"
@@ -38,64 +24,22 @@ class TensorField:
     embedding = "_embedding"
     found = "_found"
 
-class IndexSettingsField:
-    index_settings = "index_settings"
-    index_defaults = "index_defaults"
-    treat_urls_and_pointers_as_images = "treat_urls_and_pointers_as_images"
-    model = "model"
-    search_model = "search_model"
-    model_properties = "model_properties"
-    search_model_properties = "search_model_properties"
-    normalize_embeddings = "normalize_embeddings"
-
-    text_preprocessing = "text_preprocessing"
-    split_length = "split_length"
-    split_overlap = "split_overlap"
-    split_method = "split_method"
-    override_text_chunk_prefix = "override_text_chunk_prefix"
-    override_text_query_prefix = "override_text_query_prefix"
-
-    image_preprocessing = "image_preprocessing"
-    patch_method = "patch_method"
-
-    number_of_shards = "number_of_shards"
-    number_of_replicas = "number_of_replicas"
-
-    ann_parameters = "ann_parameters"
-    ann_method = "method"
-    ann_method_name = "name"
-    ann_metric = "space_type"
-    ann_engine = "engine"
-    ann_method_parameters = "parameters"
-
-    # method_parameters keys for "method"="hnsw"
-    hnsw_ef_construction = "ef_construction"
-    hnsw_m = "m"
-
-
-class SplitMethod:
-    # consider moving this enum into processing
-    sentence = "sentence"
-
 
 class Device(str, Enum):
     cpu = "cpu"
     cuda = "cuda"
+
     def __str__(self):
         # To pass the str(Device.cpu) == "cpu" check in clip
         return self.value
 
 
-class OpenSearchDataType:
-    text = "text"
-    keyword = "keyword"
-    int = "int"
-    float = "float"
-    integer = "integer"
-    to_be_defined = "to_be_defined"  # to be defined by OpenSearch
-
-
 class EnvVars:
+    VESPA_CONFIG_URL = "VESPA_CONFIG_URL"
+    VESPA_QUERY_URL = "VESPA_QUERY_URL"
+    VESPA_DOCUMENT_URL = "VESPA_DOCUMENT_URL"
+    VESPA_CONTENT_CLUSTER_NAME = "VESPA_CONTENT_CLUSTER_NAME"
+    VESPA_POOL_SIZE = "VESPA_POOL_SIZE"
     MARQO_MAX_INDEX_FIELDS = "MARQO_MAX_INDEX_FIELDS"
     MARQO_MAX_DOC_BYTES = "MARQO_MAX_DOC_BYTES"
     MARQO_MAX_RETRIEVABLE_DOCS = "MARQO_MAX_RETRIEVABLE_DOCS"
@@ -113,14 +57,9 @@ class EnvVars:
     MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES = "MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES"
     MARQO_MAX_DELETE_DOCS_COUNT = "MARQO_MAX_DELETE_DOCS_COUNT"
     MARQO_MAX_NUMBER_OF_REPLICAS = "MARQO_MAX_NUMBER_OF_REPLICAS"
+    MARQO_DEFAULT_EF_SEARCH = "MARQO_DEFAULT_EF_SEARCH"
     MARQO_BEST_AVAILABLE_DEVICE = "MARQO_BEST_AVAILABLE_DEVICE"
-    MARQO_MAX_ADD_DOCS_COUNT = "MARQO_MAX_ADD_DOCS_COUNT"
-    MARQO_MAX_BACKEND_SEARCH_RETRY_ATTEMPTS = "MARQO_MAX_BACKEND_SEARCH_RETRY_ATTEMPTS"
-    MARQO_MAX_BACKEND_SEARCH_RETRY_BACKOFF = "MARQO_MAX_BACKEND_SEARCH_RETRY_BACKOFF"
-    MARQO_MAX_BACKEND_ADD_DOCS_RETRY_ATTEMPTS = "MARQO_MAX_BACKEND_ADD_DOCS_RETRY_ATTEMPTS"
-    MARQO_MAX_BACKEND_ADD_DOCS_RETRY_BACKOFF = "MARQO_MAX_BACKEND_ADD_DOCS_RETRY_BACKOFF"
-    DEFAULT_MARQO_MAX_BACKEND_RETRY_ATTEMPTS = "DEFAULT_MARQO_MAX_BACKEND_RETRY_ATTEMPTS"
-    DEFAULT_MARQO_MAX_BACKEND_RETRY_BACKOFF = "DEFAULT_MARQO_MAX_BACKEND_RETRY_BACKOFF"
+    MARQO_ENABLE_BATCH_APIS = "MARQO_ENABLE_BATCH_APIS"
 
 
 class RequestType:
@@ -129,19 +68,13 @@ class RequestType:
     DELETE = "DELETE"
     CREATE = "CREATE"
 
-# Each type has different add_documents behavior. More can be added to represent special types.
-class DocumentFieldType:
-    standard = "standard"       # str, int, float, bool, or list
-    multimodal_combination = "multimodal_combination"   # dict
-    custom_vector = "custom_vector"     # dict
 
-class MappingsObjectType(str, Enum):
+class MappingsObjectType:
     multimodal_combination = "multimodal_combination"
-    custom_vector = "custom_vector"
 
 
 class SearchDb:
-    opensearch = 'opensearch'
+    vespa = 'vespa'
 
 
 class AvailableModelsKey:
@@ -158,30 +91,7 @@ class ObjectStores:
 class ModelProperties:
     auth_required = 'auth_required'
     model_location = 'model_location'
-    text_chunk_prefix = 'text_chunk_prefix'
-    text_query_prefix = 'text_query_prefix'
-
-
-class SpecialModels:
-    no_model = 'no_model'
 
 
 class InferenceParams:
     model_auth = "model_auth"
-# Perhaps create a ThrottleType to differentiate thread_count and data_size throttling mechanisms
-
-
-class HealthStatuses(str, Enum):
-    green = "green"
-    yellow = "yellow"
-    red = "red"
-
-    def _status_index(self):
-        status_order = [self.green, self.yellow, self.red]
-        return status_order.index(self)
-
-    def __gt__(self, other):
-        return self._status_index() > other._status_index()
-
-    def __lt__(self, other):
-        return self._status_index() < other._status_index()

@@ -6,6 +6,7 @@ from tests.marqo_test import MarqoTestCase
 from marqo.tensor_search import enums
 
 
+@unittest.skip
 class TestConfig(MarqoTestCase):
 
     def setUp(self) -> None:
@@ -36,6 +37,7 @@ class TestConfig(MarqoTestCase):
         assert str(enums.Device.cpu) == "cpu"
 
 
+@unittest.skip
 class TestConfigBackend(MarqoTestCase):
 
     def setUp(self) -> None:

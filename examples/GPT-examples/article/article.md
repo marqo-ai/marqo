@@ -230,7 +230,7 @@ mq.create_index(index_name)
 ```
 Now we index the documents
 ```python
-results = mq.index(index_name).add_documents(documents, tensor_fields = ["name", "text"], auto_refresh=True)
+results = mq.index(index_name).add_documents(documents, tensor_fields = ["name", "text"])
 ```
 
 We can search and see what comes back.
@@ -353,7 +353,7 @@ We can patch, delete or add documents for the agents background with Marqo. Lets
 ```python
 from iron_data import get_extra_data
 extra_docs = [{"text":text, "name":persona} for text in get_extra_data()]
-res = mq.index(index_name).add_documents(extra_docs, tensor_fields = ["name", "text"], auto_refresh=True)
+res = mq.index(index_name).add_documents(extra_docs, tensor_fields = ["name", "text"])
 ```
 This adds some of the safety information from the iron manual. We will also take the bottom ranked results (i.e least relevant) to make it interesting. The following is the conversation - we can see it weaving its new background into the story nicely!
 

@@ -9,7 +9,7 @@ import torch
 
 from marqo.s2_inference.types import List, Dict, ImageType
 from marqo.s2_inference.s2_inference import clear_loaded_models
-from marqo.errors import InternalError
+from marqo.api.exceptions import InternalError
 
 from marqo.s2_inference.processing.DINO_utils import (
     _load_DINO_model,

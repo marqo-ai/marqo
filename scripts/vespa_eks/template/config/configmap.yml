@@ -1,0 +1,9 @@
+# Copyright Yahoo. Licensed under the terms of the Apache 2.0 license. See LICENSE in the project root.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vespa-config
+data:
+  VESPA_CONFIGSERVERS: "vespa-configserver-0.vespa-internal.default.svc.cluster.local,
+  vespa-configserver-1.vespa-internal.default.svc.cluster.local,
+  vespa-configserver-2.vespa-internal.default.svc.cluster.local"

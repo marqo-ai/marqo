@@ -1,8 +1,6 @@
 import logging
 from marqo.tensor_search.utils import read_env_vars_and_defaults
-from marqo.errors import EnvVarError
-
-
+from marqo.api.exceptions import EnvVarError
 def get_logger(name):
     logging.basicConfig()
     logger = logging.getLogger(name)
