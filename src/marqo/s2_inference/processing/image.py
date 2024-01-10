@@ -44,7 +44,7 @@ logger = get_logger(__name__)
 
 def chunk_image(image: Union[str, ImageType], device: str, 
                         method: Literal[ 'simple', 'overlap',  'frcnn', 'marqo-yolo', 'yolox', 'dino-v1', 'dino-v2'],
-                        size=get_default_size()) -> Tuple[List[ImageType], ndarray]:
+                        size=get_default_size()) -> Tuple[List[ImageType], List[float]]:
     """_summary_
     wrapper function to do the chunking and return the patches and their bounding boxes
     in the original coordinates system
@@ -61,7 +61,7 @@ def chunk_image(image: Union[str, ImageType], device: str,
         ChunkerError: Raises ChunkerError, if the chunker can't work for some reason
 
     Returns:
-        Tuple[List[ImageType], ndarray]: list of PIL images and the corresponding bounding boxes
+        Tuple[List[ImageType], List[float]]: list of PIL images and the corresponding bounding boxes
     """
 
     HN = 3
@@ -113,7 +113,7 @@ def chunk_image(image: Union[str, ImageType], device: str,
     except PIL.UnidentifiedImageError as e:
         raise ChunkerError from e
 
-    return patch.patches,patch.bboxes_orig
+    return patch.patches, patch.bboxes_orig
 
 
 class PatchifySimple:
