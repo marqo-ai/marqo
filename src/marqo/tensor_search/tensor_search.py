@@ -1318,7 +1318,7 @@ def _lexical_search(
     # Set the _highlights for each doc as [] to follow Marqo-V1's convention
     if highlights:
         for docs in gathered_docs['hits']:
-            docs['_highlights'] = {}
+            docs['_highlights'] = []
 
     total_postprocess_time = RequestMetricsStore.for_request().stop("search.lexical.postprocess")
     logger.debug(

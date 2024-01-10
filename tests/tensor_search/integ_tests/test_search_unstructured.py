@@ -401,7 +401,7 @@ class TestSearchUnstructured(MarqoTestCase):
             index_name=self.default_text_index, config=self.config, text="", filter="my_list:(tag2 some)")
 
         assert res_exists["hits"][0]["_id"] == "1235"
-        assert res_exists["hits"][0]["_highlights"] == {"abc": "some text"}
+        assert res_exists["hits"][0]["_highlights"][0] == {"abc": "some text"}
         assert len(res_exists["hits"]) == 1
 
         assert len(res_not_exists["hits"]) == 0
@@ -895,7 +895,7 @@ class TestSearchUnstructured(MarqoTestCase):
         )
         assert len(res['hits']) == 2
         assert {hit['image_field'] for hit in res['hits']} == {url_2, url_1}
-        assert {hit['_highlights']['image_field'] for hit in res['hits']} == {url_2, url_1}
+        assert {hit['_highlights'][0]['image_field'] for hit in res['hits']} == {url_2, url_1}
 
     def test_multi_search(self):
         docs = [
@@ -1101,6 +1101,59 @@ class TestSearchUnstructured(MarqoTestCase):
         for hit in res['hits']:
             original_doc = doc_dict[hit['_id']]
             assert len(hit['_highlights']) == 1
-            highlight_field = list(hit['_highlights'].keys())[0]
+            highlight_field = list(hit['_highlights'][0].keys())[0]
             assert highlight_field in original_doc
             assert hit[highlight_field] == original_doc[highlight_field]
+
+    def test_lexical_search_no_highlights_format(self):
+        docs = [
+            {"_id": "1", "text_field_1": "some text", "text_field_2": "Close match hehehe", "int_field_1": 1},
+            {"_id": "2", "text_field_1": "some code", "text_field_2": "match", "int_field_1": 2},
+
+        ]
+        tensor_search.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.default_text_index,
+                docs=docs,
+                tensor_fields = []
+            )
+        )
+        lexical_search_result = tensor_search.search(
+            text="some text",
+            index_name=self.default_text_index,
+            config=self.config,
+            search_method=SearchMethod.LEXICAL,
+        )
+        self.assertEqual(2, len(lexical_search_result['hits']))
+        for hit in lexical_search_result['hits']:
+            self.assertIn("_highlights", hit)
+            self.assertTrue(isinstance(hit["_highlights"], list))
+            self.assertEqual(0, len(hit["_highlights"]))
+
+    def test_tensor_search_highlights_format(self):
+        docs = [
+            {"_id": "1", "text_field_1": "some text", "text_field_2": "Close match hehehe", "int_field_1": 1},
+            {"_id": "2", "text_field_1": "some code", "text_field_2": "match", "int_field_1": 2},
+
+        ]
+        tensor_search.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.default_text_index,
+                docs=docs,
+                tensor_fields=["text_field_1", "text_field_2"]
+            )
+        )
+        tensor_search_result = tensor_search.search(
+            text="some text",
+            index_name=self.default_text_index,
+            config=self.config,
+            search_method=SearchMethod.TENSOR
+        )
+        self.assertEqual(2, len(tensor_search_result['hits']))
+        for hit in tensor_search_result['hits']:
+            self.assertIn("_highlights", hit)
+            self.assertTrue(isinstance(hit["_highlights"], list))
+            self.assertEqual(1, len(hit["_highlights"])) # We only have 1 highlight now
+            self.assertTrue(isinstance(hit["_highlights"][0], dict))
