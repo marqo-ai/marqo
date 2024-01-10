@@ -48,11 +48,11 @@ Now you can run Marqo locally through your IDE (e.g. PyCharm) by following the s
 6. Open the Marqo project in your IDE (e.g. PyCharm) and go to the file `src/marqo/tensor_search/api.py`
 7. Set up your debug configuration to run `api.py` with the following environment variables:
 ```
-MARQO_ENABLE_BATCH_APIS=true;
-MARQO_LOG_LEVEL=debug;
-MARQO_MODELS_TO_PRELOAD=[];
-VESPA_CONFIG_URL=http://localhost:19071;
-VESPA_DOCUMENT_URL=http://localhost:8080;
+MARQO_ENABLE_BATCH_APIS=true
+MARQO_LOG_LEVEL=debug
+MARQO_MODELS_TO_PRELOAD=[]
+VESPA_CONFIG_URL=http://localhost:19071
+VESPA_DOCUMENT_URL=http://localhost:8080
 VESPA_QUERY_URL=http://localhost:8080
 ```
 8. Now you can Debug this file directly from your IDE (e.g. PyCharm) to start Marqo locally.
