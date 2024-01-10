@@ -4,47 +4,85 @@ you want.
 
 See [here](https://github.com/marqo-ai/marqo/blob/mainline/CONTRIBUTING.md#unit-tests) for how to run unit tests.
 
-## Select an option (from A-E) to get set up. In most cases, Option A is recommended. 
+## Running Marqo locally (outside of docker) for development
 
-### Option A. Run the Marqo application locally (outside of docker):
+There are two ways to run Marqo locally (outside of docker) for development: 1. through `uvicorn`, 2. through your IDE (e.g. PyCharm). 
+We highly recommend using the second option, as it allows you to set breakpoints and debug Marqo.
 
-1. Have a running Marqo-OS instance available to use. You can spin up a local instance with the following command
-(if you are using an arm64 machine, replace `marqoai/marqo-os:0.0.3` with `marqoai/marqo-os:0.0.3-arm`):
+### Preparations
+
+1. Clone the Marqo Github repo and cd into it
 ```bash
-docker run --name marqo-os -id -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" marqoai/marqo-os:0.0.3
+git clone https://github.com/marqo-ai/marqo.git
+cd marqo
 ```
 
-2. Clone the github repo
-```
-git clone https://github.com/marqo-ai/marqo.git
-```
-3. Install marqo dependencies
-```
-cd marqo
+2. Install Marqo dependencies
+```bash
 pip install -r requirements.txt
 ```
-4. Run the following command:
+
+3. Pull and run the Vespa docker image
 ```bash
-# if you are running Marqo-OS locally: 
-export OPENSEARCH_URL="https://localhost:9200" 
+docker run --detach --name vespa --hostname vespa-tutorial \
+  --publish 8080:8080 --publish 19071:19071 --publish 19092:19092 \
+  vespaengine/vespa:latest
+```
+
+4. Install the vespa command line interface (CLI)
+Check out the [Vespa CLI documentation](https://docs.vespa.ai/en/vespa-cli.html) for how to install the CLI.
+
+5. Deploy a dummy application for Vespa docker image
+```bash
+vespa deploy scripts/vespa_dummy_app
+```
+
+Up to now. you should have a running Vespa docker image and a dummy application deployed to it. 
+You can check this by visiting `http://localhost:8080` in your browser.
+
+### Option A. Run the Marqo application locally (outside of docker) through IDE
+Now you can run Marqo locally through your IDE (e.g. PyCharm) by following the steps below.
+
+6. Open the Marqo project in your IDE (e.g. PyCharm) and go to the file `src/marqo/tensor_search/api.py`
+7. Set up your debug configuration to run `api.py` with the following environment variables:
+```
+MARQO_ENABLE_BATCH_APIS=true;
+MARQO_LOG_LEVEL=debug;
+MARQO_MODELS_TO_PRELOAD=[];
+VESPA_CONFIG_URL=http://localhost:19071;
+VESPA_DOCUMENT_URL=http://localhost:8080;
+VESPA_QUERY_URL=http://localhost:8080
+```
+8. Now you can Debug this file directly from your IDE (e.g. PyCharm) to start Marqo locally.
+9. Set breakpoints in the project for better debugging experience.
+
+
+### Option B. Run the Marqo application locally (outside of docker) through `uvicorn`
+Finish the preparations above, then run the following command:
+
+6. Set up the environment variables and run Marqo through `uvicorn`
+```bash
+export MARQO_ENABLE_BATCH_APIS=true
+expot MARQO_LOG_LEVEL=debug
+export VESPA_CONFIG_URL=http://localhost:19071
+export VESPA_DOCUMENT_URL=http://localhost:8080
+export ESPA_QUERY_URL=http://localhost:8080
 export PYTHONPATH="${PYTHONPATH}:$(pwd)/src"
 cd src/marqo/tensor_search
 uvicorn api:app --host 0.0.0.0 --port 8882 --reload
 ```
-__Notes__:
 
-- This is for marqo-os (Marqo OpenSearch) running locally. You can alternatively set
-`OPENSEARCH_URL` to  a remote Marqo OpenSearch cluster 
+### Notes:
 
-## Redis setup (Applicable for Options A and E)
-Marqo uses redis to handle concurrency throttling. Redis is automatically set up when running Marqo in docker (Options B-D), but if you are running Marqo locally on your machine (Options A and E), you will have to set redis up yourself to enable throttling.
+#### Redis setup (Applicable for Options A and B)
+Marqo uses redis to handle concurrency throttling. Redis is automatically set up when running Marqo in docker, but if you are running Marqo locally on your machine (Options A and B), you will have to set redis up yourself to enable throttling.
 
 Note: This setup is optional. If you do not have redis set up properly, Marqo will still run as normal, but throttling will be disabled (you will see warnings containing `There is a problem with your redis connection...`). To suppress these warnings, disable throttling completely with:
 ```
 export MARQO_ENABLE_THROTTLING='FALSE'
 ```
 
-### Installation
+#### Installation
 The redis-server version to install is redis 7.0.8. Install it using this command for Ubuntu 22.0.4:
 ```
 apt-get update
@@ -60,7 +98,7 @@ apt-get update
 apt-get install redis-server -y
 ``` 
 
-### Running redis
+#### Running redis
 To start up redis, simply run the command:
 ```
 redis-server /etc/redis/redis.conf
@@ -69,89 +107,19 @@ redis-server /etc/redis/redis.conf
 The `/etc/redis/redis.conf` configuration file should have been automatically created upon the redis installation step.
 
 
-### Option B. Build and run the Marqo as a Docker container, that creates and manages its own internal Marqo-OS 
+## Running Marqo in docker for development
+
+### Option C. Build and run the Marqo as a Docker container
 1. `cd` into the marqo root directory
 2. Run the following command:
 ```bash
 docker rm -f marqo &&
      DOCKER_BUILDKIT=1 docker build . -t marqo_docker_0 
-     docker run --name marqo --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqo_docker_0
-```
-
-### Option C. Build and run the Marqo as a Docker container, connecting to Marqo-OS which is running on the host:
-1. Run the following command to run Marqo-OS (if you are using an arm64 machine, replace `marqoai/marqo-os:0.0.3` with `marqoai/marqo-os:0.0.3-arm`):
-```bash
-docker run --name marqo-os -id -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" marqoai/marqo-os:0.0.3
-```
-
-2. `cd` into the marqo root directory
-3. Run the following command:
-```bash
-docker rm -f marqo &&
-     DOCKER_BUILDKIT=1 docker build . -t marqo_docker_0 && 
-     docker run --name marqo --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway \
-         -e "OPENSEARCH_URL=https://localhost:9200" marqo_docker_0
-```
-
-__Notes__:
-
-- This is for marqo-os (Marqo OpenSearch) running locally. You can alternatively set
-`OPENSEARCH_URL` to  a remote Marqo OpenSearch cluster 
-### Option D. Pull marqo from `hub.docker.com` and run it
-```
-docker rm -f marqo &&
-    docker run --name marqo --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:latest
-```
-
-### Option E. Run marqo on arm64 (including M-series Macs) for development
-
-1. Run marqo-os,
-```
-docker run --name marqo-os -id -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" marqoai/marqo-os:0.0.3-arm 
-```
-
-2. Clone the Marqo github repo (if not already done),
-```
-git clone https://github.com/marqo-ai/marqo.git
-```
-
-3. change into the Marqo directory,
-```
-cd marqo
-```
-
-4. Install some dependencies (requires [Homebrew](https://brew.sh/)),
-```
-brew install cmake;
-brew install protobuf;
-```
-
-5. [Install rust](https://www.rust-lang.org/tools/install),
-```
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs/ | sh;
-```
-
-6. Set up redis (follow instructions in Option A)
-
-7. Install marqo dependencies,
-```
-pip install -r requirements.txt
-```
-
-8. Change into the tensor search directory,
-```
-CWD=$(pwd)
-cd src/marqo/tensor_search/
-```
-9. Run Marqo,
-```
-export OPENSEARCH_URL="https://localhost:9200" && 
-    export PYTHONPATH="${PYTHONPATH}:${CWD}/src" &&
-    uvicorn api:app --host 0.0.0.0 --port 8882 --reload
+     docker run --name marqo -p 8882:8882 marqo_docker_0
 ```
 
 ### Using Marqo with a GPU
-Depending if you are running Marqo within Docker (steps B., C. and D.) or not (step A.) will determine if you need to do anything to use a GPU with Marqo.
+Depending if you are running Marqo within Docker or not, there are different steps to take to use a GPU.
 
 #### Using Marqo outside of Docker
 Marqo outside Docker will rely on the system setup to use the GPU. If you can use a GPU normally with pytorch then it should be good to go. The usual caveats apply though, the CUDA version of pytorch will need to match that of the GPU drivers (see below on how to check).
@@ -163,8 +131,7 @@ Currently, only CUDA based (Nvidia) GPU's are supported. If you have a GPU on th
 ```bash
 docker rm -f marqo &&
      DOCKER_BUILDKIT=1 docker build . -t marqo_docker_0 && 
-     docker run --name marqo --gpus all --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway \
-         -e "OPENSEARCH_URL=https://localhost:9200" marqo_docker_0
+     docker docker run --name --gpus all marqo -p 8882:8882 marqo_docker_0
 ```
 note the `--gpus all` has been added.
 
@@ -179,7 +146,7 @@ $ distribution=$(. /etc/os-release;echo $ID$VERSION_ID) \
 $ sudo apt-get update
 $ sudo apt-get install -y nvidia-docker2
 ```
-Once this is installed, one of the previous Docker commands can be run (either step B., C., or D.).
+Once this is installed, you can include `--gpus all` in the `docker run` command to allow the GPU to be used within Marqo.
 
 ### Using Marqo on an AWS EC2 machine
 #### (Note: This is not recommended for production use cases.)
@@ -192,16 +159,11 @@ To install Docker (through terminal) go to the [Official Docker Website](https:/
 
 Edit the SSH config file with `nano ~/.ssh/config` then insert the line: `ServerAliveInterval 50`
 
-3. Run marqo-os
-```
-sudo docker rm -f marqo-os; sudo docker run -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" marqoai/marqo-os:0.0.3-arm
-```
+3. Run Marqo
 
-4. Run marqo with a set `OPENSEARCH_URL`
+```bash
+docker docker run --name  marqo -p 8882:8882 marqoai/marqo:latest
 ```
-sudo docker rm -f marqo; sudo docker run --name marqo -it --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway -e "OPENSEARCH_URL=https://localhost:9200" marqoai/marqo:latest
-```
-
 
 #### Troubleshooting
 ##### Drivers
