@@ -60,10 +60,10 @@ class TestImagePreprocessing(MarqoTestCase):
                                                      index_name=index_name,
                                                      text="test")
                 self.assertIn("_highlights", search_result["hits"][0])
-                self.assertIn("image_field_1", search_result["hits"][0]["_highlights"])
-                self.assertTrue(isinstance(search_result["hits"][0]["_highlights"]["image_field_1"], str))
-                self.assertTrue(isinstance(eval(search_result["hits"][0]["_highlights"]["image_field_1"]), list))
-                self.assertEqual(4, len(eval(search_result["hits"][0]["_highlights"]["image_field_1"])))
+                self.assertIn("image_field_1", search_result["hits"][0]["_highlights"][0])
+                self.assertTrue(isinstance(search_result["hits"][0]["_highlights"][0]["image_field_1"], str))
+                self.assertTrue(isinstance(eval(search_result["hits"][0]["_highlights"][0]["image_field_1"]), list))
+                self.assertEqual(4, len(eval(search_result["hits"][0]["_highlights"][0]["image_field_1"])))
 
     def test_image_preprocess_get_documents_format(self):
         image_url = "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg"
