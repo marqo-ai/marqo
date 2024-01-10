@@ -37,6 +37,7 @@ class TestApiErrors(MarqoTestCase):
     """
 
     index_name_1 = "index1"
+
     def setUp(self):
         self.client = TestClient(api.app)
         self.index_name_1 = "index1"
@@ -142,3 +143,25 @@ class TestApiErrors(MarqoTestCase):
         self.assertEqual(response.json()["code"], "invalid_argument")
         self.assertEqual(response.json()["type"], "invalid_request")
         assert "Could not find model properties for" in response.json()["message"]
+
+    def test_create_index_snake_case_fails(self):
+        # Verify snake case rejected for fields that have camel case as alias
+        response = self.client.post(
+            "/indexes/my_index",
+            json={
+                "type": "structured",
+                "allFields": [{"name": "field1", "type": "text"}],
+                "tensorFields": [],
+                'annParameters': {
+                    'spaceType': 'dotproduct',
+                    'parameters': {
+                        'ef_construction': 128,
+                        'm': 16
+                    }
+                }
+            }
+        )
+
+        self.assertEqual(response.status_code, 422)
+        self.assertTrue("Invalid field name 'ef_construction'" in response.text)
+

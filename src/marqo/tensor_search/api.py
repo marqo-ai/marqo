@@ -293,7 +293,7 @@ def get_indexes(marqo_config: config.Config = Depends(get_config)):
 @app.get("/indexes/{index_name}/settings")
 def get_settings(index_name: str, marqo_config: config.Config = Depends(get_config)):
     marqo_index = marqo_config.index_management.get_index(index_name)
-    return IndexSettings.from_marqo_index(marqo_index).dict(exclude_none=True)
+    return IndexSettings.from_marqo_index(marqo_index).dict(exclude_none=True, by_alias=True)
 
 
 @app.get("/models")
