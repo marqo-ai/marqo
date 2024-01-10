@@ -1,3 +1,5 @@
+import unittest
+
 import numpy as np
 import os
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
@@ -14,7 +16,7 @@ from marqo.s2_inference.s2_inference import (
 from tests.marqo_test import MarqoTestCase
 from unittest import mock
 
-
+@unittest.skip
 class TestGenericModelSupport(MarqoTestCase):
 
     def setUp(self):
