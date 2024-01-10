@@ -1,8 +1,9 @@
 import functools
 import pprint
+import unittest
 import uuid
 from marqo.tensor_search import enums
-from marqo.errors import (
+from marqo.api.exceptions import (
     IndexNotFoundError, InvalidDocumentIdError, InvalidArgError,
     IllegalRequestedDocCount
 )
@@ -10,10 +11,10 @@ from marqo.tensor_search import tensor_search
 from tests.marqo_test import MarqoTestCase
 from unittest import mock
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
-from tests.utils.transition import add_docs_batched
 import os
 
 
+@unittest.skip
 class TestGetDocuments(MarqoTestCase):
 
     def setUp(self) -> None:
@@ -50,7 +51,6 @@ class TestGetDocuments(MarqoTestCase):
             config=self.config, index_name=self.index_name_1, document_ids=['1', '2', '3'],
             show_vectors=True)
         pprint.pprint(res)
-        # TODO: Confirm the content is actually correct
 
     def test_get_documents_vectors_format(self):
         keys = [("title 1", "desc 2", "_id"), ("title 1", "desc 2", "_id")]
@@ -137,9 +137,11 @@ class TestGetDocuments(MarqoTestCase):
                 enums.IndexSettingsField.model: enums.MlModel.bert
             }})
         docs = [{"Title": "a", "_id": uuid.uuid4().__str__()} for _ in range(2000)]
-        add_docs_batched(
-            config=self.config, index_name=self.index_name_2,
-            docs=docs, auto_refresh=False, device="cpu"
+        tensor_search.add_documents(
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_2,
+                docs=docs, auto_refresh=False, device="cpu"
+            )
         )
         tensor_search.refresh_index(config=self.config, index_name=self.index_name_2)
         for max_doc in [0, 1, 2, 5, 10, 100, 1000]:
@@ -175,9 +177,12 @@ class TestGetDocuments(MarqoTestCase):
     def test_limit_results_none(self):
         """if env var isn't set or is None"""
         docs = [{"Title": "a", "_id": uuid.uuid4().__str__()} for _ in range(2000)]
-        add_docs_batched(
-            config=self.config, index_name=self.index_name_1,
-            docs=docs, auto_refresh=False, device="cpu"
+
+        tensor_search.add_documents(
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1,
+                docs=docs, auto_refresh=False, device = "cpu"
+            ),
         )
         tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
 

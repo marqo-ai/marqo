@@ -1,0 +1,44 @@
+<services version="1.0">
+
+  <admin version="2.0">
+    <configservers>
+      <configserver hostalias="config0" />
+      <configserver hostalias="config1" />
+      <configserver hostalias="config2" />
+    </configservers>
+    <cluster-controllers>
+      <cluster-controller hostalias="config0" />
+      <cluster-controller hostalias="config1" />
+      <cluster-controller hostalias="config2" />
+    </cluster-controllers>
+    <slobroks>
+      <slobrok hostalias="config0" />
+      <slobrok hostalias="config1" />
+      <slobrok hostalias="config2" />
+    </slobroks>
+
+    <adminserver hostalias="admin0" />
+  </admin>
+
+  <container id="query" version="1.0">
+    <document-api />
+    <document-processing/>
+    <search/>
+    <nodes>
+{{queryNodes}}
+    </nodes>
+  </container>
+
+  <content id="content_default" version="1.0">
+    <redundancy>2</redundancy>
+    <documents>
+      <document type="marqo_settings" mode="index" />
+      <document type="simplewiki" mode="index" />
+      <document type="simplewiki_single" mode="index" />
+      <document-processing cluster="query" />
+    </documents>
+    <nodes>
+{{contentNodes}}
+    </nodes>
+  </content>
+</services>

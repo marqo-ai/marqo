@@ -8,7 +8,7 @@ from unittest import mock
 from marqo.s2_inference.sbert_utils import Model, SBERT
 from unittest.mock import patch
 import pytest
-from marqo.errors import InternalError
+from marqo.api.exceptions import InternalError
 
 
 class TestSbertLoad(unittest.TestCase):

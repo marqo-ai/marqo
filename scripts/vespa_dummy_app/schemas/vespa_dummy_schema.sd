@@ -1,0 +1,4 @@
+schema vespa_dummy_schema {
+    document vespa_dummy_schema {
+    }
+}

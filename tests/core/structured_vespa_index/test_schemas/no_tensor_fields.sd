@@ -1,0 +1,58 @@
+    schema marqo__my_00index {
+        document {
+        field marqo__id type string { indexing: summary}
+            field marqo__lexical_title type string {
+            indexing: index | summary
+            index: enable-bm25
+        }
+            field description type string {
+            indexing: summary
+        }
+            field price type float {
+            indexing: summary
+        }
+        field marqo__score_modifiers type tensor<float>(p {}) { indexing: attribute | summary}
+        field marqo__vector_count type int{
+            indexing: attribute | summary
+        }
+    }
+        rank-profile bm25 inherits default {
+            inputs {
+            query(title): 0
+        }
+            first-phase {
+            expression: if (query(title) > 0, bm25(marqo__lexical_title), 0)
+    }}
+        rank-profile modifiers inherits default {
+            inputs {
+            query(marqo__mult_weights) tensor<float>(p {})
+            query(marqo__add_weights) tensor<float>(p {})
+        }
+            function modify(score) {
+            expression: if (count(query(marqo__mult_weights)) == 0, 1, reduce(query(marqo__mult_weights) * attribute(marqo__score_modifiers), prod)) * score + reduce(query(marqo__add_weights) * attribute(marqo__score_modifiers), sum)
+    }}
+        rank-profile bm25_modifiers inherits modifiers {
+            inputs {
+            query(marqo__mult_weights) tensor<float>(p {})
+            query(marqo__add_weights) tensor<float>(p {})
+            query(title): 0
+        }
+            first-phase {
+            expression: modify(if (query(title) > 0, bm25(marqo__lexical_title), 0))
+    }}
+        fieldset default {
+        fields: marqo__lexical_title
+    }
+        document-summary all-non-vector-summary {
+        summary marqo__id type string {}
+        summary title type string { source: marqo__lexical_title}
+        summary description type string { source: description}
+        summary price type float { source: price}
+    }
+        document-summary all-vector-summary {
+        summary marqo__id type string {}
+        summary title type string { source: marqo__lexical_title}
+        summary description type string { source: description}
+        summary price type float { source: price}
+    }
+}

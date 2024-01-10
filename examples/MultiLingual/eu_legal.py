@@ -75,10 +75,10 @@ def build_index():
                 # Index the document. The device is set to 'cuda' to take
                 # advantage of the machine's GPU. If you don't have a GPU,
                 # change this argument to 'cpu'.
-                # We do not set auto_refresh, which will make it default to False. This is optimal for indexing
+                # We set auto_refresh to False which is optimal for indexing
                 # a lot of documents.
                 mq.index(index_name=INDEX_NAME).add_documents(
-                    documents=[to_post], device=DEVICE,
+                    documents=[to_post], device=DEVICE, auto_refresh=False,
                     tensor_fields=["language", "text", "labels"]
                 )
     t1 = datetime.datetime.now()

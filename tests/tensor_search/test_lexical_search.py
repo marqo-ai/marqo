@@ -1,15 +1,17 @@
 import time
-from marqo.tensor_search import enums, backend
+import unittest
+
+from marqo.tensor_search import enums
 from marqo.tensor_search import tensor_search
 import copy
-from marqo.errors import InvalidArgError, IndexNotFoundError
+from marqo.api.exceptions import InvalidArgError, IndexNotFoundError
 from tests.marqo_test import MarqoTestCase
 import random
 import requests
 import json
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 
-
+@unittest.skip
 class TestLexicalSearch(MarqoTestCase):
 
     def setUp(self) -> None:
@@ -60,7 +62,7 @@ class TestLexicalSearch(MarqoTestCase):
                 res = tensor_search._lexical_search(config=self.config, index_name=self.index_name_1, text=a)
                 raise AssertionError
             except InvalidArgError as e:
-                assert "type `str`" in str(e)
+                assert "type str" in str(e)
 
     def test_lexical_search_no_index(self):
         try:

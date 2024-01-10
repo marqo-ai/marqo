@@ -1,5 +1,5 @@
-FROM marqoai/marqo-base:17 as base_image
-VOLUME /var/lib/docker
+FROM marqoai/marqo-base:poc as base_image
+VOLUME /opt/vespa/
 ARG TARGETPLATFORM
 WORKDIR /app
 
@@ -7,7 +7,6 @@ COPY requirements.txt requirements.txt
 RUN pip3 install --no-cache-dir -r requirements.txt
 
 COPY scripts scripts
-RUN bash scripts/dind_setup/setup_dind.sh
 
 FROM base_image
 COPY . /app

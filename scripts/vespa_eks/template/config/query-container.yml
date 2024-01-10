@@ -1,0 +1,37 @@
+# Copyright Yahoo. Licensed under the terms of the Apache 2.0 license. See LICENSE in the project root.
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: vespa-query-container
+spec:
+  replicas: {{query.replicas}}
+  selector:
+    matchLabels:
+      app: vespa-query-container
+      name: vespa-internal
+  serviceName: vespa-internal
+  template:
+    metadata:
+      labels:
+        app: vespa-query-container
+        name: vespa-internal
+    spec:
+      containers:
+      - name: vespa-query-container
+        image: vespaengine/vespa
+        args: ["services"]
+        imagePullPolicy: Always
+        envFrom:
+        - configMapRef:
+            name: vespa-config
+        securityContext:
+          privileged: true
+          runAsUser: 0
+        resources:
+          requests:
+            memory: {{query.memory}}
+            cpu: {{query.cpu}}
+          limits:
+            memory: {{query.memory}}
+            cpu: {{query.cpu}}

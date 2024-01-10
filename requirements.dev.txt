@@ -17,7 +17,7 @@ Pillow==9.3.0
 numpy==1.23.4
 validators==0.20.0
 sentence-transformers==2.2.2
-open_clip_torch==2.23.0
+open_clip_torch==2.18.0
 clip-marqo==1.0.2
 onnx
 protobuf
@@ -32,8 +32,7 @@ redis==4.4.2
 # pin specific packages (last working 0.0.19 image)
 # to fix ARM64 build scikit-learn error
 platformdirs==3.5.0
-safetensors==0.4.1
-timm==0.9.12
+timm==0.6.13
 transformers==4.29.0
 
 flatbuffers==23.5.9
@@ -41,4 +40,10 @@ certifi==2019.11.28
 idna==2.8
 six==1.14.0
 typing-extensions==4.5.0
-urllib3==1.25.8
+urllib3==1.26.0
+pydantic==1.10.11
+httpx==0.25.0
+
+# test requirements
+pyvespa==0.37.1
+pytest==7.4.3

@@ -1,34 +1,33 @@
 import json
 import os
-from marqo.tensor_search import enums
-from marqo.tensor_search.tensor_search_logging import get_logger
 import time
-from marqo.tensor_search.enums import EnvVars
-# we need to import backend before index_meta_cache to prevent circular import error:
-from marqo.tensor_search import backend, index_meta_cache, utils
-from marqo import config
-from marqo.tensor_search import constants
-from marqo.tensor_search.web import api_utils
-from marqo import errors
-from marqo.tensor_search.throttling.redis_throttle import throttle
-from marqo.connections import redis_driver
-from marqo.s2_inference.s2_inference import vectorise
+
 import torch
 
+from marqo import config
+from marqo.api import exceptions
+from marqo.connections import redis_driver
+from marqo.s2_inference.s2_inference import vectorise
+# we need to import backend before index_meta_cache to prevent circular import error:
+from marqo.tensor_search import index_meta_cache, utils
+from marqo.tensor_search.enums import EnvVars
+from marqo.tensor_search.tensor_search_logging import get_logger
 
-def on_start(marqo_os_url: str):
-        
+logger = get_logger(__name__)
+
+
+def on_start(config: config.Config):
     to_run_on_start = (
-                        PopulateCache(marqo_os_url),
-                        DownloadStartText(),
-                        CUDAAvailable(), 
-                        SetBestAvailableDevice(),
-                        ModelsForCacheing(),
-                        InitializeRedis("localhost", 6379),    # TODO, have these variable
-                        DownloadFinishText(),
-                        MarqoWelcome(),
-                        MarqoPhrase(),
-                        )
+        PopulateCache(config),
+        DownloadStartText(),
+        CUDAAvailable(),
+        SetBestAvailableDevice(),
+        ModelsForCacheing(),
+        InitializeRedis("localhost", 6379),  # TODO, have these variable
+        DownloadFinishText(),
+        MarqoWelcome(),
+        MarqoPhrase(),
+    )
 
     for thing_to_start in to_run_on_start:
         thing_to_start.run()
@@ -37,47 +36,17 @@ def on_start(marqo_os_url: str):
 class PopulateCache:
     """Populates the cache on start"""
 
-    def __init__(self, marqo_os_url: str):
-        self.marqo_os_url = marqo_os_url
-        pass
+    def __init__(self, config: config.Config):
+        self.config = config
 
     def run(self):
-        c = config.Config(api_utils.upconstruct_authorized_url(
-            opensearch_url=self.marqo_os_url
-        ))
-        try:
-            index_meta_cache.populate_cache(c)
-        except errors.BackendCommunicationError as e:
-            raise errors.BackendCommunicationError(
-                message="Can't connect to Marqo-os backend. \n"  
-                        "    Possible causes: \n"
-                        "        - If this is an arm64 machine, ensure you are using an external Marqo-os instance \n"
-                        "        - If you are using an external Marqo-os instance, check if it is running: "
-                        "`curl <YOUR MARQO-OS URL>` \n"
-                        "        - Ensure that the OPENSEARCH_URL environment variable defined "
-                        "in the `docker run marqo` command points to Marqo-os\n",
-                link="https://github.com/marqo-ai/marqo/tree/mainline/src/marqo"
-                     "#c-build-and-run-the-marqo-as-a-docker-container-connecting-"
-                     "to-marqo-os-which-is-running-on-the-host"
-            ) from e
-        # the following lines turns off auto create index
-        # connection = HttpRequests(c)
-        # connection.put(
-        #     path="_cluster/settings",
-        #     body={
-        #         "persistent": {"action.auto_create_index": "false"}
-        #     })
+        index_meta_cache.start_refresh_thread(self.config)
 
 
 class CUDAAvailable:
-
     """checks the status of cuda
     """
-    logger = get_logger('DeviceSummary')
-
-    def __init__(self):
-        
-        pass
+    logger = get_logger('CUDA device summary')
 
     def run(self):
         def id_to_device(id):
@@ -90,22 +59,18 @@ class CUDAAvailable:
         # use -1 for cpu
         device_ids = [-1]
         device_ids += list(range(device_count))
-        
+
         device_names = []
         for device_id in device_ids:
-            device_names.append( {'id':device_id, 'name':id_to_device(device_id)})
+            device_names.append({'id': device_id, 'name': id_to_device(device_id)})
 
         self.logger.info(f"found devices {device_names}")
 
 
 class SetBestAvailableDevice:
-
     """sets the MARQO_BEST_AVAILABLE_DEVICE env var
     """
     logger = get_logger('SetBestAvailableDevice')
-
-    def __init__(self):
-        pass
 
     def run(self):
         """
@@ -116,7 +81,7 @@ class SetBestAvailableDevice:
             os.environ[EnvVars.MARQO_BEST_AVAILABLE_DEVICE] = "cuda"
         else:
             os.environ[EnvVars.MARQO_BEST_AVAILABLE_DEVICE] = "cpu"
-        
+
         self.logger.info(f"Best available device set to: {os.environ[EnvVars.MARQO_BEST_AVAILABLE_DEVICE]}")
 
 
@@ -134,7 +99,7 @@ class ModelsForCacheing:
                 self.models = json.loads(warmed_models)
             except json.JSONDecodeError as e:
                 # TODO: Change error message to match new format
-                raise errors.EnvVarError(
+                raise exceptions.EnvVarError(
                     f"Could not parse environment variable `{EnvVars.MARQO_MODELS_TO_PRELOAD}`. "
                     f"Please ensure that this a JSON-encoded array of strings or dicts. For example:\n"
                     f"""export {EnvVars.MARQO_MODELS_TO_PRELOAD}='["ViT-L/14", "onnx/all_datasets_v4_MiniLM-L6"]'"""
@@ -153,24 +118,9 @@ class ModelsForCacheing:
         N = 10
         messages = []
         for model in self.models:
-            # Skip preloading of models that can't be preloaded (eg. no_model)
-            if isinstance(model, str):
-                model_name = model
-            elif isinstance(model, dict):
-                try:
-                    model_name = model["model"]
-                except KeyError as e:
-                    raise errors.EnvVarError(
-                        f"Your custom model {model} is missing `model` key."
-                        f"""To add a custom model, it must be a dict with keys `model` and `model_properties` as defined in `https://marqo.pages.dev/0.0.20/Advanced-Usage/configuration/#configuring-preloaded-models`"""
-                    ) from e
-            if model_name in constants.MODELS_TO_SKIP_PRELOADING:
-                self.logger.info(f"Skipping preloading of `{model_name}`.")
-                continue
-
             for device in self.default_devices:
                 self.logger.debug(f"Beginning loading for model: {model} on device: {device}")
-                
+
                 # warm it up
                 _ = _preload_model(model=model, content=test_string, device=device)
 
@@ -180,7 +130,7 @@ class ModelsForCacheing:
                     _ = _preload_model(model=model, content=test_string, device=device)
                     t1 = time.time()
                     t += (t1 - t0)
-                message = f"{(t)/float((N))} for {model} and {device}"
+                message = f"{(t) / float((N))} for {model} and {device}"
                 messages.append(message)
                 self.logger.debug(f"{model} {device} vectorise run {N} times.")
                 self.logger.info(f"{model} {device} run succesfully!")
@@ -200,21 +150,25 @@ def _preload_model(model, content, device):
     if isinstance(model, str):
         # For models IN REGISTRY
         _ = vectorise(
-            model_name=model, 
-            content=content, 
+            model_name=model,
+            content=content,
             device=device
         )
     elif isinstance(model, dict):
         # For models from URL
+        """
+        TODO: include validation from on start script (model name properties etc)
+        _check_model_name(index_settings)
+        """
         try:
             _ = vectorise(
-                model_name=model["model"], 
-                model_properties=model["model_properties"], 
-                content=content, 
+                model_name=model["model"],
+                model_properties=model["modelProperties"],
+                content=content,
                 device=device
             )
         except KeyError as e:
-            raise errors.EnvVarError(
+            raise exceptions.EnvVarError(
                 f"Your custom model {model} is missing either `model` or `model_properties`."
                 f"""To add a custom model, it must be a dict with keys `model` and `model_properties` as defined in `https://marqo.pages.dev/0.0.20/Advanced-Usage/configuration/#configuring-preloaded-models`"""
             ) from e
@@ -235,7 +189,6 @@ class InitializeRedis:
 class DownloadStartText:
 
     def run(self):
-
         print('\n')
         print("###########################################################")
         print("###########################################################")
@@ -260,7 +213,6 @@ class DownloadFinishText:
 class MarqoPhrase:
 
     def run(self):
-
         message = r"""
      _____                                                   _        __              _                                     
     |_   _|__ _ __  ___  ___  _ __   ___  ___  __ _ _ __ ___| |__    / _| ___  _ __  | |__  _   _ _ __ ___   __ _ _ __  ___ 
@@ -276,7 +228,6 @@ class MarqoPhrase:
 class MarqoWelcome:
 
     def run(self):
-
         message = r"""   
      __    __    ___  _        __   ___   ___ ___    ___      ______   ___       ___ ___   ____  ____   ___    ___   __ 
     |  |__|  |  /  _]| |      /  ] /   \ |   |   |  /  _]    |      | /   \     |   |   | /    ||    \ /   \  /   \ |  |

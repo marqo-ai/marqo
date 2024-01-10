@@ -18,13 +18,13 @@ import pytest
 from marqo.tensor_search.models.private_models import ModelLocation, ModelAuth
 from marqo.tensor_search.models.private_models import S3Auth, S3Location, HfModelLocation
 from marqo.s2_inference.configs import ModelCache
-from marqo.errors import InternalError
+from marqo.api.exceptions import InternalError
 
 
 class TestEncoding(unittest.TestCase):
 
     def test_load_image_from_path_timeout(self):
-        good_url = 'https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png'
+        good_url = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
         # should be fine on regular timeout:
         img = clip_utils.load_image_from_path(good_url, {})
         assert isinstance(img, types.ImageType)
@@ -39,7 +39,7 @@ class TestEncoding(unittest.TestCase):
         """Do we catch other download errors?
         The errors tested inherit from requests.exceptions.RequestException
         """
-        good_url = 'https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png'
+        good_url = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
         # it should be fine normally
         clip_utils.load_image_from_path(good_url, {})
 
@@ -59,7 +59,7 @@ class TestEncoding(unittest.TestCase):
             run()
 
     def test_load_image_from_path_http_error(self):
-        good_url = 'https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png'
+        good_url = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
         # it should be fine normally
         clip_utils.load_image_from_path(good_url, {})
         #
@@ -84,7 +84,7 @@ class TestEncoding(unittest.TestCase):
             run()
 
     def test_load_image_from_path_closes_response(self):
-        good_url = 'https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png'
+        good_url = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
 
         mock_resp = mock.MagicMock()
         mock_resp.ok = True

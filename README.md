@@ -29,13 +29,13 @@ Vector databases are specialized components for vector similarity and only servi
 
 Here is a code snippet for a minimal example of vector search with Marqo (see [Getting Started](#getting-started)):
 
-1. Use docker to run Marqo (Mac users with M-series chips will need to [go here](#m-series-mac-users)):
+1. Use docker to run Marqo:
 
 ```bash
 
 docker rm -f marqo
 docker pull marqoai/marqo:latest
-docker run --name marqo -it --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:latest
+docker run --name marqo -it -p 8882:8882 marqoai/marqo:latest
 
 ```
 
@@ -67,12 +67,11 @@ mq.index("my-first-index").add_documents([
                        "mobility, life support, and communications for astronauts",
         "_id": "article_591"
     }],
-    tensor_fields=["Title", "Description"],
-    auto_refresh=True
+    tensor_fields=["Description"]
 )
 
 results = mq.index("my-first-index").search(
-    q="What is the best outfit to wear on the moon?", searchable_attributes=["Title", "Description"]
+    q="What is the best outfit to wear on the moon?"
 )
 
 ```
@@ -149,7 +148,7 @@ This integration lets you leverage open source or custom fine tuned models throu
 
 1. Marqo requires docker. To install Docker go to the [Docker Official website](https://docs.docker.com/get-docker/). Ensure that docker has at least 8GB memory and 50GB storage.
 
-2. Use docker to run Marqo (Mac users with M-series chips will need to [go here](#m-series-mac-users)):
+2. Use docker to run Marqo:
 
 ```bash
 
@@ -187,12 +186,11 @@ mq.index("my-first-index").add_documents([
                        "mobility, life support, and communications for astronauts",
         "_id": "article_591"
     }],
-    tensor_fields=["Title", "Description"],
-    auto_refresh=True
+    tensor_fields=["Description"]
 )
 
 results = mq.index("my-first-index").search(
-    q="What is the best outfit to wear on the moon?", searchable_attributes=["Title", "Description"]
+    q="What is the best outfit to wear on the moon?"
 )
 
 ```
@@ -200,7 +198,6 @@ results = mq.index("my-first-index").search(
 - `mq` is the client that wraps the `marqo` API.
 - `create_index()` creates a new index with default settings. You have the option to specify what model to use. For example, `mq.create_index("my-first-index", model="hf/all_datasets_v4_MiniLM-L6")` will create an index with the default text model `hf/all_datasets_v4_MiniLM-L6`. Experimentation with different models is often required to achieve the best retrieval for your specific use case. Different models also offer a tradeoff between inference speed and relevancy. See [here](https://docs.marqo.ai/1.0.0/Models-Reference/dense_retrieval/) for the full list of models.
 - `add_documents()` takes a list of documents, represented as python dicts for indexing.
-    - The `auto_refresh` parameter ensures that documents are available for search after being added. When performing heavy add_documents operations, leave this as `False` for optimal indexing and search performance.
 - You can optionally set a document's ID with the special `_id` field. Otherwise, Marqo will generate one.
 
 Let's have a look at the results:
@@ -276,16 +273,6 @@ result = mq.index("my-first-index").search('marco polo', search_method=marqo.Sea
 
 ```
 
-### Search specific fields
-
-Using the default tensor search method.
-
-```python
-
-result = mq.index("my-first-index").search('adventure', searchable_attributes=['Title'])
-
-```
-
 ### Multi modal and cross modal search
 
 To power image and text search, Marqo allows users to plug and play with CLIP models from HuggingFace. **Note that if you do not configure multi modal search, image urls will be treated as strings.** To start indexing and searching with images, first create an index with a CLIP configuration, as below:
@@ -308,22 +295,15 @@ response = mq.index("my-multimodal-index").add_documents([{
     "My Image": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
     "Description": "The hippopotamus, also called the common hippopotamus or river hippopotamus, is a large semiaquatic mammal native to sub-Saharan Africa",
     "_id": "hippo-facts"
-}], tensor_fields=["My Image", "Description"], auto_refresh=True)
+}], tensor_fields=["My Image"])
 
 ```
 
-You can then search using text as usual. Both text and image fields will be searched:
+You can then search the image field using text.
 
 ```python
 
 results = mq.index("my-multimodal-index").search('animal')
-
-```
- Setting `searchable_attributes` to the image field `['My Image'] ` ensures only images are searched in this index:
-
-```python
-
-results = mq.index("my-multimodal-index").search('animal',  searchable_attributes=['My Image'])
 
 ```
 
@@ -367,10 +347,9 @@ mq.index("my-weighted-query-index").add_documents(
             "Description": "The thylacine, also commonly known as the Tasmanian tiger or Tasmanian wolf, "
             "is an extinct carnivorous marsupial."
             "The last known of its species died in 1936.",
-        },
+        }
     ],
-    tensor_fields=["Title", "Description"],
-    auto_refresh=True
+    tensor_fields=["Description"]
 )
 
 # initially we ask for a type of communications device which is popular in the 21st century
@@ -378,12 +357,10 @@ query = {
     # a weighting of 1.1 gives this query slightly more importance
     "I need to buy a communications device, what should I get?": 1.1,
     # a weighting of 1 gives this query a neutral importance
-    "Technology that became prevelant in the 21st century": 1.0,
+    "Technology that became prevelant in the 21st century": 1.0
 }
 
-results = mq.index("my-weighted-query-index").search(
-    q=query, searchable_attributes=["Title", "Description"]
-)
+results = mq.index("my-weighted-query-index").search(q=query)
 
 print("Query 1:")
 pprint.pprint(results)
@@ -393,12 +370,10 @@ query = {
     # a weighting of 1 gives this query a neutral importance
     "I need to buy a communications device, what should I get?": 1.0,
     # a weighting of -1 gives this query a negation effect
-    "Technology that became prevelant in the 21st century": -1.0,
+    "Technology that became prevelant in the 21st century": -1.0
 }
 
-results = mq.index("my-weighted-query-index").search(
-    q=query, searchable_attributes=["Title", "Description"]
-)
+results = mq.index("my-weighted-query-index").search(q=query)
 
 print("\nQuery 2:")
 pprint.pprint(results)
@@ -425,24 +400,18 @@ mq.index("my-first-multimodal-index").add_documents(
     [
         {
             "Title": "Flying Plane",
-            "captioned_image": {
-                "caption": "An image of a passenger plane flying in front of the moon.",
-                "image": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
-            },
+            "caption": "An image of a passenger plane flying in front of the moon.",
+            "image": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
         },
         {
             "Title": "Red Bus",
-            "captioned_image": {
-                "caption": "A red double decker London bus traveling to Aldwych",
-                "image": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg",
-            },
+            "caption": "A red double decker London bus traveling to Aldwych",
+            "image": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg",
         },
         {
             "Title": "Horse Jumping",
-            "captioned_image": {
-                "caption": "A person riding a horse over a jump in a competition.",
-                "image": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
-            },
+            "caption": "A person riding a horse over a jump in a competition.",
+            "image": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
         },
     ],
     # Create the mappings, here we define our captioned_image mapping 
@@ -453,20 +422,18 @@ mq.index("my-first-multimodal-index").add_documents(
             "type": "multimodal_combination",
             "weights": {
                 "caption": 0.3,
-                "image": 0.7,
-            },
+                "image": 0.7
+            }
         }
     },
     # We specify which fields to create vectors for. 
     # Note that captioned_image is treated as a single field.
-    tensor_fields=["Title", "captioned_image"],
-    auto_refresh=True
+    tensor_fields=["captioned_image"]
 )
 
 # Search this index with a simple text query
 results = mq.index("my-first-multimodal-index").search(
-    q="Give me some images of vehicles and modes of transport. I am especially interested in air travel and commercial aeroplanes.",
-    searchable_attributes=["captioned_image"],
+    q="Give me some images of vehicles and modes of transport. I am especially interested in air travel and commercial aeroplanes."
 )
 
 print("Query 1:")
@@ -476,16 +443,14 @@ pprint.pprint(results)
 results = mq.index("my-first-multimodal-index").search(
     q={
         "What are some vehicles and modes of transport?": 1.0,
-        "Aeroplanes and other things that fly": -1.0,
+        "Aeroplanes and other things that fly": -1.0
     },
-    searchable_attributes=["captioned_image"],
 )
 print("\nQuery 2:")
 pprint.pprint(results)
 
 results = mq.index("my-first-multimodal-index").search(
-    q={"Animals of the Perissodactyla order": -1.0},
-    searchable_attributes=["captioned_image"],
+    q={"Animals of the Perissodactyla order": -1.0}
 )
 print("\nQuery 3:")
 pprint.pprint(results)
@@ -519,28 +484,6 @@ The full documentation for Marqo can be found here [https://docs.marqo.ai/](http
 ## Warning
 
 Note that you should not run other applications on Marqo's Opensearch cluster as Marqo automatically changes and adapts the settings on the cluster.
-
-## M series Mac users
-
-Marqo does not yet support the docker-in-docker backend configuration for the arm64 architecture. This means that if you have an M series Mac, you will also need to run Marqo's backend, marqo-os, locally.
-
-To run Marqo on an M series Mac, follow the next steps.
-
-1. In one terminal run the following command to start opensearch:
-
-```shell
-docker rm -f marqo-os; docker run -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" marqoai/marqo-os:0.0.3-arm
-```
-
-2. In another terminal run the following command to launch Marqo:
-
-```shell
-docker rm -f marqo; docker run --name marqo --privileged \
-    -p 8882:8882 --add-host host.docker.internal:host-gateway \
-    -e "OPENSEARCH_URL=https://localhost:9200" \
-    marqoai/marqo:latest
-```
-
 
 ## Contributors
 

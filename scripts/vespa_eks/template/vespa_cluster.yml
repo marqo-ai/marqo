@@ -1,0 +1,19 @@
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+metadata:
+  name: {{name}}
+  region: {{region}}
+  version: "1.26"
+
+nodeGroups:
+  - name: ng-workers
+    labels: { role: workers }
+    instanceType: {{instanceType}}
+    desiredCapacity: {{nodeCount}}
+    volumeSize: 80
+    iam:
+      withAddonPolicies:
+        ebs: true
+
+addons:
+- name: aws-ebs-csi-driver

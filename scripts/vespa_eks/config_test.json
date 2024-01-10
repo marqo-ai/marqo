@@ -1,0 +1,21 @@
+{
+  "name": "vespa-cluster-test",
+  "region": "us-east-1",
+  "instanceType": "c7g.8xlarge",
+  "nodeCount": 2,
+  "content": {
+    "replicas": 2,
+    "memory": "44G",
+    "storage": "50G"
+  },
+  "feed": {
+    "replicas": 0,
+    "memory": "6G",
+    "cpu": 2
+  },
+  "query": {
+    "replicas": 2,
+    "memory": "6G",
+    "cpu": 2
+  }
+}

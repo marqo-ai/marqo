@@ -1,0 +1,31 @@
+schema test_vespa_client {
+
+    document test_vespa_client {
+
+        field id type string {
+            indexing: summary | attribute
+        }
+
+        field title type string {
+            indexing: summary | attribute | index
+            index: enable-bm25
+        }
+
+        field contents type string {
+            indexing: summary | attribute | index
+            index: enable-bm25
+        }
+
+    }
+
+    fieldset default {
+        fields: title, contents
+    }
+
+    rank-profile bm25 inherits default {
+        first-phase {
+            expression: bm25(title) + bm25(contents)
+        }
+    }
+
+}

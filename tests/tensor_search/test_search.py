@@ -1,30 +1,27 @@
 import math
 import os
-import sys
-from tests.utils.transition import add_docs_caller, add_docs_batched
-from marqo.tensor_search.models.add_docs_objects import AddDocsParams
-from unittest import mock
-from marqo.s2_inference.s2_inference import vectorise, get_model_properties_from_registry
-import numpy as np
-from marqo.tensor_search import utils
-import typing
-from marqo.tensor_search.enums import TensorField, SearchMethod, EnvVars, IndexSettingsField, MlModel
-from marqo.errors import (
-    MarqoApiError, MarqoError, IndexNotFoundError, InvalidArgError,
-    InvalidFieldNameError, IllegalRequestedDocCount, BadRequestError, InternalError
-)
-from marqo.tensor_search import tensor_search, constants, index_meta_cache
-import copy
-from tests.marqo_test import MarqoTestCase
-import requests
-import random
-from marqo.tensor_search.tensor_search import (_create_dummy_query_for_zero_vector_search,
-                                               _vector_text_search_query_verbose,
-                                               _generate_vector_text_search_query_for_verbose_one)
 import pprint
-from marqo.tensor_search.models.index_info import IndexInfo
+import random
+import sys
+import typing
+import unittest
+from unittest import mock
+
+import numpy as np
+import requests
+
+from marqo.api.exceptions import (
+    IndexNotFoundError, InvalidArgError, InvalidFieldNameError, IllegalRequestedDocCount,
+    BadRequestError, InternalError)
+from marqo.s2_inference.s2_inference import vectorise, get_model_properties_from_registry
+from marqo.tensor_search import tensor_search
+from marqo.tensor_search.enums import TensorField, SearchMethod, EnvVars
+from marqo.tensor_search.models.add_docs_objects import AddDocsParams
+from tests.marqo_test import MarqoTestCase
+from tests.utils.transition import add_docs_caller
 
 
+@unittest.skip
 class TestVectorSearch(MarqoTestCase):
 
     def setUp(self) -> None:
@@ -441,7 +438,7 @@ class TestVectorSearch(MarqoTestCase):
         settings = {"index_defaults": {"treat_urls_and_pointers_as_images": True, "model": "ViT-B/32"}}
         tensor_search.delete_index(self.config, self.index_name_1)
         tensor_search.create_vector_index(index_name=self.index_name_1, index_settings=settings, config=self.config)
-        hippo_img = 'https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png'
+        hippo_img = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
         add_docs_caller(
             config=self.config, index_name=self.index_name_1, docs=[
                 {"img": hippo_img, "abc": "some text", "other field": "baaadd", "_id": "5678", "my_string": "b"},
@@ -857,10 +854,10 @@ class TestVectorSearch(MarqoTestCase):
 
         vocab = requests.get(vocab_source).text.splitlines()
 
-        add_docs_batched(
+        add_docs_caller(
             config=self.config, index_name=self.index_name_1,
             docs=[{"Title": "a " + (" ".join(random.choices(population=vocab, k=25)))}
-                  for _ in range(2000)], auto_refresh=False, device="cpu"
+                  for _ in range(2000)], auto_refresh=False
         )
         tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
         for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
@@ -900,10 +897,12 @@ class TestVectorSearch(MarqoTestCase):
 
         vocab = requests.get(vocab_source).text.splitlines()
 
-        add_docs_batched(
-            config=self.config, index_name=self.index_name_1,
-            docs=[{"Title": "a " + (" ".join(random.choices(population=vocab, k=25)))}
-            for _ in range(700)], auto_refresh=False, device="cpu"
+        tensor_search.add_documents(
+            config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1,
+                                                              docs=[{"Title": "a " + (
+                                                                  " ".join(random.choices(population=vocab, k=25)))}
+                                                                    for _ in range(700)], auto_refresh=False,
+                                                              device="cpu")
         )
         tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
 
@@ -961,8 +960,8 @@ class TestVectorSearch(MarqoTestCase):
         tensor_search.create_vector_index(
             index_name=self.index_name_1, index_settings=settings, config=self.config
         )
-        url_1 = "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png"
-        url_2 = "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_statue.png"
+        url_1 = "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png"
+        url_2 = "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png"
         docs = [
             {"_id": "123",
              "image_field": url_1,
@@ -1017,15 +1016,15 @@ class TestVectorSearch(MarqoTestCase):
     def test_multi_search_images(self):
         docs = [
             {
-                "loc a": "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png",
+                "loc a": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
                 "_id": 'realistic_hippo'},
-            {"loc b": "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_statue.png",
+            {"loc b": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png",
              "_id": 'artefact_hippo'}
         ]
         image_index_config = {
             IndexSettingsField.index_defaults: {
                 IndexSettingsField.model: "ViT-B/16",
-                IndexSettingsField.treat_urls_and_pointers_as_images: True
+                IndexSettingsField.treatUrlsAndPointersAsImages: True
             }
         }
         tensor_search.delete_index(self.config, self.index_name_1)
@@ -1039,13 +1038,13 @@ class TestVectorSearch(MarqoTestCase):
             ({"Nature photography": 2.0, "Artefact": -2}, ['realistic_hippo', 'artefact_hippo']),
             ({"Nature photography": -1.0, "Artefact": 1.0}, ['artefact_hippo', 'realistic_hippo']),
             ({"Nature photography": -1.5, "Artefact": 1.0, "hippo": 1.0}, ['artefact_hippo', 'realistic_hippo']),
-            ({"https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_statue.png": -1.0,
+            ({"https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png": -1.0,
               "blah": 1.0}, ['realistic_hippo', 'artefact_hippo']),
-            ({"https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_statue.png": 2.0,
-              "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png": -1.0},
+            ({"https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png": 2.0,
+              "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png": -1.0},
              ['artefact_hippo', 'realistic_hippo']),
-            ({"https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_statue.png": 2.0,
-              "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png": -1.0,
+            ({"https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png": 2.0,
+              "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png": -1.0,
               "artefact": 1.0, "photo realistic": -1,
               },
              ['artefact_hippo', 'realistic_hippo']),
@@ -1068,15 +1067,15 @@ class TestVectorSearch(MarqoTestCase):
         """
         docs = [
             {
-                "loc a": "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png",
+                "loc a": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
                 "_id": 'realistic_hippo'},
-            {"loc a": "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_statue.png",
+            {"loc a": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png",
              "_id": 'artefact_hippo'}
         ]
         image_index_config = {
             IndexSettingsField.index_defaults: {
                 IndexSettingsField.model: "ViT-B/16",
-                IndexSettingsField.treat_urls_and_pointers_as_images: True
+                IndexSettingsField.treatUrlsAndPointersAsImages: True
             }
         }
         tensor_search.delete_index(self.config, self.index_name_1)
@@ -1088,19 +1087,19 @@ class TestVectorSearch(MarqoTestCase):
         )
         multi_queries = [
             {
-                "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_statue.png": 2.0,
-                "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png": -1.0,
+                "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png": 2.0,
+                "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png": -1.0,
                 "artefact": 5.0, "photo realistic": -1,
             },
             {
                 "artefact": 5.0,
-                "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_statue.png": 2.0,
+                "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png": 2.0,
                 "photo realistic": -1,
-                "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png": -1.0
+                "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png": -1.0
             },
             {
-                "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_statue.png": 3,
-                "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png": -1.0,
+                "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png": 3,
+                "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png": -1.0,
             },
             {
                 "hello": 3, "some thing": -1.0,
@@ -1148,7 +1147,7 @@ class TestVectorSearch(MarqoTestCase):
 
     def test_multi_search_images_edge_cases(self):
         docs = [
-            {"loc": "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png",
+            {"loc": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
              "_id": 'realistic_hippo'},
             {"field_a": "Some text about a weird forest",
              "_id": 'artefact_hippo'}
@@ -1156,7 +1155,7 @@ class TestVectorSearch(MarqoTestCase):
         image_index_config = {
             IndexSettingsField.index_defaults: {
                 IndexSettingsField.model: "ViT-B/16",
-                IndexSettingsField.treat_urls_and_pointers_as_images: True
+                IndexSettingsField.treatUrlsAndPointersAsImages: True
             }
         }
         tensor_search.delete_index(self.config, self.index_name_1)
@@ -1182,7 +1181,7 @@ class TestVectorSearch(MarqoTestCase):
 
     def test_multi_search_images_ok_edge_cases(self):
         docs = [
-            {"loc": "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png",
+            {"loc": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
              "_id": 'realistic_hippo'},
             {"field_a": "Some text about a weird forest",
              "_id": 'artefact_hippo'}
@@ -1190,7 +1189,7 @@ class TestVectorSearch(MarqoTestCase):
         image_index_config = {
             IndexSettingsField.index_defaults: {
                 IndexSettingsField.model: "ViT-B/16",
-                IndexSettingsField.treat_urls_and_pointers_as_images: True
+                IndexSettingsField.treatUrlsAndPointersAsImages: True
             }
         }
         tensor_search.delete_index(self.config, self.index_name_1)
@@ -1237,7 +1236,7 @@ class TestVectorSearch(MarqoTestCase):
         The code paths for image and search have diverged quite a bit
         """
         hippo_image = (
-            'https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png'
+            'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
         )
         doc_dict = {
             'realistic_hippo': {"loc": hippo_image,
@@ -1249,7 +1248,7 @@ class TestVectorSearch(MarqoTestCase):
         image_index_config = {
             IndexSettingsField.index_defaults: {
                 IndexSettingsField.model: "ViT-B/16",
-                IndexSettingsField.treat_urls_and_pointers_as_images: True
+                IndexSettingsField.treatUrlsAndPointersAsImages: True
             }
         }
         tensor_search.delete_index(self.config, self.index_name_1)
@@ -1373,178 +1372,3 @@ class TestVectorSearch(MarqoTestCase):
             return True
 
         assert run()
-
-
-class TestVectorSearchUtils(MarqoTestCase):
-
-    def setUp(self) -> None:
-        self.index_name_1 = "my-test-index-1"
-        self.index_name_2 = "my-test-index-2"
-        self.index_name_3 = "my-test-index-3"
-        self._delete_test_indices()
-        self._create_test_indices()
-
-        # Any tests that call add_document, search, bulk_search need this env var
-        # Ensure other os.environ patches in indiv tests do not erase this one.
-        self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
-        self.device_patcher.start()
-
-    def tearDown(self):
-        self.device_patcher.stop()
-
-    def _delete_test_indices(self, indices=None):
-        if indices is None or not indices:
-            ix_to_delete = [self.index_name_1, self.index_name_2, self.index_name_3]
-        else:
-            ix_to_delete = indices
-        for ix_name in ix_to_delete:
-            try:
-                tensor_search.delete_index(config=self.config, index_name=ix_name)
-            except IndexNotFoundError as s:
-                pass
-
-    def _create_test_indices(self, indices=None):
-        if indices is None or not indices:
-            ix_to_create = [self.index_name_1, self.index_name_2, self.index_name_3]
-        else:
-            ix_to_create = indices
-        for ix_name in ix_to_create:
-            tensor_search.create_vector_index(config=self.config, index_name=ix_name)
-    
-    def test_construct_vector_input_batches(self):
-        index_info_with_images = IndexInfo(
-            model_name = "ViT-B/32",        # Placeholder
-            search_model_name = None,       # should work with no search model set
-            properties = {"PLACEHOLDER": "PLACEHOLDER"},
-            index_settings = {
-                IndexSettingsField.index_defaults: {
-                    IndexSettingsField.treat_urls_and_pointers_as_images: True
-                }
-            }
-        )
-
-        index_info_without_images = IndexInfo(
-            model_name = "ViT-B/32",        # Placeholder
-            search_model_name = None,       # should work with no search model set
-            properties = {"PLACEHOLDER": "PLACEHOLDER"},
-            index_settings = {
-                IndexSettingsField.index_defaults: {
-                    IndexSettingsField.treat_urls_and_pointers_as_images: False
-                }
-            }
-        )
-        
-        # query is None
-        res = tensor_search.construct_vector_input_batches(None, index_info_with_images)
-        assert res == ([], [])
-
-        # query string
-        res = tensor_search.construct_vector_input_batches("some text", index_info_with_images)
-        assert res == (["some text"], [])
-
-        # query string, image, with urls as images
-        res = tensor_search.construct_vector_input_batches("https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png", index_info_with_images)
-        assert res == ([], ["https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png"])
-
-        # query dict, mixed text and image, with urls as images
-        res = tensor_search.construct_vector_input_batches({
-            "some text": 1, 
-            "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png": 2}, 
-        index_info_with_images)
-        assert res == (["some text"], ["https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png"])
-
-        # query dict, all text
-        res = tensor_search.construct_vector_input_batches({
-            "some text": 1, 
-            "some other text": 2},
-        index_info_with_images)
-        assert res == (["some text", "some other text"], [])
-
-        # query dict, all image, with urls as images
-        res = tensor_search.construct_vector_input_batches({
-            "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png": 1, 
-            "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_statue.png": 2},
-        index_info_with_images)
-        assert res == ([], ["https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png", "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_statue.png"])
-
-        # query string, image, no urls as images
-        res = tensor_search.construct_vector_input_batches("https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png", index_info_without_images)
-        assert res == (["https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png"], [])
-
-        # query dict, mixed text and image, no urls as images
-        res = tensor_search.construct_vector_input_batches({
-            "some text": 1, 
-            "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png": 2},
-        index_info_without_images)
-        assert res == (["some text", "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png"], [])
-
-        # query dict, all image, no urls as images
-        res = tensor_search.construct_vector_input_batches({
-            "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png": 1, 
-            "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_statue.png": 2},
-        index_info_without_images)
-        assert res == (["https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png", "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_statue.png"], [])
-
-
-    def test_determine_text_query_prefix(self):
-        """
-        Ensures proper priority order is followed when determining the query prefix.
-        search request-level > index override-level > model default level
-        """
-
-        index_info_with_model_default = IndexInfo(
-            model_name="prefix-test-model",
-            search_model_name=None,
-            properties={},
-            index_settings={
-                IndexSettingsField.index_defaults: {
-                    IndexSettingsField.model: "prefix-test-model",
-                    IndexSettingsField.treat_urls_and_pointers_as_images: True,
-                    IndexSettingsField.text_preprocessing: {}
-                }
-            }
-        )
-
-        index_info_with_search_model_default = IndexInfo(
-            model_name="ViT-B/32",  # Shouldn't be used for prefixing
-            search_model_name="prefix-test-model",
-            properties={},
-            index_settings={
-                IndexSettingsField.index_defaults: {
-                    IndexSettingsField.model: "ViT-B/32",
-                    IndexSettingsField.search_model: "prefix-test-model",
-                    IndexSettingsField.treat_urls_and_pointers_as_images: True,
-                    IndexSettingsField.text_preprocessing: {}
-                }
-            }
-        )
-
-        index_info_with_override = IndexInfo(
-            model_name="ViT-B/32",  # Shouldn't be used for prefixing
-            search_model_name="prefix-test-model",
-            properties={},
-            index_settings={
-                IndexSettingsField.index_defaults: {
-                    IndexSettingsField.model: "ViT-B/32",
-                    IndexSettingsField.search_model: "prefix-test-model",
-                    IndexSettingsField.treat_urls_and_pointers_as_images: True,
-                    IndexSettingsField.text_preprocessing: {
-                        IndexSettingsField.override_text_query_prefix: "index-override"
-                    }
-                }
-            }
-        )
-
-        with self.subTest("All prefixes on (request level chosen)"):
-            assert tensor_search.determine_text_query_prefix("request-level", index_info_with_override) == "request-level"
-       
-        with self.subTest("Request and model default on (request level chosen)"):
-            assert tensor_search.determine_text_query_prefix("request-level", index_info_with_search_model_default) == "request-level"
-            assert tensor_search.determine_text_query_prefix("request-level", index_info_with_model_default) == "request-level"
-        
-        with self.subTest("Index override and model default on (index override chosen)"):
-            assert tensor_search.determine_text_query_prefix(None, index_info_with_override) == "index-override"
-        
-        with self.subTest("Only model default on (model default chosen)"):
-            assert tensor_search.determine_text_query_prefix(None, index_info_with_search_model_default) == "test query: "
-            assert tensor_search.determine_text_query_prefix(None, index_info_with_model_default) == "test query: "

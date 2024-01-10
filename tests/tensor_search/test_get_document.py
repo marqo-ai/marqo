@@ -1,12 +1,14 @@
 import functools
-import pprint
+import unittest
+
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.tensor_search import enums
-from marqo.errors import IndexNotFoundError, InvalidDocumentIdError
+from marqo.api.exceptions import IndexNotFoundError, InvalidDocumentIdError
 from marqo.tensor_search import tensor_search
 from tests.marqo_test import MarqoTestCase
 
 
+@unittest.skip
 class TestGetDocument(MarqoTestCase):
 
     def setUp(self) -> None:

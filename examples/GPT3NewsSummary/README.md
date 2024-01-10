@@ -83,7 +83,7 @@ print('creating a Marqo index')
 mq.create_index(DOC_INDEX_NAME)
 
 print('Indexing documents')
-mq.index(DOC_INDEX_NAME).add_documents(MARQO_DOCUMENTS, tensor_fields= ["Title", "Description"], auto_refresh=True)
+mq.index(DOC_INDEX_NAME).add_documents(MARQO_DOCUMENTS, tensor_fields= ["Title", "Description"])
 ```  
 
 Now we have indexed our news documents, we can simply use Marqo Python search API to return relevant context for our GPT3 generation.  For query "q", we use the question and want to match news context based on the "Title" and "Description" text. We also want to filter our documents for "today", which was '2022-11-09'.   

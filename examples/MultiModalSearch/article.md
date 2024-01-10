@@ -494,10 +494,10 @@ mappings2 = {"multimodal":
                             }}}
 
 # index the document             
-res = client.index(index_name_context).add_documents([document1], tensor_fields=["multimodal"], device=device, mappings=mappings1, auto_refresh=True)
+res = client.index(index_name_context).add_documents([document1], tensor_fields=["multimodal"], device=device, mappings=mappings1)
     
 # index the other using a different mappings
-res = client.index(index_name_context).add_documents([document2], tensor_fields=["multimodal"], device=device, mappings=mappings2, auto_refresh=True)
+res = client.index(index_name_context).add_documents([document2], tensor_fields=["multimodal"], device=device, mappings=mappings2)
 ```
 
 To get the vectors to use as context vectors at search time - we need to [retrieve the calculated vectors](https://marqo.pages.dev/0.0.21/API-Reference/documents/). We can then [create a context object](https://marqo.pages.dev/0.0.21/API-Reference/search/#context) that is used at search time.

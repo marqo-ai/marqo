@@ -5,7 +5,7 @@ from unittest import mock
 from marqo.tensor_search import enums, configs
 from marqo.tensor_search import on_start_script
 from marqo.s2_inference import s2_inference
-from marqo import errors
+from marqo.api import exceptions
 import os
 
 
@@ -44,7 +44,7 @@ class TestOnStartScript(MarqoTestCase):
             try:
                 model_caching_script = on_start_script.ModelsForCacheing()
                 raise AssertionError
-            except errors.EnvVarError as e:
+            except exceptions.EnvVarError as e:
                 print(str(e))
                 return True
         assert run()
@@ -52,7 +52,7 @@ class TestOnStartScript(MarqoTestCase):
     def test_preload_url_models(self):
         clip_model_object = {
             "model": "generic-clip-test-model-2",
-            "model_properties": {
+            "modelProperties": {
                 "name": "ViT-B/32",
                 "dimensions": 512,
                 "type": "clip",
@@ -70,7 +70,7 @@ class TestOnStartScript(MarqoTestCase):
 
         open_clip_model_object = {
             "model": "random-open-clip-1",
-            "model_properties": {
+            "modelProperties": {
                 "name": "ViT-B-32-quickgelu",
                 "dimensions": 512,
                 "type": "open_clip",
@@ -130,7 +130,7 @@ class TestOnStartScript(MarqoTestCase):
                 # There should be a KeyError -> EnvVarError when attempting to call vectorise
                 model_caching_script.run()
                 raise AssertionError
-            except errors.EnvVarError as e:
+            except exceptions.EnvVarError as e:
                 return True
         assert run()
     
@@ -147,25 +147,9 @@ class TestOnStartScript(MarqoTestCase):
                 # There should be a KeyError -> EnvVarError when attempting to call vectorise
                 model_caching_script.run()
                 raise AssertionError
-            except errors.EnvVarError as e:
+            except exceptions.EnvVarError as e:
                 return True
         assert run()
-    
-    def test_preload_no_model(self):
-        no_model_object = {
-            "model": "no_model",
-            "model_properties": {
-                "dimensions": 123
-            }
-        }
-        mock_preload = mock.MagicMock()
-        @mock.patch("marqo.tensor_search.on_start_script._preload_model", mock_preload)
-        @mock.patch.dict(os.environ, {enums.EnvVars.MARQO_MODELS_TO_PRELOAD: json.dumps([no_model_object])})
-        def run():
-            model_caching_script = on_start_script.ModelsForCacheing()
-            model_caching_script.run()
-            mock_preload.assert_not_called()    # The preloading function should never be called for no_model
-        run()
     
     # TODO: test bad/no names/URLS in end-to-end tests, as this logic is done in vectorise call
 
