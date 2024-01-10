@@ -237,6 +237,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                 if (
                         add_docs_params.use_existing_tensors and
                         doc_id in existing_docs_dict and
+                        field in existing_docs_dict[doc_id] and
                         existing_docs_dict[doc_id][field] == field_content
                 ):
                     if (
@@ -665,6 +666,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                 if (
                         add_docs_params.use_existing_tensors and
                         doc_id in existing_docs_dict and
+                        field in existing_docs_dict[doc_id] and
                         existing_docs_dict[doc_id][field] == field_content
                 ):
                     if (
@@ -1188,7 +1190,14 @@ def search(config: Config, index_name: str, text: Union[str, dict],
         selected_device = device
 
     if search_method.upper() == SearchMethod.TENSOR:
-        # Default to approximate, but we can't set it at API since it's not a valid arg for lexical search
+        # Default approximate and efSearch -- we can't set these at API-level since they're not a valid args
+        # for lexical search
+        if ef_search is None:
+            # efSearch must be min result_count + offset
+            ef_search = max(
+                utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_DEFAULT_EF_SEARCH),
+                result_count + offset
+            )
         if approximate is None:
             approximate = True
 
@@ -1206,6 +1215,10 @@ def search(config: Config, index_name: str, text: Union[str, dict],
         if approximate is not None:
             raise errors.InvalidArgError(
                 f"approximate is not a valid argument for lexical search")
+        if score_modifiers is not None:
+            raise errors.InvalidArgError(
+                "Score modifiers is not supported for lexical search yet"
+            )
 
         search_result = _lexical_search(
             config=config, index_name=index_name, text=text, result_count=result_count, offset=offset,
@@ -1312,7 +1325,7 @@ def _lexical_search(
     # Set the _highlights for each doc as [] to follow Marqo-V1's convention
     if highlights:
         for docs in gathered_docs['hits']:
-            docs['_highlights'] = {}
+            docs['_highlights'] = []
 
     total_postprocess_time = RequestMetricsStore.for_request().stop("search.lexical.postprocess")
     logger.debug(

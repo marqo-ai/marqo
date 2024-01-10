@@ -30,7 +30,7 @@ class UnstructuredVespaDocumentFields(MarqoBaseModel):
 
     match_features: Dict[str, Any] = Field(default_factory=dict, alias=unstructured_common.VESPA_DOC_MATCH_FEATURES)
 
-    def extract_highlights(self) -> Dict[str, Any]:
+    def extract_highlights(self) -> List[Dict[str, str]]:
         if not self.match_features:
             raise VespaDocumentParsingError("No match features found in the document")
         try:
@@ -39,7 +39,7 @@ class UnstructuredVespaDocumentFields(MarqoBaseModel):
         except KeyError:
             raise VespaDocumentParsingError("No match features found in the document")
         field_name, content = self.vespa_chunks[chunk_index].split("::", 2)
-        return {field_name: content}
+        return [{field_name: content}]
 
 
 class UnstructuredVespaDocument(MarqoBaseModel):
@@ -170,5 +170,4 @@ class UnstructuredVespaDocument(MarqoBaseModel):
                 raise VespaDocumentParsingError(f"Document {self.fields.marqo__id} does not have any chunks. "
                                                 f"No highlights can be extracted.")
             marqo_document[index_constants.MARQO_DOC_HIGHLIGHTS] = self.fields.extract_highlights()
-
         return marqo_document

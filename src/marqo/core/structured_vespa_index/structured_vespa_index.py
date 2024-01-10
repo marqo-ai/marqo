@@ -1,3 +1,5 @@
+from typing import List, Dict, Any
+
 import marqo.core.search.search_filter as search_filter
 from marqo.core.exceptions import InvalidDataTypeError, InvalidFieldNameError, VespaDocumentParsingError
 from marqo.core.models import MarqoQuery
@@ -330,17 +332,25 @@ class StructuredVespaIndex(VespaIndex):
             fields_to_search = self._marqo_index.tensor_field_map.keys()
 
         if marqo_query.ef_search is not None:
-            additional_hits = f', hnsw.exploreAdditionalHits:{marqo_query.ef_search - marqo_query.limit}'
+            target_hits = min(marqo_query.limit + marqo_query.offset, marqo_query.ef_search)
+            additional_hits = max(marqo_query.ef_search - (marqo_query.limit + marqo_query.offset), 0)
         else:
-            additional_hits = ''
+            target_hits = marqo_query.limit + marqo_query.offset
+            additional_hits = 0
 
         terms = []
         for field in fields_to_search:
             tensor_field = self._marqo_index.tensor_field_map[field]
             embedding_field_name = tensor_field.embeddings_field_name
             terms.append(
-                f'({{targetHits:{marqo_query.limit}, approximate:{str(marqo_query.approximate)}{additional_hits}}}'
-                f'nearestNeighbor({embedding_field_name}, {common.QUERY_INPUT_EMBEDDING}))'
+                f'('
+                f'{{'
+                f'targetHits:{target_hits}, '
+                f'approximate:{str(marqo_query.approximate)}, '
+                f'hnsw.exploreAdditionalHits:{additional_hits}'
+                f'}}'
+                f'nearestNeighbor({embedding_field_name}, {common.QUERY_INPUT_EMBEDDING})'
+                f')'
             )
 
         if terms:
@@ -485,7 +495,7 @@ class StructuredVespaIndex(VespaIndex):
                                        f'{marqo_type.value}. Expected a value of type {python_type}, but found '
                                        f'{type(value)}')
 
-    def _extract_highlights(self, vespa_document_fields: Dict[str, Any]) -> Dict[str, Any]:
+    def _extract_highlights(self, vespa_document_fields: Dict[str, Any]) -> List[Dict[Any, str]]:
         # For each tensor field we will have closest(tensor_field) and distance(tensor_field) in match features
         # If a tensor field hasn't been searched, closest(tensor_field)[cells] will be empty and distance(tensor_field)
         # will be max double
@@ -541,11 +551,9 @@ class StructuredVespaIndex(VespaIndex):
             ) from e
 
         if chunk:
-            return {
-                closest_tensor_field.name: chunk
-            }
+            return [{closest_tensor_field.name: chunk}]
         else:
-            return {}
+            return []
 
     def _get_python_type(self, marqo_type: FieldType) -> type:
         try:
