@@ -48,7 +48,8 @@ class IndexSettings(StrictBaseModel):
         def validate_dict_keys(d: dict):
             for key in d.keys():
                 if '_' in key:
-                    raise ValueError(f"Invalid field name '{key}'")
+                    raise ValueError(f"Invalid field name '{key}'. "
+                                     f"See Create Index API reference here https://docs.marqo.ai/2.0.0/API-Reference/Indexes/create_index/")
                 if isinstance(d[key], dict):
                     validate_dict_keys(d[key])
 
