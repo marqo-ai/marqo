@@ -29,5 +29,6 @@ def default_env_vars() -> dict:
         EnvVars.MARQO_MAX_DELETE_DOCS_COUNT: 10000,
         EnvVars.MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES: None,
         EnvVars.MARQO_MAX_NUMBER_OF_REPLICAS: 1,
+        EnvVars.MARQO_DEFAULT_EF_SEARCH: 2000,
         EnvVars.MARQO_ENABLE_BATCH_APIS: "FALSE",
     }

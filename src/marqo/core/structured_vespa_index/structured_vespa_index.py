@@ -316,17 +316,25 @@ class StructuredVespaIndex(VespaIndex):
             fields_to_search = self._marqo_index.tensor_field_map.keys()
 
         if marqo_query.ef_search is not None:
-            additional_hits = f', hnsw.exploreAdditionalHits:{marqo_query.ef_search - marqo_query.limit}'
+            target_hits = min(marqo_query.limit + marqo_query.offset, marqo_query.ef_search)
+            additional_hits = max(marqo_query.ef_search - (marqo_query.limit + marqo_query.offset), 0)
         else:
-            additional_hits = ''
+            target_hits = marqo_query.limit + marqo_query.offset
+            additional_hits = 0
 
         terms = []
         for field in fields_to_search:
             tensor_field = self._marqo_index.tensor_field_map[field]
             embedding_field_name = tensor_field.embeddings_field_name
             terms.append(
-                f'({{targetHits:{marqo_query.limit}, approximate:{str(marqo_query.approximate)}{additional_hits}}}'
-                f'nearestNeighbor({embedding_field_name}, {common.QUERY_INPUT_EMBEDDING}))'
+                f'('
+                f'{{'
+                f'targetHits:{target_hits}, '
+                f'approximate:{str(marqo_query.approximate)}, '
+                f'hnsw.exploreAdditionalHits:{additional_hits}'
+                f'}}'
+                f'nearestNeighbor({embedding_field_name}, {common.QUERY_INPUT_EMBEDDING})'
+                f')'
             )
 
         if terms:
