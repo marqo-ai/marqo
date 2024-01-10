@@ -1,31 +1,88 @@
+import os
+import unittest
+from unittest import mock
+
+from marqo.core.models.marqo_index_request import FieldRequest
+from marqo.tensor_search import tensor_search
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
-import unittest.mock
-import requests
 from tests.marqo_test import MarqoTestCase
-from marqo.tensor_search import add_docs
-from marqo.s2_inference.s2_inference import vectorise
-from marqo.s2_inference.clip_utils import load_image_from_path
-from marqo.tensor_search import tensor_search, index_meta_cache
-from marqo.tensor_search.enums import TensorField
-from marqo.api.exceptions import IndexNotFoundError, InvalidArgError, BadRequestError
 
 
-@unittest.skip
 class TestAddDocumentsUseExistingTensors(MarqoTestCase):
 
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+
+        structured_index = cls.structured_marqo_index_request(
+            fields=[FieldRequest(name="text_field_1", type="text"),
+                    FieldRequest(name="text_field_2", type="text")],
+            tensor_fields=["text_field_1", "text_field_2"]
+        )
+
+        unstructured_index = cls.unstructured_marqo_index_request()
+
+        cls.indexes = cls.create_indexes([
+            structured_index,
+            unstructured_index
+        ])
+
+        cls.structured_index = structured_index.name
+        cls.unstructured_index = unstructured_index.name
+
     def setUp(self) -> None:
-        self.endpoint = self.authorized_url
-        self.generic_header = {"Content-type": "application/json"}
-        self.index_name_1 = "my-test-index-1"  # standard index created by setUp
-        self.index_name_2 = "my-test-index-2"  # for tests that need custom index config
-        try:
-            tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
-            tensor_search.delete_index(config=self.config, index_name=self.index_name_2)
-        except IndexNotFoundError as s:
-            pass
+        super().setUp()
+        self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
+        self.device_patcher.start()
 
-        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
+    def tearDown(self) -> None:
+        super().tearDown()
+        self.device_patcher.stop()
 
+    def test_use_existing_tensor_new_fields(self):
+        doc_1 = {
+            "text_field_1": "content 1",
+            "_id": "1"
+        }
+
+        doc_2 = {
+            "text_field_2": "content 2",
+            "_id": "1"
+        }
+
+        for index_name in [self.structured_index, self.unstructured_index]:
+            tensor_fields = None if index_name == self.structured_index else ["text_field_1", "text_field_2"]
+            with self.subTest(f"{index_name}"):
+                tensor_search.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index_name,
+                        docs=[doc_1],
+                        tensor_fields=tensor_fields,
+                    )
+                )
+                tensor_search.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index_name,
+                        docs=[doc_2],
+                        tensor_fields=tensor_fields,
+                        use_existing_tensors=True
+                    )
+                )
+
+                search_res = tensor_search.search(config=self.config, index_name=index_name, text="content")
+                get_doc_res = tensor_search.get_document_by_id(config=self.config, index_name=index_name,
+                                                               document_id="1", show_vectors=True)
+
+                from pprint import pprint
+                pprint(search_res)
+                pprint(get_doc_res)
+                self.assertEqual("content 2", search_res["hits"][0]["text_field_2"])
+                self.assertEqual(1, len(get_doc_res["_tensor_facets"]))
+                self.assertEqual("content 2", get_doc_res["_tensor_facets"][0]["text_field_2"])
+
+    @unittest.skip
     def test_use_existing_tensors_resilience(self):
         """should if one doc fails validation, the rest should still be inserted
         """
@@ -49,6 +106,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
         # we also should not be send in a get request as there are no valid document IDs
         assert [item['status'] for item in res_no_valid_id['items']] == [201, 400, 201]
 
+    @unittest.skip
     def test_use_existing_tensors_no_id(self):
         """should insert if there's no ID
         """
@@ -70,6 +128,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
         for item in r2['items']:
             assert item['result'] == 'created'
 
+    @unittest.skip
     def test_use_existing_tensors_non_existing(self):
         """check parity between a doc created with and without use_existing_tensors, then overwritten,
         for a newly created doc.
@@ -114,8 +173,9 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
 
         self.assertEqual(use_existing_tensors_doc, overwritten_doc)
 
+    @unittest.skip
     def test_use_existing_tensors_dupe_ids(self):
-        """ 
+        """
         Should only use the latest inserted ID. Make sure it doesn't get the first/middle one
         """
 
@@ -188,6 +248,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
         # Needs to be 3b, not 3a
         self.assertEqual(doc_3_duped, doc_3_overwritten)
 
+    @unittest.skip
     def test_use_existing_tensors_retensorize_fields(self):
         """
         During the initial index, some fields are non-tensor fields
@@ -225,6 +286,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
 
         assert len(d2["_tensor_facets"]) == 0
 
+    @unittest.skip
     def test_use_existing_tensors_getting_non_tensorised(self):
         """
         During the initial index, one field is set as a non_tensor_field.
@@ -279,6 +341,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
             document_id="999", show_vectors=True)
         self.assertEqual(d1["_tensor_facets"], d2["_tensor_facets"])
 
+    @unittest.skip
     def test_use_existing_tensors_check_updates(self):
         """ Check to see if the document has been appropriately updated
         """
@@ -321,6 +384,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
 
         assert run()
 
+    @unittest.skip
     def test_use_existing_tensors_check_meta_data(self):
         """
 
@@ -378,6 +442,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
                 assert isinstance(ch[TensorField.marqo_knn_field], list)
             assert found_vector_field
 
+    @unittest.skip
     def test_use_existing_tensors_check_meta_data_mappings(self):
         tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
             index_name=self.index_name_1, docs=[
@@ -429,6 +494,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
             assert index_info.properties[field_name]['type'] == os_type
             assert index_info.properties['__chunks']['properties'][field_name]['type'] == os_type
 
+    @unittest.skip
     def test_use_existing_tensors_long_strings_and_images(self):
         """Checks vectorise calls and chunk structure for image and text fields with more than 1 chunk"""
         index_settings = {
@@ -543,6 +609,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
 
         assert run()
 
+    @unittest.skip
     def test_use_existing_tensors_all_data_types(self):
         """
         Ensure no errors occur even with chunkless docs. (only int, only bool, etc)

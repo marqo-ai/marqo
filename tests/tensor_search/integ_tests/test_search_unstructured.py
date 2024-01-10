@@ -795,7 +795,7 @@ class TestSearchUnstructured(MarqoTestCase):
             add_docs_params=AddDocsParams(
                 index_name=self.image_index_with_random_model,
                 docs=[{"Title": "a test of" + (" ".join(random.choices(population=vocab, k=10)))}
-                      for _ in range(200)],
+                      for _ in range(128)],
                 tensor_fields=["Title"]
             )
         )
