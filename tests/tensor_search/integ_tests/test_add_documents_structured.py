@@ -9,9 +9,9 @@ import PIL
 import pytest
 import requests
 
+from marqo.api.exceptions import IndexNotFoundError, BadRequestError
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
-from marqo.api.exceptions import IndexNotFoundError, BadRequestError
 from marqo.s2_inference import types
 from marqo.tensor_search import add_docs
 from marqo.tensor_search import enums
@@ -646,6 +646,44 @@ class TestAddDocumentsStructured(MarqoTestCase):
                 return True
 
             assert run()
+
+    def test_add_documents_exceeded_max_doc_count(self):
+        max_docs = 128
+
+        test_cases = [  # count, error out=?
+            (max_docs - 10, False),
+            (max_docs - 1, False),
+            (max_docs, False),
+            (max_docs + 1, True),
+            (max_docs + 10, True),
+        ]
+
+        for count, error in test_cases:
+            with self.subTest(f'{count} - {error}'):
+
+                if error:
+                    with self.assertRaises(BadRequestError):
+                        tensor_search.add_documents(
+                            config=self.config, add_docs_params=AddDocsParams(
+                                index_name=self.index_name_1,
+                                docs=[{
+                                    "desc": "some desc"
+                                }] * count,
+                                device="cpu"
+                            )
+                        )
+                else:
+                    self.assertEqual(False,
+                                     tensor_search.add_documents(
+                                         config=self.config, add_docs_params=AddDocsParams(
+                                             index_name=self.index_name_1,
+                                             docs=[{
+                                                 "desc": "some desc"
+                                             }] * count,
+                                             device="cpu"
+                                         )
+                                     )['errors']
+                                     )
 
     def test_remove_tensor_field(self):
         """

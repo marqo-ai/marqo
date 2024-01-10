@@ -466,6 +466,12 @@ def validate_structured_field(values, marqo_index: bool) -> None:
             f'{FieldType.Text.value} or {FieldType.ArrayText.value}'
         )
 
+    if FieldFeature.ScoreModifier in features and type not in [FieldType.Float, FieldType.Int]:
+        raise ValueError(
+            f'{name}: Field with {FieldFeature.ScoreModifier.value} feature must be of type '
+            f'{FieldType.Float.value} or {FieldType.Int.value}'
+        )
+
     # These validations are specific to marqo_index.Field
     if marqo_index:
         lexical_field_name: Optional[str] = values['lexical_field_name']
@@ -483,12 +489,6 @@ def validate_structured_field(values, marqo_index: bool) -> None:
             raise ValueError(
                 f'{name}: filter_field_name must be populated when {FieldFeature.Filter.value} '
                 f'feature is present'
-            )
-
-        if FieldFeature.ScoreModifier in features and type not in [FieldType.Float, FieldType.Int]:
-            raise ValueError(
-                f'{name}: Field with {FieldFeature.ScoreModifier.value} feature must be of type '
-                f'{FieldType.Float.value} or {FieldType.Int.value}'
             )
 
         if lexical_field_name and FieldFeature.LexicalSearch not in features:

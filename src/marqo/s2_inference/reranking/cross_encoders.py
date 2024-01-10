@@ -208,9 +208,9 @@ class ReRanker:
             _df = reranked_top.loc[rerank_id]
              
             if self.num_highlights == 1:
-                _content = {_df[Columns.original_field_name]:_df[highlight_content_column]}
+                _content = [{_df[Columns.original_field_name]:_df[highlight_content_column]}]
             else:
-                _content = [{row[Columns.original_field_name]:row[highlight_content_column]} for _,row in _df.iterrows()]
+                _content = [{row[Columns.original_field_name]:row[highlight_content_column]} for _, row in _df.iterrows()]
 
             result[ResultsFields.highlights_reranked] = _content
 
