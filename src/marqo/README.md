@@ -6,8 +6,10 @@ See [here](https://github.com/marqo-ai/marqo/blob/mainline/CONTRIBUTING.md#unit-
 
 ## Running Marqo locally (outside of docker) for development
 
-There are two ways to run Marqo locally (outside of docker) for development: 1. through `uvicorn`, 2. through your IDE (e.g. PyCharm). 
-We highly recommend using the second option, as it allows you to set breakpoints and debug Marqo.
+There are two ways to run Marqo locally (outside of docker) for development: Option A. through `uvicorn`, 
+Option B. through your IDE (e.g. PyCharm). 
+We highly recommend using the Option A, as it allows you to set breakpoints and debug Marqo. 
+Before running Marqo locally, you will need to do some preparations to set up Vespa locally.
 
 ### Preparations
 
