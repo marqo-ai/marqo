@@ -65,7 +65,7 @@ Finish the preparations above, then run the following command:
 6. Set up the environment variables and run Marqo through `uvicorn`
 ```bash
 export MARQO_ENABLE_BATCH_APIS=true
-expot MARQO_LOG_LEVEL=debug
+export MARQO_LOG_LEVEL=debug
 export VESPA_CONFIG_URL=http://localhost:19071
 export VESPA_DOCUMENT_URL=http://localhost:8080
 export ESPA_QUERY_URL=http://localhost:8080
