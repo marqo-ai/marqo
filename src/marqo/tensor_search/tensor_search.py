@@ -1208,6 +1208,10 @@ def search(config: Config, index_name: str, text: Union[str, dict],
         if approximate is not None:
             raise errors.InvalidArgError(
                 f"approximate is not a valid argument for lexical search")
+        if score_modifiers is not None:
+            raise errors.InvalidArgError(
+                "Score modifiers is not supported for lexical search yet"
+            )
 
         search_result = _lexical_search(
             config=config, index_name=index_name, text=text, result_count=result_count, offset=offset,
