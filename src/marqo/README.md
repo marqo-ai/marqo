@@ -21,7 +21,7 @@ cd marqo
 
 2. Install Marqo dependencies
 ```bash
-pip install -r requirements.txt
+pip install -r requirements.dev.txt
 ```
 
 3. Pull and run the Vespa docker image
@@ -31,12 +31,9 @@ docker run --detach --name vespa --hostname vespa-tutorial \
   vespaengine/vespa:latest
 ```
 
-4. Install the vespa command line interface (CLI)
-Check out the [Vespa CLI documentation](https://docs.vespa.ai/en/vespa-cli.html) for how to install the CLI.
-
-5. Deploy a dummy application for Vespa docker image
+4Deploy a dummy application for Vespa docker image by using the provided `scripts/vespa_dummy_app.zip` file and `curl`
 ```bash
-vespa deploy scripts/vespa_dummy_app
+curl --header "Content-Type:application/zip" --data-binary @scripts/vespa_dummy_app.zip http://localhost:19071/application/v2/tenant/default/prepareandactivate
 ```
 
 Up to now. you should have a running Vespa docker image and a dummy application deployed to it. 
