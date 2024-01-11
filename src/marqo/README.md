@@ -31,7 +31,7 @@ docker run --detach --name vespa --hostname vespa-tutorial \
   vespaengine/vespa:latest
 ```
 
-4Deploy a dummy application for Vespa docker image by using the provided `scripts/vespa_dummy_app.zip` file and `curl`
+4. Deploy a dummy application for Vespa docker image by using the provided `scripts/vespa_dummy_app.zip` file and `curl`
 ```bash
 curl --header "Content-Type:application/zip" --data-binary @scripts/vespa_dummy_app.zip http://localhost:19071/application/v2/tenant/default/prepareandactivate
 ```
