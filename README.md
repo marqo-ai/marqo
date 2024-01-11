@@ -34,8 +34,8 @@ Here is a code snippet for a minimal example of vector search with Marqo (see [G
 ```bash
 
 docker rm -f marqo
-docker pull marqoai/marqo:latest
-docker run --name marqo -it -p 8882:8882 marqoai/marqo:latest
+docker pull marqoai/marqo:1.5.0
+docker run --name marqo -it -p 8882:8882 marqoai/marqo:1.5.0
 
 ```
 
