@@ -42,8 +42,8 @@ You can check this by visiting `http://localhost:8080` in your browser.
 ### Option A. Run the Marqo application locally (outside of docker) through IDE
 Now you can run Marqo locally through your IDE (e.g. PyCharm) by following the steps below.
 
-6. Open the Marqo project in your IDE (e.g. PyCharm) and go to the file `src/marqo/tensor_search/api.py`
-7. Set up your [debug configuration](https://www.jetbrains.com/help/pycharm/creating-run-debug-configuration-for-tests.html)
+5. Open the Marqo project in your IDE (e.g. PyCharm) and go to the file `src/marqo/tensor_search/api.py`
+6. Set up your [debug configuration](https://www.jetbrains.com/help/pycharm/creating-run-debug-configuration-for-tests.html)
 to run `api.py` with the following environment variables:
 ```
 MARQO_ENABLE_BATCH_APIS=true
@@ -53,14 +53,14 @@ VESPA_CONFIG_URL=http://localhost:19071
 VESPA_DOCUMENT_URL=http://localhost:8080
 VESPA_QUERY_URL=http://localhost:8080
 ```
-8. Now you can Debug this file directly from your IDE (e.g. PyCharm) to start Marqo locally.
-9. Set breakpoints in the project for better debugging experience.
+7. Now you can Debug this file directly from your IDE (e.g. PyCharm) to start Marqo locally.
+8. Set breakpoints in the project for better debugging experience.
 
 
 ### Option B. Run the Marqo application locally (outside of docker) through `uvicorn`
 Finish the preparations above, then run the following command:
 
-6. Set up the environment variables and run Marqo through `uvicorn`
+5. Set up the environment variables and run Marqo through `uvicorn`
 ```bash
 export MARQO_ENABLE_BATCH_APIS=true
 export MARQO_LOG_LEVEL=debug
