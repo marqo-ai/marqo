@@ -22,7 +22,7 @@ class IndexSettings(StrictBaseModel):
     tensorFields: Optional[List[str]]
     treatUrlsAndPointersAsImages: Optional[bool]
     filterStringMaxLength: Optional[int]
-    model: str = 'hf/all_datasets_v4_MiniLM-L6'
+    model: str = 'hf/e5-base-v2'
     modelProperties: Optional[Dict[str, Any]]
     normalizeEmbeddings: bool = True
     textPreprocessing: core.TextPreProcessing = core.TextPreProcessing(
