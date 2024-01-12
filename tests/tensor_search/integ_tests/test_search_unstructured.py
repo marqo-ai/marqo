@@ -517,6 +517,46 @@ class TestSearchUnstructured(MarqoTestCase):
                 if expected_id:
                     self.assertEqual(expected_id, res["hits"][0]["_id"])
 
+    def test_filtering_fake_and_real_boolean_fields(self):
+        tensor_search.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.default_text_index,
+                docs=[
+                    {"_id": "1", "text_field_1": "true", "text_field_2": "false",
+                     "bool_field_1": True, "bool_field_2": False, "text_field_3": "search me"},
+                    {"_id": "2", "text_field_1": "false", "text_field_2": "True",
+                     "bool_field_1": False, "bool_field_2": True, "text_field_3": "search me"},
+                ],
+                tensor_fields=["text_field_1", "text_field_2", "text_field_3"]
+            )
+        )
+
+        test_cases = [
+            ("text_field_1:true", 1, "1"),
+            ("text_field_1:false", 1, "2"),
+            ("bool_field_1:true", 1, "1"),
+            ("bool_field_1:false", 1, "2"),
+            ("text_field_2:true", 1, "2"),
+            ("text_field_2:false", 1, "1"),
+            ("bool_field_2:true", 1, "2"),
+            ("bool_field_2:false", 1, "1"),
+            ("bool_field_2:false AND bool_field_1:false", 0, None),
+            ("bool_field_2:false AND text_field_1:true", 1, "1"),
+        ]
+        for search_method in [SearchMethod.LEXICAL, SearchMethod.TENSOR]:
+            for filter_string, expected_hits, expected_id in test_cases:
+                with self.subTest(
+                        f"search_method = {search_method}, filter_string={filter_string}, "
+                        f"expected_hits={expected_hits}, expected_id={expected_id}"):
+                    res = tensor_search.search(
+                        index_name=self.default_text_index, config=self.config, text="search me",
+                        search_method=search_method, filter=filter_string
+                    )
+                    self.assertEqual(expected_hits, len(res["hits"]))
+                    if expected_id:
+                        self.assertEqual(expected_id, res["hits"][0]["_id"])
+
     def test_filter_spaced_fields(self):
         # Add documents
         tensor_search.add_documents(

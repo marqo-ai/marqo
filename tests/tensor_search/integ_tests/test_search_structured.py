@@ -516,7 +516,6 @@ class TestSearchStructured(MarqoTestCase):
                 if expected_id:
                     self.assertEqual(expected_id, res["hits"][0]["_id"])
 
-    #
     def test_filtering_list_case_image(self):
         hippo_img = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
         tensor_search.add_documents(
