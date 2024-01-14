@@ -25,6 +25,9 @@ import shutil
 from marqo.tensor_search.models.external_apis.hf import HfModelLocation
 from marqo.tensor_search.models.private_models import ModelLocation
 from pydantic.error_wrappers import ValidationError
+from marqo.core.models.marqo_index import *
+from marqo.core.models.marqo_index_request import FieldRequest
+
 
 def fake_vectorise(*args, **_kwargs):
     random_model = Random(model_name='blah', embedding_dim=512, device="cpu")
@@ -144,6 +147,23 @@ class TestModelAuthLoadedS3(MarqoTestCase):
             aws_secret_access_key=cls.fake_secret_key,
             aws_session_token=None
         )
+
+        unstructured_image_index = cls.unstructured_marqo_index_request(
+            treat_urls_and_pointers_as_images=True,
+            model="open_clip/ViT-B-32/laion400m_e32"
+        )
+
+        structured_image_index = cls.structured_marqo_index_request(
+            fields=[
+                FieldRequest(name="text_field_1", type=FieldType.Text),
+                FieldRequest(name="image_field_1", type=FieldType.ImagePointer),
+                FieldRequest(name="image_field_2", type=FieldType.ImagePointer),
+            ],
+            model="open_clip/ViT-B-32/laion400m_e32",
+            tensor_fields=["text_field_1", "image_field_1", "image_field_2"]
+        )
+
+
         
     @classmethod
     def tearDownClass(cls) -> None:
