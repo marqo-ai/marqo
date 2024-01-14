@@ -209,21 +209,21 @@ pprint.pprint(results)
 
 {
     'hits': [
-        {   
+        {
             'Title': 'Extravehicular Mobility Unit (EMU)',
-            'Description': 'The EMU is a spacesuit that provides environmental protection, mobility, life support, and' 
+            'Description': 'The EMU is a spacesuit that provides environmental protection, mobility, life support, and'
                            'communications for astronauts',
-            '_highlights': {
+            '_highlights': [{
                 'Description': 'The EMU is a spacesuit that provides environmental protection, '
                                'mobility, life support, and communications for astronauts'
-            },
+            }],
             '_id': 'article_591',
             '_score': 0.61938936
-        }, 
-        {   
+        },
+        {
             'Title': 'The Travels of Marco Polo',
             'Description': "A 13th-century travelogue describing Polo's travels",
-            '_highlights': {'Title': 'The Travels of Marco Polo'},
+            '_highlights': [{'Title': 'The Travels of Marco Polo'}],
             '_id': 'e00d1a8d-894c-41a1-8e3b-d8b2a8fce12a',
             '_score': 0.60237324
         }
@@ -292,10 +292,10 @@ Images can then be added within documents as follows. You can use urls from the 
 ```python
 
 response = mq.index("my-multimodal-index").add_documents([{
-    "My Image": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+    "My_Image": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
     "Description": "The hippopotamus, also called the common hippopotamus or river hippopotamus, is a large semiaquatic mammal native to sub-Saharan Africa",
     "_id": "hippo-facts"
-}], tensor_fields=["My Image"])
+}], tensor_fields=["My_Image"])
 
 ```
 
@@ -497,11 +497,9 @@ Marqo is a community project with the goal of making tensor search accessible to
 
 3. Install requirements from the requirements file: ```pip install -r requirements.txt```.
 
-4. Ensure you have marqo-os running with `docker run -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" --name marqo-os marqoai/marqo-os:0.0.3`
+4. Run tests by running the tox file. CD into this dir and then run "tox".
 
-5. Run tests by running the tox file. CD into this dir and then run "tox".
-
-6. If you update dependencies, make sure to delete the .tox dir and rerun.
+5. If you update dependencies, make sure to delete the .tox dir and rerun.
 
 ## Merge instructions:
 
