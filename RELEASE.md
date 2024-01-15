@@ -1,6 +1,6 @@
 # Release 2.0.0
 ## New features
-* Significant queries-per-second (QPS) and latency improvements and reduced memory and storage requirements. 
+* Significant queries-per-second (QPS) and latency improvements in addition to reduced memory and storage requirements. 
 Get a higher QPS and a lower latency for the same infrastructure cost, or get the same performance for much cheaper! 
 In our large-scale experiments, we have achieved 2x QPS improvement, 2x speed-up in P50 search latency and 2.3x
 speed-up in P99 search latency, compared to previous Marqo versions.
@@ -11,13 +11,16 @@ recall and performance.
 * Structured index. You can now create structured indexes, which provide better data validation, higher performance, 
 better recall and better memory efficiency.
 * New API search parameter  `efSearch`. Search API now accepts an optional `efSearch` parameter which allows you to 
-fine-tune the underlying HNSW search. Increase efSearch to improve recall at a minor cost of QPS and latency.
-* Exact nearest neighbour search. Set `”approximate”: false` in the Search API body to perform an exact nearest 
-neighbour search. This is useful for calculating recall and finding the best `efSearch` for your dataset.
-* New ANN space types. Marqo now supports Euclidean, angular, dot product, pre-normalized angular, and hamming distance
-metrics. L1, L2 and Linf distance metrics are no longer supported. The distance metric determines how Marqo calculates 
-the closeness between indexed documents and search queries.
-* Easier local runs. Simply run `docker run -p 8882:8882 marqoai/marqo:2.0.0` to start Marqo locally.
+fine-tune the underlying HNSW search. Increase efSearch to improve recall at a minor cost of QPS and latency. See 
+[here](https://docs.marqo.ai/2.0.0/API-Reference/Search/search/#body) for usage. 
+* Exact nearest neighbour search. Set `"approximate": false` in the Search API body to perform an exact nearest 
+neighbour search. This is useful for calculating recall and finding the best `efSearch` for your dataset. 
+See [here](https://docs.marqo.ai/2.0.0/API-Reference/Search/search/#body) for usage. 
+* New approximate nearest neighbour space types. Marqo now supports `euclidean`, `angular`, `dotproduct`,
+`prenormalized-angular`, and `hamming` distance metrics. L1, L2 and Linf distance metrics are no longer supported.
+The distance metric determines how Marqo calculates the closeness between indexed documents and search queries.
+* Easier local runs. Simply run `docker run -p 8882:8882 marqoai/marqo:2.0.0` to start Marqo locally on both 
+ARM64 (M-series Macs) and AMD64 machines.
 
 ## Breaking changes
 * Create index API no longer accept the `index_defaults` parameter. Attributes previously defined in this object, 
@@ -29,7 +32,8 @@ See [here](https://docs.marqo.ai/2.0.0/API-Reference/Indexes/create_index/) for 
 [add documents](https://docs.marqo.ai/2.0.0/API-Reference/Documents/add_or_replace_documents/) for a few examples.
 * New Marqo configuration parameters See [here](https://docs.marqo.ai/2.0.0/Guides/Advanced-Usage/configuration/) for 
 usage.
-* Search response highlights is now a list of dictionaries.
+* Search response `_highlights` attribute is now a list of dictionaries. 
+See [here](https://docs.marqo.ai/2.0.0/API-Reference/Search/search/#response-200-ok) for new usage.
 * Add documents multimodal fields are defined as normal fields and not dictionaries. Furthermore, the mappings object 
 is optional for structured indexes. See [here](https://docs.marqo.ai/2.0.0/API-Reference/Documents/add_or_replace_documents/) for usage.
 * Add documents does not accept the `refresh` parameter anymore.
@@ -42,9 +46,8 @@ releases:
   * Optional Search API `q` parameter when searching with context vectors.
 
 ## Contributor shout-outs
-* A huge thank you to all our 3.9k stargazers!
-* Thanks to everyone for maintaining the lively atmosphere in our forum. Please continue to share your thoughts, 
-inquiries, and feedback with us!
+* Thank you to the community for your invaluable feedback, which drove the prioritisation for this major release.
+* A warm thank you to all our 3.9
 
 # Release 1.5.1
 ## Bug fixes and minor changes
