@@ -1,3 +1,113 @@
+# Release 2.0.0
+## New features
+* Significant queries-per-second (QPS) and latency improvements and reduced memory and storage requirements. 
+Get a higher QPS and a lower latency for the same infrastructure cost, or get the same performance for much cheaper! 
+In our large-scale experiment, we have achieved 2x QPS improvement, 2x speed-up in P50 search latency and 2.3x 
+speed-up in P99 search latency, compared to previous Marqo versions.
+* Significantly improved recall. You can now get up to 99% recall (depending on your dataset and configuration) without 
+sacrificing performance.
+* Support for bfloat16 numeric type. Index 2x more vectors with the same memory for a minimal reduction in recall and 
+performance.
+* Structured index. You can now create structured indexes, which provide better data validation, higher performance, 
+better recall and better memory efficiency.
+* New API search parameter  `efSearch`. Search API now accepts an optional `efSearch` parameter which allows you to 
+fine-tune the underlying HNSW search. Increase efSearch to improve recall performance at a minor cost of throughput.
+* Exact nearest neighbour search. Set `”approximate”: false` in the Search API body to perform an exact nearest 
+neighbour search. This is useful for calculating recall and finding the best `efSearch` for your dataset.
+* New ANN space types. Marqo now supports Euclidean, angular, dot product, pre-normalized angular, and hamming distance
+metrics. L1, L2 and Linf distance metrics are no longer supported. The distance metric determines how Marqo calculates 
+the closeness between indexed documents and search queries.
+* Easier local runs. Simply run `docker run -p 8882:8882 marqoai/marqo:2.0.0` to start Marqo locally.
+
+## Breaking changes
+* Create index API no longer accept the `index_defaults` parameter. Attributes previously defined in this object, 
+like textPreprocessing, are now moved out to the top level settings object. 
+See [here](https://docs.marqo.ai/2.0.0/API-Reference/Indexes/create_index/) for details.
+* Most APIs now require camel case request bodies and return camel case responses. See 
+[create index](https://docs.marqo.ai/2.0.0/API-Reference/Indexes/create_index/), 
+[search](https://docs.marqo.ai/2.0.0/API-Reference/Search/search/) and 
+[add documents](https://docs.marqo.ai/2.0.0/API-Reference/Documents/add_or_replace_documents/) for a few examples.
+* New Marqo configuration parameters See [here](https://docs.marqo.ai/2.0.0/Guides/Advanced-Usage/configuration/) for 
+usage.
+* Search response highlights is now a list of dictionaries.
+* Add documents multimodal fields are defined as normal fields and not dictionaries. Furthermore, the mappings object 
+is optional for structured indexes. See [here](https://docs.marqo.ai/2.0.0/API-Reference/Documents/add_or_replace_documents/) for usage.
+* Add documents does not accept the `refresh` parameter anymore.
+* The following features are available in Marqo 1.5, but are not supported by Marqo 2.0 and will be added in future 
+releases:
+* Separate models for search and add documents
+* Prefixes for text chunks and queries
+* Configurable document count limit for add documents. There is a non-configurable limit of 128 in Marqo 2.0.
+* Custom (externally generated) vectors and `no_model` option for index creation.
+* Optional Search API `q` parameter when searching with context vectors.
+
+## Contributor shout-outs
+* A huge thank you to all our 3.9k stargazers!
+* Thanks to everyone for maintaining the lively atmosphere in our forum. Please continue to share your thoughts, 
+inquiries, and feedback with us!
+
+# Release 1.5.1
+## Bug fixes and minor changes
+- Adding `no_model` to `MARQO_MODELS_TO_PRELOAD` no longer causes an error on startup. Preloading process is simply skipped for this model [#657](https://github.com/marqo-ai/marqo/pull/657).
+
+
+# Release 1.5.0
+## New Features
+- Separate model for search and add documents (https://github.com/marqo-ai/marqo/pull/633). Using the `search_model` and `search_model_properties` key in `index_defaults` allows you to specify a model specifically to be used for searching. This is useful for using a different model for search than what is used for add_documents. Learn how to use `search_model` [here](https://docs.marqo.ai/1.5.0/API-Reference/Indexes/create_index/#search-model).
+- Prefixes for text chunks and queries enabled to improve retrieval for specific models (https://github.com/marqo-ai/marqo/pull/643). These prefixes are defined at the `model_properties` level, but can be overriden at index creation, add documents, or search time. Learn how to use prefixes for `add_documents` [here](https://docs.marqo.ai/1.5.0/API-Reference/Documents/add_or_replace_documents/#text-chunk-prefix) and `search` [here](https://docs.marqo.ai/1.5.0/API-Reference/Search/search/#text-query-prefix).
+
+## Bug fixes and minor changes
+- Upgraded `open_clip_torch`, `timm`, and `safetensors` for access to new models (https://github.com/marqo-ai/marqo/pull/646). 
+- Documents containing multimodal objects that encounter errors in processing are rejected with a 400 error (https://github.com/marqo-ai/marqo/pull/631). 
+- Updated README: More detailed explanations, fixed formatting issues (https://github.com/marqo-ai/marqo/pull/629/files, https://github.com/marqo-ai/marqo/pull/642/files).  
+
+## Contributor shout-outs
+- A huge thank you to all our 3.7k stargazers!
+- Thanks everyone for continuing to participate in our [forum](https://community.marqo.ai/)! Keep all your insights, questions, and feedback coming!
+
+
+# Release 1.4.0
+
+## Breaking Changes
+- Configurable document count limit for `add_documents()` calls (https://github.com/marqo-ai/marqo/pull/592). This mitigates Marqo getting overloaded 
+due to add_documents requests with a very high number of documents. If you are adding documents in batches larger than the default (64), you will now 
+receive an error. You can ensure your add_documents request complies to this limit by setting the Python client’s `client_batch_size` or changing this 
+limit via the  `MARQO_MAX_ADD_DOCS_COUNT` variable. Read more on configuring the doc count limit [here](https://marqo.pages.dev/1.4.0/Guides/Advanced-Usage/configuration/#configuring-usage-limits).
+- Default `refresh` value for `add_documents()` and `delete_documents()` set to `false` (https://github.com/marqo-ai/marqo/pull/601). This prevents 
+unnecessary refreshes, which can negatively impact search and add_documents performance, especially for applications that are 
+constantly adding or deleting documents. If you search or get documents immediately after adding or deleting documents, you may still get some extra 
+or missing documents. To see results of these operations more immediately, simply set the `refresh` parameter to `true`. Read more on this parameter 
+[here](https://marqo.pages.dev/1.4.0/API-Reference/Documents/add_or_replace_documents/#query-parameters).
+
+## New Features
+- Custom vector field type added (https://github.com/marqo-ai/marqo/pull/610). You can now add externally generated vectors to Marqo documents! See 
+usage [here](https://marqo.pages.dev/1.4.0/Guides/Advanced-Usage/document_fields/#custom-vector-object).
+- `no_model` option added for index creation (https://github.com/marqo-ai/marqo/pull/617). This allows for indexes that do no vectorisation, providing 
+easy use of custom vectors with no risk of accidentally mixing them up with Marqo-generated vectors. See usage [here](https://marqo.pages.dev/1.4.0/API-Reference/Indexes/create_index/#no-model).
+- The search endpoint's `q` parameter is now optional if `context` vectors are provided. (https://github.com/marqo-ai/marqo/pull/617). This is 
+particularly useful when using context vectors to search across your documents that have custom vector fields. See usage [here](https://marqo.pages.dev/1.4.0/API-Reference/Search/search/#context).
+- Configurable retries added to backend requests (https://github.com/marqo-ai/marqo/pull/623). This makes `add_documents()` and `search()` requests 
+more resilient to transient network errors. Use with caution, as retries in Marqo will change the consistency guarantees for these endpoints. For more 
+control over retry error handling, you can leave retry attempts at the default value (0) and implement your own backend communication error handling. 
+See retry configuration instructions and how it impacts these endpoints' behaviour [here](https://marqo.pages.dev/1.4.0/Guides/Advanced-Usage/configuration/#configuring-marqo-os-request-retries).
+- More informative `delete_documents()` response (https://github.com/marqo-ai/marqo/pull/619). The response object now includes a list of document 
+ids, status codes, and results (success or reason for failure). See delete documents usage [here](https://marqo.pages.dev/1.4.0/API-Reference/Documents/delete_documents/).
+- Friendlier startup experience (https://github.com/marqo-ai/marqo/pull/600). Startup output has been condensed, with unhelpful log messages removed. 
+More detailed logs can be accessed by setting `MARQO_LOG_LEVEL` to `debug`.
+
+## Bug fixes and minor changes
+- Updated README: added Haystack integration, tips, and fixed links (https://github.com/marqo-ai/marqo/pull/593, https://github.com/marqo-ai/marqo/pull/602, https://github.com/marqo-ai/marqo/pull/616). 
+- Stabilized test suite by adding score modifiers search tests (​​https://github.com/marqo-ai/marqo/pull/596) and migrating test images to S3 (https://github.com/marqo-ai/marqo/pull/594). 
+- `bulk` added as an illegal index name (https://github.com/marqo-ai/marqo/pull/598). This prevents conflicts with the `/bulk` endpoint.
+- Unnecessary `reputation` field removed from backend call (https://github.com/marqo-ai/marqo/pull/609).
+- Fixed typo in error message (https://github.com/marqo-ai/marqo/pull/615).
+
+## Contributor shout-outs
+- A huge thank you to all our 3.7k stargazers!
+- Shoutout to @TuanaCelik for helping out with the Haystack integration!
+- Thanks everyone for keeping our [forum](https://community.marqo.ai/) busy. Don't hesitate to keep posting your insights, questions, and feedback!
+
+
 # Release 1.3.0
 
 ## New features
