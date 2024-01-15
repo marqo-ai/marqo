@@ -2,16 +2,16 @@
 ## New features
 * Significant queries-per-second (QPS) and latency improvements and reduced memory and storage requirements. 
 Get a higher QPS and a lower latency for the same infrastructure cost, or get the same performance for much cheaper! 
-In our large-scale experiment, we have achieved 2x QPS improvement, 2x speed-up in P50 search latency and 2.3x 
+In our large-scale experiments, we have achieved 2x QPS improvement, 2x speed-up in P50 search latency and 2.3x
 speed-up in P99 search latency, compared to previous Marqo versions.
 * Significantly improved recall. You can now get up to 99% recall (depending on your dataset and configuration) without 
 sacrificing performance.
-* Support for bfloat16 numeric type. Index 2x more vectors with the same memory for a minimal reduction in recall and 
-performance.
+* Support for bfloat16 numeric type. Index 2x more vectors with the same amount of memory for a minimal reduction in
+recall and performance.
 * Structured index. You can now create structured indexes, which provide better data validation, higher performance, 
 better recall and better memory efficiency.
 * New API search parameter  `efSearch`. Search API now accepts an optional `efSearch` parameter which allows you to 
-fine-tune the underlying HNSW search. Increase efSearch to improve recall performance at a minor cost of throughput.
+fine-tune the underlying HNSW search. Increase efSearch to improve recall at a minor cost of QPS and latency.
 * Exact nearest neighbour search. Set `”approximate”: false` in the Search API body to perform an exact nearest 
 neighbour search. This is useful for calculating recall and finding the best `efSearch` for your dataset.
 * New ANN space types. Marqo now supports Euclidean, angular, dot product, pre-normalized angular, and hamming distance
@@ -21,7 +21,7 @@ the closeness between indexed documents and search queries.
 
 ## Breaking changes
 * Create index API no longer accept the `index_defaults` parameter. Attributes previously defined in this object, 
-like textPreprocessing, are now moved out to the top level settings object. 
+like `textPreprocessing`, are now moved out to the top level settings object. 
 See [here](https://docs.marqo.ai/2.0.0/API-Reference/Indexes/create_index/) for details.
 * Most APIs now require camel case request bodies and return camel case responses. See 
 [create index](https://docs.marqo.ai/2.0.0/API-Reference/Indexes/create_index/), 
@@ -35,11 +35,11 @@ is optional for structured indexes. See [here](https://docs.marqo.ai/2.0.0/API-R
 * Add documents does not accept the `refresh` parameter anymore.
 * The following features are available in Marqo 1.5, but are not supported by Marqo 2.0 and will be added in future 
 releases:
-* Separate models for search and add documents
-* Prefixes for text chunks and queries
-* Configurable document count limit for add documents. There is a non-configurable limit of 128 in Marqo 2.0.
-* Custom (externally generated) vectors and `no_model` option for index creation.
-* Optional Search API `q` parameter when searching with context vectors.
+  * Separate models for search and add documents
+  * Prefixes for text chunks and queries
+  * Configurable document count limit for add documents. There is a non-configurable limit of 128 in Marqo 2.0.
+  * Custom (externally generated) vectors and `no_model` option for index creation.
+  * Optional Search API `q` parameter when searching with context vectors.
 
 ## Contributor shout-outs
 * A huge thank you to all our 3.9k stargazers!
