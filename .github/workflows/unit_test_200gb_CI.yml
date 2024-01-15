@@ -79,17 +79,19 @@ jobs:
           export VESPA_CONFIG_URL=http://localhost:19071
           export VESPA_DOCUMENT_URL=http://localhost:8080
           export VESPA_QUERY_URL=http://localhost:8080
-          python marqo/scripts/vespa_local.py start
-          python marqo/scripts/vespa_local.py deploy-config
+          python marqo/scripts/vespa_local/vespa_local.py start
+          python marqo/scripts/vespa_local/vespa_local.py deploy-config
           
-          # wait vespa to start:
+          # wait for vespa to start (document url):
           timeout 10m bash -c 'until [[ $(curl -v --silent --insecure $VESPA_DOCUMENT_URL 2>&1 | grep Unauthorized) ]]; do sleep 0.1; done;' || \
-            (echo "Vespa did not start in time" && exit 1)
+            (echo "Vespa (Document URL) did not start in time" && exit 1)
           
+          # wait for vespa to start (config url):
+          timeout 10m bash -c 'until [[ $(curl -v --silent --insecure $VESPA_CONFIG_URL 2>&1 | grep Unauthorized) ]]; do sleep 0.1; done;' || \
+            (echo "Vespa (Config URL) did not start in time" && exit 1)
           
       - name: Run Unit Tests
         run: |
-          export LOCAL_OPENSEARCH_URL="https://localhost:9200"
           export PYTHONPATH="./marqo/tests:./marqo/src:./marqo"
           pytest marqo/tests
   
