@@ -2,7 +2,7 @@
 #source /opt/bash-utils/logger.sh
 export PYTHONPATH="${PYTHONPATH}:/app/src/"
 if [ -z "${MARQO_CUDA_PATH}" ]; then
-    export CUDA_HOME=/usr/local/cuda/
+    export CUDA_HOME=/usr/local/cuda
 else
     export CUDA_HOME=${MARQO_CUDA_PATH}
 fi
