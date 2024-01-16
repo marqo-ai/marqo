@@ -26,6 +26,9 @@ ARM64 (M-series Macs) and AMD64 machines.
 * Create index API no longer accept the `index_defaults` parameter. Attributes previously defined in this object, 
 like `textPreprocessing`, are now moved out to the top level settings object. 
 See [here](https://docs.marqo.ai/2.0.0/API-Reference/Indexes/create_index/) for details.
+* Create index API's `filterStringMaxLength` parameter determines the maximum length of strings that are indexed for 
+filtering (default value 20 characters). This limitation does not apply to structured indexes. 
+See [here](https://docs.marqo.ai/2.0.0/API-Reference/Indexes/create_index/) for details.
 * Most APIs now require camel case request bodies and return camel case responses. See 
 [create index](https://docs.marqo.ai/2.0.0/API-Reference/Indexes/create_index/), 
 [search](https://docs.marqo.ai/2.0.0/API-Reference/Search/search/) and 
