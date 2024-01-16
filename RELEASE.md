@@ -47,7 +47,7 @@ releases:
 
 ## Contributor shout-outs
 * Thank you to the community for your invaluable feedback, which drove the prioritisation for this major release.
-* A warm thank you to all our 3.9
+* A warm thank you to all our 3.9k stargazers.
 
 # Release 1.5.1
 ## Bug fixes and minor changes
