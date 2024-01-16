@@ -68,6 +68,8 @@ def marqo_base_exception_handler(request: Request, exc: base_exceptions.MarqoErr
     Mappings are in an ordered list to allow for hierarchical resolution of errors.
     Stored as 2-tuples: (Base/Core/Vespa/Inference Error, API Error)
     """
+    logger.error(str(exc), exc_info=True)
+    raise exc
     api_exception_mappings = [
         # More specific errors should take precedence
 
@@ -104,7 +106,9 @@ def marqo_api_exception_handler(request: Request, exc: api_exceptions.MarqoWebEr
 
     We can potentially catch any type of Marqo exception. We can do isinstance() calls
     to handle WebErrors vs Regular errors"""
-    logger.error(str(exc), exc_info=True)
+    # logger.error(str(exc), exc_info=True)
+
+    raise exc
 
     headers = getattr(exc, "headers", None)
     body = {
@@ -142,7 +146,7 @@ async def validation_exception_handler(request: Request, exc: pydantic.Validatio
     return JSONResponse(content=body, status_code=api_exceptions.InvalidArgError.status_code)
 
 
-@app.exception_handler(api_exceptions.MarqoError)
+# @app.exception_handler(api_exceptions.MarqoError)
 def marqo_internal_exception_handler(request, exc: api_exceptions.MarqoError):
     """MarqoErrors are treated as internal errors"""
     logger.error(str(exc), exc_info=True)
