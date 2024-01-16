@@ -145,23 +145,44 @@ class TestApiErrors(MarqoTestCase):
         assert "Could not find model properties for" in response.json()["message"]
 
     def test_create_index_snake_case_fails(self):
-        # Verify snake case rejected for fields that have camel case as alias
-        response = self.client.post(
-            "/indexes/my_index",
-            json={
-                "type": "structured",
-                "allFields": [{"name": "field1", "type": "text"}],
-                "tensorFields": [],
-                'annParameters': {
-                    'spaceType': 'dotproduct',
-                    'parameters': {
-                        'ef_construction': 128,
-                        'm': 16
-                    }
-                }
-            }
-        )
+        """
+        Verify snake case rejected for fields that have camel case as alias
+        """
+        test_cases = [
+            ({
+                 "type": "structured",
+                 "allFields": [
+                     {
+                         "name": "field1",
+                         "type": "text"
+                     },
+                     {
+                         "name": "field2",
+                         "type": "multimodal_combination",
+                         "dependent_fields": ["field1"]
+                     }
+                 ],
+                 "tensorFields": [],
+             }, 'dependent_fields', 'Snake case within a list'),
+            ({
+                 "type": "structured",
+                 "allFields": [],
+                 "tensorFields": [],
+                 'annParameters': {
+                     'spaceType': 'dotproduct',
+                     'parameters': {
+                         'ef_construction': 128,
+                         'm': 16
+                     }
+                 }
+             }, 'ef_construction', 'Snake case within a dict')
+        ]
+        for test_case, field, test_name in test_cases:
+            with self.subTest(test_name):
+                response = self.client.post(
+                    "/indexes/my_index",
+                    json=test_case
+                )
 
-        self.assertEqual(response.status_code, 422)
-        self.assertTrue("Invalid field name 'ef_construction'" in response.text)
-
+                self.assertEqual(response.status_code, 422)
+                self.assertTrue(f"Invalid field name '{field}'" in response.text)
