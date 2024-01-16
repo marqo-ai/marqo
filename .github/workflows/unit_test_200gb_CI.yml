@@ -77,7 +77,9 @@ jobs:
       - name: Start Vespa
         run: |
           python marqo/scripts/vespa_local/vespa_local.py start
-          python marqo/scripts/vespa_local/vespa_local.py deploy-config
+
+          # Deploy dummy application
+          curl --header "Content-Type:application/zip" --data-binary @marqo/scripts/vespa_dummy_app.zip http://localhost:19071/application/v2/tenant/default/prepareandactivate
 
           # Define these for checking if Vespa is ready
           export VESPA_CONFIG_URL=http://localhost:19071
@@ -86,7 +88,7 @@ jobs:
 
           # wait for vespa to start (document url):
           timeout 10m bash -c 'until curl -f -X GET $VESPA_DOCUMENT_URL >/dev/null 2>&1; do echo "  Waiting for Vespa document API to be available..."; sleep 10; done;' || \
-            (echo "Vespa (Document API) did not start in time" && exit 1)
+            (echo "Vespa (Document URL) did not start in time" && exit 1)
           
           echo "  Vespa document API is available. Local Vespa setup complete."
           
