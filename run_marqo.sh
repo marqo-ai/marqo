@@ -104,9 +104,9 @@ fi
 
 # Start up redis
 if [ "$MARQO_ENABLE_THROTTLING" != "FALSE" ]; then
-    echo "Starting redis-server"
+    echo "Starting Marqo throttling"
     redis-server /etc/redis/redis.conf &
-    echo "Called redis-server command"
+    echo "Called Marqo throttling start command"
 
     start_time=$(($(date +%s%N)/1000000))
     while true; do
@@ -125,10 +125,10 @@ if [ "$MARQO_ENABLE_THROTTLING" != "FALSE" ]; then
         sleep 0.1
         
     done
-    echo "redis-server is now running"
+    echo "Marqo throttling is now running"
 
 else
-    echo "Throttling has been disabled. Skipping redis-server start."
+    echo "Throttling has been disabled. Skipping Marqo throttling start."
 fi
 
 # set the default value to info and convert to lower case
