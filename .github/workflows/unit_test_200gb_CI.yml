@@ -85,14 +85,10 @@ jobs:
           export VESPA_QUERY_URL=http://localhost:8080
 
           # wait for vespa to start (document url):
-          timeout 10m bash -c 'until [[ $(curl -v --silent --insecure $VESPA_DOCUMENT_URL 2>&1 | grep "Empty reply from server") ]]; do sleep 0.1; done;' || \
-            (echo "Vespa (Document URL) did not start in time" && exit 1)
+          timeout 10m bash -c 'until curl -f -X GET $VESPA_DOCUMENT_URL >/dev/null 2>&1; do echo "  Waiting for Vespa document API to be available..."; sleep 10; done;' || \
+            (echo "Vespa (Document API) did not start in time" && exit 1)
           
-          # wait for vespa to start (config url):
-          timeout 10m bash -c 'until [[ $(curl -v --silent --insecure $VESPA_CONFIG_URL 2>&1 | grep "200 OK") ]]; do sleep 0.1; done;' || \
-            (echo "Vespa (Config URL) did not start in time" && exit 1)
-          
-          echo "Vespa started successfully!"
+          echo "  Vespa document API is available. Local Vespa setup complete."
           
       - name: Run Unit Tests
         run: |
