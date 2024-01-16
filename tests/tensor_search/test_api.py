@@ -175,7 +175,17 @@ class TestApiErrors(MarqoTestCase):
                          'm': 16
                      }
                  }
-             }, 'ef_construction', 'Snake case within a dict')
+             }, 'ef_construction', 'Snake case within a dict'),
+            ({
+                 "type": "unstructured",
+                 'annParameters': {
+                     'spaceType': 'dotproduct',
+                     'parameters': {
+                         'ef_construction': 128,
+                         'm': 16
+                     }
+                 }
+             }, 'ef_construction', 'Snake case within a dict, unstructured index')
         ]
         for test_case, field, test_name in test_cases:
             with self.subTest(test_name):
