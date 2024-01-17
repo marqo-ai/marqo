@@ -84,7 +84,7 @@ jobs:
           python marqo/scripts/vespa_local/vespa_local.py start
 
           echo "Waiting for Vespa to start"
-          for i in {1..5}; do
+          for i in {1..20}; do
               echo -ne "Waiting... $i seconds\r"
               sleep 1
           done
