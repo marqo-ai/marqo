@@ -1,4 +1,4 @@
-FROM marqoai/marqo-base:poc as base_image
+FROM marqoai/marqo-base:18 as base_image
 VOLUME /opt/vespa/
 ARG TARGETPLATFORM
 WORKDIR /app
