@@ -83,9 +83,12 @@ jobs:
 
           python marqo/scripts/vespa_local/vespa_local.py start
 
-          # Wait for start (1)
-          timeout 10m bash -c 'until [[ $(curl -v --silent --insecure $VESPA_DOCUMENT_URL >/dev/null 2>&1 | grep "Empty reply from server") ]]; do sleep 0.1; done;' || \
-            (echo "Vespa (Document URL) did not start in time" && exit 1)
+          echo "Waiting for Vespa to start"
+          for i in {1..5}; do
+              echo -ne "Waiting... $i seconds\r"
+              sleep 1
+          done
+          echo -e "\nDone waiting."
           
           # Deploy dummy application
           curl --header "Content-Type:application/zip" --data-binary @marqo/scripts/vespa_dummy_app.zip http://localhost:19071/application/v2/tenant/default/prepareandactivate
