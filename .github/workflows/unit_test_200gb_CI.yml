@@ -80,8 +80,9 @@ jobs:
           export VESPA_CONFIG_URL=http://localhost:19071
           export VESPA_DOCUMENT_URL=http://localhost:8080
           export VESPA_QUERY_URL=http://localhost:8080
-
-          python marqo/scripts/vespa_local/vespa_local.py start
+          
+          cd marqo/scripts/vespa_local
+          python vespa_local.py start
 
           echo "Waiting for Vespa to start"
           for i in {1..20}; do
@@ -90,8 +91,11 @@ jobs:
           done
           echo -e "\nDone waiting."
           
-          # Deploy dummy application
-          curl --header "Content-Type:application/zip" --data-binary @marqo/scripts/vespa_dummy_app.zip http://localhost:19071/application/v2/tenant/default/prepareandactivate
+          # Zip up schemas and services
+          zip -r vespa_tester_app.zip services.xml schemas
+
+          # Deploy dummy application with test schema
+          curl --header "Content-Type:application/zip" --data-binary @vespa_tester_app.zip http://localhost:19071/application/v2/tenant/default/prepareandactivate
 
           # wait for vespa to start (document url):
           timeout 10m bash -c 'until curl -f -X GET $VESPA_DOCUMENT_URL >/dev/null 2>&1; do echo "  Waiting for Vespa document API to be available..."; sleep 10; done;' || \
