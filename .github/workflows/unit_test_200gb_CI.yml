@@ -92,7 +92,7 @@ jobs:
           echo -e "\nDone waiting."
           
           # Zip up schemas and services
-          apt install zip
+          apt-get install zip -y
           zip -r vespa_tester_app.zip services.xml schemas
 
           # Deploy dummy application with test schema
