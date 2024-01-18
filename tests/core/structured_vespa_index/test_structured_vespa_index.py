@@ -7,10 +7,10 @@ from tests.marqo_test import MarqoTestCase
 
 
 class TestStructuredVespaIndex(MarqoTestCase):
-    @unittest.skip
     def test_to_vespa_document_standardMarqoDoc_successful(self):
         marqo_index = self.structured_marqo_index(
             name='my_index',
+            schema_name='my_index',
             model=Model(name='ViT-B/32'),
             distance_metric=DistanceMetric.PrenormalizedAnguar,
             vector_numeric_type=VectorNumericType.Float,
