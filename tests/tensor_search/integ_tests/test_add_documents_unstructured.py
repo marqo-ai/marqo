@@ -889,3 +889,26 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
                 )
 
                 self.assertEqual(thread_count, mock_download_images.call_count)
+
+    def test_supported_large_integer_and_float_number(self):
+        """Test to ensure large integer and float numbers are handled correctly for long and double data types
+        in the unstructured index schema"""
+
+        test_case = [
+            ({"large_int_field": 1e10}, False),  # large positive integer mathematical expression
+            ({"large_int_field": -1e12}, False),  # large negative integer mathematical expression
+            ({'large_int_field': int("1" * 50)}, True),  # large positive float
+            ({'large_int_field': -1 * int("1" * 50)}, True),  # large positive float
+            ({"large_float_field": 1e10 + 0.123249357987123}, False),  # large positive float
+            ({"large_float_field": - 1e10 + 0.123249357987123}, False),  # large negative float
+        ]
+
+        for doc, error in test_case:
+            with self.subTest():
+                res = tensor_search.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=self.default_text_index, docs=[doc], device="cpu",
+                        tensor_fields=[]
+                    )
+                )
+                self.assertEqual(res['errors'], error)

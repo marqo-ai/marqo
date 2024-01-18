@@ -104,7 +104,7 @@ class UnstructuredVespaSchema(VespaSchema):
                         indexing: summary
                     }}
 
-                    field {cls._INT_FIELDS} type map<string, int> {{
+                    field {cls._INT_FIELDS} type map<string, long> {{
                         indexing: summary
                         struct-field key {{ indexing : attribute
                                            attribute: fast-search
@@ -124,7 +124,7 @@ class UnstructuredVespaSchema(VespaSchema):
                                               rank: filter }}
                         }}
                                                     
-                    field {cls._FLOAT_FIELDS} type map<string, float> {{
+                    field {cls._FLOAT_FIELDS} type map<string, double> {{
                         indexing: summary
                         struct-field key {{ indexing : attribute
                                            attribute: fast-search
@@ -219,8 +219,8 @@ class UnstructuredVespaSchema(VespaSchema):
                     summary {cls._LONGS_STRINGS_FIELDS} type map<string, string> {{}}
                     summary {cls._SHORT_STRINGS_FIELDS} type map<string, string> {{}}
                     summary {cls._STRING_ARRAY} type array<string> {{}}
-                    summary {cls._INT_FIELDS} type map<string, int> {{}}
-                    summary {cls._FLOAT_FIELDS} type map<string, float> {{}}
+                    summary {cls._INT_FIELDS} type map<string, long> {{}}
+                    summary {cls._FLOAT_FIELDS} type map<string, double> {{}}
                     summary {cls._CHUNKS} type array<string> {{}}
                 }}
 
@@ -230,8 +230,8 @@ class UnstructuredVespaSchema(VespaSchema):
                     summary {cls._LONGS_STRINGS_FIELDS} type map<string, string> {{}}
                     summary {cls._SHORT_STRINGS_FIELDS} type map<string, string> {{}}
                     summary {cls._STRING_ARRAY} type array<string> {{}}
-                    summary {cls._INT_FIELDS} type map<string, int> {{}}
-                    summary {cls._FLOAT_FIELDS} type map<string, float> {{}}
+                    summary {cls._INT_FIELDS} type map<string, long> {{}}
+                    summary {cls._FLOAT_FIELDS} type map<string, double> {{}}
                     summary {cls._CHUNKS} type array<string> {{}}
                     summary {cls._EMBEDDINGS} type tensor<float>(p{{}}, x[{dimension}]) {{}}
                 }}
