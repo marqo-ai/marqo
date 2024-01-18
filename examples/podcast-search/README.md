@@ -1,4 +1,0 @@
-- Clone the repository.
-- Run Marqo, for instructions refer to the <a href="https://github.com/marqo-ai/marqo#getting-started">getting started</a> guide.
-- `cd` into the `podcast-search` directory.
-- Run the code using `python3 podcast_search_demo.py`
