@@ -52,19 +52,19 @@ jobs:
   run-arm64-tests:
     needs: should-tests-run
     if: needs.should-tests-run.outputs.decision == 'true'
-    uses: ./.github/workflows/arm64_local_os_CI.yml
+    uses: ./.github/workflows/arm64_docker_marqo.yml
     secrets: inherit
 
-  run-cuda-dind-tests:
+  run-cuda-tests:
     needs: should-tests-run
     if: needs.should-tests-run.outputs.decision == 'true'
-    uses: ./.github/workflows/cuda_dind_os_CI.yml
+    uses: ./.github/workflows/cuda_docker_marqo.yml
     secrets: inherit
 
-  run-dind-os-tests:
+  run-cpu-docker-tests:
     needs: should-tests-run
     if: needs.should-tests-run.outputs.decision == 'true'
-    uses: ./.github/workflows/dind_os_CI.yml
+    uses: ./.github/workflows/cpu_docker_marqo.yml
     secrets: inherit
 
   run-largemodel-unit-tests:
@@ -73,10 +73,10 @@ jobs:
     uses: ./.github/workflows/largemodel_unit_test_CI.yml
     secrets: inherit
 
-  run-local-os-tests:
+  run-cpu-local-tests:
     needs: should-tests-run
     if: needs.should-tests-run.outputs.decision == 'true'
-    uses: ./.github/workflows/local_os_CI.yml
+    uses: ./.github/workflows/cpu_local_marqo.yml
     secrets: inherit
 
   run-unit-tests:
