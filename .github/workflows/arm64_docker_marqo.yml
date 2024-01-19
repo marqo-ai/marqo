@@ -8,12 +8,14 @@ on:
         required: false
         default: marqo
         description: >
+          They "py-marqo" branch this test is running against.
           This is optional. If left as the default value "marqo", we run the test based on the  
           latest release of py-marqo on pypi. Otherwise, the specified branch is tested. For example "mainline"
       api_tests_branch:
         required: false
         default: mainline
         description: >
+          They "api-tests" branch this test is running against.
           This is optional. If left as the default value "mainline", we run the api tests based at branch
           "mainline". Otherwise, the specified branch is tested. For example "li/test-xx"
       image_to_test:
