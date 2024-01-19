@@ -119,7 +119,7 @@ jobs:
           CUSTOM_TEST_IMG="${{ github.event.inputs.image_to_test }}"
           export MQ_API_TEST_IMG=${CUSTOM_TEST_IMG:-"marqo_docker_0"}
           export MQ_PY_MARQO_BRANCH=${{ steps.set_var.outputs.py_marqo_branch }}
-          tox -e py3-cuda_dind_os
+          tox -e py3-cuda_docker_marqo
   
   Stop-Runner:
     name: Stop self-hosted EC2 runner
