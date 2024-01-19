@@ -1,12 +1,24 @@
-name: local_os_CI
-# runs Integration Tests on LOCAL OS on AMD64 machine
-
+name: arm64_docker_marqo
+# runs Integration Tests on ARM64 machine with Vespa and Marqo in the same docker container
 on:
   workflow_call:
   workflow_dispatch:
     inputs:
+      py_marqo_branch:
+        required: false
+        default: marqo
+        description: >
+          This is optional. If left as the default value "marqo", we run the test based on the  
+          latest release of py-marqo on pypi. Otherwise, the specified branch is tested. For example "mainline"
+      api_tests_branch:
+        required: false
+        default: mainline
+        description: >
+          This is optional. If left as the default value "mainline", we run the api tests based at branch
+          "mainline". Otherwise, the specified branch is tested. For example "li/test-xx"
       image_to_test:
         required: false
+        # This is the name of the docker image that is built by the build script:
         default: marqo_docker_0
         description: >
           This is optional. If left as the default value "marqo_docker_0", the docker image built from this branch is tested.
@@ -40,13 +52,15 @@ jobs:
         with:
           mode: start
           github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
-          ec2-image-id:  ${{ secrets.AMD_EC2_IMAGE_ID }}
-          ec2-instance-type: t3.xlarge
-          subnet-id: ${{ secrets.AMD_SUBNET_ID }}
-          security-group-id: ${{ secrets.AMD_SECURITY_GROUP_ID }}
+
+          # ARM Runner Image
+          ec2-image-id: ${{ secrets.ARM_EC2_IMAGE_ID }}
+          ec2-instance-type: t4g.xlarge
+          subnet-id: ${{ secrets.ARM_SUBNET_ID }}
+          security-group-id: ${{ secrets.ARM_SECURITY_GROUP_ID }}
 
   Test-Marqo:
-    name: Run Local Marqo-OS API Tests
+    name: Run arm64 API Tests
     needs: Start-Runner # required to start the main job when the runner is ready
     runs-on: ${{ needs.start-runner.outputs.label }} # run the job on the newly created runner
                 
@@ -59,12 +73,12 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up Python 3.8
-        uses: actions/setup-python@v3
-        with:
-          python-version: "3.8"
-          cache: "pip"
-          
+      - name: Set up Python 3.9   # TODO: Check if 3.9 is okay instead of 3.8. So far, so good
+        run:  |
+          apt-get -y update
+          apt-get -y install python3.9
+          apt-get -y install pip
+  
       - name: Install Dependencies
         run: |
           #pip install -r requirements.txt
@@ -77,6 +91,18 @@ jobs:
         uses: actions/checkout@v3
         with:
           repository: marqo-ai/marqo-api-tests
+          ref: ${{ github.event.inputs.api_tests_branch }}
+
+      - name: Set py_marqo_branch variable
+        id: set_var
+        run: |
+          if [[ "${{ env.PY_MQ_API_TEST_BRANCH }}" == "marqo" ]]; then
+            echo "::set-output name=py_marqo_branch::marqo"
+          else
+            echo "::set-output name=py_marqo_branch::git+https://github.com/marqo-ai/py-marqo.git@${{ env.PY_MQ_API_TEST_BRANCH }}"
+          fi
+        env:
+          PY_MQ_API_TEST_BRANCH: ${{ inputs.py-marqo-branch }}
           
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
@@ -86,12 +112,13 @@ jobs:
           # Set up conf file
           echo 'export MARQO_API_TESTS_ROOT="${{ github.workspace }}"' >> conf
           
-      - name: Run Integration Tests - local_os
+      - name: Run Integration Tests - ARM64 local_os
         run: |
           export MQ_API_TEST_BRANCH=$(echo "${GITHUB_REF}" | cut -d'/' -f3-)
           CUSTOM_TEST_IMG="${{ github.event.inputs.image_to_test }}"
           export MQ_API_TEST_IMG=${CUSTOM_TEST_IMG:-"marqo_docker_0"}
-          tox -e py3-local_os
+          export MQ_PY_MARQO_BRANCH=${{ steps.set_var.outputs.py_marqo_branch }}
+          tox -e py3-docker_marqo
   
   Stop-Runner:
     name: Stop self-hosted EC2 runner
