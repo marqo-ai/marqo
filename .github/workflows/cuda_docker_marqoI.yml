@@ -1,4 +1,4 @@
-name: cuda_CI
+name: cuda_docker_marqo_API_tests
 # runs GPU-enabled Integration Tests on AMD64 machine
 
 on:

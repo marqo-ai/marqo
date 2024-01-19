@@ -1,4 +1,4 @@
-name: local_os_CI
+name: cpu_local_marqo_API_tests
 # runs Integration Tests on LOCAL OS on AMD64 machine
 
 on:

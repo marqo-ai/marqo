@@ -1,4 +1,4 @@
-name: dind_os_CI
+name: cpu_docker_marqo_API_tests
 # runs Integration Tests on DIND OS on AMD64 machine
 
 on:

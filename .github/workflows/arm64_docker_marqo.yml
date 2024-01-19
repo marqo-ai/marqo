@@ -1,4 +1,4 @@
-name: arm64_docker_marqo
+name: arm64_docker_marqo_API_tests
 # runs Integration Tests on ARM64 machine with Vespa and Marqo in the same docker container
 on:
   workflow_call:
