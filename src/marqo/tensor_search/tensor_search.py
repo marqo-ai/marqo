@@ -164,15 +164,12 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
             ids = [doc["_id"] for doc in add_docs_params.docs if "_id" in doc]
             existing_docs_dict: Dict[str, dict] = {}
             if len(ids) > 0:
-                existing_docs = get_documents_by_ids(config, marqo_index.name, ids, show_vectors=True,
-                                                     ignore_invalid_ids=True)['results']
+                existing_docs = _get_marqo_documents_by_ids(config, marqo_index.name, ids)
                 for doc in existing_docs:
                     id = doc["_id"]
                     if id in existing_docs_dict:
                         raise errors.InternalError(f"Received duplicate documents for ID {id} from Vespa")
-                    if doc[TensorField.found]:
-                        del doc[TensorField.found]
-                        existing_docs_dict[id] = doc
+                    existing_docs_dict[id] = doc
 
                 logger.debug(f"Found {len(existing_docs_dict)} existing docs")
 
@@ -573,11 +570,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
         if add_docs_params.use_existing_tensors:
             existing_docs_dict: Dict[str, dict] = {}
             if len(doc_ids) > 0:
-                existing_docs = get_documents_by_ids(config,
-                                                     marqo_index.name,
-                                                     doc_ids,
-                                                     show_vectors=True,
-                                                     ignore_invalid_ids=True)['results']
+                existing_docs = _get_marqo_documents_by_ids(config, marqo_index.name, doc_ids)
                 for doc in existing_docs:
                     if not isinstance(doc, dict):
                         continue
@@ -585,9 +578,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                     id = doc["_id"]
                     if id in existing_docs_dict:
                         raise api_exceptions.InternalError(f"Received duplicate documents for ID {id} from Vespa")
-                    if doc[TensorField.found]:
-                        del doc[TensorField.found]
-                        existing_docs_dict[id] = doc
+                    existing_docs_dict[id] = doc
 
                 logger.debug(f"Found {len(existing_docs_dict)} existing docs")
 
@@ -951,11 +942,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
         return translate_add_doc_response(index_responses, time_diff=t1 - t0)
 
 
-def get_document_by_id(
-        config: Config, index_name: str, document_id: str, show_vectors: bool = False):
-    """returns document by its ID"""
-    validation.validate_id(document_id)
-
+def _get_marqo_document_by_id(config: Config, index_name: str, document_id: str):
     marqo_index = index_meta_cache.get_index(config=config, index_name=index_name)
 
     try:
@@ -969,6 +956,16 @@ def get_document_by_id(
 
     vespa_index = vespa_index_factory(marqo_index)
     marqo_document = vespa_index.to_marqo_document(res.document.dict())
+
+    return marqo_document
+
+
+def get_document_by_id(
+        config: Config, index_name: str, document_id: str, show_vectors: bool = False):
+    """returns document by its ID"""
+    validation.validate_id(document_id)
+
+    marqo_document = _get_marqo_document_by_id(config, index_name, document_id)
 
     if show_vectors:
         if constants.MARQO_DOC_TENSORS in marqo_document:
@@ -984,6 +981,17 @@ def get_document_by_id(
         del marqo_document[constants.MARQO_DOC_TENSORS]
 
     return marqo_document
+
+
+def _get_marqo_documents_by_ids(
+        config: Config, index_name: str, document_ids
+):
+    marqo_index = index_meta_cache.get_index(config=config, index_name=index_name)
+    batch_get = config.vespa_client.get_batch(document_ids, marqo_index.schema_name)
+    vespa_index = vespa_index_factory(marqo_index)
+
+    return [vespa_index.to_marqo_document(response.document.dict()) for response in batch_get.responses
+            if response.status == 200]
 
 
 def get_documents_by_ids(
