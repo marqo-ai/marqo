@@ -1,4 +1,4 @@
-name: arm64_docker_marqo
+name: arm64_docker_marqo_API_tests
 # runs Integration Tests on ARM64 machine with Vespa and Marqo in the same docker container
 on:
   workflow_call:
@@ -8,12 +8,14 @@ on:
         required: false
         default: marqo
         description: >
+          The "py-marqo" branch this test is running against.
           This is optional. If left as the default value "marqo", we run the test based on the  
           latest release of py-marqo on pypi. Otherwise, the specified branch is tested. For example "mainline"
       api_tests_branch:
         required: false
         default: mainline
         description: >
+          The "api-tests" branch this test is running against.
           This is optional. If left as the default value "mainline", we run the api tests based at branch
           "mainline". Otherwise, the specified branch is tested. For example "li/test-xx"
       image_to_test:
@@ -60,7 +62,7 @@ jobs:
           security-group-id: ${{ secrets.ARM_SECURITY_GROUP_ID }}
 
   Test-Marqo:
-    name: Run arm64 API Tests
+    name: Run ARM64 Docker Maqo API Tests
     needs: Start-Runner # required to start the main job when the runner is ready
     runs-on: ${{ needs.start-runner.outputs.label }} # run the job on the newly created runner
                 
