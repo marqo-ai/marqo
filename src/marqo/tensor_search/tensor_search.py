@@ -376,11 +376,12 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                     ):
                         existing_doc = existing_docs_dict[doc_id]
                         current_field_contents = utils.extract_multimodal_content(existing_doc, multimodal_params)
-                        current_multimodal_params = existing_doc[unstructured_common.MARQO_DOC_MULTIMODAL_PARAMS][
-                            field_name]
                         if (
                                 field_content == current_field_contents and
-                                current_multimodal_params == multimodal_params and
+                                unstructured_common.MARQO_DOC_MULTIMODAL_PARAMS in existing_doc and
+                                field_name in existing_doc[unstructured_common.MARQO_DOC_MULTIMODAL_PARAMS] and
+                                existing_doc[unstructured_common.MARQO_DOC_MULTIMODAL_PARAMS][
+                                    field_name] == multimodal_params and
                                 field_name in existing_doc[constants.MARQO_DOC_TENSORS]
                         ):
                             combo_chunk = f"{field_name}::{existing_doc[constants.MARQO_DOC_TENSORS][field_name][constants.MARQO_DOC_CHUNKS]}"

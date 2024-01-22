@@ -216,7 +216,8 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
                     self.assertEqual("content 1", search_res["hits"][0]["text_field_1"])
                     self.assertEqual("content 2", search_res["hits"][0]["text_field_2"])
                     self.assertEqual(1, len(get_doc_res["_tensor_facets"]))
-                    self.assertEqual("content 1", get_doc_res["_tensor_facets"][0]["text_field_1"])
+                    self.assertEqual('{"text_field_1": "content 1", "text_field_2": "content 2"}',
+                                     get_doc_res["_tensor_facets"][0]["multimodal_field"])
 
     def test_use_existing_tensor_multimodal_added(self):
         """
@@ -256,8 +257,6 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
                         )
                     )
 
-                    self.assertEqual(1, mock_vectorise.call_count, 'vectorise should be called once')
-
                 with mock.patch.object(s2_inference,
                                        'vectorise',
                                        side_effect=original_vectorise) as mock_vectorise:
@@ -272,7 +271,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
                         )
                     )
 
-                    self.assertEqual(0, mock_vectorise.call_count, 'vectorise should not be called')
+                    self.assertEqual(1, mock_vectorise.call_count, 'vectorise should be called')
 
                     search_res = tensor_search.search(config=self.config, index_name=index_name, text="content")
                     get_doc_res = tensor_search.get_document_by_id(config=self.config, index_name=index_name,
@@ -281,7 +280,8 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
                     self.assertEqual("content 1", search_res["hits"][0]["text_field_1"])
                     self.assertEqual("content 2", search_res["hits"][0]["text_field_2"])
                     self.assertEqual(1, len(get_doc_res["_tensor_facets"]))
-                    self.assertEqual("content 1", get_doc_res["_tensor_facets"][0]["text_field_1"])
+                    self.assertEqual('{"text_field_1": "content 1", "text_field_2": "content 2"}',
+                                     get_doc_res["_tensor_facets"][0]["multimodal_field"])
 
     def test_use_existing_tensor_multimodal_changed(self):
         """
