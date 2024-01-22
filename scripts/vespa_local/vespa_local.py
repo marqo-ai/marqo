@@ -14,7 +14,7 @@ def start(args):
               "--name vespa "
               "--hostname vespa-container "
               "--publish 8080:8080 --publish 19071:19071 "
-              "--memory=\"16g\" "
+              "--memory=\"32g\" "
               "vespaengine/vespa")
 
 
