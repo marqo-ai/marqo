@@ -9,20 +9,14 @@ on:
         required: false
         default: marqo
         description: >
-<<<<<<<< HEAD:.github/workflows/cuda_docker_marqo.yml
           The "py-marqo" branch this test is running against.
-========
->>>>>>>> mainline:.github/workflows/cuda_docker_marqoI.yml
           This is optional. If left as the default value "marqo", we run the test based on the  
           latest release of py-marqo on pypi. Otherwise, the specified branch is tested. For example "mainline"
       api_tests_branch:
         required: false
         default: mainline
         description: >
-<<<<<<<< HEAD:.github/workflows/cuda_docker_marqo.yml
           The "api-tests" branch this test is running against.
-========
->>>>>>>> mainline:.github/workflows/cuda_docker_marqoI.yml
           This is optional. If left as the default value "mainline", we run the api tests based at branch
           "mainline". Otherwise, the specified branch is tested. For example "li/test-xx"
       image_to_test:
@@ -127,11 +121,7 @@ jobs:
           CUSTOM_TEST_IMG="${{ github.event.inputs.image_to_test }}"
           export MQ_API_TEST_IMG=${CUSTOM_TEST_IMG:-"marqo_docker_0"}
           export MQ_PY_MARQO_BRANCH=${{ steps.set_var.outputs.py_marqo_branch }}
-<<<<<<<< HEAD:.github/workflows/cuda_docker_marqo.yml
           tox -e py3-cuda_docker_marqo
-========
-          tox -e py3-cuda_dind_os
->>>>>>>> mainline:.github/workflows/cuda_docker_marqoI.yml
   
   Stop-Runner:
     name: Stop self-hosted EC2 runner
