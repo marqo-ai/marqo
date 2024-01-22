@@ -164,7 +164,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
             ids = [doc["_id"] for doc in add_docs_params.docs if "_id" in doc]
             existing_docs_dict: Dict[str, dict] = {}
             if len(ids) > 0:
-                existing_docs = _get_marqo_documents_by_ids(config, marqo_index.name, ids)
+                existing_docs = _get_marqo_documents_by_ids(config, marqo_index.name, ids, ignore_invalid_ids=True)
                 for doc in existing_docs:
                     id = doc["_id"]
                     if id in existing_docs_dict:
@@ -571,7 +571,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
         if add_docs_params.use_existing_tensors:
             existing_docs_dict: Dict[str, dict] = {}
             if len(doc_ids) > 0:
-                existing_docs = _get_marqo_documents_by_ids(config, marqo_index.name, doc_ids)
+                existing_docs = _get_marqo_documents_by_ids(config, marqo_index.name, doc_ids, ignore_invalid_ids=True)
                 for doc in existing_docs:
                     if not isinstance(doc, dict):
                         continue
@@ -985,10 +985,22 @@ def get_document_by_id(
 
 
 def _get_marqo_documents_by_ids(
-        config: Config, index_name: str, document_ids
+        config: Config, index_name: str, document_ids, ignore_invalid_ids: bool = False
 ):
+    validated_ids = []
+    for doc_id in document_ids:
+        try:
+            validated_ids.append(validation.validate_id(doc_id))
+        except api_exceptions.InvalidDocumentIdError as e:
+            if not ignore_invalid_ids:
+                raise e
+            logger.debug(f'Invalid document ID {doc_id} ignored')
+
+    if len(validated_ids) == 0:  # Can only happen when ignore_invalid_ids is True
+        return []
+
     marqo_index = index_meta_cache.get_index(config=config, index_name=index_name)
-    batch_get = config.vespa_client.get_batch(document_ids, marqo_index.schema_name)
+    batch_get = config.vespa_client.get_batch(validated_ids, marqo_index.schema_name)
     vespa_index = vespa_index_factory(marqo_index)
 
     return [vespa_index.to_marqo_document(response.document.dict()) for response in batch_get.responses
