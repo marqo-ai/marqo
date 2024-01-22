@@ -384,7 +384,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                                     field_name] == multimodal_params and
                                 field_name in existing_doc[constants.MARQO_DOC_TENSORS]
                         ):
-                            combo_chunk = f"{field_name}::{existing_doc[constants.MARQO_DOC_TENSORS][field_name][constants.MARQO_DOC_CHUNKS]}"
+                            combo_chunk = f"{field_name}::{existing_doc[constants.MARQO_DOC_TENSORS][field_name][constants.MARQO_DOC_CHUNKS][0]}"
                             combo_embeddings = existing_doc[constants.MARQO_DOC_TENSORS][field_name][
                                 constants.MARQO_DOC_EMBEDDINGS]
 
