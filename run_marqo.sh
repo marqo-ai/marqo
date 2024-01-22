@@ -60,7 +60,7 @@ elif [ -z "$VESPA_QUERY_URL" ] && [ -z "$VESPA_DOCUMENT_URL" ] && [ -z "$VESPA_C
     # Make the curl request and capture the output
     RESPONSE=$(curl -s -X GET "$END_POINT")
 
-    # Check for the specific "not found" error response
+    # Check for the specific "not found" error response which indicates there is no application package deployed
     if echo "$RESPONSE" | grep -q '"error-code":"NOT_FOUND"'; then
       echo "Marqo does not find an existing index"
       echo "Marqo is deploying the application and waiting for the response from document API to start..."
@@ -74,7 +74,7 @@ elif [ -z "$VESPA_QUERY_URL" ] && [ -z "$VESPA_DOCUMENT_URL" ] && [ -z "$VESPA_C
       echo "  Vespa document API is available. Local Vespa setup complete."
       break
 
-    # Check for the "generation" success response
+    # Check for the "generation" success response which indicates there is an existing application package deployed
     elif echo "$RESPONSE" | grep -q '"generation":'; then
       echo "Marqo found an existing index. Waiting for the response from document API to start Marqo..."
 
