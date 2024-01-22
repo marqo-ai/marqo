@@ -1,12 +1,27 @@
-name: cuda_CI
-# runs GPU-enabled Integration Tests on AMD64 machine
+name: cpu_docker_marqo_API_tests
+# runs Integration Tests on DIND OS on AMD64 machine
 
 on:
   workflow_call:
   workflow_dispatch:
     inputs:
+      py_marqo_branch:
+        required: false
+        default: marqo
+        description: >
+          The "py-marqo" branch this test is running against.
+          This is optional. If left as the default value "marqo", we run the test based on the  
+          latest release of py-marqo on pypi. Otherwise, the specified branch is tested. For example "mainline"
+      api_tests_branch:
+        required: false
+        default: mainline
+        description: >
+          The "api-tests" branch this test is running against.
+          This is optional. If left as the default value "mainline", we run the api tests based at branch
+          "mainline". Otherwise, the specified branch is tested. For example "li/test-xx"
       image_to_test:
         required: false
+        # This is the name of the docker image that is built by the build script:
         default: marqo_docker_0
         description: >
           This is optional. If left as the default value "marqo_docker_0", the docker image built from this branch is tested.
@@ -14,7 +29,6 @@ on:
   push:
     branches:
       mainline
-      mainline-poc
     paths-ignore:
       - '**.md'
 
@@ -41,15 +55,13 @@ jobs:
         with:
           mode: start
           github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
-
-          # CUDA AMD64 instance
-          ec2-image-id: ${{ secrets.CUDA_EC2_IMAGE_ID }}
-          ec2-instance-type: g4dn.xlarge
-          subnet-id: ${{ secrets.CUDA_SUBNET_ID }}
-          security-group-id: ${{ secrets.CUDA_SECURITY_GROUP_ID }}
+          ec2-image-id:  ${{ secrets.AMD_EC2_IMAGE_ID }}
+          ec2-instance-type: t3.xlarge
+          subnet-id: ${{ secrets.AMD_SUBNET_ID }}
+          security-group-id: ${{ secrets.AMD_SECURITY_GROUP_ID }}
 
   Test-Marqo:
-    name: Run CUDA Docker-in-Docker API Tests
+    name: Run CPU Docker Marqo API Tests
     needs: Start-Runner # required to start the main job when the runner is ready
     runs-on: ${{ needs.start-runner.outputs.label }} # run the job on the newly created runner
                 
@@ -74,14 +86,24 @@ jobs:
           pip install tox==3.26
           pip install flake8
       
-      # TODO: linting here
+      # linting here
+
+      - name: Set py_marqo_branch variable
+        id: set_var
+        run: |
+          if [[ "${{ env.PY_MQ_API_TEST_BRANCH }}" == "marqo" ]]; then
+            echo "::set-output name=py_marqo_branch::marqo"
+          else
+            echo "::set-output name=py_marqo_branch::git+https://github.com/marqo-ai/py-marqo.git@${{ env.PY_MQ_API_TEST_BRANCH }}"
+          fi
+        env:
+          PY_MQ_API_TEST_BRANCH: ${{ inputs.py-marqo-branch }}
   
       - name: Checkout marqo-api-tests repo
         uses: actions/checkout@v3
         with:
           repository: marqo-ai/marqo-api-tests
-          # TODO change this back to mainline when we do the official release
-          ref: mainline-poc
+          ref: ${{ github.event.inputs.api_tests_branch }}
           
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
@@ -91,12 +113,13 @@ jobs:
           # Set up conf file
           echo 'export MARQO_API_TESTS_ROOT="${{ github.workspace }}"' >> conf
           
-      - name: Run CUDA Integration Tests - dind_os
+      - name: Run Integration Tests - dind_os
         run: |
           export MQ_API_TEST_BRANCH=$(echo "${GITHUB_REF}" | cut -d'/' -f3-)
           CUSTOM_TEST_IMG="${{ github.event.inputs.image_to_test }}"
           export MQ_API_TEST_IMG=${CUSTOM_TEST_IMG:-"marqo_docker_0"}
-          tox -e py3-cuda_dind_os
+          export MQ_PY_MARQO_BRANCH=${{ steps.set_var.outputs.py_marqo_branch }}
+          tox -e py3-docker_marqo
   
   Stop-Runner:
     name: Stop self-hosted EC2 runner

@@ -24,7 +24,9 @@ class TestSearchUnstructured(MarqoTestCase):
     def setUpClass(cls) -> None:
         super().setUpClass()
 
-        default_text_index = cls.unstructured_marqo_index_request()
+        default_text_index = cls.unstructured_marqo_index_request(
+            model=Model(name='hf/all_datasets_v4_MiniLM-L6')
+        )
         default_text_index_encoded_name = cls.unstructured_marqo_index_request(
             name='a-b_' + str(uuid.uuid4()).replace('-', '')
         )
@@ -1132,7 +1134,7 @@ class TestSearchUnstructured(MarqoTestCase):
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
                 docs=docs,
-                tensor_fields = []
+                tensor_fields=[]
             )
         )
         lexical_search_result = tensor_search.search(
@@ -1171,5 +1173,5 @@ class TestSearchUnstructured(MarqoTestCase):
         for hit in tensor_search_result['hits']:
             self.assertIn("_highlights", hit)
             self.assertTrue(isinstance(hit["_highlights"], list))
-            self.assertEqual(1, len(hit["_highlights"])) # We only have 1 highlight now
+            self.assertEqual(1, len(hit["_highlights"]))  # We only have 1 highlight now
             self.assertTrue(isinstance(hit["_highlights"][0], dict))

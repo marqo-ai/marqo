@@ -145,3 +145,5 @@ dump.rdb
 
 # VSCode
 .vscode/
+
+.DS_Store

@@ -52,19 +52,19 @@ jobs:
   run-arm64-tests:
     needs: should-tests-run
     if: needs.should-tests-run.outputs.decision == 'true'
-    uses: ./.github/workflows/arm64_local_os_CI.yml
+    uses: ./.github/workflows/arm64_docker_marqo.yml
     secrets: inherit
 
-  run-cuda-dind-tests:
+  run-cuda-tests:
     needs: should-tests-run
     if: needs.should-tests-run.outputs.decision == 'true'
-    uses: ./.github/workflows/cuda_dind_os_CI.yml
+    uses: ./.github/workflows/cuda_docker_marqo.yml
     secrets: inherit
 
-  run-dind-os-tests:
+  run-cpu-docker-tests:
     needs: should-tests-run
     if: needs.should-tests-run.outputs.decision == 'true'
-    uses: ./.github/workflows/dind_os_CI.yml
+    uses: ./.github/workflows/cpu_docker_marqo.yml
     secrets: inherit
 
   run-largemodel-unit-tests:
@@ -73,10 +73,10 @@ jobs:
     uses: ./.github/workflows/largemodel_unit_test_CI.yml
     secrets: inherit
 
-  run-local-os-tests:
+  run-cpu-local-tests:
     needs: should-tests-run
     if: needs.should-tests-run.outputs.decision == 'true'
-    uses: ./.github/workflows/local_os_CI.yml
+    uses: ./.github/workflows/cpu_local_marqo.yml
     secrets: inherit
 
   run-unit-tests:
@@ -88,7 +88,7 @@ jobs:
   summary:
     if: ${{ always() }}
     name: Test Summary
-    needs: [should-tests-run, run-arm64-tests, run-cuda-dind-tests, run-dind-os-tests, run-largemodel-unit-tests, run-local-os-tests, run-unit-tests]
+    needs: [should-tests-run, run-arm64-tests, run-cuda-tests, run-cpu-docker-tests, run-largemodel-unit-tests, run-cpu-local-tests, run-unit-tests]
     runs-on: ubuntu-latest
     steps:
     - name: Check test results
@@ -104,13 +104,13 @@ jobs:
           exit 1
         fi
         
-        if [[ "${{ needs.run-cuda-dind-tests.result }}" != "success" && "${{ needs.run-cuda-dind-tests.result }}" != "skipped" ]]; then
-          echo "Job run-cuda-dind-tests did not succeed."
+        if [[ "${{ needs.run-cuda-tests.result }}" != "success" && "${{ needs.run-cuda-tests.result }}" != "skipped" ]]; then
+          echo "Job run-cuda-tests did not succeed."
           exit 1
         fi
   
-        if [[ "${{ needs.run-dind-os-tests.result }}" != "success" && "${{ needs.run-dind-os-tests.result }}" != "skipped" ]]; then
-          echo "Job run-dind-os-tests did not succeed."
+        if [[ "${{ needs.run-cpu-docker-tests.result }}" != "success" && "${{ needs.run-cpu-docker-tests.result }}" != "skipped" ]]; then
+          echo "Job run-cpu-docker-tests did not succeed."
           exit 1
         fi
   
@@ -119,8 +119,8 @@ jobs:
           exit 1
         fi
   
-        if [[ "${{ needs.run-local-os-tests.result }}" != "success" && "${{ needs.run-local-os-tests.result }}" != "skipped" ]]; then
-          echo "Job run-local-os-tests did not succeed."
+        if [[ "${{ needs.run-cpu-local-tests.result }}" != "success" && "${{ needs.run-cpu-local-tests.result }}" != "skipped" ]]; then
+          echo "Job run-cpu-local-tests did not succeed."
           exit 1
         fi
   
