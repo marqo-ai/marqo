@@ -29,7 +29,6 @@ on:
   push:
     branches:
       mainline
-      mainline-poc
     paths-ignore:
       - '**.md'
 
