@@ -2,6 +2,7 @@ import os
 import unittest
 from unittest import mock
 
+from marqo.core.models.marqo_index import FieldType
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
@@ -19,15 +20,26 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
                     FieldRequest(name="text_field_2", type="text")],
             tensor_fields=["text_field_1", "text_field_2"]
         )
+        structured_index_multimodal = cls.structured_marqo_index_request(
+            fields=[
+                FieldRequest(name="text_field_1", type="text"),
+                FieldRequest(name="text_field_2", type="text"),
+                FieldRequest(name='multimodal_field', type=FieldType.MultimodalCombination,
+                             dependent_fields={'text_field_1': 0.5, 'text_field_2': 0.8})
+            ],
+            tensor_fields=["multimodal_field"]
+        )
 
         unstructured_index = cls.unstructured_marqo_index_request()
 
         cls.indexes = cls.create_indexes([
             structured_index,
+            structured_index_multimodal,
             unstructured_index
         ])
 
         cls.structured_index = structured_index.name
+        cls.structured_index_multimodal = structured_index_multimodal.name
         cls.unstructured_index = unstructured_index.name
 
     def setUp(self) -> None:
@@ -38,6 +50,58 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
     def tearDown(self) -> None:
         super().tearDown()
         self.device_patcher.stop()
+
+    def test_use_existing_tensor_no_change(self):
+        """
+        Checks that the vectors are not updated if the content is the same
+        """
+        doc = {
+            "text_field_1": "content 1",
+            "_id": "1"
+        }
+
+        from marqo.s2_inference import s2_inference
+        original_vectorise = s2_inference.vectorise
+
+        for index_name in [self.structured_index, self.unstructured_index]:
+            tensor_fields = None if index_name == self.structured_index else ["text_field_1", "text_field_2"]
+            with self.subTest(f"{index_name}"):
+                with mock.patch.object(s2_inference,
+                                       'vectorise',
+                                       side_effect=original_vectorise) as mock_vectorise:
+                    tensor_search.add_documents(
+                        config=self.config,
+                        add_docs_params=AddDocsParams(
+                            index_name=index_name,
+                            docs=[doc],
+                            tensor_fields=tensor_fields,
+                        )
+                    )
+
+                    self.assertEqual(1, mock_vectorise.call_count, 'vectorise should be called once')
+
+                with mock.patch.object(s2_inference,
+                                       'vectorise',
+                                       side_effect=original_vectorise) as mock_vectorise:
+                    tensor_search.add_documents(
+                        config=self.config,
+                        add_docs_params=AddDocsParams(
+                            index_name=index_name,
+                            docs=[doc],
+                            tensor_fields=tensor_fields,
+                            use_existing_tensors=True
+                        )
+                    )
+
+                    self.assertEqual(0, mock_vectorise.call_count, 'vectorise should not be called')
+
+                    search_res = tensor_search.search(config=self.config, index_name=index_name, text="content")
+                    get_doc_res = tensor_search.get_document_by_id(config=self.config, index_name=index_name,
+                                                                   document_id="1", show_vectors=True)
+
+                    self.assertEqual("content 1", search_res["hits"][0]["text_field_1"])
+                    self.assertEqual(1, len(get_doc_res["_tensor_facets"]))
+                    self.assertEqual("content 1", get_doc_res["_tensor_facets"][0]["text_field_1"])
 
     def test_use_existing_tensor_new_fields(self):
         doc_1 = {
@@ -50,37 +114,241 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
             "_id": "1"
         }
 
+        from marqo.s2_inference import s2_inference
+        original_vectorise = s2_inference.vectorise
+
         for index_name in [self.structured_index, self.unstructured_index]:
             tensor_fields = None if index_name == self.structured_index else ["text_field_1", "text_field_2"]
             with self.subTest(f"{index_name}"):
-                tensor_search.add_documents(
-                    config=self.config,
-                    add_docs_params=AddDocsParams(
-                        index_name=index_name,
-                        docs=[doc_1],
-                        tensor_fields=tensor_fields,
+                with mock.patch.object(s2_inference,
+                                       'vectorise',
+                                       side_effect=original_vectorise) as mock_vectorise:
+                    tensor_search.add_documents(
+                        config=self.config,
+                        add_docs_params=AddDocsParams(
+                            index_name=index_name,
+                            docs=[doc_1],
+                            tensor_fields=tensor_fields,
+                        )
                     )
-                )
-                tensor_search.add_documents(
-                    config=self.config,
-                    add_docs_params=AddDocsParams(
-                        index_name=index_name,
-                        docs=[doc_2],
-                        tensor_fields=tensor_fields,
-                        use_existing_tensors=True
+
+                    self.assertEqual(1, mock_vectorise.call_count, 'vectorise should be called once')
+
+                with mock.patch.object(s2_inference,
+                                       'vectorise',
+                                       side_effect=original_vectorise) as mock_vectorise:
+                    tensor_search.add_documents(
+                        config=self.config,
+                        add_docs_params=AddDocsParams(
+                            index_name=index_name,
+                            docs=[doc_2],
+                            tensor_fields=tensor_fields,
+                            use_existing_tensors=True
+                        )
                     )
-                )
 
-                search_res = tensor_search.search(config=self.config, index_name=index_name, text="content")
-                get_doc_res = tensor_search.get_document_by_id(config=self.config, index_name=index_name,
-                                                               document_id="1", show_vectors=True)
+                    self.assertEqual(1, mock_vectorise.call_count, 'vectorise should not be called')
 
-                from pprint import pprint
-                pprint(search_res)
-                pprint(get_doc_res)
-                self.assertEqual("content 2", search_res["hits"][0]["text_field_2"])
-                self.assertEqual(1, len(get_doc_res["_tensor_facets"]))
-                self.assertEqual("content 2", get_doc_res["_tensor_facets"][0]["text_field_2"])
+                    search_res = tensor_search.search(config=self.config, index_name=index_name, text="content")
+                    get_doc_res = tensor_search.get_document_by_id(config=self.config, index_name=index_name,
+                                                                   document_id="1", show_vectors=True)
+
+                    self.assertEqual("content 2", search_res["hits"][0]["text_field_2"])
+                    self.assertEqual(1, len(get_doc_res["_tensor_facets"]))
+                    self.assertEqual("content 2", get_doc_res["_tensor_facets"][0]["text_field_2"])
+
+    def test_use_existing_tensor_multimodal_no_change(self):
+        """
+        Checks that the vectors are not updated if the content is the same for multimodal fields
+        """
+        doc = {
+            "text_field_1": "content 1",
+            "text_field_2": "content 2",
+            "_id": "1"
+        }
+
+        from marqo.s2_inference import s2_inference
+        original_vectorise = s2_inference.vectorise
+
+        for index_name in [self.structured_index_multimodal, self.unstructured_index]:
+            tensor_fields = None if index_name == self.structured_index_multimodal else ["multimodal_field"]
+            mappings = None if index_name == self.structured_index else \
+                {
+                    "multimodal_field": {"type": "multimodal_combination", "weights": {
+                        "text_field_1": 0.5, "text_field_2": 0.8}}
+                }
+            with self.subTest(f"{index_name}"):
+                with mock.patch.object(s2_inference,
+                                       'vectorise',
+                                       side_effect=original_vectorise) as mock_vectorise:
+                    tensor_search.add_documents(
+                        config=self.config,
+                        add_docs_params=AddDocsParams(
+                            index_name=index_name,
+                            docs=[doc],
+                            tensor_fields=tensor_fields,
+                            mappings=mappings
+                        )
+                    )
+
+                    self.assertEqual(1, mock_vectorise.call_count, 'vectorise should be called once')
+
+                with mock.patch.object(s2_inference,
+                                       'vectorise',
+                                       side_effect=original_vectorise) as mock_vectorise:
+                    tensor_search.add_documents(
+                        config=self.config,
+                        add_docs_params=AddDocsParams(
+                            index_name=index_name,
+                            docs=[doc],
+                            tensor_fields=tensor_fields,
+                            mappings=mappings,
+                            use_existing_tensors=True
+                        )
+                    )
+
+                    self.assertEqual(0, mock_vectorise.call_count, 'vectorise should not be called')
+
+                    search_res = tensor_search.search(config=self.config, index_name=index_name, text="content")
+                    get_doc_res = tensor_search.get_document_by_id(config=self.config, index_name=index_name,
+                                                                   document_id="1", show_vectors=True)
+
+                    self.assertEqual("content 1", search_res["hits"][0]["text_field_1"])
+                    self.assertEqual("content 2", search_res["hits"][0]["text_field_2"])
+                    self.assertEqual(1, len(get_doc_res["_tensor_facets"]))
+                    self.assertEqual("content 1", get_doc_res["_tensor_facets"][0]["text_field_1"])
+
+    def test_use_existing_tensor_multimodal_added(self):
+        """
+        Checks that the vectors are updated if a multimodal field is added
+        """
+        doc_1 = {
+            "_id": "1"
+        }
+        doc_2 = {
+            "text_field_1": "content 1",
+            "text_field_2": "content 2",
+            "_id": "1"
+        }
+
+        from marqo.s2_inference import s2_inference
+        original_vectorise = s2_inference.vectorise
+
+        for index_name in [self.structured_index_multimodal, self.unstructured_index]:
+            tensor_fields_1 = None if index_name == self.structured_index_multimodal else []
+            tensor_fields_2 = None if index_name == self.structured_index_multimodal else ["multimodal_field"]
+            mappings = None if index_name == self.structured_index else \
+                {
+                    "multimodal_field": {"type": "multimodal_combination", "weights": {
+                        "text_field_1": 0.5, "text_field_2": 0.8}}
+                }
+            with self.subTest(f"{index_name}"):
+                with mock.patch.object(s2_inference,
+                                       'vectorise',
+                                       side_effect=original_vectorise) as mock_vectorise:
+                    tensor_search.add_documents(
+                        config=self.config,
+                        add_docs_params=AddDocsParams(
+                            index_name=index_name,
+                            docs=[doc_1],
+                            tensor_fields=tensor_fields_1,  # No tensor fields
+                            mappings=None
+                        )
+                    )
+
+                    self.assertEqual(1, mock_vectorise.call_count, 'vectorise should be called once')
+
+                with mock.patch.object(s2_inference,
+                                       'vectorise',
+                                       side_effect=original_vectorise) as mock_vectorise:
+                    tensor_search.add_documents(
+                        config=self.config,
+                        add_docs_params=AddDocsParams(
+                            index_name=index_name,
+                            docs=[doc_2],
+                            tensor_fields=tensor_fields_2,
+                            mappings=mappings,
+                            use_existing_tensors=True
+                        )
+                    )
+
+                    self.assertEqual(0, mock_vectorise.call_count, 'vectorise should not be called')
+
+                    search_res = tensor_search.search(config=self.config, index_name=index_name, text="content")
+                    get_doc_res = tensor_search.get_document_by_id(config=self.config, index_name=index_name,
+                                                                   document_id="1", show_vectors=True)
+
+                    self.assertEqual("content 1", search_res["hits"][0]["text_field_1"])
+                    self.assertEqual("content 2", search_res["hits"][0]["text_field_2"])
+                    self.assertEqual(1, len(get_doc_res["_tensor_facets"]))
+                    self.assertEqual("content 1", get_doc_res["_tensor_facets"][0]["text_field_1"])
+
+    def test_use_existing_tensor_multimodal_changed(self):
+        """
+        Checks that the vectors are updated if a multimodal field is added
+        """
+        doc_1 = {
+            "text_field_1": "content 1",
+            "text_field_2": "content 2",
+            "_id": "1"
+        }
+        doc_2 = {
+            "text_field_1": "content 1",
+            "text_field_2": "content 2-updated",
+            "_id": "1"
+        }
+
+        from marqo.s2_inference import s2_inference
+        original_vectorise = s2_inference.vectorise
+
+        for index_name in [self.structured_index_multimodal, self.unstructured_index]:
+            tensor_fields = None if index_name == self.structured_index_multimodal else ["multimodal_field"]
+            mappings = None if index_name == self.structured_index else \
+                {
+                    "multimodal_field": {"type": "multimodal_combination", "weights": {
+                        "text_field_1": 0.5, "text_field_2": 0.8}}
+                }
+            with self.subTest(f"{index_name}"):
+                with mock.patch.object(s2_inference,
+                                       'vectorise',
+                                       side_effect=original_vectorise) as mock_vectorise:
+                    tensor_search.add_documents(
+                        config=self.config,
+                        add_docs_params=AddDocsParams(
+                            index_name=index_name,
+                            docs=[doc_1],
+                            tensor_fields=tensor_fields,
+                            mappings=mappings
+                        )
+                    )
+
+                    self.assertEqual(1, mock_vectorise.call_count, 'vectorise should be called once')
+
+                with mock.patch.object(s2_inference,
+                                       'vectorise',
+                                       side_effect=original_vectorise) as mock_vectorise:
+                    tensor_search.add_documents(
+                        config=self.config,
+                        add_docs_params=AddDocsParams(
+                            index_name=index_name,
+                            docs=[doc_2],
+                            tensor_fields=tensor_fields,
+                            mappings=mappings,
+                            use_existing_tensors=True
+                        )
+                    )
+
+                    self.assertEqual(1, mock_vectorise.call_count, 'vectorise should be called again')
+
+                    search_res = tensor_search.search(config=self.config, index_name=index_name, text="content")
+                    get_doc_res = tensor_search.get_document_by_id(config=self.config, index_name=index_name,
+                                                                   document_id="1", show_vectors=True)
+
+                    self.assertEqual("content 1", search_res["hits"][0]["text_field_1"])
+                    self.assertEqual("content 2-updated", search_res["hits"][0]["text_field_2"])
+                    self.assertEqual(1, len(get_doc_res["_tensor_facets"]))
+                    self.assertEqual('{"text_field_1": "content 1", "text_field_2": "content 2-updated"}',
+                                     get_doc_res["_tensor_facets"][0]["multimodal_field"])
 
     @unittest.skip
     def test_use_existing_tensors_resilience(self):
