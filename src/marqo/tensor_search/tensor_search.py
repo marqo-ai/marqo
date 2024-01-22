@@ -1042,9 +1042,18 @@ def get_documents_by_ids(
             marqo_document = vespa_index.to_marqo_document(response.document.dict())
 
             if show_vectors:
-                marqo_document[TensorField.tensor_facets] = _get_tensor_facets(
-                    marqo_document[constants.MARQO_DOC_TENSORS])
-            del marqo_document[constants.MARQO_DOC_TENSORS]
+                if constants.MARQO_DOC_TENSORS in marqo_document:
+                    marqo_document[TensorField.tensor_facets] = _get_tensor_facets(
+                        marqo_document[constants.MARQO_DOC_TENSORS])
+                else:
+                    marqo_document[TensorField.tensor_facets] = []
+
+            if not show_vectors:
+                if unstructured_common.MARQO_DOC_MULTIMODAL_PARAMS in marqo_document:
+                    del marqo_document[unstructured_common.MARQO_DOC_MULTIMODAL_PARAMS]
+
+            if constants.MARQO_DOC_TENSORS in marqo_document:
+                del marqo_document[constants.MARQO_DOC_TENSORS]
 
             to_return['results'].append(
                 {
