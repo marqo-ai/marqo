@@ -38,10 +38,10 @@ jobs:
         with:
           mode: start
           github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
-          ec2-image-id:  ${{ secrets.CUDA_EC2_IMAGE_ID }}
+          ec2-image-id:  ${{ secrets.AMD_200GB_EC2_IMAGE_ID }}
           ec2-instance-type: t3.xlarge
-          subnet-id: ${{ secrets.CUDA_SUBNET_ID }}
-          security-group-id: ${{ secrets.CUDA_SECURITY_GROUP_ID }}
+          subnet-id: ${{ secrets.AMD_SUBNET_ID }}
+          security-group-id: ${{ secrets.AMD_SECURITY_GROUP_ID }}
 
   Test-Marqo:
     name: Run Unit Tests
@@ -82,7 +82,9 @@ jobs:
           export VESPA_QUERY_URL=http://localhost:8080
           
           cd marqo/scripts/vespa_local
+          set -x
           python vespa_local.py start
+          set +x
 
           echo "Waiting for Vespa to start"
           for i in {1..20}; do
@@ -102,7 +104,11 @@ jobs:
           timeout 10m bash -c 'until curl -f -X GET $VESPA_DOCUMENT_URL >/dev/null 2>&1; do echo "  Waiting for Vespa document API to be available..."; sleep 10; done;' || \
             (echo "Vespa (Document URL) did not start in time" && exit 1)
           
-          echo "  Vespa document API is available. Local Vespa setup complete."
+          echo "Vespa document API is available. Local Vespa setup complete."
+
+          # Delete the zip file
+          rm vespa_tester_app.zip
+          echo "Deleted vespa_tester_app.zip"
           
       - name: Run Unit Tests
         run: |
