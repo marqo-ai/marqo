@@ -1,5 +1,5 @@
 name: cuda_docker_marqo_API_tests
-# runs GPU-enabled Integration Tests on AMD64 machine
+# runs API Tests on cuda-enabled instance with Vespa and Marqo running in the same container
 
 on:
   workflow_call:
@@ -29,7 +29,6 @@ on:
   push:
     branches:
       mainline
-      mainline-poc
     paths-ignore:
       - '**.md'
 
