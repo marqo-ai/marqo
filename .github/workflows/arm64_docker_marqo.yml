@@ -27,7 +27,7 @@ on:
           Otherwise, the specified docker image is tested. For example "marqoai/marqo:test"
   push:
     branches:
-      mainline
+      - mainline
     paths-ignore:
       - '**.md'
 
