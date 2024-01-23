@@ -1,0 +1,145 @@
+name: arm64_docker_marqo_API_tests
+# runs API Tests on ARM64 machine with Vespa and Marqo in the same docker container
+on:
+  workflow_call:
+  workflow_dispatch:
+    inputs:
+      py_marqo_branch:
+        required: false
+        default: marqo
+        description: >
+          The "py-marqo" branch this test is running against.
+          This is optional. If left as the default value "marqo", we run the test based on the  
+          latest release of py-marqo on pypi. Otherwise, the specified branch is tested. For example "mainline"
+      api_tests_branch:
+        required: false
+        default: mainline
+        description: >
+          The "api-tests" branch this test is running against.
+          This is optional. If left as the default value "mainline", we run the api tests based at branch
+          "mainline". Otherwise, the specified branch is tested. For example "li/test-xx"
+      image_to_test:
+        required: false
+        # This is the name of the docker image that is built by the build script:
+        default: marqo_docker_0
+        description: >
+          This is optional. If left as the default value "marqo_docker_0", the docker image built from this branch is tested.
+          Otherwise, the specified docker image is tested. For example "marqoai/marqo:test"
+  push:
+    branches:
+      - mainline
+    paths-ignore:
+      - '**.md'
+
+permissions:
+  contents: read
+
+jobs:
+  Start-Runner:
+    name: Start self-hosted EC2 runner
+    runs-on: ubuntu-latest
+    outputs:
+      label: ${{ steps.start-ec2-runner.outputs.label }}
+      ec2-instance-id: ${{ steps.start-ec2-runner.outputs.ec2-instance-id }}
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Start EC2 runner
+        id: start-ec2-runner
+        uses: machulav/ec2-github-runner@v2
+        with:
+          mode: start
+          github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
+
+          # ARM Runner Image
+          ec2-image-id: ${{ secrets.ARM_EC2_IMAGE_ID }}
+          ec2-instance-type: t4g.xlarge
+          subnet-id: ${{ secrets.ARM_SUBNET_ID }}
+          security-group-id: ${{ secrets.ARM_SECURITY_GROUP_ID }}
+
+  Test-Marqo:
+    name: Run ARM64 Docker Maqo API Tests
+    needs: Start-Runner # required to start the main job when the runner is ready
+    runs-on: ${{ needs.start-runner.outputs.label }} # run the job on the newly created runner
+                
+    environment: marqo-test-suite 
+    
+    steps:
+       
+      - name: Checkout marqo repo
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.9   # TODO: Check if 3.9 is okay instead of 3.8. So far, so good
+        run:  |
+          apt-get -y update
+          apt-get -y install python3.9
+          apt-get -y install pip
+  
+      - name: Install Dependencies
+        run: |
+          #pip install -r requirements.txt
+          pip install tox==3.26
+          pip install flake8
+      
+      # TODO: linting here
+  
+      - name: Checkout marqo-api-tests repo
+        uses: actions/checkout@v3
+        with:
+          repository: marqo-ai/marqo-api-tests
+          ref: ${{ github.event.inputs.api_tests_branch }}
+
+      - name: Set py_marqo_branch variable
+        id: set_var
+        run: |
+          if [[ "${{ env.PY_MQ_API_TEST_BRANCH }}" == "marqo" ]]; then
+            echo "::set-output name=py_marqo_branch::marqo"
+          else
+            echo "::set-output name=py_marqo_branch::git+https://github.com/marqo-ai/py-marqo.git@${{ env.PY_MQ_API_TEST_BRANCH }}"
+          fi
+        env:
+          PY_MQ_API_TEST_BRANCH: ${{ inputs.py-marqo-branch }}
+          
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+          
+      - name: Set up Environment
+        run: |
+          # Set up conf file
+          echo 'export MARQO_API_TESTS_ROOT="${{ github.workspace }}"' >> conf
+          
+      - name: Run Integration Tests - ARM64 local_os
+        run: |
+          export MQ_API_TEST_BRANCH=$(echo "${GITHUB_REF}" | cut -d'/' -f3-)
+          CUSTOM_TEST_IMG="${{ github.event.inputs.image_to_test }}"
+          export MQ_API_TEST_IMG=${CUSTOM_TEST_IMG:-"marqo_docker_0"}
+          export MQ_PY_MARQO_BRANCH=${{ steps.set_var.outputs.py_marqo_branch }}
+          tox -e py3-docker_marqo
+  
+  Stop-Runner:
+    name: Stop self-hosted EC2 runner
+    needs:
+      - Start-Runner # required to get output from the start-runner job
+      - Test-Marqo # required to wait when the main job is done
+    runs-on: ubuntu-latest
+    if: ${{ always() }} # required to stop the runner even if the error happened in the previous jobs
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Stop EC2 runner
+        uses: machulav/ec2-github-runner@v2
+        with:
+          mode: stop
+          github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
+          label: ${{ needs.start-runner.outputs.label }}
+          ec2-instance-id: ${{ needs.start-runner.outputs.ec2-instance-id }}
