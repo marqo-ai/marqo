@@ -45,7 +45,15 @@ class IndexManagement:
         Returns:
             True if schema was created, False if it already existed
         """
-        pass
+        app = self.vespa_client.download_application()
+        settings_schema_created = self._add_marqo_settings_schema(app)
+
+        if settings_schema_created:
+            self.vespa_client.deploy_application(app)
+            self.vespa_client.wait_for_application_convergence()
+            return True
+
+        return False
 
     def create_index(self, marqo_index_request: MarqoIndexRequest) -> MarqoIndex:
         """

@@ -1,8 +1,6 @@
 import uuid
 from unittest import mock
 
-import httpx
-
 from marqo.core.exceptions import IndexExistsError
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models.marqo_index import *
@@ -21,7 +19,7 @@ class TestIndexManagement(MarqoTestCase):
     def test_create_settings_schema_doesNotExist_successful(self):
         settings_schema_name = 'a' + str(uuid.uuid4()).replace('-', '')
         with mock.patch.object(IndexManagement, '_MARQO_SETTINGS_SCHEMA_NAME', settings_schema_name):
-            self.index_management.create_settings_schema()
+            self.assertTrue(self.index_management.create_settings_schema())
 
             # Verify settings schema exists
             try:
@@ -38,13 +36,24 @@ class TestIndexManagement(MarqoTestCase):
                 else:
                     raise e
 
-    def test_create_settings_schema_Exists_skips(self):
+    def test_create_settings_schema_exists_skips(self):
         settings_schema_name = 'a' + str(uuid.uuid4()).replace('-', '')
         with mock.patch.object(IndexManagement, '_MARQO_SETTINGS_SCHEMA_NAME', settings_schema_name):
-            self.index_management.create_settings_schema()
+            self.assertTrue(self.index_management.create_settings_schema())
 
-            with mock.patch.object(httpx.Client, 'post', side_effect=Exception('Should not be called')):
-                self.index_management.create_settings_schema()
+            import httpx
+
+            def modified_post(*args, **kwargs):
+                self.assertFalse(
+                    'prepareandactivate' in args[0],
+                    'Settings schema deployment must be skipped'
+                )
+                return httpx.post(*args, **kwargs)
+
+            with mock.patch.object(httpx.Client, 'post', side_effect=modified_post) as mock_post:
+                self.assertFalse(self.index_management.create_settings_schema())
+                # Sanity check that we're patching the right method
+                self.assertTrue(mock_post.called)
 
     def test_create_index_settingsSchemaDoesNotExist_successful(self):
         """
