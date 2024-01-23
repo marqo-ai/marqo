@@ -107,8 +107,8 @@ def _check_refresh_thread(config: Config):
                         if isinstance(e, VespaStatusError) and e.status_code == 400:
                             # This can happen when settings schema doesn't exist
                             logger.warn(
-                                'Failed to populate index cache due to 400 error from Vespa. This is expected if you '
-                                f'have not created an index yet. Error: {e}'
+                                'Failed to populate index cache due to 400 error from vector store. This can happen '
+                                'if Marqo settings schema does not exist. Error: {e}'
                             )
                         else:
                             logger.warn(
