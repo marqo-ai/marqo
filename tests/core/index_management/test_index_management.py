@@ -1,11 +1,14 @@
 import uuid
 from unittest import mock
 
+import httpx
+
 from marqo.core.exceptions import IndexExistsError
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.core.vespa_schema import for_marqo_index_request as vespa_schema_factory
+from marqo.vespa.exceptions import VespaStatusError
 from marqo.vespa.models import VespaDocument
 from tests.marqo_test import MarqoTestCase
 
@@ -14,6 +17,34 @@ class TestIndexManagement(MarqoTestCase):
 
     def setUp(self):
         self.index_management = IndexManagement(self.vespa_client)
+
+    def test_create_settings_schema_doesNotExist_successful(self):
+        settings_schema_name = 'a' + str(uuid.uuid4()).replace('-', '')
+        with mock.patch.object(IndexManagement, '_MARQO_SETTINGS_SCHEMA_NAME', settings_schema_name):
+            self.index_management.create_settings_schema()
+
+            # Verify settings schema exists
+            try:
+                self.vespa_client.feed_document(
+                    VespaDocument(
+                        id='1',
+                        fields={}
+                    ),
+                    schema=settings_schema_name
+                )
+            except VespaStatusError as e:
+                if e.status_code == 400:
+                    self.fail('Settings schema does not exist')
+                else:
+                    raise e
+
+    def test_create_settings_schema_Exists_skips(self):
+        settings_schema_name = 'a' + str(uuid.uuid4()).replace('-', '')
+        with mock.patch.object(IndexManagement, '_MARQO_SETTINGS_SCHEMA_NAME', settings_schema_name):
+            self.index_management.create_settings_schema()
+
+            with mock.patch.object(httpx.Client, 'post', side_effect=Exception('Should not be called')):
+                self.index_management.create_settings_schema()
 
     def test_create_index_settingsSchemaDoesNotExist_successful(self):
         """
@@ -39,13 +70,11 @@ class TestIndexManagement(MarqoTestCase):
             self.index_management.create_index(marqo_index_request)
 
             # Inserting a document into the new schema to verify it exists
-            self.vespa_client.feed_batch(
-                [
-                    VespaDocument(
-                        id='1',
-                        fields={}
-                    )
-                ],
+            self.vespa_client.feed_document(
+                VespaDocument(
+                    id='1',
+                    fields={}
+                ),
                 schema=index_name
             )
 
