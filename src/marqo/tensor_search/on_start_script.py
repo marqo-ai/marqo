@@ -4,7 +4,7 @@ import time
 
 import torch
 
-from marqo import config
+from marqo import config, documentation
 from marqo.api import exceptions
 from marqo.connections import redis_driver
 from marqo.s2_inference.s2_inference import vectorise
@@ -12,12 +12,14 @@ from marqo.s2_inference.s2_inference import vectorise
 from marqo.tensor_search import index_meta_cache, utils
 from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.tensor_search_logging import get_logger
+from marqo.vespa.exceptions import VespaError
 
 logger = get_logger(__name__)
 
 
 def on_start(config: config.Config):
     to_run_on_start = (
+        CreateSettingsSchema(config),
         PopulateCache(config),
         DownloadStartText(),
         CUDAAvailable(),
@@ -31,6 +33,23 @@ def on_start(config: config.Config):
 
     for thing_to_start in to_run_on_start:
         thing_to_start.run()
+
+
+class CreateSettingsSchema:
+    """Create the Marqo settings schema on Vespa"""
+
+    def __init__(self, config: config.Config):
+        self.config = config
+
+    def run(self):
+        try:
+            self.config.index_management.create_settings_schema()
+        except VespaError as e:
+            logger.warn(
+                f"Could not create Marqo settings schema. If you are using an external vector store, "
+                "ensure that Marqo is configured properly for this. See "
+                f"{documentation.configuring_marqo()} for more details. Error: {e}"
+            )
 
 
 class PopulateCache:
