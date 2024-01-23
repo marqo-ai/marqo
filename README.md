@@ -21,7 +21,7 @@ Marqo is more than a vector database, it's an end-to-end vector search engine fo
 
 Vector similarity alone is not enough for vector search. Vector search requires more than a vector database - it also requires machine learning (ML) deployment and management, preprocessing and transformations of inputs as well as the ability to modify search behavior without retraining a model. Marqo contains all these pieces, enabling developers to build vector search into their application with minimal effort. A full list of features can be found [below](#-core-features).
 
-**Why not X, Y, Z vector database?** 
+**Why bundle embedding generation with vector search?** 
 
 Vector databases are specialized components for vector similarity and only service one component of a vector search system. They are “vectors in - vectors out”. They still require the production of vectors, management of the ML models, associated orchestration and processing of the inputs. Marqo makes this easy by being “documents in, documents out”. Preprocessing of text and images, embedding the content, storing meta-data and deployment of inference and storage is all taken care of by Marqo. 
 
