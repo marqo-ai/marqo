@@ -274,7 +274,7 @@ class IndexManagement:
         except VespaStatusError as e:
             if e.status_code == 404:
                 logger.debug('Marqo config document does not exist. Assuming Marqo version 2.0.x')
-                return '2.0.x'
+                return '2.0'
             raise e
 
         return _MarqoConfig.parse_raw(response.document.fields['settings']).version

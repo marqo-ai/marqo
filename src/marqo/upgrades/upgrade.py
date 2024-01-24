@@ -31,7 +31,7 @@ class UpgradeRunner:
 
     def upgrade(self):
         config_version_full = self.index_management.get_marqo_version()
-        parsed_version = semver.VersionInfo.parse(config_version_full)
+        parsed_version = semver.VersionInfo.parse(config_version_full, optional_minor_and_patch=True)
         config_version = f'{parsed_version.major}.{parsed_version.minor}'
 
         upgrade = self._for_version(config_version)
@@ -44,7 +44,10 @@ class UpgradeRunner:
         upgrade.run()
 
     def _for_version(self, from_version) -> Optional[Upgrade]:
-        to_version = version.get_version()
+        to_version_full = version.get_version()
+        parsed_version = semver.VersionInfo.parse(to_version_full)
+        to_version = f'{parsed_version.major}.{parsed_version.minor}'
+
         if from_version == "2.0" and to_version == '2.1':
             from marqo.upgrades.v20_v21 import v20v21
             return v20v21(self.vespa_client)

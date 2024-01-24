@@ -22,8 +22,8 @@ class v20v21(Upgrade):
     def __init__(self, vespa_client: VespaClient):
         self.vespa_client = vespa_client
         self.settings_schema = IndexManagement._MARQO_SETTINGS_SCHEMA_NAME
-        self.config_id = IndexManagement._MARQO_CONFIG_ID
-        self.default_query_profile = IndexManagement._MARQO_DEFAULT_QUERY_PROFILE
+        self.config_id = IndexManagement._MARQO_CONFIG_DOC_ID
+        self.default_query_profile = IndexManagement._DEFAULT_QUERY_PROFILE_TEMPLATE
 
     def run(self):
         logger.info("Running upgrade v20v21")
