@@ -211,6 +211,14 @@ class TestApiErrors(MarqoTestCase):
                      }
                  ],
                  "tensorFields": ['field_3'],
+                 "model": "ViT-L/14",
+                 "modelProperties": {
+                     "name": "ViT-L/14",
+                     "dimensions": 768,
+                     "url": "https://7b4d1a66-507d-43f1-b99f-7368b655de46.s3.amazonaws.com/e5a7d9c7-0736-4301-a037-b1307f43a314/23fa0cb1-68d5-40f6-8039-e9e1265b6103.pt",
+                     "type": "open_clip",
+                     "field_1": "sth"
+                 }
              }, 'Snake case in field name is valid'),
         ]
 
