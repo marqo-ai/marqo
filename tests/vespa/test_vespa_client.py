@@ -74,7 +74,6 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
         self.assertIsNone(messages[0])
         self.assertIsNotNone(messages[1])
 
-    @unittest.skip
     def test_feed_batch_invalidFeedUrl_fails(self):
         feed_client = VespaClient("http://localhost:8080", "http://localhost:8000",
                                   "http://localhost:8080", "content_default")
