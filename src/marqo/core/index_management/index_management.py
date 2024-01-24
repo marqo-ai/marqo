@@ -6,13 +6,13 @@ from typing import List
 
 import marqo.logging
 import marqo.vespa.vespa_client
+from marqo import version
 from marqo.base_model import ImmutableStrictBaseModel
 from marqo.core import constants
 from marqo.core.exceptions import IndexExistsError, IndexNotFoundError
 from marqo.core.models import MarqoIndex
 from marqo.core.models.marqo_index_request import MarqoIndexRequest
 from marqo.core.vespa_schema import for_marqo_index_request as vespa_schema_factory
-from marqo import version
 from marqo.exceptions import InternalError
 from marqo.vespa.exceptions import VespaStatusError
 from marqo.vespa.models import VespaDocument
@@ -223,8 +223,10 @@ class IndexManagement:
             raise InternalError("Unexpected continuation token received")
 
         return [
-            MarqoIndex.parse_raw(response.fields['settings'])
-            for response in batch_response.documents
+            MarqoIndex.parse_raw(document.fields['settings'])
+
+            for document in batch_response.documents
+            if not document.id.split('::')[-1].startswith(constants.MARQO_RESERVED_PREFIX)
         ]
 
     def get_index(self, index_name) -> MarqoIndex:
