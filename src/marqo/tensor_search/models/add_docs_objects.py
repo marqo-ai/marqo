@@ -30,6 +30,7 @@ class AddDocsBodyParams(BaseModel):
     documents: Union[Sequence[Union[dict, Any]], np.ndarray]
     imageDownloadThreadCount: int = 20
 
+
 # TODO - Make this configurable
 MAX_DOCS = 128
 
