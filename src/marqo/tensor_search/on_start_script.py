@@ -4,7 +4,7 @@ import time
 
 import torch
 
-from marqo import config, documentation
+from marqo import config, documentation, version
 from marqo.api import exceptions
 from marqo.connections import redis_driver
 from marqo.s2_inference.s2_inference import vectorise
@@ -27,6 +27,7 @@ def on_start(config: config.Config):
         ModelsForCacheing(),
         InitializeRedis("localhost", 6379),
         DownloadFinishText(),
+        PrintVersion(),
         MarqoWelcome(),
         MarqoPhrase(),
     )
@@ -234,6 +235,11 @@ class DownloadFinishText:
         print("###########################################################")
         print("###########################################################")
         print('\n', flush=True)
+
+
+class PrintVersion:
+    def run(self):
+        print(f"Version: {version.__version__}")
 
 
 class MarqoPhrase:
