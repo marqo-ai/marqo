@@ -112,7 +112,7 @@ jobs:
           # Set up conf file
           echo 'export MARQO_API_TESTS_ROOT="${{ github.workspace }}"' >> conf
           
-      - name: Run Integration Tests - local_os
+      - name: Run Integration Tests - CPU Local Marqo
         run: |
           export MQ_API_TEST_BRANCH=$(echo "${GITHUB_REF}" | cut -d'/' -f3-)
           CUSTOM_TEST_IMG="${{ github.event.inputs.image_to_test }}"
