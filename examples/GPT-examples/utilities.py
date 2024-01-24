@@ -174,9 +174,9 @@ def extract_text_from_highlights(res, token_limit=256, truncate=True):
     highlights = []
     texts = []
     for ind,hit in enumerate(res[ResultsFields.hits]):
-        highlight_dict = hit[ResultsFields.highlights]
-        highlight_key = list(highlight_dict.keys())[0]
-        highlight_text = list(highlight_dict.values())[0]
+        highlight_list = hit[ResultsFields.highlights]
+        highlight_key = list(highlight_list[0].keys())[0]
+        highlight_text = list(highlight_list[0].values())[0]
         text = hit[highlight_key]
     
         if truncate:
