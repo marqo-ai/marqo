@@ -9,6 +9,9 @@ from marqo.tensor_search.enums import EnvVars
 from marqo.config import Config
 from copy import deepcopy
 
+# TODO - Change when max docs becomes configurable
+from marqo.tensor_search.models.add_docs_objects import MAX_DOCS
+
 
 def add_docs_caller(config: Config, **kwargs):
     """This represents the call signature of add_documents at commit
@@ -25,7 +28,7 @@ def add_docs_caller(config: Config, **kwargs):
     return add_documents(config=config, add_docs_params=AddDocsParams(**kwargs))
 
 
-def add_docs_batched(config: Config, batch_size: int = default_env_vars()[EnvVars.MARQO_MAX_ADD_DOCS_COUNT], **kwargs):
+def add_docs_batched(config: Config, batch_size: int = MAX_DOCS, **kwargs):
     """
     Helper function to batch large add_documents calls in testing
     Default batch size is the default max add docs count env var

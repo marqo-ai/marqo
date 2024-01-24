@@ -25,13 +25,13 @@ class TestDeleteDocuments(MarqoTestCase):
     def setUpClass(cls) -> None:
         super().setUpClass()
 
-        text_index_with_random_model = cls.unstructured_marqo_index_request(model=Model(name='random'))
+        text_index_with_random_model_request = cls.unstructured_marqo_index_request(model=Model(name='random'))
 
         cls.create_indexes([
-            text_index_with_random_model
+            text_index_with_random_model_request
         ])
 
-        cls.text_index_with_random_model = text_index_with_random_model.name
+        cls.text_index_with_random_model = text_index_with_random_model_request.name
 
     def setUp(self) -> None:
         self.clear_indexes(self.indexes)
@@ -67,8 +67,8 @@ class TestDeleteDocuments(MarqoTestCase):
 
         count_post_delete = self.monitoring.get_index_stats_by_name(self.text_index_with_random_model).number_of_documents
 
-        assert count_post_delete == count0_res
-        assert count1_res == count0_res + 2
+        self.assertEqual(count_post_delete, count0_res)
+        self.assertEqual(count1_res, count0_res + 2)
 
     def test_delete_docs_format(self):
         add_docs_caller(
@@ -79,11 +79,11 @@ class TestDeleteDocuments(MarqoTestCase):
             ], tensor_fields=["f1"])
 
         res = marqo.tensor_search.tensor_search.delete_documents(config=self.config, doc_ids=["5678", "491"], index_name=self.text_index_with_random_model)
-        assert res["index_name"] == self.text_index_with_random_model
-        assert res["type"] == "documentDeletion"
-        assert res["status"] == "succeeded"
-        assert res["details"]["receivedDocumentIds"] == 2
-        assert res["details"]["deletedDocuments"] == 2  # 491 is counted in deletedDocuments count, even if it doesn't exist
+        self.assertEqual(res["index_name"], self.text_index_with_random_model)
+        self.assertEqual(res["type"], "documentDeletion")
+        self.assertEqual(res["status"], "succeeded")
+        self.assertEqual(res["details"]["receivedDocumentIds"], 2)
+        self.assertEqual(res["details"]["deletedDocuments"], 2)  # 491 is counted in deletedDocuments count, even if it doesn't exist
         assert "PT" in res["duration"]
         assert "Z" in res["startedAt"]
         assert "T" in res["finishedAt"]
@@ -475,8 +475,8 @@ class TestDeleteDocumentsEndpoint(MarqoTestCase):
             # under the limit
             update_res = tensor_search.delete_documents(
                 config=self.config, index_name=self.text_index_with_random_model, doc_ids=doc_ids[:90])
-            assert update_res['details']['receivedDocumentIds'] == update_res['details']['deletedDocuments']
-            assert update_res['details']['receivedDocumentIds'] == 90
+            self.assertEqual(update_res['details']['receivedDocumentIds'], update_res['details']['deletedDocuments'])
+            self.assertEqual(update_res['details']['receivedDocumentIds'], 90)
             return True
 
         assert run()
@@ -486,8 +486,9 @@ class TestDeleteDocumentsEndpoint(MarqoTestCase):
 
         @patch.dict(os.environ, dict())
         def run():
-            assert default_limit == tensor_search.utils.read_env_vars_and_defaults_ints(
+            self.assertEqual(default_limit, tensor_search.utils.read_env_vars_and_defaults_ints(
                 enums.EnvVars.MARQO_MAX_DELETE_DOCS_COUNT)
+            )
             return True
 
         assert run()
