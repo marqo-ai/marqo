@@ -12,7 +12,7 @@ from marqo.core.exceptions import IndexExistsError, IndexNotFoundError
 from marqo.core.models import MarqoIndex
 from marqo.core.models.marqo_index_request import MarqoIndexRequest
 from marqo.core.vespa_schema import for_marqo_index_request as vespa_schema_factory
-from marqo.documentation import version
+from marqo import version
 from marqo.exceptions import InternalError
 from marqo.vespa.exceptions import VespaStatusError
 from marqo.vespa.models import VespaDocument
@@ -44,9 +44,9 @@ class IndexManagement:
     )
     _MARQO_QUERY_PROFILE_TEMPLATE = textwrap.dedent(
         '''
-        <query-profile id="%s" type="root">
-            <maxHits>1000</maxHits>
-            <maxOffset>10000</maxOffset>
+        <query-profile id="default">
+            <field name="maxHits">1000</field>
+            <field name="maxOffset">10000</field>
         </query-profile>
         '''
     )
@@ -286,7 +286,7 @@ class IndexManagement:
         # but no Marqo query profile
         settings_schema_exists = os.path.exists(os.path.join(app, 'schemas', f'{self._MARQO_SETTINGS_SCHEMA_NAME}.sd'))
         query_profile_exists = os.path.exists(
-            os.path.join(app, 'search/query-profiles', f'{constants.MARQO_VESPA_QUERY_PROFILE}.xml')
+            os.path.join(app, 'search/query-profiles', 'default.xml')
         )
 
         if settings_schema_exists and not query_profile_exists:
@@ -336,6 +336,7 @@ class IndexManagement:
                 self._MARQO_SETTINGS_SCHEMA_NAME,
                 self._MARQO_SETTINGS_SCHEMA_NAME
             )
+            os.makedirs(os.path.dirname(schema_path), exist_ok=True)
             with open(schema_path, 'w') as f:
                 f.write(schema)
             self._add_schema_to_services(app, self._MARQO_SETTINGS_SCHEMA_NAME)
@@ -352,11 +353,12 @@ class IndexManagement:
         Returns:
             True if query profile was created, False if it already existed
         """
-        profile_path = os.path.join(app, 'search/query-profiles', f'{constants.MARQO_VESPA_QUERY_PROFILE}.xml')
+        profile_path = os.path.join(app, 'search/query-profiles', 'default.xml')
         if not os.path.exists(profile_path):
             logger.debug('Marqo query profile does not exist. Creating it')
 
-            query_profile = self._MARQO_QUERY_PROFILE_TEMPLATE % constants.MARQO_VESPA_QUERY_PROFILE
+            query_profile = self._MARQO_QUERY_PROFILE_TEMPLATE
+            os.makedirs(os.path.dirname(profile_path), exist_ok=True)
             with open(profile_path, 'w') as f:
                 f.write(query_profile)
 

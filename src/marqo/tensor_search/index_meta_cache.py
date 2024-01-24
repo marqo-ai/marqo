@@ -108,7 +108,7 @@ def _check_refresh_thread(config: Config):
                             # This can happen when settings schema doesn't exist
                             logger.warn(
                                 'Failed to populate index cache due to 400 error from vector store. This can happen '
-                                'if Marqo settings schema does not exist. Error: {e}'
+                                f'if Marqo settings schema does not exist. Error: {e}'
                             )
                         else:
                             logger.warn(
