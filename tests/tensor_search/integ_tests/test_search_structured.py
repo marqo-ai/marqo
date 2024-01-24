@@ -352,10 +352,27 @@ class TestSearchStructured(MarqoTestCase):
             )
 
         with self.assertRaises(errors.IllegalRequestedDocCount):
-            # too small
+            # violates total results
             search_res = tensor_search.search(
                 config=self.config, index_name=self.default_text_index, text="Exact match hehehe",
                 result_count=1000000
+            )
+            raise AssertionError
+
+        with self.assertRaises(errors.IllegalRequestedDocCount):
+            # violates max limit of 1000
+            search_res = tensor_search.search(
+                config=self.config, index_name=self.default_text_index, text="Exact match hehehe",
+                result_count=1001
+            )
+            raise AssertionError
+
+        with self.assertRaises(errors.IllegalRequestedDocCount):
+            # violates max offset of 10,000
+            search_res = tensor_search.search(
+                config=self.config, index_name=self.default_text_index, text="Exact match hehehe",
+                result_count=1,
+                offset=10001
             )
             raise AssertionError
 
@@ -1230,6 +1247,5 @@ class TestSearchStructured(MarqoTestCase):
         for hit in tensor_search_result['hits']:
             self.assertIn("_highlights", hit)
             self.assertTrue(isinstance(hit["_highlights"], list))
-            self.assertEqual(1, len(hit["_highlights"])) # We only have 1 highlight now
+            self.assertEqual(1, len(hit["_highlights"]))  # We only have 1 highlight now
             self.assertTrue(isinstance(hit["_highlights"][0], dict))
-
