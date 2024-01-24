@@ -38,6 +38,10 @@ class v20v21(Upgrade):
             raise Exception('Upgrade v20v21 failed. Partial changes may have been applied. This process is '
                             'idempotent. A successful run is required to bring Marqo into a consistent state') from e
 
+        logger.info("Verifying upgrade")
+        self._verify_query_profile()
+        self._verify_marqo_version()
+
         logger.info("Upgrade v20v21 finished")
 
     def _create_query_profile(self):
@@ -66,3 +70,21 @@ class v20v21(Upgrade):
             ),
             schema=self.settings_schema
         )
+
+    def _verify_query_profile(self):
+        app = self.vespa_client.download_application()
+        profile_path_exists = os.path.exists(os.path.join(app, 'search/query-profiles', 'default.xml'))
+        if not profile_path_exists:
+            raise api_exceptions.InternalError(
+                f"Query profile does not exist. "
+                f"Upgrade has not been applied correctly"
+            )
+
+    def _verify_marqo_version(self):
+        index_management = IndexManagement(self.vespa_client)
+        configured_version = index_management.get_marqo_version()
+        if configured_version != version.get_version():
+            raise api_exceptions.InternalError(
+                f"Marqo version in config is {configured_version}, but Marqo version is {version.get_version()}. "
+                f"Upgrade has not been applied correctly"
+            )
