@@ -1,3 +1,4 @@
+import uuid
 from unittest import mock
 
 from fastapi.testclient import TestClient
@@ -148,7 +149,7 @@ class TestApiErrors(MarqoTestCase):
         """
         Verify snake case rejected for fields that have camel case as alias
         """
-        test_cases = [
+        test_cases_fail = [
             ({
                  "type": "structured",
                  "allFields": [
@@ -158,8 +159,12 @@ class TestApiErrors(MarqoTestCase):
                      },
                      {
                          "name": "field2",
+                         "type": "text"
+                     },
+                     {
+                         "name": "field3",
                          "type": "multimodal_combination",
-                         "dependent_fields": ["field1"]
+                         "dependent_fields": {"field1": 0.5, "field2": 0.5}
                      }
                  ],
                  "tensorFields": [],
@@ -175,7 +180,7 @@ class TestApiErrors(MarqoTestCase):
                          'm': 16
                      }
                  }
-             }, 'ef_construction', 'Snake case within a dict'),
+             }, 'ef_construction', 'Snake case within a dict is invalid'),
             ({
                  "type": "unstructured",
                  'annParameters': {
@@ -185,9 +190,31 @@ class TestApiErrors(MarqoTestCase):
                          'm': 16
                      }
                  }
-             }, 'ef_construction', 'Snake case within a dict, unstructured index')
+             }, 'ef_construction', 'Snake case within a dict is invalid, unstructured index')
         ]
-        for test_case, field, test_name in test_cases:
+        test_cases_pass = [
+            ({
+                 "type": "structured",
+                 "allFields": [
+                     {
+                         "name": "field_1",
+                         "type": "text"
+                     },
+                     {
+                         "name": "field_2",
+                         "type": "text"
+                     },
+                     {
+                         "name": "field_3",
+                         "type": "multimodal_combination",
+                         "dependentFields": {"field_1": 0.5, "field_2": 0.5}
+                     }
+                 ],
+                 "tensorFields": ['field_3'],
+             }, 'Snake case in field name is valid'),
+        ]
+
+        for test_case, field, test_name in test_cases_fail:
             with self.subTest(test_name):
                 response = self.client.post(
                     "/indexes/my_index",
@@ -196,3 +223,13 @@ class TestApiErrors(MarqoTestCase):
 
                 self.assertEqual(response.status_code, 422)
                 self.assertTrue(f"Invalid field name '{field}'" in response.text)
+
+        for test_case, test_name in test_cases_pass:
+            with self.subTest(test_name):
+                index_name = 'a' + str(uuid.uuid4()).replace('-', '')
+                response = self.client.post(
+                    f"/indexes/{index_name}",
+                    json=test_case
+                )
+
+                self.assertEqual(response.status_code, 200)

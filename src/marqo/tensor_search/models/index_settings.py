@@ -51,8 +51,9 @@ class IndexSettings(StrictBaseModel):
                     if '_' in key:
                         raise ValueError(f"Invalid field name '{key}'. "
                                          f"See Create Index API reference here https://docs.marqo.ai/2.0.0/API-Reference/Indexes/create_index/")
-                    
-                    validate_keys(d[key])
+
+                    if key != 'dependentFields':
+                        validate_keys(d[key])
             elif isinstance(d, list):
                 for item in d:
                     validate_keys(item)
