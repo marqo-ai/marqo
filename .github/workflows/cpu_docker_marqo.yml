@@ -97,7 +97,7 @@ jobs:
             echo "::set-output name=py_marqo_branch::git+https://github.com/marqo-ai/py-marqo.git@${{ env.PY_MQ_API_TEST_BRANCH }}"
           fi
         env:
-          PY_MQ_API_TEST_BRANCH: ${{ inputs.py-marqo-branch }}
+          PY_MQ_API_TEST_BRANCH: ${{ inputs.py_marqo_branch }}
   
       - name: Checkout marqo-api-tests repo
         uses: actions/checkout@v3
