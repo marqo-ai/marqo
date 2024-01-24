@@ -6,6 +6,7 @@ from typing import List
 
 import marqo.logging
 import marqo.vespa.vespa_client
+from marqo.core import constants
 from marqo.core.exceptions import IndexExistsError, IndexNotFoundError
 from marqo.core.models import MarqoIndex
 from marqo.core.models.marqo_index_request import MarqoIndexRequest
@@ -241,6 +242,24 @@ class IndexManagement:
         except IndexNotFoundError:
             return False
 
+    def _add_marqo_config(self, app: str) -> bool:
+        """
+        Add Marqo configuration to Vespa application package if this application package has not already been
+        configured for Marqo.
+
+        An application package is considered configured for Marqo if it contains the Marqo settings schema.
+        Args:
+            app: Path to Vespa application package
+        Returns:
+            True if configuration was added, False if it already existed
+        """
+        added = self._add_marqo_settings_schema(app)
+        if added:
+            self._add_marqo_query_profile(app)
+            return True
+
+        return False
+
     def _add_marqo_settings_schema(self, app: str) -> bool:
         """
         Create the Marqo settings schema if it does not exist.
@@ -263,6 +282,32 @@ class IndexManagement:
 
             return True
         return False
+
+    def _add_marqo_query_profile(self, app: str) -> bool:
+        """
+        Create the Marqo query profile if it does not exist.
+        Args:
+            app: Path to Vespa application package
+
+        Returns:
+            True if query profile was created, False if it already existed
+        """
+        schema_path = os.path.join(app, 'search/query-profiles', f'{constants.MARQO_VESPA_QUERY_PROFILE}.xml')
+        if not os.path.exists(schema_path):
+            logger.debug('Marqo query profile does not exist. Creating it')
+
+            query_profile = textwrap.dedent(
+                f'''
+                <query-profile id="{constants.MARQO_VESPA_QUERY_PROFILE}">
+                    <field name="ranking.features.query(model)"/>
+                </query-profile>
+                '''
+            ).strip()
+            with open(schema_path, 'w') as f:
+                f.write(query_profile)
+
+            return True
+        pass
 
     def _add_schema(self, app: str, name: str, schema: str) -> None:
         schema_path = os.path.join(app, 'schemas', f'{name}.sd')
