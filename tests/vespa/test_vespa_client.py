@@ -40,7 +40,6 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
         self.assertEqual(ids, batch_ids)
         self.assertEqual(messages, [None] * len(batch))
 
-    @unittest.skip
     def test_feed_batch_successful(self):
         documents = [
             VespaDocument(id="doc1", fields={"title": "Title 1", "contents": "Content 1"}),
