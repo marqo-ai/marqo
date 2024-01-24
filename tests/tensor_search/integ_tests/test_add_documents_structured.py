@@ -47,7 +47,17 @@ class TestAddDocumentsStructured(MarqoTestCase):
                     name='in_stock',
                     type=FieldType.Bool,
                     features=[FieldFeature.Filter]
-                )
+                ),
+                FieldRequest(
+                    name="long_field_1",
+                    type=FieldType.Long,
+                    features=[FieldFeature.Filter]
+                ),
+                FieldRequest(
+                    name="double_field_1",
+                    type=FieldType.Double,
+                    features=[FieldFeature.Filter]
+                ),
             ],
             tensor_fields=['title']
         )
@@ -995,3 +1005,28 @@ class TestAddDocumentsStructured(MarqoTestCase):
                 )
 
                 self.assertEqual(thread_count, mock_download_images.call_count)
+
+    def test_add_long_double_numeric_values(self):
+        """Test to ensure large integer and float numbers are handled correctly for long and double fields"""
+        test_case = [
+            ({"long_field_1": 1}, False),  # small positive integer
+            ({"long_field_1": -1}, False),  # small negative integer
+            ({"long_field_1": 100232142}, False),  # large positive integer
+            ({"long_field_1": -923217213}, False),  # large positive integer
+            ({'long_field_1': int("1" * 50)}, True),  # overlarge positive integer, should raise error in long field
+            # overlarge negative integer, should raise error in long field
+            ({'long_field_1': -1 * int("1" * 50)}, True),
+            ({"double_field_1": 1e10}, False),  # large positive integer mathematical expression
+            ({"double_field_1": -1e12}, False),  # large negative integer mathematical expression
+            ({"double_field_1": 1e10 + 0.123249357987123}, False),  # large positive float
+            ({"double_field_1": - 1e10 + 0.123249357987123}, False),  # large negative float
+        ]
+
+        for doc, error in test_case:
+            with self.subTest():
+                res = tensor_search.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=self.index_name_1, docs=[doc], device="cpu",
+                    )
+                )
+                self.assertEqual(res['errors'], error)

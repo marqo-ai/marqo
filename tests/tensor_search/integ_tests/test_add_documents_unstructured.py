@@ -893,14 +893,18 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
     def test_supported_large_integer_and_float_number(self):
         """Test to ensure large integer and float numbers are handled correctly for long and double data types
         in the unstructured index schema"""
-
         test_case = [
-            ({"large_int_field": 1e10}, False),  # large positive integer mathematical expression
-            ({"large_int_field": -1e12}, False),  # large negative integer mathematical expression
-            ({'large_int_field': int("1" * 50)}, True),  # large positive float
-            ({'large_int_field': -1 * int("1" * 50)}, True),  # large positive float
-            ({"large_float_field": 1e10 + 0.123249357987123}, False),  # large positive float
-            ({"large_float_field": - 1e10 + 0.123249357987123}, False),  # large negative float
+            ({"long_field_1": 1}, False),  # small positive integer
+            ({"long_field_1": -1}, False),  # small negative integer
+            ({"long_field_1": 100232142}, False),  # large positive integer
+            ({"long_field_1": -923217213}, False),  # large positive integer
+            ({'long_field_1': int("1" * 50)}, True),  # overlarge positive integer, should raise error in long field
+            # overlarge negative integer, should raise error in long field
+            ({'long_field_1': -1 * int("1" * 50)}, True),
+            ({"double_field_1": 1e10}, False),  # large positive integer mathematical expression
+            ({"double_field_1": -1e12}, False),  # large negative integer mathematical expression
+            ({"double_field_1": 1e10 + 0.123249357987123}, False),  # large positive float
+            ({"double_field_1": - 1e10 + 0.123249357987123}, False),  # large negative float
         ]
 
         for doc, error in test_case:

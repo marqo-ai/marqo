@@ -12,10 +12,14 @@ class StructuredVespaSchema(VespaSchema):
         FieldType.Text: 'string',
         FieldType.Bool: 'byte',
         FieldType.Int: 'int',
+        FieldType.Long: 'long',
         FieldType.Float: 'float',
+        FieldType.Double: 'double',
         FieldType.ArrayText: 'array<string>',
         FieldType.ArrayInt: 'array<int>',
+        FieldType.ArrayLong: 'array<long>',
         FieldType.ArrayFloat: 'array<float>',
+        FieldType.ArrayDouble: 'array<double>',
         FieldType.ImagePointer: 'string',
         FieldType.MultimodalCombination: 'map<string, float>'
     }
