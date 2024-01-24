@@ -915,4 +915,5 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
                         tensor_fields=[]
                     )
                 )
+                print(res)
                 self.assertEqual(res['errors'], error)

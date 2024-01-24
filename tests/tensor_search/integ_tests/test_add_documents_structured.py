@@ -58,6 +58,16 @@ class TestAddDocumentsStructured(MarqoTestCase):
                     type=FieldType.Double,
                     features=[FieldFeature.Filter]
                 ),
+                FieldRequest(
+                    name="array_long_field_1",
+                    type=FieldType.ArrayLong,
+                    features=[FieldFeature.Filter]
+                ),
+                FieldRequest(
+                    name="double_double_field_1",
+                    type=FieldType.ArrayDouble,
+                    features=[FieldFeature.Filter]
+                ),
             ],
             tensor_fields=['title']
         )
@@ -1020,6 +1030,10 @@ class TestAddDocumentsStructured(MarqoTestCase):
             ({"double_field_1": -1e12}, False),  # large negative integer mathematical expression
             ({"double_field_1": 1e10 + 0.123249357987123}, False),  # large positive float
             ({"double_field_1": - 1e10 + 0.123249357987123}, False),  # large negative float
+            ({"array_double_field_1": [1e10, 1e10 + 0.123249357987123]}, False),  # large float array
+            ({"array_long_field_1": [1002321423, -4923217213, 12390809]}, False),  # large integer array
+            # large integer array with one overlarge integer, should raise error
+            ({"array_long_field_1": [1002321423, -4923217213, 12390809, int("9" * 50)]}, True)
         ]
 
         for doc, error in test_case:
