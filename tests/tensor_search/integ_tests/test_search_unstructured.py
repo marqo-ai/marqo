@@ -1,6 +1,5 @@
 import math
 import os
-import pprint
 import random
 import uuid
 from unittest import mock
@@ -1219,3 +1218,25 @@ class TestSearchUnstructured(MarqoTestCase):
                     )
                     self.assertEqual(1, len(res["hits"]))
                     self.assertEqual(expected_document_ids, res["hits"][0]["_id"])
+
+    def test_search_with_content_double_colon(self):
+        docs = [
+            {"_id": "1", "text_field": "::my_text"} # This should work properly
+        ]
+        tensor_search.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.default_text_index,
+                docs=docs,
+                tensor_fields=["text_field"]
+            )
+        )
+        tensor_search_result = tensor_search.search(
+            text="some text",
+            index_name=self.default_text_index,
+            config=self.config,
+            search_method=SearchMethod.TENSOR,
+        )
+        self.assertEqual(1, len(tensor_search_result['hits']))
+        self.assertEqual("1", tensor_search_result['hits'][0]['_id'])
+

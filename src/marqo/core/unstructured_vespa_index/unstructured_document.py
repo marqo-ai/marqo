@@ -38,7 +38,7 @@ class UnstructuredVespaDocumentFields(MarqoBaseModel):
                                             ["cells"].keys())[0])
         except KeyError:
             raise VespaDocumentParsingError("No match features found in the document")
-        field_name, content = self.vespa_chunks[chunk_index].split("::", 2)
+        field_name, content = self.vespa_chunks[chunk_index].split("::", 1)
         return [{field_name: content}]
 
 
@@ -118,7 +118,7 @@ class UnstructuredVespaDocument(MarqoBaseModel):
         marqo_document.update(self.fields.long_string_fields)
         # Reconstruct string arrays
         for string_array in self.fields.string_arrays:
-            key, value = string_array.split("::", 2)
+            key, value = string_array.split("::", 1)
             if key not in marqo_document:
                 marqo_document[key] = []
             marqo_document[key].append(value)
@@ -146,7 +146,7 @@ class UnstructuredVespaDocument(MarqoBaseModel):
             for chunk, embedding in zip(self.fields.vespa_chunks, embeddings_list):
                 if "::" not in chunk:
                     raise VespaDocumentParsingError(f"Chunk {chunk} does not have a field_name::content format")
-                field_name, content = chunk.split("::", 2)
+                field_name, content = chunk.split("::", 1)
                 if field_name not in marqo_document[index_constants.MARQO_DOC_TENSORS]:
                     marqo_document[index_constants.MARQO_DOC_TENSORS][field_name] = dict()
                     marqo_document[index_constants.MARQO_DOC_TENSORS][field_name][index_constants.MARQO_DOC_CHUNKS]\
