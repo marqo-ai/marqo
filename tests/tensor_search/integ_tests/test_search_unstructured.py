@@ -1180,8 +1180,10 @@ class TestSearchUnstructured(MarqoTestCase):
         valid_documents = [
             {'long_field_1': 1, '_id': '0', "search_field": "some text"},  # small positive integer
             {'long_field_1': -1, '_id': '1', "search_field": "some text"},  # small negative integer
-            {'long_field_1': 100232142, '_id': '2', "search_field": "some text"},  # large positive integer
-            {'long_field_1': -923217213, '_id': '3', "search_field": "some text"},  # large positive integer
+            # large positive integer that can't be handled by int
+            {'long_field_1': 100232142864, '_id': '2', "search_field": "some text"},
+            # large positive integer that can't be handled by int
+            {'long_field_1': -923217213, '_id': '3', "search_field": "some text"},
             # large positive integer mathematical expression
             {'double_field_1': 10000000000.0, '_id': '4', "search_field": "some text"},
             # large negative integer mathematical expression

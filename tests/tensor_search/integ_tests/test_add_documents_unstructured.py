@@ -896,8 +896,8 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
         test_case = [
             ({"long_field_1": 1}, False),  # small positive integer
             ({"long_field_1": -1}, False),  # small negative integer
-            ({"long_field_1": 100232142}, False),  # large positive integer
-            ({"long_field_1": -923217213}, False),  # large positive integer
+            ({"long_field_1": -100232142002}, False),  # large positive integer that can't be handled by int
+            ({"long_field_1": -923217213231}, False),  # large negative integer that can't be handled by int
             ({'long_field_1': int("1" * 50)}, True),  # overlarge positive integer, should raise error in long field
             # overlarge negative integer, should raise error in long field
             ({'long_field_1': -1 * int("1" * 50)}, True),
