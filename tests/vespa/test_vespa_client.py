@@ -23,7 +23,6 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
 
         self.pyvespa_client.delete_all_docs(self.TEST_CLUSTER, self.TEST_SCHEMA)
 
-    @unittest.skip
     def _base_test_feed_batch_successful(self, func, batch):
         batch_ids = [doc.id for doc in batch]
 
