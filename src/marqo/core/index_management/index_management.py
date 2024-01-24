@@ -6,11 +6,13 @@ from typing import List
 
 import marqo.logging
 import marqo.vespa.vespa_client
+from marqo.base_model import ImmutableStrictBaseModel
 from marqo.core import constants
 from marqo.core.exceptions import IndexExistsError, IndexNotFoundError
 from marqo.core.models import MarqoIndex
 from marqo.core.models.marqo_index_request import MarqoIndexRequest
 from marqo.core.vespa_schema import for_marqo_index_request as vespa_schema_factory
+from marqo.documentation import version
 from marqo.exceptions import InternalError
 from marqo.vespa.exceptions import VespaStatusError
 from marqo.vespa.models import VespaDocument
@@ -19,8 +21,13 @@ from marqo.vespa.vespa_client import VespaClient
 logger = marqo.logging.get_logger(__name__)
 
 
+class _MarqoConfig(ImmutableStrictBaseModel):
+    version: str
+
+
 class IndexManagement:
     _MARQO_SETTINGS_SCHEMA_NAME = 'marqo__settings'
+    _MARQO_CONFIG_DOC_ID = 'marqo__config'
     _MARQO_SETTINGS_SCHEMA_TEMPLATE = textwrap.dedent(
         '''
         schema %s {
@@ -35,23 +42,33 @@ class IndexManagement:
         }
         '''
     )
+    _MARQO_QUERY_PROFILE_TEMPLATE = textwrap.dedent(
+        '''
+        <query-profile id="%s" type="root">
+            <maxHits>1000</maxHits>
+            <maxOffset>10000</maxOffset>
+        </query-profile>
+        '''
+    )
 
     def __init__(self, vespa_client: VespaClient):
         self.vespa_client = vespa_client
 
-    def create_settings_schema(self) -> bool:
+    def bootstrap_vespa(self) -> bool:
         """
-        Create the Marqo settings schema if it does not exist.
+        Add Marqo configuration to Vespa application package if an existing Marqo configuration is not detected.
 
         Returns:
-            True if schema was created, False if it already existed
+            True if Vespa was configured, False if it was already configured
         """
         app = self.vespa_client.download_application()
-        settings_schema_created = self._add_marqo_settings_schema(app)
+        configured = self._marqo_config_exists(app)
 
-        if settings_schema_created:
+        if not configured:
+            self._add_marqo_config(app)
             self.vespa_client.deploy_application(app)
             self.vespa_client.wait_for_application_convergence()
+            self._save_marqo_version(version.get_version())
             return True
 
         return False
@@ -71,10 +88,13 @@ class IndexManagement:
             InvalidVespaApplicationError: If Vespa application is invalid after applying the index
         """
         app = self.vespa_client.download_application()
-        settings_schema_created = self._add_marqo_settings_schema(app)
+        configured = self._marqo_config_exists(app)
 
-        if not settings_schema_created and self.index_exists(marqo_index_request.name):
+        if configured and self.index_exists(marqo_index_request.name):
             raise IndexExistsError(f"Index {marqo_index_request.name} already exists")
+        else:
+            logger.debug('Marqo config does not exist. Configuring Vespa as part of index creation')
+            self._add_marqo_config(app)
 
         vespa_schema = vespa_schema_factory(marqo_index_request)
         schema, marqo_index = vespa_schema.generate_schema()
@@ -86,6 +106,9 @@ class IndexManagement:
         self.vespa_client.deploy_application(app)
         self.vespa_client.wait_for_application_convergence()
         self._save_index_settings(marqo_index)
+
+        if not configured:
+            self._save_marqo_version(version.get_version())
 
         return marqo_index
 
@@ -106,9 +129,9 @@ class IndexManagement:
             InvalidVespaApplicationError: If Vespa application is invalid after applying the indexes
         """
         app = self.vespa_client.download_application()
-        settings_schema_created = self._add_marqo_settings_schema(app)
+        configured = self._add_marqo_config(app)
 
-        if not settings_schema_created:
+        if not configured:
             for index in marqo_index_requests:
                 if self.index_exists(index.name):
                     raise IndexExistsError(f"Index {index.name} already exists")
@@ -242,23 +265,60 @@ class IndexManagement:
         except IndexNotFoundError:
             return False
 
+    def get_marqo_version(self) -> str:
+        """
+        Get the Marqo version Vespa is configured for.
+        """
+        try:
+            response = self.vespa_client.get_document(self._MARQO_CONFIG_DOC_ID, self._MARQO_SETTINGS_SCHEMA_NAME)
+        except VespaStatusError as e:
+            if e.status_code == 404:
+                logger.debug('Marqo config document does not exist. Assuming Marqo version 2.0.x')
+                return '2.0.x'
+            raise e
+
+        return _MarqoConfig.parse_raw(response.document.fields['settings']).version
+
+    def _marqo_config_exists(self, app) -> bool:
+        # For Marqo 2.1+, recording Marqo version is the final stage of configuration, and its absence
+        # indicates an incomplete configuration (e.g., interrupted configuration). However, for Marqo 2.0.x,
+        # Marqo version is not recorded. Marqo 2.0.x can be detected by an existing Marqo settings schema,
+        # but no Marqo query profile
+        settings_schema_exists = os.path.exists(os.path.join(app, 'schemas', f'{self._MARQO_SETTINGS_SCHEMA_NAME}.sd'))
+        query_profile_exists = os.path.exists(
+            os.path.join(app, 'search/query-profiles', f'{constants.MARQO_VESPA_QUERY_PROFILE}.xml')
+        )
+
+        if settings_schema_exists and not query_profile_exists:
+            logger.debug('Detected existing Marqo 2.0.x configuration')
+            return True
+
+        if settings_schema_exists and query_profile_exists:
+            try:
+                _ = self.get_marqo_version()
+                return True
+            except VespaStatusError as e:
+                if e.status_code == 404:
+                    logger.debug('Marqo config document does not exist. Detected incomplete Marqo configuration')
+                    return False
+                raise e
+
+        # Settings schema not found, so Marqo config does not exist
+        return False
+
     def _add_marqo_config(self, app: str) -> bool:
         """
-        Add Marqo configuration to Vespa application package if this application package has not already been
-        configured for Marqo.
+        Add Marqo configuration to Vespa application package.
 
-        An application package is considered configured for Marqo if it contains the Marqo settings schema.
         Args:
             app: Path to Vespa application package
         Returns:
-            True if configuration was added, False if it already existed
+            True if configuration was added, False if all components already existed
         """
-        added = self._add_marqo_settings_schema(app)
-        if added:
-            self._add_marqo_query_profile(app)
-            return True
+        added_settings_schema = self._add_marqo_settings_schema(app)
+        added_query_profile = self._add_marqo_query_profile(app)
 
-        return False
+        return added_settings_schema or added_query_profile
 
     def _add_marqo_settings_schema(self, app: str) -> bool:
         """
@@ -292,18 +352,12 @@ class IndexManagement:
         Returns:
             True if query profile was created, False if it already existed
         """
-        schema_path = os.path.join(app, 'search/query-profiles', f'{constants.MARQO_VESPA_QUERY_PROFILE}.xml')
-        if not os.path.exists(schema_path):
+        profile_path = os.path.join(app, 'search/query-profiles', f'{constants.MARQO_VESPA_QUERY_PROFILE}.xml')
+        if not os.path.exists(profile_path):
             logger.debug('Marqo query profile does not exist. Creating it')
 
-            query_profile = textwrap.dedent(
-                f'''
-                <query-profile id="{constants.MARQO_VESPA_QUERY_PROFILE}">
-                    <field name="ranking.features.query(model)"/>
-                </query-profile>
-                '''
-            ).strip()
-            with open(schema_path, 'w') as f:
+            query_profile = self._MARQO_QUERY_PROFILE_TEMPLATE % constants.MARQO_VESPA_QUERY_PROFILE
+            with open(profile_path, 'w') as f:
                 f.write(query_profile)
 
             return True
@@ -373,6 +427,17 @@ class IndexManagement:
 
         with open(validation_overrides_path, 'w') as f:
             f.write(content)
+
+    def _save_marqo_version(self, version: str) -> None:
+        self.vespa_client.feed_document(
+            VespaDocument(
+                id=self._MARQO_CONFIG_DOC_ID,
+                fields={
+                    'settings': _MarqoConfig(version=version).json()
+                }
+            ),
+            schema=self._MARQO_SETTINGS_SCHEMA_NAME
+        )
 
     def _save_index_settings(self, marqo_index: MarqoIndex) -> None:
         """

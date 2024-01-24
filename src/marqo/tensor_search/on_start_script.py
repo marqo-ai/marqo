@@ -44,7 +44,7 @@ class CreateSettingsSchema:
     def run(self):
         try:
             logger.debug('Creating Marqo settings schema')
-            created = self.config.index_management.create_settings_schema()
+            created = self.config.index_management.bootstrap_vespa()
             if created:
                 logger.debug('Marqo settings schema created')
             else:

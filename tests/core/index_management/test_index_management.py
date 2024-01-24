@@ -19,7 +19,7 @@ class TestIndexManagement(MarqoTestCase):
     def test_create_settings_schema_doesNotExist_successful(self):
         settings_schema_name = 'a' + str(uuid.uuid4()).replace('-', '')
         with mock.patch.object(IndexManagement, '_MARQO_SETTINGS_SCHEMA_NAME', settings_schema_name):
-            self.assertTrue(self.index_management.create_settings_schema())
+            self.assertTrue(self.index_management.bootstrap_vespa())
 
             # Verify settings schema exists
             try:
@@ -39,7 +39,7 @@ class TestIndexManagement(MarqoTestCase):
     def test_create_settings_schema_exists_skips(self):
         settings_schema_name = 'a' + str(uuid.uuid4()).replace('-', '')
         with mock.patch.object(IndexManagement, '_MARQO_SETTINGS_SCHEMA_NAME', settings_schema_name):
-            self.assertTrue(self.index_management.create_settings_schema())
+            self.assertTrue(self.index_management.bootstrap_vespa())
 
             import httpx
 
@@ -51,7 +51,7 @@ class TestIndexManagement(MarqoTestCase):
                 return httpx.post(*args, **kwargs)
 
             with mock.patch.object(httpx.Client, 'post', side_effect=modified_post) as mock_post:
-                self.assertFalse(self.index_management.create_settings_schema())
+                self.assertFalse(self.index_management.bootstrap_vespa())
                 # Sanity check that we're patching the right method
                 self.assertTrue(mock_post.called)
 

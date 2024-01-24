@@ -1,6 +1,6 @@
 import marqo.version
 
-version = marqo.version.__version__
+version = marqo.version.get_version()
 base_url = 'https://docs.marqo.ai'
 
 
