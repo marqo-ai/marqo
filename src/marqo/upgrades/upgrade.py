@@ -49,7 +49,7 @@ class UpgradeRunner:
         to_version = f'{parsed_version.major}.{parsed_version.minor}'
 
         if from_version == "2.0" and to_version == '2.1':
-            from marqo.upgrades.v20_v21 import v20v21
-            return v20v21(self.vespa_client)
+            from marqo.upgrades.v2_v0_v2_v1 import v2_0_v2_1
+            return v2_0_v2_1(self.vespa_client)
 
         return None

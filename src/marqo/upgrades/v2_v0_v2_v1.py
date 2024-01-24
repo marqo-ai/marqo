@@ -10,7 +10,7 @@ from marqo.vespa.vespa_client import VespaClient
 logger = logging.get_logger(__name__)
 
 
-class v20v21(Upgrade):
+class V2V0V2V1(Upgrade):
     """
     Upgrade from Marqo v2.0 to v2.1.
 
