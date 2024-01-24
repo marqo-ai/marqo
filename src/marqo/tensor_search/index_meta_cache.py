@@ -7,6 +7,7 @@ import threading
 import time
 from typing import Dict
 
+from marqo import documentation
 from marqo.api import exceptions
 from marqo.config import Config
 from marqo.core.exceptions import IndexNotFoundError
@@ -106,14 +107,14 @@ def _check_refresh_thread(config: Config):
                         if isinstance(e, VespaStatusError) and e.status_code == 400:
                             # This can happen when settings schema doesn't exist
                             logger.warn(
-                                'Failed to populate index cache due to 400 error from Vespa. This is expected if you '
-                                f'have not created an index yet. Error: {e}'
+                                'Failed to populate index cache due to 400 error from vector store. This can happen '
+                                'if Marqo settings schema does not exist. Error: {e}'
                             )
                         else:
                             logger.warn(
-                                "Failed to connect to Vespa Document API. If you are using an external Vespa instance, "
-                                "ensure that the VESPA_DOCUMENT_URL environment variable is set and your Vespa "
-                                f"instance is running and healthy. Error: {e}"
+                                "Failed to connect to vector store. If you are using an external vector store, "
+                                "ensure that Marqo is configured properly for this. See "
+                                f"{documentation.configuring_marqo()} for more details. Error: {e}"
                             )
                     except Exception as e:
                         logger.error(f'Unexpected error in index cache refresh thread: {e}')
