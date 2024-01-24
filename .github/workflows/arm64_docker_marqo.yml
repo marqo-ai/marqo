@@ -113,7 +113,7 @@ jobs:
         run: |
           # Set up conf file
           echo 'export MARQO_API_TESTS_ROOT="${{ github.workspace }}"' >> conf
-          
+          def test_filter_on_large_integer_and_float(self
       - name: Run Integration Tests - ARM64 Docker Marqo
         run: |
           export MQ_API_TEST_BRANCH=$(echo "${GITHUB_REF}" | cut -d'/' -f3-)

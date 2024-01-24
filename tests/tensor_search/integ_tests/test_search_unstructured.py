@@ -1182,7 +1182,7 @@ class TestSearchUnstructured(MarqoTestCase):
             {'long_field_1': -1, '_id': '1', "search_field": "some text"},  # small negative integer
             # large positive integer that can't be handled by int
             {'long_field_1': 100232142864, '_id': '2', "search_field": "some text"},
-            # large positive integer that can't be handled by int
+            # large negative integer that can't be handled by int
             {'long_field_1': -923217213, '_id': '3', "search_field": "some text"},
             # large positive integer mathematical expression
             {'double_field_1': 10000000000.0, '_id': '4', "search_field": "some text"},
