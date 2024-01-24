@@ -11,7 +11,7 @@ from marqo.vespa.models import VespaDocument
 from marqo.vespa.vespa_client import VespaClient
 from tests.marqo_test import AsyncMarqoTestCase
 
-@unittest.skip
+
 class TestFeedDocumentAsync(AsyncMarqoTestCase):
     TEST_SCHEMA = "test_vespa_client"
     TEST_CLUSTER = "content_default"
@@ -23,6 +23,7 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
 
         self.pyvespa_client.delete_all_docs(self.TEST_CLUSTER, self.TEST_SCHEMA)
 
+    @unittest.skip
     def _base_test_feed_batch_successful(self, func, batch):
         batch_ids = [doc.id for doc in batch]
 
@@ -40,6 +41,7 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
         self.assertEqual(ids, batch_ids)
         self.assertEqual(messages, [None] * len(batch))
 
+    @unittest.skip
     def test_feed_batch_successful(self):
         documents = [
             VespaDocument(id="doc1", fields={"title": "Title 1", "contents": "Content 1"}),
@@ -48,11 +50,13 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
 
         self._base_test_feed_batch_successful(self.client.feed_batch, documents)
 
+    @unittest.skip
     def test_feed_batch_emptyBatch_successful(self):
         documents = []
 
         self._base_test_feed_batch_successful(self.client.feed_batch, documents)
 
+    @unittest.skip
     def test_feed_batch_invalidDoc_successful(self):
         documents = [
             VespaDocument(id="doc1", fields={"title": "Title 1", "contents": "Content 1"}),
@@ -74,6 +78,7 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
         self.assertIsNone(messages[0])
         self.assertIsNotNone(messages[1])
 
+    @unittest.skip
     def test_feed_batch_invalidFeedUrl_fails(self):
         feed_client = VespaClient("http://localhost:8080", "http://localhost:8000",
                                   "http://localhost:8080", "content_default")
@@ -85,6 +90,7 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
         with self.assertRaises(VespaError):
             feed_client.feed_batch(documents, self.TEST_SCHEMA)
 
+    @unittest.skip
     @patch.object(concurrency, "_run_coroutine_in_thread", wraps=concurrency._run_coroutine_in_thread)
     async def test_feed_batch_existingEventLoop_successful(self, mock_executor):
         """Test that feed_batch works when an event loop is already running and runs in a new thread"""
@@ -97,6 +103,7 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
 
         mock_executor.assert_called_once()
 
+    @unittest.skip
     def test_feed_batch_noEventLoop_successful(self):
         """Test that feed_batch works when no event loop is running and doesn't use a new thread"""
 
@@ -113,6 +120,7 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
 
         run()
 
+    @unittest.skip
     def test_feed_batch_sync_successful(self):
         documents = [
             VespaDocument(id="doc1", fields={"title": "Title 1", "contents": "Content 1"}),
@@ -121,11 +129,13 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
 
         self._base_test_feed_batch_successful(self.client.feed_batch_sync, documents)
 
+    @unittest.skip
     def test_feed_batch_sync_emptyBatch_successful(self):
         documents = []
 
         self._base_test_feed_batch_successful(self.client.feed_batch_sync, documents)
 
+    @unittest.skip
     def test_feed_batch_multithreaded_successful(self):
         documents = [
             VespaDocument(id="doc1", fields={"title": "Title 1", "contents": "Content 1"}),
@@ -134,11 +144,13 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
 
         self._base_test_feed_batch_successful(self.client.feed_batch_multithreaded, documents)
 
+    @unittest.skip
     def test_feed_batch_multithreaded_emptyBatch_successful(self):
         documents = []
 
         self._base_test_feed_batch_successful(self.client.feed_batch_multithreaded, documents)
 
+    @unittest.skip
     def test_delete_document_successful(self):
         documents = [
             {"id": "doc1", "fields": {"title": "Title 1", "contents": "Content 1"}},
@@ -160,6 +172,7 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
 
         self.assertEqual(status, [{"doc1": 404}, {"doc2": 200}])
 
+    @unittest.skip
     def test_delete_document_notFound_successful(self):
         documents = [
             {"id": "doc1", "fields": {"title": "Title 1", "contents": "Content 1"}},
@@ -181,6 +194,7 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
 
         self.assertEqual(status, [{"docx": 404}, {"doc1": 200}])
 
+    @unittest.skip
     def test_query_found_successful(self):
         documents = [
             {"id": "doc1", "fields": {"title": "Title 1", "contents": "Content 1"}},
@@ -203,6 +217,7 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
         self.assertEqual(titles, {"Title 1"})
         self.assertEqual(contents, {"Content 1", "Content 1.1"})
 
+    @unittest.skip
     def test_query_notFound_successful(self):
         documents = [
             {"id": "doc1", "fields": {"title": "Title 1", "contents": "Content 1"}},
@@ -218,6 +233,7 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
 
         self.assertEqual(len(result.root.children), 0)
 
+    @unittest.skip
     def test_query_invalidQueryUrl_fails(self):
         query_client = VespaClient("http://localhost:8080", "http://localhost:8080",
                                    "http://localhost:8000", "content_default")
@@ -227,6 +243,7 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
                 yql="select * from sources * where title contains 'Title 1';"
             )
 
+    @unittest.skip
     @patch.object(httpx, "get", wraps=httpx.get)
     @patch.object(httpx, "post", wraps=httpx.post)
     def test_download_application_successful(self, mock_post, mock_get):
@@ -239,6 +256,7 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
         self.assertTrue(os.path.isfile(os.path.join(app, "schemas", "test_vespa_client.sd")),
                         "test_vespa_client.sd does not exist or is not a file")
 
+    @unittest.skip
     def test_download_application_createSessionError_fails(self):
         """
         Test that download_application fails when session creation fails
@@ -254,6 +272,7 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
             with self.assertRaises(VespaError):
                 self.client.download_application()
 
+    @unittest.skip
     def test_download_application_downloadError_fails(self):
         original_get = httpx.Client.get
 
@@ -266,6 +285,7 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
             with self.assertRaises(VespaError):
                 self.client.download_application()
 
+    @unittest.skip
     def test_deploy_application_successful(self):
         """
         Test that deploy_application works. To ensure we're not changing our local Vespa, we download the current
@@ -293,10 +313,12 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
             mock_post.assert_called_once()
             self.assertTrue('prepareandactivate' in mock_post.call_args[0][0])
 
+    @unittest.skip
     def test_deploy_application_invalidAppPath_fails(self):
         with self.assertRaises(VespaError):
             self.client.deploy_application("/invalid/path")
 
+    @unittest.skip
     def test_deploy_application_invalidApp_fails(self):
         with self.assertRaises(VespaError):
             self.client.deploy_application(os.path.abspath(os.path.curdir))
