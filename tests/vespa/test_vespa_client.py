@@ -48,7 +48,6 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
 
         self._base_test_feed_batch_successful(self.client.feed_batch, documents)
 
-    @unittest.skip
     def test_feed_batch_emptyBatch_successful(self):
         documents = []
 
