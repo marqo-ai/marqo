@@ -42,7 +42,7 @@ class IndexManagement:
         }
         '''
     )
-    _MARQO_QUERY_PROFILE_TEMPLATE = textwrap.dedent(
+    _DEFAULT_QUERY_PROFILE_TEMPLATE = textwrap.dedent(
         '''
         <query-profile id="default">
             <field name="maxHits">1000</field>
@@ -283,7 +283,7 @@ class IndexManagement:
         # For Marqo 2.1+, recording Marqo version is the final stage of configuration, and its absence
         # indicates an incomplete configuration (e.g., interrupted configuration). However, for Marqo 2.0.x,
         # Marqo version is not recorded. Marqo 2.0.x can be detected by an existing Marqo settings schema,
-        # but no Marqo query profile
+        # but no default query profile
         settings_schema_exists = os.path.exists(os.path.join(app, 'schemas', f'{self._MARQO_SETTINGS_SCHEMA_NAME}.sd'))
         query_profile_exists = os.path.exists(
             os.path.join(app, 'search/query-profiles', 'default.xml')
@@ -316,7 +316,7 @@ class IndexManagement:
             True if configuration was added, False if all components already existed
         """
         added_settings_schema = self._add_marqo_settings_schema(app)
-        added_query_profile = self._add_marqo_query_profile(app)
+        added_query_profile = self._add_default_query_profile(app)
 
         return added_settings_schema or added_query_profile
 
@@ -344,9 +344,9 @@ class IndexManagement:
             return True
         return False
 
-    def _add_marqo_query_profile(self, app: str) -> bool:
+    def _add_default_query_profile(self, app: str) -> bool:
         """
-        Create the Marqo query profile if it does not exist.
+        Create the default query profile if it does not exist.
         Args:
             app: Path to Vespa application package
 
@@ -355,9 +355,9 @@ class IndexManagement:
         """
         profile_path = os.path.join(app, 'search/query-profiles', 'default.xml')
         if not os.path.exists(profile_path):
-            logger.debug('Marqo query profile does not exist. Creating it')
+            logger.debug('Default query profile does not exist. Creating it')
 
-            query_profile = self._MARQO_QUERY_PROFILE_TEMPLATE
+            query_profile = self._DEFAULT_QUERY_PROFILE_TEMPLATE
             os.makedirs(os.path.dirname(profile_path), exist_ok=True)
             with open(profile_path, 'w') as f:
                 f.write(query_profile)

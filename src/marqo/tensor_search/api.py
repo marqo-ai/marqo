@@ -25,6 +25,7 @@ from marqo.tensor_search.on_start_script import on_start
 from marqo.tensor_search.telemetry import RequestMetricsStore, TelemetryMiddleware
 from marqo.tensor_search.throttling.redis_throttle import throttle
 from marqo.tensor_search.web import api_validation, api_utils
+from marqo.upgrades.upgrade import UpgradeRunner
 from marqo.vespa.vespa_client import VespaClient
 
 logger = get_logger(__name__)
@@ -353,6 +354,14 @@ def delete_all_documents(index_name: str, marqo_config: config.Config = Depends(
     document_count: int = marqo_config.document.delete_all_docs(index_name=index_name)
 
     return {"documentCount": document_count}
+
+
+@app.post("/upgrade")
+@utils.enable_upgrade_api()
+def upgrade_marqo(marqo_config: config.Config = Depends(get_config)):
+    """An internal API used for testing processes. Not to be used by users."""
+    upgrade_runner = UpgradeRunner(marqo_config.vespa_client, marqo_config.index_management)
+    upgrade_runner.upgrade()
 
 
 if __name__ == "__main__":
