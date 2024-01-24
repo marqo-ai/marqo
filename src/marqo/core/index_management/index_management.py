@@ -38,6 +38,23 @@ class IndexManagement:
     def __init__(self, vespa_client: VespaClient):
         self.vespa_client = vespa_client
 
+    def create_settings_schema(self) -> bool:
+        """
+        Create the Marqo settings schema if it does not exist.
+
+        Returns:
+            True if schema was created, False if it already existed
+        """
+        app = self.vespa_client.download_application()
+        settings_schema_created = self._add_marqo_settings_schema(app)
+
+        if settings_schema_created:
+            self.vespa_client.deploy_application(app)
+            self.vespa_client.wait_for_application_convergence()
+            return True
+
+        return False
+
     def create_index(self, marqo_index_request: MarqoIndexRequest) -> MarqoIndex:
         """
         Create a Marqo index.
@@ -53,7 +70,7 @@ class IndexManagement:
             InvalidVespaApplicationError: If Vespa application is invalid after applying the index
         """
         app = self.vespa_client.download_application()
-        settings_schema_created = self._create_marqo_settings_schema(app)
+        settings_schema_created = self._add_marqo_settings_schema(app)
 
         if not settings_schema_created and self.index_exists(marqo_index_request.name):
             raise IndexExistsError(f"Index {marqo_index_request.name} already exists")
@@ -88,7 +105,7 @@ class IndexManagement:
             InvalidVespaApplicationError: If Vespa application is invalid after applying the indexes
         """
         app = self.vespa_client.download_application()
-        settings_schema_created = self._create_marqo_settings_schema(app)
+        settings_schema_created = self._add_marqo_settings_schema(app)
 
         if not settings_schema_created:
             for index in marqo_index_requests:
@@ -224,7 +241,7 @@ class IndexManagement:
         except IndexNotFoundError:
             return False
 
-    def _create_marqo_settings_schema(self, app: str) -> bool:
+    def _add_marqo_settings_schema(self, app: str) -> bool:
         """
         Create the Marqo settings schema if it does not exist.
         Args:
