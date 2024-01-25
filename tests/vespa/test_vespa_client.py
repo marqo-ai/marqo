@@ -97,7 +97,6 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
 
         mock_executor.assert_called_once()
 
-    @unittest.skip
     def test_feed_batch_noEventLoop_successful(self):
         """Test that feed_batch works when no event loop is running and doesn't use a new thread"""
 
