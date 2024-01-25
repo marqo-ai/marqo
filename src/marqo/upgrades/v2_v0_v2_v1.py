@@ -19,8 +19,9 @@ class V2V0V2V1(Upgrade):
     2. Add Marqo version to Marqo settings schema
     """
 
-    def __init__(self, vespa_client: VespaClient):
+    def __init__(self, vespa_client: VespaClient, index_management: IndexManagement):
         self.vespa_client = vespa_client
+        self.index_management = index_management
         self.settings_schema = IndexManagement._MARQO_SETTINGS_SCHEMA_NAME
         self.config_id = IndexManagement._MARQO_CONFIG_DOC_ID
         self.default_query_profile = IndexManagement._DEFAULT_QUERY_PROFILE_TEMPLATE
@@ -81,8 +82,7 @@ class V2V0V2V1(Upgrade):
             )
 
     def _verify_marqo_version(self):
-        index_management = IndexManagement(self.vespa_client)
-        configured_version = index_management.get_marqo_version()
+        configured_version = self.index_management.get_marqo_version()
         if configured_version != version.get_version():
             raise api_exceptions.InternalError(
                 f"Marqo version in config is {configured_version}, but Marqo version is {version.get_version()}. "
