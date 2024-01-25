@@ -174,7 +174,7 @@ Now we have the prepared documents and prompt, we can call GPT using Langchain. 
 
 ```python
 from langchain.chains import LLMChain
-llm = OpenAI(temperature=0.9,  model_name = "text-davinci-003")
+llm = OpenAI(temperature=0.9)
 chain_qa = LLMChain(llm=llm, prompt=prompt)
 llm_results = chain_qa({"summaries": docs, "question": results['query']}, return_only_outputs=True)
 ```
@@ -292,7 +292,7 @@ Now we have the prepared documents and prompt, we can call GPT using Langchain. 
 
 ```python
 from langchain.chains import LLMChain
-lm = OpenAI(temperature=0.9,  model_name = "text-davinci-003")
+lm = OpenAI(temperature=0.9)
 chain_qa = LLMChain(llm=llm, prompt=prompt)
 llm_results = chain_qa({"summaries": docs, "conversation": "wow, what are some of your favorite things to do?", return_only_outputs=True)
 ```

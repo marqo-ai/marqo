@@ -69,7 +69,7 @@ pprint.pprint(results['hits'][1]['_highlights'])  # [1] returns the second hit
 
 # let's create another query and perform tensor search on a particular field
 query = 'water issues in US'
-results = mq.index(index_name).search(query, searchable_attributes=['description'])
+results = mq.index(index_name).search(query)
 
 print("Result 3 -", end=" ")
 pprint.pprint(results['hits'][0]['_highlights'])
