@@ -218,7 +218,6 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
 
         self.assertEqual(len(result.root.children), 0)
 
-    @unittest.skip
     def test_query_invalidQueryUrl_fails(self):
         query_client = VespaClient("http://localhost:8080", "http://localhost:8080",
                                    "http://localhost:8000", "content_default")
