@@ -266,7 +266,6 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
             with self.assertRaises(VespaError):
                 self.client.download_application()
 
-    @unittest.skip
     def test_deploy_application_successful(self):
         """
         Test that deploy_application works. To ensure we're not changing our local Vespa, we download the current
