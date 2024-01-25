@@ -365,7 +365,7 @@ def upgrade_marqo(marqo_config: config.Config = Depends(get_config)):
     upgrade_runner.upgrade()
 
 
-@app.post("/upgrade")
+@app.post("/rollback")
 @utils.enable_upgrade_api()
 def rollback_marqo(req: RollbackRequest, marqo_config: config.Config = Depends(get_config)):
     """An internal API used for testing processes. Not to be used by users."""
