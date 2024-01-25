@@ -69,7 +69,7 @@ if __name__ == "__main__":
     
     # https://marqo.pages.dev/0.0.21/API-Reference/search/
     query = "green shirt"
-    res = client.index(index_name).search(query, searchable_attributes=['s3_http'], device=device, limit=10)
+    res = client.index(index_name).search(query, device=device, limit=10)
     
     
     #######################################################################
@@ -77,7 +77,7 @@ if __name__ == "__main__":
     #######################################################################
 
     query = "cozy sweater, xmas, festive, holidays"    
-    res = client.index(index_name).search(query, searchable_attributes=['s3_http'], device=device, limit=10)
+    res = client.index(index_name).search(query, device=device, limit=10)
 
     #######################################################################
     ############        Searching with semantic filters        ############
@@ -85,7 +85,7 @@ if __name__ == "__main__":
     
     # https://marqo.pages.dev/0.0.21/API-Reference/search/#query-q
     query = {"green shirt":1.0, "short sleeves":1.0}
-    res = client.index(index_name).search(query, searchable_attributes=['s3_http'], device=device, limit=10)
+    res = client.index(index_name).search(query, device=device, limit=10)
 
     
     #######################################################################
@@ -93,7 +93,7 @@ if __name__ == "__main__":
     #######################################################################
 
     query = {"green shirt":1.0, "short sleeves":1.0, "buttons":-1.0}
-    res = client.index(index_name).search(query, searchable_attributes=['s3_http'], device=device, limit=10)
+    res = client.index(index_name).search(query, device=device, limit=10)
 
     #######################################################################
     ############        Searching with images                  ############
@@ -101,7 +101,7 @@ if __name__ == "__main__":
 
     image_context_url = "https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/red_backpack.jpg"
     query = {image_context_url:1.0}
-    res = client.index(index_name).search(query, searchable_attributes=['s3_http'], device=device, limit=10)
+    res = client.index(index_name).search(query, device=device, limit=10)
     
     #######################################################################
     ############        Searching with multi-modal queries     ############
@@ -111,13 +111,13 @@ if __name__ == "__main__":
     image_context_url = "https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/71iPk9lfhML._SL1500_.jpg"
 
     query = {"backpack":1.0, image_context_url:1.0}
-    res = client.index(index_name).search(query, searchable_attributes=['s3_http'], device=device, limit=10)
+    res = client.index(index_name).search(query, device=device, limit=10)
 
     # trees/hiking
     image_context_url = "https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/trees.jpg"
 
     query = {"backpack":1.0, image_context_url:1.0}
-    res = client.index(index_name).search(query, searchable_attributes=['s3_http'], device=device, limit=10)
+    res = client.index(index_name).search(query, device=device, limit=10)
 
     #######################################################################
     ############        Searching with ranking                 ############
@@ -134,13 +134,13 @@ if __name__ == "__main__":
             {"field_name": "aesthetic_score", "weight": 0.02}]
         }
     
-    res = client.index(index_name).search(query, searchable_attributes=['s3_http'], device=device, limit=10, score_modifiers=score_modifiers)
+    res = client.index(index_name).search(query, device=device, limit=10, score_modifiers=score_modifiers)
 
     # now get the aggregate aesthetic score
     print(sum(r['aesthetic_score'] for r in res['hits']))
     
     # and compare to the non ranking version
-    res = client.index(index_name).search(query, searchable_attributes=['s3_http'], device=device, limit=10)
+    res = client.index(index_name).search(query, device=device, limit=10)
 
     print(sum(r['aesthetic_score'] for r in res['hits']))
 
@@ -163,26 +163,20 @@ if __name__ == "__main__":
 
     # https://marqo.pages.dev/0.0.21/Advanced-Usage/document_fields/#multimodal-combination-object
     # create the document that will be created from multiple images
-    document1 = {"_id":"1",
-                "multimodal": 
-                    {
-                        "top_1":"https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/blue_backpack.jpg", 
-                        "top_2":"https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/dark_backpack.jpeg", 
-                        "top_3":'https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/green+_backpack.jpg',
-                        "top_4":"https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/red_backpack.jpg"
-                    }
-               }
+    document1 = {"_id": "1",
+                 "top_1": "https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/blue_backpack.jpg",
+                 "top_2": "https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/dark_backpack.jpeg",
+                 "top_3": 'https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/green+_backpack.jpg',
+                 "top_4": "https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/red_backpack.jpg"
+                 }
 
     # create the document that will be created from multiple images
-    document2 = {"_id":"2",
-                "multimodal": 
-                    {
-                        "top_1":"https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/office_1.jpg", 
-                        "top_2":"https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/office2.webp", 
-                        "top_3":'https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/office_3.jpeg',
-                        "top_4":"https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/office_4.jpg"
-                    }
-               }
+    document2 = {"_id": "2",
+                 "top_1": "https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/office_1.jpg",
+                 "top_2": "https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/office2.webp",
+                 "top_3": 'https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/office_3.jpeg',
+                 "top_4": "https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/office_4.jpg"
+                 }
 
     # https://marqo.pages.dev/0.0.21/API-Reference/mappings/
     # define how we want to comnbined
@@ -231,9 +225,9 @@ if __name__ == "__main__":
 
     # now search
     query = {"backpack":1.0}
-    res1 = client.index(index_name).search(query, searchable_attributes=['s3_http'], device=device, limit=10, context=context1)
+    res1 = client.index(index_name).search(query, device=device, limit=10, context=context1)
 
-    res2 = client.index(index_name).search(query, searchable_attributes=['s3_http'], device=device, limit=10, context=context2)
+    res2 = client.index(index_name).search(query, device=device, limit=10, context=context2)
     
     
     #######################################################################
@@ -250,13 +244,6 @@ if __name__ == "__main__":
 
     res = client.create_index(index_name_mm_objects, settings_dict=settings) 
     print(res)
-    
-    # now create the multi-modal field in the documents
-    for doc in documents:
-        doc['multimodal'] = {
-                            'blip_large_caption':doc['blip_large_caption'],
-                            's3_http':doc['s3_http'],
-                            }
 
     # define how we want to combine the fields
     mappings = {"multimodal": 
@@ -273,4 +260,4 @@ if __name__ == "__main__":
 
     # now search
     query = "red shawl"
-    res = client.index(index_name_mm_objects).search(query, searchable_attributes=['multimodal'], device=device, limit=10)
+    res = client.index(index_name_mm_objects).search(query, device=device, limit=10)

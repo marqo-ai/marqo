@@ -341,7 +341,7 @@ Now the images are indexed, we can start [searching](https://marqo.pages.dev/0.0
 
 ```python
 query = "green shirt"
-res = client.index(index_name).search(query, searchable_attributes=['s3_http'], device=device, limit=10)
+res = client.index(index_name).search(query, device=device, limit=10)
 ```
 
 ###  3.7 Searching as Prompting
@@ -350,7 +350,7 @@ Like in the examples above, it is easy to do more specific searches by adopting 
 
 ```python
 query = "cozy sweater, xmas, festive, holidays"    
-res = client.index(index_name).search(query, searchable_attributes=['s3_http'], device=device, limit=10)
+res = client.index(index_name).search(query, device=device, limit=10)
 ```
 
 ###  3.8 Searching with Semantic Filters
@@ -359,7 +359,7 @@ Now we can extend the searching to use multi-part queries. These can act as "sem
 
 ```python
 query = {"green shirt":1.0, "short sleeves":1.0}
-res = client.index(index_name).search(query, searchable_attributes=['s3_http'], device=device, limit=10)
+res = client.index(index_name).search(query, device=device, limit=10)
 ```
 
 ###  3.9 Searching with Negation
@@ -368,7 +368,7 @@ In addition to additive terms, negation can be used. Here we remove buttons from
 
 ```python
 query = {"green shirt":1.0, "short sleeves":1.0, "buttons":-1.0}
-res = client.index(index_name).search(query, searchable_attributes=['s3_http'], device=device, limit=10)
+res = client.index(index_name).search(query, device=device, limit=10)
 ```
 
 ###  3.10 Searching with Images
@@ -378,7 +378,7 @@ In addition to text, searching can be done with images alone.
 ```python
 image_context_url = "https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/red_backpack.jpg"
 query = {image_context_url:1.0}
-res = client.index(index_name).search(query, searchable_attributes=['s3_http'], device=device, limit=10)
+res = client.index(index_name).search(query, device=device, limit=10)
 ```
 
 ###  3.11 Searching with Multimodal Queries
@@ -390,13 +390,13 @@ The multi-part queries can span both text and images.
 image_context_url = "https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/71iPk9lfhML._SL1500_.jpg"
 
 query = {"backpack":1.0, image_context_url:1.0}
-res = client.index(index_name).search(query, searchable_attributes=['s3_http'], device=device, limit=10)
+res = client.index(index_name).search(query, device=device, limit=10)
 
 # trees/hiking
 image_context_url = "https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/trees.jpg"
 
 query = {"backpack":1.0, image_context_url:1.0}
-res = client.index(index_name).search(query, searchable_attributes=['s3_http'], device=device, limit=10)
+res = client.index(index_name).search(query, device=device, limit=10)
 ```
 
 ###  3.12 Searching with Ranking
@@ -414,13 +414,13 @@ score_modifiers = {
             {"field_name": "aesthetic_score", "weight": 0.02}]
         }
     
-res = client.index(index_name).search(query, searchable_attributes=['s3_http'], device=device, limit=10, score_modifiers=score_modifiers)
+res = client.index(index_name).search(query, device=device, limit=10, score_modifiers=score_modifiers)
 
 # now get the aggregate aesthetic score
 print(sum(r['aesthetic_score'] for r in res['hits']))
     
 # and compare to the non ranking version
-res = client.index(index_name).search(query, searchable_attributes=['s3_http'], device=device, limit=10)
+res = client.index(index_name).search(query, device=device, limit=10)
 
 print(sum(r['aesthetic_score'] for r in res['hits']))
 ```
@@ -445,26 +445,21 @@ Then we [construct the objects](https://marqo.pages.dev/0.0.21/Advanced-Usage/do
 
 ```python
 # create the document that will be created from multiple images
-document1 = {"_id":"1",
-                "multimodal": 
-                    {
-                        "top_1":"https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/blue_backpack.jpg", 
-                        "top_2":"https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/dark_backpack.jpeg", 
-                        "top_3":'https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/green+_backpack.jpg',
-                        "top_4":"https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/red_backpack.jpg"
-                    }
-               }
+document1 = {"_id": "1",
+			 "top_1": "https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/blue_backpack.jpg",
+			 "top_2": "https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/dark_backpack.jpeg",
+			 "top_3": 'https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/green+_backpack.jpg',
+			 "top_4": "https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/red_backpack.jpg"
+
+			 }
 
 # create the document that will be created from multiple images
-document2 = {"_id":"2",
-                "multimodal": 
-                    {
-                        "top_1":"https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/office_1.jpg", 
-                        "top_2":"https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/office2.webp", 
-                        "top_3":'https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/office_3.jpeg',
-                        "top_4":"https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/office_4.jpg"
-                    }
-               }
+document2 = {"_id": "2",
+			 "top_1": "https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/office_1.jpg",
+			 "top_2": "https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/office2.webp",
+			 "top_3": 'https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/office_3.jpeg',
+			 "top_4": "https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/office_4.jpg"
+			 }
 
 ```
 
@@ -523,9 +518,9 @@ context2 = {"tensor":
 
 # now search
 query = {"backpack":1.0}
-res1 = client.index(index_name).search(query, searchable_attributes=['s3_http'], device=device, limit=10, context=context1)
+res1 = client.index(index_name).search(query, device=device, limit=10, context=context1)
     
-res2 = client.index(index_name).search(query, searchable_attributes=['s3_http'], device=device, limit=10, context=context2)
+res2 = client.index(index_name).search(query, device=device, limit=10, context=context2)
 ```
 
 ###  3.14 Indexing as Multimodal Objects
@@ -545,16 +540,6 @@ settings = {
 res = client.create_index(index_name_mm_objects, settings_dict=settings) 
 ```
  
- To index the documents as multimodal objects, we need to create a new field and add in what we want to use. 
-    
- ```python
- # now create the multimodal field in the documents
- for doc in documents:
-     doc['multimodal'] = {
-                            'blip_large_caption':doc['blip_large_caption'],
-                            's3_http':doc['s3_http'],
-                            }
-```
 
 The next step is to index. The only change is an additional mappings object which details how we want to combine the different fields for each document.
 
@@ -580,7 +565,7 @@ Finally we can search in the same way as before.
 
 ```python
 query = "red shawl"
-res = client.index(index_name_mm_objects).search(query, searchable_attributes=['multimodal'], device=device, limit=10)
+res = client.index(index_name_mm_objects).search(query, device=device, limit=10)
 ```
 
 ### 4. Conclusion
