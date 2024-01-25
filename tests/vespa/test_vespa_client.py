@@ -113,7 +113,6 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
 
         run()
 
-    @unittest.skip
     def test_feed_batch_sync_successful(self):
         documents = [
             VespaDocument(id="doc1", fields={"title": "Title 1", "contents": "Content 1"}),
